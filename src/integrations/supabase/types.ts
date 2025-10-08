@@ -111,21 +111,21 @@ export type Database = {
           id: string
           order_item_id: string
           price_at_order: number
-          product_extra_id: string
+          product_extra_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           order_item_id: string
           price_at_order: number
-          product_extra_id: string
+          product_extra_id?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
           order_item_id?: string
           price_at_order?: number
-          product_extra_id?: string
+          product_extra_id?: string | null
         }
         Relationships: [
           {
@@ -150,7 +150,7 @@ export type Database = {
           id: string
           order_id: string
           price_at_order: number
-          product_id: string
+          product_id: string | null
           quantity: number
         }
         Insert: {
@@ -158,7 +158,7 @@ export type Database = {
           id?: string
           order_id: string
           price_at_order: number
-          product_id: string
+          product_id?: string | null
           quantity?: number
         }
         Update: {
@@ -166,7 +166,7 @@ export type Database = {
           id?: string
           order_id?: string
           price_at_order?: number
-          product_id?: string
+          product_id?: string | null
           quantity?: number
         }
         Relationships: [
