@@ -155,6 +155,11 @@ const Comanda = () => {
               setBillOnTheWay(true);
               setTimerSeconds(0);
               toast.success("A conta está a caminho!");
+            } else if (updatedBill.status === "paid") {
+              toast.success("Conta paga! Obrigado pela preferência!");
+              setTimeout(() => {
+                navigate(`/menu/${restaurantSlug}/${tableNumber}`);
+              }, 2000);
             }
           }
         )
