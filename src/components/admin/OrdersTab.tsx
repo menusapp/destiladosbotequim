@@ -5,6 +5,13 @@ import { Clock, Check, ChefHat, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+interface OrderItemExtra {
+  price_at_order: number;
+  product_extras: {
+    name: string;
+  };
+}
+
 interface Order {
   id: string;
   customer_name: string;
@@ -15,10 +22,11 @@ interface Order {
   };
   order_items: {
     quantity: number;
+    price_at_order: number;
     products: {
       name: string;
-      price: number;
     };
+    order_item_extras: OrderItemExtra[];
   }[];
 }
 
@@ -53,7 +61,15 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       .select(`
         *,
         tables!inner(table_number, restaurant_id),
-        order_items(quantity, products(name, price))
+        order_items(
+          quantity,
+          price_at_order,
+          products(name),
+          order_item_extras(
+            price_at_order,
+            product_extras(name)
+          )
+        )
       `)
       .eq("tables.restaurant_id", restaurantId)
       .order("created_at", { ascending: false });
@@ -147,16 +163,28 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
               </div>
 
               <div className="space-y-1">
-                {order.order_items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-sm">
-                    <span>
-                      {item.quantity}x {item.products.name}
-                    </span>
-                    <span className="text-primary font-medium">
-                      R$ {(item.products.price * item.quantity).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
+                {order.order_items.map((item, idx) => {
+                  const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
+                  const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
+                  
+                  return (
+                    <div key={idx} className="space-y-0.5">
+                      <div className="flex justify-between text-sm">
+                        <span>
+                          {item.quantity}x {item.products.name}
+                        </span>
+                        <span className="text-primary font-medium">
+                          R$ {itemTotal.toFixed(2)}
+                        </span>
+                      </div>
+                      {item.order_item_extras && item.order_item_extras.length > 0 && (
+                        <div className="text-xs text-muted-foreground pl-4">
+                          + {item.order_item_extras.map(e => e.product_extras.name).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               {order.status !== "delivered" && (

@@ -93,7 +93,10 @@ const Comanda = () => {
       if (tableError) throw tableError;
       setTableId(tableData.id);
 
-      // Buscar pedidos da mesa
+      // Buscar CPF do cliente do sessionStorage
+      const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+
+      // Buscar apenas pedidos do CPF específico na mesa
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(`
@@ -105,6 +108,7 @@ const Comanda = () => {
           )
         `)
         .eq("table_id", tableData.id)
+        .eq("customer_cpf", customerCPF || "")
         .order("created_at", { ascending: false });
 
       if (ordersError) throw ordersError;
