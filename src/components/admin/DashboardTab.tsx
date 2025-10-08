@@ -165,63 +165,72 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
       });
 
       // Buscar produtos mais vendidos
-      const billIds = bills.map((b) => b.id);
-      
-      // Buscar todas as orders relacionadas às bills pagas
+      // Buscar todas as orders relacionadas às mesas no período das bills pagas
       const { data: ordersData } = await supabase
         .from("orders")
         .select(`
           id,
-          table_id
+          table_id,
+          created_at
         `)
-        .in("table_id", tableIds);
+        .in("table_id", tableIds)
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
 
       if (ordersData) {
         const orderIds = ordersData.map((o) => o.id);
         
-        // Buscar todos os order_items
-        const { data: orderItems } = await supabase
-          .from("order_items")
-          .select(`
-            quantity,
-            price_at_order,
-            products(name)
-          `)
-          .in("order_id", orderIds);
+        if (orderIds.length === 0) {
+          setTopProducts([]);
+        } else {
+          // Buscar todos os order_items
+          const { data: orderItems } = await supabase
+            .from("order_items")
+            .select(`
+              quantity,
+              price_at_order,
+              products(name)
+            `)
+            .in("order_id", orderIds);
 
-        if (orderItems) {
-          // Agrupar por produto
-          const productMap = new Map<string, { quantity: number; revenue: number; price: number }>();
-          
-          orderItems.forEach((item: any) => {
-            const productName = item.products?.name || "Produto excluído";
-            const existing = productMap.get(productName);
+          if (orderItems) {
+            // Agrupar por produto
+            const productMap = new Map<string, { quantity: number; revenue: number; price: number }>();
             
-            if (existing) {
-              existing.quantity += item.quantity;
-              existing.revenue += item.price_at_order * item.quantity;
-            } else {
-              productMap.set(productName, {
-                quantity: item.quantity,
-                revenue: item.price_at_order * item.quantity,
-                price: item.price_at_order,
-              });
-            }
-          });
+            orderItems.forEach((item: any) => {
+              const productName = item.products?.name || "Produto excluído";
+              const existing = productMap.get(productName);
+              
+              if (existing) {
+                existing.quantity += item.quantity;
+                existing.revenue += item.price_at_order * item.quantity;
+              } else {
+                productMap.set(productName, {
+                  quantity: item.quantity,
+                  revenue: item.price_at_order * item.quantity,
+                  price: item.price_at_order,
+                });
+              }
+            });
 
-          // Converter para array e ordenar por quantidade
-          const topProductsList = Array.from(productMap.entries())
-            .map(([name, data]) => ({
-              name,
-              quantity: data.quantity,
-              unitPrice: data.price,
-              totalRevenue: data.revenue,
-            }))
-            .sort((a, b) => b.quantity - a.quantity)
-            .slice(0, 10); // Top 10 produtos
+            // Converter para array e ordenar por quantidade
+            const topProductsList = Array.from(productMap.entries())
+              .map(([name, data]) => ({
+                name,
+                quantity: data.quantity,
+                unitPrice: data.price,
+                totalRevenue: data.revenue,
+              }))
+              .sort((a, b) => b.quantity - a.quantity)
+              .slice(0, 10); // Top 10 produtos
 
-          setTopProducts(topProductsList);
+            setTopProducts(topProductsList);
+          } else {
+            setTopProducts([]);
+          }
         }
+      } else {
+        setTopProducts([]);
       }
     } catch (error) {
       console.error("Erro ao buscar estatísticas:", error);
