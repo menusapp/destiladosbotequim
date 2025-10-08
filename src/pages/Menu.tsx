@@ -7,6 +7,7 @@ import { ShoppingCart, Plus, Minus, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
+import ProductDetailDialog from "@/components/menu/ProductDetailDialog";
 
 interface Product {
   id: string;
@@ -14,6 +15,13 @@ interface Product {
   description: string | null;
   price: number;
   available: boolean;
+  image_url: string | null;
+}
+
+interface ProductExtra {
+  id: string;
+  name: string;
+  price: number;
 }
 
 interface Category {
@@ -29,9 +37,17 @@ interface Restaurant {
   secondary_color: string;
 }
 
+interface CartItemExtra {
+  id: string;
+  name: string;
+  price: number;
+}
+
 interface CartItem {
+  id: string; // ID único para cada item do carrinho
   product: Product;
   quantity: number;
+  extras: CartItemExtra[];
 }
 
 const Menu = () => {
@@ -46,6 +62,9 @@ const Menu = () => {
   const [customerCPF, setCustomerCPF] = useState("");
   const [tableId, setTableId] = useState<string | null>(null);
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
+  const [showProductDialog, setShowProductDialog] = useState(false);
 
   useEffect(() => {
     // Verificar se já tem info do cliente no sessionStorage
@@ -114,30 +133,56 @@ const Menu = () => {
     toast.success("Bem-vindo! Faça seu pedido");
   };
 
-  const addToCart = (product: Product) => {
+  const handleProductClick = async (product: Product) => {
     if (!customerName || !customerCPF) {
       setShowCustomerDialog(true);
       return;
     }
 
+    // Buscar extras do produto
+    const { data: extrasData } = await supabase
+      .from("product_extras")
+      .select("*")
+      .eq("product_id", product.id);
+
+    setSelectedProduct(product);
+    setProductExtras(extrasData || []);
+    setShowProductDialog(true);
+  };
+
+  const addToCart = (product: Product, extras: ProductExtra[]) => {
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+      // Verificar se já existe um item com o mesmo produto e mesmos extras
+      const existing = prev.find((item) => 
+        item.product.id === product.id && 
+        JSON.stringify(item.extras.map(e => e.id).sort()) === JSON.stringify(extras.map(e => e.id).sort())
+      );
+      
       if (existing) {
         return prev.map((item) =>
-          item.product.id === product.id
+          item.id === existing.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      
+      // Criar novo item com ID único
+      return [...prev, { 
+        id: crypto.randomUUID(),
+        product, 
+        quantity: 1, 
+        extras 
+      }];
     });
-    toast.success(`${product.name} adicionado ao carrinho`);
+    
+    const extrasText = extras.length > 0 ? ` com ${extras.length} adicional(is)` : '';
+    toast.success(`${product.name}${extrasText} adicionado ao carrinho`);
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const updateQuantity = (itemId: string, delta: number) => {
     setCart((prev) => {
       const updated = prev.map((item) =>
-        item.product.id === productId
+        item.id === itemId
           ? { ...item, quantity: Math.max(0, item.quantity + delta) }
           : item
       );
@@ -146,7 +191,10 @@ const Menu = () => {
   };
 
   const getCartTotal = () => {
-    return cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+    return cart.reduce((sum, item) => {
+      const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+      return sum + (item.product.price + extrasTotal) * item.quantity;
+    }, 0);
   };
 
   const handleSendOrder = async () => {
@@ -175,19 +223,36 @@ const Menu = () => {
 
       if (orderError) throw orderError;
 
-      // Criar itens do pedido
-      const orderItems = cart.map((item) => ({
-        order_id: order.id,
-        product_id: item.product.id,
-        quantity: item.quantity,
-        price_at_order: item.product.price,
-      }));
+      // Criar itens do pedido com extras
+      for (const item of cart) {
+        const { data: orderItem, error: itemError } = await supabase
+          .from("order_items")
+          .insert({
+            order_id: order.id,
+            product_id: item.product.id,
+            quantity: item.quantity,
+            price_at_order: item.product.price,
+          })
+          .select()
+          .single();
 
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(orderItems);
+        if (itemError) throw itemError;
 
-      if (itemsError) throw itemsError;
+        // Inserir extras do item
+        if (item.extras.length > 0) {
+          const orderItemExtras = item.extras.map((extra) => ({
+            order_item_id: orderItem.id,
+            product_extra_id: extra.id,
+            price_at_order: extra.price,
+          }));
+
+          const { error: extrasError } = await supabase
+            .from("order_item_extras")
+            .insert(orderItemExtras);
+
+          if (extrasError) throw extrasError;
+        }
+      }
 
       toast.success("Pedido enviado! Aguarde o atendimento");
       setCart([]);
@@ -218,6 +283,14 @@ const Menu = () => {
       <CustomerInfoDialog
         open={showCustomerDialog}
         onSubmit={handleCustomerInfoSubmit}
+      />
+
+      <ProductDetailDialog
+        product={selectedProduct}
+        extras={productExtras}
+        open={showProductDialog}
+        onClose={() => setShowProductDialog(false)}
+        onAddToCart={addToCart}
       />
 
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background pb-24">
@@ -253,14 +326,22 @@ const Menu = () => {
                 {category.products.map((product) => (
                   <div
                     key={product.id}
-                    className="flex items-start justify-between p-3 border rounded-lg hover:bg-secondary/50 transition-colors"
+                    className="flex items-start gap-3 p-3 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+                    onClick={() => product.available && handleProductClick(product)}
                   >
+                    {product.image_url && (
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-20 h-20 object-cover rounded"
+                      />
+                    )}
                     <div className="flex-1">
                       <div className="flex items-start justify-between">
                         <div>
                           <p className="font-semibold">{product.name}</p>
                           {product.description && (
-                            <p className="text-sm text-muted-foreground mt-1">
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                               {product.description}
                             </p>
                           )}
@@ -273,15 +354,6 @@ const Menu = () => {
                         R$ {product.price.toFixed(2)}
                       </p>
                     </div>
-                    {product.available && (
-                      <Button
-                        size="sm"
-                        onClick={() => addToCart(product)}
-                        className="ml-4"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    )}
                   </div>
                 ))}
               </CardContent>
@@ -294,36 +366,54 @@ const Menu = () => {
           <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-lg p-4">
             <div className="container mx-auto space-y-3">
               <div className="space-y-2 max-h-32 overflow-y-auto">
-                {cart.map((item) => (
-                  <div
-                    key={item.product.id}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span className="flex-1">{item.product.name}</span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateQuantity(item.product.id, -1)}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-8 text-center font-medium">
-                        {item.quantity}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateQuantity(item.product.id, 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-20 text-right font-semibold">
-                        R$ {(item.product.price * item.quantity).toFixed(2)}
-                      </span>
+                {cart.map((item) => {
+                  const extrasTotal = item.extras.reduce((sum, e) => sum + e.price, 0);
+                  const itemTotal = (item.product.price + extrasTotal) * item.quantity;
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-start justify-between text-sm border-b pb-2"
+                    >
+                      <div className="flex-1">
+                        <span className="font-medium">{item.product.name}</span>
+                        {item.extras.length > 0 && (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            + {item.extras.map(e => e.name).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateQuantity(item.id, -1);
+                          }}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-8 text-center font-medium">
+                          {item.quantity}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateQuantity(item.id, 1);
+                          }}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-20 text-right font-semibold">
+                          R$ {itemTotal.toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="flex items-center justify-between pt-2 border-t">
                 <span className="font-bold">Total:</span>

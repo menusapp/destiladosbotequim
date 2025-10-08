@@ -105,6 +105,45 @@ export type Database = {
           },
         ]
       }
+      order_item_extras: {
+        Row: {
+          created_at: string | null
+          id: string
+          order_item_id: string
+          price_at_order: number
+          product_extra_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          order_item_id: string
+          price_at_order: number
+          product_extra_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          order_item_id?: string
+          price_at_order?: number
+          product_extra_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_extras_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_extras_product_extra_id_fkey"
+            columns: ["product_extra_id"]
+            isOneToOne: false
+            referencedRelation: "product_extras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string | null
@@ -181,6 +220,41 @@ export type Database = {
             columns: ["table_id"]
             isOneToOne: false
             referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_extras: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          price: number
+          product_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          price?: number
+          product_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          price?: number
+          product_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_extras_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]

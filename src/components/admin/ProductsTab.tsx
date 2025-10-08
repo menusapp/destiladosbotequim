@@ -29,11 +29,18 @@ interface Product {
   price: number;
   category_id: string;
   available: boolean;
+  image_url: string | null;
 }
 
 interface Category {
   id: string;
   name: string;
+}
+
+interface ProductExtra {
+  id: string;
+  name: string;
+  price: number;
 }
 
 const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
@@ -46,6 +53,11 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
   const [productDescription, setProductDescription] = useState("");
   const [productPrice, setProductPrice] = useState("");
   const [productCategoryId, setProductCategoryId] = useState("");
+  const [productImage, setProductImage] = useState<File | null>(null);
+  const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
+  const [extras, setExtras] = useState<ProductExtra[]>([]);
+  const [extraName, setExtraName] = useState("");
+  const [extraPrice, setExtraPrice] = useState("");
 
   useEffect(() => {
     fetchCategories();
@@ -80,6 +92,25 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
     setProducts(data || []);
   };
 
+  const handleAddExtra = () => {
+    if (!extraName || !extraPrice) {
+      toast.error("Preencha nome e preço do adicional");
+      return;
+    }
+    
+    setExtras([...extras, {
+      id: crypto.randomUUID(),
+      name: extraName,
+      price: parseFloat(extraPrice)
+    }]);
+    setExtraName("");
+    setExtraPrice("");
+  };
+
+  const handleRemoveExtra = (id: string) => {
+    setExtras(extras.filter(e => e.id !== id));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -88,11 +119,35 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
       return;
     }
 
+    let imageUrl = productImageUrl;
+
+    // Upload da imagem se houver
+    if (productImage) {
+      const fileExt = productImage.name.split('.').pop();
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, productImage);
+
+      if (uploadError) {
+        toast.error("Erro ao fazer upload da imagem");
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+      
+      imageUrl = publicUrl;
+    }
+
     const productData = {
       name: productName,
       description: productDescription,
       price: parseFloat(productPrice),
       category_id: productCategoryId,
+      image_url: imageUrl,
     };
 
     if (editingProduct) {
@@ -106,13 +161,39 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
         return;
       }
 
+      // Deletar extras antigos e inserir novos
+      await supabase.from("product_extras").delete().eq("product_id", editingProduct.id);
+      
+      if (extras.length > 0) {
+        const extrasData = extras.map(extra => ({
+          product_id: editingProduct.id,
+          name: extra.name,
+          price: extra.price
+        }));
+        await supabase.from("product_extras").insert(extrasData);
+      }
+
       toast.success("Produto atualizado!");
     } else {
-      const { error } = await supabase.from("products").insert(productData);
+      const { data: newProduct, error } = await supabase
+        .from("products")
+        .insert(productData)
+        .select()
+        .single();
 
       if (error) {
         toast.error("Erro ao criar produto");
         return;
+      }
+
+      // Inserir extras
+      if (extras.length > 0 && newProduct) {
+        const extrasData = extras.map(extra => ({
+          product_id: newProduct.id,
+          name: extra.name,
+          price: extra.price
+        }));
+        await supabase.from("product_extras").insert(extrasData);
       }
 
       toast.success("Produto criado!");
@@ -136,12 +217,21 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
     fetchProducts();
   };
 
-  const openEditDialog = (product: Product) => {
+  const openEditDialog = async (product: Product) => {
     setEditingProduct(product);
     setProductName(product.name);
     setProductDescription(product.description || "");
     setProductPrice(product.price.toString());
     setProductCategoryId(product.category_id);
+    setProductImageUrl(product.image_url);
+    
+    // Buscar extras do produto
+    const { data: extrasData } = await supabase
+      .from("product_extras")
+      .select("*")
+      .eq("product_id", product.id);
+    
+    setExtras(extrasData || []);
     setDialogOpen(true);
   };
 
@@ -151,6 +241,11 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
     setProductDescription("");
     setProductPrice("");
     setProductCategoryId("");
+    setProductImage(null);
+    setProductImageUrl(null);
+    setExtras([]);
+    setExtraName("");
+    setExtraPrice("");
     setEditingProduct(null);
   };
 
@@ -165,7 +260,7 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
               Novo Produto
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingProduct ? "Editar Produto" : "Novo Produto"}
@@ -224,6 +319,65 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="product-image">Foto do Produto</Label>
+                {productImageUrl && !productImage && (
+                  <img src={productImageUrl} alt="Preview" className="w-32 h-32 object-cover rounded" />
+                )}
+                <Input
+                  id="product-image"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setProductImage(e.target.files?.[0] || null)}
+                />
+              </div>
+              
+              <div className="space-y-3 p-4 border rounded-lg bg-secondary/20">
+                <h4 className="font-semibold text-sm">Adicionais (Opcionais)</h4>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Nome do adicional"
+                      value={extraName}
+                      onChange={(e) => setExtraName(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-32">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Preço"
+                      value={extraPrice}
+                      onChange={(e) => setExtraPrice(e.target.value)}
+                    />
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddExtra}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {extras.length > 0 && (
+                  <div className="space-y-2 mt-3">
+                    {extras.map((extra) => (
+                      <div key={extra.id} className="flex items-center justify-between p-2 bg-background rounded">
+                        <span className="text-sm">{extra.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold">+ R$ {extra.price.toFixed(2)}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveExtra(extra.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <Button type="submit" className="w-full">
                 {editingProduct ? "Atualizar" : "Criar"}
               </Button>
