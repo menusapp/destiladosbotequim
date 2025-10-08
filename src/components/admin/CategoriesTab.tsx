@@ -94,15 +94,55 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
       return;
     }
 
-    const { error } = await supabase.from("categories").delete().eq("id", id);
+    try {
+      // Buscar todos os produtos desta categoria
+      const { data: products } = await supabase
+        .from("products")
+        .select("id")
+        .eq("category_id", id);
 
-    if (error) {
+      if (products && products.length > 0) {
+        for (const product of products) {
+          // Buscar order_items deste produto
+          const { data: orderItems } = await supabase
+            .from("order_items")
+            .select("id")
+            .eq("product_id", product.id);
+
+          // Deletar order_item_extras relacionados
+          if (orderItems && orderItems.length > 0) {
+            const orderItemIds = orderItems.map(item => item.id);
+            await supabase
+              .from("order_item_extras")
+              .delete()
+              .in("order_item_id", orderItemIds);
+          }
+
+          // Deletar order_items
+          await supabase.from("order_items").delete().eq("product_id", product.id);
+
+          // Deletar product_extras
+          await supabase.from("product_extras").delete().eq("product_id", product.id);
+
+          // Deletar produto
+          await supabase.from("products").delete().eq("id", product.id);
+        }
+      }
+
+      // Deletar categoria
+      const { error } = await supabase.from("categories").delete().eq("id", id);
+
+      if (error) {
+        toast.error("Erro ao excluir categoria");
+        return;
+      }
+
+      toast.success("Categoria excluída!");
+      fetchCategories();
+    } catch (error) {
+      console.error(error);
       toast.error("Erro ao excluir categoria");
-      return;
     }
-
-    toast.success("Categoria excluída!");
-    fetchCategories();
   };
 
   const openEditDialog = (category: Category) => {

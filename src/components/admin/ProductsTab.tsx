@@ -216,18 +216,43 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       return;
     }
 
-    // Deletar extras do produto primeiro
-    await supabase.from("product_extras").delete().eq("product_id", id);
+    try {
+      // Quando fechado, deletar todos os registros relacionados
+      // 1. Buscar order_items deste produto
+      const { data: orderItems } = await supabase
+        .from("order_items")
+        .select("id")
+        .eq("product_id", id);
 
-    const { error } = await supabase.from("products").delete().eq("id", id);
+      // 2. Deletar order_item_extras relacionados
+      if (orderItems && orderItems.length > 0) {
+        const orderItemIds = orderItems.map(item => item.id);
+        await supabase
+          .from("order_item_extras")
+          .delete()
+          .in("order_item_id", orderItemIds);
+      }
 
-    if (error) {
+      // 3. Deletar order_items
+      await supabase.from("order_items").delete().eq("product_id", id);
+
+      // 4. Deletar product_extras
+      await supabase.from("product_extras").delete().eq("product_id", id);
+
+      // 5. Deletar produto
+      const { error } = await supabase.from("products").delete().eq("id", id);
+
+      if (error) {
+        toast.error("Erro ao excluir produto");
+        return;
+      }
+
+      toast.success("Produto excluído!");
+      fetchProducts();
+    } catch (error) {
+      console.error(error);
       toast.error("Erro ao excluir produto");
-      return;
     }
-
-    toast.success("Produto excluído!");
-    fetchProducts();
   };
 
   const openEditDialog = async (product: Product) => {
