@@ -114,6 +114,11 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isRestaurantOpen) {
+      toast.error("Feche o restaurante para modificar produtos");
+      return;
+    }
+
     if (!productCategoryId) {
       toast.error("Selecione uma categoria");
       return;
@@ -206,18 +211,9 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este produto?")) return;
 
-    // Se restaurante está aberto, verificar se o produto tem pedidos associados
     if (isRestaurantOpen) {
-      const { data: orderItems } = await supabase
-        .from("order_items")
-        .select("id")
-        .eq("product_id", id)
-        .limit(1);
-
-      if (orderItems && orderItems.length > 0) {
-        toast.error("Não é possível excluir este produto pois ele possui pedidos associados. Feche o restaurante primeiro.");
-        return;
-      }
+      toast.error("Feche o restaurante para excluir produtos");
+      return;
     }
 
     // Deletar extras do produto primeiro
@@ -235,6 +231,10 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
   const openEditDialog = async (product: Product) => {
+    if (isRestaurantOpen) {
+      toast.error("Feche o restaurante para editar produtos");
+      return;
+    }
     setEditingProduct(product);
     setProductName(product.name);
     setProductDescription(product.description || "");
@@ -272,7 +272,13 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
         <h3 className="text-lg font-semibold">Produtos</h3>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
+            <Button onClick={() => {
+              if (isRestaurantOpen) {
+                toast.error("Feche o restaurante para adicionar produtos");
+                return;
+              }
+              resetForm();
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Produto
             </Button>

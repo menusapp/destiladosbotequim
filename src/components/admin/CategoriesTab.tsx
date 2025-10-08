@@ -48,6 +48,11 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isRestaurantOpen) {
+      toast.error("Feche o restaurante para modificar categorias");
+      return;
+    }
+
     if (editingCategory) {
       const { error } = await supabase
         .from("categories")
@@ -84,18 +89,9 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
 
-    // Se restaurante está aberto, verificar se há produtos associados
     if (isRestaurantOpen) {
-      const { data: products } = await supabase
-        .from("products")
-        .select("id")
-        .eq("category_id", id)
-        .limit(1);
-
-      if (products && products.length > 0) {
-        toast.error("Não é possível excluir esta categoria pois ela possui produtos. Feche o restaurante primeiro.");
-        return;
-      }
+      toast.error("Feche o restaurante para excluir categorias");
+      return;
     }
 
     const { error } = await supabase.from("categories").delete().eq("id", id);
@@ -110,6 +106,10 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
   };
 
   const openEditDialog = (category: Category) => {
+    if (isRestaurantOpen) {
+      toast.error("Feche o restaurante para editar categorias");
+      return;
+    }
     setEditingCategory(category);
     setCategoryName(category.name);
     setDialogOpen(true);
@@ -121,7 +121,14 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
         <h3 className="text-lg font-semibold">Categorias do Cardápio</h3>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => { setEditingCategory(null); setCategoryName(""); }}>
+            <Button onClick={() => { 
+              if (isRestaurantOpen) {
+                toast.error("Feche o restaurante para adicionar categorias");
+                return;
+              }
+              setEditingCategory(null); 
+              setCategoryName(""); 
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Categoria
             </Button>
