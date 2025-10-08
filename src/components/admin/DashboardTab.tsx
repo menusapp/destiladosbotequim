@@ -15,6 +15,16 @@ interface DashboardStats {
   cardPayments: number;
   pixPayments: number;
   cashPayments: number;
+  cardRevenue: number;
+  pixRevenue: number;
+  cashRevenue: number;
+}
+
+interface TopProduct {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  totalRevenue: number;
 }
 
 const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
@@ -24,7 +34,11 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
     cardPayments: 0,
     pixPayments: 0,
     cashPayments: 0,
+    cardRevenue: 0,
+    pixRevenue: 0,
+    cashRevenue: 0,
   });
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [dateFilter, setDateFilter] = useState<string>("today");
   const [customDateFrom, setCustomDateFrom] = useState<Date>();
   const [customDateTo, setCustomDateTo] = useState<Date>();
@@ -86,7 +100,11 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
           cardPayments: 0,
           pixPayments: 0,
           cashPayments: 0,
+          cardRevenue: 0,
+          pixRevenue: 0,
+          cashRevenue: 0,
         });
+        setTopProducts([]);
         setLoading(false);
         return;
       }
@@ -109,7 +127,11 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
           cardPayments: 0,
           pixPayments: 0,
           cashPayments: 0,
+          cardRevenue: 0,
+          pixRevenue: 0,
+          cashRevenue: 0,
         });
+        setTopProducts([]);
         setLoading(false);
         return;
       }
@@ -120,6 +142,16 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
       const cardPayments = bills.filter((b) => b.payment_method === "card").length;
       const pixPayments = bills.filter((b) => b.payment_method === "pix").length;
       const cashPayments = bills.filter((b) => b.payment_method === "cash").length;
+      
+      const cardRevenue = bills
+        .filter((b) => b.payment_method === "card")
+        .reduce((sum, bill) => sum + Number(bill.total_amount), 0);
+      const pixRevenue = bills
+        .filter((b) => b.payment_method === "pix")
+        .reduce((sum, bill) => sum + Number(bill.total_amount), 0);
+      const cashRevenue = bills
+        .filter((b) => b.payment_method === "cash")
+        .reduce((sum, bill) => sum + Number(bill.total_amount), 0);
 
       setStats({
         totalRevenue,
@@ -127,7 +159,70 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
         cardPayments,
         pixPayments,
         cashPayments,
+        cardRevenue,
+        pixRevenue,
+        cashRevenue,
       });
+
+      // Buscar produtos mais vendidos
+      const billIds = bills.map((b) => b.id);
+      
+      // Buscar todas as orders relacionadas às bills pagas
+      const { data: ordersData } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          table_id
+        `)
+        .in("table_id", tableIds);
+
+      if (ordersData) {
+        const orderIds = ordersData.map((o) => o.id);
+        
+        // Buscar todos os order_items
+        const { data: orderItems } = await supabase
+          .from("order_items")
+          .select(`
+            quantity,
+            price_at_order,
+            products(name)
+          `)
+          .in("order_id", orderIds);
+
+        if (orderItems) {
+          // Agrupar por produto
+          const productMap = new Map<string, { quantity: number; revenue: number; price: number }>();
+          
+          orderItems.forEach((item: any) => {
+            const productName = item.products?.name || "Produto excluído";
+            const existing = productMap.get(productName);
+            
+            if (existing) {
+              existing.quantity += item.quantity;
+              existing.revenue += item.price_at_order * item.quantity;
+            } else {
+              productMap.set(productName, {
+                quantity: item.quantity,
+                revenue: item.price_at_order * item.quantity,
+                price: item.price_at_order,
+              });
+            }
+          });
+
+          // Converter para array e ordenar por quantidade
+          const topProductsList = Array.from(productMap.entries())
+            .map(([name, data]) => ({
+              name,
+              quantity: data.quantity,
+              unitPrice: data.price,
+              totalRevenue: data.revenue,
+            }))
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 10); // Top 10 produtos
+
+          setTopProducts(topProductsList);
+        }
+      }
     } catch (error) {
       console.error("Erro ao buscar estatísticas:", error);
     } finally {
@@ -259,28 +354,61 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="flex items-center gap-3 p-4 border rounded-lg">
                   <CreditCard className="h-8 w-8 text-primary" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm text-muted-foreground">Cartão</p>
                     <p className="text-2xl font-bold">{stats.cardPayments}</p>
+                    <p className="text-sm text-primary font-semibold">R$ {stats.cardRevenue.toFixed(2)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-4 border rounded-lg">
                   <Smartphone className="h-8 w-8 text-primary" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm text-muted-foreground">PIX</p>
                     <p className="text-2xl font-bold">{stats.pixPayments}</p>
+                    <p className="text-sm text-primary font-semibold">R$ {stats.pixRevenue.toFixed(2)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-4 border rounded-lg">
                   <Banknote className="h-8 w-8 text-primary" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm text-muted-foreground">Dinheiro</p>
                     <p className="text-2xl font-bold">{stats.cashPayments}</p>
+                    <p className="text-sm text-primary font-semibold">R$ {stats.cashRevenue.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {topProducts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Produtos Mais Vendidos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {topProducts.map((product, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <p className="font-semibold">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Quantidade: {product.quantity} | Preço unitário: R$ {product.unitPrice.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-primary">
+                          R$ {product.totalRevenue.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>
