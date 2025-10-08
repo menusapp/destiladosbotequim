@@ -412,6 +412,24 @@ export type Database = {
         Args: { _order_item_id: string }
         Returns: boolean
       }
+      mark_bill_on_the_way: {
+        Args: { _bill_id: string }
+        Returns: {
+          bill_requested_at: string | null
+          change_amount: number | null
+          created_at: string | null
+          id: string
+          paid_at: string | null
+          payment_method: string | null
+          service_fee: number
+          service_fee_removed: boolean | null
+          service_fee_removed_at: string | null
+          status: string | null
+          subtotal: number
+          table_id: string
+          total_amount: number
+        }
+      }
     }
     Enums: {
       [_ in never]: never

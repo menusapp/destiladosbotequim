@@ -92,36 +92,14 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleMarkAsOnTheWay = async (billId: string) => {
-    // Buscar a conta atual para congelar o valor
-    const { data: billData, error: fetchError } = await supabase
-      .from("bills")
-      .select("*")
-      .eq("id", billId)
-      .single();
-
-    if (fetchError || !billData) {
-      toast.error("Erro ao buscar conta");
-      return;
-    }
-
-    // Calcular se o tempo passou e remover taxa de serviço se necessário
-    const billRequestedAt = new Date(billData.bill_requested_at);
-    const elapsed = Math.floor((Date.now() - billRequestedAt.getTime()) / 1000);
-    const serviceFeeRemoved = elapsed >= 300; // 5 minutos
-
-    const finalTotal = serviceFeeRemoved ? billData.subtotal : (billData.subtotal + billData.service_fee);
-
-    const { error } = await supabase
-      .from("bills")
-      .update({ 
-        status: "on_the_way",
-        service_fee_removed: serviceFeeRemoved,
-        total_amount: finalTotal
-      })
-      .eq("id", billId);
+    // Usar função do banco que verifica corretamente o tempo no servidor
+    const { data, error } = await supabase.rpc('mark_bill_on_the_way', {
+      _bill_id: billId
+    });
 
     if (error) {
       toast.error("Erro ao atualizar status");
+      console.error(error);
       return;
     }
 
