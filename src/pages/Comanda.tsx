@@ -102,6 +102,11 @@ const Comanda = () => {
             } else if (updatedBill.status === "paid") {
               console.log("Conta paga! Redirecionando...");
               toast.success("Conta paga! Obrigado pela preferência!");
+              
+              // Limpar dados da comanda do sessionStorage
+              sessionStorage.removeItem(`customer_name_${tableNumber}`);
+              sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+              
               setTimeout(() => {
                 navigate(`/menu/${restaurantSlug}/${tableNumber}`);
               }, 2000);
