@@ -120,6 +120,20 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
       return;
     }
 
+    // Deletar todos os pedidos da mesa (isso vai limpar a comanda)
+    const { error: deleteOrdersError } = await supabase
+      .from("orders")
+      .delete()
+      .eq("table_id", billData.table_id);
+
+    if (deleteOrdersError) {
+      console.error("Erro ao deletar pedidos:", deleteOrdersError);
+      toast.error("Erro ao limpar comanda");
+      return;
+    }
+
+    console.log("Pedidos deletados com sucesso para table_id:", billData.table_id);
+
     // Atualizar status da conta para paga
     const { error: updateError } = await supabase
       .from("bills")
@@ -131,18 +145,19 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
     if (updateError) {
       toast.error("Erro ao marcar como paga");
+      console.error(updateError);
       return;
     }
 
-    // Deletar todos os pedidos da mesa (isso vai limpar a comanda)
-    const { error: deleteError } = await supabase
-      .from("orders")
+    // Deletar a própria conta também
+    const { error: deleteBillError } = await supabase
+      .from("bills")
       .delete()
-      .eq("table_id", billData.table_id);
+      .eq("id", billId);
 
-    if (deleteError) {
-      console.error("Erro ao deletar pedidos:", deleteError);
-      // Não mostrar erro para o usuário, pois a conta já foi marcada como paga
+    if (deleteBillError) {
+      console.error("Erro ao deletar conta:", deleteBillError);
+      // Não retornar erro pois já foi marcada como paga
     }
 
     toast.success("Conta marcada como paga!");
