@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, QrCode } from "lucide-react";
+import { Plus, Trash2, QrCode, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -24,10 +24,22 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const [tables, setTables] = useState<Table[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tableNumber, setTableNumber] = useState("");
+  const [restaurantSlug, setRestaurantSlug] = useState("");
 
   useEffect(() => {
+    fetchRestaurantSlug();
     fetchTables();
   }, [restaurantId]);
+
+  const fetchRestaurantSlug = async () => {
+    const { data } = await supabase
+      .from("restaurants")
+      .select("slug")
+      .eq("id", restaurantId)
+      .single();
+    
+    if (data) setRestaurantSlug(data.slug);
+  };
 
   const fetchTables = async () => {
     const { data, error } = await supabase
@@ -78,6 +90,20 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     fetchTables();
   };
 
+  const getMenuLink = (tableNumber: number) => {
+    return `${window.location.origin}/menu/${restaurantSlug}/${tableNumber}`;
+  };
+
+  const copyMenuLink = (tableNumber: number) => {
+    const link = getMenuLink(tableNumber);
+    navigator.clipboard.writeText(link);
+    toast.success("Link copiado!");
+  };
+
+  const openMenuLink = (tableNumber: number) => {
+    window.open(getMenuLink(tableNumber), '_blank');
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -122,23 +148,54 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
           <p className="text-muted-foreground">Nenhuma mesa criada ainda</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid gap-4">
           {tables.map((table) => (
             <div
               key={table.id}
-              className="relative p-6 border rounded-lg hover:bg-secondary/50 transition-colors text-center"
+              className="p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
             >
-              <QrCode className="h-8 w-8 mx-auto mb-2 text-primary" />
-              <p className="font-bold text-lg">Mesa {table.table_number}</p>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="mt-4 w-full"
-                onClick={() => handleDelete(table.id)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Excluir
-              </Button>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
+                    <QrCode className="h-6 w-6 text-primary-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-lg">Mesa {table.table_number}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="text-xs bg-secondary px-2 py-1 rounded truncate block max-w-[300px]">
+                        {getMenuLink(table.table_number)}
+                      </code>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyMenuLink(table.table_number)}
+                    title="Copiar link"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openMenuLink(table.table_number)}
+                    title="Abrir cardápio"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDelete(table.id)}
+                    title="Excluir mesa"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           ))}
         </div>
