@@ -130,7 +130,20 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleMarkAsPaid = async (billId: string) => {
-    const { error } = await supabase
+    // Primeiro, buscar a conta para pegar o table_id
+    const { data: billData, error: fetchError } = await supabase
+      .from("bills")
+      .select("table_id")
+      .eq("id", billId)
+      .single();
+
+    if (fetchError || !billData) {
+      toast.error("Erro ao buscar conta");
+      return;
+    }
+
+    // Atualizar status da conta para paga
+    const { error: updateError } = await supabase
       .from("bills")
       .update({ 
         status: "paid",
@@ -138,9 +151,20 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
       })
       .eq("id", billId);
 
-    if (error) {
+    if (updateError) {
       toast.error("Erro ao marcar como paga");
       return;
+    }
+
+    // Deletar todos os pedidos da mesa (isso vai limpar a comanda)
+    const { error: deleteError } = await supabase
+      .from("orders")
+      .delete()
+      .eq("table_id", billData.table_id);
+
+    if (deleteError) {
+      console.error("Erro ao deletar pedidos:", deleteError);
+      // Não mostrar erro para o usuário, pois a conta já foi marcada como paga
     }
 
     toast.success("Conta marcada como paga!");
