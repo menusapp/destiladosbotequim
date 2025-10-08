@@ -18,6 +18,10 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 
+interface OrderItemExtra {
+  price_at_order: number;
+}
+
 interface OrderItem {
   id: string;
   quantity: number;
@@ -25,6 +29,7 @@ interface OrderItem {
   products: {
     name: string;
   };
+  order_item_extras: OrderItemExtra[];
 }
 
 interface Order {
@@ -95,7 +100,8 @@ const Comanda = () => {
           *,
           order_items(
             *,
-            products(name)
+            products(name),
+            order_item_extras(price_at_order)
           )
         `)
         .eq("table_id", tableData.id)
@@ -130,13 +136,11 @@ const Comanda = () => {
 
   const calculateTotal = () => {
     const subtotal = orders.reduce((sum, order) => {
-      return (
-        sum +
-        order.order_items.reduce(
-          (itemSum, item) => itemSum + item.price_at_order * item.quantity,
-          0
-        )
-      );
+      const orderSum = order.order_items.reduce((itemSum, item) => {
+        const extrasSum = (item.order_item_extras || []).reduce((s, e) => s + e.price_at_order, 0);
+        return itemSum + (item.price_at_order + extrasSum) * item.quantity;
+      }, 0);
+      return sum + orderSum;
     }, 0);
 
     const serviceFee = subtotal * 0.1;
@@ -277,7 +281,7 @@ const Comanda = () => {
                           </p>
                         </div>
                         <p className="font-semibold text-primary">
-                          R$ {(item.price_at_order * item.quantity).toFixed(2)}
+                          R$ {((item.price_at_order + (item.order_item_extras?.reduce((s, e) => s + e.price_at_order, 0) || 0)) * item.quantity).toFixed(2)}
                         </p>
                       </div>
                     ))}

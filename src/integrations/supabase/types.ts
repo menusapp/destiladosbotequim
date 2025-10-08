@@ -408,7 +408,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_restaurant_closed_by_order_item: {
+        Args: { _order_item_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
