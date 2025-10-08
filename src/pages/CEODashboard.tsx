@@ -31,32 +31,22 @@ const CEODashboard = () => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(null);
   
   // Form states
-  const [newRestName, setNewRestName] = useState("");
-  const [newRestSlug, setNewRestSlug] = useState("");
-  const [newRestUsername, setNewRestUsername] = useState("");
-  const [newRestPassword, setNewRestPassword] = useState("");
-  
-  // Edit form states
-  const [editName, setEditName] = useState("");
-  const [editSlug, setEditSlug] = useState("");
-  const [editPrimaryColor, setEditPrimaryColor] = useState("");
-  const [editSecondaryColor, setEditSecondaryColor] = useState("");
-  const [editLogoUrl, setEditLogoUrl] = useState("");
-  const [editUsername, setEditUsername] = useState("");
-  const [editPassword, setEditPassword] = useState("");
+  const [formName, setFormName] = useState("");
+  const [formSlug, setFormSlug] = useState("");
+  const [formPrimaryColor, setFormPrimaryColor] = useState("#FF6B35");
+  const [formSecondaryColor, setFormSecondaryColor] = useState("#1A1A1A");
+  const [formUsername, setFormUsername] = useState("");
+  const [formPassword, setFormPassword] = useState("");
 
   useEffect(() => {
-    // Verificar se é CEO
     const userType = sessionStorage.getItem("userType");
     if (userType !== "ceo") {
       navigate("/");
       return;
     }
-
     fetchRestaurants();
   }, [navigate]);
 
@@ -82,108 +72,106 @@ const CEODashboard = () => {
     toast.success("Logout realizado com sucesso");
   };
 
-  const handleCreateRestaurant = async (e: React.FormEvent) => {
+  const handleOpenDialog = async (restaurant?: Restaurant) => {
+    if (restaurant) {
+      setEditingRestaurant(restaurant);
+      setFormName(restaurant.name);
+      setFormSlug(restaurant.slug);
+      setFormPrimaryColor(restaurant.primary_color || "#FF6B35");
+      setFormSecondaryColor(restaurant.secondary_color || "#1A1A1A");
+      
+      // Buscar username atual
+      const { data } = await supabase
+        .from("restaurant_credentials")
+        .select("username")
+        .eq("restaurant_id", restaurant.id)
+        .single();
+      
+      setFormUsername(data?.username || "");
+      setFormPassword("");
+    } else {
+      setEditingRestaurant(null);
+      setFormName("");
+      setFormSlug("");
+      setFormPrimaryColor("#FF6B35");
+      setFormSecondaryColor("#1A1A1A");
+      setFormUsername("");
+      setFormPassword("");
+    }
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      // Criar restaurante
-      const { data: restaurant, error: restError } = await supabase
-        .from("restaurants")
-        .insert({
-          name: newRestName,
-          slug: newRestSlug,
-        })
-        .select()
-        .single();
+      if (editingRestaurant) {
+        // Atualizar restaurante
+        const { error: restError } = await supabase
+          .from("restaurants")
+          .update({
+            name: formName,
+            slug: formSlug,
+            primary_color: formPrimaryColor,
+            secondary_color: formSecondaryColor,
+          })
+          .eq("id", editingRestaurant.id);
 
-      if (restError) throw restError;
+        if (restError) throw restError;
 
-      // Criar credenciais
-      const { error: credError } = await supabase
-        .from("restaurant_credentials")
-        .insert({
-          restaurant_id: restaurant.id,
-          username: newRestUsername,
-          password_hash: newRestPassword, // Em produção, usar bcrypt
-        });
+        // Atualizar credenciais se fornecidas
+        if (formUsername || formPassword) {
+          const updateData: any = {};
+          if (formUsername) updateData.username = formUsername;
+          if (formPassword) updateData.password_hash = formPassword;
 
-      if (credError) throw credError;
+          const { error: credError } = await supabase
+            .from("restaurant_credentials")
+            .update(updateData)
+            .eq("restaurant_id", editingRestaurant.id);
 
-      toast.success("Restaurante criado com sucesso!");
-      setDialogOpen(false);
-      setNewRestName("");
-      setNewRestSlug("");
-      setNewRestUsername("");
-      setNewRestPassword("");
-      fetchRestaurants();
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao criar restaurante");
-    }
-  };
+          if (credError) throw credError;
+        }
 
-  const handleEditRestaurant = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingRestaurant) return;
+        toast.success("Restaurante atualizado com sucesso!");
+      } else {
+        // Criar restaurante
+        const { data: restaurant, error: restError } = await supabase
+          .from("restaurants")
+          .insert({
+            name: formName,
+            slug: formSlug,
+            primary_color: formPrimaryColor,
+            secondary_color: formSecondaryColor,
+          })
+          .select()
+          .single();
 
-    try {
-      // Atualizar restaurante
-      const { error: restError } = await supabase
-        .from("restaurants")
-        .update({
-          name: editName,
-          slug: editSlug,
-          primary_color: editPrimaryColor,
-          secondary_color: editSecondaryColor,
-          logo_url: editLogoUrl || null,
-        })
-        .eq("id", editingRestaurant.id);
+        if (restError) throw restError;
 
-      if (restError) throw restError;
-
-      // Atualizar credenciais se senha foi fornecida
-      if (editUsername || editPassword) {
-        const updates: any = {};
-        if (editUsername) updates.username = editUsername;
-        if (editPassword) updates.password_hash = editPassword;
-
+        // Criar credenciais
         const { error: credError } = await supabase
           .from("restaurant_credentials")
-          .update(updates)
-          .eq("restaurant_id", editingRestaurant.id);
+          .insert({
+            restaurant_id: restaurant.id,
+            username: formUsername,
+            password_hash: formPassword,
+          });
 
         if (credError) throw credError;
+
+        toast.success("Restaurante criado com sucesso!");
       }
 
-      toast.success("Restaurante atualizado com sucesso!");
-      setEditDialogOpen(false);
+      setDialogOpen(false);
       setEditingRestaurant(null);
       fetchRestaurants();
     } catch (error: any) {
-      toast.error(error.message || "Erro ao atualizar restaurante");
+      toast.error(error.message || "Erro ao processar restaurante");
     }
   };
 
-  const openEditDialog = async (restaurant: Restaurant) => {
-    setEditingRestaurant(restaurant);
-    setEditName(restaurant.name);
-    setEditSlug(restaurant.slug);
-    setEditPrimaryColor(restaurant.primary_color || "#FF6B35");
-    setEditSecondaryColor(restaurant.secondary_color || "#1A1A1A");
-    setEditLogoUrl(restaurant.logo_url || "");
-    
-    // Buscar credenciais atuais
-    const { data } = await supabase
-      .from("restaurant_credentials")
-      .select("username")
-      .eq("restaurant_id", restaurant.id)
-      .single();
-    
-    setEditUsername(data?.username || "");
-    setEditPassword("");
-    setEditDialogOpen(true);
-  };
-
-  const handleDeleteRestaurant = async (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Tem certeza que deseja excluir ${name}?`)) return;
 
     try {
@@ -212,7 +200,6 @@ const CEODashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
       <div className="container mx-auto p-6 space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
@@ -228,7 +215,6 @@ const CEODashboard = () => {
           </Button>
         </div>
 
-        {/* Estatísticas */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader>
@@ -240,7 +226,6 @@ const CEODashboard = () => {
           </Card>
         </div>
 
-        {/* Lista de Restaurantes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -249,25 +234,29 @@ const CEODashboard = () => {
             </div>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button onClick={() => handleOpenDialog()}>
                   <Plus className="h-4 w-4 mr-2" />
                   Novo Restaurante
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Cadastrar Novo Restaurante</DialogTitle>
+                  <DialogTitle>
+                    {editingRestaurant ? "Editar Restaurante" : "Cadastrar Novo Restaurante"}
+                  </DialogTitle>
                   <DialogDescription>
-                    Preencha os dados do restaurante e as credenciais de acesso
+                    {editingRestaurant 
+                      ? "Atualize os dados do restaurante e credenciais (deixe em branco para não alterar)"
+                      : "Preencha os dados do restaurante e as credenciais de acesso"}
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleCreateRestaurant} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Nome do Restaurante</Label>
                     <Input
                       id="name"
-                      value={newRestName}
-                      onChange={(e) => setNewRestName(e.target.value)}
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
                       placeholder="Ex: Pizzaria do João"
                       required
                     />
@@ -276,20 +265,56 @@ const CEODashboard = () => {
                     <Label htmlFor="slug">Slug (URL)</Label>
                     <Input
                       id="slug"
-                      value={newRestSlug}
-                      onChange={(e) => setNewRestSlug(e.target.value)}
+                      value={formSlug}
+                      onChange={(e) => setFormSlug(e.target.value)}
                       placeholder="Ex: pizzaria-do-joao"
                       required
                     />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="primaryColor">Cor Primária</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="primaryColor"
+                          type="color"
+                          value={formPrimaryColor}
+                          onChange={(e) => setFormPrimaryColor(e.target.value)}
+                          className="w-20 h-10"
+                        />
+                        <Input
+                          value={formPrimaryColor}
+                          onChange={(e) => setFormPrimaryColor(e.target.value)}
+                          placeholder="#FF6B35"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="secondaryColor">Cor Secundária</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="secondaryColor"
+                          type="color"
+                          value={formSecondaryColor}
+                          onChange={(e) => setFormSecondaryColor(e.target.value)}
+                          className="w-20 h-10"
+                        />
+                        <Input
+                          value={formSecondaryColor}
+                          onChange={(e) => setFormSecondaryColor(e.target.value)}
+                          placeholder="#1A1A1A"
+                        />
+                      </div>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="username">Usuário de Login</Label>
                     <Input
                       id="username"
-                      value={newRestUsername}
-                      onChange={(e) => setNewRestUsername(e.target.value)}
+                      value={formUsername}
+                      onChange={(e) => setFormUsername(e.target.value)}
                       placeholder="Ex: pizzaria123"
-                      required
+                      required={!editingRestaurant}
                     />
                   </div>
                   <div className="space-y-2">
@@ -297,14 +322,14 @@ const CEODashboard = () => {
                     <Input
                       id="password"
                       type="password"
-                      value={newRestPassword}
-                      onChange={(e) => setNewRestPassword(e.target.value)}
+                      value={formPassword}
+                      onChange={(e) => setFormPassword(e.target.value)}
                       placeholder="Digite a senha"
-                      required
+                      required={!editingRestaurant}
                     />
                   </div>
                   <Button type="submit" className="w-full">
-                    Criar Restaurante
+                    {editingRestaurant ? "Atualizar Restaurante" : "Criar Restaurante"}
                   </Button>
                 </form>
               </DialogContent>
@@ -323,9 +348,14 @@ const CEODashboard = () => {
                     key={restaurant.id}
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
                   >
-                  <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-                        <Store className="h-6 w-6 text-primary-foreground" />
+                    <div className="flex items-center gap-4">
+                      <div 
+                        className="w-12 h-12 rounded-full flex items-center justify-center"
+                        style={{ 
+                          background: `linear-gradient(135deg, ${restaurant.primary_color || '#FF6B35'}, ${restaurant.secondary_color || '#1A1A1A'})` 
+                        }}
+                      >
+                        <Store className="h-6 w-6 text-white" />
                       </div>
                       <div>
                         <p className="font-semibold">{restaurant.name}</p>
@@ -336,14 +366,15 @@ const CEODashboard = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => openEditDialog(restaurant)}
+                        onClick={() => handleOpenDialog(restaurant)}
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
                       </Button>
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => handleDeleteRestaurant(restaurant.id, restaurant.name)}
+                        onClick={() => handleDelete(restaurant.id, restaurant.name)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -354,100 +385,6 @@ const CEODashboard = () => {
             )}
           </CardContent>
         </Card>
-
-        {/* Dialog de Edição */}
-        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Editar Restaurante</DialogTitle>
-              <DialogDescription>
-                Atualize as informações do restaurante
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleEditRestaurant} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Nome do Restaurante</Label>
-                  <Input
-                    id="edit-name"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-slug">Slug (URL)</Label>
-                  <Input
-                    id="edit-slug"
-                    value={editSlug}
-                    onChange={(e) => setEditSlug(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-primary">Cor Primária</Label>
-                  <Input
-                    id="edit-primary"
-                    type="color"
-                    value={editPrimaryColor}
-                    onChange={(e) => setEditPrimaryColor(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-secondary">Cor Secundária</Label>
-                  <Input
-                    id="edit-secondary"
-                    type="color"
-                    value={editSecondaryColor}
-                    onChange={(e) => setEditSecondaryColor(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-logo">URL do Logo</Label>
-                <Input
-                  id="edit-logo"
-                  value={editLogoUrl}
-                  onChange={(e) => setEditLogoUrl(e.target.value)}
-                  placeholder="https://exemplo.com/logo.png"
-                />
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="font-semibold mb-3">Credenciais de Acesso</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-username">Usuário</Label>
-                    <Input
-                      id="edit-username"
-                      value={editUsername}
-                      onChange={(e) => setEditUsername(e.target.value)}
-                      placeholder="Deixe vazio para não alterar"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-password">Nova Senha</Label>
-                    <Input
-                      id="edit-password"
-                      type="password"
-                      value={editPassword}
-                      onChange={(e) => setEditPassword(e.target.value)}
-                      placeholder="Deixe vazio para não alterar"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full">
-                Salvar Alterações
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );
