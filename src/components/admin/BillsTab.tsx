@@ -54,12 +54,11 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   const fetchBills = async () => {
     setLoading(true);
     
-    const { data, error } = await supabase
+    const { data: billsData, error } = await supabase
       .from("bills")
       .select(`
         *,
-        tables!inner(table_number, restaurant_id),
-        orders!inner(customer_name, table_id)
+        tables!inner(table_number, restaurant_id)
       `)
       .eq("tables.restaurant_id", restaurantId)
       .order("created_at", { ascending: false });
@@ -71,21 +70,24 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
       return;
     }
 
-    // Agrupar orders por bill
-    const billsMap = new Map();
-    data?.forEach((row: any) => {
-      if (!billsMap.has(row.id)) {
-        billsMap.set(row.id, {
-          ...row,
-          orders: []
-        });
-      }
-      if (row.orders) {
-        billsMap.get(row.id).orders.push(row.orders);
-      }
-    });
+    // Buscar os nomes dos clientes através dos pedidos de cada mesa
+    const billsWithCustomerNames = await Promise.all(
+      (billsData || []).map(async (bill: any) => {
+        const { data: ordersData } = await supabase
+          .from("orders")
+          .select("customer_name")
+          .eq("table_id", bill.table_id)
+          .order("created_at", { ascending: false })
+          .limit(1);
 
-    setBills(Array.from(billsMap.values()));
+        return {
+          ...bill,
+          orders: ordersData || []
+        };
+      })
+    );
+
+    setBills(billsWithCustomerNames);
     setLoading(false);
   };
 
