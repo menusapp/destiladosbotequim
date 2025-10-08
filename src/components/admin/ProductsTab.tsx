@@ -43,7 +43,7 @@ interface ProductExtra {
   price: number;
 }
 
-const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
+const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string; isRestaurantOpen: boolean }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -206,16 +206,18 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este produto?")) return;
 
-    // Verificar se o produto tem pedidos associados
-    const { data: orderItems } = await supabase
-      .from("order_items")
-      .select("id")
-      .eq("product_id", id)
-      .limit(1);
+    // Se restaurante está aberto, verificar se o produto tem pedidos associados
+    if (isRestaurantOpen) {
+      const { data: orderItems } = await supabase
+        .from("order_items")
+        .select("id")
+        .eq("product_id", id)
+        .limit(1);
 
-    if (orderItems && orderItems.length > 0) {
-      toast.error("Não é possível excluir este produto pois ele possui pedidos associados. Você pode desativá-lo editando-o.");
-      return;
+      if (orderItems && orderItems.length > 0) {
+        toast.error("Não é possível excluir este produto pois ele possui pedidos associados. Feche o restaurante primeiro.");
+        return;
+      }
     }
 
     // Deletar extras do produto primeiro

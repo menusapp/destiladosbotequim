@@ -20,7 +20,7 @@ interface Category {
   display_order: number;
 }
 
-const CategoriesTab = ({ restaurantId }: { restaurantId: string }) => {
+const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string; isRestaurantOpen: boolean }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -83,6 +83,20 @@ const CategoriesTab = ({ restaurantId }: { restaurantId: string }) => {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
+
+    // Se restaurante está aberto, verificar se há produtos associados
+    if (isRestaurantOpen) {
+      const { data: products } = await supabase
+        .from("products")
+        .select("id")
+        .eq("category_id", id)
+        .limit(1);
+
+      if (products && products.length > 0) {
+        toast.error("Não é possível excluir esta categoria pois ela possui produtos. Feche o restaurante primeiro.");
+        return;
+      }
+    }
 
     const { error } = await supabase.from("categories").delete().eq("id", id);
 

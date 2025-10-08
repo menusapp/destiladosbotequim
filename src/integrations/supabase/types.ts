@@ -339,6 +339,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_open: boolean | null
           logo_url: string | null
           name: string
           primary_color: string | null
@@ -349,6 +350,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          is_open?: boolean | null
           logo_url?: string | null
           name: string
           primary_color?: string | null
@@ -359,6 +361,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          is_open?: boolean | null
           logo_url?: string | null
           name?: string
           primary_color?: string | null

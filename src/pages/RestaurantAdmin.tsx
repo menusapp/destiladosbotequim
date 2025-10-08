@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { LogOut, Package, List, TableIcon, ShoppingCart, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +18,7 @@ interface Restaurant {
   id: string;
   name: string;
   slug: string;
+  is_open: boolean;
 }
 
 const RestaurantAdmin = () => {
@@ -59,6 +62,21 @@ const RestaurantAdmin = () => {
     toast.success("Logout realizado com sucesso");
   };
 
+  const handleToggleRestaurant = async (isOpen: boolean) => {
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ is_open: isOpen })
+      .eq("id", restaurant!.id);
+
+    if (error) {
+      toast.error("Erro ao atualizar status do restaurante");
+      return;
+    }
+
+    setRestaurant({ ...restaurant!, is_open: isOpen });
+    toast.success(isOpen ? "Restaurante aberto!" : "Restaurante fechado!");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -82,10 +100,22 @@ const RestaurantAdmin = () => {
             </h1>
             <p className="text-muted-foreground mt-1">Painel Administrativo</p>
           </div>
-          <Button onClick={handleLogout} variant="outline">
-            <LogOut className="h-4 w-4 mr-2" />
-            Sair
-          </Button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="restaurant-status"
+                checked={restaurant.is_open}
+                onCheckedChange={handleToggleRestaurant}
+              />
+              <Label htmlFor="restaurant-status" className="cursor-pointer">
+                {restaurant.is_open ? "Aberto" : "Fechado"}
+              </Label>
+            </div>
+            <Button onClick={handleLogout} variant="outline">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sair
+            </Button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -123,11 +153,11 @@ const RestaurantAdmin = () => {
               </TabsContent>
 
               <TabsContent value="categories">
-                <CategoriesTab restaurantId={restaurant.id} />
+                <CategoriesTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />
               </TabsContent>
 
               <TabsContent value="products">
-                <ProductsTab restaurantId={restaurant.id} />
+                <ProductsTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />
               </TabsContent>
 
               <TabsContent value="tables">

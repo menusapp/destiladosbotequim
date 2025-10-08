@@ -35,6 +35,7 @@ interface Restaurant {
   name: string;
   primary_color: string;
   secondary_color: string;
+  is_open: boolean;
 }
 
 interface CartItemExtra {
@@ -91,6 +92,14 @@ const Menu = () => {
         .single();
 
       if (restError) throw restError;
+
+      // Verificar se restaurante está aberto
+      if (!restData.is_open) {
+        toast.error("Restaurante está fechado no momento");
+        navigate("/");
+        return;
+      }
+
       setRestaurant(restData);
 
       // Buscar mesa
