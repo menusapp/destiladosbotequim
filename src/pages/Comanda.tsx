@@ -47,6 +47,7 @@ const Comanda = () => {
   const [tableId, setTableId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [billRequested, setBillRequested] = useState(false);
+  const [billOnTheWay, setBillOnTheWay] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<string>("pix");
   const [changeAmount, setChangeAmount] = useState("");
@@ -57,7 +58,7 @@ const Comanda = () => {
   }, [restaurantSlug, tableNumber]);
 
   useEffect(() => {
-    if (billRequested && timerSeconds > 0) {
+    if (billRequested && !billOnTheWay && timerSeconds > 0) {
       const interval = setInterval(() => {
         setTimerSeconds((prev) => {
           if (prev <= 1) {
@@ -69,7 +70,7 @@ const Comanda = () => {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [billRequested, timerSeconds]);
+  }, [billRequested, billOnTheWay, timerSeconds]);
 
   const fetchData = async () => {
     try {
@@ -119,17 +120,71 @@ const Comanda = () => {
         .from("bills")
         .select("*")
         .eq("table_id", tableData.id)
-        .eq("status", "requested")
+        .in("status", ["requested", "on_the_way"])
         .single();
 
       if (billData) {
         setBillRequested(true);
-        const elapsed = Math.floor(
-          (Date.now() - new Date(billData.bill_requested_at).getTime()) / 1000
-        );
-        const remaining = Math.max(0, 300 - elapsed); // 5 minutos = 300 segundos
-        setTimerSeconds(remaining);
+        
+        if (billData.status === "on_the_way") {
+          setBillOnTheWay(true);
+          setTimerSeconds(0);
+        } else {
+          const elapsed = Math.floor(
+            (Date.now() - new Date(billData.bill_requested_at).getTime()) / 1000
+          );
+          const remaining = Math.max(0, 300 - elapsed); // 5 minutos = 300 segundos
+          setTimerSeconds(remaining);
+        }
       }
+      
+      // Configurar realtime para atualizar status da conta
+      const billChannel = supabase
+        .channel('bill-status-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'bills',
+            filter: `table_id=eq.${tableData.id}`,
+          },
+          (payload) => {
+            const updatedBill = payload.new as any;
+            if (updatedBill.status === "on_the_way") {
+              setBillOnTheWay(true);
+              setTimerSeconds(0);
+              toast.success("A conta está a caminho!");
+            }
+          }
+        )
+        .subscribe();
+
+      // Configurar realtime para pedidos aceitos
+      const ordersChannel = supabase
+        .channel('order-status-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'orders',
+            filter: `table_id=eq.${tableData.id}`,
+          },
+          (payload) => {
+            const updatedOrder = payload.new as any;
+            if (updatedOrder.status === "accepted" && payload.old?.status === "pending") {
+              toast.success("Seu pedido foi aceito!");
+              fetchData();
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(billChannel);
+        supabase.removeChannel(ordersChannel);
+      };
     } catch (error: any) {
       toast.error("Erro ao carregar comanda");
       console.error(error);
@@ -228,19 +283,36 @@ const Comanda = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Timer */}
-        {billRequested && timerSeconds > 0 && (
+        {/* Timer ou Mensagem A Caminho */}
+        {billRequested && (
           <Card className="border-primary bg-primary/5">
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
                 <Clock className="h-5 w-5 text-primary" />
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Aguardando garçom
-                  </p>
-                  <p className="text-2xl font-bold text-primary">
-                    {formatTime(timerSeconds)}
-                  </p>
+                  {billOnTheWay ? (
+                    <>
+                      <p className="text-lg font-semibold text-primary">
+                        A conta está a caminho!
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        O garçom chegará em breve com sua conta
+                      </p>
+                    </>
+                  ) : timerSeconds > 0 ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Aguardando garçom
+                      </p>
+                      <p className="text-2xl font-bold text-primary">
+                        {formatTime(timerSeconds)}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Aguardando garçom
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>

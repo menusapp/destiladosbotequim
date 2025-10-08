@@ -91,6 +91,44 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     setLoading(false);
   };
 
+  const handleMarkAsOnTheWay = async (billId: string) => {
+    // Buscar a conta atual para congelar o valor
+    const { data: billData, error: fetchError } = await supabase
+      .from("bills")
+      .select("*")
+      .eq("id", billId)
+      .single();
+
+    if (fetchError || !billData) {
+      toast.error("Erro ao buscar conta");
+      return;
+    }
+
+    // Calcular se o tempo passou e remover taxa de serviço se necessário
+    const billRequestedAt = new Date(billData.bill_requested_at);
+    const elapsed = Math.floor((Date.now() - billRequestedAt.getTime()) / 1000);
+    const serviceFeeRemoved = elapsed >= 300; // 5 minutos
+
+    const finalTotal = serviceFeeRemoved ? billData.subtotal : (billData.subtotal + billData.service_fee);
+
+    const { error } = await supabase
+      .from("bills")
+      .update({ 
+        status: "on_the_way",
+        service_fee_removed: serviceFeeRemoved,
+        total_amount: finalTotal
+      })
+      .eq("id", billId);
+
+    if (error) {
+      toast.error("Erro ao atualizar status");
+      return;
+    }
+
+    toast.success("Conta a caminho!");
+    fetchBills();
+  };
+
   const handleMarkAsPaid = async (billId: string) => {
     const { error } = await supabase
       .from("bills")
@@ -165,11 +203,16 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
                       {bill.orders[0]?.customer_name || "Cliente"}
                     </p>
                   </div>
-                  <Badge variant={bill.status === "paid" ? "default" : "secondary"}>
+                  <Badge variant={bill.status === "paid" ? "default" : bill.status === "on_the_way" ? "outline" : "secondary"}>
                     {bill.status === "paid" ? (
                       <>
                         <Check className="h-3 w-3 mr-1" />
                         Paga
+                      </>
+                    ) : bill.status === "on_the_way" ? (
+                      <>
+                        <Clock className="h-3 w-3 mr-1" />
+                        A Caminho
                       </>
                     ) : (
                       <>
@@ -214,12 +257,20 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
                   )}
                 </div>
 
-                {bill.status !== "paid" && (
+                {bill.status === "requested" && (
+                  <Button
+                    className="w-full"
+                    onClick={() => handleMarkAsOnTheWay(bill.id)}
+                  >
+                    A Caminho
+                  </Button>
+                )}
+                {bill.status === "on_the_way" && (
                   <Button
                     className="w-full"
                     onClick={() => handleMarkAsPaid(bill.id)}
                   >
-                    Marcar como Paga
+                    Conta Paga
                   </Button>
                 )}
               </CardContent>
