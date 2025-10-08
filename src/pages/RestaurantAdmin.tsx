@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut, Package, List, TableIcon, ShoppingCart } from "lucide-react";
+import { LogOut, Package, List, TableIcon, ShoppingCart, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CategoriesTab from "@/components/admin/CategoriesTab";
 import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
+import DashboardTab from "@/components/admin/DashboardTab";
 
 interface Restaurant {
   id: string;
@@ -93,8 +94,12 @@ const RestaurantAdmin = () => {
             <CardTitle>Gerenciar Restaurante</CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="categories" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+            <Tabs defaultValue="dashboard" className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="dashboard">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Dashboard
+                </TabsTrigger>
                 <TabsTrigger value="categories">
                   <List className="h-4 w-4 mr-2" />
                   Categorias
@@ -112,6 +117,10 @@ const RestaurantAdmin = () => {
                   Pedidos
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="dashboard">
+                <DashboardTab restaurantId={restaurant.id} />
+              </TabsContent>
 
               <TabsContent value="categories">
                 <CategoriesTab restaurantId={restaurant.id} />

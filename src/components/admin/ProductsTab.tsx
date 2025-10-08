@@ -206,6 +206,21 @@ const ProductsTab = ({ restaurantId }: { restaurantId: string }) => {
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este produto?")) return;
 
+    // Verificar se o produto tem pedidos associados
+    const { data: orderItems } = await supabase
+      .from("order_items")
+      .select("id")
+      .eq("product_id", id)
+      .limit(1);
+
+    if (orderItems && orderItems.length > 0) {
+      toast.error("Não é possível excluir este produto pois ele possui pedidos associados. Você pode desativá-lo editando-o.");
+      return;
+    }
+
+    // Deletar extras do produto primeiro
+    await supabase.from("product_extras").delete().eq("product_id", id);
+
     const { error } = await supabase.from("products").delete().eq("id", id);
 
     if (error) {
