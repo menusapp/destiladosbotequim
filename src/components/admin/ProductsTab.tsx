@@ -43,6 +43,19 @@ interface ProductExtra {
   price: number;
 }
 
+interface ExtraCategory {
+  id: string;
+  name: string;
+  restaurant_id: string;
+}
+
+interface ExtraCategoryItem {
+  id: string;
+  category_id: string;
+  name: string;
+  price: number;
+}
+
 const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string; isRestaurantOpen: boolean }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -59,9 +72,18 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [extraName, setExtraName] = useState("");
   const [extraPrice, setExtraPrice] = useState("");
 
+  // Estados para categorias de adicionais
+  const [extraCategories, setExtraCategories] = useState<ExtraCategory[]>([]);
+  const [extraCategoryDialogOpen, setExtraCategoryDialogOpen] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryItems, setCategoryItems] = useState<ExtraCategoryItem[]>([]);
+  const [categoryItemName, setCategoryItemName] = useState("");
+  const [categoryItemPrice, setCategoryItemPrice] = useState("");
+
   useEffect(() => {
     fetchCategories();
     fetchProducts();
+    fetchExtraCategories();
   }, [restaurantId]);
 
   const fetchCategories = async () => {
@@ -92,6 +114,17 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     setProducts(data || []);
   };
 
+  const fetchExtraCategories = async () => {
+    const { data, error } = await supabase
+      .from("extra_categories")
+      .select("*")
+      .eq("restaurant_id", restaurantId);
+
+    if (!error) {
+      setExtraCategories(data || []);
+    }
+  };
+
   const handleAddExtra = () => {
     if (!extraName || !extraPrice) {
       toast.error("Preencha nome e preço do adicional");
@@ -109,6 +142,108 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
 
   const handleRemoveExtra = (id: string) => {
     setExtras(extras.filter(e => e.id !== id));
+  };
+
+  const handleAddCategoryItem = () => {
+    if (!categoryItemName || !categoryItemPrice) {
+      toast.error("Preencha nome e preço do adicional");
+      return;
+    }
+    
+    setCategoryItems([...categoryItems, {
+      id: crypto.randomUUID(),
+      category_id: "",
+      name: categoryItemName,
+      price: parseFloat(categoryItemPrice)
+    }]);
+    setCategoryItemName("");
+    setCategoryItemPrice("");
+  };
+
+  const handleRemoveCategoryItem = (id: string) => {
+    setCategoryItems(categoryItems.filter(i => i.id !== id));
+  };
+
+  const handleSaveExtraCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!categoryName || categoryItems.length === 0) {
+      toast.error("Preencha o nome da categoria e adicione pelo menos um item");
+      return;
+    }
+
+    // Criar a categoria
+    const { data: newCategory, error: categoryError } = await supabase
+      .from("extra_categories")
+      .insert({ name: categoryName, restaurant_id: restaurantId })
+      .select()
+      .single();
+
+    if (categoryError) {
+      toast.error("Erro ao criar categoria de adicionais");
+      return;
+    }
+
+    // Inserir os itens da categoria
+    const itemsData = categoryItems.map(item => ({
+      category_id: newCategory.id,
+      name: item.name,
+      price: item.price
+    }));
+
+    const { error: itemsError } = await supabase
+      .from("extra_category_items")
+      .insert(itemsData);
+
+    if (itemsError) {
+      toast.error("Erro ao adicionar itens da categoria");
+      return;
+    }
+
+    toast.success("Categoria de adicionais criada!");
+    setCategoryName("");
+    setCategoryItems([]);
+    setExtraCategoryDialogOpen(false);
+    fetchExtraCategories();
+  };
+
+  const handleLoadExtrasFromCategory = async (categoryId: string) => {
+    const { data, error } = await supabase
+      .from("extra_category_items")
+      .select("*")
+      .eq("category_id", categoryId);
+
+    if (error) {
+      toast.error("Erro ao carregar adicionais da categoria");
+      return;
+    }
+
+    // Adicionar os itens da categoria aos extras do produto
+    const newExtras = data.map(item => ({
+      id: crypto.randomUUID(),
+      name: item.name,
+      price: item.price
+    }));
+
+    setExtras([...extras, ...newExtras]);
+    toast.success("Adicionais adicionados!");
+  };
+
+  const handleDeleteExtraCategory = async (categoryId: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
+
+    const { error } = await supabase
+      .from("extra_categories")
+      .delete()
+      .eq("id", categoryId);
+
+    if (error) {
+      toast.error("Erro ao excluir categoria");
+      return;
+    }
+
+    toast.success("Categoria excluída!");
+    fetchExtraCategories();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -273,22 +408,129 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Produtos</h3>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => {
-              if (isRestaurantOpen) {
-                toast.error("Feche o restaurante para adicionar produtos");
-                return;
-              }
-              resetForm();
-            }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Produto
-            </Button>
-          </DialogTrigger>
+    <div className="space-y-6">
+      {/* Seção de Categorias de Adicionais */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">Categorias de Adicionais</h3>
+          <Dialog open={extraCategoryDialogOpen} onOpenChange={setExtraCategoryDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Categoria
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Nova Categoria de Adicionais</DialogTitle>
+                <DialogDescription>
+                  Crie uma categoria com adicionais que podem ser reutilizados em vários produtos
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSaveExtraCategory} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category-name">Nome da Categoria</Label>
+                  <Input
+                    id="category-name"
+                    value={categoryName}
+                    onChange={(e) => setCategoryName(e.target.value)}
+                    placeholder="Ex: Tamanhos, Sabores, Bebidas"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-3 p-4 border rounded-lg bg-secondary/20">
+                  <h4 className="font-semibold text-sm">Itens da Categoria</h4>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Nome do adicional"
+                        value={categoryItemName}
+                        onChange={(e) => setCategoryItemName(e.target.value)}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Preço"
+                        value={categoryItemPrice}
+                        onChange={(e) => setCategoryItemPrice(e.target.value)}
+                      />
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={handleAddCategoryItem}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {categoryItems.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      {categoryItems.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between p-2 bg-background rounded">
+                          <span className="text-sm">{item.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold">+ R$ {item.price.toFixed(2)}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveCategoryItem(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <Button type="submit" className="w-full">
+                  Salvar Categoria
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {extraCategories.length > 0 && (
+          <div className="space-y-2">
+            {extraCategories.map((category) => (
+              <div
+                key={category.id}
+                className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
+              >
+                <p className="font-medium">{category.name}</p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleDeleteExtraCategory(category.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Seção de Produtos */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">Produtos</h3>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => {
+                if (isRestaurantOpen) {
+                  toast.error("Feche o restaurante para adicionar produtos");
+                  return;
+                }
+                resetForm();
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Produto
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
@@ -363,6 +605,25 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
               
               <div className="space-y-3 p-4 border rounded-lg bg-secondary/20">
                 <h4 className="font-semibold text-sm">Adicionais (Opcionais)</h4>
+                
+                {extraCategories.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Ou selecione uma categoria de adicionais:</Label>
+                    <Select onValueChange={handleLoadExtrasFromCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {extraCategories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <Input
@@ -415,7 +676,7 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
         </Dialog>
       </div>
 
-      {categories.length === 0 ? (
+        {categories.length === 0 ? (
         <div className="text-center py-12 border rounded-lg bg-secondary/20">
           <p className="text-muted-foreground">
             Crie categorias primeiro antes de adicionar produtos
@@ -458,7 +719,8 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
             </div>
           ))}
         </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
