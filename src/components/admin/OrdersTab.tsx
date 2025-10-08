@@ -9,7 +9,7 @@ interface OrderItemExtra {
   price_at_order: number;
   product_extras: {
     name: string;
-  };
+  } | null;
 }
 
 interface Order {
@@ -25,7 +25,7 @@ interface Order {
     price_at_order: number;
     products: {
       name: string;
-    };
+    } | null;
     order_item_extras: OrderItemExtra[];
   }[];
 }
@@ -166,12 +166,13 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 {order.order_items.map((item, idx) => {
                   const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
                   const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
+                  const productName = item.products?.name || "Produto excluído";
                   
                   return (
                     <div key={idx} className="space-y-0.5">
                       <div className="flex justify-between text-sm">
-                        <span>
-                          {item.quantity}x {item.products.name}
+                        <span className={!item.products ? "text-muted-foreground" : ""}>
+                          {item.quantity}x {productName}
                         </span>
                         <span className="text-primary font-medium">
                           R$ {itemTotal.toFixed(2)}
@@ -179,7 +180,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                       </div>
                       {item.order_item_extras && item.order_item_extras.length > 0 && (
                         <div className="text-xs text-muted-foreground pl-4">
-                          + {item.order_item_extras.map(e => e.product_extras.name).join(', ')}
+                          + {item.order_item_extras.map(e => e.product_extras?.name || "Extra excluído").join(', ')}
                         </div>
                       )}
                     </div>

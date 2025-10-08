@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { LogOut, Package, List, TableIcon, ShoppingCart, BarChart3 } from "lucide-react";
+import { LogOut, Package, List, TableIcon, ShoppingCart, BarChart3, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CategoriesTab from "@/components/admin/CategoriesTab";
@@ -13,6 +13,7 @@ import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
 import DashboardTab from "@/components/admin/DashboardTab";
+import BillsTab from "@/components/admin/BillsTab";
 
 interface Restaurant {
   id: string;
@@ -125,7 +126,7 @@ const RestaurantAdmin = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="dashboard" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="dashboard">
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Dashboard
@@ -145,6 +146,10 @@ const RestaurantAdmin = () => {
                 <TabsTrigger value="orders">
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Pedidos
+                </TabsTrigger>
+                <TabsTrigger value="bills">
+                  <Receipt className="h-4 w-4 mr-2" />
+                  Contas
                 </TabsTrigger>
               </TabsList>
 
@@ -166,6 +171,10 @@ const RestaurantAdmin = () => {
 
               <TabsContent value="orders">
                 <OrdersTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="bills">
+                <BillsTab restaurantId={restaurant.id} />
               </TabsContent>
             </Tabs>
           </CardContent>

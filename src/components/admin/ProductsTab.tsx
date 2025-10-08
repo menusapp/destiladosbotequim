@@ -209,7 +209,7 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este produto?")) return;
+    if (!confirm("Tem certeza que deseja excluir este produto? Os pedidos já feitos com este produto serão mantidos no histórico.")) return;
 
     if (isRestaurantOpen) {
       toast.error("Feche o restaurante para excluir produtos");
@@ -217,29 +217,10 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     }
 
     try {
-      // Quando fechado, deletar todos os registros relacionados
-      // 1. Buscar order_items deste produto
-      const { data: orderItems } = await supabase
-        .from("order_items")
-        .select("id")
-        .eq("product_id", id);
-
-      // 2. Deletar order_item_extras relacionados
-      if (orderItems && orderItems.length > 0) {
-        const orderItemIds = orderItems.map(item => item.id);
-        await supabase
-          .from("order_item_extras")
-          .delete()
-          .in("order_item_id", orderItemIds);
-      }
-
-      // 3. Deletar order_items
-      await supabase.from("order_items").delete().eq("product_id", id);
-
-      // 4. Deletar product_extras
+      // Apenas deletar product_extras e o produto
+      // Os order_items permanecem para histórico de faturamento
       await supabase.from("product_extras").delete().eq("product_id", id);
 
-      // 5. Deletar produto
       const { error } = await supabase.from("products").delete().eq("id", id);
 
       if (error) {
@@ -247,7 +228,7 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
         return;
       }
 
-      toast.success("Produto excluído!");
+      toast.success("Produto excluído! Pedidos históricos foram mantidos.");
       fetchProducts();
     } catch (error) {
       console.error(error);
