@@ -55,6 +55,100 @@ const Comanda = () => {
 
   useEffect(() => {
     fetchData();
+    
+    // Configurar realtime para bills (fora do fetchData para evitar múltiplas subscrições)
+    let billChannel: any = null;
+    let ordersChannel: any = null;
+    
+    const setupRealtimeChannels = async () => {
+      // Buscar table_id primeiro
+      const { data: restData } = await supabase
+        .from("restaurants")
+        .select("id")
+        .eq("slug", restaurantSlug)
+        .single();
+      
+      if (!restData) return;
+      
+      const { data: tableData } = await supabase
+        .from("tables")
+        .select("id")
+        .eq("restaurant_id", restData.id)
+        .eq("table_number", parseInt(tableNumber || "0"))
+        .single();
+      
+      if (!tableData) return;
+      
+      console.log("Configurando realtime para table_id:", tableData.id);
+      
+      // Configurar realtime para atualizar status da conta
+      billChannel = supabase
+        .channel(`bill-status-${tableData.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'bills',
+            filter: `table_id=eq.${tableData.id}`,
+          },
+          (payload) => {
+            console.log("Bill atualizada:", payload);
+            const updatedBill = payload.new as any;
+            if (updatedBill.status === "on_the_way") {
+              setBillOnTheWay(true);
+              setTimerSeconds(0);
+              toast.success("A conta está a caminho!");
+            } else if (updatedBill.status === "paid") {
+              console.log("Conta paga! Redirecionando...");
+              toast.success("Conta paga! Obrigado pela preferência!");
+              setTimeout(() => {
+                navigate(`/menu/${restaurantSlug}/${tableNumber}`);
+              }, 2000);
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log("Bill channel status:", status);
+        });
+      
+      // Configurar realtime para pedidos aceitos
+      ordersChannel = supabase
+        .channel(`order-status-${tableData.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'orders',
+            filter: `table_id=eq.${tableData.id}`,
+          },
+          (payload) => {
+            console.log("Order atualizada:", payload);
+            const updatedOrder = payload.new as any;
+            if (updatedOrder.status === "accepted" && payload.old?.status === "pending") {
+              toast.success("Seu pedido foi aceito!");
+              fetchData();
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log("Orders channel status:", status);
+        });
+    };
+    
+    setupRealtimeChannels();
+    
+    return () => {
+      if (billChannel) {
+        console.log("Removendo bill channel");
+        supabase.removeChannel(billChannel);
+      }
+      if (ordersChannel) {
+        console.log("Removendo orders channel");
+        supabase.removeChannel(ordersChannel);
+      }
+    };
   }, [restaurantSlug, tableNumber]);
 
   useEffect(() => {
@@ -138,58 +232,6 @@ const Comanda = () => {
         }
       }
       
-      // Configurar realtime para atualizar status da conta
-      const billChannel = supabase
-        .channel('bill-status-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'bills',
-            filter: `table_id=eq.${tableData.id}`,
-          },
-          (payload) => {
-            const updatedBill = payload.new as any;
-            if (updatedBill.status === "on_the_way") {
-              setBillOnTheWay(true);
-              setTimerSeconds(0);
-              toast.success("A conta está a caminho!");
-            } else if (updatedBill.status === "paid") {
-              toast.success("Conta paga! Obrigado pela preferência!");
-              setTimeout(() => {
-                navigate(`/menu/${restaurantSlug}/${tableNumber}`);
-              }, 2000);
-            }
-          }
-        )
-        .subscribe();
-
-      // Configurar realtime para pedidos aceitos
-      const ordersChannel = supabase
-        .channel('order-status-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'orders',
-            filter: `table_id=eq.${tableData.id}`,
-          },
-          (payload) => {
-            const updatedOrder = payload.new as any;
-            if (updatedOrder.status === "accepted" && payload.old?.status === "pending") {
-              toast.success("Seu pedido foi aceito!");
-              fetchData();
-            }
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(billChannel);
-        supabase.removeChannel(ordersChannel);
-      };
     } catch (error: any) {
       toast.error("Erro ao carregar comanda");
       console.error(error);
