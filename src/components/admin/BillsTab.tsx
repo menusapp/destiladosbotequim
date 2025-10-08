@@ -11,6 +11,7 @@ interface Bill {
   status: string;
   subtotal: number;
   service_fee: number;
+  service_fee_removed: boolean;
   total_amount: number;
   payment_method: string;
   change_amount: number | null;
@@ -183,10 +184,18 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
                     <span>Subtotal</span>
                     <span>R$ {bill.subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Taxa de Serviço (10%)</span>
-                    <span>R$ {bill.service_fee.toFixed(2)}</span>
-                  </div>
+                  {!bill.service_fee_removed && (
+                    <div className="flex justify-between text-sm">
+                      <span>Taxa de Serviço (10%)</span>
+                      <span>R$ {bill.service_fee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {bill.service_fee_removed && (
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Taxa de Serviço (10%)</span>
+                      <span className="line-through">R$ {bill.service_fee.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-bold pt-2 border-t">
                     <span>Total</span>
                     <span className="text-primary">R$ {bill.total_amount.toFixed(2)}</span>

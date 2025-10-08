@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Check, ChefHat, Truck } from "lucide-react";
+import { Clock, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -101,9 +101,6 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     const statusConfig = {
       pending: { label: "Pendente", variant: "secondary" as const, icon: Clock },
       accepted: { label: "Aceito", variant: "default" as const, icon: Check },
-      preparing: { label: "Preparando", variant: "default" as const, icon: ChefHat },
-      ready: { label: "Pronto", variant: "default" as const, icon: Check },
-      delivered: { label: "Entregue", variant: "default" as const, icon: Truck },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
@@ -115,26 +112,6 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         {config.label}
       </Badge>
     );
-  };
-
-  const getNextStatus = (currentStatus: string) => {
-    const statusFlow: Record<string, string> = {
-      pending: "accepted",
-      accepted: "preparing",
-      preparing: "ready",
-      ready: "delivered",
-    };
-    return statusFlow[currentStatus];
-  };
-
-  const getNextStatusLabel = (currentStatus: string) => {
-    const labels: Record<string, string> = {
-      pending: "Aceitar",
-      accepted: "Iniciar Preparo",
-      preparing: "Marcar como Pronto",
-      ready: "Marcar como Entregue",
-    };
-    return labels[currentStatus];
   };
 
   return (
@@ -188,12 +165,12 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 })}
               </div>
 
-              {order.status !== "delivered" && (
+              {order.status === "pending" && (
                 <Button
                   className="w-full"
-                  onClick={() => updateOrderStatus(order.id, getNextStatus(order.status))}
+                  onClick={() => updateOrderStatus(order.id, "accepted")}
                 >
-                  {getNextStatusLabel(order.status)}
+                  Aceitar Pedido
                 </Button>
               )}
             </div>
