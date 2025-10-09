@@ -70,6 +70,7 @@ const Comanda = () => {
   const [billRequested, setBillRequested] = useState(false);
   const [billOnTheWay, setBillOnTheWay] = useState(false);
   const [prepTimerSeconds, setPrepTimerSeconds] = useState(0);
+  const [orderSent, setOrderSent] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("pix");
   const [changeAmount, setChangeAmount] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -365,8 +366,9 @@ const Comanda = () => {
       setCart([]);
       sessionStorage.removeItem(`cart_${tableNumber}`);
       
-      // Iniciar cronômetro de preparo
+      // Iniciar cronômetro de preparo e marcar que pedido foi enviado
       setPrepTimerSeconds(prepTimeMinutes * 60);
+      setOrderSent(true);
       
       toast.success("Pedido enviado! Aguarde o atendimento");
       fetchData();
@@ -463,26 +465,26 @@ const Comanda = () => {
               </div>
             </CardContent>
           </Card>
-        ) : prepTimerSeconds > 0 ? (
+        ) : orderSent && !billRequested ? (
           <Card className="border-amber-500 bg-amber-50">
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
                 <Clock className="h-5 w-5 text-amber-600" />
                 <div className="text-center">
                   <p className="text-sm text-amber-800 font-medium">
-                    Seu pedido está em preparo
+                    Tempo de Preparo de Até
                   </p>
                   <p className="text-3xl font-bold text-amber-600 mt-1">
                     {formatTime(prepTimerSeconds)}
                   </p>
                   <p className="text-xs text-amber-700 mt-1">
-                    Tempo estimado restante
+                    {prepTimerSeconds > 0 ? "Tempo estimado restante" : "Seu pedido deve estar pronto"}
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
-        ) : billRequested ? (
+        ) : billRequested && !billOnTheWay ? (
           <Card className="border-gray-300 bg-gray-50">
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
