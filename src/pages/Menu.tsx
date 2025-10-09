@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Receipt } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
@@ -39,13 +39,26 @@ interface Restaurant {
 }
 
 
+interface CartItemExtra {
+  id: string;
+  name: string;
+  price: number;
+}
+
+interface CartItem {
+  id: string;
+  product: Product;
+  quantity: number;
+  extras: CartItemExtra[];
+}
+
 const Menu = () => {
-  console.log("Menu component is rendering");
   const { restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
   
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [customerName, setCustomerName] = useState("");
   const [customerCPF, setCustomerCPF] = useState("");
@@ -60,6 +73,12 @@ const Menu = () => {
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
     const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
     
+    // Carregar carrinho do sessionStorage
+    const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
+    if (savedCart) {
+      setCart(JSON.parse(savedCart));
+    }
+    
     if (savedName && savedCPF) {
       setCustomerName(savedName);
       setCustomerCPF(savedCPF);
@@ -69,6 +88,11 @@ const Menu = () => {
       fetchData();
     }
   }, [restaurantSlug, tableNumber]);
+
+  useEffect(() => {
+    // Salvar carrinho no sessionStorage sempre que mudar
+    sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
+  }, [cart, tableNumber]);
 
   const fetchData = async () => {
     try {
@@ -147,62 +171,49 @@ const Menu = () => {
     setShowProductDialog(true);
   };
 
-  const addToCart = async (product: Product, extras: ProductExtra[]) => {
-    if (!tableId) {
-      toast.error("Mesa não encontrada");
-      return;
-    }
-
-    try {
-      // Criar pedido imediatamente
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          table_id: tableId,
-          customer_name: customerName,
-          customer_cpf: customerCPF,
-          status: "pending",
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Criar item do pedido
-      const { data: orderItem, error: itemError } = await supabase
-        .from("order_items")
-        .insert({
-          order_id: order.id,
-          product_id: product.id,
-          quantity: 1,
-          price_at_order: product.price,
-        })
-        .select()
-        .single();
-
-      if (itemError) throw itemError;
-
-      // Inserir extras do item
-      if (extras.length > 0) {
-        const orderItemExtras = extras.map((extra) => ({
-          order_item_id: orderItem.id,
-          product_extra_id: extra.id,
-          price_at_order: extra.price,
-        }));
-
-        const { error: extrasError } = await supabase
-          .from("order_item_extras")
-          .insert(orderItemExtras);
-
-        if (extrasError) throw extrasError;
+  const addToCart = (product: Product, extras: ProductExtra[]) => {
+    setCart((prev) => {
+      const existing = prev.find((item) => 
+        item.product.id === product.id && 
+        JSON.stringify(item.extras.map(e => e.id).sort()) === JSON.stringify(extras.map(e => e.id).sort())
+      );
+      
+      if (existing) {
+        return prev.map((item) =>
+          item.id === existing.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
       }
+      
+      return [...prev, { 
+        id: crypto.randomUUID(),
+        product, 
+        quantity: 1, 
+        extras 
+      }];
+    });
+    
+    const extrasText = extras.length > 0 ? ` com ${extras.length} adicional(is)` : '';
+    toast.success(`${product.name}${extrasText} adicionado ao carrinho`);
+  };
 
-      const extrasText = extras.length > 0 ? ` com ${extras.length} adicional(is)` : '';
-      toast.success(`${product.name}${extrasText} adicionado!`);
-    } catch (error: any) {
-      toast.error("Erro ao adicionar item");
-      console.error(error);
-    }
+  const updateQuantity = (itemId: string, delta: number) => {
+    setCart((prev) => {
+      const updated = prev.map((item) =>
+        item.id === itemId
+          ? { ...item, quantity: Math.max(0, item.quantity + delta) }
+          : item
+      );
+      return updated.filter((item) => item.quantity > 0);
+    });
+  };
+
+  const getCartTotal = () => {
+    return cart.reduce((sum, item) => {
+      const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+      return sum + (item.product.price + extrasTotal) * item.quantity;
+    }, 0);
   };
 
 
@@ -293,16 +304,21 @@ const Menu = () => {
           ))}
         </div>
 
-        {/* Botão Fixo Ver Comanda */}
+        {/* Botão Fixo Ver Comanda com Badge */}
         <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-lg p-4">
           <div className="container mx-auto">
             <Button
-              className="w-full"
+              className="w-full relative"
               size="lg"
               onClick={() => navigate(`/comanda/${restaurantSlug}/${tableNumber}`)}
             >
               <Receipt className="h-5 w-5 mr-2" />
               Ver Comanda
+              {cart.length > 0 && (
+                <Badge className="absolute -top-2 -right-2 h-6 w-6 flex items-center justify-center p-0">
+                  {cart.length}
+                </Badge>
+              )}
             </Button>
           </div>
         </div>

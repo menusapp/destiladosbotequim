@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Receipt, Clock, CreditCard, Banknote, Smartphone } from "lucide-react";
+import { ArrowLeft, Receipt, Clock, CreditCard, Banknote, Smartphone, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -20,6 +20,9 @@ import { Input } from "@/components/ui/input";
 
 interface OrderItemExtra {
   price_at_order: number;
+  product_extras: {
+    name: string;
+  };
 }
 
 interface OrderItem {
@@ -39,11 +42,29 @@ interface Order {
   order_items: OrderItem[];
 }
 
+interface CartItemExtra {
+  id: string;
+  name: string;
+  price: number;
+}
+
+interface CartItem {
+  id: string;
+  product: {
+    id: string;
+    name: string;
+    price: number;
+  };
+  quantity: number;
+  extras: CartItemExtra[];
+}
+
 const Comanda = () => {
   const { restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
   
   const [orders, setOrders] = useState<Order[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [tableId, setTableId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [billRequested, setBillRequested] = useState(false);
@@ -55,6 +76,15 @@ const Comanda = () => {
 
   useEffect(() => {
     fetchData();
+    
+    // Carregar carrinho do sessionStorage
+    const loadCart = () => {
+      const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
+      if (savedCart) {
+        setCart(JSON.parse(savedCart));
+      }
+    };
+    loadCart();
     
     // Configurar realtime para bills (fora do fetchData para evitar múltiplas subscrições)
     let billChannel: any = null;
@@ -204,7 +234,10 @@ const Comanda = () => {
           order_items(
             *,
             products(name),
-            order_item_extras(price_at_order)
+            order_item_extras(
+              price_at_order,
+              product_extras(name)
+            )
           )
         `)
         .eq("table_id", tableData.id)
@@ -246,13 +279,22 @@ const Comanda = () => {
   };
 
   const calculateTotal = () => {
-    const subtotal = orders.reduce((sum, order) => {
+    // Calcular subtotal dos pedidos já enviados
+    const ordersSubtotal = orders.reduce((sum, order) => {
       const orderSum = order.order_items.reduce((itemSum, item) => {
         const extrasSum = (item.order_item_extras || []).reduce((s, e) => s + e.price_at_order, 0);
         return itemSum + (item.price_at_order + extrasSum) * item.quantity;
       }, 0);
       return sum + orderSum;
     }, 0);
+
+    // Calcular subtotal do carrinho (ainda não enviado)
+    const cartSubtotal = cart.reduce((sum, item) => {
+      const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+      return sum + (item.product.price + extrasTotal) * item.quantity;
+    }, 0);
+
+    const subtotal = ordersSubtotal + cartSubtotal;
 
     const serviceFee = subtotal * 0.1;
     const serviceFeeApplied = timerSeconds > 0 || !billRequested;
@@ -263,6 +305,78 @@ const Comanda = () => {
       serviceFeeApplied,
       total: serviceFeeApplied ? subtotal + serviceFee : subtotal,
     };
+  };
+
+  const handleSendOrder = async () => {
+    if (cart.length === 0) {
+      toast.error("Carrinho vazio");
+      return;
+    }
+
+    if (!tableId) {
+      toast.error("Mesa não encontrada");
+      return;
+    }
+
+    const customerName = sessionStorage.getItem(`customer_name_${tableNumber}`);
+    const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+
+    try {
+      // Criar pedido
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          table_id: tableId,
+          customer_name: customerName || "",
+          customer_cpf: customerCPF || "",
+          status: "pending",
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Criar itens do pedido
+      for (const item of cart) {
+        const { data: orderItem, error: itemError } = await supabase
+          .from("order_items")
+          .insert({
+            order_id: order.id,
+            product_id: item.product.id,
+            quantity: item.quantity,
+            price_at_order: item.product.price,
+          })
+          .select()
+          .single();
+
+        if (itemError) throw itemError;
+
+        // Inserir extras do item
+        if (item.extras.length > 0) {
+          const orderItemExtras = item.extras.map((extra) => ({
+            order_item_id: orderItem.id,
+            product_extra_id: extra.id,
+            price_at_order: extra.price,
+          }));
+
+          const { error: extrasError } = await supabase
+            .from("order_item_extras")
+            .insert(orderItemExtras);
+
+          if (extrasError) throw extrasError;
+        }
+      }
+
+      // Limpar carrinho
+      setCart([]);
+      sessionStorage.removeItem(`cart_${tableNumber}`);
+      
+      toast.success("Pedido enviado! Aguarde o atendimento");
+      fetchData();
+    } catch (error: any) {
+      toast.error("Erro ao enviar pedido");
+      console.error(error);
+    }
   };
 
   const handleRequestBill = async () => {
@@ -371,6 +485,49 @@ const Comanda = () => {
           </Card>
         )}
 
+        {/* Carrinho (Itens não enviados) */}
+        {cart.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Carrinho (Não enviado)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {cart.map((item) => {
+                  const extrasTotal = item.extras.reduce((sum, e) => sum + e.price, 0);
+                  const itemTotal = (item.product.price + extrasTotal) * item.quantity;
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex justify-between items-start py-2 border-b last:border-0"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium">{item.product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Qtd: {item.quantity}
+                        </p>
+                        {item.extras.length > 0 && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            + {item.extras.map(e => e.name).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                      <p className="font-semibold text-primary">
+                        R$ {itemTotal.toFixed(2)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+              <Button className="w-full mt-4" onClick={handleSendOrder}>
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Enviar Pedido
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Pedidos */}
         <Card>
           <CardHeader>
@@ -400,13 +557,18 @@ const Comanda = () => {
                     {order.order_items.map((item) => (
                       <div
                         key={item.id}
-                        className="flex justify-between items-center py-2 border-b last:border-0"
+                        className="flex justify-between items-start py-2 border-b last:border-0"
                       >
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium">{item.products.name}</p>
                           <p className="text-sm text-muted-foreground">
                             Qtd: {item.quantity}
                           </p>
+                          {item.order_item_extras && item.order_item_extras.length > 0 && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              + {item.order_item_extras.map(e => e.product_extras.name).join(', ')}
+                            </div>
+                          )}
                         </div>
                         <p className="font-semibold text-primary">
                           R$ {((item.price_at_order + (item.order_item_extras?.reduce((s, e) => s + e.price_at_order, 0) || 0)) * item.quantity).toFixed(2)}
@@ -455,7 +617,7 @@ const Comanda = () => {
         </Card>
 
         {/* Botão Pedir Conta */}
-        {!billRequested && orders.length > 0 && (
+        {!billRequested && (orders.length > 0 || cart.length > 0) && cart.length === 0 && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="w-full" size="lg">

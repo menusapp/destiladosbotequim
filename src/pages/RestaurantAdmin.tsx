@@ -23,7 +23,6 @@ interface Restaurant {
 }
 
 const RestaurantAdmin = () => {
-  console.log("RestaurantAdmin component is rendering");
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
