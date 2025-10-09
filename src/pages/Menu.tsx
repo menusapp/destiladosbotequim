@@ -40,6 +40,7 @@ interface Restaurant {
 
 
 const Menu = () => {
+  console.log("Menu component is rendering");
   const { restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
   
@@ -245,7 +246,6 @@ const Menu = () => {
             <p className="text-xs opacity-75 mt-1">Cliente: {customerName}</p>
           )}
         </div>
-
 
         {/* Categorias e Produtos */}
         <div className="container mx-auto px-4 space-y-6">
