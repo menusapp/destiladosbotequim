@@ -76,6 +76,7 @@ const Comanda = () => {
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
   const [serviceFeePercentage, setServiceFeePercentage] = useState(10);
   const [prepTimeMinutes, setPrepTimeMinutes] = useState(30);
+  const [restaurantColor, setRestaurantColor] = useState("#FF6B35");
 
   useEffect(() => {
     fetchData();
@@ -203,7 +204,7 @@ const Comanda = () => {
       // Buscar restaurante e configurações
       const { data: restData, error: restError } = await supabase
         .from("restaurants")
-        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes")
+        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color")
         .eq("slug", restaurantSlug)
         .single();
 
@@ -212,6 +213,7 @@ const Comanda = () => {
       setServiceFeeEnabled(restData.service_fee_enabled || false);
       setServiceFeePercentage(restData.service_fee_percentage || 10);
       setPrepTimeMinutes(restData.prep_time_minutes || 30);
+      setRestaurantColor(restData.primary_color || "#FF6B35");
 
       // Buscar mesa
       const { data: tableData, error: tableError } = await supabase
@@ -424,12 +426,15 @@ const Comanda = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground p-6 shadow-lg">
+      <div 
+        className="text-white p-6 shadow-lg"
+        style={{ backgroundColor: restaurantColor }}
+      >
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate(`/menu/${restaurantSlug}/${tableNumber}`)}
-          className="mb-4 text-primary-foreground hover:bg-primary-foreground/20"
+          className="mb-4 text-white hover:bg-white/20"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar ao Cardápio
@@ -478,12 +483,12 @@ const Comanda = () => {
             </CardContent>
           </Card>
         ) : billRequested ? (
-          <Card className="border-primary bg-primary/5">
+          <Card className="border-gray-300 bg-gray-50">
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
-                <Clock className="h-5 w-5 text-primary" />
+                <Clock className="h-5 w-5" style={{ color: restaurantColor }} />
                 <div className="text-center">
-                  <p className="text-lg font-semibold text-primary">
+                  <p className="text-lg font-semibold" style={{ color: restaurantColor }}>
                     Conta solicitada!
                   </p>
                   <p className="text-sm text-muted-foreground">
@@ -523,14 +528,18 @@ const Comanda = () => {
                           </div>
                         )}
                       </div>
-                      <p className="font-semibold text-primary">
+                      <p className="font-semibold" style={{ color: restaurantColor }}>
                         R$ {itemTotal.toFixed(2)}
                       </p>
                     </div>
                   );
                 })}
               </div>
-              <Button className="w-full mt-4" onClick={handleSendOrder}>
+              <Button 
+                className="w-full mt-4 text-white" 
+                onClick={handleSendOrder}
+                style={{ backgroundColor: restaurantColor }}
+              >
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Enviar Pedido
               </Button>
@@ -580,7 +589,7 @@ const Comanda = () => {
                             </div>
                           )}
                         </div>
-                        <p className="font-semibold text-primary">
+                        <p className="font-semibold" style={{ color: restaurantColor }}>
                           R$ {((item.price_at_order + (item.order_item_extras?.reduce((s, e) => s + e.price_at_order, 0) || 0)) * item.quantity).toFixed(2)}
                         </p>
                       </div>
@@ -610,7 +619,7 @@ const Comanda = () => {
             )}
             <div className="flex justify-between text-xl font-bold pt-3 border-t">
               <span>Total</span>
-              <span className="text-primary">R$ {totals.total.toFixed(2)}</span>
+              <span style={{ color: restaurantColor }}>R$ {totals.total.toFixed(2)}</span>
             </div>
           </CardContent>
         </Card>
@@ -670,7 +679,11 @@ const Comanda = () => {
                   </div>
                 )}
 
-                <Button onClick={handleRequestBill} className="w-full">
+                <Button 
+                  onClick={handleRequestBill} 
+                  className="w-full text-white"
+                  style={{ backgroundColor: restaurantColor }}
+                >
                   Confirmar e Pedir Conta
                 </Button>
               </div>

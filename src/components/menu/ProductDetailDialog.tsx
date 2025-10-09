@@ -31,6 +31,7 @@ interface ProductDetailDialogProps {
   open: boolean;
   onClose: () => void;
   onAddToCart: (product: Product, selectedExtras: ProductExtra[]) => void;
+  restaurantColor?: string;
 }
 
 const ProductDetailDialog = ({
@@ -39,6 +40,7 @@ const ProductDetailDialog = ({
   open,
   onClose,
   onAddToCart,
+  restaurantColor = "#FF6B35"
 }: ProductDetailDialogProps) => {
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
 
@@ -86,7 +88,7 @@ const ProductDetailDialog = ({
           )}
 
           <div className="space-y-2">
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-2xl font-bold" style={{ color: restaurantColor }}>
               R$ {product.price.toFixed(2)}
             </p>
 
@@ -115,16 +117,24 @@ const ProductDetailDialog = ({
             )}
 
             {selectedExtras.length > 0 && (
-              <div className="flex justify-between items-center p-3 bg-primary/10 rounded-lg">
+              <div 
+                className="flex justify-between items-center p-3 rounded-lg" 
+                style={{ backgroundColor: `${restaurantColor}15` }}
+              >
                 <span className="font-semibold">Total com adicionais:</span>
-                <span className="text-xl font-bold text-primary">
+                <span className="text-xl font-bold" style={{ color: restaurantColor }}>
                   R$ {getTotalPrice().toFixed(2)}
                 </span>
               </div>
             )}
           </div>
 
-          <Button className="w-full" size="lg" onClick={handleAddToCart}>
+          <Button 
+            className="w-full text-white" 
+            size="lg" 
+            onClick={handleAddToCart}
+            style={{ backgroundColor: restaurantColor }}
+          >
             <Plus className="h-5 w-5 mr-2" />
             Adicionar ao Carrinho
           </Button>

@@ -13,9 +13,10 @@ import {
 interface CustomerInfoDialogProps {
   open: boolean;
   onSubmit: (name: string, cpf: string) => void;
+  restaurantColor?: string;
 }
 
-const CustomerInfoDialog = ({ open, onSubmit }: CustomerInfoDialogProps) => {
+const CustomerInfoDialog = ({ open, onSubmit, restaurantColor = "#FF6B35" }: CustomerInfoDialogProps) => {
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
 
@@ -56,7 +57,11 @@ const CustomerInfoDialog = ({ open, onSubmit }: CustomerInfoDialogProps) => {
               required
             />
           </div>
-          <Button type="submit" className="w-full">
+          <Button 
+            type="submit" 
+            className="w-full text-white"
+            style={{ backgroundColor: restaurantColor }}
+          >
             Começar Pedido
           </Button>
         </form>

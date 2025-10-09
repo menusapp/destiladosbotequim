@@ -238,6 +238,7 @@ const Menu = () => {
       <CustomerInfoDialog
         open={showCustomerDialog}
         onSubmit={handleCustomerInfoSubmit}
+        restaurantColor={restaurant.primary_color}
       />
 
       <ProductDetailDialog
@@ -246,30 +247,32 @@ const Menu = () => {
         open={showProductDialog}
         onClose={() => setShowProductDialog(false)}
         onAddToCart={addToCart}
+        restaurantColor={restaurant.primary_color}
       />
 
       <div 
         className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background pb-24"
         style={{
           // @ts-ignore
-          '--primary': restaurant.primary_color.replace('#', '').match(/.{2}/g)?.map(x => parseInt(x, 16)).join(' ') || '14 88% 60%',
-        }}
+          '--primary': `${parseInt(restaurant.primary_color.slice(1,3), 16)} ${parseInt(restaurant.primary_color.slice(3,5), 16)} ${parseInt(restaurant.primary_color.slice(5,7), 16)}`,
+        } as React.CSSProperties}
       >
         {/* Header */}
         <div 
-          className="text-primary-foreground p-6 shadow-lg"
+          className="text-white p-6 shadow-lg"
           style={{ backgroundColor: restaurant.primary_color }}
         >
-          {restaurant.logo_url && (
-            <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-2">
+            {restaurant.logo_url ? (
               <img 
                 src={restaurant.logo_url} 
                 alt="Logo" 
-                className="h-16 w-auto object-contain"
+                className="h-20 w-auto object-contain"
               />
-            </div>
-          )}
-          <h1 className="text-2xl font-bold text-center">{restaurant.name}</h1>
+            ) : (
+              <h1 className="text-2xl font-bold">{restaurant.name}</h1>
+            )}
+          </div>
           <p className="text-sm opacity-90 text-center">Mesa {tableNumber}</p>
           {customerName && (
             <p className="text-xs opacity-75 mt-1 text-center">Cliente: {customerName}</p>
@@ -311,7 +314,10 @@ const Menu = () => {
                           <Badge variant="secondary">Indisponível</Badge>
                         )}
                       </div>
-                      <p className="text-lg font-bold text-primary mt-2">
+                      <p 
+                        className="text-lg font-bold mt-2"
+                        style={{ color: restaurant.primary_color }}
+                      >
                         R$ {product.price.toFixed(2)}
                       </p>
                     </div>
@@ -326,14 +332,18 @@ const Menu = () => {
         <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-lg p-4">
           <div className="container mx-auto">
             <Button
-              className="w-full relative"
+              className="w-full relative text-white"
               size="lg"
+              style={{ backgroundColor: restaurant.primary_color }}
               onClick={() => navigate(`/comanda/${restaurantSlug}/${tableNumber}`)}
             >
               <Receipt className="h-5 w-5 mr-2" />
               Ver Comanda
               {cart.length > 0 && (
-                <Badge className="absolute -top-2 -right-2 h-6 w-6 flex items-center justify-center p-0">
+                <Badge 
+                  className="absolute -top-2 -right-2 h-6 w-6 flex items-center justify-center p-0 text-white"
+                  style={{ backgroundColor: restaurant.primary_color, filter: 'brightness(0.8)' }}
+                >
                   {cart.length}
                 </Badge>
               )}
