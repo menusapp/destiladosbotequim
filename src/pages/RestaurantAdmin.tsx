@@ -87,7 +87,21 @@ const RestaurantAdmin = () => {
   }
 
   if (!restaurant) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle>Sem sessão ativa</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              Faça login para acessar o painel do restaurante.
+            </p>
+            <Button onClick={() => navigate("/")}>Ir para Login</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

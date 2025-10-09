@@ -92,10 +92,11 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleMarkAsOnTheWay = async (billId: string) => {
-    // Usar função do banco que verifica corretamente o tempo no servidor
-    const { data, error } = await supabase.rpc('mark_bill_on_the_way', {
-      _bill_id: billId
-    });
+    // Atualiza somente o status no cliente para evitar qualquer ajuste na taxa de serviço
+    const { error } = await supabase
+      .from("bills")
+      .update({ status: "on_the_way" })
+      .eq("id", billId);
 
     if (error) {
       toast.error("Erro ao atualizar status");
