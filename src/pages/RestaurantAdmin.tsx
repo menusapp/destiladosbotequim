@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { LogOut, Package, List, TableIcon, ShoppingCart, BarChart3, Receipt } from "lucide-react";
+import { LogOut, Package, List, TableIcon, ShoppingCart, BarChart3, Receipt, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CategoriesTab from "@/components/admin/CategoriesTab";
@@ -14,6 +14,7 @@ import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
 import DashboardTab from "@/components/admin/DashboardTab";
 import BillsTab from "@/components/admin/BillsTab";
+import SettingsTab from "@/components/admin/SettingsTab";
 
 interface Restaurant {
   id: string;
@@ -141,7 +142,7 @@ const RestaurantAdmin = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="dashboard" className="w-full">
-              <TabsList className="grid w-full grid-cols-6">
+              <TabsList className="grid w-full grid-cols-7">
                 <TabsTrigger value="dashboard">
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Dashboard
@@ -165,6 +166,10 @@ const RestaurantAdmin = () => {
                 <TabsTrigger value="bills">
                   <Receipt className="h-4 w-4 mr-2" />
                   Contas
+                </TabsTrigger>
+                <TabsTrigger value="settings">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configurações
                 </TabsTrigger>
               </TabsList>
 
@@ -190,6 +195,10 @@ const RestaurantAdmin = () => {
 
               <TabsContent value="bills">
                 <BillsTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="settings">
+                <SettingsTab restaurantId={restaurant.id} />
               </TabsContent>
             </Tabs>
           </CardContent>

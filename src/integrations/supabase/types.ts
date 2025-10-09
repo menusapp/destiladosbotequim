@@ -16,45 +16,36 @@ export type Database = {
     Tables: {
       bills: {
         Row: {
-          bill_requested_at: string | null
           change_amount: number | null
           created_at: string | null
           id: string
           paid_at: string | null
           payment_method: string | null
           service_fee: number
-          service_fee_removed: boolean | null
-          service_fee_removed_at: string | null
           status: string | null
           subtotal: number
           table_id: string
           total_amount: number
         }
         Insert: {
-          bill_requested_at?: string | null
           change_amount?: number | null
           created_at?: string | null
           id?: string
           paid_at?: string | null
           payment_method?: string | null
           service_fee: number
-          service_fee_removed?: boolean | null
-          service_fee_removed_at?: string | null
           status?: string | null
           subtotal: number
           table_id: string
           total_amount: number
         }
         Update: {
-          bill_requested_at?: string | null
           change_amount?: number | null
           created_at?: string | null
           id?: string
           paid_at?: string | null
           payment_method?: string | null
           service_fee?: number
-          service_fee_removed?: boolean | null
-          service_fee_removed_at?: string | null
           status?: string | null
           subtotal?: number
           table_id?: string
@@ -401,8 +392,11 @@ export type Database = {
           is_open: boolean | null
           logo_url: string | null
           name: string
+          prep_time_minutes: number | null
           primary_color: string | null
           secondary_color: string | null
+          service_fee_enabled: boolean | null
+          service_fee_percentage: number | null
           slug: string
           updated_at: string | null
         }
@@ -412,8 +406,11 @@ export type Database = {
           is_open?: boolean | null
           logo_url?: string | null
           name: string
+          prep_time_minutes?: number | null
           primary_color?: string | null
           secondary_color?: string | null
+          service_fee_enabled?: boolean | null
+          service_fee_percentage?: number | null
           slug: string
           updated_at?: string | null
         }
@@ -423,8 +420,11 @@ export type Database = {
           is_open?: boolean | null
           logo_url?: string | null
           name?: string
+          prep_time_minutes?: number | null
           primary_color?: string | null
           secondary_color?: string | null
+          service_fee_enabled?: boolean | null
+          service_fee_percentage?: number | null
           slug?: string
           updated_at?: string | null
         }
@@ -470,24 +470,6 @@ export type Database = {
       is_restaurant_closed_by_order_item: {
         Args: { _order_item_id: string }
         Returns: boolean
-      }
-      mark_bill_on_the_way: {
-        Args: { _bill_id: string }
-        Returns: {
-          bill_requested_at: string | null
-          change_amount: number | null
-          created_at: string | null
-          id: string
-          paid_at: string | null
-          payment_method: string | null
-          service_fee: number
-          service_fee_removed: boolean | null
-          service_fee_removed_at: string | null
-          status: string | null
-          subtotal: number
-          table_id: string
-          total_amount: number
-        }
       }
     }
     Enums: {

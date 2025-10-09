@@ -69,10 +69,13 @@ const Comanda = () => {
   const [loading, setLoading] = useState(true);
   const [billRequested, setBillRequested] = useState(false);
   const [billOnTheWay, setBillOnTheWay] = useState(false);
-  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [prepTimerSeconds, setPrepTimerSeconds] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<string>("pix");
   const [changeAmount, setChangeAmount] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
+  const [serviceFeePercentage, setServiceFeePercentage] = useState(10);
+  const [prepTimeMinutes, setPrepTimeMinutes] = useState(30);
 
   useEffect(() => {
     fetchData();
@@ -127,7 +130,6 @@ const Comanda = () => {
             const updatedBill = payload.new as any;
             if (updatedBill.status === "on_the_way") {
               setBillOnTheWay(true);
-              setTimerSeconds(0);
               toast.success("A conta está a caminho!");
             } else if (updatedBill.status === "paid") {
               console.log("Conta paga! Redirecionando...");
@@ -187,30 +189,29 @@ const Comanda = () => {
   }, [restaurantSlug, tableNumber]);
 
   useEffect(() => {
-    if (billRequested && !billOnTheWay && timerSeconds > 0) {
+    // Cronômetro de preparo
+    if (prepTimerSeconds > 0) {
       const interval = setInterval(() => {
-        setTimerSeconds((prev) => {
-          if (prev <= 1) {
-            toast.info("Tempo esgotado! Taxa de serviço removida");
-            return 0;
-          }
-          return prev - 1;
-        });
+        setPrepTimerSeconds((prev) => Math.max(0, prev - 1));
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [billRequested, billOnTheWay, timerSeconds]);
+  }, [prepTimerSeconds]);
 
   const fetchData = async () => {
     try {
-      // Buscar restaurante
+      // Buscar restaurante e configurações
       const { data: restData, error: restError } = await supabase
         .from("restaurants")
-        .select("id")
+        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes")
         .eq("slug", restaurantSlug)
         .single();
 
       if (restError) throw restError;
+      
+      setServiceFeeEnabled(restData.service_fee_enabled || false);
+      setServiceFeePercentage(restData.service_fee_percentage || 10);
+      setPrepTimeMinutes(restData.prep_time_minutes || 30);
 
       // Buscar mesa
       const { data: tableData, error: tableError } = await supabase
@@ -260,13 +261,6 @@ const Comanda = () => {
         
         if (billData.status === "on_the_way") {
           setBillOnTheWay(true);
-          setTimerSeconds(0);
-        } else {
-          const elapsed = Math.floor(
-            (Date.now() - new Date(billData.bill_requested_at).getTime()) / 1000
-          );
-          const remaining = Math.max(0, 300 - elapsed); // 5 minutos = 300 segundos
-          setTimerSeconds(remaining);
         }
       }
       
@@ -296,14 +290,12 @@ const Comanda = () => {
 
     const subtotal = ordersSubtotal + cartSubtotal;
 
-    const serviceFee = subtotal * 0.1;
-    const serviceFeeApplied = timerSeconds > 0 || !billRequested;
+    const serviceFee = serviceFeeEnabled ? subtotal * (serviceFeePercentage / 100) : 0;
     
     return {
       subtotal,
       serviceFee,
-      serviceFeeApplied,
-      total: serviceFeeApplied ? subtotal + serviceFee : subtotal,
+      total: subtotal + serviceFee,
     };
   };
 
@@ -371,6 +363,9 @@ const Comanda = () => {
       setCart([]);
       sessionStorage.removeItem(`cart_${tableNumber}`);
       
+      // Iniciar cronômetro de preparo
+      setPrepTimerSeconds(prepTimeMinutes * 60);
+      
       toast.success("Pedido enviado! Aguarde o atendimento");
       fetchData();
     } catch (error: any) {
@@ -391,10 +386,8 @@ const Comanda = () => {
           table_id: tableId,
           subtotal: totals.subtotal,
           service_fee: totals.serviceFee,
-          service_fee_removed: false,
           total_amount: totals.total,
           status: "requested",
-          bill_requested_at: new Date().toISOString(),
           payment_method: paymentMethod,
           change_amount: paymentMethod === "cash" ? parseFloat(changeAmount || "0") : null,
         })
@@ -404,7 +397,6 @@ const Comanda = () => {
       if (error) throw error;
 
       setBillRequested(true);
-      setTimerSeconds(300); // 5 minutos
       setDialogOpen(false);
       toast.success("Conta solicitada! O garçom chegará em breve");
     } catch (error: any) {
@@ -449,7 +441,29 @@ const Comanda = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Timer ou Mensagem A Caminho */}
+        {/* Cronômetro de Preparo */}
+        {prepTimerSeconds > 0 && (
+          <Card className="border-primary bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center gap-3">
+                <Clock className="h-5 w-5 text-primary" />
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Seu pedido está em preparo
+                  </p>
+                  <p className="text-2xl font-bold text-primary">
+                    {formatTime(prepTimerSeconds)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Tempo estimado restante
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Mensagem conta solicitada */}
         {billRequested && (
           <Card className="border-primary bg-primary/5">
             <CardContent className="pt-6">
@@ -465,19 +479,15 @@ const Comanda = () => {
                         O garçom chegará em breve com sua conta
                       </p>
                     </>
-                  ) : timerSeconds > 0 ? (
+                  ) : (
                     <>
+                      <p className="text-lg font-semibold text-primary">
+                        Conta solicitada!
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         Aguardando garçom
                       </p>
-                      <p className="text-2xl font-bold text-primary">
-                        {formatTime(timerSeconds)}
-                      </p>
                     </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Aguardando garçom
-                    </p>
                   )}
                 </div>
               </div>
@@ -592,23 +602,12 @@ const Comanda = () => {
               <span>Subtotal</span>
               <span className="font-semibold">R$ {totals.subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between">
-              <span>
-                Taxa de Serviço (10%)
-                {!totals.serviceFeeApplied && (
-                  <Badge variant="secondary" className="ml-2">
-                    Removida
-                  </Badge>
-                )}
-              </span>
-              <span
-                className={`font-semibold ${
-                  !totals.serviceFeeApplied ? "line-through text-muted-foreground" : ""
-                }`}
-              >
-                R$ {totals.serviceFee.toFixed(2)}
-              </span>
-            </div>
+            {serviceFeeEnabled && totals.serviceFee > 0 && (
+              <div className="flex justify-between">
+                <span>Taxa de Serviço ({serviceFeePercentage}%)</span>
+                <span className="font-semibold">R$ {totals.serviceFee.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-xl font-bold pt-3 border-t">
               <span>Total</span>
               <span className="text-primary">R$ {totals.total.toFixed(2)}</span>

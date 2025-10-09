@@ -11,11 +11,9 @@ interface Bill {
   status: string;
   subtotal: number;
   service_fee: number;
-  service_fee_removed: boolean;
   total_amount: number;
   payment_method: string;
   change_amount: number | null;
-  bill_requested_at: string;
   created_at: string;
   tables: {
     table_number: number;
@@ -92,34 +90,14 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleMarkAsOnTheWay = async (billId: string) => {
-    // Garantir que a taxa de serviço (10%) NÃO seja removida ao marcar "A Caminho"
-    const { data: billData, error: fetchError } = await supabase
+    const { error } = await supabase
       .from("bills")
-      .select("subtotal, service_fee")
-      .eq("id", billId)
-      .single();
-
-    if (fetchError || !billData) {
-      toast.error("Erro ao buscar conta");
-      console.error(fetchError);
-      return;
-    }
-
-    const newTotal = Number(billData.subtotal) + Number(billData.service_fee);
-
-    const { error: updateError } = await supabase
-      .from("bills")
-      .update({ 
-        status: "on_the_way",
-        service_fee_removed: false,
-        service_fee_removed_at: null,
-        total_amount: newTotal,
-      })
+      .update({ status: "on_the_way" })
       .eq("id", billId);
 
-    if (updateError) {
+    if (error) {
       toast.error("Erro ao atualizar status");
-      console.error(updateError);
+      console.error(error);
       return;
     }
 
@@ -266,16 +244,10 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
                     <span>Subtotal</span>
                     <span>R$ {bill.subtotal.toFixed(2)}</span>
                   </div>
-                  {!bill.service_fee_removed && (
+                  {bill.service_fee > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span>Taxa de Serviço (10%)</span>
+                      <span>Taxa de Serviço</span>
                       <span>R$ {bill.service_fee.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {bill.service_fee_removed && (
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>Taxa de Serviço (10%)</span>
-                      <span className="line-through">R$ {bill.service_fee.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold pt-2 border-t">
