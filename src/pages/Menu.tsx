@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Plus, Minus, Receipt } from "lucide-react";
+import { Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
@@ -38,18 +38,6 @@ interface Restaurant {
   is_open: boolean;
 }
 
-interface CartItemExtra {
-  id: string;
-  name: string;
-  price: number;
-}
-
-interface CartItem {
-  id: string; // ID único para cada item do carrinho
-  product: Product;
-  quantity: number;
-  extras: CartItemExtra[];
-}
 
 const Menu = () => {
   const { restaurantSlug, tableNumber } = useParams();
@@ -57,7 +45,6 @@ const Menu = () => {
   
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [customerName, setCustomerName] = useState("");
   const [customerCPF, setCustomerCPF] = useState("");
@@ -159,66 +146,14 @@ const Menu = () => {
     setShowProductDialog(true);
   };
 
-  const addToCart = (product: Product, extras: ProductExtra[]) => {
-    setCart((prev) => {
-      // Verificar se já existe um item com o mesmo produto e mesmos extras
-      const existing = prev.find((item) => 
-        item.product.id === product.id && 
-        JSON.stringify(item.extras.map(e => e.id).sort()) === JSON.stringify(extras.map(e => e.id).sort())
-      );
-      
-      if (existing) {
-        return prev.map((item) =>
-          item.id === existing.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      
-      // Criar novo item com ID único
-      return [...prev, { 
-        id: crypto.randomUUID(),
-        product, 
-        quantity: 1, 
-        extras 
-      }];
-    });
-    
-    const extrasText = extras.length > 0 ? ` com ${extras.length} adicional(is)` : '';
-    toast.success(`${product.name}${extrasText} adicionado ao carrinho`);
-  };
-
-  const updateQuantity = (itemId: string, delta: number) => {
-    setCart((prev) => {
-      const updated = prev.map((item) =>
-        item.id === itemId
-          ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-          : item
-      );
-      return updated.filter((item) => item.quantity > 0);
-    });
-  };
-
-  const getCartTotal = () => {
-    return cart.reduce((sum, item) => {
-      const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-      return sum + (item.product.price + extrasTotal) * item.quantity;
-    }, 0);
-  };
-
-  const handleSendOrder = async () => {
-    if (cart.length === 0) {
-      toast.error("Adicione itens ao carrinho primeiro");
-      return;
-    }
-
+  const addToCart = async (product: Product, extras: ProductExtra[]) => {
     if (!tableId) {
       toast.error("Mesa não encontrada");
       return;
     }
 
     try {
-      // Criar pedido
+      // Criar pedido imediatamente
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -232,44 +167,43 @@ const Menu = () => {
 
       if (orderError) throw orderError;
 
-      // Criar itens do pedido com extras
-      for (const item of cart) {
-        const { data: orderItem, error: itemError } = await supabase
-          .from("order_items")
-          .insert({
-            order_id: order.id,
-            product_id: item.product.id,
-            quantity: item.quantity,
-            price_at_order: item.product.price,
-          })
-          .select()
-          .single();
+      // Criar item do pedido
+      const { data: orderItem, error: itemError } = await supabase
+        .from("order_items")
+        .insert({
+          order_id: order.id,
+          product_id: product.id,
+          quantity: 1,
+          price_at_order: product.price,
+        })
+        .select()
+        .single();
 
-        if (itemError) throw itemError;
+      if (itemError) throw itemError;
 
-        // Inserir extras do item
-        if (item.extras.length > 0) {
-          const orderItemExtras = item.extras.map((extra) => ({
-            order_item_id: orderItem.id,
-            product_extra_id: extra.id,
-            price_at_order: extra.price,
-          }));
+      // Inserir extras do item
+      if (extras.length > 0) {
+        const orderItemExtras = extras.map((extra) => ({
+          order_item_id: orderItem.id,
+          product_extra_id: extra.id,
+          price_at_order: extra.price,
+        }));
 
-          const { error: extrasError } = await supabase
-            .from("order_item_extras")
-            .insert(orderItemExtras);
+        const { error: extrasError } = await supabase
+          .from("order_item_extras")
+          .insert(orderItemExtras);
 
-          if (extrasError) throw extrasError;
-        }
+        if (extrasError) throw extrasError;
       }
 
-      toast.success("Pedido enviado! Aguarde o atendimento");
-      setCart([]);
+      const extrasText = extras.length > 0 ? ` com ${extras.length} adicional(is)` : '';
+      toast.success(`${product.name}${extrasText} adicionado!`);
     } catch (error: any) {
-      toast.error("Erro ao enviar pedido");
+      toast.error("Erro ao adicionar item");
       console.error(error);
     }
   };
+
 
   if (loading) {
     return (
@@ -312,17 +246,6 @@ const Menu = () => {
           )}
         </div>
 
-        {/* Botão Ver Comanda */}
-        <div className="container mx-auto px-4 py-4">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => navigate(`/comanda/${restaurantSlug}/${tableNumber}`)}
-          >
-            <Receipt className="h-4 w-4 mr-2" />
-            Ver Comanda
-          </Button>
-        </div>
 
         {/* Categorias e Produtos */}
         <div className="container mx-auto px-4 space-y-6">
@@ -370,73 +293,19 @@ const Menu = () => {
           ))}
         </div>
 
-        {/* Carrinho Fixo */}
-        {cart.length > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-lg p-4">
-            <div className="container mx-auto space-y-3">
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {cart.map((item) => {
-                  const extrasTotal = item.extras.reduce((sum, e) => sum + e.price, 0);
-                  const itemTotal = (item.product.price + extrasTotal) * item.quantity;
-                  
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex items-start justify-between text-sm border-b pb-2"
-                    >
-                      <div className="flex-1">
-                        <span className="font-medium">{item.product.name}</span>
-                        {item.extras.length > 0 && (
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            + {item.extras.map(e => e.name).join(', ')}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateQuantity(item.id, -1);
-                          }}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center font-medium">
-                          {item.quantity}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateQuantity(item.id, 1);
-                          }}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-20 text-right font-semibold">
-                          R$ {itemTotal.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t">
-                <span className="font-bold">Total:</span>
-                <span className="text-xl font-bold text-primary">
-                  R$ {getCartTotal().toFixed(2)}
-                </span>
-              </div>
-              <Button className="w-full" size="lg" onClick={handleSendOrder}>
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                Enviar Pedido
-              </Button>
-            </div>
+        {/* Botão Fixo Ver Comanda */}
+        <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-lg p-4">
+          <div className="container mx-auto">
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => navigate(`/comanda/${restaurantSlug}/${tableNumber}`)}
+            >
+              <Receipt className="h-5 w-5 mr-2" />
+              Ver Comanda
+            </Button>
           </div>
-        )}
+        </div>
       </div>
     </>
   );
