@@ -11,7 +11,6 @@ import { Upload, Palette } from "lucide-react";
 interface Settings {
   logo_url: string | null;
   primary_color: string;
-  secondary_color: string;
   service_fee_enabled: boolean;
   service_fee_percentage: number;
   prep_time_minutes: number;
@@ -21,7 +20,6 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
   const [settings, setSettings] = useState<Settings>({
     logo_url: null,
     primary_color: "#FF6B35",
-    secondary_color: "#1A1A1A",
     service_fee_enabled: false,
     service_fee_percentage: 10,
     prep_time_minutes: 30,
@@ -37,7 +35,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, primary_color, secondary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes")
+        .select("logo_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes")
         .eq("id", restaurantId)
         .single();
 
@@ -47,7 +45,6 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
         setSettings({
           logo_url: data.logo_url,
           primary_color: data.primary_color || "#FF6B35",
-          secondary_color: data.secondary_color || "#1A1A1A",
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
           prep_time_minutes: data.prep_time_minutes || 30,
@@ -122,7 +119,6 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
         .from("restaurants")
         .update({
           primary_color: settings.primary_color,
-          secondary_color: settings.secondary_color,
           service_fee_enabled: settings.service_fee_enabled,
           service_fee_percentage: settings.service_fee_percentage,
           prep_time_minutes: settings.prep_time_minutes,
@@ -188,50 +184,33 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Palette className="h-5 w-5" />
-            Cores do Tema
+            Cor Principal
           </CardTitle>
           <CardDescription>
-            Personalize as cores do seu cardápio
+            Personalize a cor principal do seu cardápio
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="primary-color">Cor Primária</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="primary-color"
-                  type="color"
-                  value={settings.primary_color}
-                  onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
-                  className="w-20 h-10"
-                />
-                <Input
-                  type="text"
-                  value={settings.primary_color}
-                  onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
-                  className="flex-1"
-                />
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="primary-color">Cor Principal</Label>
+            <div className="flex gap-2">
+              <Input
+                id="primary-color"
+                type="color"
+                value={settings.primary_color}
+                onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                className="w-20 h-10"
+              />
+              <Input
+                type="text"
+                value={settings.primary_color}
+                onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                className="flex-1"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="secondary-color">Cor Secundária</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="secondary-color"
-                  type="color"
-                  value={settings.secondary_color}
-                  onChange={(e) => setSettings({ ...settings, secondary_color: e.target.value })}
-                  className="w-20 h-10"
-                />
-                <Input
-                  type="text"
-                  value={settings.secondary_color}
-                  onChange={(e) => setSettings({ ...settings, secondary_color: e.target.value })}
-                  className="flex-1"
-                />
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Esta cor será aplicada em todo o cardápio digital
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -441,59 +441,59 @@ const Comanda = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Cronômetro de Preparo */}
-        {prepTimerSeconds > 0 && (
-          <Card className="border-primary bg-primary/5">
+        {/* Status: Conta a caminho, Timer de preparo ou Conta solicitada */}
+        {billOnTheWay ? (
+          <Card className="bg-blue-50 border-blue-200">
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
-                <Clock className="h-5 w-5 text-primary" />
+                <Receipt className="h-5 w-5 text-blue-600" />
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-lg font-semibold text-blue-800">
+                    🧾 A conta está a caminho!
+                  </p>
+                  <p className="text-sm text-blue-600">
+                    O garçom chegará em breve com sua conta
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : prepTimerSeconds > 0 ? (
+          <Card className="border-amber-500 bg-amber-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center gap-3">
+                <Clock className="h-5 w-5 text-amber-600" />
+                <div className="text-center">
+                  <p className="text-sm text-amber-800 font-medium">
                     Seu pedido está em preparo
                   </p>
-                  <p className="text-2xl font-bold text-primary">
+                  <p className="text-3xl font-bold text-amber-600 mt-1">
                     {formatTime(prepTimerSeconds)}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-amber-700 mt-1">
                     Tempo estimado restante
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Mensagem conta solicitada */}
-        {billRequested && (
+        ) : billRequested ? (
           <Card className="border-primary bg-primary/5">
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
                 <Clock className="h-5 w-5 text-primary" />
                 <div className="text-center">
-                  {billOnTheWay ? (
-                    <>
-                      <p className="text-lg font-semibold text-primary">
-                        A conta está a caminho!
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        O garçom chegará em breve com sua conta
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-lg font-semibold text-primary">
-                        Conta solicitada!
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Aguardando garçom
-                      </p>
-                    </>
-                  )}
+                  <p className="text-lg font-semibold text-primary">
+                    Conta solicitada!
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Aguardando garçom
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
         {/* Carrinho (Itens não enviados) */}
         {cart.length > 0 && (

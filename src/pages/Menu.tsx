@@ -33,8 +33,8 @@ interface Category {
 interface Restaurant {
   id: string;
   name: string;
+  logo_url: string | null;
   primary_color: string;
-  secondary_color: string;
   is_open: boolean;
 }
 
@@ -248,13 +248,31 @@ const Menu = () => {
         onAddToCart={addToCart}
       />
 
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background pb-24">
+      <div 
+        className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background pb-24"
+        style={{
+          // @ts-ignore
+          '--primary': restaurant.primary_color.replace('#', '').match(/.{2}/g)?.map(x => parseInt(x, 16)).join(' ') || '14 88% 60%',
+        }}
+      >
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground p-6 shadow-lg">
-          <h1 className="text-2xl font-bold">{restaurant.name}</h1>
-          <p className="text-sm opacity-90">Mesa {tableNumber}</p>
+        <div 
+          className="text-primary-foreground p-6 shadow-lg"
+          style={{ backgroundColor: restaurant.primary_color }}
+        >
+          {restaurant.logo_url && (
+            <div className="flex justify-center mb-4">
+              <img 
+                src={restaurant.logo_url} 
+                alt="Logo" 
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+          )}
+          <h1 className="text-2xl font-bold text-center">{restaurant.name}</h1>
+          <p className="text-sm opacity-90 text-center">Mesa {tableNumber}</p>
           {customerName && (
-            <p className="text-xs opacity-75 mt-1">Cliente: {customerName}</p>
+            <p className="text-xs opacity-75 mt-1 text-center">Cliente: {customerName}</p>
           )}
         </div>
 
