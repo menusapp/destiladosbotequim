@@ -92,15 +92,34 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleMarkAsOnTheWay = async (billId: string) => {
-    // Atualiza somente o status no cliente para evitar qualquer ajuste na taxa de serviço
-    const { error } = await supabase
+    // Garantir que a taxa de serviço (10%) NÃO seja removida ao marcar "A Caminho"
+    const { data: billData, error: fetchError } = await supabase
       .from("bills")
-      .update({ status: "on_the_way" })
+      .select("subtotal, service_fee")
+      .eq("id", billId)
+      .single();
+
+    if (fetchError || !billData) {
+      toast.error("Erro ao buscar conta");
+      console.error(fetchError);
+      return;
+    }
+
+    const newTotal = Number(billData.subtotal) + Number(billData.service_fee);
+
+    const { error: updateError } = await supabase
+      .from("bills")
+      .update({ 
+        status: "on_the_way",
+        service_fee_removed: false,
+        service_fee_removed_at: null,
+        total_amount: newTotal,
+      })
       .eq("id", billId);
 
-    if (error) {
+    if (updateError) {
       toast.error("Erro ao atualizar status");
-      console.error(error);
+      console.error(updateError);
       return;
     }
 

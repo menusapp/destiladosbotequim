@@ -32,12 +32,13 @@ const RestaurantAdmin = () => {
     const restaurantId = sessionStorage.getItem("restaurantId");
 
     if (userType !== "restaurant" || !restaurantId) {
-      navigate("/");
+      // No session in preview: don't redirect, just show inline login card
+      setLoading(false);
       return;
     }
 
     fetchRestaurant(restaurantId);
-  }, [navigate]);
+  }, []);
 
   const fetchRestaurant = async (restaurantId: string) => {
     try {
