@@ -17,12 +17,14 @@ interface Order {
   customer_name: string;
   status: string;
   created_at: string;
+  notes: string | null;
   tables: {
     table_number: number;
   };
   order_items: {
     quantity: number;
     price_at_order: number;
+    notes: string | null;
     products: {
       name: string;
     } | null;
@@ -64,6 +66,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         order_items(
           quantity,
           price_at_order,
+          notes,
           products(name),
           order_item_extras(
             price_at_order,
@@ -160,10 +163,22 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                           + {item.order_item_extras.map(e => e.product_extras?.name || "Extra excluído").join(', ')}
                         </div>
                       )}
+                      {item.notes && (
+                        <div className="text-xs text-amber-600 pl-4 italic">
+                          Obs: {item.notes}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
+
+              {order.notes && (
+                <div className="text-sm p-2 bg-amber-50 border border-amber-200 rounded">
+                  <span className="font-semibold text-amber-800">Observação do Pedido:</span>
+                  <p className="text-amber-700 italic">{order.notes}</p>
+                </div>
+              )}
 
               {order.status === "pending" && (
                 <Button

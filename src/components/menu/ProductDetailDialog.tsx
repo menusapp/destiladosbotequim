@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
 
 interface ProductExtra {
@@ -30,7 +31,7 @@ interface ProductDetailDialogProps {
   extras: ProductExtra[];
   open: boolean;
   onClose: () => void;
-  onAddToCart: (product: Product, selectedExtras: ProductExtra[]) => void;
+  onAddToCart: (product: Product, selectedExtras: ProductExtra[], notes?: string) => void;
   restaurantColor?: string;
 }
 
@@ -43,6 +44,7 @@ const ProductDetailDialog = ({
   restaurantColor = "#FF6B35"
 }: ProductDetailDialogProps) => {
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
+  const [notes, setNotes] = useState("");
 
   if (!product) return null;
 
@@ -56,8 +58,9 @@ const ProductDetailDialog = ({
 
   const handleAddToCart = () => {
     const extrasToAdd = extras.filter((e) => selectedExtras.includes(e.id));
-    onAddToCart(product, extrasToAdd);
+    onAddToCart(product, extrasToAdd, notes || undefined);
     setSelectedExtras([]);
+    setNotes("");
     onClose();
   };
 
@@ -127,6 +130,17 @@ const ProductDetailDialog = ({
                 </span>
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Observações (opcional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Ex: Sem cebola, ponto da carne mal passado..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
           </div>
 
           <Button 

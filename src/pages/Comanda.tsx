@@ -17,6 +17,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -57,6 +58,7 @@ interface CartItem {
   };
   quantity: number;
   extras: CartItemExtra[];
+  notes?: string;
 }
 
 const Comanda = () => {
@@ -78,6 +80,7 @@ const Comanda = () => {
   const [serviceFeePercentage, setServiceFeePercentage] = useState(10);
   const [prepTimeMinutes, setPrepTimeMinutes] = useState(30);
   const [restaurantColor, setRestaurantColor] = useState("#FF6B35");
+  const [orderNotes, setOrderNotes] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -325,6 +328,7 @@ const Comanda = () => {
           customer_name: customerName || "",
           customer_cpf: customerCPF || "",
           status: "pending",
+          notes: orderNotes || null,
         })
         .select()
         .single();
@@ -340,6 +344,7 @@ const Comanda = () => {
             product_id: item.product.id,
             quantity: item.quantity,
             price_at_order: item.product.price,
+            notes: item.notes || null,
           })
           .select()
           .single();
@@ -362,8 +367,9 @@ const Comanda = () => {
         }
       }
 
-      // Limpar carrinho
+      // Limpar carrinho e observações
       setCart([]);
+      setOrderNotes("");
       sessionStorage.removeItem(`cart_${tableNumber}`);
       
       // Iniciar cronômetro de preparo e marcar que pedido foi enviado
@@ -529,6 +535,11 @@ const Comanda = () => {
                             + {item.extras.map(e => e.name).join(', ')}
                           </div>
                         )}
+                        {item.notes && (
+                          <div className="text-xs text-muted-foreground mt-1 italic">
+                            Obs: {item.notes}
+                          </div>
+                        )}
                       </div>
                       <p className="font-semibold" style={{ color: restaurantColor }}>
                         R$ {itemTotal.toFixed(2)}
@@ -537,14 +548,26 @@ const Comanda = () => {
                   );
                 })}
               </div>
-              <Button 
-                className="w-full mt-4 text-white" 
-                onClick={handleSendOrder}
-                style={{ backgroundColor: restaurantColor }}
-              >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Enviar Pedido
-              </Button>
+              <div className="mt-4 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="order-notes">Observações do Pedido (opcional)</Label>
+                  <Textarea
+                    id="order-notes"
+                    placeholder="Ex: Pedido urgente, alergia a amendoim..."
+                    value={orderNotes}
+                    onChange={(e) => setOrderNotes(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+                <Button 
+                  className="w-full text-white" 
+                  onClick={handleSendOrder}
+                  style={{ backgroundColor: restaurantColor }}
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Enviar Pedido
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

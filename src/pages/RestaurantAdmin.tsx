@@ -27,6 +27,9 @@ const RestaurantAdmin = () => {
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [hasNewOrders, setHasNewOrders] = useState(false);
+  const [hasNewBills, setHasNewBills] = useState(false);
 
   useEffect(() => {
     const userType = sessionStorage.getItem("userType");
@@ -39,7 +42,79 @@ const RestaurantAdmin = () => {
     }
 
     fetchRestaurant(restaurantId);
+    setupNotifications(restaurantId);
   }, []);
+
+  const setupNotifications = (restaurantId: string) => {
+    // Canal para novos pedidos
+    const ordersChannel = supabase
+      .channel('new-orders-notification')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'orders',
+        },
+        (payload) => {
+          // Verificar se o pedido é do restaurante atual através da mesa
+          supabase
+            .from('tables')
+            .select('restaurant_id')
+            .eq('id', (payload.new as any).table_id)
+            .single()
+            .then(({ data }) => {
+              if (data?.restaurant_id === restaurantId && activeTab !== 'orders') {
+                setHasNewOrders(true);
+                toast.info("Novo pedido recebido!");
+              }
+            });
+        }
+      )
+      .subscribe();
+
+    // Canal para novas contas
+    const billsChannel = supabase
+      .channel('new-bills-notification')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bills',
+        },
+        (payload) => {
+          // Verificar se a conta é do restaurante atual através da mesa
+          supabase
+            .from('tables')
+            .select('restaurant_id')
+            .eq('id', (payload.new as any).table_id)
+            .single()
+            .then(({ data }) => {
+              if (data?.restaurant_id === restaurantId && activeTab !== 'bills') {
+                setHasNewBills(true);
+                toast.info("Nova conta solicitada!");
+              }
+            });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(billsChannel);
+    };
+  };
+
+  useEffect(() => {
+    // Limpar notificações quando mudar de aba
+    if (activeTab === 'orders') {
+      setHasNewOrders(false);
+    }
+    if (activeTab === 'bills') {
+      setHasNewBills(false);
+    }
+  }, [activeTab]);
 
   const fetchRestaurant = async (restaurantId: string) => {
     try {
@@ -141,7 +216,7 @@ const RestaurantAdmin = () => {
             <CardTitle>Gerenciar Restaurante</CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="dashboard" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-7">
                 <TabsTrigger value="dashboard">
                   <BarChart3 className="h-4 w-4 mr-2" />
@@ -159,13 +234,19 @@ const RestaurantAdmin = () => {
                   <TableIcon className="h-4 w-4 mr-2" />
                   Mesas
                 </TabsTrigger>
-                <TabsTrigger value="orders">
+                <TabsTrigger value="orders" className="relative">
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Pedidos
+                  {hasNewOrders && (
+                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
+                  )}
                 </TabsTrigger>
-                <TabsTrigger value="bills">
+                <TabsTrigger value="bills" className="relative">
                   <Receipt className="h-4 w-4 mr-2" />
                   Contas
+                  {hasNewBills && (
+                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="settings">
                   <Settings className="h-4 w-4 mr-2" />

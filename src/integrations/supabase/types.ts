@@ -198,6 +198,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          notes: string | null
           order_id: string
           price_at_order: number
           product_id: string | null
@@ -206,6 +207,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          notes?: string | null
           order_id: string
           price_at_order: number
           product_id?: string | null
@@ -214,6 +216,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          notes?: string | null
           order_id?: string
           price_at_order?: number
           product_id?: string | null
@@ -242,6 +245,7 @@ export type Database = {
           customer_cpf: string
           customer_name: string
           id: string
+          notes: string | null
           status: string | null
           table_id: string
           updated_at: string | null
@@ -251,6 +255,7 @@ export type Database = {
           customer_cpf: string
           customer_name: string
           id?: string
+          notes?: string | null
           status?: string | null
           table_id: string
           updated_at?: string | null
@@ -260,6 +265,7 @@ export type Database = {
           customer_cpf?: string
           customer_name?: string
           id?: string
+          notes?: string | null
           status?: string | null
           table_id?: string
           updated_at?: string | null

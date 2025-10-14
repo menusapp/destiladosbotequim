@@ -50,6 +50,7 @@ interface CartItem {
   product: Product;
   quantity: number;
   extras: CartItemExtra[];
+  notes?: string;
 }
 
 const Menu = () => {
@@ -67,6 +68,7 @@ const Menu = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
     // Verificar se já tem info do cliente no sessionStorage
@@ -137,6 +139,11 @@ const Menu = () => {
 
       if (categoriesError) throw categoriesError;
       setCategories(categoriesData || []);
+      
+      // Selecionar primeira categoria por padrão
+      if (categoriesData && categoriesData.length > 0) {
+        setSelectedCategoryId(categoriesData[0].id);
+      }
     } catch (error: any) {
       toast.error("Erro ao carregar cardápio");
       console.error(error);
@@ -171,11 +178,12 @@ const Menu = () => {
     setShowProductDialog(true);
   };
 
-  const addToCart = (product: Product, extras: ProductExtra[]) => {
+  const addToCart = (product: Product, extras: ProductExtra[], notes?: string) => {
     setCart((prev) => {
       const existing = prev.find((item) => 
         item.product.id === product.id && 
-        JSON.stringify(item.extras.map(e => e.id).sort()) === JSON.stringify(extras.map(e => e.id).sort())
+        JSON.stringify(item.extras.map(e => e.id).sort()) === JSON.stringify(extras.map(e => e.id).sort()) &&
+        item.notes === notes
       );
       
       if (existing) {
@@ -190,7 +198,8 @@ const Menu = () => {
         id: crypto.randomUUID(),
         product, 
         quantity: 1, 
-        extras 
+        extras,
+        notes 
       }];
     });
     
@@ -279,53 +288,71 @@ const Menu = () => {
           )}
         </div>
 
-        {/* Categorias e Produtos */}
-        <div className="container mx-auto px-4 space-y-6">
-          {categories.map((category) => (
-            <Card key={category.id}>
-              <CardHeader>
-                <CardTitle className="text-xl">{category.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+        {/* Categorias com scroll horizontal */}
+        <div className="container mx-auto px-4 pt-6">
+          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
+            {categories.map((category) => (
+              <Button
+                key={category.id}
+                variant={selectedCategoryId === category.id ? "default" : "outline"}
+                onClick={() => setSelectedCategoryId(category.id)}
+                className="whitespace-nowrap"
+                style={selectedCategoryId === category.id ? { backgroundColor: restaurant.primary_color, color: 'white' } : {}}
+              >
+                {category.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Produtos da categoria selecionada */}
+        <div className="container mx-auto px-4 pb-6">
+          {categories
+            .filter(category => category.id === selectedCategoryId)
+            .map((category) => (
+              <div key={category.id} className="space-y-4">
                 {category.products.map((product) => (
-                  <div
+                  <Card
                     key={product.id}
-                    className="flex items-start gap-3 p-3 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+                    className="cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => product.available && handleProductClick(product)}
                   >
-                    {product.image_url && (
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-20 h-20 object-cover rounded"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-semibold">{product.name}</p>
-                          {product.description && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                              {product.description}
-                            </p>
-                          )}
-                        </div>
-                        {!product.available && (
-                          <Badge variant="secondary">Indisponível</Badge>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {product.image_url && (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-24 h-24 object-cover rounded"
+                          />
                         )}
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="font-semibold text-lg">{product.name}</p>
+                              {product.description && (
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {product.description}
+                                </p>
+                              )}
+                            </div>
+                            {!product.available && (
+                              <Badge variant="secondary">Indisponível</Badge>
+                            )}
+                          </div>
+                          <p 
+                            className="text-xl font-bold mt-2"
+                            style={{ color: restaurant.primary_color }}
+                          >
+                            R$ {product.price.toFixed(2)}
+                          </p>
+                        </div>
                       </div>
-                      <p 
-                        className="text-lg font-bold mt-2"
-                        style={{ color: restaurant.primary_color }}
-                      >
-                        R$ {product.price.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            ))}
         </div>
 
         {/* Botão Fixo Ver Comanda com Badge */}
