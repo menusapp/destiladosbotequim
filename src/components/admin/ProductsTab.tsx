@@ -326,6 +326,11 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       return;
     }
 
+    if (ingredients.length === 0) {
+      toast.error("Adicione pelo menos 1 insumo ao produto");
+      return;
+    }
+
     let imageUrl = productImageUrl;
 
     // Upload da imagem se houver
@@ -753,6 +758,73 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
                   accept="image/*"
                   onChange={(e) => setProductImage(e.target.files?.[0] || null)}
                 />
+              </div>
+
+              {/* Seção de Insumos (Obrigatório) */}
+              <div className="space-y-3 p-4 border rounded-lg bg-primary/10">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm">Insumos * (Obrigatório)</h4>
+                  {productCost > 0 && (
+                    <div className="text-sm space-y-1">
+                      <p className="text-muted-foreground">Custo total: <span className="font-semibold text-foreground">R$ {productCost.toFixed(2)}</span></p>
+                      {parsedProductPrice > 0 && (
+                        <p className="text-muted-foreground">CMV: <span className={`font-semibold ${cmvPercentage > 35 ? 'text-destructive' : 'text-green-600'}`}>{cmvPercentage.toFixed(1)}%</span></p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Select value={selectedStockItem} onValueChange={setSelectedStockItem}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um insumo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stockItems.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name} ({item.unit}) - R$ {item.price_per_unit.toFixed(2)}/{item.unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-32">
+                    <Input
+                      type="number"
+                      step="0.001"
+                      placeholder="Qtd"
+                      value={ingredientQuantity}
+                      onChange={(e) => setIngredientQuantity(e.target.value)}
+                    />
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddIngredient}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {ingredients.length > 0 && (
+                  <div className="space-y-2 mt-3">
+                    {ingredients.map((ing) => (
+                      <div key={ing.id} className="flex items-center justify-between p-2 bg-background rounded">
+                        <div className="flex-1">
+                          <span className="text-sm font-medium">{ing.stock_item_name}</span>
+                          <p className="text-xs text-muted-foreground">
+                            {ing.quantity} {ing.stock_item_unit} × R$ {ing.stock_item_price?.toFixed(2)} = R$ {(ing.quantity * (ing.stock_item_price || 0)).toFixed(2)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveIngredient(ing.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               
               <div className="space-y-3 p-4 border rounded-lg bg-secondary/20">
