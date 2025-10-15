@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Check } from "lucide-react";
+import { Clock, Check, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -195,6 +195,89 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
+  const printOrder = (order: Order) => {
+    const printWindow = window.open('', '', 'height=600,width=400');
+    if (!printWindow) return;
+
+    const orderItems = order.order_items.map((item, idx) => {
+      const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
+      const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
+      const productName = item.products?.name || "Produto excluído";
+      const extras = item.order_item_extras && item.order_item_extras.length > 0
+        ? `<div style="font-size: 11px; padding-left: 20px; margin-top: 2px;">+ ${item.order_item_extras.map(e => e.product_extras?.name || "Extra excluído").join(', ')}</div>`
+        : '';
+      const notes = item.notes
+        ? `<div style="font-size: 11px; padding-left: 20px; margin-top: 2px; font-style: italic; color: #b45309;">Obs: ${item.notes}</div>`
+        : '';
+      
+      return `
+        <div style="margin: 8px 0; border-bottom: 1px dashed #ddd; padding-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; font-size: 13px;">
+            <span><strong>${item.quantity}x</strong> ${productName}</span>
+            <span>R$ ${itemTotal.toFixed(2)}</span>
+          </div>
+          ${extras}
+          ${notes}
+        </div>
+      `;
+    }).join('');
+
+    const orderNotes = order.notes
+      ? `<div style="background: #fef3c7; border: 1px solid #fbbf24; padding: 10px; margin: 10px 0; border-radius: 4px;">
+           <strong style="color: #92400e;">Observação do Pedido:</strong>
+           <div style="color: #78350f; font-style: italic; margin-top: 4px;">${order.notes}</div>
+         </div>`
+      : '';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Pedido Mesa ${order.tables.table_number}</title>
+          <style>
+            @media print {
+              @page { margin: 10mm; }
+              body { margin: 0; }
+            }
+            body {
+              font-family: 'Courier New', monospace;
+              max-width: 300px;
+              margin: 0 auto;
+              padding: 15px;
+            }
+          </style>
+        </head>
+        <body>
+          <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
+            <h2 style="margin: 5px 0;">PEDIDO - COZINHA</h2>
+            <div style="font-size: 16px; font-weight: bold; margin-top: 8px;">MESA ${order.tables.table_number}</div>
+            <div style="font-size: 12px; margin-top: 5px;">Cliente: ${order.customer_name}</div>
+            <div style="font-size: 11px; color: #666; margin-top: 5px;">${new Date(order.created_at).toLocaleString('pt-BR')}</div>
+          </div>
+          
+          <div style="margin: 15px 0;">
+            <h3 style="margin: 0 0 10px 0; font-size: 14px; border-bottom: 1px solid #000; padding-bottom: 5px;">ITENS</h3>
+            ${orderItems}
+          </div>
+
+          ${orderNotes}
+
+          <div style="text-align: center; margin-top: 20px; padding-top: 15px; border-top: 2px solid #000; font-size: 11px;">
+            <p style="margin: 5px 0;">Pedido: ${order.id.slice(0, 8)}</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       pending: { label: "Pendente", variant: "secondary" as const, icon: Clock },
@@ -275,14 +358,25 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 </div>
               )}
 
-              {order.status === "pending" && (
+              <div className="flex gap-2">
                 <Button
-                  className="w-full"
-                  onClick={() => updateOrderStatus(order.id, "accepted")}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => printOrder(order)}
                 >
-                  Aceitar Pedido
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir
                 </Button>
-              )}
+                {order.status === "pending" && (
+                  <Button
+                    className="flex-1"
+                    onClick={() => updateOrderStatus(order.id, "accepted")}
+                  >
+                    Aceitar Pedido
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>
