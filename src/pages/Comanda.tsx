@@ -219,33 +219,36 @@ const Comanda = () => {
     if (!restaurantSlug || !tableNumber) return;
     
     try {
-      // Query otimizada: buscar dados em paralelo
+      // Buscar restaurante primeiro
       const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
       
-      const [restResult, tableResult] = await Promise.all([
-        supabase
-          .from("restaurants")
-          .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color")
-          .eq("slug", restaurantSlug)
-          .maybeSingle(),
-        
-        supabase
-          .from("tables")
-          .select("id")
-          .eq("table_number", parseInt(tableNumber))
-          .limit(1)
-          .maybeSingle()
-      ]);
+      const restResult = await supabase
+        .from("restaurants")
+        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color")
+        .eq("slug", restaurantSlug)
+        .maybeSingle();
 
       if (restResult.error) throw restResult.error;
       const restData = restResult.data;
       
-      if (restData) {
-        setServiceFeeEnabled(restData.service_fee_enabled || false);
-        setServiceFeePercentage(restData.service_fee_percentage || 10);
-        setPrepTimeMinutes(restData.prep_time_minutes || 30);
-        setRestaurantColor(restData.primary_color || "#FF6B35");
+      if (!restData) {
+        toast.error("Restaurante não encontrado");
+        return;
       }
+      
+      setServiceFeeEnabled(restData.service_fee_enabled || false);
+      setServiceFeePercentage(restData.service_fee_percentage || 10);
+      setPrepTimeMinutes(restData.prep_time_minutes || 30);
+      setRestaurantColor(restData.primary_color || "#FF6B35");
+
+      // Buscar mesa DO RESTAURANTE ESPECÍFICO
+      const tableResult = await supabase
+        .from("tables")
+        .select("id")
+        .eq("table_number", parseInt(tableNumber))
+        .eq("restaurant_id", restData.id)
+        .limit(1)
+        .maybeSingle();
 
       if (tableResult.error) throw tableResult.error;
       const tableData = tableResult.data;

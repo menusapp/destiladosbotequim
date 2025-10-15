@@ -156,31 +156,23 @@ const Menu = () => {
     if (!restaurantSlug || !tableNumber) return;
     
     try {
-      // Query otimizada: buscar tudo em paralelo
-      const [restResult, tableResult, categoriesResult] = await Promise.all([
-        supabase
-          .from("restaurants")
-          .select("id, name, logo_url, primary_color, is_open")
-          .eq("slug", restaurantSlug)
-          .maybeSingle(),
-        
-        supabase
-          .from("tables")
-          .select("id")
-          .eq("table_number", parseInt(tableNumber))
-          .limit(1)
-          .maybeSingle(),
-        
-        supabase
-          .from("categories")
-          .select("id, name, display_order, products(id, name, description, price, available, image_url)")
-          .order("display_order")
-      ]);
+      // Buscar restaurante primeiro
+      const restResult = await supabase
+        .from("restaurants")
+        .select("id, name, logo_url, primary_color, is_open")
+        .eq("slug", restaurantSlug)
+        .maybeSingle();
 
       if (restResult.error) throw restResult.error;
       const restData = restResult.data;
 
-      if (!restData?.is_open) {
+      if (!restData) {
+        toast.error("Restaurante não encontrado");
+        navigate("/");
+        return;
+      }
+
+      if (!restData.is_open) {
         toast.error("Restaurante está fechado no momento");
         navigate("/");
         return;
@@ -188,7 +180,24 @@ const Menu = () => {
 
       setRestaurant(restData);
 
-      // Filtrar categorias do restaurante e definir selecionada
+      // Agora buscar mesa e categorias DO RESTAURANTE ESPECÍFICO
+      const [tableResult, categoriesResult] = await Promise.all([
+        supabase
+          .from("tables")
+          .select("id")
+          .eq("table_number", parseInt(tableNumber))
+          .eq("restaurant_id", restData.id)
+          .limit(1)
+          .maybeSingle(),
+        
+        supabase
+          .from("categories")
+          .select("id, name, display_order, products(id, name, description, price, available, image_url)")
+          .eq("restaurant_id", restData.id)
+          .order("display_order")
+      ]);
+
+      // Filtrar categorias com produtos
       const filteredCategories = (categoriesResult.data || []).filter(
         (cat: any) => cat.products.some((p: any) => p)
       );
