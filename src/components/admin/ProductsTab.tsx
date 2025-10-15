@@ -43,6 +43,22 @@ interface ProductExtra {
   price: number;
 }
 
+interface ProductIngredient {
+  id: string;
+  stock_item_id: string;
+  quantity: number;
+  stock_item_name?: string;
+  stock_item_unit?: string;
+  stock_item_price?: number;
+}
+
+interface StockItem {
+  id: string;
+  name: string;
+  unit: string;
+  price_per_unit: number;
+}
+
 interface ExtraCategory {
   id: string;
   name: string;
@@ -61,6 +77,13 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [categories, setCategories] = useState<Category[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [ingredients, setIngredients] = useState<ProductIngredient[]>([]);
+  const [selectedStockItem, setSelectedStockItem] = useState("");
+  const [ingredientQuantity, setIngredientQuantity] = useState("");
   
   const [productName, setProductName] = useState("");
   const [productDescription, setProductDescription] = useState("");
@@ -84,7 +107,16 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     fetchCategories();
     fetchProducts();
     fetchExtraCategories();
+    fetchStockItems();
   }, [restaurantId]);
+
+  const fetchStockItems = async () => {
+    const { data } = await supabase
+      .from("stock_items")
+      .select("id, name, unit, price_per_unit")
+      .eq("restaurant_id", restaurantId);
+    setStockItems(data || []);
+  };
 
   const fetchCategories = async () => {
     const { data, error } = await supabase
@@ -142,6 +174,40 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
 
   const handleRemoveExtra = (id: string) => {
     setExtras(extras.filter(e => e.id !== id));
+  };
+
+  const handleAddIngredient = () => {
+    if (!selectedStockItem || !ingredientQuantity) return;
+    const stockItem = stockItems.find(s => s.id === selectedStockItem);
+    if (!stockItem) return;
+    
+    setIngredients([...ingredients, {
+      id: crypto.randomUUID(),
+      stock_item_id: selectedStockItem,
+      quantity: parseFloat(ingredientQuantity),
+      stock_item_name: stockItem.name,
+      stock_item_unit: stockItem.unit,
+      stock_item_price: stockItem.price_per_unit
+    }]);
+    setSelectedStockItem("");
+    setIngredientQuantity("");
+  };
+
+  const handleRemoveIngredient = (id: string) => {
+    setIngredients(ingredients.filter(i => i.id !== id));
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    const { error } = await supabase
+      .from("categories")
+      .insert({ name: newCategoryName, restaurant_id: restaurantId });
+    if (!error) {
+      toast.success("Categoria criada!");
+      setNewCategoryName("");
+      setCategoryDialogOpen(false);
+      fetchCategories();
+    }
   };
 
   const handleAddCategoryItem = () => {
@@ -336,6 +402,16 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
         await supabase.from("product_extras").insert(extrasData);
       }
 
+      // Inserir ingredientes
+      if (ingredients.length > 0 && newProduct) {
+        const ingredientsData = ingredients.map(ing => ({
+          product_id: newProduct.id,
+          stock_item_id: ing.stock_item_id,
+          quantity: ing.quantity
+        }));
+        await supabase.from("product_ingredients").insert(ingredientsData);
+      }
+
       toast.success("Produto criado!");
     }
 
@@ -390,6 +466,23 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       .eq("product_id", product.id);
     
     setExtras(extrasData || []);
+
+    // Buscar ingredientes
+    const { data: ingredientsData } = await supabase
+      .from("product_ingredients")
+      .select("*, stock_items(name, unit, price_per_unit)")
+      .eq("product_id", product.id);
+    
+    const formattedIngredients = ingredientsData?.map((ing: any) => ({
+      id: ing.id,
+      stock_item_id: ing.stock_item_id,
+      quantity: ing.quantity,
+      stock_item_name: ing.stock_items?.name,
+      stock_item_unit: ing.stock_items?.unit,
+      stock_item_price: ing.stock_items?.price_per_unit
+    })) || [];
+    
+    setIngredients(formattedIngredients);
     setDialogOpen(true);
   };
 
@@ -404,8 +497,21 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     setExtras([]);
     setExtraName("");
     setExtraPrice("");
+    setIngredients([]);
+    setSelectedStockItem("");
+    setIngredientQuantity("");
     setEditingProduct(null);
   };
+
+  const calculateProductCost = () => {
+    return ingredients.reduce((sum, ing) => {
+      return sum + (ing.quantity * (ing.stock_item_price || 0));
+    }, 0);
+  };
+
+  const productCost = calculateProductCost();
+  const productPrice = parseFloat(productPrice) || 0;
+  const cmvPercentage = productPrice > 0 ? (productCost / productPrice) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -512,6 +618,39 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
             ))}
           </div>
         )}
+      </div>
+
+      {/* Seção de Categorias de Produtos */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">Categorias de Produtos</h3>
+          <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Categoria
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Nova Categoria de Produto</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <Input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Nome da categoria"
+                />
+                <Button onClick={handleCreateCategory} className="w-full">Criar</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {categories.map(cat => (
+            <Card key={cat.id} className="p-2 text-center text-sm">{cat.name}</Card>
+          ))}
+        </div>
       </div>
 
       {/* Seção de Produtos */}
