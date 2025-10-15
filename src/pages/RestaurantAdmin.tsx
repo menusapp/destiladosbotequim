@@ -5,10 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { LogOut, Package, List, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp } from "lucide-react";
+import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import CategoriesTab from "@/components/admin/CategoriesTab";
 import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
@@ -219,7 +218,7 @@ const RestaurantAdmin = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-9 text-xs">
+              <TabsList className="grid w-full grid-cols-8 text-xs">
                 <TabsTrigger value="faturamento">
                   <BarChart3 className="h-4 w-4 mr-1" />
                   Faturamento
@@ -231,10 +230,6 @@ const RestaurantAdmin = () => {
                 <TabsTrigger value="stock">
                   <Warehouse className="h-4 w-4 mr-1" />
                   Estoque
-                </TabsTrigger>
-                <TabsTrigger value="categories">
-                  <List className="h-4 w-4 mr-1" />
-                  Categorias
                 </TabsTrigger>
                 <TabsTrigger value="products">
                   <Package className="h-4 w-4 mr-1" />
@@ -274,10 +269,6 @@ const RestaurantAdmin = () => {
 
               <TabsContent value="stock">
                 <StockTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="categories">
-                <CategoriesTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />
               </TabsContent>
 
               <TabsContent value="products">

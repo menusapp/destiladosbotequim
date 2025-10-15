@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -510,8 +511,8 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
   const productCost = calculateProductCost();
-  const productPrice = parseFloat(productPrice) || 0;
-  const cmvPercentage = productPrice > 0 ? (productCost / productPrice) * 100 : 0;
+  const parsedProductPrice = parseFloat(productPrice) || 0;
+  const cmvPercentage = parsedProductPrice > 0 ? (productCost / parsedProductPrice) * 100 : 0;
 
   return (
     <div className="space-y-6">
