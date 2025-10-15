@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { LogOut, Package, List, TableIcon, ShoppingCart, BarChart3, Receipt, Settings } from "lucide-react";
+import { LogOut, Package, List, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CategoriesTab from "@/components/admin/CategoriesTab";
@@ -15,6 +15,8 @@ import OrdersTab from "@/components/admin/OrdersTab";
 import DashboardTab from "@/components/admin/DashboardTab";
 import BillsTab from "@/components/admin/BillsTab";
 import SettingsTab from "@/components/admin/SettingsTab";
+import StockTab from "@/components/admin/StockTab";
+import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
 
 interface Restaurant {
   id: string;
@@ -217,45 +219,61 @@ const RestaurantAdmin = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-7">
-                <TabsTrigger value="dashboard">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Dashboard
+              <TabsList className="grid w-full grid-cols-9 text-xs">
+                <TabsTrigger value="faturamento">
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  Faturamento
+                </TabsTrigger>
+                <TabsTrigger value="cmv">
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  CMV
+                </TabsTrigger>
+                <TabsTrigger value="stock">
+                  <Warehouse className="h-4 w-4 mr-1" />
+                  Estoque
                 </TabsTrigger>
                 <TabsTrigger value="categories">
-                  <List className="h-4 w-4 mr-2" />
+                  <List className="h-4 w-4 mr-1" />
                   Categorias
                 </TabsTrigger>
                 <TabsTrigger value="products">
-                  <Package className="h-4 w-4 mr-2" />
+                  <Package className="h-4 w-4 mr-1" />
                   Produtos
                 </TabsTrigger>
                 <TabsTrigger value="tables">
-                  <TableIcon className="h-4 w-4 mr-2" />
+                  <TableIcon className="h-4 w-4 mr-1" />
                   Mesas
                 </TabsTrigger>
                 <TabsTrigger value="orders" className="relative">
-                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  <ShoppingCart className="h-4 w-4 mr-1" />
                   Pedidos
                   {hasNewOrders && (
                     <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="bills" className="relative">
-                  <Receipt className="h-4 w-4 mr-2" />
+                  <Receipt className="h-4 w-4 mr-1" />
                   Contas
                   {hasNewBills && (
                     <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="settings">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Configurações
+                  <Settings className="h-4 w-4 mr-1" />
+                  Config
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="dashboard">
+              <TabsContent value="faturamento">
                 <DashboardTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="cmv">
+                <CMVDashboardTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="stock">
+                <StockTab restaurantId={restaurant.id} />
               </TabsContent>
 
               <TabsContent value="categories">
