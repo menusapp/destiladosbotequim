@@ -372,11 +372,13 @@ const Comanda = () => {
       setOrderNotes("");
       sessionStorage.removeItem(`cart_${tableNumber}`);
       
-      // Iniciar cronômetro de preparo e marcar que pedido foi enviado
-      setPrepTimerSeconds(prepTimeMinutes * 60);
-      setOrderSent(true);
+      // Iniciar cronômetro de preparo apenas no primeiro pedido
+      if (orders.length === 0) {
+        setPrepTimerSeconds(prepTimeMinutes * 60);
+        setOrderSent(true);
+      }
       
-      toast.success("Pedido enviado! Aguarde o atendimento");
+      toast.success("Pedido enviado! Você pode continuar pedindo");
       fetchData();
     } catch (error: any) {
       toast.error("Erro ao enviar pedido");
