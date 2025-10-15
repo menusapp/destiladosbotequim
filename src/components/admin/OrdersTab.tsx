@@ -86,6 +86,11 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    // Se está aceitando o pedido, dar baixa no estoque
+    if (newStatus === "accepted") {
+      await processStockDeduction(orderId);
+    }
+
     const { error } = await supabase
       .from("orders")
       .update({ status: newStatus })
@@ -96,8 +101,69 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       return;
     }
 
-    toast.success("Status atualizado!");
+    toast.success(newStatus === "accepted" ? "Pedido aceito e estoque atualizado!" : "Status atualizado!");
     fetchOrders();
+  };
+
+  const processStockDeduction = async (orderId: string) => {
+    try {
+      // Buscar os itens do pedido
+      const { data: orderItems, error: itemsError } = await supabase
+        .from("order_items")
+        .select("id, product_id, quantity")
+        .eq("order_id", orderId);
+
+      if (itemsError || !orderItems) {
+        console.error("Erro ao buscar itens do pedido:", itemsError);
+        return;
+      }
+
+      // Processar cada item do pedido
+      for (const item of orderItems) {
+        // Buscar os ingredientes do produto
+        const { data: ingredients, error: ingredientsError } = await supabase
+          .from("product_ingredients")
+          .select("stock_item_id, quantity")
+          .eq("product_id", item.product_id);
+
+        if (ingredientsError || !ingredients) continue;
+
+        // Dar baixa em cada ingrediente
+        for (const ingredient of ingredients) {
+          const totalQuantityToDeduct = ingredient.quantity * item.quantity;
+
+          // Buscar quantidade atual
+          const { data: currentStock } = await supabase
+            .from("stock_items")
+            .select("current_quantity")
+            .eq("id", ingredient.stock_item_id)
+            .maybeSingle();
+
+          if (currentStock) {
+            // Atualizar quantidade
+            await supabase
+              .from("stock_items")
+              .update({ 
+                current_quantity: Math.max(0, currentStock.current_quantity - totalQuantityToDeduct)
+              })
+              .eq("id", ingredient.stock_item_id);
+
+            // Registrar movimentação
+            await supabase
+              .from("stock_movements")
+              .insert({
+                stock_item_id: ingredient.stock_item_id,
+                movement_type: "out",
+                quantity: totalQuantityToDeduct,
+                reason: `Venda - Pedido ${orderId}`,
+                order_id: orderId
+              });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao processar baixa de estoque:", error);
+    }
   };
 
   const getStatusBadge = (status: string) => {

@@ -106,125 +106,62 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleMarkAsPaid = async (billId: string) => {
-    // Primeiro, buscar a conta para pegar o table_id
-    const { data: billData, error: fetchError } = await supabase
-      .from("bills")
-      .select("table_id")
-      .eq("id", billId)
-      .single();
+    try {
+      // Buscar a conta para pegar o table_id
+      const { data: billData, error: fetchError } = await supabase
+        .from("bills")
+        .select("table_id")
+        .eq("id", billId)
+        .maybeSingle();
 
-    if (fetchError || !billData) {
-      toast.error("Erro ao buscar conta");
-      return;
-    }
-
-    // Buscar todos os pedidos da mesa para dar baixa no estoque
-    const { data: ordersData, error: ordersError } = await supabase
-      .from("orders")
-      .select(`
-        id,
-        order_items (
-          id,
-          product_id,
-          quantity
-        )
-      `)
-      .eq("table_id", billData.table_id);
-
-    if (ordersError) {
-      console.error("Erro ao buscar pedidos:", ordersError);
-      toast.error("Erro ao processar estoque");
-      return;
-    }
-
-    // Processar baixa no estoque para cada item do pedido
-    for (const order of ordersData || []) {
-      for (const item of order.order_items || []) {
-        // Buscar os ingredientes do produto
-        const { data: ingredientsData, error: ingredientsError } = await supabase
-          .from("product_ingredients")
-          .select("stock_item_id, quantity")
-          .eq("product_id", item.product_id);
-
-        if (ingredientsError) {
-          console.error("Erro ao buscar ingredientes:", ingredientsError);
-          continue;
-        }
-
-        // Dar baixa em cada ingrediente
-        for (const ingredient of ingredientsData || []) {
-          const totalQuantityToDeduct = ingredient.quantity * item.quantity;
-
-          // Buscar quantidade atual do estoque
-          const { data: currentStock } = await supabase
-            .from("stock_items")
-            .select("current_quantity")
-            .eq("id", ingredient.stock_item_id)
-            .single();
-
-          if (currentStock) {
-            // Atualizar quantidade no estoque
-            await supabase
-              .from("stock_items")
-              .update({ 
-                current_quantity: Math.max(0, currentStock.current_quantity - totalQuantityToDeduct)
-              })
-              .eq("id", ingredient.stock_item_id);
-          }
-
-          // Registrar movimentação de estoque
-          await supabase
-            .from("stock_movements")
-            .insert({
-              stock_item_id: ingredient.stock_item_id,
-              movement_type: "out",
-              quantity: totalQuantityToDeduct,
-              reason: `Venda - Pedido ${order.id}`,
-              order_id: order.id
-            });
-        }
+      if (fetchError || !billData) {
+        toast.error("Erro ao buscar conta");
+        return;
       }
+
+      // Deletar todos os pedidos da mesa
+      const { error: deleteOrdersError } = await supabase
+        .from("orders")
+        .delete()
+        .eq("table_id", billData.table_id);
+
+      if (deleteOrdersError) {
+        console.error("Erro ao deletar pedidos:", deleteOrdersError);
+        toast.error("Erro ao limpar comanda");
+        return;
+      }
+
+      // Atualizar status da conta para paga
+      const { error: updateError } = await supabase
+        .from("bills")
+        .update({ 
+          status: "paid",
+          paid_at: new Date().toISOString()
+        })
+        .eq("id", billId);
+
+      if (updateError) {
+        toast.error("Erro ao marcar como paga");
+        console.error(updateError);
+        return;
+      }
+
+      // Deletar a conta
+      const { error: deleteBillError } = await supabase
+        .from("bills")
+        .delete()
+        .eq("id", billId);
+
+      if (deleteBillError) {
+        console.error("Erro ao deletar conta:", deleteBillError);
+      }
+
+      toast.success("Conta paga!");
+      fetchBills();
+    } catch (error) {
+      console.error("Erro ao processar pagamento:", error);
+      toast.error("Erro ao processar pagamento");
     }
-
-    // Deletar todos os pedidos da mesa (isso vai limpar a comanda)
-    const { error: deleteOrdersError } = await supabase
-      .from("orders")
-      .delete()
-      .eq("table_id", billData.table_id);
-
-    if (deleteOrdersError) {
-      console.error("Erro ao deletar pedidos:", deleteOrdersError);
-      toast.error("Erro ao limpar comanda");
-      return;
-    }
-
-    // Atualizar status da conta para paga
-    const { error: updateError } = await supabase
-      .from("bills")
-      .update({ 
-        status: "paid",
-        paid_at: new Date().toISOString()
-      })
-      .eq("id", billId);
-
-    if (updateError) {
-      toast.error("Erro ao marcar como paga");
-      console.error(updateError);
-      return;
-    }
-
-    // Deletar a própria conta também
-    const { error: deleteBillError } = await supabase
-      .from("bills")
-      .delete()
-      .eq("id", billId);
-
-    if (deleteBillError) {
-      console.error("Erro ao deletar conta:", deleteBillError);
-    }
-
-    toast.success("Conta paga e estoque atualizado!");
-    fetchBills();
   };
 
   const getPaymentIcon = (method: string) => {
