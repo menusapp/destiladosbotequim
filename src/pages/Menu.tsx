@@ -7,6 +7,7 @@ import { ShoppingCart, Plus, Minus, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
+import ComandaTypeDialog from "@/components/menu/ComandaTypeDialog";
 import ProductDetailDialog from "@/components/menu/ProductDetailDialog";
 
 interface Product {
@@ -64,7 +65,9 @@ const Menu = () => {
   const [customerName, setCustomerName] = useState("");
   const [customerCPF, setCustomerCPF] = useState("");
   const [tableId, setTableId] = useState<string | null>(null);
+  const [showComandaTypeDialog, setShowComandaTypeDialog] = useState(false);
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
+  const [comandaType, setComandaType] = useState<'individual' | 'coletiva' | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
@@ -74,6 +77,7 @@ const Menu = () => {
     // Verificar se já tem info do cliente no sessionStorage
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
     const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+    const savedType = sessionStorage.getItem(`comanda_type_${tableNumber}`) as 'individual' | 'coletiva' | null;
     
     // Carregar carrinho do sessionStorage
     const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
@@ -81,12 +85,13 @@ const Menu = () => {
       setCart(JSON.parse(savedCart));
     }
     
-    if (savedName && savedCPF) {
+    if (savedName && savedCPF && savedType) {
       setCustomerName(savedName);
       setCustomerCPF(savedCPF);
+      setComandaType(savedType);
       fetchData();
     } else {
-      setShowCustomerDialog(true);
+      setShowComandaTypeDialog(true);
       fetchData();
     }
   }, [restaurantSlug, tableNumber]);
@@ -150,6 +155,13 @@ const Menu = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleComandaTypeSelect = (type: 'individual' | 'coletiva') => {
+    setComandaType(type);
+    sessionStorage.setItem(`comanda_type_${tableNumber}`, type);
+    setShowComandaTypeDialog(false);
+    setShowCustomerDialog(true);
   };
 
   const handleCustomerInfoSubmit = (name: string, cpf: string) => {
@@ -244,10 +256,17 @@ const Menu = () => {
 
   return (
     <>
+      <ComandaTypeDialog
+        open={showComandaTypeDialog}
+        onSelect={handleComandaTypeSelect}
+        restaurantColor={restaurant.primary_color}
+      />
+
       <CustomerInfoDialog
         open={showCustomerDialog}
         onSubmit={handleCustomerInfoSubmit}
         restaurantColor={restaurant.primary_color}
+        isColetiva={comandaType === 'coletiva'}
       />
 
       <ProductDetailDialog

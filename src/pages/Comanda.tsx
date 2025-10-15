@@ -30,6 +30,7 @@ interface OrderItem {
   id: string;
   quantity: number;
   price_at_order: number;
+  notes?: string;
   products: {
     name: string;
   };
@@ -40,6 +41,8 @@ interface Order {
   id: string;
   status: string;
   created_at: string;
+  customer_name: string;
+  notes?: string;
   order_items: OrderItem[];
 }
 
@@ -81,8 +84,15 @@ const Comanda = () => {
   const [prepTimeMinutes, setPrepTimeMinutes] = useState(30);
   const [restaurantColor, setRestaurantColor] = useState("#FF6B35");
   const [orderNotes, setOrderNotes] = useState("");
+  const [comandaType, setComandaType] = useState<'individual' | 'coletiva'>('individual');
 
   useEffect(() => {
+    // Carregar tipo de comanda
+    const savedType = sessionStorage.getItem(`comanda_type_${tableNumber}`) as 'individual' | 'coletiva' | null;
+    if (savedType) {
+      setComandaType(savedType);
+    }
+
     fetchData();
     
     // Carregar carrinho do sessionStorage
@@ -140,9 +150,11 @@ const Comanda = () => {
               console.log("Conta paga! Redirecionando...");
               toast.success("Conta paga! Obrigado pela preferência!");
               
-              // Limpar dados da comanda do sessionStorage
+               // Limpar dados da comanda do sessionStorage
               sessionStorage.removeItem(`customer_name_${tableNumber}`);
               sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+              sessionStorage.removeItem(`comanda_type_${tableNumber}`);
+              sessionStorage.removeItem(`cart_${tableNumber}`);
               
               setTimeout(() => {
                 navigate(`/menu/${restaurantSlug}/${tableNumber}`);
@@ -233,7 +245,8 @@ const Comanda = () => {
       // Buscar CPF do cliente do sessionStorage
       const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
 
-      // Buscar apenas pedidos do CPF específico na mesa
+      // Para comanda coletiva, buscar TODOS os pedidos com o mesmo CPF
+      // Para comanda individual, buscar apenas os do cliente específico
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(`
@@ -577,14 +590,86 @@ const Comanda = () => {
         {/* Pedidos */}
         <Card>
           <CardHeader>
-            <CardTitle>Itens Pedidos</CardTitle>
+            <CardTitle>
+              {comandaType === 'coletiva' ? 'Pedidos da Mesa (Coletivo)' : 'Itens Pedidos'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {orders.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
                 Nenhum pedido realizado ainda
               </p>
+            ) : comandaType === 'coletiva' ? (
+              // Agrupar pedidos por nome do cliente
+              <div className="space-y-6">
+                {Object.entries(
+                  orders.reduce((acc, order) => {
+                    if (!acc[order.customer_name]) {
+                      acc[order.customer_name] = [];
+                    }
+                    acc[order.customer_name].push(order);
+                    return acc;
+                  }, {} as Record<string, Order[]>)
+                ).map(([customerName, customerOrders]) => (
+                  <div key={customerName} className="space-y-3">
+                    <div className="flex items-center gap-2 pb-2 border-b-2" style={{ borderColor: restaurantColor }}>
+                      <div className="h-8 w-8 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: restaurantColor }}>
+                        {customerName.charAt(0).toUpperCase()}
+                      </div>
+                      <h4 className="font-bold text-lg">{customerName}</h4>
+                    </div>
+                    {customerOrders.map((order) => (
+                      <div key={order.id} className="ml-4 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">
+                            {order.status === "pending" && "Pendente"}
+                            {order.status === "accepted" && "Aceito"}
+                            {order.status === "preparing" && "Preparando"}
+                            {order.status === "ready" && "Pronto"}
+                            {order.status === "delivered" && "Entregue"}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(order.created_at).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        {order.notes && (
+                          <p className="text-sm text-muted-foreground italic ml-2">
+                            Obs: {order.notes}
+                          </p>
+                        )}
+                        {order.order_items.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex justify-between items-start py-2 border-b last:border-0 ml-2"
+                          >
+                            <div className="flex-1">
+                              <p className="font-medium">{item.products.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Qtd: {item.quantity}
+                              </p>
+                              {item.order_item_extras && item.order_item_extras.length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  + {item.order_item_extras.map(e => e.product_extras.name).join(', ')}
+                                </div>
+                              )}
+                              {item.notes && (
+                                <div className="text-xs text-muted-foreground mt-1 italic">
+                                  Obs: {item.notes}
+                                </div>
+                              )}
+                            </div>
+                            <p className="font-semibold" style={{ color: restaurantColor }}>
+                              R$ {((item.price_at_order + (item.order_item_extras?.reduce((s, e) => s + e.price_at_order, 0) || 0)) * item.quantity).toFixed(2)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             ) : (
+              // Visualização individual normal
               <div className="space-y-4">
                 {orders.map((order) => (
                   <div key={order.id} className="space-y-2">
@@ -600,6 +685,11 @@ const Comanda = () => {
                         {new Date(order.created_at).toLocaleTimeString()}
                       </span>
                     </div>
+                    {order.notes && (
+                      <p className="text-sm text-muted-foreground italic">
+                        Obs: {order.notes}
+                      </p>
+                    )}
                     {order.order_items.map((item) => (
                       <div
                         key={item.id}
@@ -613,6 +703,11 @@ const Comanda = () => {
                           {item.order_item_extras && item.order_item_extras.length > 0 && (
                             <div className="text-xs text-muted-foreground mt-1">
                               + {item.order_item_extras.map(e => e.product_extras.name).join(', ')}
+                            </div>
+                          )}
+                          {item.notes && (
+                            <div className="text-xs text-muted-foreground mt-1 italic">
+                              Obs: {item.notes}
                             </div>
                           )}
                         </div>

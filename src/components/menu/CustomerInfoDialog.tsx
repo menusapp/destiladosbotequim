@@ -14,9 +14,15 @@ interface CustomerInfoDialogProps {
   open: boolean;
   onSubmit: (name: string, cpf: string) => void;
   restaurantColor?: string;
+  isColetiva?: boolean;
 }
 
-const CustomerInfoDialog = ({ open, onSubmit, restaurantColor = "#FF6B35" }: CustomerInfoDialogProps) => {
+const CustomerInfoDialog = ({ 
+  open, 
+  onSubmit, 
+  restaurantColor = "#FF6B35",
+  isColetiva = false 
+}: CustomerInfoDialogProps) => {
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
 
@@ -31,11 +37,27 @@ const CustomerInfoDialog = ({ open, onSubmit, restaurantColor = "#FF6B35" }: Cus
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>Bem-vindo!</DialogTitle>
+          <DialogTitle>
+            {isColetiva ? "Comanda Coletiva" : "Bem-vindo!"}
+          </DialogTitle>
           <DialogDescription>
-            Para começar seu pedido, precisamos de algumas informações
+            {isColetiva 
+              ? "Compartilhe o CPF com todos que vão pedir juntos" 
+              : "Para começar seu pedido, precisamos de algumas informações"}
           </DialogDescription>
         </DialogHeader>
+        
+        {isColetiva && (
+          <div className="bg-amber-50 border border-amber-500 rounded-lg p-3 text-sm">
+            <p className="text-amber-800 font-semibold">
+              ⚠️ Usem o mesmo CPF para todos os dispositivos
+            </p>
+            <p className="text-amber-700 text-xs mt-1">
+              Cada pessoa coloca seu nome, mas todos usam o mesmo CPF para compartilhar a comanda
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="customer-name">Nome</Label>
@@ -62,7 +84,7 @@ const CustomerInfoDialog = ({ open, onSubmit, restaurantColor = "#FF6B35" }: Cus
             className="w-full text-white"
             style={{ backgroundColor: restaurantColor }}
           >
-            Começar Pedido
+            {isColetiva ? "Entrar na Comanda" : "Começar Pedido"}
           </Button>
         </form>
       </DialogContent>
