@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -215,84 +215,92 @@ const Comanda = () => {
     }
   }, [prepTimerSeconds]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!restaurantSlug || !tableNumber) return;
+    
     try {
-      // Buscar restaurante e configurações
-      const { data: restData, error: restError } = await supabase
-        .from("restaurants")
-        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color")
-        .eq("slug", restaurantSlug)
-        .single();
-
-      if (restError) throw restError;
+      // Query otimizada: buscar dados em paralelo
+      const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
       
-      setServiceFeeEnabled(restData.service_fee_enabled || false);
-      setServiceFeePercentage(restData.service_fee_percentage || 10);
-      setPrepTimeMinutes(restData.prep_time_minutes || 30);
-      setRestaurantColor(restData.primary_color || "#FF6B35");
+      const [restResult, tableResult] = await Promise.all([
+        supabase
+          .from("restaurants")
+          .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color")
+          .eq("slug", restaurantSlug)
+          .maybeSingle(),
+        
+        supabase
+          .from("tables")
+          .select("id")
+          .eq("table_number", parseInt(tableNumber))
+          .limit(1)
+          .maybeSingle()
+      ]);
 
-      // Buscar mesa
-      const { data: tableData, error: tableError } = await supabase
-        .from("tables")
-        .select("*")
-        .eq("restaurant_id", restData.id)
-        .eq("table_number", parseInt(tableNumber || "0"))
-        .single();
+      if (restResult.error) throw restResult.error;
+      const restData = restResult.data;
+      
+      if (restData) {
+        setServiceFeeEnabled(restData.service_fee_enabled || false);
+        setServiceFeePercentage(restData.service_fee_percentage || 10);
+        setPrepTimeMinutes(restData.prep_time_minutes || 30);
+        setRestaurantColor(restData.primary_color || "#FF6B35");
+      }
 
-      if (tableError) throw tableError;
+      if (tableResult.error) throw tableResult.error;
+      const tableData = tableResult.data;
+      
+      if (!tableData) {
+        toast.error("Mesa não encontrada");
+        return;
+      }
+      
       setTableId(tableData.id);
 
-      // Buscar CPF do cliente do sessionStorage
-      const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
-
-      // Para comanda coletiva, buscar TODOS os pedidos com o mesmo CPF
-      // Para comanda individual, buscar apenas os do cliente específico
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
-          *,
-          order_items(
-            *,
-            products(name),
-            order_item_extras(
-              price_at_order,
-              product_extras(name)
+      // Buscar pedidos e conta em paralelo
+      const [ordersResult, billResult] = await Promise.all([
+        supabase
+          .from("orders")
+          .select(`
+            id, status, created_at, customer_name, notes,
+            order_items(
+              id, quantity, price_at_order, notes,
+              products(name),
+              order_item_extras(price_at_order, product_extras(name))
             )
-          )
-        `)
-        .eq("table_id", tableData.id)
-        .eq("customer_cpf", customerCPF || "")
-        .order("created_at", { ascending: false });
-
-      if (ordersError) throw ordersError;
-      setOrders(ordersData || []);
-
-      // Verificar se já foi solicitada a conta
-      const { data: billData } = await supabase
-        .from("bills")
-        .select("*")
-        .eq("table_id", tableData.id)
-        .in("status", ["requested", "on_the_way"])
-        .single();
-
-      if (billData) {
-        setBillRequested(true);
+          `)
+          .eq("table_id", tableData.id)
+          .eq("customer_cpf", customerCPF || "")
+          .order("created_at", { ascending: false }),
         
-        if (billData.status === "on_the_way") {
+        supabase
+          .from("bills")
+          .select("status")
+          .eq("table_id", tableData.id)
+          .in("status", ["requested", "on_the_way"])
+          .maybeSingle()
+      ]);
+
+      if (ordersResult.data) {
+        setOrders(ordersResult.data);
+      }
+
+      if (billResult.data) {
+        setBillRequested(true);
+        if (billResult.data.status === "on_the_way") {
           setBillOnTheWay(true);
         }
       }
-      
     } catch (error: any) {
       toast.error("Erro ao carregar comanda");
       console.error(error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [restaurantSlug, tableNumber]);
 
-  const calculateTotal = () => {
-    // Calcular subtotal dos pedidos já enviados
+  // Memoizar cálculo do total
+  const totals = useMemo(() => {
     const ordersSubtotal = orders.reduce((sum, order) => {
       const orderSum = order.order_items.reduce((itemSum, item) => {
         const extrasSum = (item.order_item_extras || []).reduce((s, e) => s + e.price_at_order, 0);
@@ -301,14 +309,12 @@ const Comanda = () => {
       return sum + orderSum;
     }, 0);
 
-    // Calcular subtotal do carrinho (ainda não enviado)
     const cartSubtotal = cart.reduce((sum, item) => {
       const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
       return sum + (item.product.price + extrasTotal) * item.quantity;
     }, 0);
 
     const subtotal = ordersSubtotal + cartSubtotal;
-
     const serviceFee = serviceFeeEnabled ? subtotal * (serviceFeePercentage / 100) : 0;
     
     return {
@@ -316,7 +322,7 @@ const Comanda = () => {
       serviceFee,
       total: subtotal + serviceFee,
     };
-  };
+  }, [orders, cart, serviceFeeEnabled, serviceFeePercentage]);
 
   const handleSendOrder = async () => {
     if (cart.length === 0) {
@@ -403,8 +409,6 @@ const Comanda = () => {
     if (!tableId) return;
 
     try {
-      const totals = calculateTotal();
-
       const { data: billData, error } = await supabase
         .from("bills")
         .insert({
@@ -443,8 +447,6 @@ const Comanda = () => {
       </div>
     );
   }
-
-  const totals = calculateTotal();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
