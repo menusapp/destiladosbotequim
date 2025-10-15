@@ -131,13 +131,24 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
   const fetchProducts = async () => {
+    // Buscar primeiro as categorias do restaurante
+    const { data: restaurantCategories } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("restaurant_id", restaurantId);
+
+    if (!restaurantCategories || restaurantCategories.length === 0) {
+      setProducts([]);
+      return;
+    }
+
+    const categoryIds = restaurantCategories.map(c => c.id);
+
+    // Buscar apenas produtos dessas categorias
     const { data, error } = await supabase
       .from("products")
-      .select(`
-        *,
-        categories!inner(restaurant_id)
-      `)
-      .eq("categories.restaurant_id", restaurantId);
+      .select("*")
+      .in("category_id", categoryIds);
 
     if (error) {
       toast.error("Erro ao carregar produtos");
