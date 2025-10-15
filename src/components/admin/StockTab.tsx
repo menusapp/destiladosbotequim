@@ -209,7 +209,7 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
               <div className="space-y-1">
                 {lowStockItems.map(item => (
                   <p key={item.id} className="text-sm">
-                    <strong>{item.name}</strong>: {item.current_quantity} {item.unit} (mínimo: {item.minimum_quantity} {item.unit})
+                    <strong>{item.name}</strong>: {item.current_quantity.toFixed(2)} {item.unit} (mínimo: {item.minimum_quantity.toFixed(2)} {item.unit})
                   </p>
                 ))}
               </div>
@@ -395,11 +395,11 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground">Quantidade:</span>
-                        <p className="font-medium">{item.current_quantity} {item.unit}</p>
+                        <p className="font-medium">{item.current_quantity.toFixed(2)} {item.unit}</p>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Mínimo:</span>
-                        <p className="font-medium">{item.minimum_quantity} {item.unit}</p>
+                        <p className="font-medium">{item.minimum_quantity.toFixed(2)} {item.unit}</p>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Preço/Un:</span>
