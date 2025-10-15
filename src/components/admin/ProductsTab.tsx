@@ -380,6 +380,18 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
         await supabase.from("product_extras").insert(extrasData);
       }
 
+      // Deletar ingredientes antigos e inserir novos
+      await supabase.from("product_ingredients").delete().eq("product_id", editingProduct.id);
+      
+      if (ingredients.length > 0) {
+        const ingredientsData = ingredients.map(ing => ({
+          product_id: editingProduct.id,
+          stock_item_id: ing.stock_item_id,
+          quantity: ing.quantity
+        }));
+        await supabase.from("product_ingredients").insert(ingredientsData);
+      }
+
       toast.success("Produto atualizado!");
     } else {
       const { data: newProduct, error } = await supabase
