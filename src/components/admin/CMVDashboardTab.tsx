@@ -32,19 +32,21 @@ export default function CMVDashboardTab({ restaurantId }: { restaurantId: string
   }, [restaurantId]);
 
   const fetchProductsCost = async () => {
-    // Buscar produtos com seus ingredientes
+    // Buscar produtos com seus ingredientes do restaurante específico
     const { data: products, error: prodError } = await supabase
       .from("products")
       .select(`
         id,
         name,
         price,
+        category_id,
+        categories!inner(restaurant_id),
         product_ingredients(
           quantity,
           stock_items(price_per_unit)
         )
       `)
-      .eq("product_ingredients.stock_items.restaurant_id", restaurantId);
+      .eq("categories.restaurant_id", restaurantId);
 
     if (prodError || !products) return;
 
