@@ -44,6 +44,7 @@ interface CashMovement {
 export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) {
   const [currentSession, setCurrentSession] = useState<CashSession | null>(null);
   const [movements, setMovements] = useState<CashMovement[]>([]);
+  const [allMovements, setAllMovements] = useState<CashMovement[]>([]);
   const [bills, setBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,6 +72,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
   useEffect(() => {
     fetchCurrentSession();
     fetchBills();
+    fetchAllMovements();
   }, [restaurantId]);
 
   useEffect(() => {
@@ -114,6 +116,21 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       setMovements(data || []);
     } catch (error: any) {
       toast.error("Erro ao buscar movimentações: " + error.message);
+    }
+  };
+
+  const fetchAllMovements = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("cash_movements")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setAllMovements(data || []);
+    } catch (error: any) {
+      console.error("Erro ao buscar todas movimentações:", error);
     }
   };
 
@@ -199,6 +216,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       setCloseNotes("");
       setCurrentSession(null);
       fetchCurrentSession();
+      fetchAllMovements();
     } catch (error: any) {
       toast.error("Erro ao fechar caixa: " + error.message);
     }
@@ -271,7 +289,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       })
       .reduce((sum, b) => sum + b.total_amount, 0);
 
-    const expenses = movements
+    const expenses = allMovements
       .filter(m => {
         const movDate = new Date(m.created_at);
         return movDate >= new Date(startDate) && movDate <= new Date(endDate) && 
@@ -533,7 +551,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
             <CardHeader>
               <CardTitle>Histórico de Movimentações</CardTitle>
               <CardDescription>
-                {movements.length} movimentações registradas
+                {currentSession 
+                  ? `${movements.length} movimentações registradas nesta sessão`
+                  : "Abra o caixa para ver as movimentações"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -668,7 +688,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   <div className="flex justify-between items-center p-4 bg-red-50 rounded-lg">
                     <span className="font-medium">Total de Despesas</span>
                     <span className="text-2xl font-bold text-red-600">
-                      R$ {movements
+                      R$ {allMovements
                         .filter(m => {
                           const movDate = new Date(m.created_at);
                           return movDate >= new Date(startDate) && 
@@ -682,7 +702,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Por categoria:</p>
                     {Array.from(new Set(
-                      movements
+                      allMovements
                         .filter(m => {
                           const movDate = new Date(m.created_at);
                           return movDate >= new Date(startDate) && 
@@ -692,7 +712,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                         })
                         .map(m => m.category)
                     )).map(category => {
-                      const total = movements
+                      const total = allMovements
                         .filter(m => {
                           const movDate = new Date(m.created_at);
                           return movDate >= new Date(startDate) && 
