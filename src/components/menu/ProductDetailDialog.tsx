@@ -120,11 +120,11 @@ const ProductDetailDialog = ({
                     return (
                       <label
                         key={extra.id}
-                        className="flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors hover:bg-accent"
+                        className="flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors"
                         style={
                           isSelected
                             ? { backgroundColor: `${restaurantColor}10`, borderColor: restaurantColor }
-                            : {}
+                            : { borderColor: `${restaurantColor}55` }
                         }
                       >
                         <Checkbox

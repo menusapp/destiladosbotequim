@@ -359,10 +359,6 @@ const Menu = () => {
 
       <div 
         className="min-h-screen bg-background pb-24"
-        style={{
-          // @ts-ignore
-          '--primary': `${parseInt(restaurant.primary_color.slice(1,3), 16)} ${parseInt(restaurant.primary_color.slice(3,5), 16)} ${parseInt(restaurant.primary_color.slice(5,7), 16)}`,
-        } as React.CSSProperties}
       >
         {/* Header + Categorias com fundo da cor primária */}
         <div 
