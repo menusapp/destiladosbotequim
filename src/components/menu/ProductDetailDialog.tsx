@@ -72,7 +72,17 @@ const ProductDetailDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <>
+      <style>{`
+        .custom-checkbox-${product.id.replace(/[^a-zA-Z0-9]/g, '')} {
+          border-color: ${restaurantColor} !important;
+        }
+        .custom-checkbox-${product.id.replace(/[^a-zA-Z0-9]/g, '')}[data-state="checked"] {
+          background-color: ${restaurantColor} !important;
+          border-color: ${restaurantColor} !important;
+        }
+      `}</style>
+      <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader className="space-y-2">
           <DialogTitle className="text-xl">{product.name}</DialogTitle>
@@ -105,33 +115,31 @@ const ProductDetailDialog = ({
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold">Adicionais</h4>
                 <div className="space-y-2">
-                  {extras.map((extra) => (
-                    <label
-                      key={extra.id}
-                      className="flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors hover:bg-accent"
-                      style={
-                        selectedExtras.includes(extra.id)
-                          ? { backgroundColor: `${restaurantColor}10`, borderColor: restaurantColor }
-                          : {}
-                      }
-                    >
-                      <Checkbox
-                        id={extra.id}
-                        checked={selectedExtras.includes(extra.id)}
-                        onCheckedChange={() => handleExtraToggle(extra.id)}
-                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        style={{
-                          // @ts-ignore
-                          '--primary': `${parseInt(restaurantColor.slice(1,3), 16)} ${parseInt(restaurantColor.slice(3,5), 16)} ${parseInt(restaurantColor.slice(5,7), 16)}`,
-                          borderColor: restaurantColor
-                        } as React.CSSProperties}
-                      />
-                      <span className="flex-1 text-sm">{extra.name}</span>
-                      <span className="text-sm font-semibold" style={{ color: restaurantColor }}>
-                        + R$ {extra.price.toFixed(2)}
-                      </span>
-                    </label>
-                  ))}
+                  {extras.map((extra) => {
+                    const isSelected = selectedExtras.includes(extra.id);
+                    return (
+                      <label
+                        key={extra.id}
+                        className="flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors hover:bg-accent"
+                        style={
+                          isSelected
+                            ? { backgroundColor: `${restaurantColor}10`, borderColor: restaurantColor }
+                            : {}
+                        }
+                      >
+                        <Checkbox
+                          id={extra.id}
+                          checked={isSelected}
+                          onCheckedChange={() => handleExtraToggle(extra.id)}
+                          className={`custom-checkbox-${product.id.replace(/[^a-zA-Z0-9]/g, '')}`}
+                        />
+                        <span className="flex-1 text-sm">{extra.name}</span>
+                        <span className="text-sm font-semibold" style={{ color: restaurantColor }}>
+                          + R$ {extra.price.toFixed(2)}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -173,6 +181,7 @@ const ProductDetailDialog = ({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 };
 
