@@ -32,6 +32,7 @@ interface CashSession {
 
 interface CashMovement {
   id: string;
+  cash_session_id: string;
   movement_type: string;
   amount: number;
   description: string;
@@ -39,13 +40,14 @@ interface CashMovement {
   payment_method: string | null;
   created_by: string;
   created_at: string;
+  bill_id: string | null;
 }
 
 export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) {
   const [currentSession, setCurrentSession] = useState<CashSession | null>(null);
   const [movements, setMovements] = useState<CashMovement[]>([]);
+  const [closedSessions, setClosedSessions] = useState<CashSession[]>([]);
   const [allMovements, setAllMovements] = useState<CashMovement[]>([]);
-  const [bills, setBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Estados para abrir caixa
@@ -71,7 +73,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
   useEffect(() => {
     fetchCurrentSession();
-    fetchAllMovements();
+    fetchClosedSessions();
   }, [restaurantId]);
 
   useEffect(() => {
@@ -118,60 +120,34 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
     }
   };
 
-  const fetchAllMovements = async () => {
+  const fetchClosedSessions = async () => {
     try {
-      // Buscar apenas movimentações de sessões fechadas
-      const { data: closedSessions, error: sessionsError } = await supabase
+      const { data, error } = await supabase
         .from("cash_register_sessions")
-        .select("id")
-        .eq("restaurant_id", restaurantId)
-        .eq("status", "closed");
-
-      if (sessionsError) throw sessionsError;
-
-      if (!closedSessions || closedSessions.length === 0) {
-        setAllMovements([]);
-        return;
-      }
-
-      const sessionIds = closedSessions.map(s => s.id);
-
-      const { data, error } = await supabase
-        .from("cash_movements")
         .select("*")
-        .in("cash_session_id", sessionIds)
-        .order("created_at", { ascending: false });
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "closed")
+        .order("closed_at", { ascending: false});
 
       if (error) throw error;
-      setAllMovements(data || []);
+      setClosedSessions(data || []);
+      
+      // Buscar movimentações das sessões fechadas
+      if (data && data.length > 0) {
+        const sessionIds = data.map(s => s.id);
+        const { data: movementsData, error: movError } = await supabase
+          .from("cash_movements")
+          .select("*")
+          .in("cash_session_id", sessionIds)
+          .order("created_at", { ascending: false });
+        
+        if (movError) throw movError;
+        setAllMovements(movementsData || []);
+      } else {
+        setAllMovements([]);
+      }
     } catch (error: any) {
-      console.error("Erro ao buscar movimentações de sessões fechadas:", error);
-    }
-  };
-
-  const fetchBills = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("bills")
-        .select(`
-          *,
-          tables:tables(table_number),
-          orders:orders(
-            customer_name,
-            order_items:order_items(
-              quantity,
-              price_at_order,
-              order_item_extras:order_item_extras(price_at_order)
-            )
-          )
-        `)
-        .eq("tables.restaurant_id", restaurantId)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setBills(data || []);
-    } catch (error: any) {
-      console.error("Erro ao buscar contas:", error);
+      console.error("Erro ao buscar sessões fechadas:", error);
     }
   };
 
@@ -231,7 +207,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       setCloseNotes("");
       setCurrentSession(null);
       fetchCurrentSession();
-      fetchAllMovements();
+      fetchClosedSessions();
     } catch (error: any) {
       toast.error("Erro ao fechar caixa: " + error.message);
     }
@@ -274,7 +250,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
     let balance = currentSession.opening_balance;
     
     movements.forEach(mov => {
-      if (mov.movement_type === "entrada" || mov.movement_type === "venda" || mov.movement_type === "suprimento") {
+      if (mov.movement_type === "entrada") {
         balance += mov.amount;
       } else {
         balance -= mov.amount;
@@ -286,36 +262,36 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
   const calculateTotalSales = () => {
     return movements
-      .filter(m => m.category === "venda")
+      .filter(m => m.movement_type === "entrada")
       .reduce((sum, m) => sum + m.amount, 0);
   };
 
   const calculateTotalExpenses = () => {
     return movements
-      .filter(m => m.movement_type === "saida" || m.movement_type === "despesa" || m.movement_type === "sangria")
+      .filter(m => m.movement_type === "saida")
       .reduce((sum, m) => sum + m.amount, 0);
   };
 
   const generateDRE = () => {
-    const salesTotal = allMovements
-      .filter(m => {
-        const movDate = new Date(m.created_at);
-        return movDate >= new Date(startDate) && movDate <= new Date(endDate) && m.category === "venda";
-      })
-      .reduce((sum, m) => sum + m.amount, 0);
+    const filtered = closedSessions.filter(s => {
+      const sessionDate = new Date(s.closed_at || s.opened_at);
+      return sessionDate >= new Date(startDate) && sessionDate <= new Date(endDate);
+    });
 
-    const expenses = allMovements
-      .filter(m => {
-        const movDate = new Date(m.created_at);
-        return movDate >= new Date(startDate) && movDate <= new Date(endDate) && 
-               (m.movement_type === "despesa" || m.movement_type === "saida");
-      })
-      .reduce((sum, m) => sum + m.amount, 0);
+    const totalRevenue = filtered.reduce((sum, s) => {
+      const sessionMovements = allMovements.filter(m => m.cash_session_id === s.id && m.movement_type === "entrada");
+      return sum + sessionMovements.reduce((total, m) => total + m.amount, 0);
+    }, 0);
 
-    const profit = salesTotal - expenses;
-    const margin = salesTotal > 0 ? (profit / salesTotal) * 100 : 0;
+    const totalExpenses = filtered.reduce((sum, s) => {
+      const sessionMovements = allMovements.filter(m => m.cash_session_id === s.id && m.movement_type === "saida");
+      return sum + sessionMovements.reduce((total, m) => total + m.amount, 0);
+    }, 0);
 
-    return { salesTotal, expenses, profit, margin };
+    const profit = totalRevenue - totalExpenses;
+    const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+
+    return { salesTotal: totalRevenue, expenses: totalExpenses, profit, margin };
   };
 
   const dre = generateDRE();
@@ -494,10 +470,6 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       <SelectContent>
                         <SelectItem value="entrada">Entrada</SelectItem>
                         <SelectItem value="saida">Saída</SelectItem>
-                        <SelectItem value="venda">Venda</SelectItem>
-                        <SelectItem value="sangria">Sangria</SelectItem>
-                        <SelectItem value="suprimento">Suprimento</SelectItem>
-                        <SelectItem value="despesa">Despesa</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -551,7 +523,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   </div>
                 </div>
                 <Button onClick={handleAddMovement} className="w-full mt-4">
-                  {movementType === "entrada" || movementType === "venda" || movementType === "suprimento" ? (
+                  {movementType === "entrada" ? (
                     <PlusCircle className="h-4 w-4 mr-2" />
                   ) : (
                     <MinusCircle className="h-4 w-4 mr-2" />
@@ -581,7 +553,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   movements.map((mov) => (
                     <div key={mov.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex items-center gap-4">
-                        {mov.movement_type === "entrada" || mov.movement_type === "venda" || mov.movement_type === "suprimento" ? (
+                        {mov.movement_type === "entrada" ? (
                           <TrendingUp className="h-5 w-5 text-green-600" />
                         ) : (
                           <TrendingDown className="h-5 w-5 text-red-600" />
@@ -597,11 +569,11 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                         </div>
                       </div>
                       <div className={`text-lg font-bold ${
-                        mov.movement_type === "entrada" || mov.movement_type === "venda" || mov.movement_type === "suprimento"
+                        mov.movement_type === "entrada"
                           ? "text-green-600"
                           : "text-red-600"
                       }`}>
-                        {mov.movement_type === "entrada" || mov.movement_type === "venda" || mov.movement_type === "suprimento" ? "+" : "-"}
+                        {mov.movement_type === "entrada" ? "+" : "-"}
                         R$ {mov.amount.toFixed(2)}
                       </div>
                     </div>
@@ -653,43 +625,44 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
-                    <span className="font-medium">Total de Vendas</span>
+                    <span className="font-medium">Total de Receitas</span>
                     <span className="text-2xl font-bold text-green-600">
-                      R$ {allMovements
-                        .filter(m => {
-                          const movDate = new Date(m.created_at);
-                          return movDate >= new Date(startDate) && movDate <= new Date(endDate) && m.category === "venda";
+                      R$ {closedSessions
+                        .filter(s => {
+                          const d = new Date(s.closed_at || s.opened_at);
+                          return d >= new Date(startDate) && d <= new Date(endDate);
                         })
-                        .reduce((sum, m) => sum + m.amount, 0)
+                        .reduce((total, session) => {
+                          const sessionEntries = allMovements.filter(m => 
+                            m.cash_session_id === session.id && m.movement_type === "entrada"
+                          );
+                          return total + sessionEntries.reduce((sum, m) => sum + m.amount, 0);
+                        }, 0)
                         .toFixed(2)}
                     </span>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Por forma de pagamento:</p>
-                    {Array.from(new Set(
-                      allMovements
-                        .filter(m => {
-                          const d = new Date(m.created_at);
-                          return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda" && m.payment_method;
-                        })
-                        .map(m => m.payment_method as string)
-                    )).map(method => {
-                      const total = allMovements
-                        .filter(m => {
-                          const d = new Date(m.created_at);
-                          return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda" && m.payment_method === method;
-                        })
-                        .reduce((sum, m) => sum + m.amount, 0);
-                      
-                      if (total === 0) return null;
-                      
-                      return (
-                        <div key={method} className="flex justify-between p-2 border-l-2 border-green-500 pl-4">
-                          <span className="capitalize">{method}</span>
-                          <span className="font-medium">R$ {total.toFixed(2)}</span>
-                        </div>
-                      );
-                    })}
+                    <p className="text-sm font-medium">Por caixa fechado:</p>
+                    {closedSessions
+                      .filter(s => {
+                        const d = new Date(s.closed_at || s.opened_at);
+                        return d >= new Date(startDate) && d <= new Date(endDate);
+                      })
+                      .map(session => {
+                        const sessionEntries = allMovements.filter(m => 
+                          m.cash_session_id === session.id && m.movement_type === "entrada"
+                        );
+                        const total = sessionEntries.reduce((sum, m) => sum + m.amount, 0);
+                        
+                        if (total === 0) return null;
+                        
+                        return (
+                          <div key={session.id} className="flex justify-between p-2 border-l-2 border-green-500 pl-4">
+                            <span>Caixa {format(new Date(session.closed_at!), "dd/MM/yyyy")}</span>
+                            <span className="font-medium">R$ {total.toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
               </CardContent>
@@ -707,14 +680,17 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   <div className="flex justify-between items-center p-4 bg-red-50 rounded-lg">
                     <span className="font-medium">Total de Despesas</span>
                     <span className="text-2xl font-bold text-red-600">
-                      R$ {allMovements
-                        .filter(m => {
-                          const movDate = new Date(m.created_at);
-                          return movDate >= new Date(startDate) && 
-                                 movDate <= new Date(endDate) && 
-                                 (m.movement_type === "despesa" || m.movement_type === "saida");
+                      R$ {closedSessions
+                        .filter(s => {
+                          const d = new Date(s.closed_at || s.opened_at);
+                          return d >= new Date(startDate) && d <= new Date(endDate);
                         })
-                        .reduce((sum, m) => sum + m.amount, 0)
+                        .reduce((total, session) => {
+                          const sessionExits = allMovements.filter(m => 
+                            m.cash_session_id === session.id && m.movement_type === "saida"
+                          );
+                          return total + sessionExits.reduce((sum, m) => sum + m.amount, 0);
+                        }, 0)
                         .toFixed(2)}
                     </span>
                   </div>
@@ -722,24 +698,24 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     <p className="text-sm font-medium">Por categoria:</p>
                     {Array.from(new Set(
                       allMovements
-                        .filter(m => {
-                          const movDate = new Date(m.created_at);
-                          return movDate >= new Date(startDate) && 
-                                 movDate <= new Date(endDate) && 
-                                 (m.movement_type === "despesa" || m.movement_type === "saida") &&
-                                 m.category;
-                        })
+                        .filter(m => m.movement_type === "saida" && m.category)
                         .map(m => m.category)
                     )).map(category => {
-                      const total = allMovements
-                        .filter(m => {
-                          const movDate = new Date(m.created_at);
-                          return movDate >= new Date(startDate) && 
-                                 movDate <= new Date(endDate) && 
-                                 (m.movement_type === "despesa" || m.movement_type === "saida") &&
-                                 m.category === category;
+                      const total = closedSessions
+                        .filter(s => {
+                          const d = new Date(s.closed_at || s.opened_at);
+                          return d >= new Date(startDate) && d <= new Date(endDate);
                         })
-                        .reduce((sum, m) => sum + m.amount, 0);
+                        .reduce((sum, session) => {
+                          const categoryMovements = allMovements.filter(m => 
+                            m.cash_session_id === session.id && 
+                            m.movement_type === "saida" && 
+                            m.category === category
+                          );
+                          return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
+                        }, 0);
+                      
+                      if (total === 0) return null;
                       
                       return (
                         <div key={category} className="flex justify-between p-2 border-l-2 border-red-500 pl-4">
@@ -804,11 +780,11 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   <Card>
                     <CardContent className="pt-6">
                       <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Total de Vendas</p>
+                        <p className="text-sm text-muted-foreground">Total de Caixas</p>
                         <p className="text-2xl font-bold">
-                          {allMovements.filter(m => {
-                            const d = new Date(m.created_at);
-                            return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda";
+                          {closedSessions.filter(s => {
+                            const d = new Date(s.closed_at || s.opened_at);
+                            return d >= new Date(startDate) && d <= new Date(endDate);
                           }).length}
                         </p>
                       </div>
@@ -817,11 +793,11 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   <Card>
                     <CardContent className="pt-6">
                       <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Ticket Médio</p>
+                        <p className="text-sm text-muted-foreground">Receita Média por Caixa</p>
                         <p className="text-2xl font-bold">
-                          R$ {(dre.salesTotal / Math.max(allMovements.filter(m => {
-                            const d = new Date(m.created_at);
-                            return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda";
+                          R$ {(dre.salesTotal / Math.max(closedSessions.filter(s => {
+                            const d = new Date(s.closed_at || s.opened_at);
+                            return d >= new Date(startDate) && d <= new Date(endDate);
                           }).length, 1)).toFixed(2)}
                         </p>
                       </div>
@@ -830,15 +806,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   <Card>
                     <CardContent className="pt-6">
                       <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
+                        <p className="text-sm text-muted-foreground">Margem Média</p>
                         <p className="text-2xl font-bold">
-                          {((allMovements.filter(m => {
-                            const d = new Date(m.created_at);
-                            return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda";
-                          }).length / Math.max(allMovements.filter(m => {
-                            const d = new Date(m.created_at);
-                            return d >= new Date(startDate) && d <= new Date(endDate);
-                          }).length, 1)) * 100).toFixed(1)}%
+                          {dre.margin.toFixed(1)}%
                         </p>
                       </div>
                     </CardContent>
