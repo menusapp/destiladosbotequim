@@ -121,16 +121,32 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
   const fetchAllMovements = async () => {
     try {
+      // Buscar apenas movimentações de sessões fechadas
+      const { data: closedSessions, error: sessionsError } = await supabase
+        .from("cash_register_sessions")
+        .select("id")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "closed");
+
+      if (sessionsError) throw sessionsError;
+
+      if (!closedSessions || closedSessions.length === 0) {
+        setAllMovements([]);
+        return;
+      }
+
+      const sessionIds = closedSessions.map(s => s.id);
+
       const { data, error } = await supabase
         .from("cash_movements")
         .select("*")
-        .eq("restaurant_id", restaurantId)
+        .in("cash_session_id", sessionIds)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       setAllMovements(data || []);
     } catch (error: any) {
-      console.error("Erro ao buscar todas movimentações:", error);
+      console.error("Erro ao buscar movimentações de sessões fechadas:", error);
     }
   };
 
