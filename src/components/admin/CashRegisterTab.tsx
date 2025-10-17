@@ -71,7 +71,6 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
   useEffect(() => {
     fetchCurrentSession();
-    fetchBills();
     fetchAllMovements();
   }, [restaurantId]);
 
@@ -287,7 +286,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
   const calculateTotalSales = () => {
     return movements
-      .filter(m => m.movement_type === "venda")
+      .filter(m => m.category === "venda")
       .reduce((sum, m) => sum + m.amount, 0);
   };
 
@@ -298,12 +297,12 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
   };
 
   const generateDRE = () => {
-    const salesTotal = bills
-      .filter(b => {
-        const billDate = new Date(b.created_at);
-        return billDate >= new Date(startDate) && billDate <= new Date(endDate) && b.status === "paid";
+    const salesTotal = allMovements
+      .filter(m => {
+        const movDate = new Date(m.created_at);
+        return movDate >= new Date(startDate) && movDate <= new Date(endDate) && m.category === "venda";
       })
-      .reduce((sum, b) => sum + b.total_amount, 0);
+      .reduce((sum, m) => sum + m.amount, 0);
 
     const expenses = allMovements
       .filter(m => {
@@ -656,27 +655,31 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
                     <span className="font-medium">Total de Vendas</span>
                     <span className="text-2xl font-bold text-green-600">
-                      R$ {bills
-                        .filter(b => {
-                          const billDate = new Date(b.created_at);
-                          return billDate >= new Date(startDate) && billDate <= new Date(endDate) && b.status === "paid";
+                      R$ {allMovements
+                        .filter(m => {
+                          const movDate = new Date(m.created_at);
+                          return movDate >= new Date(startDate) && movDate <= new Date(endDate) && m.category === "venda";
                         })
-                        .reduce((sum, b) => sum + b.total_amount, 0)
+                        .reduce((sum, m) => sum + m.amount, 0)
                         .toFixed(2)}
                     </span>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Por forma de pagamento:</p>
-                    {["dinheiro", "pix", "credito", "debito"].map(method => {
-                      const total = bills
-                        .filter(b => {
-                          const billDate = new Date(b.created_at);
-                          return billDate >= new Date(startDate) && 
-                                 billDate <= new Date(endDate) && 
-                                 b.status === "paid" && 
-                                 b.payment_method === method;
+                    {Array.from(new Set(
+                      allMovements
+                        .filter(m => {
+                          const d = new Date(m.created_at);
+                          return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda" && m.payment_method;
                         })
-                        .reduce((sum, b) => sum + b.total_amount, 0);
+                        .map(m => m.payment_method as string)
+                    )).map(method => {
+                      const total = allMovements
+                        .filter(m => {
+                          const d = new Date(m.created_at);
+                          return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda" && m.payment_method === method;
+                        })
+                        .reduce((sum, m) => sum + m.amount, 0);
                       
                       if (total === 0) return null;
                       
@@ -803,9 +806,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Total de Vendas</p>
                         <p className="text-2xl font-bold">
-                          {bills.filter(b => {
-                            const billDate = new Date(b.created_at);
-                            return billDate >= new Date(startDate) && billDate <= new Date(endDate) && b.status === "paid";
+                          {allMovements.filter(m => {
+                            const d = new Date(m.created_at);
+                            return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda";
                           }).length}
                         </p>
                       </div>
@@ -816,9 +819,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Ticket Médio</p>
                         <p className="text-2xl font-bold">
-                          R$ {(dre.salesTotal / Math.max(bills.filter(b => {
-                            const billDate = new Date(b.created_at);
-                            return billDate >= new Date(startDate) && billDate <= new Date(endDate) && b.status === "paid";
+                          R$ {(dre.salesTotal / Math.max(allMovements.filter(m => {
+                            const d = new Date(m.created_at);
+                            return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda";
                           }).length, 1)).toFixed(2)}
                         </p>
                       </div>
@@ -829,12 +832,12 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
                         <p className="text-2xl font-bold">
-                          {((bills.filter(b => {
-                            const billDate = new Date(b.created_at);
-                            return billDate >= new Date(startDate) && billDate <= new Date(endDate) && b.status === "paid";
-                          }).length / Math.max(bills.filter(b => {
-                            const billDate = new Date(b.created_at);
-                            return billDate >= new Date(startDate) && billDate <= new Date(endDate);
+                          {((allMovements.filter(m => {
+                            const d = new Date(m.created_at);
+                            return d >= new Date(startDate) && d <= new Date(endDate) && m.category === "venda";
+                          }).length / Math.max(allMovements.filter(m => {
+                            const d = new Date(m.created_at);
+                            return d >= new Date(startDate) && d <= new Date(endDate);
                           }).length, 1)) * 100).toFixed(1)}%
                         </p>
                       </div>
