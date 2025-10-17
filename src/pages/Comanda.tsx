@@ -411,6 +411,15 @@ const Comanda = () => {
   const handleRequestBill = async () => {
     if (!tableId) return;
 
+    // Validar troco em dinheiro
+    if (paymentMethod === "cash" && changeAmount) {
+      const changeValue = parseFloat(changeAmount);
+      if (changeValue < totals.total) {
+        toast.error(`O valor para troco deve ser maior ou igual ao total da conta (R$ ${totals.total.toFixed(2)})`);
+        return;
+      }
+    }
+
     try {
       const { data: billData, error } = await supabase
         .from("bills")
