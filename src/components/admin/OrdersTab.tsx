@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Check, Printer } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Clock, Check, Printer, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -34,6 +35,7 @@ interface Order {
 
 const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchOrders();
@@ -297,7 +299,18 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Pedidos em Tempo Real</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Pedidos em Tempo Real</h3>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por mesa ou cliente..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 w-64"
+          />
+        </div>
+      </div>
 
       {orders.length === 0 ? (
         <div className="text-center py-12 border rounded-lg bg-secondary/20">
@@ -305,7 +318,15 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => (
+          {orders
+            .filter((order) => {
+              const searchLower = searchQuery.toLowerCase();
+              return (
+                order.tables.table_number.toString().includes(searchLower) ||
+                order.customer_name.toLowerCase().includes(searchLower)
+              );
+            })
+            .map((order) => (
             <div
               key={order.id}
               className="p-4 border rounded-lg space-y-3 hover:bg-secondary/50 transition-colors"

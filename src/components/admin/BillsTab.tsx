@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Check, CreditCard, Smartphone, Banknote, Printer } from "lucide-react";
+import { Clock, Check, CreditCard, Smartphone, Banknote, Printer, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -40,6 +41,7 @@ interface Bill {
 const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchBills();
@@ -343,7 +345,18 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Contas Solicitadas</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Contas Solicitadas</h3>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por mesa ou cliente..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 w-64"
+          />
+        </div>
+      </div>
 
       {bills.length === 0 ? (
         <div className="text-center py-12 border rounded-lg bg-secondary/20">
@@ -351,7 +364,15 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
         </div>
       ) : (
         <div className="grid gap-4">
-          {bills.map((bill) => (
+          {bills
+            .filter((bill) => {
+              const searchLower = searchQuery.toLowerCase();
+              return (
+                bill.tables.table_number.toString().includes(searchLower) ||
+                bill.orders[0]?.customer_name.toLowerCase().includes(searchLower)
+              );
+            })
+            .map((bill) => (
             <Card key={bill.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
