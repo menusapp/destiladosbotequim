@@ -366,25 +366,25 @@ const Menu = () => {
       >
         {/* Header + Categorias com fundo da cor primária */}
         <div 
-          className="text-white shadow-lg pb-6"
+          className="text-white shadow-lg pb-3"
           style={{ backgroundColor: restaurant.primary_color }}
         >
           {/* Header */}
-          <div className="p-6">
-            <div className="flex justify-center mb-2">
+          <div className="p-4">
+            <div className="flex justify-center mb-1">
               {restaurant.logo_url ? (
                 <img 
                   src={restaurant.logo_url} 
                   alt="Logo" 
-                  className="h-20 w-auto object-contain"
+                  className="h-16 w-auto object-contain"
                 />
               ) : (
-                <h1 className="text-2xl font-bold">{restaurant.name}</h1>
+                <h1 className="text-xl font-bold">{restaurant.name}</h1>
               )}
             </div>
-            <p className="text-sm opacity-90 text-center">Mesa {tableNumber}</p>
+            <p className="text-xs opacity-90 text-center">Mesa {tableNumber}</p>
             {customerName && (
-              <p className="text-xs opacity-75 mt-1 text-center">Cliente: {customerName}</p>
+              <p className="text-xs opacity-75 text-center">Cliente: {customerName}</p>
             )}
           </div>
 
@@ -392,14 +392,14 @@ const Menu = () => {
           <div className="container mx-auto px-4 relative">
             <div 
               id="categories-scroll"
-              className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+              className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
             >
               {categories.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => setSelectedCategoryId(category.id)}
                   className={`
-                    whitespace-nowrap px-4 py-2.5 rounded-lg font-medium text-white
+                    whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium text-white
                     transition-all duration-200
                     ${selectedCategoryId === category.id 
                       ? 'bg-white/25 shadow-md' 
@@ -420,8 +420,8 @@ const Menu = () => {
         </div>
 
         {/* Produtos da categoria selecionada */}
-        <div className="container mx-auto px-4 pt-6 pb-6">
-          <div className="space-y-4">
+        <div className="container mx-auto px-4 pt-4 pb-6">
+          <div className="space-y-3">
             {selectedCategoryProducts.map((product) => (
               <ProductCard
                 key={product.id}
