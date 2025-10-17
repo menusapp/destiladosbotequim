@@ -78,20 +78,20 @@ const ProductCard = memo(({
             loading="lazy"
           />
         )}
-        <div className="flex-1">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="font-semibold text-lg">{product.name}</p>
-              {product.description && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {product.description}
-                </p>
+          <div className="flex-1">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="font-semibold text-lg">{product.name}</p>
+                {product.description && (
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                    {product.description}
+                  </p>
+                )}
+              </div>
+              {!product.available && (
+                <Badge variant="secondary">Indisponível</Badge>
               )}
             </div>
-            {!product.available && (
-              <Badge variant="secondary">Indisponível</Badge>
-            )}
-          </div>
           <p 
             className="text-xl font-bold mt-2"
             style={{ color: restaurantColor }}
