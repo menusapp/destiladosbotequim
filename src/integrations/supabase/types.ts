@@ -61,6 +61,129 @@ export type Database = {
           },
         ]
       }
+      cash_movements: {
+        Row: {
+          amount: number
+          bill_id: string | null
+          cash_session_id: string
+          category: string | null
+          created_at: string | null
+          created_by: string
+          description: string
+          id: string
+          movement_type: string
+          payment_method: string | null
+          restaurant_id: string
+        }
+        Insert: {
+          amount: number
+          bill_id?: string | null
+          cash_session_id: string
+          category?: string | null
+          created_at?: string | null
+          created_by: string
+          description: string
+          id?: string
+          movement_type: string
+          payment_method?: string | null
+          restaurant_id: string
+        }
+        Update: {
+          amount?: number
+          bill_id?: string | null
+          cash_session_id?: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string
+          description?: string
+          id?: string
+          movement_type?: string
+          payment_method?: string | null
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_movements_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_cash_session_id_fkey"
+            columns: ["cash_session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_register_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_register_sessions: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          closing_balance: number | null
+          created_at: string | null
+          difference: number | null
+          expected_balance: number | null
+          id: string
+          notes: string | null
+          opened_at: string
+          opened_by: string
+          opening_balance: number
+          restaurant_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_balance?: number | null
+          created_at?: string | null
+          difference?: number | null
+          expected_balance?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by: string
+          opening_balance?: number
+          restaurant_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_balance?: number | null
+          created_at?: string | null
+          difference?: number | null
+          expected_balance?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string
+          opening_balance?: number
+          restaurant_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_register_sessions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string | null
