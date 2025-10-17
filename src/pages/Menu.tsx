@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Receipt } from "lucide-react";
+import { Receipt, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
@@ -123,6 +123,7 @@ const Menu = () => {
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
 
   useEffect(() => {
     // Verificar se já tem info do cliente no sessionStorage
@@ -303,6 +304,19 @@ const Menu = () => {
     return categories.find(cat => cat.id === selectedCategoryId)?.products || [];
   }, [categories, selectedCategoryId]);
 
+  // Verificar se precisa mostrar indicador de scroll
+  useEffect(() => {
+    const checkScroll = () => {
+      const container = document.getElementById('categories-scroll');
+      if (container) {
+        setShowScrollIndicator(container.scrollWidth > container.clientWidth);
+      }
+    };
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, [categories]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -375,8 +389,11 @@ const Menu = () => {
           </div>
 
           {/* Categorias */}
-          <div className="container mx-auto px-4">
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="container mx-auto px-4 relative">
+            <div 
+              id="categories-scroll"
+              className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+            >
               {categories.map((category) => (
                 <button
                   key={category.id}
@@ -394,6 +411,11 @@ const Menu = () => {
                 </button>
               ))}
             </div>
+            {showScrollIndicator && (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ChevronRight className="h-4 w-4 text-white/60 animate-pulse" />
+              </div>
+            )}
           </div>
         </div>
 
