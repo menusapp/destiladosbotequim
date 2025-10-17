@@ -369,7 +369,9 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
               const searchLower = searchQuery.toLowerCase();
               return (
                 bill.tables.table_number.toString().includes(searchLower) ||
-                bill.orders[0]?.customer_name.toLowerCase().includes(searchLower)
+                bill.orders.some(order => 
+                  order.customer_name.toLowerCase().includes(searchLower)
+                )
               );
             })
             .map((bill) => (
