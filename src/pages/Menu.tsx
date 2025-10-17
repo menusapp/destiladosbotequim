@@ -344,53 +344,61 @@ const Menu = () => {
       />
 
       <div 
-        className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background pb-24"
+        className="min-h-screen bg-background pb-24"
         style={{
           // @ts-ignore
           '--primary': `${parseInt(restaurant.primary_color.slice(1,3), 16)} ${parseInt(restaurant.primary_color.slice(3,5), 16)} ${parseInt(restaurant.primary_color.slice(5,7), 16)}`,
         } as React.CSSProperties}
       >
-        {/* Header */}
+        {/* Header + Categorias com fundo da cor primária */}
         <div 
-          className="text-white p-6 shadow-lg"
+          className="text-white shadow-lg pb-6"
           style={{ backgroundColor: restaurant.primary_color }}
         >
-          <div className="flex justify-center mb-2">
-            {restaurant.logo_url ? (
-              <img 
-                src={restaurant.logo_url} 
-                alt="Logo" 
-                className="h-20 w-auto object-contain"
-              />
-            ) : (
-              <h1 className="text-2xl font-bold">{restaurant.name}</h1>
+          {/* Header */}
+          <div className="p-6">
+            <div className="flex justify-center mb-2">
+              {restaurant.logo_url ? (
+                <img 
+                  src={restaurant.logo_url} 
+                  alt="Logo" 
+                  className="h-20 w-auto object-contain"
+                />
+              ) : (
+                <h1 className="text-2xl font-bold">{restaurant.name}</h1>
+              )}
+            </div>
+            <p className="text-sm opacity-90 text-center">Mesa {tableNumber}</p>
+            {customerName && (
+              <p className="text-xs opacity-75 mt-1 text-center">Cliente: {customerName}</p>
             )}
           </div>
-          <p className="text-sm opacity-90 text-center">Mesa {tableNumber}</p>
-          {customerName && (
-            <p className="text-xs opacity-75 mt-1 text-center">Cliente: {customerName}</p>
-          )}
-        </div>
 
-        {/* Categorias com scroll horizontal */}
-        <div className="container mx-auto px-4 pt-6">
-          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                variant={selectedCategoryId === category.id ? "default" : "outline"}
-                onClick={() => setSelectedCategoryId(category.id)}
-                className="whitespace-nowrap"
-                style={selectedCategoryId === category.id ? { backgroundColor: restaurant.primary_color, color: 'white' } : {}}
-              >
-                {category.name}
-              </Button>
-            ))}
+          {/* Categorias */}
+          <div className="container mx-auto px-4">
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => setSelectedCategoryId(category.id)}
+                  className={`
+                    whitespace-nowrap px-4 py-2.5 rounded-lg font-medium text-white
+                    transition-all duration-200
+                    ${selectedCategoryId === category.id 
+                      ? 'bg-white/25 shadow-md' 
+                      : 'hover:bg-white/10'
+                    }
+                  `}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Produtos da categoria selecionada */}
-        <div className="container mx-auto px-4 pb-6">
+        <div className="container mx-auto px-4 pt-6 pb-6">
           <div className="space-y-4">
             {selectedCategoryProducts.map((product) => (
               <ProductCard
