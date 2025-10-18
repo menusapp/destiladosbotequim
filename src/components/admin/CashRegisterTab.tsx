@@ -8,9 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, Calendar, PlusCircle, MinusCircle } from "lucide-react";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, Calendar as CalendarIcon, PlusCircle, MinusCircle } from "lucide-react";
+import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface CashRegisterTabProps {
   restaurantId: string;
@@ -68,8 +72,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
   const [movementCreatedBy, setMovementCreatedBy] = useState("");
 
   // Estados para relatórios
-  const [startDate, setStartDate] = useState(format(new Date(new Date().setDate(1)), "yyyy-MM-dd"));
-  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [dateFilter, setDateFilter] = useState<string>("today");
+  const [customDateFrom, setCustomDateFrom] = useState<Date>();
+  const [customDateTo, setCustomDateTo] = useState<Date>();
 
   useEffect(() => {
     fetchCurrentSession();
@@ -272,11 +277,48 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       .reduce((sum, m) => sum + m.amount, 0);
   };
 
+  const getDateRange = () => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = endOfDay(now);
+
+    switch (dateFilter) {
+      case "today":
+        startDate = startOfDay(now);
+        break;
+      case "yesterday":
+        startDate = startOfDay(subDays(now, 1));
+        endDate = endOfDay(subDays(now, 1));
+        break;
+      case "7days":
+        startDate = startOfDay(subDays(now, 6));
+        break;
+      case "thisMonth":
+        startDate = startOfMonth(now);
+        break;
+      case "lastMonth":
+        startDate = startOfMonth(subMonths(now, 1));
+        endDate = endOfMonth(subMonths(now, 1));
+        break;
+      case "custom":
+        if (customDateFrom && customDateTo) {
+          startDate = startOfDay(customDateFrom);
+          endDate = endOfDay(customDateTo);
+        } else {
+          startDate = startOfDay(now);
+        }
+        break;
+      default:
+        startDate = startOfDay(now);
+    }
+
+    return { startDate, endDate };
+  };
+
   const filterSessionsByDate = (session: CashSession) => {
+    const { startDate, endDate } = getDateRange();
     const sessionDate = new Date(session.closed_at || session.opened_at);
-    const start = startOfDay(new Date(startDate));
-    const end = endOfDay(new Date(endDate));
-    return sessionDate >= start && sessionDate <= end;
+    return sessionDate >= startDate && sessionDate <= endDate;
   };
 
   const generateDRE = () => {
@@ -592,28 +634,89 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
+                <CalendarIcon className="h-5 w-5" />
                 Período de Análise
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Data Início</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Data Fim</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={dateFilter === "today" ? "default" : "outline"}
+                  onClick={() => setDateFilter("today")}
+                >
+                  Hoje
+                </Button>
+                <Button
+                  variant={dateFilter === "yesterday" ? "default" : "outline"}
+                  onClick={() => setDateFilter("yesterday")}
+                >
+                  Ontem
+                </Button>
+                <Button
+                  variant={dateFilter === "7days" ? "default" : "outline"}
+                  onClick={() => setDateFilter("7days")}
+                >
+                  Últimos 7 Dias
+                </Button>
+                <Button
+                  variant={dateFilter === "thisMonth" ? "default" : "outline"}
+                  onClick={() => setDateFilter("thisMonth")}
+                >
+                  Este Mês
+                </Button>
+                <Button
+                  variant={dateFilter === "lastMonth" ? "default" : "outline"}
+                  onClick={() => setDateFilter("lastMonth")}
+                >
+                  Mês Passado
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={dateFilter === "custom" ? "default" : "outline"}
+                      className={cn("justify-start text-left font-normal")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFilter === "custom" && customDateFrom && customDateTo
+                        ? `${format(customDateFrom, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateTo, "dd/MM/yyyy", { locale: ptBR })}`
+                        : "Personalizado"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <div className="p-3 space-y-2">
+                      <div>
+                        <label className="text-sm font-medium">Data inicial</label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={customDateFrom}
+                          onSelect={(date) => {
+                            setCustomDateFrom(date);
+                            if (date && customDateTo) {
+                              setDateFilter("custom");
+                            }
+                          }}
+                          locale={ptBR}
+                          className="pointer-events-auto"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Data final</label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={customDateTo}
+                          onSelect={(date) => {
+                            setCustomDateTo(date);
+                            if (date && customDateFrom) {
+                              setDateFilter("custom");
+                            }
+                          }}
+                          locale={ptBR}
+                          className="pointer-events-auto"
+                        />
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </CardContent>
           </Card>
@@ -727,28 +830,89 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
+                <CalendarIcon className="h-5 w-5" />
                 Período de Análise
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Data Início</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Data Fim</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={dateFilter === "today" ? "default" : "outline"}
+                  onClick={() => setDateFilter("today")}
+                >
+                  Hoje
+                </Button>
+                <Button
+                  variant={dateFilter === "yesterday" ? "default" : "outline"}
+                  onClick={() => setDateFilter("yesterday")}
+                >
+                  Ontem
+                </Button>
+                <Button
+                  variant={dateFilter === "7days" ? "default" : "outline"}
+                  onClick={() => setDateFilter("7days")}
+                >
+                  Últimos 7 Dias
+                </Button>
+                <Button
+                  variant={dateFilter === "thisMonth" ? "default" : "outline"}
+                  onClick={() => setDateFilter("thisMonth")}
+                >
+                  Este Mês
+                </Button>
+                <Button
+                  variant={dateFilter === "lastMonth" ? "default" : "outline"}
+                  onClick={() => setDateFilter("lastMonth")}
+                >
+                  Mês Passado
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={dateFilter === "custom" ? "default" : "outline"}
+                      className={cn("justify-start text-left font-normal")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFilter === "custom" && customDateFrom && customDateTo
+                        ? `${format(customDateFrom, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateTo, "dd/MM/yyyy", { locale: ptBR })}`
+                        : "Personalizado"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <div className="p-3 space-y-2">
+                      <div>
+                        <label className="text-sm font-medium">Data inicial</label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={customDateFrom}
+                          onSelect={(date) => {
+                            setCustomDateFrom(date);
+                            if (date && customDateTo) {
+                              setDateFilter("custom");
+                            }
+                          }}
+                          locale={ptBR}
+                          className="pointer-events-auto"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Data final</label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={customDateTo}
+                          onSelect={(date) => {
+                            setCustomDateTo(date);
+                            if (date && customDateFrom) {
+                              setDateFilter("custom");
+                            }
+                          }}
+                          locale={ptBR}
+                          className="pointer-events-auto"
+                        />
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </CardContent>
           </Card>
@@ -760,7 +924,10 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                 Demonstração do Resultado do Exercício (DRE)
               </CardTitle>
               <CardDescription>
-                Período: {format(new Date(startDate), "dd/MM/yyyy")} a {format(new Date(endDate), "dd/MM/yyyy")}
+                {(() => {
+                  const { startDate, endDate } = getDateRange();
+                  return `Período: ${format(startDate, "dd/MM/yyyy", { locale: ptBR })} a ${format(endDate, "dd/MM/yyyy", { locale: ptBR })}`;
+                })()}
               </CardDescription>
             </CardHeader>
             <CardContent>
