@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, Calendar, PlusCircle, MinusCircle } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 
 interface CashRegisterTabProps {
   restaurantId: string;
@@ -272,11 +272,15 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       .reduce((sum, m) => sum + m.amount, 0);
   };
 
+  const filterSessionsByDate = (session: CashSession) => {
+    const sessionDate = new Date(session.closed_at || session.opened_at);
+    const start = startOfDay(new Date(startDate));
+    const end = endOfDay(new Date(endDate));
+    return sessionDate >= start && sessionDate <= end;
+  };
+
   const generateDRE = () => {
-    const filtered = closedSessions.filter(s => {
-      const sessionDate = new Date(s.closed_at || s.opened_at);
-      return sessionDate >= new Date(startDate) && sessionDate <= new Date(endDate);
-    });
+    const filtered = closedSessions.filter(filterSessionsByDate);
 
     const totalRevenue = filtered.reduce((sum, s) => {
       const sessionMovements = allMovements.filter(m => m.cash_session_id === s.id && m.movement_type === "entrada");
@@ -628,10 +632,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     <span className="font-medium">Total de Receitas</span>
                     <span className="text-2xl font-bold text-green-600">
                       R$ {closedSessions
-                        .filter(s => {
-                          const d = new Date(s.closed_at || s.opened_at);
-                          return d >= new Date(startDate) && d <= new Date(endDate);
-                        })
+                        .filter(filterSessionsByDate)
                         .reduce((total, session) => {
                           const sessionEntries = allMovements.filter(m => 
                             m.cash_session_id === session.id && m.movement_type === "entrada"
@@ -644,10 +645,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Por caixa fechado:</p>
                     {closedSessions
-                      .filter(s => {
-                        const d = new Date(s.closed_at || s.opened_at);
-                        return d >= new Date(startDate) && d <= new Date(endDate);
-                      })
+                      .filter(filterSessionsByDate)
                       .map(session => {
                         const sessionEntries = allMovements.filter(m => 
                           m.cash_session_id === session.id && m.movement_type === "entrada"
@@ -681,10 +679,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     <span className="font-medium">Total de Despesas</span>
                     <span className="text-2xl font-bold text-red-600">
                       R$ {closedSessions
-                        .filter(s => {
-                          const d = new Date(s.closed_at || s.opened_at);
-                          return d >= new Date(startDate) && d <= new Date(endDate);
-                        })
+                        .filter(filterSessionsByDate)
                         .reduce((total, session) => {
                           const sessionExits = allMovements.filter(m => 
                             m.cash_session_id === session.id && m.movement_type === "saida"
@@ -702,10 +697,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                         .map(m => m.category)
                     )).map(category => {
                       const total = closedSessions
-                        .filter(s => {
-                          const d = new Date(s.closed_at || s.opened_at);
-                          return d >= new Date(startDate) && d <= new Date(endDate);
-                        })
+                        .filter(filterSessionsByDate)
                         .reduce((sum, session) => {
                           const categoryMovements = allMovements.filter(m => 
                             m.cash_session_id === session.id && 
@@ -732,6 +724,35 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         </TabsContent>
 
         <TabsContent value="dre" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Período de Análise
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Data Início</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Data Fim</Label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -782,10 +803,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Total de Caixas</p>
                         <p className="text-2xl font-bold">
-                          {closedSessions.filter(s => {
-                            const d = new Date(s.closed_at || s.opened_at);
-                            return d >= new Date(startDate) && d <= new Date(endDate);
-                          }).length}
+                          {closedSessions.filter(filterSessionsByDate).length}
                         </p>
                       </div>
                     </CardContent>
@@ -795,10 +813,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Receita Média por Caixa</p>
                         <p className="text-2xl font-bold">
-                          R$ {(dre.salesTotal / Math.max(closedSessions.filter(s => {
-                            const d = new Date(s.closed_at || s.opened_at);
-                            return d >= new Date(startDate) && d <= new Date(endDate);
-                          }).length, 1)).toFixed(2)}
+                          R$ {(dre.salesTotal / Math.max(closedSessions.filter(filterSessionsByDate).length, 1)).toFixed(2)}
                         </p>
                       </div>
                     </CardContent>
