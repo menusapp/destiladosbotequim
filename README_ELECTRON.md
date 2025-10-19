@@ -156,6 +156,36 @@ Para problemas ou dúvidas:
 2. Verifique a localização do banco de dados
 3. Teste primeiro em modo desenvolvimento (`npm run electron:dev`)
 
+## 🔄 Sistema de Atualizações Automáticas
+
+O Menu's Desktop possui sistema de atualizações automáticas:
+
+### Para Usuários Finais
+- Ao abrir o app, ele verifica automaticamente se há nova versão disponível
+- Se houver atualização, aparece um alerta embaixo do login
+- Clique em "Atualizar" para baixar e instalar a nova versão
+
+### Para Desenvolvedores/Administradores
+Quando quiser lançar uma nova versão:
+
+1. **Atualize a versão no `package.json`:**
+   ```json
+   { "version": "1.1.0" }
+   ```
+
+2. **Gere os instaladores:**
+   ```bash
+   npm run electron:build
+   ```
+
+3. **Faça upload dos instaladores** para seu servidor web
+
+4. **Atualize a tabela `app_versions` no banco de dados:**
+   - Marque a versão anterior como `is_current = false`
+   - Insira nova versão com `is_current = true` e URLs de download
+
+📖 Veja `README_UPDATES.md` para documentação completa sobre atualizações.
+
 ## 🎯 Próximos Passos
 
 1. **Customizar o ícone**: Substitua `public/favicon.ico` por um ícone de 256x256

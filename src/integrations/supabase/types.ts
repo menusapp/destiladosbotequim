@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_versions: {
+        Row: {
+          created_at: string | null
+          download_url_linux: string | null
+          download_url_mac: string | null
+          download_url_windows: string | null
+          id: string
+          is_current: boolean | null
+          release_notes: string | null
+          version: string
+        }
+        Insert: {
+          created_at?: string | null
+          download_url_linux?: string | null
+          download_url_mac?: string | null
+          download_url_windows?: string | null
+          id?: string
+          is_current?: boolean | null
+          release_notes?: string | null
+          version: string
+        }
+        Update: {
+          created_at?: string | null
+          download_url_linux?: string | null
+          download_url_mac?: string | null
+          download_url_windows?: string | null
+          id?: string
+          is_current?: boolean | null
+          release_notes?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
       bills: {
         Row: {
           change_amount: number | null

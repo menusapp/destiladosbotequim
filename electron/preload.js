@@ -70,6 +70,9 @@ contextBridge.exposeInMainWorld('electronDB', {
   // Auth
   login: (username, password) => ipcRenderer.invoke('db:login', username, password),
   createUser: (data) => ipcRenderer.invoke('db:createUser', data),
+  
+  // App
+  getVersion: () => ipcRenderer.invoke('app:getVersion'),
 });
 
 // Detect if running in Electron

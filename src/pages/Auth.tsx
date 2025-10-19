@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Menu } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { UpdateChecker } from "@/components/UpdateChecker";
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -213,6 +214,10 @@ const Auth = () => {
               </form>
             </TabsContent>
           </Tabs>
+
+          <div className="mt-4">
+            <UpdateChecker />
+          </div>
 
           <div className="mt-6 text-center">
             <Button

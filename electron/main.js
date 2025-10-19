@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const Database = require('./database');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 let db;
@@ -39,6 +40,11 @@ app.whenReady().then(() => {
   setupIpcHandlers();
   
   createWindow();
+
+  // Check for updates (only in production)
+  if (process.env.NODE_ENV !== 'development') {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -122,4 +128,7 @@ function setupIpcHandlers() {
   // Auth
   ipcMain.handle('db:login', (_, username, password) => db.login(username, password));
   ipcMain.handle('db:createUser', (_, data) => db.createUser(data));
+  
+  // App version
+  ipcMain.handle('app:getVersion', () => app.getVersion());
 }

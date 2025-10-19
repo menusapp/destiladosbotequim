@@ -34,5 +34,9 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true
+  },
+  "publish": {
+    "provider": "generic",
+    "url": "https://seu-dominio.com/downloads/"
   }
 }
