@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
@@ -27,6 +28,7 @@ interface Restaurant {
 
 const RestaurantAdmin = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading, isRestaurantAdmin, getRestaurantId, signOut } = useAuth();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -34,18 +36,24 @@ const RestaurantAdmin = () => {
   const [hasNewBills, setHasNewBills] = useState(false);
 
   useEffect(() => {
-    const userType = sessionStorage.getItem("userType");
-    const restaurantId = sessionStorage.getItem("restaurantId");
+    if (!authLoading) {
+      if (!user) {
+        toast.error("Você precisa estar logado para acessar esta página");
+        navigate("/auth");
+        return;
+      }
+      
+      const restaurantId = getRestaurantId();
+      if (!isRestaurantAdmin || !restaurantId) {
+        toast.error("Acesso não autorizado. Você precisa ser administrador de um restaurante.");
+        navigate("/");
+        return;
+      }
 
-    if (userType !== "restaurant" || !restaurantId) {
-      // No session in preview: don't redirect, just show inline login card
-      setLoading(false);
-      return;
+      fetchRestaurant(restaurantId);
+      setupNotifications(restaurantId);
     }
-
-    fetchRestaurant(restaurantId);
-    setupNotifications(restaurantId);
-  }, []);
+  }, [user, authLoading, isRestaurantAdmin, navigate]);
 
   const setupNotifications = (restaurantId: string) => {
     // Canal para novos pedidos
@@ -136,9 +144,8 @@ const RestaurantAdmin = () => {
     }
   };
 
-  const handleLogout = () => {
-    sessionStorage.clear();
-    navigate("/");
+  const handleLogout = async () => {
+    await signOut();
     toast.success("Logout realizado com sucesso");
   };
 
