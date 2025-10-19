@@ -30,10 +30,18 @@ const Auth = () => {
   }, []);
 
   const checkUserRoleAndRedirect = async (userId: string) => {
-    const { data: roles } = await supabase
+    const { data: roles, error } = await supabase
       .from("user_roles")
       .select("role, restaurant_id")
       .eq("user_id", userId);
+
+    // If query failed, continue as basic user
+    if (error) {
+      console.warn("Roles query failed:", error.message);
+      toast.success("Login realizado com sucesso!");
+      navigate("/dashboard");
+      return;
+    }
 
     if (roles && roles.length > 0) {
       if (roles.some(r => r.role === "ceo")) {
@@ -41,13 +49,14 @@ const Auth = () => {
       } else if (roles.some(r => r.role === "restaurant_admin")) {
         navigate("/admin");
       } else {
-        // Usuário comum sem permissões administrativas
         toast.success("Login realizado com sucesso!");
         navigate("/dashboard");
       }
     } else {
-      toast.error("Erro ao verificar permissões. Entre em contato com o suporte.");
-      navigate("/");
+      // Backfill default role for legacy accounts without roles
+      const { error: insertError } = await supabase.from("user_roles").insert({ user_id: userId, role: "user" });
+      toast.success("Login realizado com sucesso!");
+      navigate("/dashboard");
     }
   };
 
