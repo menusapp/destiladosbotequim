@@ -41,10 +41,13 @@ const Auth = () => {
       } else if (roles.some(r => r.role === "restaurant_admin")) {
         navigate("/admin");
       } else {
-        toast.error("Você não tem permissões para acessar o painel administrativo");
+        // Usuário comum sem permissões administrativas
+        toast.success("Login realizado com sucesso!");
+        navigate("/dashboard");
       }
     } else {
-      toast.error("Nenhuma role encontrada. Entre em contato com o administrador.");
+      toast.error("Erro ao verificar permissões. Entre em contato com o suporte.");
+      navigate("/");
     }
   };
 
@@ -67,7 +70,10 @@ const Auth = () => {
       if (error) throw error;
 
       if (data?.user) {
-        toast.success("Conta criada com sucesso! Verifique seu email para confirmar.");
+        toast.success("Conta criada com sucesso! Você já pode fazer login.");
+        setEmail("");
+        setPassword("");
+        setFullName("");
         setActiveTab("login");
       }
     } catch (error: any) {
