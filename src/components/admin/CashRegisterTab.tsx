@@ -321,26 +321,116 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
     return sessionDate >= startDate && sessionDate <= endDate;
   };
 
-  const generateDRE = () => {
+  const generateDRE = async () => {
     const filtered = closedSessions.filter(filterSessionsByDate);
+    const { startDate, endDate } = getDateRange();
 
     const totalRevenue = filtered.reduce((sum, s) => {
       const sessionMovements = allMovements.filter(m => m.cash_session_id === s.id && m.movement_type === "entrada");
       return sum + sessionMovements.reduce((total, m) => total + m.amount, 0);
     }, 0);
 
-    const totalExpenses = filtered.reduce((sum, s) => {
+    const operationalExpenses = filtered.reduce((sum, s) => {
       const sessionMovements = allMovements.filter(m => m.cash_session_id === s.id && m.movement_type === "saida");
       return sum + sessionMovements.reduce((total, m) => total + m.amount, 0);
     }, 0);
 
-    const profit = totalRevenue - totalExpenses;
-    const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+    // Calcular CMV (Custo de Mercadorias Vendidas) baseado nos ingredientes dos produtos vendidos
+    let cmv = 0;
+    try {
+      // Buscar todos os pedidos aceitos no período
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          created_at,
+          table_id,
+          order_items (
+            id,
+            quantity,
+            product_id,
+            products (
+              id,
+              product_ingredients (
+                quantity,
+                stock_items (
+                  price_per_unit
+                )
+              )
+            )
+          )
+        `)
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString())
+        .eq("status", "accepted");
 
-    return { salesTotal: totalRevenue, expenses: totalExpenses, profit, margin };
+      if (ordersError) throw ordersError;
+
+      // Calcular o custo total dos ingredientes
+      orders?.forEach(order => {
+        order.order_items?.forEach((item: any) => {
+          const itemQuantity = item.quantity;
+          const ingredients = item.products?.product_ingredients || [];
+          
+          ingredients.forEach((ingredient: any) => {
+            const ingredientQty = ingredient.quantity;
+            const pricePerUnit = ingredient.stock_items?.price_per_unit || 0;
+            cmv += ingredientQty * pricePerUnit * itemQuantity;
+          });
+        });
+      });
+    } catch (error) {
+      console.error("Erro ao calcular CMV:", error);
+    }
+
+    const totalExpenses = operationalExpenses + cmv;
+    const grossProfit = totalRevenue - cmv;
+    const netProfit = totalRevenue - totalExpenses;
+    const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    return { 
+      salesTotal: totalRevenue, 
+      cmv,
+      grossProfit,
+      operationalExpenses, 
+      totalExpenses,
+      netProfit, 
+      grossMargin,
+      netMargin
+    };
   };
 
-  const dre = generateDRE();
+  const [dreData, setDreData] = useState<{
+    salesTotal: number;
+    cmv: number;
+    grossProfit: number;
+    operationalExpenses: number;
+    totalExpenses: number;
+    netProfit: number;
+    grossMargin: number;
+    netMargin: number;
+  }>({
+    salesTotal: 0,
+    cmv: 0,
+    grossProfit: 0,
+    operationalExpenses: 0,
+    totalExpenses: 0,
+    netProfit: 0,
+    grossMargin: 0,
+    netMargin: 0
+  });
+
+  useEffect(() => {
+    const loadDRE = async () => {
+      const data = await generateDRE();
+      setDreData(data);
+    };
+    
+    if (closedSessions.length > 0) {
+      loadDRE();
+    }
+  }, [closedSessions, allMovements, dateFilter, customDateRange]);
 
   if (loading) {
     return <div className="p-4">Carregando...</div>;
@@ -729,24 +819,32 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     </span>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Por caixa fechado:</p>
-                    {closedSessions
-                      .filter(filterSessionsByDate)
-                      .map(session => {
-                        const sessionEntries = allMovements.filter(m => 
-                          m.cash_session_id === session.id && m.movement_type === "entrada"
-                        );
-                        const total = sessionEntries.reduce((sum, m) => sum + m.amount, 0);
-                        
-                        if (total === 0) return null;
-                        
-                        return (
-                          <div key={session.id} className="flex justify-between p-2 border-l-2 border-green-500 pl-4">
-                            <span>Caixa {format(new Date(session.closed_at!), "dd/MM/yyyy")}</span>
-                            <span className="font-medium">R$ {total.toFixed(2)}</span>
-                          </div>
-                        );
-                      })}
+                    <p className="text-sm font-medium">Por tipo de entrada:</p>
+                    {Array.from(new Set(
+                      allMovements
+                        .filter(m => m.movement_type === "entrada")
+                        .map(m => m.category || "Sem categoria")
+                    )).map(category => {
+                      const total = closedSessions
+                        .filter(filterSessionsByDate)
+                        .reduce((sum, session) => {
+                          const categoryMovements = allMovements.filter(m => 
+                            m.cash_session_id === session.id && 
+                            m.movement_type === "entrada" && 
+                            (m.category || "Sem categoria") === category
+                          );
+                          return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
+                        }, 0);
+                      
+                      if (total === 0) return null;
+                      
+                      return (
+                        <div key={category} className="flex justify-between p-2 border-l-2 border-green-500 pl-4">
+                          <span>{category}</span>
+                          <span className="font-medium">R$ {total.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>
@@ -776,11 +874,11 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     </span>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Por categoria:</p>
+                    <p className="text-sm font-medium">Por tipo de despesa:</p>
                     {Array.from(new Set(
                       allMovements
-                        .filter(m => m.movement_type === "saida" && m.category)
-                        .map(m => m.category)
+                        .filter(m => m.movement_type === "saida")
+                        .map(m => m.category || "Sem categoria")
                     )).map(category => {
                       const total = closedSessions
                         .filter(filterSessionsByDate)
@@ -788,7 +886,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                           const categoryMovements = allMovements.filter(m => 
                             m.cash_session_id === session.id && 
                             m.movement_type === "saida" && 
-                            m.category === category
+                            (m.category || "Sem categoria") === category
                           );
                           return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
                         }, 0);
@@ -897,70 +995,88 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between p-4 bg-blue-50 rounded-lg">
-                    <span className="font-bold text-lg">Receita Bruta</span>
-                    <span className="font-bold text-lg text-blue-600">R$ {dre.salesTotal.toFixed(2)}</span>
+              <div className="space-y-6">
+                {/* Receitas */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border-l-4 border-green-500">
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">RECEITA BRUTA</p>
+                      <p className="text-xs text-muted-foreground">Todas as entradas do período</p>
+                    </div>
+                    <span className="font-bold text-2xl text-green-600">R$ {dreData.salesTotal.toFixed(2)}</span>
                   </div>
                 </div>
 
-                <div className="space-y-2 pl-4 border-l-4 border-gray-300">
-                  <div className="flex justify-between p-3">
-                    <span className="text-red-600">(-) Despesas Operacionais</span>
-                    <span className="text-red-600 font-medium">R$ {dre.expenses.toFixed(2)}</span>
+                {/* CMV */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-l-4 border-orange-500">
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">(-) CMV - CUSTO DE MERCADORIAS VENDIDAS</p>
+                      <p className="text-xs text-muted-foreground">Custo dos insumos utilizados nos produtos vendidos</p>
+                    </div>
+                    <span className="font-bold text-xl text-orange-600">R$ {dreData.cmv.toFixed(2)}</span>
                   </div>
                 </div>
 
-                <div className="h-px bg-gray-300" />
-
-                <div className={`flex justify-between p-4 rounded-lg ${
-                  dre.profit >= 0 ? "bg-green-50" : "bg-red-50"
-                }`}>
-                  <span className="font-bold text-xl">Lucro Líquido</span>
-                  <span className={`font-bold text-xl ${
-                    dre.profit >= 0 ? "text-green-600" : "text-red-600"
-                  }`}>
-                    R$ {dre.profit.toFixed(2)}
-                  </span>
+                {/* Lucro Bruto */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">(=) LUCRO BRUTO</p>
+                      <p className="text-xs text-muted-foreground">Receita - CMV | Margem: {dreData.grossMargin.toFixed(1)}%</p>
+                    </div>
+                    <span className="font-bold text-2xl text-blue-600">R$ {dreData.grossProfit.toFixed(2)}</span>
+                  </div>
                 </div>
 
-                <div className="flex justify-between p-4 bg-purple-50 rounded-lg">
-                  <span className="font-bold">Margem de Lucro</span>
-                  <span className="font-bold text-purple-600">{dre.margin.toFixed(2)}%</span>
+                {/* Despesas Operacionais */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border-l-4 border-red-500">
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">(-) DESPESAS OPERACIONAIS</p>
+                      <p className="text-xs text-muted-foreground">Todas as saídas registradas no caixa</p>
+                    </div>
+                    <span className="font-bold text-xl text-red-600">R$ {dreData.operationalExpenses.toFixed(2)}</span>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Total de Caixas</p>
-                        <p className="text-2xl font-bold">
-                          {closedSessions.filter(filterSessionsByDate).length}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Receita Média por Caixa</p>
-                        <p className="text-2xl font-bold">
-                          R$ {(dre.salesTotal / Math.max(closedSessions.filter(filterSessionsByDate).length, 1)).toFixed(2)}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Margem Média</p>
-                        <p className="text-2xl font-bold">
-                          {dre.margin.toFixed(1)}%
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                {/* Separador */}
+                <div className="border-t-2 border-dashed"></div>
+
+                {/* Despesas Totais */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">TOTAL DE DESPESAS</p>
+                      <p className="text-xs text-muted-foreground">CMV + Despesas Operacionais</p>
+                    </div>
+                    <span className="font-bold text-lg">R$ {dreData.totalExpenses.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Separador Final */}
+                <div className="border-t-4 border-primary"></div>
+
+                {/* Lucro Líquido */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-5 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border-l-4 border-purple-500 shadow-md">
+                    <div>
+                      <p className="text-base font-bold text-purple-900">(=) LUCRO LÍQUIDO</p>
+                      <p className="text-xs text-muted-foreground">Receita Bruta - Total de Despesas</p>
+                    </div>
+                    <span className="font-bold text-3xl text-purple-600">R$ {dreData.netProfit.toFixed(2)}</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <span className="text-xs text-muted-foreground">Margem Bruta</span>
+                      <span className="font-bold text-xl text-blue-600">{dreData.grossMargin.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex flex-col p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <span className="text-xs text-muted-foreground">Margem Líquida</span>
+                      <span className="font-bold text-xl text-purple-600">{dreData.netMargin.toFixed(1)}%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
