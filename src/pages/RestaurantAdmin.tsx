@@ -17,6 +17,7 @@ import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
 import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
 import CashRegisterTab from "@/components/admin/CashRegisterTab";
+import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 interface Restaurant {
   id: string;
@@ -32,6 +33,8 @@ const RestaurantAdmin = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [hasNewBills, setHasNewBills] = useState(false);
+  
+  useInactivityLogout();
 
   useEffect(() => {
     const restaurantId = localStorage.getItem('restaurant_id');

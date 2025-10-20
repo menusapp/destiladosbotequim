@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 interface Restaurant {
   id: string;
@@ -34,6 +35,8 @@ const CEODashboard = () => {
   const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(null);
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(true);
   const [ceoPassword, setCeoPassword] = useState("");
+  
+  useInactivityLogout();
   
   // Form states
   const [formName, setFormName] = useState("");
