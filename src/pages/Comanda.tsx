@@ -75,7 +75,7 @@ const Comanda = () => {
   const [billRequested, setBillRequested] = useState(false);
   const [billOnTheWay, setBillOnTheWay] = useState(false);
   const [prepTimerSeconds, setPrepTimerSeconds] = useState(0);
-  const [orderSent, setOrderSent] = useState(false);
+  const [hasAcceptedOrder, setHasAcceptedOrder] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("pix");
   const [changeAmount, setChangeAmount] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -199,7 +199,9 @@ const Comanda = () => {
             console.log("Order atualizada:", payload);
             const updatedOrder = payload.new as any;
             if (updatedOrder.status === "accepted" && payload.old?.status === "pending") {
-              toast.success("Seu pedido foi aceito!");
+              toast.success("Seu pedido foi aceito e está sendo preparado!");
+              setHasAcceptedOrder(true);
+              setPrepTimerSeconds(prepTimeMinutes * 60);
               fetchData();
             }
           }
@@ -304,6 +306,9 @@ const Comanda = () => {
 
       if (ordersResult.data) {
         setOrders(ordersResult.data);
+        // Verificar se há algum pedido aceito para mostrar cronômetro
+        const hasAccepted = ordersResult.data.some(order => order.status === "accepted");
+        setHasAcceptedOrder(hasAccepted);
       }
 
       if (billResult.data) {
@@ -412,13 +417,7 @@ const Comanda = () => {
       setOrderNotes("");
       sessionStorage.removeItem(`cart_${tableNumber}`);
       
-      // Iniciar cronômetro de preparo apenas no primeiro pedido
-      if (orders.length === 0) {
-        setPrepTimerSeconds(prepTimeMinutes * 60);
-        setOrderSent(true);
-      }
-      
-      toast.success("Pedido enviado! Você pode continuar pedindo");
+      toast.success("Pedido enviado! Aguarde a confirmação do restaurante");
       fetchData();
     } catch (error: any) {
       toast.error("Erro ao enviar pedido");
@@ -518,14 +517,14 @@ const Comanda = () => {
               </div>
             </CardContent>
           </Card>
-        ) : orderSent && !billRequested ? (
+        ) : hasAcceptedOrder && !billRequested ? (
           <Card className="border-amber-500 bg-amber-50">
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
                 <Clock className="h-5 w-5 text-amber-600" />
                 <div className="text-center">
                   <p className="text-sm text-amber-800 font-medium">
-                    Tempo de Preparo de Até
+                    👨‍🍳 Preparando seu pedido
                   </p>
                   <p className="text-3xl font-bold text-amber-600 mt-1">
                     {formatTime(prepTimerSeconds)}
