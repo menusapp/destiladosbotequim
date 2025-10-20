@@ -80,20 +80,22 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       // Otimista: atualiza UI imediatamente
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
 
-      if (newStatus === "accepted") {
-        await processStockDeduction(orderId);
-      }
-
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: newStatus })
-        .eq("id", orderId);
+      // Atualiza via função segura no backend, validando o restaurante
+      const { error } = await supabase.rpc('admin_update_order_status', {
+        p_order_id: orderId,
+        p_new_status: newStatus,
+        p_restaurant_id: restaurantId,
+      });
 
       if (error) {
         toast.error("Erro ao atualizar status");
-        // Recarrega para desfazer otimista em caso de erro
         await fetchOrders();
         return;
+      }
+
+      // Após confirmado, processa baixa de estoque se necessário
+      if (newStatus === "accepted") {
+        await processStockDeduction(orderId);
       }
 
       toast.success(newStatus === "accepted" ? "Pedido aceito e estoque atualizado!" : "Status atualizado!");
