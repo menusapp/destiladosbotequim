@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_versions: {
+        Row: {
+          created_at: string | null
+          download_url_linux: string | null
+          download_url_mac: string | null
+          download_url_windows: string | null
+          id: string
+          is_current: boolean | null
+          release_notes: string | null
+          version: string
+        }
+        Insert: {
+          created_at?: string | null
+          download_url_linux?: string | null
+          download_url_mac?: string | null
+          download_url_windows?: string | null
+          id?: string
+          is_current?: boolean | null
+          release_notes?: string | null
+          version: string
+        }
+        Update: {
+          created_at?: string | null
+          download_url_linux?: string | null
+          download_url_mac?: string | null
+          download_url_windows?: string | null
+          id?: string
+          is_current?: boolean | null
+          release_notes?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
       bills: {
         Row: {
           change_amount: number | null
@@ -825,6 +858,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_mark_bill_on_the_way: {
+        Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_mark_bill_paid: {
+        Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_update_order_status: {
+        Args: {
+          p_new_status: string
+          p_order_id: string
+          p_restaurant_id: string
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -839,6 +888,13 @@ export type Database = {
       is_restaurant_closed_by_order_item: {
         Args: { _order_item_id: string }
         Returns: boolean
+      }
+      validate_restaurant_credentials: {
+        Args: { p_password: string; p_username: string }
+        Returns: {
+          restaurant_id: string
+          restaurant_name: string
+        }[]
       }
     }
     Enums: {
