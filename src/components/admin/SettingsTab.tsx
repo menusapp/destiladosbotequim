@@ -132,6 +132,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
       if (error) throw error;
 
       toast.success("Configurações salvas!");
+      await fetchSettings(); // Recarrega os dados do banco para confirmar
     } catch (error) {
       toast.error("Erro ao salvar configurações");
       console.error(error);
