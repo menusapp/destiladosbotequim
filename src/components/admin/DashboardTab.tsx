@@ -119,13 +119,13 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
       // Buscar movimentações das sessões fechadas
       const { data: movements, error: movError } = await supabase
         .from("cash_movements")
-        .select("movement_type, amount, payment_method, category")
+        .select("movement_type, amount, payment_method, category, description")
         .in("cash_session_id", sessionIds);
 
       if (movError) throw movError;
 
       const entradas = (movements || []).filter((m) => m.movement_type === "entrada");
-      const vendas = entradas.filter((m) => (m.category === "venda"));
+      const pedidos = entradas.filter((m) => m.category === "Pedido");
 
       const totalRevenue = entradas.reduce((sum, m) => sum + Number(m.amount || 0), 0);
 
@@ -133,23 +133,23 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
       const isPix = (method?: string | null) => method === "pix";
       const isCard = (method?: string | null) => method === "card" || method === "credito" || method === "debito";
 
-      const cardPayments = vendas.filter((v) => isCard(v.payment_method)).length;
-      const pixPayments = vendas.filter((v) => isPix(v.payment_method)).length;
-      const cashPayments = vendas.filter((v) => isCash(v.payment_method)).length;
+      const cardPayments = pedidos.filter((v) => isCard(v.payment_method)).length;
+      const pixPayments = pedidos.filter((v) => isPix(v.payment_method)).length;
+      const cashPayments = pedidos.filter((v) => isCash(v.payment_method)).length;
 
-      const cardRevenue = vendas
+      const cardRevenue = pedidos
         .filter((v) => isCard(v.payment_method))
         .reduce((sum, v) => sum + Number(v.amount || 0), 0);
-      const pixRevenue = vendas
+      const pixRevenue = pedidos
         .filter((v) => isPix(v.payment_method))
         .reduce((sum, v) => sum + Number(v.amount || 0), 0);
-      const cashRevenue = vendas
+      const cashRevenue = pedidos
         .filter((v) => isCash(v.payment_method))
         .reduce((sum, v) => sum + Number(v.amount || 0), 0);
 
       setStats({
         totalRevenue,
-        totalOrders: vendas.length,
+        totalOrders: pedidos.length,
         cardPayments,
         pixPayments,
         cashPayments,
@@ -158,9 +158,64 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
         cashRevenue,
       });
 
-      // Top produtos: como os pedidos são removidos ao pagar,
-      // não é possível compilar produtos vendidos a partir de "orders" aqui.
-      setTopProducts([]);
+      // Buscar produtos mais vendidos dos pedidos que entraram no caixa
+      const orderIds: string[] = [];
+      pedidos.forEach((movement) => {
+        const match = movement.description?.match(/Pedido #([a-f0-9-]+)/);
+        if (match && match[1]) {
+          orderIds.push(match[1]);
+        }
+      });
+
+      if (orderIds.length > 0) {
+        const { data: orderItems } = await supabase
+          .from("order_items")
+          .select(`
+            quantity,
+            price_at_order,
+            products (
+              name
+            )
+          `)
+          .in("order_id", orderIds);
+
+        if (orderItems && orderItems.length > 0) {
+          const productMap = new Map<string, { quantity: number; revenue: number; unitPrice: number }>();
+
+          orderItems.forEach((item: any) => {
+            const productName = item.products?.name || "Produto desconhecido";
+            const existing = productMap.get(productName);
+            const itemRevenue = item.price_at_order * item.quantity;
+
+            if (existing) {
+              existing.quantity += item.quantity;
+              existing.revenue += itemRevenue;
+            } else {
+              productMap.set(productName, {
+                quantity: item.quantity,
+                revenue: itemRevenue,
+                unitPrice: item.price_at_order,
+              });
+            }
+          });
+
+          const topProductsList = Array.from(productMap.entries())
+            .map(([name, data]) => ({
+              name,
+              quantity: data.quantity,
+              unitPrice: data.unitPrice,
+              totalRevenue: data.revenue,
+            }))
+            .sort((a, b) => b.totalRevenue - a.totalRevenue)
+            .slice(0, 5);
+
+          setTopProducts(topProductsList);
+        } else {
+          setTopProducts([]);
+        }
+      } else {
+        setTopProducts([]);
+      }
     } catch (error) {
       console.error("Erro ao buscar estatísticas:", error);
     } finally {
