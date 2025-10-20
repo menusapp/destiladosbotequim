@@ -149,17 +149,35 @@ const Comanda = () => {
             } else if (updatedBill.status === "paid") {
               console.log("Conta paga! Redirecionando...");
               toast.success("Conta paga! Obrigado pela preferência!");
-              
-               // Limpar dados da comanda do sessionStorage
+              // Limpar dados da comanda do sessionStorage
               sessionStorage.removeItem(`customer_name_${tableNumber}`);
               sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
               sessionStorage.removeItem(`comanda_type_${tableNumber}`);
               sessionStorage.removeItem(`cart_${tableNumber}`);
-              
               setTimeout(() => {
                 navigate(`/menu/${restaurantSlug}/${tableNumber}`);
               }, 2000);
             }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'bills',
+            filter: `table_id=eq.${tableData.id}`,
+          },
+          () => {
+            // Conta removida (paga e encerrada) -> agradecer e sair
+            toast.success("Conta paga! Obrigado pela preferência!");
+            sessionStorage.removeItem(`customer_name_${tableNumber}`);
+            sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+            sessionStorage.removeItem(`comanda_type_${tableNumber}`);
+            sessionStorage.removeItem(`cart_${tableNumber}`);
+            setTimeout(() => {
+              navigate(`/menu/${restaurantSlug}/${tableNumber}`);
+            }, 1500);
           }
         )
         .subscribe((status) => {
@@ -485,15 +503,15 @@ const Comanda = () => {
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Status: Conta a caminho, Timer de preparo ou Conta solicitada */}
         {billOnTheWay ? (
-          <Card className="bg-blue-50 border-blue-200">
+          <Card className="border" style={{ borderColor: restaurantColor }}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
-                <Receipt className="h-5 w-5 text-blue-600" />
+                <Receipt className="h-5 w-5" style={{ color: restaurantColor }} />
                 <div className="text-center">
-                  <p className="text-lg font-semibold text-blue-800">
+                  <p className="text-lg font-semibold" style={{ color: restaurantColor }}>
                     🧾 A conta está a caminho!
                   </p>
-                  <p className="text-sm text-blue-600">
+                  <p className="text-sm text-muted-foreground">
                     O garçom chegará em breve com sua conta
                   </p>
                 </div>
@@ -520,7 +538,7 @@ const Comanda = () => {
             </CardContent>
           </Card>
         ) : billRequested && !billOnTheWay ? (
-          <Card className="border-gray-300 bg-gray-50">
+          <Card className="border" style={{ borderColor: restaurantColor }}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
                 <Clock className="h-5 w-5" style={{ color: restaurantColor }} />
@@ -637,7 +655,7 @@ const Comanda = () => {
                         <div className="flex items-center gap-2">
                           <Badge variant="outline">
                             {order.status === "pending" && "Pendente"}
-                            {order.status === "accepted" && "Aceito"}
+                            {order.status === "accepted" && "👨‍🍳 Preparando"}
                             {order.status === "preparing" && "Preparando"}
                             {order.status === "ready" && "Pronto"}
                             {order.status === "delivered" && "Entregue"}
@@ -690,7 +708,7 @@ const Comanda = () => {
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">
                         {order.status === "pending" && "Pendente"}
-                        {order.status === "accepted" && "Aceito"}
+                        {order.status === "accepted" && "👨‍🍳 Preparando"}
                         {order.status === "preparing" && "Preparando"}
                         {order.status === "ready" && "Pronto"}
                         {order.status === "delivered" && "Entregue"}

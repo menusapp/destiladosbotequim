@@ -91,11 +91,12 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     // UI otimista: atualiza imediatamente na tela
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
 
-    // Atualiza status primeiro (rápido)
-    const { error } = await supabase
-      .from("orders")
-      .update({ status: newStatus })
-      .eq("id", orderId);
+    // Atualiza status via função segura (bypassa RLS)
+    const { error } = await (supabase as any).rpc('admin_update_order_status', {
+      p_order_id: orderId,
+      p_new_status: newStatus,
+      p_restaurant_id: restaurantId,
+    });
 
     if (error) {
       toast.error("Erro ao atualizar status");
@@ -116,7 +117,6 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     // Garante consistência com o backend
     fetchOrders();
   };
-
   const processStockDeduction = async (orderId: string) => {
     try {
       // Buscar os itens do pedido

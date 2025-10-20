@@ -119,10 +119,10 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleMarkAsOnTheWay = async (billId: string) => {
-    const { error } = await supabase
-      .from("bills")
-      .update({ status: "on_the_way" })
-      .eq("id", billId);
+    const { error } = await (supabase as any).rpc('admin_mark_bill_on_the_way', {
+      p_bill_id: billId,
+      p_restaurant_id: restaurantId,
+    });
 
     if (error) {
       toast.error("Erro ao atualizar status");
@@ -136,92 +136,18 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
   const handleMarkAsPaid = async (billId: string) => {
     try {
-      // Buscar a conta completa com informações da mesa e restaurante
-      const { data: billData, error: fetchError } = await supabase
-        .from("bills")
-        .select(`
-          *,
-          tables!inner(
-            table_number,
-            restaurant_id
-          )
-        `)
-        .eq("id", billId)
-        .maybeSingle();
+      const { error } = await (supabase as any).rpc('admin_mark_bill_paid', {
+        p_bill_id: billId,
+        p_restaurant_id: restaurantId,
+      });
 
-      if (fetchError || !billData) {
-        toast.error("Erro ao buscar conta");
+      if (error) {
+        toast.error("Erro ao processar pagamento");
+        console.error(error);
         return;
       }
 
-      // Buscar sessão de caixa aberta
-      const { data: cashSession, error: sessionError } = await supabase
-        .from("cash_register_sessions")
-        .select("id")
-        .eq("restaurant_id", billData.tables.restaurant_id)
-        .eq("status", "open")
-        .maybeSingle();
-
-      // Deletar todos os pedidos da mesa
-      const { error: deleteOrdersError } = await supabase
-        .from("orders")
-        .delete()
-        .eq("table_id", billData.table_id);
-
-      if (deleteOrdersError) {
-        console.error("Erro ao deletar pedidos:", deleteOrdersError);
-        toast.error("Erro ao limpar comanda");
-        return;
-      }
-
-      // Atualizar status da conta para paga
-      const { error: updateError } = await supabase
-        .from("bills")
-        .update({ 
-          status: "paid",
-          paid_at: new Date().toISOString()
-        })
-        .eq("id", billId);
-
-      if (updateError) {
-        toast.error("Erro ao marcar como paga");
-        console.error(updateError);
-        return;
-      }
-
-      // Registrar movimento de caixa se houver sessão aberta
-      if (cashSession) {
-        const { error: movementError } = await supabase
-          .from("cash_movements")
-          .insert({
-            cash_session_id: cashSession.id,
-            restaurant_id: billData.tables.restaurant_id,
-            movement_type: "entrada",
-            amount: billData.total_amount,
-            description: `Venda - Mesa ${billData.tables.table_number}`,
-            category: "venda",
-            payment_method: billData.payment_method,
-            bill_id: billData.id,
-            created_by: "Sistema",
-          });
-
-        if (movementError) {
-          console.error("Erro ao registrar movimento de caixa:", movementError);
-          toast.error("Conta paga, mas erro ao registrar no caixa");
-        }
-      }
-
-      // Deletar a conta
-      const { error: deleteBillError } = await supabase
-        .from("bills")
-        .delete()
-        .eq("id", billId);
-
-      if (deleteBillError) {
-        console.error("Erro ao deletar conta:", deleteBillError);
-      }
-
-      toast.success("Conta paga e registrada no caixa!");
+      toast.success("Conta paga e registrada!" );
       fetchBills();
     } catch (error) {
       console.error("Erro ao processar pagamento:", error);
