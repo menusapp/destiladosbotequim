@@ -534,18 +534,24 @@ const Comanda = () => {
             </CardContent>
           </Card>
         ) : hasAcceptedOrder && !billRequested ? (
-          <Card className="border-amber-500 bg-amber-50">
+          <Card 
+            className="border-2" 
+            style={{ 
+              borderColor: restaurantColor,
+              backgroundColor: `${restaurantColor}15`
+            }}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
-                <Clock className="h-5 w-5 text-amber-600" />
+                <Clock className="h-5 w-5" style={{ color: restaurantColor }} />
                 <div className="text-center">
-                  <p className="text-sm text-amber-800 font-medium">
+                  <p className="text-sm font-medium" style={{ color: restaurantColor }}>
                     👨‍🍳 Em Preparo
                   </p>
-                  <p className="text-3xl font-bold text-amber-600 mt-1">
+                  <p className="text-3xl font-bold mt-1" style={{ color: restaurantColor }}>
                     {formatTime(prepTimerSeconds)}
                   </p>
-                  <p className="text-xs text-amber-700 mt-1">
+                  <p className="text-xs mt-1" style={{ color: restaurantColor, opacity: 0.8 }}>
                     {prepTimerSeconds > 0 ? "Tempo estimado restante" : "Seu pedido deve estar pronto"}
                   </p>
                 </div>
@@ -813,7 +819,11 @@ const Comanda = () => {
         {!billRequested && (orders.length > 0 || cart.length > 0) && cart.length === 0 && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full" size="lg">
+              <Button 
+                className="w-full" 
+                size="lg"
+                style={{ backgroundColor: restaurantColor }}
+              >
                 <Receipt className="h-5 w-5 mr-2" />
                 Pedir a Conta
               </Button>
