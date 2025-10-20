@@ -46,9 +46,16 @@ const Login = () => {
         .from("restaurant_credentials")
         .select("*, restaurants(*)")
         .eq("username", username)
-        .single();
+        .maybeSingle();
 
-      if (error || !credentials) {
+      if (error) {
+        console.error("Erro ao buscar credenciais:", error);
+        toast.error("Erro ao fazer login");
+        setLoading(false);
+        return;
+      }
+
+      if (!credentials) {
         toast.error("Credenciais inválidas!");
         setLoading(false);
         return;
@@ -66,6 +73,7 @@ const Login = () => {
         toast.error("Senha incorreta!");
       }
     } catch (error) {
+      console.error("Erro ao fazer login:", error);
       toast.error("Erro ao fazer login");
     } finally {
       setLoading(false);
