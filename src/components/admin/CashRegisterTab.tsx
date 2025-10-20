@@ -322,80 +322,72 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
   };
 
   const generateDRE = async () => {
-    const filtered = closedSessions.filter(filterSessionsByDate);
     const { startDate, endDate } = getDateRange();
 
-    const totalRevenue = filtered.reduce((sum, s) => {
-      const sessionMovements = allMovements.filter(m => m.cash_session_id === s.id && m.movement_type === "entrada");
-      return sum + sessionMovements.reduce((total, m) => total + m.amount, 0);
-    }, 0);
+    // Sessões no período: fechadas + (aberta, se dentro do período)
+    const sessionsInRange: CashSession[] = [
+      ...closedSessions.filter(filterSessionsByDate),
+      ...(currentSession && filterSessionsByDate(currentSession) ? [currentSession] : []),
+    ];
 
-    const operationalExpenses = filtered.reduce((sum, s) => {
-      const sessionMovements = allMovements.filter(m => m.cash_session_id === s.id && m.movement_type === "saida");
-      return sum + sessionMovements.reduce((total, m) => total + m.amount, 0);
-    }, 0);
+    const sessionIds = sessionsInRange.map((s) => s.id);
 
-    // Calcular CMV (Custo de Mercadorias Vendidas) baseado nos ingredientes dos produtos que entraram no caixa
+    // Movimentações no período dessas sessões (fechadas + aberta)
+    const movementsInRange: CashMovement[] = [
+      ...allMovements.filter((m) => sessionIds.includes(m.cash_session_id)),
+      ...(currentSession && sessionIds.includes(currentSession.id) ? movements : []),
+    ];
+
+    const totalRevenue = movementsInRange
+      .filter((m) => m.movement_type === "entrada")
+      .reduce((sum, m) => sum + m.amount, 0);
+
+    const operationalExpenses = movementsInRange
+      .filter((m) => m.movement_type === "saida")
+      .reduce((sum, m) => sum + m.amount, 0);
+
+    // CMV com base APENAS nos pedidos que efetivamente entraram no caixa
     let cmv = 0;
     try {
-      // Buscar as sessões de caixa do período filtrado
-      const sessionIds = filtered.map(s => s.id);
-      
-      if (sessionIds.length > 0) {
-        // Buscar todos os movimentos de entrada (pedidos) das sessões filtradas
-        const cashMovementsInPeriod = allMovements.filter(m => 
-          sessionIds.includes(m.cash_session_id) && 
-          m.movement_type === "entrada" &&
-          m.category === "Pedido"
-        );
+      const cashMovementsOrders = movementsInRange.filter(
+        (m) => m.movement_type === "entrada" && m.category === "Pedido"
+      );
 
-        // Extrair os IDs dos pedidos das descrições (formato: "Pedido #uuid - Nome")
-        const orderIds: string[] = [];
-        cashMovementsInPeriod.forEach(movement => {
-          const match = movement.description.match(/Pedido #([a-f0-9-]+)/);
-          if (match && match[1]) {
-            orderIds.push(match[1]);
-          }
-        });
+      // Extrair IDs de pedidos do texto "Pedido #<uuid>"
+      const orderIds: string[] = [];
+      cashMovementsOrders.forEach((movement) => {
+        const match = movement.description.match(/Pedido #([a-f0-9-]+)/);
+        if (match && match[1]) orderIds.push(match[1]);
+      });
 
-        if (orderIds.length > 0) {
-          // Buscar os itens dos pedidos que entraram no caixa
-          const { data: orders, error: ordersError } = await supabase
-            .from("orders")
-            .select(`
+      if (orderIds.length > 0) {
+        const { data: items, error: itemsError } = await supabase
+          .from("order_items")
+          .select(`
+            id,
+            quantity,
+            order_id,
+            products (
               id,
-              order_items (
-                id,
+              product_ingredients (
                 quantity,
-                products (
-                  id,
-                  product_ingredients (
-                    quantity,
-                    stock_items (
-                      price_per_unit
-                    )
-                  )
-                )
+                stock_items ( price_per_unit )
               )
-            `)
-            .in("id", orderIds);
+            )
+          `)
+          .in("order_id", orderIds);
 
-          if (ordersError) throw ordersError;
+        if (itemsError) throw itemsError;
 
-          // Calcular o custo total dos ingredientes dos produtos vendidos
-          orders?.forEach(order => {
-            order.order_items?.forEach((item: any) => {
-              const itemQuantity = item.quantity;
-              const ingredients = item.products?.product_ingredients || [];
-              
-              ingredients.forEach((ingredient: any) => {
-                const ingredientQty = ingredient.quantity;
-                const pricePerUnit = ingredient.stock_items?.price_per_unit || 0;
-                cmv += ingredientQty * pricePerUnit * itemQuantity;
-              });
-            });
+        items?.forEach((item: any) => {
+          const itemQty = item.quantity;
+          const ingredients = item.products?.product_ingredients || [];
+          ingredients.forEach((ing: any) => {
+            const ingQty = ing.quantity || 0;
+            const pricePerUnit = ing.stock_items?.price_per_unit || 0;
+            cmv += ingQty * pricePerUnit * itemQty;
           });
-        }
+        });
       }
     } catch (error) {
       console.error("Erro ao calcular CMV:", error);
@@ -407,15 +399,15 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
     const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
     const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-    return { 
-      salesTotal: totalRevenue, 
+    return {
+      salesTotal: totalRevenue,
       cmv,
       grossProfit,
-      operationalExpenses, 
+      operationalExpenses,
       totalExpenses,
-      netProfit, 
+      netProfit,
       grossMargin,
-      netMargin
+      netMargin,
     };
   };
 
@@ -444,11 +436,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       const data = await generateDRE();
       setDreData(data);
     };
-    
-    if (closedSessions.length > 0) {
-      loadDRE();
-    }
-  }, [closedSessions, allMovements, dateFilter, customDateRange]);
+
+    loadDRE();
+  }, [closedSessions, allMovements, currentSession, movements, dateFilter, customDateRange]);
 
   if (loading) {
     return <div className="p-4">Carregando...</div>;
