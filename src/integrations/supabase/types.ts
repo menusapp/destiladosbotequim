@@ -877,6 +877,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_update_restaurant_settings: {
+        Args: {
+          p_prep_time_minutes: number
+          p_primary_color: string
+          p_restaurant_id: string
+          p_service_fee_enabled: boolean
+          p_service_fee_percentage: number
+          p_target_cmv_percentage: number
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

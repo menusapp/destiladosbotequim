@@ -39,7 +39,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
         .from("restaurants")
         .select("logo_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, target_cmv_percentage")
         .eq("id", restaurantId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       
@@ -52,6 +52,9 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           prep_time_minutes: data.prep_time_minutes || 30,
           target_cmv_percentage: data.target_cmv_percentage || 30,
         });
+      } else {
+        // Nenhuma configuração encontrada para este restaurante
+        setSettings((prev) => ({ ...prev }));
       }
     } catch (error) {
       toast.error("Erro ao carregar configurações");
@@ -118,21 +121,19 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
 
   const handleSaveSettings = async () => {
     try {
-      const { error } = await supabase
-        .from("restaurants")
-        .update({
-          primary_color: settings.primary_color,
-          service_fee_enabled: settings.service_fee_enabled,
-          service_fee_percentage: settings.service_fee_percentage,
-          prep_time_minutes: settings.prep_time_minutes,
-          target_cmv_percentage: settings.target_cmv_percentage,
-        })
-        .eq("id", restaurantId);
+      const { error } = await (supabase as any).rpc('admin_update_restaurant_settings', {
+        p_restaurant_id: restaurantId,
+        p_primary_color: settings.primary_color,
+        p_service_fee_enabled: settings.service_fee_enabled,
+        p_service_fee_percentage: settings.service_fee_percentage,
+        p_prep_time_minutes: settings.prep_time_minutes,
+        p_target_cmv_percentage: settings.target_cmv_percentage,
+      });
 
       if (error) throw error;
 
       toast.success("Configurações salvas!");
-      await fetchSettings(); // Recarrega os dados do banco para confirmar
+      await fetchSettings();
     } catch (error) {
       toast.error("Erro ao salvar configurações");
       console.error(error);

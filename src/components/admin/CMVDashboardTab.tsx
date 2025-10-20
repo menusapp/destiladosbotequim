@@ -37,7 +37,7 @@ export default function CMVDashboardTab({ restaurantId }: { restaurantId: string
       .from("restaurants")
       .select("target_cmv_percentage")
       .eq("id", restaurantId)
-      .single();
+      .maybeSingle();
     
     if (data) {
       setTargetCMV(data.target_cmv_percentage || 30);
