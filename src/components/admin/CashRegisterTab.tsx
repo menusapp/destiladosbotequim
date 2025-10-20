@@ -15,6 +15,7 @@ import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, Calendar as Cal
 import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
 
 interface CashRegisterTabProps {
   restaurantId: string;
@@ -73,8 +74,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
   // Estados para relatórios
   const [dateFilter, setDateFilter] = useState<string>("today");
-  const [customDateFrom, setCustomDateFrom] = useState<Date>();
-  const [customDateTo, setCustomDateTo] = useState<Date>();
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
 
   useEffect(() => {
     fetchCurrentSession();
@@ -301,9 +301,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         endDate = endOfMonth(subMonths(now, 1));
         break;
       case "custom":
-        if (customDateFrom && customDateTo) {
-          startDate = startOfDay(customDateFrom);
-          endDate = endOfDay(customDateTo);
+        if (customDateRange?.from) {
+          startDate = startOfDay(customDateRange.from);
+          endDate = customDateRange.to ? endOfDay(customDateRange.to) : endOfDay(customDateRange.from);
         } else {
           startDate = startOfDay(now);
         }
@@ -677,44 +677,27 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       className={cn("justify-start text-left font-normal")}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateFilter === "custom" && customDateFrom && customDateTo
-                        ? `${format(customDateFrom, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateTo, "dd/MM/yyyy", { locale: ptBR })}`
+                      {dateFilter === "custom" && customDateRange?.from
+                        ? customDateRange.to
+                          ? `${format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateRange.to, "dd/MM/yyyy", { locale: ptBR })}`
+                          : format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })
                         : "Personalizado"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <div className="p-3 space-y-2">
-                      <div>
-                        <label className="text-sm font-medium">Data inicial</label>
-                        <CalendarComponent
-                          mode="single"
-                          selected={customDateFrom}
-                          onSelect={(date) => {
-                            setCustomDateFrom(date);
-                            if (date && customDateTo) {
-                              setDateFilter("custom");
-                            }
-                          }}
-                          locale={ptBR}
-                          className="pointer-events-auto"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Data final</label>
-                        <CalendarComponent
-                          mode="single"
-                          selected={customDateTo}
-                          onSelect={(date) => {
-                            setCustomDateTo(date);
-                            if (date && customDateFrom) {
-                              setDateFilter("custom");
-                            }
-                          }}
-                          locale={ptBR}
-                          className="pointer-events-auto"
-                        />
-                      </div>
-                    </div>
+                    <CalendarComponent
+                      mode="range"
+                      selected={customDateRange}
+                      onSelect={(range) => {
+                        setCustomDateRange(range);
+                        if (range?.from) {
+                          setDateFilter("custom");
+                        }
+                      }}
+                      locale={ptBR}
+                      numberOfMonths={2}
+                      className="pointer-events-auto"
+                    />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -873,44 +856,27 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       className={cn("justify-start text-left font-normal")}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateFilter === "custom" && customDateFrom && customDateTo
-                        ? `${format(customDateFrom, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateTo, "dd/MM/yyyy", { locale: ptBR })}`
+                      {dateFilter === "custom" && customDateRange?.from
+                        ? customDateRange.to
+                          ? `${format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateRange.to, "dd/MM/yyyy", { locale: ptBR })}`
+                          : format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })
                         : "Personalizado"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <div className="p-3 space-y-2">
-                      <div>
-                        <label className="text-sm font-medium">Data inicial</label>
-                        <CalendarComponent
-                          mode="single"
-                          selected={customDateFrom}
-                          onSelect={(date) => {
-                            setCustomDateFrom(date);
-                            if (date && customDateTo) {
-                              setDateFilter("custom");
-                            }
-                          }}
-                          locale={ptBR}
-                          className="pointer-events-auto"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Data final</label>
-                        <CalendarComponent
-                          mode="single"
-                          selected={customDateTo}
-                          onSelect={(date) => {
-                            setCustomDateTo(date);
-                            if (date && customDateFrom) {
-                              setDateFilter("custom");
-                            }
-                          }}
-                          locale={ptBR}
-                          className="pointer-events-auto"
-                        />
-                      </div>
-                    </div>
+                    <CalendarComponent
+                      mode="range"
+                      selected={customDateRange}
+                      onSelect={(range) => {
+                        setCustomDateRange(range);
+                        if (range?.from) {
+                          setDateFilter("custom");
+                        }
+                      }}
+                      locale={ptBR}
+                      numberOfMonths={2}
+                      className="pointer-events-auto"
+                    />
                   </PopoverContent>
                 </Popover>
               </div>
