@@ -153,6 +153,80 @@ const Menu = () => {
     sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
   }, [cart, tableNumber]);
 
+  // Marcar mesa como ocupada quando cliente fizer login
+  useEffect(() => {
+    const markTableOccupied = async () => {
+      if (tableId && customerName && customerCPF) {
+        try {
+          await supabase
+            .from("tables")
+            .update({
+              is_occupied: true,
+              occupied_at: new Date().toISOString(),
+              occupied_by: customerName
+            })
+            .eq("id", tableId);
+        } catch (error) {
+          console.error("Erro ao marcar mesa como ocupada:", error);
+        }
+      }
+    };
+
+    markTableOccupied();
+
+    // Cleanup: desocupar mesa quando sair do cardápio
+    const handleBeforeUnload = async () => {
+      if (tableId) {
+        // Usar sendBeacon para garantir que a requisição seja enviada mesmo ao fechar
+        const { data: hasUnpaidBills } = await supabase
+          .from("bills")
+          .select("id")
+          .eq("table_id", tableId)
+          .neq("status", "paid")
+          .limit(1);
+
+        // Só desocupa se não houver contas não pagas
+        if (!hasUnpaidBills || hasUnpaidBills.length === 0) {
+          await supabase
+            .from("tables")
+            .update({
+              is_occupied: false,
+              occupied_at: null,
+              occupied_by: null
+            })
+            .eq("id", tableId);
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      // Quando o componente desmontar (navegação), desocupar se não houver contas
+      if (tableId) {
+        supabase
+          .from("bills")
+          .select("id")
+          .eq("table_id", tableId)
+          .neq("status", "paid")
+          .limit(1)
+          .then(({ data }) => {
+            if (!data || data.length === 0) {
+              supabase
+                .from("tables")
+                .update({
+                  is_occupied: false,
+                  occupied_at: null,
+                  occupied_by: null
+                })
+                .eq("id", tableId);
+            }
+          });
+      }
+    };
+  }, [tableId, customerName, customerCPF]);
+
   const fetchData = useCallback(async () => {
     if (!restaurantSlug || !tableNumber) return;
     
