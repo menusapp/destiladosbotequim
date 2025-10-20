@@ -13,6 +13,9 @@ const UserDashboard = () => {
   useEffect(() => {
     if (!loading && !user) {
       navigate("/auth");
+    } else if (!loading && user) {
+      // Redirect all users to admin panel
+      navigate("/admin");
     }
   }, [user, loading, navigate]);
 
