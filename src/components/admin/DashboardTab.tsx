@@ -87,18 +87,22 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
     const { startDate, endDate } = getDateRange();
 
     try {
-      // Buscar sessões de caixa FECHADAS no período
-      const { data: sessions, error: sessionsError } = await supabase
-        .from("cash_register_sessions")
-        .select("id, closed_at")
-        .eq("restaurant_id", restaurantId)
-        .eq("status", "closed")
-        .gte("closed_at", startDate.toISOString())
-        .lte("closed_at", endDate.toISOString());
+      // Buscar TODOS os pedidos aceitos no período (não apenas de sessões fechadas)
+      const { data: acceptedOrders, error: ordersError } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          created_at,
+          tables!inner(restaurant_id)
+        `)
+        .eq("tables.restaurant_id", restaurantId)
+        .eq("status", "accepted")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
 
-      if (sessionsError) throw sessionsError;
+      if (ordersError) throw ordersError;
 
-      if (!sessions || sessions.length === 0) {
+      if (!acceptedOrders || acceptedOrders.length === 0) {
         setStats({
           totalRevenue: 0,
           totalOrders: 0,
@@ -114,20 +118,26 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
         return;
       }
 
-      const sessionIds = sessions.map((s) => s.id);
+      const orderIds = acceptedOrders.map(o => o.id);
 
-      // Buscar movimentações das sessões fechadas
+      // Buscar movimentações de caixa para esses pedidos
       const { data: movements, error: movError } = await supabase
         .from("cash_movements")
         .select("movement_type, amount, payment_method, category, description")
-        .in("cash_session_id", sessionIds);
+        .eq("restaurant_id", restaurantId)
+        .eq("category", "Pedido")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
 
       if (movError) throw movError;
 
-      const entradas = (movements || []).filter((m) => m.movement_type === "entrada");
-      const pedidos = entradas.filter((m) => m.category === "Pedido");
+      // Filtrar apenas movimentações dos pedidos aceitos
+      const pedidos = (movements || []).filter((m) => {
+        const match = m.description?.match(/Pedido #([a-f0-9-]+)/);
+        return match && orderIds.includes(match[1]);
+      });
 
-      const totalRevenue = entradas.reduce((sum, m) => sum + Number(m.amount || 0), 0);
+      const totalRevenue = pedidos.reduce((sum, m) => sum + Number(m.amount || 0), 0);
 
       const isCash = (method?: string | null) => method === "cash" || method === "dinheiro";
       const isPix = (method?: string | null) => method === "pix";
@@ -158,15 +168,7 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
         cashRevenue,
       });
 
-      // Buscar produtos mais vendidos dos pedidos que entraram no caixa
-      const orderIds: string[] = [];
-      pedidos.forEach((movement) => {
-        const match = movement.description?.match(/Pedido #([a-f0-9-]+)/);
-        if (match && match[1]) {
-          orderIds.push(match[1]);
-        }
-      });
-
+      // Buscar produtos mais vendidos dos pedidos aceitos
       if (orderIds.length > 0) {
         const { data: orderItems } = await supabase
           .from("order_items")

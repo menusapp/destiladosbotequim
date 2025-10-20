@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Clock, Check, Printer, Search } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Clock, Check, Printer, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -195,6 +196,22 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     } catch (error) {
       console.error("Erro ao processar baixa de estoque:", error);
     }
+  };
+
+  const deleteOrder = async (orderId: string) => {
+    const { error } = await (supabase as any).rpc('admin_delete_order', {
+      p_order_id: orderId,
+      p_restaurant_id: restaurantId,
+    });
+
+    if (error) {
+      toast.error("Erro ao excluir pedido");
+      console.error(error);
+      return;
+    }
+
+    toast.success("Pedido excluído!");
+    fetchOrders();
   };
 
   const printOrder = (order: Order) => {
@@ -392,11 +409,33 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 {order.status === "pending" && (
                   <Button
                     className="flex-1"
+                    size="sm"
                     onClick={() => updateOrderStatus(order.id, "accepted")}
                   >
                     Aceitar Pedido
                   </Button>
                 )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir Pedido</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => deleteOrder(order.id)}>
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           ))}

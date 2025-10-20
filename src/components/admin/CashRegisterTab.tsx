@@ -53,6 +53,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [closedSessions, setClosedSessions] = useState<CashSession[]>([]);
   const [allMovements, setAllMovements] = useState<CashMovement[]>([]);
+  const [lastClosedSession, setLastClosedSession] = useState<CashSession | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Estados para abrir caixa
@@ -101,6 +102,35 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
       if (error) throw error;
       setCurrentSession(data);
+
+      // Se não houver caixa aberto, buscar última sessão fechada
+      if (!data) {
+        const { data: lastClosed, error: lastError } = await supabase
+          .from("cash_register_sessions")
+          .select("*")
+          .eq("restaurant_id", restaurantId)
+          .eq("status", "closed")
+          .order("closed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lastError) throw lastError;
+        setLastClosedSession(lastClosed);
+
+        // Buscar movimentações da última sessão fechada
+        if (lastClosed) {
+          const { data: lastMovements, error: movError } = await supabase
+            .from("cash_movements")
+            .select("*")
+            .eq("cash_session_id", lastClosed.id)
+            .order("created_at", { ascending: false });
+
+          if (movError) throw movError;
+          setMovements(lastMovements || []);
+        }
+      } else {
+        setLastClosedSession(null);
+      }
     } catch (error: any) {
       toast.error("Erro ao buscar sessão de caixa: " + error.message);
     } finally {
@@ -614,6 +644,42 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         </Card>
       )}
 
+      {!currentSession && lastClosedSession && (
+        <Card className="bg-secondary/20 border-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Último Caixa Fechado - Histórico
+            </CardTitle>
+            <CardDescription>
+              Fechado em {format(new Date(lastClosedSession.closed_at!), "dd/MM/yyyy 'às' HH:mm")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Saldo Inicial</p>
+                <p className="text-2xl font-bold">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Saldo Esperado</p>
+                <p className="text-2xl font-bold">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Saldo Final</p>
+                <p className="text-2xl font-bold">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Diferença</p>
+                <p className={`text-2xl font-bold ${(lastClosedSession.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  R$ {(lastClosedSession.difference || 0).toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="movements" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="movements">Movimentações</TabsTrigger>
@@ -622,6 +688,14 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         </TabsList>
 
         <TabsContent value="movements" className="space-y-4">
+          {!currentSession && !lastClosedSession && (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Nenhum caixa aberto. Abra um caixa para registrar movimentações.
+              </CardContent>
+            </Card>
+          )}
+          
           {currentSession && (
             <Card>
               <CardHeader>
@@ -708,7 +782,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
               <CardDescription>
                 {currentSession 
                   ? `${movements.length} movimentações registradas nesta sessão`
-                  : "Abra o caixa para ver as movimentações"}
+                  : lastClosedSession
+                    ? `${movements.length} movimentações do último caixa fechado`
+                    : "Abra o caixa para ver as movimentações"}
               </CardDescription>
             </CardHeader>
             <CardContent>

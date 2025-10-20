@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Check, CreditCard, Smartphone, Banknote, Printer, Search } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Clock, Check, CreditCard, Smartphone, Banknote, Printer, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -153,6 +154,22 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
       console.error("Erro ao processar pagamento:", error);
       toast.error("Erro ao processar pagamento");
     }
+  };
+
+  const deleteBill = async (billId: string) => {
+    const { error } = await (supabase as any).rpc('admin_delete_bill', {
+      p_bill_id: billId,
+      p_restaurant_id: restaurantId,
+    });
+
+    if (error) {
+      toast.error("Erro ao excluir conta");
+      console.error(error);
+      return;
+    }
+
+    toast.success("Conta excluída!");
+    fetchBills();
   };
 
   const printBill = (bill: Bill) => {
@@ -424,6 +441,27 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
                       Conta Paga
                     </Button>
                   )}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir Conta</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteBill(bill.id)}>
+                          Excluir
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
