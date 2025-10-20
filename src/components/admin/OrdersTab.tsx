@@ -74,23 +74,30 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   });
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    // Se está aceitando o pedido, dar baixa no estoque
-    if (newStatus === "accepted") {
-      await processStockDeduction(orderId);
+    try {
+      // Se está aceitando o pedido, dar baixa no estoque
+      if (newStatus === "accepted") {
+        await processStockDeduction(orderId);
+      }
+
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: newStatus })
+        .eq("id", orderId);
+
+      if (error) {
+        toast.error("Erro ao atualizar status");
+        return;
+      }
+
+      toast.success(newStatus === "accepted" ? "Pedido aceito e estoque atualizado!" : "Status atualizado!");
+      
+      // Forçar atualização imediata dos pedidos
+      await fetchOrders();
+    } catch (error) {
+      console.error("Erro ao atualizar pedido:", error);
+      toast.error("Erro ao processar pedido");
     }
-
-    const { error } = await supabase
-      .from("orders")
-      .update({ status: newStatus })
-      .eq("id", orderId);
-
-    if (error) {
-      toast.error("Erro ao atualizar status");
-      return;
-    }
-
-    toast.success(newStatus === "accepted" ? "Pedido aceito e estoque atualizado!" : "Status atualizado!");
-    fetchOrders();
   };
 
   const processStockDeduction = async (orderId: string) => {
