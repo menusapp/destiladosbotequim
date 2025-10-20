@@ -235,6 +235,13 @@ const Comanda = () => {
     }
   }, [prepTimerSeconds]);
 
+  // Iniciar timer quando houver pedido aceito
+  useEffect(() => {
+    if (hasAcceptedOrder && prepTimerSeconds === 0 && prepTimeMinutes > 0) {
+      setPrepTimerSeconds(prepTimeMinutes * 60);
+    }
+  }, [hasAcceptedOrder, prepTimeMinutes]);
+
   const fetchData = useCallback(async () => {
     if (!restaurantSlug || !tableNumber) return;
     
@@ -328,7 +335,7 @@ const Comanda = () => {
     } finally {
       setLoading(false);
     }
-  }, [restaurantSlug, tableNumber]);
+  }, [restaurantSlug, tableNumber, prepTimeMinutes]);
 
   // Memoizar cálculo do total
   const totals = useMemo(() => {
