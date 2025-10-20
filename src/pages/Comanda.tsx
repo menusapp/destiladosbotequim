@@ -820,9 +820,13 @@ const Comanda = () => {
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button 
-                className="w-full" 
+                className="w-full text-white hover:opacity-90"
+                variant="ghost"
                 size="lg"
-                style={{ backgroundColor: restaurantColor }}
+                style={{ 
+                  backgroundColor: restaurantColor,
+                  borderColor: restaurantColor
+                }}
               >
                 <Receipt className="h-5 w-5 mr-2" />
                 Pedir a Conta
