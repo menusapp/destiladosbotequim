@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { LogOut, Plus, Store, Trash2, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
   DialogContent,
@@ -29,37 +28,30 @@ interface Restaurant {
 
 const CEODashboard = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading, isCEO, signOut } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(null);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(true);
+  const [ceoPassword, setCeoPassword] = useState("");
   
   // Form states
   const [formName, setFormName] = useState("");
   const [formSlug, setFormSlug] = useState("");
   const [formPrimaryColor, setFormPrimaryColor] = useState("#FF6B35");
   const [formSecondaryColor, setFormSecondaryColor] = useState("#1A1A1A");
-  const [formEmail, setFormEmail] = useState("");
+  const [formUsername, setFormUsername] = useState("");
   const [formPassword, setFormPassword] = useState("");
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        toast.error("Você precisa estar logado para acessar esta página");
-        navigate("/auth");
-        return;
-      }
-      
-      if (!isCEO) {
-        toast.error("Acesso não autorizado. Apenas CEOs podem acessar esta área.");
-        navigate("/");
-        return;
-      }
-      
+    const isCEOAuthenticated = localStorage.getItem('is_ceo_authenticated');
+    if (isCEOAuthenticated === 'true') {
+      setShowPasswordPrompt(false);
       fetchRestaurants();
+    } else {
+      setLoading(false);
     }
-  }, [user, authLoading, isCEO, navigate]);
+  }, []);
 
   const fetchRestaurants = async () => {
     try {
@@ -77,9 +69,23 @@ const CEODashboard = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
+  const handleCEOLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Senha CEO: "ceo123" (você pode mudar isso)
+    if (ceoPassword === "ceo123") {
+      localStorage.setItem('is_ceo_authenticated', 'true');
+      setShowPasswordPrompt(false);
+      fetchRestaurants();
+      toast.success("Acesso CEO autorizado");
+    } else {
+      toast.error("Senha incorreta");
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('is_ceo_authenticated');
     toast.success("Logout realizado com sucesso");
+    navigate("/");
   };
 
   const handleOpenDialog = async (restaurant?: Restaurant) => {
@@ -89,7 +95,7 @@ const CEODashboard = () => {
       setFormSlug(restaurant.slug);
       setFormPrimaryColor(restaurant.primary_color || "#FF6B35");
       setFormSecondaryColor(restaurant.secondary_color || "#1A1A1A");
-      setFormEmail("");
+      setFormUsername("");
       setFormPassword("");
     } else {
       setEditingRestaurant(null);
@@ -97,7 +103,7 @@ const CEODashboard = () => {
       setFormSlug("");
       setFormPrimaryColor("#FF6B35");
       setFormSecondaryColor("#1A1A1A");
-      setFormEmail("");
+      setFormUsername("");
       setFormPassword("");
     }
     setDialogOpen(true);
@@ -137,32 +143,17 @@ const CEODashboard = () => {
 
         if (restError) throw restError;
 
-        // Criar usuário admin do restaurante se email e senha fornecidos
-        if (formEmail && formPassword) {
-          const { data: newUser, error: signUpError } = await supabase.auth.signUp({
-            email: formEmail,
-            password: formPassword,
-            options: {
-              data: {
-                full_name: `Admin ${formName}`,
-              },
-            },
-          });
+        // Criar credenciais de login do restaurante
+        if (formUsername && formPassword) {
+          const { error: credError } = await supabase
+            .from("restaurant_credentials")
+            .insert({
+              restaurant_id: restaurant.id,
+              username: formUsername,
+              password_hash: formPassword, // Em produção, usar hash real
+            });
 
-          if (signUpError) throw signUpError;
-
-          if (newUser.user) {
-            // Criar role de restaurant_admin
-            const { error: roleError } = await supabase
-              .from("user_roles")
-              .insert({
-                user_id: newUser.user.id,
-                role: "restaurant_admin",
-                restaurant_id: restaurant.id,
-              });
-
-            if (roleError) throw roleError;
-          }
+          if (credError) throw credError;
         }
 
         toast.success("Restaurante criado com sucesso!");
@@ -193,6 +184,42 @@ const CEODashboard = () => {
       toast.error("Erro ao excluir restaurante");
     }
   };
+
+  if (showPasswordPrompt) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Acesso CEO</CardTitle>
+            <CardDescription>Digite a senha de CEO para continuar</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCEOLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="ceo-password">Senha CEO</Label>
+                <Input
+                  id="ceo-password"
+                  type="password"
+                  value={ceoPassword}
+                  onChange={(e) => setCeoPassword(e.target.value)}
+                  placeholder="Digite a senha"
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1">
+                  Entrar
+                </Button>
+                <Button type="button" variant="outline" onClick={() => navigate("/")}>
+                  Voltar
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -315,18 +342,18 @@ const CEODashboard = () => {
                   {!editingRestaurant && (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="email">Email do Administrador</Label>
+                        <Label htmlFor="username">Usuário do Restaurante</Label>
                         <Input
-                          id="email"
-                          type="email"
-                          value={formEmail}
-                          onChange={(e) => setFormEmail(e.target.value)}
-                          placeholder="admin@exemplo.com"
+                          id="username"
+                          type="text"
+                          value={formUsername}
+                          onChange={(e) => setFormUsername(e.target.value)}
+                          placeholder="usuario_restaurante"
                           required
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="password">Senha do Administrador</Label>
+                        <Label htmlFor="password">Senha do Restaurante</Label>
                         <Input
                           id="password"
                           type="password"
