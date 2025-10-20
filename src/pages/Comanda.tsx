@@ -198,12 +198,11 @@ const Comanda = () => {
           (payload) => {
             console.log("Order atualizada:", payload);
             const updatedOrder = payload.new as any;
-            if (updatedOrder.status === "accepted" && payload.old?.status === "pending") {
-              toast.success("Seu pedido foi aceito e está sendo preparado!");
-              setHasAcceptedOrder(true);
-              setPrepTimerSeconds(prepTimeMinutes * 60);
-              fetchData();
+            if (updatedOrder.status === "accepted") {
+              toast.success("Seu pedido foi aceito e está em preparo!");
             }
+            // Atualiza dados para refletir status e iniciar timer via efeito
+            fetchData();
           }
         )
         .subscribe((status) => {
@@ -541,7 +540,7 @@ const Comanda = () => {
                 <Clock className="h-5 w-5 text-amber-600" />
                 <div className="text-center">
                   <p className="text-sm text-amber-800 font-medium">
-                    👨‍🍳 Preparando seu pedido
+                    👨‍🍳 Em Preparo
                   </p>
                   <p className="text-3xl font-bold text-amber-600 mt-1">
                     {formatTime(prepTimerSeconds)}
@@ -686,11 +685,11 @@ const Comanda = () => {
                       <div key={order.id} className="ml-4 space-y-2">
                          <div className="flex items-center gap-2">
                            <Badge variant="outline" className={order.status === "pending" ? "border-blue-500 text-blue-700" : ""}>
-                             {order.status === "pending" && "⏳ Aguardando"}
-                             {order.status === "accepted" && "👨‍🍳 Preparando"}
-                             {order.status === "preparing" && "Preparando"}
-                             {order.status === "ready" && "Pronto"}
-                             {order.status === "delivered" && "Entregue"}
+                           {order.status === "pending" && "⏳ Aguardando"}
+                           {order.status === "accepted" && "👨‍🍳 Em Preparo"}
+                           {order.status === "preparing" && "Em Preparo"}
+                           {order.status === "ready" && "Pronto"}
+                           {order.status === "delivered" && "Entregue"}
                            </Badge>
                           <span className="text-xs text-muted-foreground">
                             {new Date(order.created_at).toLocaleTimeString()}
@@ -739,11 +738,11 @@ const Comanda = () => {
                   <div key={order.id} className="space-y-2">
                      <div className="flex items-center gap-2">
                        <Badge variant="outline" className={order.status === "pending" ? "border-blue-500 text-blue-700" : ""}>
-                         {order.status === "pending" && "⏳ Aguardando"}
-                         {order.status === "accepted" && "👨‍🍳 Preparando"}
-                         {order.status === "preparing" && "Preparando"}
-                         {order.status === "ready" && "Pronto"}
-                         {order.status === "delivered" && "Entregue"}
+                          {order.status === "pending" && "⏳ Aguardando"}
+                          {order.status === "accepted" && "👨‍🍳 Em Preparo"}
+                          {order.status === "preparing" && "Em Preparo"}
+                          {order.status === "ready" && "Pronto"}
+                          {order.status === "delivered" && "Entregue"}
                        </Badge>
                       <span className="text-xs text-muted-foreground">
                         {new Date(order.created_at).toLocaleTimeString()}
