@@ -25,11 +25,24 @@ export default function CMVDashboardTab({ restaurantId }: { restaurantId: string
   const [productsWithCost, setProductsWithCost] = useState<ProductWithCost[]>([]);
   const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
   const [avgCMV, setAvgCMV] = useState(0);
+  const [targetCMV, setTargetCMV] = useState(30);
 
   useEffect(() => {
+    fetchSettings();
     fetchProductsCost();
-    fetchStockAlerts();
   }, [restaurantId]);
+
+  const fetchSettings = async () => {
+    const { data } = await supabase
+      .from("restaurants")
+      .select("target_cmv_percentage")
+      .eq("id", restaurantId)
+      .single();
+    
+    if (data) {
+      setTargetCMV(data.target_cmv_percentage || 30);
+    }
+  };
 
   const fetchProductsCost = async () => {
     // Buscar produtos com seus ingredientes do restaurante específico
@@ -76,20 +89,9 @@ export default function CMVDashboardTab({ restaurantId }: { restaurantId: string
     setAvgCMV(productsData.length > 0 ? totalCMV / productsData.length : 0);
   };
 
-  const fetchStockAlerts = async () => {
-    const { data, error } = await supabase
-      .from("stock_items")
-      .select("id, name, current_quantity, minimum_quantity, unit")
-      .eq("restaurant_id", restaurantId);
-
-    if (error || !data) return;
-
-    const alerts = data.filter(item => item.current_quantity <= item.minimum_quantity);
-    setStockAlerts(alerts);
-  };
-
   const mostProfitable = [...productsWithCost].sort((a, b) => b.margin - a.margin).slice(0, 5);
   const leastProfitable = [...productsWithCost].sort((a, b) => a.margin - b.margin).slice(0, 5);
+  const highCMVProducts = productsWithCost.filter(p => p.cmv_percentage > targetCMV);
 
   return (
     <div className="space-y-6">
@@ -125,30 +127,37 @@ export default function CMVDashboardTab({ restaurantId }: { restaurantId: string
               <AlertTriangle className="h-6 w-6 text-destructive" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Alertas de Estoque</p>
-              <p className="text-2xl font-bold">{stockAlerts.length}</p>
+              <p className="text-sm text-muted-foreground">Produtos CMV Alto</p>
+              <p className="text-2xl font-bold">{highCMVProducts.length}</p>
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Alertas de estoque baixo */}
-      {stockAlerts.length > 0 && (
+      {/* Alertas de CMV Alto */}
+      {highCMVProducts.length > 0 && (
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <h3 className="text-lg font-semibold">Insumos com Estoque Baixo</h3>
+            <h3 className="text-lg font-semibold">Produtos com CMV Acima do Desejado ({targetCMV}%)</h3>
           </div>
           <div className="space-y-2">
-            {stockAlerts.map((alert) => (
-              <div key={alert.id} className="flex items-center justify-between p-3 bg-destructive/5 rounded-lg">
-                <div>
-                  <p className="font-medium">{alert.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Atual: {alert.current_quantity} {alert.unit} / Mínimo: {alert.minimum_quantity} {alert.unit}
+            {highCMVProducts.map((product) => (
+              <div key={product.id} className="flex items-center justify-between p-3 bg-destructive/5 rounded-lg">
+                <div className="flex-1">
+                  <p className="font-medium">{product.name}</p>
+                  <div className="flex gap-4 text-sm text-muted-foreground mt-1">
+                    <span>Custo: R$ {product.cost.toFixed(2)}</span>
+                    <span>Venda: R$ {product.price.toFixed(2)}</span>
+                    <span>Margem: R$ {product.margin.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Badge variant="destructive">CMV: {product.cmv_percentage.toFixed(1)}%</Badge>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {(product.cmv_percentage - targetCMV).toFixed(1)}% acima
                   </p>
                 </div>
-                <Badge variant="destructive">Crítico</Badge>
               </div>
             ))}
           </div>
@@ -223,7 +232,7 @@ export default function CMVDashboardTab({ restaurantId }: { restaurantId: string
                 </div>
               </div>
               <div className="text-right">
-                <Badge variant={product.cmv_percentage > 40 ? "destructive" : product.cmv_percentage > 30 ? "secondary" : "default"}>
+                <Badge variant={product.cmv_percentage > targetCMV ? "destructive" : "default"}>
                   CMV: {product.cmv_percentage.toFixed(1)}%
                 </Badge>
               </div>

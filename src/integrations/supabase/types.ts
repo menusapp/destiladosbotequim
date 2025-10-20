@@ -626,6 +626,7 @@ export type Database = {
           service_fee_enabled: boolean | null
           service_fee_percentage: number | null
           slug: string
+          target_cmv_percentage: number | null
           updated_at: string | null
         }
         Insert: {
@@ -640,6 +641,7 @@ export type Database = {
           service_fee_enabled?: boolean | null
           service_fee_percentage?: number | null
           slug: string
+          target_cmv_percentage?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -654,6 +656,7 @@ export type Database = {
           service_fee_enabled?: boolean | null
           service_fee_percentage?: number | null
           slug?: string
+          target_cmv_percentage?: number | null
           updated_at?: string | null
         }
         Relationships: []

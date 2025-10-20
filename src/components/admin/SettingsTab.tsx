@@ -14,6 +14,7 @@ interface Settings {
   service_fee_enabled: boolean;
   service_fee_percentage: number;
   prep_time_minutes: number;
+  target_cmv_percentage: number;
 }
 
 const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
@@ -23,6 +24,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     service_fee_enabled: false,
     service_fee_percentage: 10,
     prep_time_minutes: 30,
+    target_cmv_percentage: 30,
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -35,7 +37,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes")
+        .select("logo_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, target_cmv_percentage")
         .eq("id", restaurantId)
         .single();
 
@@ -48,6 +50,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
           prep_time_minutes: data.prep_time_minutes || 30,
+          target_cmv_percentage: data.target_cmv_percentage || 30,
         });
       }
     } catch (error) {
@@ -122,6 +125,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: settings.service_fee_enabled,
           service_fee_percentage: settings.service_fee_percentage,
           prep_time_minutes: settings.prep_time_minutes,
+          target_cmv_percentage: settings.target_cmv_percentage,
         })
         .eq("id", restaurantId);
 
@@ -275,6 +279,33 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           />
           <p className="text-sm text-muted-foreground">
             Os clientes verão um cronômetro de {settings.prep_time_minutes} minutos após enviar o pedido
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* CMV Desejado */}
+      <Card>
+        <CardHeader>
+          <CardTitle>CMV Desejado</CardTitle>
+          <CardDescription>
+            Defina a porcentagem ideal de Custo de Mercadorias Vendidas
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="target-cmv">Porcentagem (%)</Label>
+          <Input
+            id="target-cmv"
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value={settings.target_cmv_percentage}
+            onChange={(e) =>
+              setSettings({ ...settings, target_cmv_percentage: parseFloat(e.target.value) || 30 })
+            }
+          />
+          <p className="text-sm text-muted-foreground">
+            Produtos com CMV acima deste valor serão destacados como alerta na aba CMV
           </p>
         </CardContent>
       </Card>
