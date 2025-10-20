@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp } from "lucide-react";
+import { Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { RestaurantHeader } from "@/components/admin/RestaurantHeader";
@@ -16,6 +16,7 @@ import BillsTab from "@/components/admin/BillsTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
 import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
+import CashRegisterTab from "@/components/admin/CashRegisterTab";
 
 interface Restaurant {
   id: string;
@@ -181,7 +182,7 @@ const RestaurantAdmin = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-8 text-xs">
+              <TabsList className="grid w-full grid-cols-9 text-xs">
                 <TabsTrigger value="faturamento">
                   <BarChart3 className="h-4 w-4 mr-1" />
                   Faturamento
@@ -189,6 +190,10 @@ const RestaurantAdmin = () => {
                 <TabsTrigger value="cmv">
                   <TrendingUp className="h-4 w-4 mr-1" />
                   CMV
+                </TabsTrigger>
+                <TabsTrigger value="caixa">
+                  <Wallet className="h-4 w-4 mr-1" />
+                  Caixa
                 </TabsTrigger>
                 <TabsTrigger value="stock">
                   <Warehouse className="h-4 w-4 mr-1" />
@@ -224,6 +229,10 @@ const RestaurantAdmin = () => {
 
               <TabsContent value="cmv">
                 <CMVDashboardTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="caixa">
+                <CashRegisterTab restaurantId={restaurant.id} />
               </TabsContent>
 
               <TabsContent value="stock">
