@@ -389,6 +389,30 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
           });
         });
       }
+
+      // fallback via movimentações de estoque quando itens não estão mais disponíveis
+      if (cmv === 0) {
+        // Buscar movimentações de estoque por vendas no período e calcular custo por insumo
+        const { data: stockMoves } = await supabase
+          .from("stock_movements")
+          .select("stock_item_id, quantity, movement_type, created_at, reason")
+          .gte("created_at", startDate.toISOString())
+          .lte("created_at", endDate.toISOString());
+
+        const saleMoves = (stockMoves || []).filter((m: any) => m.movement_type === 'out' && m.reason && m.reason.startsWith('Venda - Pedido'));
+        const stockIds = Array.from(new Set(saleMoves.map((m: any) => m.stock_item_id)));
+        if (stockIds.length > 0) {
+          const { data: stockItems } = await supabase
+            .from("stock_items")
+            .select("id, price_per_unit")
+            .in("id", stockIds);
+          const priceMap = new Map<string, number>();
+          (stockItems || []).forEach((s: any) => priceMap.set(s.id, Number(s.price_per_unit) || 0));
+          saleMoves.forEach((m: any) => {
+            cmv += Number(m.quantity) * (priceMap.get(m.stock_item_id) || 0);
+          });
+        }
+      }
     } catch (error) {
       console.error("Erro ao calcular CMV:", error);
     }
