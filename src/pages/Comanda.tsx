@@ -167,28 +167,28 @@ const Comanda = () => {
         });
       
       // Configurar realtime para pedidos aceitos
-      ordersChannel = supabase
-        .channel(`order-status-${tableData.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'orders',
-            filter: `table_id=eq.${tableData.id}`,
-          },
-          (payload) => {
-            console.log("Order atualizada:", payload);
-            const updatedOrder = payload.new as any;
-            if (updatedOrder.status === "accepted" && payload.old?.status === "pending") {
-              toast.success("Seu pedido foi aceito!");
-              fetchData();
+        ordersChannel = supabase
+          .channel(`order-status-${tableData.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'orders',
+              filter: `table_id=eq.${tableData.id}`,
+            },
+            (payload) => {
+              console.log("Order atualizada:", payload);
+              const updatedOrder = payload.new as any;
+              // Qualquer atualização relevante deve atualizar a tela do cliente
+              if (['accepted','preparing','ready','delivered','pending'].includes(updatedOrder.status)) {
+                fetchData();
+              }
             }
-          }
-        )
-        .subscribe((status) => {
-          console.log("Orders channel status:", status);
-        });
+          )
+          .subscribe((status) => {
+            console.log("Orders channel status:", status);
+          });
     };
     
     setupRealtimeChannels();
