@@ -3,14 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Download, Menu, QrCode, TrendingUp, Users } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const Landing = () => {
   const navigate = useNavigate();
-  const [showLogin, setShowLogin] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,242 +43,71 @@ const Landing = () => {
     }
   };
 
-  const features = [
-    {
-      icon: <Menu className="h-8 w-8 text-primary" />,
-      title: "Cardápio Digital",
-      description: "Cardápios interativos e atualizáveis em tempo real"
-    },
-    {
-      icon: <QrCode className="h-8 w-8 text-primary" />,
-      title: "QR Code nas Mesas",
-      description: "Clientes acessam o menu escaneando o código da mesa"
-    },
-    {
-      icon: <TrendingUp className="h-8 w-8 text-primary" />,
-      title: "Gestão Completa",
-      description: "Controle de estoque, pedidos, caixa e relatórios"
-    },
-    {
-      icon: <Users className="h-8 w-8 text-primary" />,
-      title: "Multi-Restaurante",
-      description: "Gerencie múltiplos estabelecimentos em uma única plataforma"
-    }
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
-      {/* Header */}
-      <header className="border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-              <Menu className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-lg border-border/50">
+        <CardHeader className="text-center space-y-4">
+          <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-glow">
+            <Menu className="h-8 w-8 text-primary-foreground" />
+          </div>
+          <div>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               Menu's
-            </span>
-          </div>
-          <div className="flex gap-4">
-            <Button variant="ghost" onClick={() => setShowLogin(!showLogin)}>
-              {showLogin ? "Voltar" : "Entrar"}
-            </Button>
-            <Button onClick={() => navigate("/ceo")}>
-              Área CEO
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 text-center">
-        {showLogin ? (
-          <Card className="max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle className="text-2xl">Login do Restaurante</CardTitle>
-              <CardDescription>Entre com suas credenciais</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Usuário</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Senha</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Entrando..." : "Entrar"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-              Transforme seu Restaurante
-              <br />
-              com Cardápios Digitais
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Sistema completo de gestão de cardápios digitais com QR Code. 
-              Aumente suas vendas e modernize seu atendimento.
-            </p>
-            <div className="flex gap-4 justify-center flex-wrap">
-              <Button size="lg" className="gap-2" onClick={() => setShowLogin(true)}>
-                <Download className="h-5 w-5" />
-                Fazer Login
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => {
-                const featuresSection = document.getElementById('features');
-                featuresSection?.scrollIntoView({ behavior: 'smooth' });
-              }}>
-                Saiba Mais
-              </Button>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="container mx-auto px-4 py-20">
-        <h2 className="text-4xl font-bold text-center mb-4">
-          Tudo que você precisa em um só lugar
-        </h2>
-        <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-          Funcionalidades completas para gerenciar seu restaurante de forma eficiente
-        </p>
-        
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          {features.map((feature, index) => (
-            <Card key={index} className="border-border/50 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <div className="mb-4">{feature.icon}</div>
-                <CardTitle className="text-xl">{feature.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-base">
-                  {feature.description}
-                </CardDescription>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="bg-muted/30 py-20">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-4xl font-bold mb-6">
-                Por que escolher o Menu's?
-              </h2>
-              <div className="space-y-4">
-                {[
-                  "Redução de custos com impressão de cardápios",
-                  "Atualização instantânea de preços e produtos",
-                  "Aumento da velocidade no atendimento",
-                  "Relatórios detalhados de vendas e estoque",
-                  "Controle completo de caixa e financeiro",
-                  "Suporte técnico especializado"
-                ].map((benefit, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
-                    <span className="text-lg">{benefit}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="text-2xl">Como Funciona</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    1
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Cadastre-se</h3>
-                    <p className="text-muted-foreground">Crie sua conta e configure seu restaurante</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    2
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Configure o Cardápio</h3>
-                    <p className="text-muted-foreground">Adicione produtos, preços e imagens</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    3
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Gere QR Codes</h3>
-                    <p className="text-muted-foreground">Imprima e coloque nas mesas do seu restaurante</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    4
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Comece a Vender</h3>
-                    <p className="text-muted-foreground">Clientes escaneiam e fazem pedidos direto pelo celular</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="container mx-auto px-4 py-20 text-center">
-        <Card className="border-border/50 bg-gradient-to-br from-primary/5 to-accent/5">
-          <CardHeader className="space-y-4 pb-8">
-            <CardTitle className="text-4xl">
-              Pronto para Começar?
             </CardTitle>
-            <CardDescription className="text-lg">
-              Junte-se a centenas de restaurantes que já modernizaram seu atendimento
+            <CardDescription className="text-base mt-2">
+              Sistema de Gestão de Cardápios Digitais
             </CardDescription>
-          </CardHeader>
-          <CardContent className="pb-8">
-            <Button size="lg" onClick={() => setShowLogin(true)} className="gap-2">
-              <Download className="h-5 w-5" />
-              Fazer Login
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Usuário do Restaurante</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Digite o usuário"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Digite sua senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Entrando..." : "Entrar no Painel"}
             </Button>
-            <p className="text-sm text-muted-foreground mt-4">
-              Entre com suas credenciais de restaurante
-            </p>
-          </CardContent>
-        </Card>
-      </section>
+          </form>
 
-      {/* Footer */}
-      <footer className="border-t border-border/50 bg-muted/30">
-        <div className="container mx-auto px-4 py-8 text-center text-muted-foreground">
-          <p>© 2025 Menu's. Todos os direitos reservados.</p>
-        </div>
-      </footer>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                Ou
+              </span>
+            </div>
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => navigate("/ceo")}
+          >
+            Acessar como CEO
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 };
