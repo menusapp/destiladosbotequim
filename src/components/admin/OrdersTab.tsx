@@ -35,6 +35,7 @@ interface Order {
 const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const { getOrderStatusBadge } = useStatusBadge();
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     const { data, error } = await supabase
@@ -75,7 +76,10 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      // Se está aceitando o pedido, dar baixa no estoque
+      setUpdatingId(orderId);
+      // Otimista: atualiza UI imediatamente
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
+
       if (newStatus === "accepted") {
         await processStockDeduction(orderId);
       }
@@ -87,16 +91,19 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (error) {
         toast.error("Erro ao atualizar status");
+        // Recarrega para desfazer otimista em caso de erro
+        await fetchOrders();
         return;
       }
 
       toast.success(newStatus === "accepted" ? "Pedido aceito e estoque atualizado!" : "Status atualizado!");
-      
-      // Forçar atualização imediata dos pedidos
       await fetchOrders();
     } catch (error) {
       console.error("Erro ao atualizar pedido:", error);
       toast.error("Erro ao processar pedido");
+      await fetchOrders();
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -225,14 +232,15 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 </div>
               )}
 
-              {order.status === "pending" && (
-                <Button
-                  className="w-full"
-                  onClick={() => updateOrderStatus(order.id, "accepted")}
-                >
-                  Aceitar Pedido
-                </Button>
-              )}
+                {order.status === "pending" && (
+                  <Button
+                    className="w-full"
+                    disabled={updatingId === order.id}
+                    onClick={() => updateOrderStatus(order.id, "accepted")}
+                  >
+                    {updatingId === order.id ? "Aceitando..." : "Aceitar Pedido"}
+                  </Button>
+                )}
             </div>
           ))}
         </div>
