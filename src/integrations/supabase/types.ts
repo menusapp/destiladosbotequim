@@ -858,6 +858,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_mark_bill_on_the_way: {
+        Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_mark_bill_paid: {
+        Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_update_order_status: {
         Args: {
           p_new_status: string

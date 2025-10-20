@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Printer } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
@@ -171,6 +172,62 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
 
+  const handlePrintOrder = (order: Order) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const itemsHtml = order.order_items.map((item) => {
+      const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
+      const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
+      const productName = item.products?.name || "Produto excluído";
+      const extrasText = item.order_item_extras && item.order_item_extras.length > 0
+        ? `<br><small>+ ${item.order_item_extras.map(e => e.product_extras?.name || "Extra excluído").join(', ')}</small>`
+        : '';
+      const notesText = item.notes ? `<br><small><em>Obs: ${item.notes}</em></small>` : '';
+      
+      return `
+        <tr>
+          <td>${item.quantity}x</td>
+          <td>${productName}${extrasText}${notesText}</td>
+          <td class="right">R$ ${itemTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Pedido - Mesa ${order.tables.table_number}</title>
+        <style>
+          body { font-family: monospace; padding: 20px; }
+          h1 { text-align: center; border-bottom: 2px solid #000; }
+          .info { margin: 10px 0; }
+          table { width: 100%; margin: 10px 0; border-collapse: collapse; }
+          td { padding: 5px; border-bottom: 1px dashed #ccc; }
+          .right { text-align: right; }
+          small { color: #666; }
+        </style>
+      </head>
+      <body>
+        <h1>PEDIDO</h1>
+        <div class="info">Mesa: ${order.tables.table_number}</div>
+        <div class="info">Cliente: ${order.customer_name}</div>
+        <div class="info">Data: ${new Date(order.created_at).toLocaleString('pt-BR')}</div>
+        ${order.notes ? `<div class="info"><strong>Observação do Pedido:</strong> ${order.notes}</div>` : ''}
+        <table>
+          ${itemsHtml}
+        </table>
+      </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">Pedidos em Tempo Real</h3>
@@ -227,22 +284,31 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 })}
               </div>
 
-              {order.notes && (
-                <div className="text-sm p-2 bg-amber-50 border border-amber-200 rounded">
-                  <span className="font-semibold text-amber-800">Observação do Pedido:</span>
-                  <p className="text-amber-700 italic">{order.notes}</p>
-                </div>
-              )}
-
-                {order.status === "pending" && (
-                  <Button
-                    className="w-full"
-                    disabled={updatingId === order.id}
-                    onClick={() => updateOrderStatus(order.id, "accepted")}
-                  >
-                    {updatingId === order.id ? "Aceitando..." : "Aceitar Pedido"}
-                  </Button>
+                {order.notes && (
+                  <div className="text-sm p-2 bg-amber-50 border border-amber-200 rounded">
+                    <span className="font-semibold text-amber-800">Observação do Pedido:</span>
+                    <p className="text-amber-700 italic">{order.notes}</p>
+                  </div>
                 )}
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePrintOrder(order)}
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                  {order.status === "pending" && (
+                    <Button
+                      className="flex-1"
+                      disabled={updatingId === order.id}
+                      onClick={() => updateOrderStatus(order.id, "accepted")}
+                    >
+                      {updatingId === order.id ? "Aceitando..." : "Aceitar Pedido"}
+                    </Button>
+                  )}
+                </div>
             </div>
           ))}
         </div>

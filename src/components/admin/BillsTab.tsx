@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { usePaymentFormat } from "@/hooks/usePaymentFormat";
 import { useStatusBadge } from "@/hooks/useStatusBadge";
+import { Printer } from "lucide-react";
 
 interface Bill {
   id: string;
@@ -80,78 +81,99 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   });
 
   const handleMarkAsOnTheWay = async (billId: string) => {
-    const { error } = await supabase
-      .from("bills")
-      .update({ status: "on_the_way" })
-      .eq("id", billId);
+    try {
+      const { error } = await supabase.rpc('admin_mark_bill_on_the_way', {
+        p_bill_id: billId,
+        p_restaurant_id: restaurantId,
+      });
 
-    if (error) {
+      if (error) {
+        toast.error("Erro ao atualizar status");
+        console.error(error);
+        return;
+      }
+
+      toast.success("Conta a caminho!");
+      fetchBills();
+    } catch (error) {
+      console.error("Erro:", error);
       toast.error("Erro ao atualizar status");
-      console.error(error);
-      return;
     }
-
-    toast.success("Conta a caminho!");
-    fetchBills();
   };
 
   const handleMarkAsPaid = async (billId: string) => {
     try {
-      // Buscar a conta para pegar o table_id
-      const { data: billData, error: fetchError } = await supabase
-        .from("bills")
-        .select("table_id")
-        .eq("id", billId)
-        .maybeSingle();
+      const { error } = await supabase.rpc('admin_mark_bill_paid', {
+        p_bill_id: billId,
+        p_restaurant_id: restaurantId,
+      });
 
-      if (fetchError || !billData) {
-        toast.error("Erro ao buscar conta");
-        return;
-      }
-
-      // Deletar todos os pedidos da mesa
-      const { error: deleteOrdersError } = await supabase
-        .from("orders")
-        .delete()
-        .eq("table_id", billData.table_id);
-
-      if (deleteOrdersError) {
-        console.error("Erro ao deletar pedidos:", deleteOrdersError);
-        toast.error("Erro ao limpar comanda");
-        return;
-      }
-
-      // Atualizar status da conta para paga
-      const { error: updateError } = await supabase
-        .from("bills")
-        .update({ 
-          status: "paid",
-          paid_at: new Date().toISOString()
-        })
-        .eq("id", billId);
-
-      if (updateError) {
+      if (error) {
         toast.error("Erro ao marcar como paga");
-        console.error(updateError);
+        console.error(error);
         return;
       }
 
-      // Deletar a conta
-      const { error: deleteBillError } = await supabase
-        .from("bills")
-        .delete()
-        .eq("id", billId);
-
-      if (deleteBillError) {
-        console.error("Erro ao deletar conta:", deleteBillError);
-      }
-
-      toast.success("Conta paga!");
+      toast.success("Conta paga! Mesa liberada");
       fetchBills();
     } catch (error) {
       console.error("Erro ao processar pagamento:", error);
       toast.error("Erro ao processar pagamento");
     }
+  };
+
+  const handlePrintBill = (bill: Bill) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const customerName = bill.orders[0]?.customer_name || "Cliente";
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Conta - Mesa ${bill.tables.table_number}</title>
+        <style>
+          body { font-family: monospace; padding: 20px; }
+          h1 { text-align: center; border-bottom: 2px solid #000; }
+          .info { margin: 10px 0; }
+          .total { font-size: 1.2em; font-weight: bold; margin-top: 20px; border-top: 2px solid #000; padding-top: 10px; }
+          table { width: 100%; margin: 10px 0; }
+          td { padding: 5px 0; }
+          .right { text-align: right; }
+        </style>
+      </head>
+      <body>
+        <h1>CONTA</h1>
+        <div class="info">Mesa: ${bill.tables.table_number}</div>
+        <div class="info">Cliente: ${customerName}</div>
+        <div class="info">Data: ${new Date(bill.created_at).toLocaleString('pt-BR')}</div>
+        <table>
+          <tr>
+            <td>Subtotal</td>
+            <td class="right">R$ ${bill.subtotal.toFixed(2)}</td>
+          </tr>
+          ${bill.service_fee > 0 ? `
+          <tr>
+            <td>Taxa de Serviço</td>
+            <td class="right">R$ ${bill.service_fee.toFixed(2)}</td>
+          </tr>
+          ` : ''}
+          <tr class="total">
+            <td>TOTAL</td>
+            <td class="right">R$ ${bill.total_amount.toFixed(2)}</td>
+          </tr>
+        </table>
+        <div class="info">Pagamento: ${getPaymentLabel(bill.payment_method)}</div>
+        ${bill.payment_method === 'cash' && bill.change_amount ? `<div class="info">Troco para: R$ ${bill.change_amount.toFixed(2)}</div>` : ''}
+      </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
   };
 
 
@@ -219,22 +241,31 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
                   )}
                 </div>
 
-                {bill.status === "requested" && (
+                <div className="flex gap-2">
                   <Button
-                    className="w-full"
-                    onClick={() => handleMarkAsOnTheWay(bill.id)}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePrintBill(bill)}
                   >
-                    A Caminho
+                    <Printer className="h-4 w-4" />
                   </Button>
-                )}
-                {bill.status === "on_the_way" && (
-                  <Button
-                    className="w-full"
-                    onClick={() => handleMarkAsPaid(bill.id)}
-                  >
-                    Conta Paga
-                  </Button>
-                )}
+                  {bill.status === "requested" && (
+                    <Button
+                      className="flex-1"
+                      onClick={() => handleMarkAsOnTheWay(bill.id)}
+                    >
+                      A Caminho
+                    </Button>
+                  )}
+                  {bill.status === "on_the_way" && (
+                    <Button
+                      className="flex-1"
+                      onClick={() => handleMarkAsPaid(bill.id)}
+                    >
+                      Conta Paga
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
