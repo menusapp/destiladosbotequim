@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -80,6 +80,7 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [ingredients, setIngredients] = useState<ProductIngredient[]>([]);
@@ -131,13 +132,24 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
   const fetchProducts = async () => {
+    // Buscar primeiro as categorias do restaurante
+    const { data: restaurantCategories } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("restaurant_id", restaurantId);
+
+    if (!restaurantCategories || restaurantCategories.length === 0) {
+      setProducts([]);
+      return;
+    }
+
+    const categoryIds = restaurantCategories.map(c => c.id);
+
+    // Buscar apenas produtos dessas categorias
     const { data, error } = await supabase
       .from("products")
-      .select(`
-        *,
-        categories!inner(restaurant_id)
-      `)
-      .eq("categories.restaurant_id", restaurantId);
+      .select("*")
+      .in("category_id", categoryIds);
 
     if (error) {
       toast.error("Erro ao carregar produtos");
@@ -675,7 +687,17 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-semibold">Produtos</h3>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar produto..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 w-64"
+              />
+            </div>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => {
                 if (isRestaurantOpen) {
@@ -898,7 +920,8 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+          </div>
+        </div>
 
         {categories.length === 0 ? (
         <div className="text-center py-12 border rounded-lg bg-secondary/20">
@@ -912,7 +935,11 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
         </div>
       ) : (
         <div className="space-y-2">
-          {products.map((product) => (
+          {products
+            .filter((product) =>
+              product.name.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map((product) => (
             <div
               key={product.id}
               className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"

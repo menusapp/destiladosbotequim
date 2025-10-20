@@ -1,13 +1,14 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp, Wallet } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { RestaurantHeader } from "@/components/admin/RestaurantHeader";
-import { NotificationBadge } from "@/components/admin/NotificationBadge";
+import { useAuth } from "@/hooks/useAuth";
 import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
@@ -27,6 +28,7 @@ interface Restaurant {
 
 const RestaurantAdmin = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading, isRestaurantAdmin, getRestaurantId, signOut } = useAuth();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -34,61 +36,85 @@ const RestaurantAdmin = () => {
   const [hasNewBills, setHasNewBills] = useState(false);
 
   useEffect(() => {
-    const userType = sessionStorage.getItem("userType");
-    const restaurantId = sessionStorage.getItem("restaurantId");
+    if (!authLoading) {
+      if (!user) {
+        toast.error("Você precisa estar logado para acessar esta página");
+        navigate("/auth");
+        return;
+      }
+      
+      const restaurantId = getRestaurantId();
+      if (!isRestaurantAdmin || !restaurantId) {
+        toast.error("Acesso não autorizado. Você precisa ser administrador de um restaurante.");
+        navigate("/");
+        return;
+      }
 
-    if (userType !== "restaurant" || !restaurantId) {
-      setLoading(false);
-      return;
+      fetchRestaurant(restaurantId);
+      setupNotifications(restaurantId);
     }
+  }, [user, authLoading, isRestaurantAdmin, navigate]);
 
-    fetchRestaurant(restaurantId);
-    const cleanup = setupNotifications(restaurantId);
-    return cleanup;
-  }, [activeTab]);
-
-  const setupNotifications = useCallback((restaurantId: string) => {
-    const handleOrderInsert = async (payload: any) => {
-      const { data } = await supabase
-        .from('tables')
-        .select('restaurant_id')
-        .eq('id', payload.new.table_id)
-        .single();
-      
-      if (data?.restaurant_id === restaurantId && activeTab !== 'orders') {
-        setHasNewOrders(true);
-        toast.info("Novo pedido recebido!");
-      }
-    };
-
-    const handleBillInsert = async (payload: any) => {
-      const { data } = await supabase
-        .from('tables')
-        .select('restaurant_id')
-        .eq('id', payload.new.table_id)
-        .single();
-      
-      if (data?.restaurant_id === restaurantId && activeTab !== 'bills') {
-        setHasNewBills(true);
-        toast.info("Nova conta solicitada!");
-      }
-    };
-
+  const setupNotifications = (restaurantId: string) => {
+    // Canal para novos pedidos
     const ordersChannel = supabase
       .channel('new-orders-notification')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, handleOrderInsert)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'orders',
+        },
+        (payload) => {
+          // Verificar se o pedido é do restaurante atual através da mesa
+          supabase
+            .from('tables')
+            .select('restaurant_id')
+            .eq('id', (payload.new as any).table_id)
+            .single()
+            .then(({ data }) => {
+              if (data?.restaurant_id === restaurantId && activeTab !== 'orders') {
+                setHasNewOrders(true);
+                toast.info("Novo pedido recebido!");
+              }
+            });
+        }
+      )
       .subscribe();
 
+    // Canal para novas contas
     const billsChannel = supabase
       .channel('new-bills-notification')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bills' }, handleBillInsert)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bills',
+        },
+        (payload) => {
+          // Verificar se a conta é do restaurante atual através da mesa
+          supabase
+            .from('tables')
+            .select('restaurant_id')
+            .eq('id', (payload.new as any).table_id)
+            .single()
+            .then(({ data }) => {
+              if (data?.restaurant_id === restaurantId && activeTab !== 'bills') {
+                setHasNewBills(true);
+                toast.info("Nova conta solicitada!");
+              }
+            });
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(billsChannel);
     };
-  }, [activeTab]);
+  };
 
   useEffect(() => {
     // Limpar notificações quando mudar de aba
@@ -118,9 +144,8 @@ const RestaurantAdmin = () => {
     }
   };
 
-  const handleLogout = () => {
-    sessionStorage.clear();
-    navigate("/");
+  const handleLogout = async () => {
+    await signOut();
     toast.success("Logout realizado com sucesso");
   };
 
@@ -168,12 +193,31 @@ const RestaurantAdmin = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
       <div className="container mx-auto p-6 space-y-6">
-        <RestaurantHeader
-          restaurantName={restaurant.name}
-          isOpen={restaurant.is_open}
-          onToggleOpen={handleToggleRestaurant}
-          onLogout={handleLogout}
-        />
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              {restaurant.name}
+            </h1>
+            <p className="text-muted-foreground mt-1">Painel Administrativo</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="restaurant-status"
+                checked={restaurant.is_open}
+                onCheckedChange={handleToggleRestaurant}
+              />
+              <Label htmlFor="restaurant-status" className="cursor-pointer">
+                {restaurant.is_open ? "Aberto" : "Fechado"}
+              </Label>
+            </div>
+            <Button onClick={handleLogout} variant="outline">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sair
+            </Button>
+          </div>
+        </div>
 
         {/* Tabs */}
         <Card>
@@ -210,12 +254,16 @@ const RestaurantAdmin = () => {
                 <TabsTrigger value="orders" className="relative">
                   <ShoppingCart className="h-4 w-4 mr-1" />
                   Pedidos
-                  <NotificationBadge show={hasNewOrders} />
+                  {hasNewOrders && (
+                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="bills" className="relative">
                   <Receipt className="h-4 w-4 mr-1" />
                   Contas
-                  <NotificationBadge show={hasNewBills} />
+                  {hasNewBills && (
+                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="settings">
                   <Settings className="h-4 w-4 mr-1" />

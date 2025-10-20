@@ -8,7 +8,6 @@ import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import type { DateRange } from "react-day-picker";
 
 interface DashboardStats {
   totalRevenue: number;
@@ -41,12 +40,13 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
   });
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [dateFilter, setDateFilter] = useState<string>("today");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [customDateFrom, setCustomDateFrom] = useState<Date>();
+  const [customDateTo, setCustomDateTo] = useState<Date>();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchStats();
-  }, [restaurantId, dateFilter, dateRange]);
+  }, [restaurantId, dateFilter, customDateFrom, customDateTo]);
 
   const getDateRange = () => {
     const now = new Date();
@@ -68,9 +68,9 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
         startDate = startOfDay(subDays(now, 30));
         break;
       case "custom":
-        if (dateRange?.from) {
-          startDate = startOfDay(dateRange.from);
-          endDate = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+        if (customDateFrom && customDateTo) {
+          startDate = startOfDay(customDateFrom);
+          endDate = endOfDay(customDateTo);
         } else {
           startDate = startOfDay(now);
         }
@@ -87,13 +87,18 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
     const { startDate, endDate } = getDateRange();
 
     try {
-      // Buscar todas as mesas do restaurante
-      const { data: tables } = await supabase
-        .from("tables")
-        .select("id")
-        .eq("restaurant_id", restaurantId);
+      // Buscar sessões de caixa FECHADAS no período
+      const { data: sessions, error: sessionsError } = await supabase
+        .from("cash_register_sessions")
+        .select("id, closed_at")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "closed")
+        .gte("closed_at", startDate.toISOString())
+        .lte("closed_at", endDate.toISOString());
 
-      if (!tables || tables.length === 0) {
+      if (sessionsError) throw sessionsError;
+
+      if (!sessions || sessions.length === 0) {
         setStats({
           totalRevenue: 0,
           totalOrders: 0,
@@ -109,53 +114,42 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
         return;
       }
 
-      const tableIds = tables.map((t) => t.id);
+      const sessionIds = sessions.map((s) => s.id);
 
-      // Buscar contas pagas no período
-      const { data: bills } = await supabase
-        .from("bills")
-        .select("*")
-        .in("table_id", tableIds)
-        .eq("status", "paid")
-        .gte("paid_at", startDate.toISOString())
-        .lte("paid_at", endDate.toISOString());
+      // Buscar movimentações das sessões fechadas
+      const { data: movements, error: movError } = await supabase
+        .from("cash_movements")
+        .select("movement_type, amount, payment_method, category")
+        .in("cash_session_id", sessionIds);
 
-      if (!bills) {
-        setStats({
-          totalRevenue: 0,
-          totalOrders: 0,
-          cardPayments: 0,
-          pixPayments: 0,
-          cashPayments: 0,
-          cardRevenue: 0,
-          pixRevenue: 0,
-          cashRevenue: 0,
-        });
-        setTopProducts([]);
-        setLoading(false);
-        return;
-      }
+      if (movError) throw movError;
 
-      // Calcular estatísticas
-      const totalRevenue = bills.reduce((sum, bill) => sum + Number(bill.total_amount), 0);
-      const totalOrders = bills.length;
-      const cardPayments = bills.filter((b) => b.payment_method === "card").length;
-      const pixPayments = bills.filter((b) => b.payment_method === "pix").length;
-      const cashPayments = bills.filter((b) => b.payment_method === "cash").length;
-      
-      const cardRevenue = bills
-        .filter((b) => b.payment_method === "card")
-        .reduce((sum, bill) => sum + Number(bill.total_amount), 0);
-      const pixRevenue = bills
-        .filter((b) => b.payment_method === "pix")
-        .reduce((sum, bill) => sum + Number(bill.total_amount), 0);
-      const cashRevenue = bills
-        .filter((b) => b.payment_method === "cash")
-        .reduce((sum, bill) => sum + Number(bill.total_amount), 0);
+      const entradas = (movements || []).filter((m) => m.movement_type === "entrada");
+      const vendas = entradas.filter((m) => (m.category === "venda"));
+
+      const totalRevenue = entradas.reduce((sum, m) => sum + Number(m.amount || 0), 0);
+
+      const isCash = (method?: string | null) => method === "cash" || method === "dinheiro";
+      const isPix = (method?: string | null) => method === "pix";
+      const isCard = (method?: string | null) => method === "card" || method === "credito" || method === "debito";
+
+      const cardPayments = vendas.filter((v) => isCard(v.payment_method)).length;
+      const pixPayments = vendas.filter((v) => isPix(v.payment_method)).length;
+      const cashPayments = vendas.filter((v) => isCash(v.payment_method)).length;
+
+      const cardRevenue = vendas
+        .filter((v) => isCard(v.payment_method))
+        .reduce((sum, v) => sum + Number(v.amount || 0), 0);
+      const pixRevenue = vendas
+        .filter((v) => isPix(v.payment_method))
+        .reduce((sum, v) => sum + Number(v.amount || 0), 0);
+      const cashRevenue = vendas
+        .filter((v) => isCash(v.payment_method))
+        .reduce((sum, v) => sum + Number(v.amount || 0), 0);
 
       setStats({
         totalRevenue,
-        totalOrders,
+        totalOrders: vendas.length,
         cardPayments,
         pixPayments,
         cashPayments,
@@ -164,74 +158,9 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
         cashRevenue,
       });
 
-      // Buscar produtos mais vendidos
-      // Buscar todas as orders relacionadas às mesas no período das bills pagas
-      const { data: ordersData } = await supabase
-        .from("orders")
-        .select(`
-          id,
-          table_id,
-          created_at
-        `)
-        .in("table_id", tableIds)
-        .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString());
-
-      if (ordersData) {
-        const orderIds = ordersData.map((o) => o.id);
-        
-        if (orderIds.length === 0) {
-          setTopProducts([]);
-        } else {
-          // Buscar todos os order_items
-          const { data: orderItems } = await supabase
-            .from("order_items")
-            .select(`
-              quantity,
-              price_at_order,
-              products(name)
-            `)
-            .in("order_id", orderIds);
-
-          if (orderItems) {
-            // Agrupar por produto
-            const productMap = new Map<string, { quantity: number; revenue: number; price: number }>();
-            
-            orderItems.forEach((item: any) => {
-              const productName = item.products?.name || "Produto excluído";
-              const existing = productMap.get(productName);
-              
-              if (existing) {
-                existing.quantity += item.quantity;
-                existing.revenue += item.price_at_order * item.quantity;
-              } else {
-                productMap.set(productName, {
-                  quantity: item.quantity,
-                  revenue: item.price_at_order * item.quantity,
-                  price: item.price_at_order,
-                });
-              }
-            });
-
-            // Converter para array e ordenar por quantidade
-            const topProductsList = Array.from(productMap.entries())
-              .map(([name, data]) => ({
-                name,
-                quantity: data.quantity,
-                unitPrice: data.price,
-                totalRevenue: data.revenue,
-              }))
-              .sort((a, b) => b.quantity - a.quantity)
-              .slice(0, 10); // Top 10 produtos
-
-            setTopProducts(topProductsList);
-          } else {
-            setTopProducts([]);
-          }
-        }
-      } else {
-        setTopProducts([]);
-      }
+      // Top produtos: como os pedidos são removidos ao pagar,
+      // não é possível compilar produtos vendidos a partir de "orders" aqui.
+      setTopProducts([]);
     } catch (error) {
       console.error("Erro ao buscar estatísticas:", error);
     } finally {
@@ -273,27 +202,42 @@ const DashboardTab = ({ restaurantId }: { restaurantId: string }) => {
               className={cn("justify-start text-left font-normal")}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateFilter === "custom" && dateRange?.from
-                ? dateRange.to
-                  ? `${format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} - ${format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}`
-                  : format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
+              {dateFilter === "custom" && customDateFrom && customDateTo
+                ? `${format(customDateFrom, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateTo, "dd/MM/yyyy", { locale: ptBR })}`
                 : "Personalizado"}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="range"
-              selected={dateRange}
-              onSelect={(range) => {
-                setDateRange(range);
-                if (range?.from) {
-                  setDateFilter("custom");
-                }
-              }}
-              locale={ptBR}
-              numberOfMonths={1}
-              className="pointer-events-auto"
-            />
+            <div className="p-3 space-y-2">
+              <div>
+                <label className="text-sm font-medium">Data inicial</label>
+                <Calendar
+                  mode="single"
+                  selected={customDateFrom}
+                  onSelect={(date) => {
+                    setCustomDateFrom(date);
+                    if (date && customDateTo) {
+                      setDateFilter("custom");
+                    }
+                  }}
+                  locale={ptBR}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Data final</label>
+                <Calendar
+                  mode="single"
+                  selected={customDateTo}
+                  onSelect={(date) => {
+                    setCustomDateTo(date);
+                    if (date && customDateFrom) {
+                      setDateFilter("custom");
+                    }
+                  }}
+                  locale={ptBR}
+                />
+              </div>
+            </div>
           </PopoverContent>
         </Popover>
       </div>

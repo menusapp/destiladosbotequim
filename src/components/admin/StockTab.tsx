@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Package, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Package, AlertTriangle, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface StockCategory {
@@ -33,6 +33,7 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const [itemForm, setItemForm] = useState({
     name: "",
@@ -275,11 +276,21 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">Insumos / Ingredientes</h2>
-          <Dialog open={itemDialogOpen} onOpenChange={(open) => {
-            setItemDialogOpen(open);
-            if (!open) resetItemForm();
-          }}>
-            <DialogTrigger asChild>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar insumo..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 w-64"
+              />
+            </div>
+            <Dialog open={itemDialogOpen} onOpenChange={(open) => {
+              setItemDialogOpen(open);
+              if (!open) resetItemForm();
+            }}>
+              <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Insumo
@@ -374,10 +385,15 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <div className="space-y-2">
-          {stockItems.map((item) => (
+          {stockItems
+            .filter((item) =>
+              item.name.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map((item) => (
             <Card key={item.id} className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3 flex-1">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -150,7 +150,7 @@ const Comanda = () => {
               console.log("Conta paga! Redirecionando...");
               toast.success("Conta paga! Obrigado pela preferência!");
               
-              // Limpar dados da comanda do sessionStorage
+               // Limpar dados da comanda do sessionStorage
               sessionStorage.removeItem(`customer_name_${tableNumber}`);
               sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
               sessionStorage.removeItem(`comanda_type_${tableNumber}`);
@@ -162,56 +162,33 @@ const Comanda = () => {
             }
           }
         )
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'bills',
-            filter: `table_id=eq.${tableData.id}`,
-          },
-          (payload) => {
-            console.log("Bill deletada (conta paga):", payload);
-            toast.success("Conta paga! Obrigado pela preferência!");
-            
-            // Limpar dados da comanda do sessionStorage
-            sessionStorage.removeItem(`customer_name_${tableNumber}`);
-            sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
-            sessionStorage.removeItem(`comanda_type_${tableNumber}`);
-            sessionStorage.removeItem(`cart_${tableNumber}`);
-            
-            setTimeout(() => {
-              navigate(`/menu/${restaurantSlug}/${tableNumber}`);
-            }, 1500);
-          }
-        )
         .subscribe((status) => {
           console.log("Bill channel status:", status);
         });
       
       // Configurar realtime para pedidos aceitos
-        ordersChannel = supabase
-          .channel(`order-status-${tableData.id}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'orders',
-              filter: `table_id=eq.${tableData.id}`,
-            },
-            (payload) => {
-              console.log("Order atualizada:", payload);
-              const updatedOrder = payload.new as any;
-              // Qualquer atualização relevante deve atualizar a tela do cliente
-              if (['accepted','preparing','ready','delivered','pending'].includes(updatedOrder.status)) {
-                fetchData();
-              }
+      ordersChannel = supabase
+        .channel(`order-status-${tableData.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'orders',
+            filter: `table_id=eq.${tableData.id}`,
+          },
+          (payload) => {
+            console.log("Order atualizada:", payload);
+            const updatedOrder = payload.new as any;
+            if (updatedOrder.status === "accepted" && payload.old?.status === "pending") {
+              toast.success("Seu pedido foi aceito!");
+              fetchData();
             }
-          )
-          .subscribe((status) => {
-            console.log("Orders channel status:", status);
-          });
+          }
+        )
+        .subscribe((status) => {
+          console.log("Orders channel status:", status);
+        });
     };
     
     setupRealtimeChannels();
@@ -238,84 +215,95 @@ const Comanda = () => {
     }
   }, [prepTimerSeconds]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!restaurantSlug || !tableNumber) return;
+    
     try {
-      // Buscar restaurante e configurações
-      const { data: restData, error: restError } = await supabase
+      // Buscar restaurante primeiro
+      const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+      
+      const restResult = await supabase
         .from("restaurants")
         .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color")
         .eq("slug", restaurantSlug)
-        .single();
+        .maybeSingle();
 
-      if (restError) throw restError;
+      if (restResult.error) throw restResult.error;
+      const restData = restResult.data;
+      
+      if (!restData) {
+        toast.error("Restaurante não encontrado");
+        return;
+      }
       
       setServiceFeeEnabled(restData.service_fee_enabled || false);
       setServiceFeePercentage(restData.service_fee_percentage || 10);
       setPrepTimeMinutes(restData.prep_time_minutes || 30);
       setRestaurantColor(restData.primary_color || "#FF6B35");
 
-      // Buscar mesa
-      const { data: tableData, error: tableError } = await supabase
+      // Buscar mesa DO RESTAURANTE ESPECÍFICO
+      const tableResult = await supabase
         .from("tables")
-        .select("*")
+        .select("id")
+        .eq("table_number", parseInt(tableNumber))
         .eq("restaurant_id", restData.id)
-        .eq("table_number", parseInt(tableNumber || "0"))
-        .single();
+        .limit(1)
+        .maybeSingle();
 
-      if (tableError) throw tableError;
+      if (tableResult.error) throw tableResult.error;
+      const tableData = tableResult.data;
+      
+      if (!tableData) {
+        toast.error("Mesa não encontrada");
+        return;
+      }
+      
       setTableId(tableData.id);
 
-      // Buscar CPF do cliente do sessionStorage
-      const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
-
-      // Para comanda coletiva, buscar TODOS os pedidos com o mesmo CPF
-      // Para comanda individual, buscar apenas os do cliente específico
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
-          *,
-          order_items(
-            *,
-            products(name),
-            order_item_extras(
-              price_at_order,
-              product_extras(name)
+      // Buscar pedidos e conta em paralelo
+      const [ordersResult, billResult] = await Promise.all([
+        supabase
+          .from("orders")
+          .select(`
+            id, status, created_at, customer_name, notes,
+            order_items(
+              id, quantity, price_at_order, notes,
+              products(name),
+              order_item_extras(price_at_order, product_extras(name))
             )
-          )
-        `)
-        .eq("table_id", tableData.id)
-        .eq("customer_cpf", customerCPF || "")
-        .order("created_at", { ascending: false });
-
-      if (ordersError) throw ordersError;
-      setOrders(ordersData || []);
-
-      // Verificar se já foi solicitada a conta
-      const { data: billData } = await supabase
-        .from("bills")
-        .select("*")
-        .eq("table_id", tableData.id)
-        .in("status", ["requested", "on_the_way"])
-        .single();
-
-      if (billData) {
-        setBillRequested(true);
+          `)
+          .eq("table_id", tableData.id)
+          .eq("customer_cpf", customerCPF || "")
+          .order("created_at", { ascending: false }),
         
-        if (billData.status === "on_the_way") {
+        supabase
+          .from("bills")
+          .select("status")
+          .eq("table_id", tableData.id)
+          .in("status", ["requested", "on_the_way"])
+          .maybeSingle()
+      ]);
+
+      if (ordersResult.data) {
+        setOrders(ordersResult.data);
+      }
+
+      if (billResult.data) {
+        setBillRequested(true);
+        if (billResult.data.status === "on_the_way") {
           setBillOnTheWay(true);
         }
       }
-      
     } catch (error: any) {
       toast.error("Erro ao carregar comanda");
       console.error(error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [restaurantSlug, tableNumber]);
 
-  const calculateTotal = () => {
-    // Calcular subtotal dos pedidos já enviados
+  // Memoizar cálculo do total
+  const totals = useMemo(() => {
     const ordersSubtotal = orders.reduce((sum, order) => {
       const orderSum = order.order_items.reduce((itemSum, item) => {
         const extrasSum = (item.order_item_extras || []).reduce((s, e) => s + e.price_at_order, 0);
@@ -324,14 +312,12 @@ const Comanda = () => {
       return sum + orderSum;
     }, 0);
 
-    // Calcular subtotal do carrinho (ainda não enviado)
     const cartSubtotal = cart.reduce((sum, item) => {
       const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
       return sum + (item.product.price + extrasTotal) * item.quantity;
     }, 0);
 
     const subtotal = ordersSubtotal + cartSubtotal;
-
     const serviceFee = serviceFeeEnabled ? subtotal * (serviceFeePercentage / 100) : 0;
     
     return {
@@ -339,7 +325,7 @@ const Comanda = () => {
       serviceFee,
       total: subtotal + serviceFee,
     };
-  };
+  }, [orders, cart, serviceFeeEnabled, serviceFeePercentage]);
 
   const handleSendOrder = async () => {
     if (cart.length === 0) {
@@ -425,22 +411,16 @@ const Comanda = () => {
   const handleRequestBill = async () => {
     if (!tableId) return;
 
-    // Verificar se há pedidos pendentes
-    const hasPendingOrders = orders.some(order => order.status === "pending");
-    if (hasPendingOrders) {
-      toast.error("Aguarde seus pedidos serem aceitos antes de solicitar a conta");
-      return;
-    }
-
-    // Verificar se há carrinho não enviado
-    if (cart.length > 0) {
-      toast.error("Você tem itens no carrinho. Envie ou remova-os antes de solicitar a conta");
-      return;
+    // Validar troco em dinheiro
+    if (paymentMethod === "cash" && changeAmount) {
+      const changeValue = parseFloat(changeAmount);
+      if (changeValue < totals.total) {
+        toast.error(`O valor para troco deve ser maior ou igual ao total da conta (R$ ${totals.total.toFixed(2)})`);
+        return;
+      }
     }
 
     try {
-      const totals = calculateTotal();
-
       const { data: billData, error } = await supabase
         .from("bills")
         .insert({
@@ -479,8 +459,6 @@ const Comanda = () => {
       </div>
     );
   }
-
-  const totals = calculateTotal();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
@@ -529,13 +507,13 @@ const Comanda = () => {
                 <Clock className="h-5 w-5 text-amber-600" />
                 <div className="text-center">
                   <p className="text-sm text-amber-800 font-medium">
-                    Seu pedido está sendo preparado!
+                    Tempo de Preparo de Até
                   </p>
-                  <p className="text-lg text-amber-600 mt-1 font-bold">
-                    Tempo estimado: {formatTime(prepTimerSeconds)}
+                  <p className="text-3xl font-bold text-amber-600 mt-1">
+                    {formatTime(prepTimerSeconds)}
                   </p>
                   <p className="text-xs text-amber-700 mt-1">
-                    {prepTimerSeconds > 0 ? "Aguardando preparo..." : "Seu pedido deve estar pronto!"}
+                    {prepTimerSeconds > 0 ? "Tempo estimado restante" : "Seu pedido deve estar pronto"}
                   </p>
                 </div>
               </div>
@@ -657,15 +635,12 @@ const Comanda = () => {
                     {customerOrders.map((order) => (
                       <div key={order.id} className="ml-4 space-y-2">
                         <div className="flex items-center gap-2">
-                          <Badge 
-                            variant={order.status === "pending" ? "secondary" : "default"}
-                            className={order.status === "accepted" ? "bg-green-500 text-white" : ""}
-                          >
-                            {order.status === "pending" && "🕐 Aguardando"}
-                            {order.status === "accepted" && "👨‍🍳 Preparando"}
-                            {order.status === "preparing" && "👨‍🍳 Preparando"}
-                            {order.status === "ready" && "✅ Pronto"}
-                            {order.status === "delivered" && "✅ Entregue"}
+                          <Badge variant="outline">
+                            {order.status === "pending" && "Pendente"}
+                            {order.status === "accepted" && "Aceito"}
+                            {order.status === "preparing" && "Preparando"}
+                            {order.status === "ready" && "Pronto"}
+                            {order.status === "delivered" && "Entregue"}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
                             {new Date(order.created_at).toLocaleTimeString()}
@@ -713,15 +688,12 @@ const Comanda = () => {
                 {orders.map((order) => (
                   <div key={order.id} className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Badge 
-                        variant={order.status === "pending" ? "secondary" : "default"}
-                        className={order.status === "accepted" ? "bg-green-500 text-white" : ""}
-                      >
-                        {order.status === "pending" && "🕐 Aguardando"}
-                        {order.status === "accepted" && "👨‍🍳 Preparando"}
-                        {order.status === "preparing" && "👨‍🍳 Preparando"}
-                        {order.status === "ready" && "✅ Pronto"}
-                        {order.status === "delivered" && "✅ Entregue"}
+                      <Badge variant="outline">
+                        {order.status === "pending" && "Pendente"}
+                        {order.status === "accepted" && "Aceito"}
+                        {order.status === "preparing" && "Preparando"}
+                        {order.status === "ready" && "Pronto"}
+                        {order.status === "delivered" && "Entregue"}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
                         {new Date(order.created_at).toLocaleTimeString()}
