@@ -72,99 +72,73 @@ const ProductDetailDialog = ({
   };
 
   return (
-    <>
-      <style>{`
-        .custom-checkbox-${product.id.replace(/[^a-zA-Z0-9]/g, '')} {
-          border-color: ${restaurantColor} !important;
-        }
-        .custom-checkbox-${product.id.replace(/[^a-zA-Z0-9]/g, '')}[data-state="checked"] {
-          background-color: ${restaurantColor} !important;
-          border-color: ${restaurantColor} !important;
-        }
-      `}</style>
-      <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="space-y-2">
-          <DialogTitle className="text-xl">{product.name}</DialogTitle>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{product.name}</DialogTitle>
           {product.description && (
-            <DialogDescription className="text-sm">{product.description}</DialogDescription>
+            <DialogDescription>{product.description}</DialogDescription>
           )}
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {product.image_url && (
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-40 object-cover rounded-lg"
+              className="w-full h-48 object-cover rounded-lg"
             />
           )}
 
-          <div className="space-y-3">
-            <div 
-              className="p-3 rounded-lg flex items-center justify-between"
-              style={{ backgroundColor: `${restaurantColor}15` }}
-            >
-              <span className="text-sm font-medium">Preço base</span>
-              <p className="text-2xl font-bold" style={{ color: restaurantColor }}>
-                R$ {product.price.toFixed(2)}
-              </p>
-            </div>
+          <div className="space-y-2">
+            <p className="text-2xl font-bold" style={{ color: restaurantColor }}>
+              R$ {product.price.toFixed(2)}
+            </p>
 
             {extras.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold">Adicionais</h4>
-                <div className="space-y-2">
-                  {extras.map((extra) => {
-                    const isSelected = selectedExtras.includes(extra.id);
-                    return (
-                      <label
-                        key={extra.id}
-                        className="flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors"
-                        style={
-                          isSelected
-                            ? { backgroundColor: `${restaurantColor}10`, borderColor: restaurantColor }
-                            : { borderColor: `${restaurantColor}55` }
-                        }
-                      >
-                        <Checkbox
-                          id={extra.id}
-                          checked={isSelected}
-                          onCheckedChange={() => handleExtraToggle(extra.id)}
-                          className={`custom-checkbox-${product.id.replace(/[^a-zA-Z0-9]/g, '')}`}
-                        />
-                        <span className="flex-1 text-sm">{extra.name}</span>
-                        <span className="text-sm font-semibold" style={{ color: restaurantColor }}>
-                          + R$ {extra.price.toFixed(2)}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
+              <div className="space-y-3 p-4 border rounded-lg bg-secondary/20">
+                <h4 className="font-semibold">Adicionais</h4>
+                {extras.map((extra) => (
+                  <div key={extra.id} className="flex items-center space-x-3">
+                    <Checkbox
+                      id={extra.id}
+                      checked={selectedExtras.includes(extra.id)}
+                      onCheckedChange={() => handleExtraToggle(extra.id)}
+                    />
+                    <Label
+                      htmlFor={extra.id}
+                      className="flex-1 cursor-pointer flex justify-between"
+                    >
+                      <span>{extra.name}</span>
+                      <span className="font-semibold">
+                        + R$ {extra.price.toFixed(2)}
+                      </span>
+                    </Label>
+                  </div>
+                ))}
               </div>
             )}
 
             {selectedExtras.length > 0 && (
               <div 
                 className="flex justify-between items-center p-3 rounded-lg" 
-                style={{ backgroundColor: restaurantColor, color: 'white' }}
+                style={{ backgroundColor: `${restaurantColor}15` }}
               >
-                <span className="font-semibold">Total</span>
-                <span className="text-2xl font-bold">
+                <span className="font-semibold">Total com adicionais:</span>
+                <span className="text-xl font-bold" style={{ color: restaurantColor }}>
                   R$ {getTotalPrice().toFixed(2)}
                 </span>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="notes" className="text-sm">Observações (opcional)</Label>
+              <Label htmlFor="notes">Observações (opcional)</Label>
               <Textarea
                 id="notes"
-                placeholder="Ex: Sem cebola, bem passado..."
+                placeholder="Ex: Sem cebola, ponto da carne mal passado..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                className="text-sm"
+                rows={3}
               />
             </div>
           </div>
@@ -181,7 +155,6 @@ const ProductDetailDialog = ({
         </div>
       </DialogContent>
     </Dialog>
-    </>
   );
 };
 

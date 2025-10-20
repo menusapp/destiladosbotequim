@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { LogOut, Plus, Store, Trash2, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +28,6 @@ interface Restaurant {
 
 const CEODashboard = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading, isCEO, signOut } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -40,26 +38,17 @@ const CEODashboard = () => {
   const [formSlug, setFormSlug] = useState("");
   const [formPrimaryColor, setFormPrimaryColor] = useState("#FF6B35");
   const [formSecondaryColor, setFormSecondaryColor] = useState("#1A1A1A");
-  const [formEmail, setFormEmail] = useState("");
+  const [formUsername, setFormUsername] = useState("");
   const [formPassword, setFormPassword] = useState("");
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        toast.error("Você precisa estar logado para acessar esta página");
-        navigate("/auth");
-        return;
-      }
-      
-      if (!isCEO) {
-        toast.error("Acesso não autorizado. Apenas CEOs podem acessar esta área.");
-        navigate("/");
-        return;
-      }
-      
-      fetchRestaurants();
+    const userType = sessionStorage.getItem("userType");
+    if (userType !== "ceo") {
+      navigate("/");
+      return;
     }
-  }, [user, authLoading, isCEO, navigate]);
+    fetchRestaurants();
+  }, [navigate]);
 
   const fetchRestaurants = async () => {
     try {
@@ -77,8 +66,9 @@ const CEODashboard = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
+  const handleLogout = () => {
+    sessionStorage.clear();
+    navigate("/");
     toast.success("Logout realizado com sucesso");
   };
 
@@ -89,7 +79,15 @@ const CEODashboard = () => {
       setFormSlug(restaurant.slug);
       setFormPrimaryColor(restaurant.primary_color || "#FF6B35");
       setFormSecondaryColor(restaurant.secondary_color || "#1A1A1A");
-      setFormEmail("");
+      
+      // Buscar username atual
+      const { data } = await supabase
+        .from("restaurant_credentials")
+        .select("username")
+        .eq("restaurant_id", restaurant.id)
+        .single();
+      
+      setFormUsername(data?.username || "");
       setFormPassword("");
     } else {
       setEditingRestaurant(null);
@@ -97,7 +95,7 @@ const CEODashboard = () => {
       setFormSlug("");
       setFormPrimaryColor("#FF6B35");
       setFormSecondaryColor("#1A1A1A");
-      setFormEmail("");
+      setFormUsername("");
       setFormPassword("");
     }
     setDialogOpen(true);
@@ -121,6 +119,20 @@ const CEODashboard = () => {
 
         if (restError) throw restError;
 
+        // Atualizar credenciais se fornecidas
+        if (formUsername || formPassword) {
+          const updateData: any = {};
+          if (formUsername) updateData.username = formUsername;
+          if (formPassword) updateData.password_hash = formPassword;
+
+          const { error: credError } = await supabase
+            .from("restaurant_credentials")
+            .update(updateData)
+            .eq("restaurant_id", editingRestaurant.id);
+
+          if (credError) throw credError;
+        }
+
         toast.success("Restaurante atualizado com sucesso!");
       } else {
         // Criar restaurante
@@ -137,33 +149,16 @@ const CEODashboard = () => {
 
         if (restError) throw restError;
 
-        // Criar usuário admin do restaurante se email e senha fornecidos
-        if (formEmail && formPassword) {
-          const { data: newUser, error: signUpError } = await supabase.auth.signUp({
-            email: formEmail,
-            password: formPassword,
-            options: {
-              data: {
-                full_name: `Admin ${formName}`,
-              },
-            },
+        // Criar credenciais
+        const { error: credError } = await supabase
+          .from("restaurant_credentials")
+          .insert({
+            restaurant_id: restaurant.id,
+            username: formUsername,
+            password_hash: formPassword,
           });
 
-          if (signUpError) throw signUpError;
-
-          if (newUser.user) {
-            // Criar role de restaurant_admin
-            const { error: roleError } = await supabase
-              .from("user_roles")
-              .insert({
-                user_id: newUser.user.id,
-                role: "restaurant_admin",
-                restaurant_id: restaurant.id,
-              });
-
-            if (roleError) throw roleError;
-          }
-        }
+        if (credError) throw credError;
 
         toast.success("Restaurante criado com sucesso!");
       }
@@ -312,33 +307,27 @@ const CEODashboard = () => {
                       </div>
                     </div>
                   </div>
-                  {!editingRestaurant && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email do Administrador</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formEmail}
-                          onChange={(e) => setFormEmail(e.target.value)}
-                          placeholder="admin@exemplo.com"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password">Senha do Administrador</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          value={formPassword}
-                          onChange={(e) => setFormPassword(e.target.value)}
-                          placeholder="Mínimo 6 caracteres"
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                    </>
-                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Usuário de Login</Label>
+                    <Input
+                      id="username"
+                      value={formUsername}
+                      onChange={(e) => setFormUsername(e.target.value)}
+                      placeholder="Ex: pizzaria123"
+                      required={!editingRestaurant}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Senha</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formPassword}
+                      onChange={(e) => setFormPassword(e.target.value)}
+                      placeholder="Digite a senha"
+                      required={!editingRestaurant}
+                    />
+                  </div>
                   <Button type="submit" className="w-full">
                     {editingRestaurant ? "Atualizar Restaurante" : "Criar Restaurante"}
                   </Button>

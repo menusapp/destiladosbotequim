@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo, useCallback, memo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Receipt, ChevronRight } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
@@ -54,57 +54,6 @@ interface CartItem {
   notes?: string;
 }
 
-// Componente memoizado para produtos individuais
-const ProductCard = memo(({ 
-  product, 
-  restaurantColor, 
-  onProductClick 
-}: { 
-  product: Product; 
-  restaurantColor: string; 
-  onProductClick: (product: Product) => void;
-}) => (
-  <Card
-    className="cursor-pointer hover:shadow-md transition-shadow"
-    onClick={() => product.available && onProductClick(product)}
-  >
-    <CardContent className="p-4">
-      <div className="flex items-start gap-3">
-        {product.image_url && (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            className="w-24 h-24 object-cover rounded"
-            loading="lazy"
-          />
-        )}
-          <div className="flex-1">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="font-semibold text-lg">{product.name}</p>
-                {product.description && (
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                    {product.description}
-                  </p>
-                )}
-              </div>
-              {!product.available && (
-                <Badge variant="secondary">Indisponível</Badge>
-              )}
-            </div>
-          <p 
-            className="text-xl font-bold mt-2"
-            style={{ color: restaurantColor }}
-          >
-            R$ {product.price.toFixed(2)}
-          </p>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-));
-ProductCard.displayName = "ProductCard";
-
 const Menu = () => {
   const { restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
@@ -123,7 +72,6 @@ const Menu = () => {
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
 
   useEffect(() => {
     // Verificar se já tem info do cliente no sessionStorage
@@ -153,26 +101,18 @@ const Menu = () => {
     sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
   }, [cart, tableNumber]);
 
-  const fetchData = useCallback(async () => {
-    if (!restaurantSlug || !tableNumber) return;
-    
+  const fetchData = async () => {
     try {
-      // Buscar restaurante primeiro
-      const restResult = await supabase
+      // Buscar restaurante
+      const { data: restData, error: restError } = await supabase
         .from("restaurants")
-        .select("id, name, logo_url, primary_color, is_open")
+        .select("*")
         .eq("slug", restaurantSlug)
-        .maybeSingle();
+        .single();
 
-      if (restResult.error) throw restResult.error;
-      const restData = restResult.data;
+      if (restError) throw restError;
 
-      if (!restData) {
-        toast.error("Restaurante não encontrado");
-        navigate("/");
-        return;
-      }
-
+      // Verificar se restaurante está aberto
       if (!restData.is_open) {
         toast.error("Restaurante está fechado no momento");
         navigate("/");
@@ -181,36 +121,33 @@ const Menu = () => {
 
       setRestaurant(restData);
 
-      // Agora buscar mesa e categorias DO RESTAURANTE ESPECÍFICO
-      const [tableResult, categoriesResult] = await Promise.all([
-        supabase
-          .from("tables")
-          .select("id")
-          .eq("table_number", parseInt(tableNumber))
-          .eq("restaurant_id", restData.id)
-          .limit(1)
-          .maybeSingle(),
-        
-        supabase
-          .from("categories")
-          .select("id, name, display_order, products(id, name, description, price, available, image_url)")
-          .eq("restaurant_id", restData.id)
-          .order("display_order")
-      ]);
+      // Buscar mesa
+      const { data: tableData, error: tableError } = await supabase
+        .from("tables")
+        .select("*")
+        .eq("restaurant_id", restData.id)
+        .eq("table_number", parseInt(tableNumber || "0"))
+        .single();
 
-      // Filtrar categorias com produtos
-      const filteredCategories = (categoriesResult.data || []).filter(
-        (cat: any) => cat.products.some((p: any) => p)
-      );
-      setCategories(filteredCategories);
+      if (tableError) throw tableError;
+      setTableId(tableData.id);
+
+      // Buscar categorias e produtos
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from("categories")
+        .select(`
+          *,
+          products(*)
+        `)
+        .eq("restaurant_id", restData.id)
+        .order("display_order");
+
+      if (categoriesError) throw categoriesError;
+      setCategories(categoriesData || []);
       
-      if (filteredCategories.length > 0 && !selectedCategoryId) {
-        setSelectedCategoryId(filteredCategories[0].id);
-      }
-
-      if (tableResult.error) throw tableResult.error;
-      if (tableResult.data) {
-        setTableId(tableResult.data.id);
+      // Selecionar primeira categoria por padrão
+      if (categoriesData && categoriesData.length > 0) {
+        setSelectedCategoryId(categoriesData[0].id);
       }
     } catch (error: any) {
       toast.error("Erro ao carregar cardápio");
@@ -218,7 +155,7 @@ const Menu = () => {
     } finally {
       setLoading(false);
     }
-  }, [restaurantSlug, tableNumber, navigate, selectedCategoryId]);
+  };
 
   const handleComandaTypeSelect = (type: 'individual' | 'coletiva') => {
     setComandaType(type);
@@ -236,24 +173,24 @@ const Menu = () => {
     toast.success("Bem-vindo! Faça seu pedido");
   };
 
-  const handleProductClick = useCallback(async (product: Product) => {
+  const handleProductClick = async (product: Product) => {
     if (!customerName || !customerCPF) {
       setShowCustomerDialog(true);
       return;
     }
 
-    // Buscar extras do produto apenas quando necessário
+    // Buscar extras do produto
     const { data: extrasData } = await supabase
       .from("product_extras")
-      .select("id, name, price")
+      .select("*")
       .eq("product_id", product.id);
 
     setSelectedProduct(product);
     setProductExtras(extrasData || []);
     setShowProductDialog(true);
-  }, [customerName, customerCPF]);
+  };
 
-  const addToCart = useCallback((product: Product, extras: ProductExtra[], notes?: string) => {
+  const addToCart = (product: Product, extras: ProductExtra[], notes?: string) => {
     setCart((prev) => {
       const existing = prev.find((item) => 
         item.product.id === product.id && 
@@ -280,7 +217,7 @@ const Menu = () => {
     
     const extrasText = extras.length > 0 ? ` com ${extras.length} adicional(is)` : '';
     toast.success(`${product.name}${extrasText} adicionado ao carrinho`);
-  }, []);
+  };
 
   const updateQuantity = (itemId: string, delta: number) => {
     setCart((prev) => {
@@ -299,23 +236,7 @@ const Menu = () => {
       return sum + (item.product.price + extrasTotal) * item.quantity;
     }, 0);
   };
-  // Memoizar produtos da categoria selecionada
-  const selectedCategoryProducts = useMemo(() => {
-    return categories.find(cat => cat.id === selectedCategoryId)?.products || [];
-  }, [categories, selectedCategoryId]);
 
-  // Verificar se precisa mostrar indicador de scroll
-  useEffect(() => {
-    const checkScroll = () => {
-      const container = document.getElementById('categories-scroll');
-      if (container) {
-        setShowScrollIndicator(container.scrollWidth > container.clientWidth);
-      }
-    };
-    checkScroll();
-    window.addEventListener('resize', checkScroll);
-    return () => window.removeEventListener('resize', checkScroll);
-  }, [categories]);
 
   if (loading) {
     return (
@@ -358,75 +279,99 @@ const Menu = () => {
       />
 
       <div 
-        className="min-h-screen bg-background pb-24"
+        className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background pb-24"
+        style={{
+          // @ts-ignore
+          '--primary': `${parseInt(restaurant.primary_color.slice(1,3), 16)} ${parseInt(restaurant.primary_color.slice(3,5), 16)} ${parseInt(restaurant.primary_color.slice(5,7), 16)}`,
+        } as React.CSSProperties}
       >
-        {/* Header + Categorias com fundo da cor primária */}
+        {/* Header */}
         <div 
-          className="text-white shadow-lg pb-3"
+          className="text-white p-6 shadow-lg"
           style={{ backgroundColor: restaurant.primary_color }}
         >
-          {/* Header */}
-          <div className="p-4">
-            <div className="flex justify-center mb-1">
-              {restaurant.logo_url ? (
-                <img 
-                  src={restaurant.logo_url} 
-                  alt="Logo" 
-                  className="h-16 w-auto object-contain"
-                />
-              ) : (
-                <h1 className="text-xl font-bold">{restaurant.name}</h1>
-              )}
-            </div>
-            <p className="text-xs opacity-90 text-center">Mesa {tableNumber}</p>
-            {customerName && (
-              <p className="text-xs opacity-75 text-center">Cliente: {customerName}</p>
+          <div className="flex justify-center mb-2">
+            {restaurant.logo_url ? (
+              <img 
+                src={restaurant.logo_url} 
+                alt="Logo" 
+                className="h-20 w-auto object-contain"
+              />
+            ) : (
+              <h1 className="text-2xl font-bold">{restaurant.name}</h1>
             )}
           </div>
+          <p className="text-sm opacity-90 text-center">Mesa {tableNumber}</p>
+          {customerName && (
+            <p className="text-xs opacity-75 mt-1 text-center">Cliente: {customerName}</p>
+          )}
+        </div>
 
-          {/* Categorias */}
-          <div className="container mx-auto px-4 relative">
-            <div 
-              id="categories-scroll"
-              className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
-            >
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategoryId(category.id)}
-                  className={`
-                    whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium text-white
-                    transition-all duration-200
-                    ${selectedCategoryId === category.id 
-                      ? 'bg-white/25 shadow-md' 
-                      : 'hover:bg-white/10'
-                    }
-                  `}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
-            {showScrollIndicator && (
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                <ChevronRight className="h-4 w-4 text-white/60 animate-pulse" />
-              </div>
-            )}
+        {/* Categorias com scroll horizontal */}
+        <div className="container mx-auto px-4 pt-6">
+          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
+            {categories.map((category) => (
+              <Button
+                key={category.id}
+                variant={selectedCategoryId === category.id ? "default" : "outline"}
+                onClick={() => setSelectedCategoryId(category.id)}
+                className="whitespace-nowrap"
+                style={selectedCategoryId === category.id ? { backgroundColor: restaurant.primary_color, color: 'white' } : {}}
+              >
+                {category.name}
+              </Button>
+            ))}
           </div>
         </div>
 
         {/* Produtos da categoria selecionada */}
-        <div className="container mx-auto px-4 pt-4 pb-6">
-          <div className="space-y-3">
-            {selectedCategoryProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                restaurantColor={restaurant.primary_color}
-                onProductClick={handleProductClick}
-              />
+        <div className="container mx-auto px-4 pb-6">
+          {categories
+            .filter(category => category.id === selectedCategoryId)
+            .map((category) => (
+              <div key={category.id} className="space-y-4">
+                {category.products.map((product) => (
+                  <Card
+                    key={product.id}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => product.available && handleProductClick(product)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {product.image_url && (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-24 h-24 object-cover rounded"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="font-semibold text-lg">{product.name}</p>
+                              {product.description && (
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {product.description}
+                                </p>
+                              )}
+                            </div>
+                            {!product.available && (
+                              <Badge variant="secondary">Indisponível</Badge>
+                            )}
+                          </div>
+                          <p 
+                            className="text-xl font-bold mt-2"
+                            style={{ color: restaurant.primary_color }}
+                          >
+                            R$ {product.price.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             ))}
-          </div>
         </div>
 
         {/* Botão Fixo Ver Comanda com Badge */}

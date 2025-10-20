@@ -5,10 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp, Wallet } from "lucide-react";
+import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
@@ -17,7 +16,6 @@ import BillsTab from "@/components/admin/BillsTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
 import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
-import CashRegisterTab from "@/components/admin/CashRegisterTab";
 
 interface Restaurant {
   id: string;
@@ -28,7 +26,6 @@ interface Restaurant {
 
 const RestaurantAdmin = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading, isRestaurantAdmin, getRestaurantId, signOut } = useAuth();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -36,24 +33,18 @@ const RestaurantAdmin = () => {
   const [hasNewBills, setHasNewBills] = useState(false);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        toast.error("Você precisa estar logado para acessar esta página");
-        navigate("/auth");
-        return;
-      }
-      
-      const restaurantId = getRestaurantId();
-      if (!isRestaurantAdmin || !restaurantId) {
-        toast.error("Acesso não autorizado. Você precisa ser administrador de um restaurante.");
-        navigate("/");
-        return;
-      }
+    const userType = sessionStorage.getItem("userType");
+    const restaurantId = sessionStorage.getItem("restaurantId");
 
-      fetchRestaurant(restaurantId);
-      setupNotifications(restaurantId);
+    if (userType !== "restaurant" || !restaurantId) {
+      // No session in preview: don't redirect, just show inline login card
+      setLoading(false);
+      return;
     }
-  }, [user, authLoading, isRestaurantAdmin, navigate]);
+
+    fetchRestaurant(restaurantId);
+    setupNotifications(restaurantId);
+  }, []);
 
   const setupNotifications = (restaurantId: string) => {
     // Canal para novos pedidos
@@ -144,8 +135,9 @@ const RestaurantAdmin = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
+  const handleLogout = () => {
+    sessionStorage.clear();
+    navigate("/");
     toast.success("Logout realizado com sucesso");
   };
 
@@ -226,7 +218,7 @@ const RestaurantAdmin = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-9 text-xs">
+              <TabsList className="grid w-full grid-cols-8 text-xs">
                 <TabsTrigger value="faturamento">
                   <BarChart3 className="h-4 w-4 mr-1" />
                   Faturamento
@@ -234,10 +226,6 @@ const RestaurantAdmin = () => {
                 <TabsTrigger value="cmv">
                   <TrendingUp className="h-4 w-4 mr-1" />
                   CMV
-                </TabsTrigger>
-                <TabsTrigger value="caixa">
-                  <Wallet className="h-4 w-4 mr-1" />
-                  Caixa
                 </TabsTrigger>
                 <TabsTrigger value="stock">
                   <Warehouse className="h-4 w-4 mr-1" />
@@ -277,10 +265,6 @@ const RestaurantAdmin = () => {
 
               <TabsContent value="cmv">
                 <CMVDashboardTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="caixa">
-                <CashRegisterTab restaurantId={restaurant.id} />
               </TabsContent>
 
               <TabsContent value="stock">

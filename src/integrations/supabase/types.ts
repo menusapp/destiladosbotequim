@@ -14,39 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      app_versions: {
-        Row: {
-          created_at: string | null
-          download_url_linux: string | null
-          download_url_mac: string | null
-          download_url_windows: string | null
-          id: string
-          is_current: boolean | null
-          release_notes: string | null
-          version: string
-        }
-        Insert: {
-          created_at?: string | null
-          download_url_linux?: string | null
-          download_url_mac?: string | null
-          download_url_windows?: string | null
-          id?: string
-          is_current?: boolean | null
-          release_notes?: string | null
-          version: string
-        }
-        Update: {
-          created_at?: string | null
-          download_url_linux?: string | null
-          download_url_mac?: string | null
-          download_url_windows?: string | null
-          id?: string
-          is_current?: boolean | null
-          release_notes?: string | null
-          version?: string
-        }
-        Relationships: []
-      }
       bills: {
         Row: {
           change_amount: number | null
@@ -90,129 +57,6 @@ export type Database = {
             columns: ["table_id"]
             isOneToOne: false
             referencedRelation: "tables"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      cash_movements: {
-        Row: {
-          amount: number
-          bill_id: string | null
-          cash_session_id: string
-          category: string | null
-          created_at: string | null
-          created_by: string
-          description: string
-          id: string
-          movement_type: string
-          payment_method: string | null
-          restaurant_id: string
-        }
-        Insert: {
-          amount: number
-          bill_id?: string | null
-          cash_session_id: string
-          category?: string | null
-          created_at?: string | null
-          created_by: string
-          description: string
-          id?: string
-          movement_type: string
-          payment_method?: string | null
-          restaurant_id: string
-        }
-        Update: {
-          amount?: number
-          bill_id?: string | null
-          cash_session_id?: string
-          category?: string | null
-          created_at?: string | null
-          created_by?: string
-          description?: string
-          id?: string
-          movement_type?: string
-          payment_method?: string | null
-          restaurant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "cash_movements_bill_id_fkey"
-            columns: ["bill_id"]
-            isOneToOne: false
-            referencedRelation: "bills"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cash_movements_cash_session_id_fkey"
-            columns: ["cash_session_id"]
-            isOneToOne: false
-            referencedRelation: "cash_register_sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cash_movements_restaurant_id_fkey"
-            columns: ["restaurant_id"]
-            isOneToOne: false
-            referencedRelation: "restaurants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      cash_register_sessions: {
-        Row: {
-          closed_at: string | null
-          closed_by: string | null
-          closing_balance: number | null
-          created_at: string | null
-          difference: number | null
-          expected_balance: number | null
-          id: string
-          notes: string | null
-          opened_at: string
-          opened_by: string
-          opening_balance: number
-          restaurant_id: string
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          closed_at?: string | null
-          closed_by?: string | null
-          closing_balance?: number | null
-          created_at?: string | null
-          difference?: number | null
-          expected_balance?: number | null
-          id?: string
-          notes?: string | null
-          opened_at?: string
-          opened_by: string
-          opening_balance?: number
-          restaurant_id: string
-          status?: string
-          updated_at?: string | null
-        }
-        Update: {
-          closed_at?: string | null
-          closed_by?: string | null
-          closing_balance?: number | null
-          created_at?: string | null
-          difference?: number | null
-          expected_balance?: number | null
-          id?: string
-          notes?: string | null
-          opened_at?: string
-          opened_by?: string
-          opening_balance?: number
-          restaurant_id?: string
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "cash_register_sessions_restaurant_id_fkey"
-            columns: ["restaurant_id"]
-            isOneToOne: false
-            referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
         ]
@@ -554,33 +398,6 @@ export type Database = {
           },
         ]
       }
-      profiles: {
-        Row: {
-          created_at: string
-          email: string
-          full_name: string | null
-          id: string
-          phone: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          full_name?: string | null
-          id: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          full_name?: string | null
-          id?: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       restaurant_credentials: {
         Row: {
           created_at: string | null
@@ -821,61 +638,18 @@ export type Database = {
           },
         ]
       }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          restaurant_id: string | null
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          restaurant_id?: string | null
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          restaurant_id?: string | null
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_roles_restaurant_id_fkey"
-            columns: ["restaurant_id"]
-            isOneToOne: false
-            referencedRelation: "restaurants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      is_restaurant_admin: {
-        Args: { _restaurant_id: string; _user_id: string }
-        Returns: boolean
-      }
       is_restaurant_closed_by_order_item: {
         Args: { _order_item_id: string }
         Returns: boolean
       }
     }
     Enums: {
-      app_role: "admin" | "ceo" | "restaurant_admin" | "user"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1002,8 +776,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      app_role: ["admin", "ceo", "restaurant_admin", "user"],
-    },
+    Enums: {},
   },
 } as const
