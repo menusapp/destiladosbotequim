@@ -1,10 +1,48 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { CheckCircle2, Download, Menu, QrCode, TrendingUp, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Landing = () => {
   const navigate = useNavigate();
+  const [showLogin, setShowLogin] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const { data, error } = await (supabase as any)
+        .rpc('validate_restaurant_credentials', {
+          p_username: username,
+          p_password: password
+        });
+
+      if (error) throw error;
+
+      if (data && Array.isArray(data) && data.length > 0) {
+        const { restaurant_id, restaurant_name } = data[0];
+        localStorage.setItem('restaurant_id', restaurant_id);
+        localStorage.setItem('restaurant_name', restaurant_name);
+        toast.success(`Bem-vindo ao ${restaurant_name}!`);
+        navigate('/admin');
+      } else {
+        toast.error("Credenciais inválidas");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao fazer login");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const features = [
     {
@@ -43,11 +81,11 @@ const Landing = () => {
             </span>
           </div>
           <div className="flex gap-4">
-            <Button variant="ghost" onClick={() => navigate("/auth")}>
-              Entrar
+            <Button variant="ghost" onClick={() => setShowLogin(!showLogin)}>
+              {showLogin ? "Voltar" : "Entrar"}
             </Button>
-            <Button onClick={() => navigate("/auth?mode=signup")}>
-              Começar Agora
+            <Button onClick={() => navigate("/ceo")}>
+              Área CEO
             </Button>
           </div>
         </div>
@@ -55,27 +93,65 @@ const Landing = () => {
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
-        <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-          Transforme seu Restaurante
-          <br />
-          com Cardápios Digitais
-        </h1>
-        <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-          Sistema completo de gestão de cardápios digitais com QR Code. 
-          Aumente suas vendas e modernize seu atendimento.
-        </p>
-        <div className="flex gap-4 justify-center flex-wrap">
-          <Button size="lg" className="gap-2" onClick={() => navigate("/auth?mode=signup")}>
-            <Download className="h-5 w-5" />
-            Começar Gratuitamente
-          </Button>
-          <Button size="lg" variant="outline" onClick={() => {
-            const featuresSection = document.getElementById('features');
-            featuresSection?.scrollIntoView({ behavior: 'smooth' });
-          }}>
-            Saiba Mais
-          </Button>
-        </div>
+        {showLogin ? (
+          <Card className="max-w-md mx-auto">
+            <CardHeader>
+              <CardTitle className="text-2xl">Login do Restaurante</CardTitle>
+              <CardDescription>Entre com suas credenciais</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">Usuário</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Entrando..." : "Entrar"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+              Transforme seu Restaurante
+              <br />
+              com Cardápios Digitais
+            </h1>
+            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+              Sistema completo de gestão de cardápios digitais com QR Code. 
+              Aumente suas vendas e modernize seu atendimento.
+            </p>
+            <div className="flex gap-4 justify-center flex-wrap">
+              <Button size="lg" className="gap-2" onClick={() => setShowLogin(true)}>
+                <Download className="h-5 w-5" />
+                Fazer Login
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => {
+                const featuresSection = document.getElementById('features');
+                featuresSection?.scrollIntoView({ behavior: 'smooth' });
+              }}>
+                Saiba Mais
+              </Button>
+            </div>
+          </>
+        )}
       </section>
 
       {/* Features Section */}
@@ -187,12 +263,12 @@ const Landing = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-8">
-            <Button size="lg" onClick={() => navigate("/auth?mode=signup")} className="gap-2">
+            <Button size="lg" onClick={() => setShowLogin(true)} className="gap-2">
               <Download className="h-5 w-5" />
-              Criar Conta Grátis
+              Fazer Login
             </Button>
             <p className="text-sm text-muted-foreground mt-4">
-              Sem cartão de crédito necessário. Configure em minutos.
+              Entre com suas credenciais de restaurante
             </p>
           </CardContent>
         </Card>
