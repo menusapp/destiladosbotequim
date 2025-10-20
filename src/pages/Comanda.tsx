@@ -150,7 +150,7 @@ const Comanda = () => {
               console.log("Conta paga! Redirecionando...");
               toast.success("Conta paga! Obrigado pela preferência!");
               
-               // Limpar dados da comanda do sessionStorage
+              // Limpar dados da comanda do sessionStorage
               sessionStorage.removeItem(`customer_name_${tableNumber}`);
               sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
               sessionStorage.removeItem(`comanda_type_${tableNumber}`);
@@ -160,6 +160,29 @@ const Comanda = () => {
                 navigate(`/menu/${restaurantSlug}/${tableNumber}`);
               }, 2000);
             }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'bills',
+            filter: `table_id=eq.${tableData.id}`,
+          },
+          (payload) => {
+            console.log("Bill deletada (conta paga):", payload);
+            toast.success("Conta paga! Obrigado pela preferência!");
+            
+            // Limpar dados da comanda do sessionStorage
+            sessionStorage.removeItem(`customer_name_${tableNumber}`);
+            sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+            sessionStorage.removeItem(`comanda_type_${tableNumber}`);
+            sessionStorage.removeItem(`cart_${tableNumber}`);
+            
+            setTimeout(() => {
+              navigate(`/menu/${restaurantSlug}/${tableNumber}`);
+            }, 1500);
           }
         )
         .subscribe((status) => {
