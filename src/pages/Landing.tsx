@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import menusLogo from "@/assets/menus-logo.png";
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -47,17 +47,12 @@ const Landing = () => {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-lg border-border/50">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-glow">
-            <Menu className="h-8 w-8 text-primary-foreground" />
+          <div className="mx-auto w-32 h-32 flex items-center justify-center">
+            <img src={menusLogo} alt="Menu's" className="w-full h-full object-contain" />
           </div>
-          <div>
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              Menu's
-            </CardTitle>
-            <CardDescription className="text-base mt-2">
-              Sistema de Gestão de Cardápios Digitais
-            </CardDescription>
-          </div>
+          <CardDescription className="text-base">
+            Sistema de Gestão de Cardápios Digitais
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <form onSubmit={handleLogin} className="space-y-4">
