@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Check, CreditCard, Smartphone, Banknote } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { usePaymentFormat } from "@/hooks/usePaymentFormat";
+import { useStatusBadge } from "@/hooks/useStatusBadge";
 
 interface Bill {
   id: string;
@@ -26,30 +27,10 @@ interface Bill {
 const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
+  const { getPaymentIcon, getPaymentLabel } = usePaymentFormat();
+  const { getBillStatusBadge } = useStatusBadge();
 
-  useEffect(() => {
-    fetchBills();
-    
-    // Realtime subscription
-    const channel = supabase
-      .channel('bills-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bills',
-        },
-        () => fetchBills()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [restaurantId]);
-
-  const fetchBills = async () => {
+  const fetchBills = useCallback(async () => {
     setLoading(true);
     
     const { data: billsData, error } = await supabase
@@ -87,7 +68,16 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
     setBills(billsWithCustomerNames);
     setLoading(false);
-  };
+  }, [restaurantId]);
+
+  useEffect(() => {
+    fetchBills();
+  }, [fetchBills]);
+
+  useRealtimeSubscription({
+    table: 'bills',
+    callback: fetchBills,
+  });
 
   const handleMarkAsOnTheWay = async (billId: string) => {
     const { error } = await supabase
@@ -164,31 +154,6 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  const getPaymentIcon = (method: string) => {
-    switch (method) {
-      case "card":
-        return <CreditCard className="h-4 w-4" />;
-      case "pix":
-        return <Smartphone className="h-4 w-4" />;
-      case "cash":
-        return <Banknote className="h-4 w-4" />;
-      default:
-        return null;
-    }
-  };
-
-  const getPaymentLabel = (method: string) => {
-    switch (method) {
-      case "card":
-        return "Cartão";
-      case "pix":
-        return "PIX";
-      case "cash":
-        return "Dinheiro";
-      default:
-        return method;
-    }
-  };
 
   if (loading) {
     return (
@@ -220,24 +185,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
                       {bill.orders[0]?.customer_name || "Cliente"}
                     </p>
                   </div>
-                  <Badge variant={bill.status === "paid" ? "default" : bill.status === "on_the_way" ? "outline" : "secondary"}>
-                    {bill.status === "paid" ? (
-                      <>
-                        <Check className="h-3 w-3 mr-1" />
-                        Paga
-                      </>
-                    ) : bill.status === "on_the_way" ? (
-                      <>
-                        <Clock className="h-3 w-3 mr-1" />
-                        A Caminho
-                      </>
-                    ) : (
-                      <>
-                        <Clock className="h-3 w-3 mr-1" />
-                        Pendente
-                      </>
-                    )}
-                  </Badge>
+                  {getBillStatusBadge(bill.status)}
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -259,7 +207,10 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
                 </div>
 
                 <div className="flex items-center gap-2 text-sm">
-                  {getPaymentIcon(bill.payment_method)}
+                  {(() => {
+                    const Icon = getPaymentIcon(bill.payment_method);
+                    return Icon ? <Icon className="h-4 w-4" /> : null;
+                  })()}
                   <span>{getPaymentLabel(bill.payment_method)}</span>
                   {bill.payment_method === "cash" && bill.change_amount && (
                     <span className="text-muted-foreground">

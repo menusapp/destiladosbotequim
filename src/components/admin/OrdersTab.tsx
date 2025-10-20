@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Clock, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { useStatusBadge } from "@/hooks/useStatusBadge";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -34,30 +34,9 @@ interface Order {
 
 const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const { getOrderStatusBadge } = useStatusBadge();
 
-  useEffect(() => {
-    fetchOrders();
-    
-    // Realtime subscription
-    const channel = supabase
-      .channel('orders-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-        },
-        () => fetchOrders()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [restaurantId]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     const { data, error } = await supabase
       .from("orders")
       .select(`
@@ -83,7 +62,16 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     }
 
     setOrders(data || []);
-  };
+  }, [restaurantId]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  useRealtimeSubscription({
+    table: 'orders',
+    callback: fetchOrders,
+  });
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     // Se está aceitando o pedido, dar baixa no estoque
@@ -166,22 +154,6 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { label: "Pendente", variant: "secondary" as const, icon: Clock },
-      accepted: { label: "Aceito", variant: "default" as const, icon: Check },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon className="h-3 w-3" />
-        {config.label}
-      </Badge>
-    );
-  };
 
   return (
     <div className="space-y-4">
@@ -205,7 +177,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                     Cliente: {order.customer_name}
                   </p>
                 </div>
-                {getStatusBadge(order.status)}
+                {getOrderStatusBadge(order.status)}
               </div>
 
               <div className="space-y-1">

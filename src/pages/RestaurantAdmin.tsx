@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp } from "lucide-react";
+import { Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { RestaurantHeader } from "@/components/admin/RestaurantHeader";
+import { NotificationBadge } from "@/components/admin/NotificationBadge";
 import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
@@ -37,75 +37,57 @@ const RestaurantAdmin = () => {
     const restaurantId = sessionStorage.getItem("restaurantId");
 
     if (userType !== "restaurant" || !restaurantId) {
-      // No session in preview: don't redirect, just show inline login card
       setLoading(false);
       return;
     }
 
     fetchRestaurant(restaurantId);
-    setupNotifications(restaurantId);
-  }, []);
+    const cleanup = setupNotifications(restaurantId);
+    return cleanup;
+  }, [activeTab]);
 
-  const setupNotifications = (restaurantId: string) => {
-    // Canal para novos pedidos
+  const setupNotifications = useCallback((restaurantId: string) => {
+    const handleOrderInsert = async (payload: any) => {
+      const { data } = await supabase
+        .from('tables')
+        .select('restaurant_id')
+        .eq('id', payload.new.table_id)
+        .single();
+      
+      if (data?.restaurant_id === restaurantId && activeTab !== 'orders') {
+        setHasNewOrders(true);
+        toast.info("Novo pedido recebido!");
+      }
+    };
+
+    const handleBillInsert = async (payload: any) => {
+      const { data } = await supabase
+        .from('tables')
+        .select('restaurant_id')
+        .eq('id', payload.new.table_id)
+        .single();
+      
+      if (data?.restaurant_id === restaurantId && activeTab !== 'bills') {
+        setHasNewBills(true);
+        toast.info("Nova conta solicitada!");
+      }
+    };
+
     const ordersChannel = supabase
       .channel('new-orders-notification')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'orders',
-        },
-        (payload) => {
-          // Verificar se o pedido é do restaurante atual através da mesa
-          supabase
-            .from('tables')
-            .select('restaurant_id')
-            .eq('id', (payload.new as any).table_id)
-            .single()
-            .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId && activeTab !== 'orders') {
-                setHasNewOrders(true);
-                toast.info("Novo pedido recebido!");
-              }
-            });
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, handleOrderInsert)
       .subscribe();
 
-    // Canal para novas contas
     const billsChannel = supabase
       .channel('new-bills-notification')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'bills',
-        },
-        (payload) => {
-          // Verificar se a conta é do restaurante atual através da mesa
-          supabase
-            .from('tables')
-            .select('restaurant_id')
-            .eq('id', (payload.new as any).table_id)
-            .single()
-            .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId && activeTab !== 'bills') {
-                setHasNewBills(true);
-                toast.info("Nova conta solicitada!");
-              }
-            });
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bills' }, handleBillInsert)
       .subscribe();
 
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(billsChannel);
     };
-  };
+  }, [activeTab]);
 
   useEffect(() => {
     // Limpar notificações quando mudar de aba
@@ -185,31 +167,12 @@ const RestaurantAdmin = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
       <div className="container mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              {restaurant.name}
-            </h1>
-            <p className="text-muted-foreground mt-1">Painel Administrativo</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="restaurant-status"
-                checked={restaurant.is_open}
-                onCheckedChange={handleToggleRestaurant}
-              />
-              <Label htmlFor="restaurant-status" className="cursor-pointer">
-                {restaurant.is_open ? "Aberto" : "Fechado"}
-              </Label>
-            </div>
-            <Button onClick={handleLogout} variant="outline">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
-            </Button>
-          </div>
-        </div>
+        <RestaurantHeader
+          restaurantName={restaurant.name}
+          isOpen={restaurant.is_open}
+          onToggleOpen={handleToggleRestaurant}
+          onLogout={handleLogout}
+        />
 
         {/* Tabs */}
         <Card>
@@ -242,16 +205,12 @@ const RestaurantAdmin = () => {
                 <TabsTrigger value="orders" className="relative">
                   <ShoppingCart className="h-4 w-4 mr-1" />
                   Pedidos
-                  {hasNewOrders && (
-                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
-                  )}
+                  <NotificationBadge show={hasNewOrders} />
                 </TabsTrigger>
                 <TabsTrigger value="bills" className="relative">
                   <Receipt className="h-4 w-4 mr-1" />
                   Contas
-                  {hasNewBills && (
-                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
-                  )}
+                  <NotificationBadge show={hasNewBills} />
                 </TabsTrigger>
                 <TabsTrigger value="settings">
                   <Settings className="h-4 w-4 mr-1" />
