@@ -355,6 +355,11 @@ const Comanda = () => {
     };
   }, [orders, cart, serviceFeeEnabled, serviceFeePercentage]);
 
+  // Verificar se há pedidos pendentes (aguardando aceitação)
+  const hasPendingOrders = useMemo(() => {
+    return orders.some(order => order.status === "pending");
+  }, [orders]);
+
   const handleSendOrder = async () => {
     if (cart.length === 0) {
       toast.error("Carrinho vazio");
@@ -505,7 +510,7 @@ const Comanda = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Status: Conta a caminho, Timer de preparo ou Conta solicitada */}
+        {/* Status: Conta a caminho, Timer de preparo, Aguardando aceitação ou Conta solicitada */}
         {billOnTheWay && orders.length > 0 ? (
           <Card className="border" style={{ borderColor: restaurantColor }}>
             <CardContent className="pt-6">
@@ -536,6 +541,22 @@ const Comanda = () => {
                   </p>
                   <p className="text-xs text-amber-700 mt-1">
                     {prepTimerSeconds > 0 ? "Tempo estimado restante" : "Seu pedido deve estar pronto"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : hasPendingOrders && !billRequested ? (
+          <Card className="border-blue-500 bg-blue-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center gap-3">
+                <Clock className="h-5 w-5 text-blue-600" />
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-blue-800">
+                    ⏳ Pedido realizado!
+                  </p>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Aguardando aceitação da cozinha
                   </p>
                 </div>
               </div>
@@ -656,14 +677,14 @@ const Comanda = () => {
                     </div>
                     {customerOrders.map((order) => (
                       <div key={order.id} className="ml-4 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            {order.status === "pending" && "Pendente"}
-                            {order.status === "accepted" && "👨‍🍳 Preparando"}
-                            {order.status === "preparing" && "Preparando"}
-                            {order.status === "ready" && "Pronto"}
-                            {order.status === "delivered" && "Entregue"}
-                          </Badge>
+                         <div className="flex items-center gap-2">
+                           <Badge variant="outline" className={order.status === "pending" ? "border-blue-500 text-blue-700" : ""}>
+                             {order.status === "pending" && "⏳ Aguardando"}
+                             {order.status === "accepted" && "👨‍🍳 Preparando"}
+                             {order.status === "preparing" && "Preparando"}
+                             {order.status === "ready" && "Pronto"}
+                             {order.status === "delivered" && "Entregue"}
+                           </Badge>
                           <span className="text-xs text-muted-foreground">
                             {new Date(order.created_at).toLocaleTimeString()}
                           </span>
@@ -709,14 +730,14 @@ const Comanda = () => {
               <div className="space-y-4">
                 {orders.map((order) => (
                   <div key={order.id} className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">
-                        {order.status === "pending" && "Pendente"}
-                        {order.status === "accepted" && "👨‍🍳 Preparando"}
-                        {order.status === "preparing" && "Preparando"}
-                        {order.status === "ready" && "Pronto"}
-                        {order.status === "delivered" && "Entregue"}
-                      </Badge>
+                     <div className="flex items-center gap-2">
+                       <Badge variant="outline" className={order.status === "pending" ? "border-blue-500 text-blue-700" : ""}>
+                         {order.status === "pending" && "⏳ Aguardando"}
+                         {order.status === "accepted" && "👨‍🍳 Preparando"}
+                         {order.status === "preparing" && "Preparando"}
+                         {order.status === "ready" && "Pronto"}
+                         {order.status === "delivered" && "Entregue"}
+                       </Badge>
                       <span className="text-xs text-muted-foreground">
                         {new Date(order.created_at).toLocaleTimeString()}
                       </span>
