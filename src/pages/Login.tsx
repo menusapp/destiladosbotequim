@@ -41,40 +41,34 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // Buscar credenciais do restaurante
-      const { data: credentials, error } = await supabase
-        .from("restaurant_credentials")
-        .select("*, restaurants(*)")
-        .eq("username", username)
-        .maybeSingle();
+      // Validar credenciais via função segura no backend (bypassa RLS com segurança)
+      const { data, error } = await supabase.rpc('validate_restaurant_credentials', {
+        p_username: username,
+        p_password: password,
+      });
 
       if (error) {
-        console.error("Erro ao buscar credenciais:", error);
-        toast.error("Erro ao fazer login");
+        console.error('Erro ao validar credenciais:', error);
+        toast.error('Erro ao fazer login');
         setLoading(false);
         return;
       }
 
-      if (!credentials) {
-        toast.error("Credenciais inválidas!");
+      if (!data || data.length === 0) {
+        toast.error('Credenciais inválidas!');
         setLoading(false);
         return;
       }
 
-      // Em produção, você deveria usar bcrypt para comparar senhas
-      // Por agora, vamos fazer comparação simples
-      if (credentials.password_hash === password) {
-        sessionStorage.setItem("userType", "restaurant");
-        sessionStorage.setItem("restaurantId", credentials.restaurant_id);
-        sessionStorage.setItem("username", username);
-        toast.success(`Bem-vindo ao ${credentials.restaurants.name}!`);
-        navigate("/admin");
-      } else {
-        toast.error("Senha incorreta!");
-      }
+      const cred = data[0];
+      sessionStorage.setItem('userType', 'restaurant');
+      sessionStorage.setItem('restaurantId', cred.restaurant_id);
+      sessionStorage.setItem('username', username);
+      toast.success(`Bem-vindo ao ${cred.restaurant_name}!`);
+      navigate('/admin');
     } catch (error) {
-      console.error("Erro ao fazer login:", error);
-      toast.error("Erro ao fazer login");
+      console.error('Erro ao fazer login:', error);
+      toast.error('Erro ao fazer login');
     } finally {
       setLoading(false);
     }
