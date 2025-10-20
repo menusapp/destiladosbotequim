@@ -335,50 +335,68 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       return sum + sessionMovements.reduce((total, m) => total + m.amount, 0);
     }, 0);
 
-    // Calcular CMV (Custo de Mercadorias Vendidas) baseado nos ingredientes dos produtos vendidos
+    // Calcular CMV (Custo de Mercadorias Vendidas) baseado nos ingredientes dos produtos que entraram no caixa
     let cmv = 0;
     try {
-      // Buscar todos os pedidos aceitos no período
-      const { data: orders, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
-          id,
-          created_at,
-          table_id,
-          order_items (
-            id,
-            quantity,
-            product_id,
-            products (
+      // Buscar as sessões de caixa do período filtrado
+      const sessionIds = filtered.map(s => s.id);
+      
+      if (sessionIds.length > 0) {
+        // Buscar todos os movimentos de entrada (pedidos) das sessões filtradas
+        const cashMovementsInPeriod = allMovements.filter(m => 
+          sessionIds.includes(m.cash_session_id) && 
+          m.movement_type === "entrada" &&
+          m.category === "Pedido"
+        );
+
+        // Extrair os IDs dos pedidos das descrições (formato: "Pedido #uuid - Nome")
+        const orderIds: string[] = [];
+        cashMovementsInPeriod.forEach(movement => {
+          const match = movement.description.match(/Pedido #([a-f0-9-]+)/);
+          if (match && match[1]) {
+            orderIds.push(match[1]);
+          }
+        });
+
+        if (orderIds.length > 0) {
+          // Buscar os itens dos pedidos que entraram no caixa
+          const { data: orders, error: ordersError } = await supabase
+            .from("orders")
+            .select(`
               id,
-              product_ingredients (
+              order_items (
+                id,
                 quantity,
-                stock_items (
-                  price_per_unit
+                products (
+                  id,
+                  product_ingredients (
+                    quantity,
+                    stock_items (
+                      price_per_unit
+                    )
+                  )
                 )
               )
-            )
-          )
-        `)
-        .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString())
-        .eq("status", "accepted");
+            `)
+            .in("id", orderIds);
 
-      if (ordersError) throw ordersError;
+          if (ordersError) throw ordersError;
 
-      // Calcular o custo total dos ingredientes
-      orders?.forEach(order => {
-        order.order_items?.forEach((item: any) => {
-          const itemQuantity = item.quantity;
-          const ingredients = item.products?.product_ingredients || [];
-          
-          ingredients.forEach((ingredient: any) => {
-            const ingredientQty = ingredient.quantity;
-            const pricePerUnit = ingredient.stock_items?.price_per_unit || 0;
-            cmv += ingredientQty * pricePerUnit * itemQuantity;
+          // Calcular o custo total dos ingredientes dos produtos vendidos
+          orders?.forEach(order => {
+            order.order_items?.forEach((item: any) => {
+              const itemQuantity = item.quantity;
+              const ingredients = item.products?.product_ingredients || [];
+              
+              ingredients.forEach((ingredient: any) => {
+                const ingredientQty = ingredient.quantity;
+                const pricePerUnit = ingredient.stock_items?.price_per_unit || 0;
+                cmv += ingredientQty * pricePerUnit * itemQuantity;
+              });
+            });
           });
-        });
-      });
+        }
+      }
     } catch (error) {
       console.error("Erro ao calcular CMV:", error);
     }
