@@ -311,11 +311,16 @@ const Comanda = () => {
         setHasAcceptedOrder(hasAccepted);
       }
 
-      if (billResult.data) {
+      // Só mostrar status de bill se houver pedidos
+      if (billResult.data && ordersResult.data && ordersResult.data.length > 0) {
         setBillRequested(true);
         if (billResult.data.status === "on_the_way") {
           setBillOnTheWay(true);
         }
+      } else {
+        // Limpar estados se não houver pedidos
+        setBillRequested(false);
+        setBillOnTheWay(false);
       }
     } catch (error: any) {
       toast.error("Erro ao carregar comanda");
@@ -501,7 +506,7 @@ const Comanda = () => {
 
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Status: Conta a caminho, Timer de preparo ou Conta solicitada */}
-        {billOnTheWay ? (
+        {billOnTheWay && orders.length > 0 ? (
           <Card className="border" style={{ borderColor: restaurantColor }}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
@@ -536,7 +541,7 @@ const Comanda = () => {
               </div>
             </CardContent>
           </Card>
-        ) : billRequested && !billOnTheWay ? (
+        ) : billRequested && !billOnTheWay && orders.length > 0 ? (
           <Card className="border" style={{ borderColor: restaurantColor }}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-center gap-3">
