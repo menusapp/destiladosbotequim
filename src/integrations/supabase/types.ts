@@ -796,6 +796,9 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_occupied: boolean | null
+          occupied_at: string | null
+          occupied_by: string | null
           qr_code: string | null
           restaurant_id: string
           table_number: number
@@ -803,6 +806,9 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          is_occupied?: boolean | null
+          occupied_at?: string | null
+          occupied_by?: string | null
           qr_code?: string | null
           restaurant_id: string
           table_number: number
@@ -810,6 +816,9 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          is_occupied?: boolean | null
+          occupied_at?: string | null
+          occupied_by?: string | null
           qr_code?: string | null
           restaurant_id?: string
           table_number?: number

@@ -2,9 +2,12 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, QrCode, Copy, ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, QrCode, Copy, ExternalLink, User, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +21,9 @@ interface Table {
   id: string;
   table_number: number;
   qr_code: string | null;
+  is_occupied: boolean;
+  occupied_at: string | null;
+  occupied_by: string | null;
 }
 
 const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
@@ -29,6 +35,27 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   useEffect(() => {
     fetchRestaurantSlug();
     fetchTables();
+
+    // Realtime subscription para atualizar mesas em tempo real
+    const channel = supabase
+      .channel('tables-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tables',
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        () => {
+          fetchTables();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [restaurantId]);
 
   const fetchRestaurantSlug = async () => {
@@ -112,6 +139,34 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
   return (
     <div className="space-y-4">
+      {/* Resumo de Ocupação */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="p-4 border rounded-lg bg-card">
+          <p className="text-sm text-muted-foreground mb-1">Total de Mesas</p>
+          <p className="text-3xl font-bold">{tables.length}</p>
+        </div>
+        <div className="p-4 border-2 border-green-300 rounded-lg bg-green-50 dark:bg-green-950/20">
+          <p className="text-sm text-muted-foreground mb-1">Mesas Livres</p>
+          <p className="text-3xl font-bold text-green-600">
+            {tables.filter(t => !t.is_occupied).length}
+          </p>
+        </div>
+        <div className="p-4 border-2 border-red-300 rounded-lg bg-red-50 dark:bg-red-950/20">
+          <p className="text-sm text-muted-foreground mb-1">Mesas Ocupadas</p>
+          <p className="text-3xl font-bold text-red-600">
+            {tables.filter(t => t.is_occupied).length}
+          </p>
+        </div>
+        <div className="p-4 border rounded-lg bg-card">
+          <p className="text-sm text-muted-foreground mb-1">Taxa de Ocupação</p>
+          <p className="text-3xl font-bold">
+            {tables.length > 0 
+              ? Math.round((tables.filter(t => t.is_occupied).length / tables.length) * 100)
+              : 0}%
+          </p>
+        </div>
+      </div>
+
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Mesas do Restaurante</h3>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -158,20 +213,47 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
           {tables.map((table) => (
             <div
               key={table.id}
-              className="p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
+              className={`p-4 border-2 rounded-lg transition-all ${
+                table.is_occupied
+                  ? "bg-red-50 border-red-300 dark:bg-red-950/20 dark:border-red-800"
+                  : "bg-green-50 border-green-300 dark:bg-green-950/20 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-950/30"
+              }`}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <QrCode className="h-8 w-8 text-primary" />
+                  <QrCode className={`h-8 w-8 ${table.is_occupied ? "text-red-600" : "text-green-600"}`} />
                   <div>
-                    <p className="font-bold text-lg">Mesa {table.table_number}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-lg">Mesa {table.table_number}</p>
+                      <Badge variant={table.is_occupied ? "destructive" : "default"}>
+                        {table.is_occupied ? "Ocupada" : "Livre"}
+                      </Badge>
+                    </div>
                     <p className="text-xs text-muted-foreground">Link do Cardápio Digital</p>
+                    {table.is_occupied && table.occupied_by && (
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center gap-1 text-xs text-red-700 dark:text-red-400">
+                          <User className="h-3 w-3" />
+                          <span className="font-medium">{table.occupied_by}</span>
+                        </div>
+                        {table.occupied_at && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>
+                              Desde {format(new Date(table.occupied_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <Button
                   variant="destructive"
                   size="sm"
                   onClick={() => handleDelete(table.id)}
+                  disabled={table.is_occupied}
+                  title={table.is_occupied ? "Não é possível excluir mesa ocupada" : "Excluir mesa"}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
