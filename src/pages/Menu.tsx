@@ -7,7 +7,6 @@ import { Receipt, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
-import ComandaTypeDialog from "@/components/menu/ComandaTypeDialog";
 import ProductDetailDialog from "@/components/menu/ProductDetailDialog";
 
 interface Product {
@@ -116,9 +115,7 @@ const Menu = () => {
   const [customerName, setCustomerName] = useState("");
   const [customerCPF, setCustomerCPF] = useState("");
   const [tableId, setTableId] = useState<string | null>(null);
-  const [showComandaTypeDialog, setShowComandaTypeDialog] = useState(false);
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
-  const [comandaType, setComandaType] = useState<'individual' | 'coletiva' | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
@@ -129,9 +126,8 @@ const Menu = () => {
     // Verificar se já tem info do cliente no sessionStorage
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
     const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
-    const savedType = sessionStorage.getItem(`comanda_type_${tableNumber}`) as 'individual' | 'coletiva' | null;
     
-    if (savedName && savedCPF && savedType) {
+    if (savedName && savedCPF) {
       // Se tem informações do cliente, carregar o carrinho
       const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
       if (savedCart) {
@@ -139,14 +135,12 @@ const Menu = () => {
       }
       setCustomerName(savedName);
       setCustomerCPF(savedCPF);
-      setComandaType(savedType);
       fetchData();
     } else {
-      // Se não tem informações do cliente, limpar tudo
+      // Se não tem informações do cliente, limpar tudo e mostrar diálogo
       sessionStorage.removeItem(`cart_${tableNumber}`);
-      sessionStorage.removeItem(`comanda_type_${tableNumber}`);
       setCart([]);
-      setShowComandaTypeDialog(true);
+      setShowCustomerDialog(true);
       fetchData();
     }
   }, [restaurantSlug, tableNumber]);
@@ -336,13 +330,6 @@ const Menu = () => {
     }
   }, [restaurantSlug, tableNumber, navigate, selectedCategoryId]);
 
-  const handleComandaTypeSelect = (type: 'individual' | 'coletiva') => {
-    setComandaType(type);
-    sessionStorage.setItem(`comanda_type_${tableNumber}`, type);
-    setShowComandaTypeDialog(false);
-    setShowCustomerDialog(true);
-  };
-
   const handleCustomerInfoSubmit = (name: string, cpf: string) => {
     setCustomerName(name);
     setCustomerCPF(cpf);
@@ -451,17 +438,10 @@ const Menu = () => {
 
   return (
     <>
-      <ComandaTypeDialog
-        open={showComandaTypeDialog}
-        onSelect={handleComandaTypeSelect}
-        restaurantColor={restaurant.primary_color}
-      />
-
       <CustomerInfoDialog
         open={showCustomerDialog}
         onSubmit={handleCustomerInfoSubmit}
         restaurantColor={restaurant.primary_color}
-        isColetiva={comandaType === 'coletiva'}
       />
 
       <ProductDetailDialog
