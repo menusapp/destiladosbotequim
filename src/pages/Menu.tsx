@@ -272,19 +272,56 @@ const Menu = () => {
         
         supabase
           .from("categories")
-          .select("id, name, display_order, products(id, name, description, price, available, image_url)")
+          .select("id, name, display_order")
           .eq("restaurant_id", restData.id)
           .order("display_order")
       ]);
 
-      // Filtrar categorias com produtos
-      const filteredCategories = (categoriesResult.data || []).filter(
-        (cat: any) => cat.products.some((p: any) => p)
-      );
-      setCategories(filteredCategories);
-      
-      if (filteredCategories.length > 0 && !selectedCategoryId) {
-        setSelectedCategoryId(filteredCategories[0].id);
+      // Buscar produtos e verificar disponibilidade por estoque
+      if (categoriesResult.data) {
+        const categoriesWithProducts = await Promise.all(
+          categoriesResult.data.map(async (category: any) => {
+            const { data: products } = await supabase
+              .from("products")
+              .select("id, name, description, price, available, image_url")
+              .eq("category_id", category.id);
+
+            if (!products) return { ...category, products: [] };
+
+            // Verificar disponibilidade baseada no estoque para cada produto
+            const productsWithAvailability = await Promise.all(
+              products.map(async (product: any) => {
+                // Verificar se tem ingredientes zerados
+                const { data: outOfStock } = await supabase
+                  .from("product_ingredients")
+                  .select("stock_items!inner(current_quantity)")
+                  .eq("product_id", product.id)
+                  .lte("stock_items.current_quantity", 0)
+                  .limit(1);
+
+                // Se tem ingredientes zerados, marcar como indisponível
+                const stockAvailable = !outOfStock || outOfStock.length === 0;
+                
+                return {
+                  ...product,
+                  available: product.available && stockAvailable
+                };
+              })
+            );
+
+            return { ...category, products: productsWithAvailability };
+          })
+        );
+
+        // Filtrar categorias com produtos
+        const filteredCategories = categoriesWithProducts.filter(
+          (cat: any) => cat.products.some((p: any) => p)
+        );
+        setCategories(filteredCategories);
+        
+        if (filteredCategories.length > 0 && !selectedCategoryId) {
+          setSelectedCategoryId(filteredCategories[0].id);
+        }
       }
 
       if (tableResult.error) throw tableResult.error;

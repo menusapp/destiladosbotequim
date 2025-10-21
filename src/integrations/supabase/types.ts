@@ -905,6 +905,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      check_product_availability: {
+        Args: { p_product_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
