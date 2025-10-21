@@ -73,6 +73,8 @@ interface ExtraCategoryItem {
   category_id: string;
   name: string;
   price: number;
+  ingredients?: ProductIngredient[];
+  cost?: number;
 }
 
 const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string; isRestaurantOpen: boolean }) => {
@@ -110,6 +112,10 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [categoryItems, setCategoryItems] = useState<ExtraCategoryItem[]>([]);
   const [categoryItemName, setCategoryItemName] = useState("");
   const [categoryItemPrice, setCategoryItemPrice] = useState("");
+  const [categoryItemIngredients, setCategoryItemIngredients] = useState<ProductIngredient[]>([]);
+  const [selectedCategoryItemStockItem, setSelectedCategoryItemStockItem] = useState("");
+  const [categoryItemIngredientQuantity, setCategoryItemIngredientQuantity] = useState("");
+  const [editingCategoryItemIndex, setEditingCategoryItemIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -298,18 +304,80 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       return;
     }
     
-    setCategoryItems([...categoryItems, {
-      id: crypto.randomUUID(),
-      category_id: "",
-      name: categoryItemName,
-      price: parseFloat(categoryItemPrice)
-    }]);
+    if (categoryItemIngredients.length === 0) {
+      toast.error("Adicione pelo menos 1 insumo ao adicional");
+      return;
+    }
+    
+    const itemCost = categoryItemIngredients.reduce((sum, ing) => {
+      return sum + (ing.quantity * (ing.stock_item_price || 0));
+    }, 0);
+    
+    if (editingCategoryItemIndex !== null) {
+      const updatedItems = [...categoryItems];
+      updatedItems[editingCategoryItemIndex] = {
+        id: updatedItems[editingCategoryItemIndex].id,
+        category_id: "",
+        name: categoryItemName,
+        price: parseFloat(categoryItemPrice),
+        ingredients: [...categoryItemIngredients],
+        cost: itemCost
+      };
+      setCategoryItems(updatedItems);
+      setEditingCategoryItemIndex(null);
+    } else {
+      setCategoryItems([...categoryItems, {
+        id: crypto.randomUUID(),
+        category_id: "",
+        name: categoryItemName,
+        price: parseFloat(categoryItemPrice),
+        ingredients: [...categoryItemIngredients],
+        cost: itemCost
+      }]);
+    }
+    
     setCategoryItemName("");
     setCategoryItemPrice("");
+    setCategoryItemIngredients([]);
+  };
+
+  const handleEditCategoryItem = (index: number) => {
+    const item = categoryItems[index];
+    setCategoryItemName(item.name);
+    setCategoryItemPrice(item.price.toString());
+    setCategoryItemIngredients(item.ingredients || []);
+    setEditingCategoryItemIndex(index);
   };
 
   const handleRemoveCategoryItem = (id: string) => {
     setCategoryItems(categoryItems.filter(i => i.id !== id));
+    if (editingCategoryItemIndex !== null) {
+      setEditingCategoryItemIndex(null);
+      setCategoryItemName("");
+      setCategoryItemPrice("");
+      setCategoryItemIngredients([]);
+    }
+  };
+
+  const handleAddCategoryItemIngredient = () => {
+    if (!selectedCategoryItemStockItem || !categoryItemIngredientQuantity) return;
+    const stockItem = stockItems.find(s => s.id === selectedCategoryItemStockItem);
+    if (!stockItem) return;
+    
+    setCategoryItemIngredients([...categoryItemIngredients, {
+      id: crypto.randomUUID(),
+      stock_item_id: selectedCategoryItemStockItem,
+      quantity: parseFloat(categoryItemIngredientQuantity),
+      stock_item_name: stockItem.name,
+      stock_item_unit: stockItem.unit,
+      stock_item_price: stockItem.price_per_unit
+    }]);
+    setSelectedCategoryItemStockItem("");
+    setCategoryItemIngredientQuantity("");
+  };
+
+  const handleRemoveCategoryItemIngredient = (id: string) => {
+    setCategoryItemIngredients(categoryItemIngredients.filter(i => i.id !== id));
   };
 
   const handleSaveExtraCategory = async (e: React.FormEvent) => {
@@ -339,18 +407,36 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       price: item.price
     }));
 
-    const { error: itemsError } = await supabase
+    const { data: insertedItems, error: itemsError } = await supabase
       .from("extra_category_items")
-      .insert(itemsData);
+      .insert(itemsData)
+      .select();
 
     if (itemsError) {
       toast.error("Erro ao adicionar itens da categoria");
       return;
     }
 
+    // Inserir ingredientes dos itens
+    if (insertedItems) {
+      for (let i = 0; i < insertedItems.length; i++) {
+        const item = categoryItems[i];
+        if (item.ingredients && item.ingredients.length > 0) {
+          const ingredientsData = item.ingredients.map(ing => ({
+            category_item_id: insertedItems[i].id,
+            stock_item_id: ing.stock_item_id,
+            quantity: ing.quantity
+          }));
+          await supabase.from("extra_category_item_ingredients").insert(ingredientsData);
+        }
+      }
+    }
+
     toast.success("Categoria de adicionais criada!");
     setCategoryName("");
     setCategoryItems([]);
+    setCategoryItemIngredients([]);
+    setEditingCategoryItemIndex(null);
     setExtraCategoryDialogOpen(false);
     fetchExtraCategories();
   };
@@ -358,7 +444,7 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const handleLoadExtrasFromCategory = async (categoryId: string) => {
     const { data, error } = await supabase
       .from("extra_category_items")
-      .select("*")
+      .select("*, extra_category_item_ingredients(*, stock_items(name, unit, price_per_unit))")
       .eq("category_id", categoryId);
 
     if (error) {
@@ -367,11 +453,28 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     }
 
     // Adicionar os itens da categoria aos extras do produto
-    const newExtras = data.map(item => ({
-      id: crypto.randomUUID(),
-      name: item.name,
-      price: item.price
-    }));
+    const newExtras = data.map(item => {
+      const ingredients = item.extra_category_item_ingredients?.map((ing: any) => ({
+        id: crypto.randomUUID(),
+        stock_item_id: ing.stock_item_id,
+        quantity: ing.quantity,
+        stock_item_name: ing.stock_items?.name,
+        stock_item_unit: ing.stock_items?.unit,
+        stock_item_price: ing.stock_items?.price_per_unit
+      })) || [];
+      
+      const cost = ingredients.reduce((sum: number, ing: any) => {
+        return sum + (ing.quantity * (ing.stock_item_price || 0));
+      }, 0);
+      
+      return {
+        id: crypto.randomUUID(),
+        name: item.name,
+        price: item.price,
+        ingredients,
+        cost
+      };
+    });
 
     setExtras([...extras, ...newExtras]);
     toast.success("Adicionais adicionados!");
@@ -707,42 +810,138 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
 
                 <div className="space-y-3 p-4 border rounded-lg bg-secondary/20">
                   <h4 className="font-semibold text-sm">Itens da Categoria</h4>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <Input
-                        placeholder="Nome do adicional"
-                        value={categoryItemName}
-                        onChange={(e) => setCategoryItemName(e.target.value)}
-                      />
+                  <p className="text-xs text-muted-foreground">Cada adicional deve ter pelo menos 1 insumo configurado</p>
+                  
+                  <div className="space-y-3 p-3 border rounded bg-primary/5">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-medium text-sm">{editingCategoryItemIndex !== null ? 'Editar Adicional' : 'Novo Adicional'}</h5>
+                      {categoryItemIngredients.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Custo: <span className="font-semibold text-foreground">R$ {categoryItemIngredients.reduce((sum, ing) => sum + (ing.quantity * (ing.stock_item_price || 0)), 0).toFixed(2)}</span>
+                        </p>
+                      )}
                     </div>
-                    <div className="w-32">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Preço"
-                        value={categoryItemPrice}
-                        onChange={(e) => setCategoryItemPrice(e.target.value)}
-                      />
+
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Input
+                          placeholder="Nome do adicional"
+                          value={categoryItemName}
+                          onChange={(e) => setCategoryItemName(e.target.value)}
+                        />
+                      </div>
+                      <div className="w-32">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Preço"
+                          value={categoryItemPrice}
+                          onChange={(e) => setCategoryItemPrice(e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={handleAddCategoryItem}>
-                      <Plus className="h-4 w-4" />
+
+                    <div className="space-y-2">
+                      <Label className="text-xs">Insumos do Adicional *</Label>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Select value={selectedCategoryItemStockItem} onValueChange={setSelectedCategoryItemStockItem}>
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Selecione um insumo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {stockItems.map((item) => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.name} ({item.unit}) - R$ {item.price_per_unit.toFixed(2)}/{item.unit}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Input
+                          className="w-24 h-9"
+                          type="number"
+                          step="0.001"
+                          placeholder="Qtd"
+                          value={categoryItemIngredientQuantity}
+                          onChange={(e) => setCategoryItemIngredientQuantity(e.target.value)}
+                        />
+                        <Button type="button" variant="outline" size="sm" onClick={handleAddCategoryItemIngredient}>
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+
+                      {categoryItemIngredients.length > 0 && (
+                        <div className="space-y-1 mt-2">
+                          {categoryItemIngredients.map((ing) => (
+                            <div key={ing.id} className="flex items-center justify-between p-1.5 bg-background rounded text-xs">
+                              <div className="flex-1">
+                                <span className="font-medium">{ing.stock_item_name}</span>
+                                <span className="text-muted-foreground ml-1">
+                                  {ing.quantity} {ing.stock_item_unit} × R$ {ing.stock_item_price?.toFixed(2)} = R$ {(ing.quantity * (ing.stock_item_price || 0)).toFixed(2)}
+                                </span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => handleRemoveCategoryItemIngredient(ing.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <Button 
+                      type="button" 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={handleAddCategoryItem}
+                      className="w-full"
+                    >
+                      {editingCategoryItemIndex !== null ? 'Atualizar Adicional' : 'Adicionar Adicional'}
                     </Button>
                   </div>
 
                   {categoryItems.length > 0 && (
                     <div className="space-y-2 mt-3">
-                      {categoryItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between p-2 bg-background rounded">
-                          <span className="text-sm">{item.name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold">+ R$ {item.price.toFixed(2)}</span>
+                      <Label className="text-xs">Adicionais da Categoria:</Label>
+                      {categoryItems.map((item, index) => (
+                        <div key={item.id} className="flex items-center justify-between p-2 bg-background rounded border">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">{item.name}</span>
+                              <span className="text-xs text-muted-foreground">+ R$ {item.price.toFixed(2)}</span>
+                            </div>
+                            {item.cost !== undefined && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Custo: R$ {item.cost.toFixed(2)} | {item.ingredients?.length || 0} insumo(s)
+                              </p>
+                            )}
+                            {(!item.ingredients || item.ingredients.length === 0) && (
+                              <p className="text-xs text-amber-600 mt-0.5">⚠️ Configurar custo</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditCategoryItem(index)}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
                               onClick={() => handleRemoveCategoryItem(item.id)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>

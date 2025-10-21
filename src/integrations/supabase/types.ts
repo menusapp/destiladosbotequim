@@ -311,6 +311,45 @@ export type Database = {
         }
         Relationships: []
       }
+      extra_category_item_ingredients: {
+        Row: {
+          category_item_id: string
+          created_at: string | null
+          id: string
+          quantity: number
+          stock_item_id: string
+        }
+        Insert: {
+          category_item_id: string
+          created_at?: string | null
+          id?: string
+          quantity?: number
+          stock_item_id: string
+        }
+        Update: {
+          category_item_id?: string
+          created_at?: string | null
+          id?: string
+          quantity?: number
+          stock_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extra_category_item_ingredients_category_item_id_fkey"
+            columns: ["category_item_id"]
+            isOneToOne: false
+            referencedRelation: "extra_category_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_category_item_ingredients_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extra_category_items: {
         Row: {
           category_id: string
