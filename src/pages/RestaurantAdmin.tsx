@@ -15,8 +15,8 @@ import DashboardTab from "@/components/admin/DashboardTab";
 import BillsTab from "@/components/admin/BillsTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
-import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
-import CashRegisterTab from "@/components/admin/CashRegisterTab";
+import CostsMarginsTab from "@/components/admin/CostsMarginsTab";
+import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 interface Restaurant {
@@ -224,17 +224,17 @@ const RestaurantAdmin = () => {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-9 text-xs">
-                <TabsTrigger value="faturamento">
+                <TabsTrigger value="dashboard">
                   <BarChart3 className="h-4 w-4 mr-1" />
-                  Faturamento
+                  Dashboard
                 </TabsTrigger>
-                <TabsTrigger value="cmv">
+                <TabsTrigger value="custos">
                   <TrendingUp className="h-4 w-4 mr-1" />
-                  CMV
+                  Custos & Margens
                 </TabsTrigger>
-                <TabsTrigger value="caixa">
+                <TabsTrigger value="fluxo-caixa">
                   <Wallet className="h-4 w-4 mr-1" />
-                  Caixa
+                  Fluxo de Caixa
                 </TabsTrigger>
                 <TabsTrigger value="stock">
                   <Warehouse className="h-4 w-4 mr-1" />
@@ -268,16 +268,16 @@ const RestaurantAdmin = () => {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="faturamento">
+              <TabsContent value="dashboard">
                 <DashboardTab restaurantId={restaurant.id} />
               </TabsContent>
 
-              <TabsContent value="cmv">
-                <CMVDashboardTab restaurantId={restaurant.id} />
+              <TabsContent value="custos">
+                <CostsMarginsTab restaurantId={restaurant.id} />
               </TabsContent>
 
-              <TabsContent value="caixa">
-                <CashRegisterTab restaurantId={restaurant.id} />
+              <TabsContent value="fluxo-caixa">
+                <FluxoCaixaTab restaurantId={restaurant.id} />
               </TabsContent>
 
               <TabsContent value="stock">
