@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Pencil } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Pencil, Search, ArrowUpDown } from "lucide-react";
 import { format } from "date-fns";
 
 interface CostsMarginsTabProps {
@@ -53,6 +53,10 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
   const [newCardBrand, setNewCardBrand] = useState("");
   const [newCardFee, setNewCardFee] = useState("");
   const [editingCard, setEditingCard] = useState<CardFee | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
+    return (localStorage.getItem('productsSortByMargin') as 'asc' | 'desc') || 'desc';
+  });
 
   useEffect(() => {
     fetchSettings();
@@ -253,8 +257,27 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
   };
 
   const highCMVProducts = productsWithCost.filter(p => p.cmv_percentage > targetCMV);
-  const mostProfitable = [...productsWithCost].sort((a, b) => b.margin - a.margin).slice(0, 5);
-  const leastProfitable = [...productsWithCost].sort((a, b) => a.margin - b.margin).slice(0, 5);
+  
+  // Filtrar e ordenar produtos
+  const filteredAndSortedProducts = productsWithCost
+    .filter(product => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      // Ordenar por margem (valor em R$)
+      const marginDiff = sortOrder === 'desc' ? b.margin - a.margin : a.margin - b.margin;
+      // Desempate por % de margem
+      if (marginDiff === 0) {
+        const marginPercentA = (a.margin / a.price) * 100;
+        const marginPercentB = (b.margin / b.price) * 100;
+        return sortOrder === 'desc' ? marginPercentB - marginPercentA : marginPercentA - marginPercentB;
+      }
+      return marginDiff;
+    });
+
+  const toggleSortOrder = () => {
+    const newOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+    setSortOrder(newOrder);
+    localStorage.setItem('productsSortByMargin', newOrder);
+  };
 
   return (
     <div className="space-y-6">
@@ -444,100 +467,39 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
         </Card>
       </div>
 
-      {highCMVProducts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Produtos com CMV Acima do Desejado</CardTitle>
-            <CardDescription>Produtos que excedem o CMV alvo de {targetCMV}%</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {highCMVProducts.map((product) => (
-                <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{product.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Preço: R$ {product.price.toFixed(2)} | Custo: R$ {product.cost.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-destructive">{product.cmv_percentage.toFixed(2)}%</p>
-                    <p className="text-sm text-muted-foreground">
-                      Margem: R$ {product.margin.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Produtos Mais Rentáveis</CardTitle>
-            <CardDescription>Top 5 produtos com maior margem</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {mostProfitable.map((product, index) => (
-                <div key={product.id} className="flex items-center justify-between p-2 border-b">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-muted-foreground">#{index + 1}</span>
-                    <div>
-                      <p className="font-medium text-sm">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">CMV: {product.cmv_percentage.toFixed(1)}%</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-green-600">R$ {product.margin.toFixed(2)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Produtos Menos Rentáveis</CardTitle>
-            <CardDescription>Top 5 produtos com menor margem</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {leastProfitable.map((product, index) => (
-                <div key={product.id} className="flex items-center justify-between p-2 border-b">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-muted-foreground">#{index + 1}</span>
-                    <div>
-                      <p className="font-medium text-sm">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">CMV: {product.cmv_percentage.toFixed(1)}%</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-orange-600">R$ {product.margin.toFixed(2)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Todos os Produtos</CardTitle>
           <CardDescription>Lista completa com custos e margens</CardDescription>
         </CardHeader>
         <CardContent>
-          {productsWithCost.length === 0 ? (
+          <div className="flex flex-col md:flex-row gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar produto..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={toggleSortOrder}
+              className="whitespace-nowrap"
+            >
+              <ArrowUpDown className="h-4 w-4 mr-2" />
+              Ordenar por margem {sortOrder === 'desc' ? '↓ (maior→menor)' : '↑ (menor→maior)'}
+            </Button>
+          </div>
+
+          {filteredAndSortedProducts.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Nenhum produto com ingredientes cadastrados
+              {searchTerm ? 'Nenhum produto encontrado' : 'Nenhum produto com ingredientes cadastrados'}
             </p>
           ) : (
             <div className="space-y-2">
-              {productsWithCost.map((product) => (
+              {filteredAndSortedProducts.map((product) => (
                 <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
                     <p className="font-medium">{product.name}</p>
