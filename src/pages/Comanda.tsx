@@ -246,7 +246,8 @@ const Comanda = () => {
     
     try {
       // Buscar restaurante primeiro
-      const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+      const rawCustomerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+      const customerCPF = (rawCustomerCPF || '').replace(/\D/g, '');
       
       const restResult = await supabase
         .from("restaurants")
@@ -308,7 +309,7 @@ const Comanda = () => {
           )
         `)
         .eq("table_id", tableData.id)
-        .eq("customer_cpf", customerCPF || "");
+        .eq("customer_cpf", customerCPF);
 
       // Se existe conta paga, buscar apenas pedidos criados após ela
       if (lastPaidBill?.paid_at) {
@@ -395,7 +396,8 @@ const Comanda = () => {
     }
 
     const customerName = sessionStorage.getItem(`customer_name_${tableNumber}`);
-    const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+    const rawCustomerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+    const customerCPF = (rawCustomerCPF || '').replace(/\D/g, '');
 
     try {
       // Criar pedido

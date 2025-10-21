@@ -29,10 +29,10 @@ const CustomerInfoDialog = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && cpf.trim()) {
-      onSubmit(name.trim(), cpf.trim());
+      const sanitizedCPF = cpf.replace(/\D/g, "");
+      onSubmit(name.trim(), sanitizedCPF);
     }
   };
-
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
