@@ -131,27 +131,32 @@ const Menu = () => {
     const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
     const savedType = sessionStorage.getItem(`comanda_type_${tableNumber}`) as 'individual' | 'coletiva' | null;
     
-    // Carregar carrinho do sessionStorage
-    const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
-    if (savedCart) {
-      setCart(JSON.parse(savedCart));
-    }
-    
     if (savedName && savedCPF && savedType) {
+      // Se tem informações do cliente, carregar o carrinho
+      const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
+      if (savedCart) {
+        setCart(JSON.parse(savedCart));
+      }
       setCustomerName(savedName);
       setCustomerCPF(savedCPF);
       setComandaType(savedType);
       fetchData();
     } else {
+      // Se não tem informações do cliente, limpar tudo
+      sessionStorage.removeItem(`cart_${tableNumber}`);
+      sessionStorage.removeItem(`comanda_type_${tableNumber}`);
+      setCart([]);
       setShowComandaTypeDialog(true);
       fetchData();
     }
   }, [restaurantSlug, tableNumber]);
 
   useEffect(() => {
-    // Salvar carrinho no sessionStorage sempre que mudar
-    sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
-  }, [cart, tableNumber]);
+    // Salvar carrinho no sessionStorage apenas se houver cliente logado
+    if (customerName && customerCPF) {
+      sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
+    }
+  }, [cart, tableNumber, customerName, customerCPF]);
 
   // Marcar mesa como ocupada quando cliente fizer login
   useEffect(() => {
