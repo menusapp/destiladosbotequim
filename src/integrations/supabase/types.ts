@@ -515,6 +515,45 @@ export type Database = {
           },
         ]
       }
+      product_extra_ingredients: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_extra_id: string
+          quantity: number
+          stock_item_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_extra_id: string
+          quantity?: number
+          stock_item_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_extra_id?: string
+          quantity?: number
+          stock_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_extra_ingredients_product_extra_id_fkey"
+            columns: ["product_extra_id"]
+            isOneToOne: false
+            referencedRelation: "product_extras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_extra_ingredients_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_extras: {
         Row: {
           created_at: string | null

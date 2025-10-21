@@ -42,6 +42,8 @@ interface ProductExtra {
   id: string;
   name: string;
   price: number;
+  ingredients?: ProductIngredient[];
+  cost?: number;
 }
 
 interface ProductIngredient {
@@ -96,6 +98,10 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [extras, setExtras] = useState<ProductExtra[]>([]);
   const [extraName, setExtraName] = useState("");
   const [extraPrice, setExtraPrice] = useState("");
+  const [extraIngredients, setExtraIngredients] = useState<ProductIngredient[]>([]);
+  const [selectedExtraStockItem, setSelectedExtraStockItem] = useState("");
+  const [extraIngredientQuantity, setExtraIngredientQuantity] = useState("");
+  const [editingExtraIndex, setEditingExtraIndex] = useState<number | null>(null);
 
   // Estados para categorias de adicionais
   const [extraCategories, setExtraCategories] = useState<ExtraCategory[]>([]);
@@ -176,17 +182,80 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       return;
     }
     
-    setExtras([...extras, {
-      id: crypto.randomUUID(),
-      name: extraName,
-      price: parseFloat(extraPrice)
-    }]);
+    if (extraIngredients.length === 0) {
+      toast.error("Adicione pelo menos 1 insumo ao adicional");
+      return;
+    }
+    
+    const extraCost = extraIngredients.reduce((sum, ing) => {
+      return sum + (ing.quantity * (ing.stock_item_price || 0));
+    }, 0);
+    
+    if (editingExtraIndex !== null) {
+      // Atualizar adicional existente
+      const updatedExtras = [...extras];
+      updatedExtras[editingExtraIndex] = {
+        id: updatedExtras[editingExtraIndex].id,
+        name: extraName,
+        price: parseFloat(extraPrice),
+        ingredients: [...extraIngredients],
+        cost: extraCost
+      };
+      setExtras(updatedExtras);
+      setEditingExtraIndex(null);
+    } else {
+      // Adicionar novo adicional
+      setExtras([...extras, {
+        id: crypto.randomUUID(),
+        name: extraName,
+        price: parseFloat(extraPrice),
+        ingredients: [...extraIngredients],
+        cost: extraCost
+      }]);
+    }
+    
     setExtraName("");
     setExtraPrice("");
+    setExtraIngredients([]);
+  };
+
+  const handleEditExtra = (index: number) => {
+    const extra = extras[index];
+    setExtraName(extra.name);
+    setExtraPrice(extra.price.toString());
+    setExtraIngredients(extra.ingredients || []);
+    setEditingExtraIndex(index);
   };
 
   const handleRemoveExtra = (id: string) => {
     setExtras(extras.filter(e => e.id !== id));
+    if (editingExtraIndex !== null) {
+      setEditingExtraIndex(null);
+      setExtraName("");
+      setExtraPrice("");
+      setExtraIngredients([]);
+    }
+  };
+
+  const handleAddExtraIngredient = () => {
+    if (!selectedExtraStockItem || !extraIngredientQuantity) return;
+    const stockItem = stockItems.find(s => s.id === selectedExtraStockItem);
+    if (!stockItem) return;
+    
+    setExtraIngredients([...extraIngredients, {
+      id: crypto.randomUUID(),
+      stock_item_id: selectedExtraStockItem,
+      quantity: parseFloat(extraIngredientQuantity),
+      stock_item_name: stockItem.name,
+      stock_item_unit: stockItem.unit,
+      stock_item_price: stockItem.price_per_unit
+    }]);
+    setSelectedExtraStockItem("");
+    setExtraIngredientQuantity("");
+  };
+
+  const handleRemoveExtraIngredient = (id: string) => {
+    setExtraIngredients(extraIngredients.filter(i => i.id !== id));
   };
 
   const handleAddIngredient = () => {
@@ -394,7 +463,25 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
           name: extra.name,
           price: extra.price
         }));
-        await supabase.from("product_extras").insert(extrasData);
+        const { data: insertedExtras } = await supabase
+          .from("product_extras")
+          .insert(extrasData)
+          .select();
+        
+        // Inserir ingredientes dos extras
+        if (insertedExtras) {
+          for (let i = 0; i < insertedExtras.length; i++) {
+            const extra = extras[i];
+            if (extra.ingredients && extra.ingredients.length > 0) {
+              const extraIngredientsData = extra.ingredients.map(ing => ({
+                product_extra_id: insertedExtras[i].id,
+                stock_item_id: ing.stock_item_id,
+                quantity: ing.quantity
+              }));
+              await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
+            }
+          }
+        }
       }
 
       // Deletar ingredientes antigos e inserir novos
@@ -429,7 +516,25 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
           name: extra.name,
           price: extra.price
         }));
-        await supabase.from("product_extras").insert(extrasData);
+        const { data: insertedExtras } = await supabase
+          .from("product_extras")
+          .insert(extrasData)
+          .select();
+        
+        // Inserir ingredientes dos extras
+        if (insertedExtras) {
+          for (let i = 0; i < insertedExtras.length; i++) {
+            const extra = extras[i];
+            if (extra.ingredients && extra.ingredients.length > 0) {
+              const extraIngredientsData = extra.ingredients.map(ing => ({
+                product_extra_id: insertedExtras[i].id,
+                stock_item_id: ing.stock_item_id,
+                quantity: ing.quantity
+              }));
+              await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
+            }
+          }
+        }
       }
 
       // Inserir ingredientes
@@ -489,13 +594,36 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     setProductCategoryId(product.category_id);
     setProductImageUrl(product.image_url);
     
-    // Buscar extras do produto
+    // Buscar extras do produto com ingredientes
     const { data: extrasData } = await supabase
       .from("product_extras")
-      .select("*")
+      .select("*, product_extra_ingredients(*, stock_items(name, unit, price_per_unit))")
       .eq("product_id", product.id);
     
-    setExtras(extrasData || []);
+    const formattedExtras = extrasData?.map((extra: any) => {
+      const ingredients = extra.product_extra_ingredients?.map((ing: any) => ({
+        id: ing.id,
+        stock_item_id: ing.stock_item_id,
+        quantity: ing.quantity,
+        stock_item_name: ing.stock_items?.name,
+        stock_item_unit: ing.stock_items?.unit,
+        stock_item_price: ing.stock_items?.price_per_unit
+      })) || [];
+      
+      const cost = ingredients.reduce((sum: number, ing: any) => {
+        return sum + (ing.quantity * (ing.stock_item_price || 0));
+      }, 0);
+      
+      return {
+        id: extra.id,
+        name: extra.name,
+        price: extra.price,
+        ingredients,
+        cost
+      };
+    }) || [];
+    
+    setExtras(formattedExtras);
 
     // Buscar ingredientes
     const { data: ingredientsData } = await supabase
@@ -527,6 +655,8 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     setExtras([]);
     setExtraName("");
     setExtraPrice("");
+    setExtraIngredients([]);
+    setEditingExtraIndex(null);
     setIngredients([]);
     setSelectedStockItem("");
     setIngredientQuantity("");
@@ -850,7 +980,8 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
               </div>
               
               <div className="space-y-3 p-4 border rounded-lg bg-secondary/20">
-                <h4 className="font-semibold text-sm">Adicionais (Opcionais)</h4>
+                <h4 className="font-semibold text-sm">Adicionais</h4>
+                <p className="text-xs text-muted-foreground">Cada adicional deve ter pelo menos 1 insumo configurado</p>
                 
                 {extraCategories.length > 0 && (
                   <div className="space-y-2">
@@ -870,42 +1001,136 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Nome do adicional"
-                      value={extraName}
-                      onChange={(e) => setExtraName(e.target.value)}
-                    />
+                <div className="space-y-3 p-3 border rounded bg-primary/5">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-medium text-sm">{editingExtraIndex !== null ? 'Editar Adicional' : 'Novo Adicional'}</h5>
+                    {extraIngredients.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Custo: <span className="font-semibold text-foreground">R$ {extraIngredients.reduce((sum, ing) => sum + (ing.quantity * (ing.stock_item_price || 0)), 0).toFixed(2)}</span>
+                      </p>
+                    )}
                   </div>
-                  <div className="w-32">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Preço"
-                      value={extraPrice}
-                      onChange={(e) => setExtraPrice(e.target.value)}
-                    />
+
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Nome do adicional"
+                        value={extraName}
+                        onChange={(e) => setExtraName(e.target.value)}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Preço"
+                        value={extraPrice}
+                        onChange={(e) => setExtraPrice(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={handleAddExtra}>
-                    <Plus className="h-4 w-4" />
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Insumos do Adicional *</Label>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Select value={selectedExtraStockItem} onValueChange={setSelectedExtraStockItem}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Selecione um insumo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {stockItems.map((item) => (
+                              <SelectItem key={item.id} value={item.id}>
+                                {item.name} ({item.unit}) - R$ {item.price_per_unit.toFixed(2)}/{item.unit}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Input
+                        className="w-24 h-9"
+                        type="number"
+                        step="0.001"
+                        placeholder="Qtd"
+                        value={extraIngredientQuantity}
+                        onChange={(e) => setExtraIngredientQuantity(e.target.value)}
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={handleAddExtraIngredient}>
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+
+                    {extraIngredients.length > 0 && (
+                      <div className="space-y-1 mt-2">
+                        {extraIngredients.map((ing) => (
+                          <div key={ing.id} className="flex items-center justify-between p-1.5 bg-background rounded text-xs">
+                            <div className="flex-1">
+                              <span className="font-medium">{ing.stock_item_name}</span>
+                              <span className="text-muted-foreground ml-1">
+                                {ing.quantity} {ing.stock_item_unit} × R$ {ing.stock_item_price?.toFixed(2)} = R$ {(ing.quantity * (ing.stock_item_price || 0)).toFixed(2)}
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleRemoveExtraIngredient(ing.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={handleAddExtra}
+                    className="w-full"
+                  >
+                    {editingExtraIndex !== null ? 'Atualizar Adicional' : 'Adicionar Adicional'}
                   </Button>
                 </div>
                 
                 {extras.length > 0 && (
                   <div className="space-y-2 mt-3">
-                    {extras.map((extra) => (
-                      <div key={extra.id} className="flex items-center justify-between p-2 bg-background rounded">
-                        <span className="text-sm">{extra.name}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold">+ R$ {extra.price.toFixed(2)}</span>
+                    <Label className="text-xs">Adicionais do Produto:</Label>
+                    {extras.map((extra, index) => (
+                      <div key={extra.id} className="flex items-center justify-between p-2 bg-background rounded border">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{extra.name}</span>
+                            <span className="text-xs text-muted-foreground">+ R$ {extra.price.toFixed(2)}</span>
+                          </div>
+                          {extra.cost !== undefined && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Custo: R$ {extra.cost.toFixed(2)} | {extra.ingredients?.length || 0} insumo(s)
+                            </p>
+                          )}
+                          {(!extra.ingredients || extra.ingredients.length === 0) && (
+                            <p className="text-xs text-amber-600 mt-0.5">⚠️ Configurar custo</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditExtra(index)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveExtra(extra.id)}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>

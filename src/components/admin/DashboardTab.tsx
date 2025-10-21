@@ -273,6 +273,7 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
     }
 
     try {
+      // Buscar itens do pedido com ingredientes dos produtos
       const { data: items, error } = await supabase
         .from("order_items")
         .select(`
@@ -285,6 +286,17 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
                 price_per_unit
               )
             )
+          ),
+          order_item_extras (
+            product_extra_id,
+            product_extras (
+              product_extra_ingredients (
+                quantity,
+                stock_items (
+                  price_per_unit
+                )
+              )
+            )
           )
         `)
         .in("order_id", orderIds);
@@ -292,13 +304,27 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       if (error) throw error;
 
       let totalCmv = 0;
+      
       items?.forEach((item: any) => {
         const itemQty = item.quantity;
+        
+        // Custo dos ingredientes do produto
         const ingredients = item.products?.product_ingredients || [];
         ingredients.forEach((ing: any) => {
           const ingQty = ing.quantity || 0;
           const pricePerUnit = ing.stock_items?.price_per_unit || 0;
           totalCmv += ingQty * pricePerUnit * itemQty;
+        });
+        
+        // Custo dos ingredientes dos adicionais
+        const extras = item.order_item_extras || [];
+        extras.forEach((extra: any) => {
+          const extraIngredients = extra.product_extras?.product_extra_ingredients || [];
+          extraIngredients.forEach((ing: any) => {
+            const ingQty = ing.quantity || 0;
+            const pricePerUnit = ing.stock_items?.price_per_unit || 0;
+            totalCmv += ingQty * pricePerUnit * itemQty;
+          });
         });
       });
 

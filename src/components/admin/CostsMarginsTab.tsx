@@ -217,6 +217,14 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
             stock_items (
               price_per_unit
             )
+          ),
+          product_extras (
+            product_extra_ingredients (
+              quantity,
+              stock_items (
+                price_per_unit
+              )
+            )
           )
         `)
         .eq("categories.restaurant_id", restaurantId);
@@ -226,20 +234,32 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
       const productsWithCostData: ProductWithCost[] = products
         ?.filter((p: any) => p.product_ingredients && p.product_ingredients.length > 0)
         .map((product: any) => {
+          // Custo dos ingredientes do produto
           const cost = product.product_ingredients.reduce((sum: number, ing: any) => {
             const quantity = ing.quantity || 0;
             const pricePerUnit = ing.stock_items?.price_per_unit || 0;
             return sum + (quantity * pricePerUnit);
           }, 0);
+          
+          // Custo médio dos adicionais (apenas para exibição)
+          const extrasCost = product.product_extras?.reduce((sum: number, extra: any) => {
+            const extraCost = extra.product_extra_ingredients?.reduce((eSum: number, ing: any) => {
+              const quantity = ing.quantity || 0;
+              const pricePerUnit = ing.stock_items?.price_per_unit || 0;
+              return eSum + (quantity * pricePerUnit);
+            }, 0) || 0;
+            return sum + extraCost;
+          }, 0) || 0;
 
-          const cmv_percentage = product.price > 0 ? (cost / product.price) * 100 : 0;
-          const margin = product.price - cost;
+          const totalCost = cost + extrasCost;
+          const cmv_percentage = product.price > 0 ? (totalCost / product.price) * 100 : 0;
+          const margin = product.price - totalCost;
 
           return {
             id: product.id,
             name: product.name,
             price: product.price,
-            cost,
+            cost: totalCost,
             cmv_percentage,
             margin
           };
