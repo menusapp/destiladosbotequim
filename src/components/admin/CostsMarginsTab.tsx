@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Pencil, Search, ArrowUpDown } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Pencil, Search, ArrowUpDown, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 
 interface CostsMarginsTabProps {
@@ -57,6 +58,8 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
     return (localStorage.getItem('productsSortByMargin') as 'asc' | 'desc') || 'desc';
   });
+  const [operationalCostsOpen, setOperationalCostsOpen] = useState(false);
+  const [cardFeesOpen, setCardFeesOpen] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -302,12 +305,21 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
   return (
     <div className="space-y-6">
       {/* Seção de Custos Operacionais */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Custos Operacionais</CardTitle>
-          <CardDescription>Configure os custos mensais do restaurante</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Collapsible open={operationalCostsOpen} onOpenChange={setOperationalCostsOpen}>
+        <Card>
+          <CollapsibleTrigger className="w-full">
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="text-left">
+                  <CardTitle>Custos Operacionais</CardTitle>
+                  <CardDescription>Configure os custos mensais do restaurante</CardDescription>
+                </div>
+                <ChevronDown className={`h-5 w-5 transition-transform ${operationalCostsOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Custo Fixo (R$/mês)</Label>
@@ -359,19 +371,30 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
             </div>
           </div>
 
-          <Button onClick={saveOperationalCosts} className="w-full">
-            Salvar Custos Operacionais
-          </Button>
-        </CardContent>
-      </Card>
+              <Button onClick={saveOperationalCosts} className="w-full">
+                Salvar Custos Operacionais
+              </Button>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Seção de Taxas de Cartões */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Taxas de Cartões</CardTitle>
-          <CardDescription>Configure as taxas por bandeira de cartão</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Collapsible open={cardFeesOpen} onOpenChange={setCardFeesOpen}>
+        <Card>
+          <CollapsibleTrigger className="w-full">
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="text-left">
+                  <CardTitle>Taxas de Cartões</CardTitle>
+                  <CardDescription>Configure as taxas por bandeira de cartão</CardDescription>
+                </div>
+                <ChevronDown className={`h-5 w-5 transition-transform ${cardFeesOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
               placeholder="Bandeira (ex: Visa, Mastercard)"
@@ -440,10 +463,12 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
                   </Button>
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Seção de CMV dos Produtos (mantida) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

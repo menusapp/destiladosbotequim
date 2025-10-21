@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Product {
   id: string;
@@ -116,6 +117,10 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [selectedCategoryItemStockItem, setSelectedCategoryItemStockItem] = useState("");
   const [categoryItemIngredientQuantity, setCategoryItemIngredientQuantity] = useState("");
   const [editingCategoryItemIndex, setEditingCategoryItemIndex] = useState<number | null>(null);
+
+  const [extraCategoriesOpen, setExtraCategoriesOpen] = useState(false);
+  const [productCategoriesOpen, setProductCategoriesOpen] = useState(false);
+  const [productsOpen, setProductsOpen] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -779,16 +784,24 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   return (
     <div className="space-y-6">
       {/* Seção de Categorias de Adicionais */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold">Categorias de Adicionais</h3>
-          <Dialog open={extraCategoryDialogOpen} onOpenChange={setExtraCategoryDialogOpen}>
+      <Collapsible open={extraCategoriesOpen} onOpenChange={setExtraCategoriesOpen}>
+        <Card>
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between p-6 cursor-pointer hover:bg-muted/50 transition-colors">
+              <h3 className="text-lg font-semibold">Categorias de Adicionais</h3>
+              <ChevronDown className={`h-5 w-5 transition-transform ${extraCategoriesOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="px-6 pb-6">
+              <div className="flex justify-end items-center mb-4">
+                <Dialog open={extraCategoryDialogOpen} onOpenChange={setExtraCategoryDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Categoria
-              </Button>
-            </DialogTrigger>
+                  </Button>
+                </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Nova Categoria de Adicionais</DialogTitle>
@@ -954,12 +967,12 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
                   Salvar Categoria
                 </Button>
               </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </DialogContent>
+            </Dialog>
+          </div>
 
-        {extraCategories.length > 0 && (
-          <div className="space-y-2">
+          {extraCategories.length > 0 && (
+            <div className="space-y-2">
             {extraCategories.map((category) => (
               <div
                 key={category.id}
@@ -974,22 +987,33 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+        </CollapsibleContent>
+      </Card>
+      </Collapsible>
 
       {/* Seção de Categorias de Produtos */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold">Categorias de Produtos</h3>
-          <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+      <Collapsible open={productCategoriesOpen} onOpenChange={setProductCategoriesOpen}>
+        <Card>
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between p-6 cursor-pointer hover:bg-muted/50 transition-colors">
+              <h3 className="text-lg font-semibold">Categorias de Produtos</h3>
+              <ChevronDown className={`h-5 w-5 transition-transform ${productCategoriesOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="px-6 pb-6">
+              <div className="flex justify-end items-center mb-4">
+                <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Categoria
-              </Button>
-            </DialogTrigger>
+                  </Button>
+                </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Nova Categoria de Produto</DialogTitle>
@@ -1002,21 +1026,31 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
                 />
                 <Button onClick={handleCreateCategory} className="w-full">Criar</Button>
               </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {categories.map(cat => (
+              <Card key={cat.id} className="p-2 text-center text-sm">{cat.name}</Card>
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {categories.map(cat => (
-            <Card key={cat.id} className="p-2 text-center text-sm">{cat.name}</Card>
-          ))}
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Card>
+      </Collapsible>
 
       {/* Seção de Produtos */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold">Produtos</h3>
-          <div className="flex gap-2">
+      <Collapsible open={productsOpen} onOpenChange={setProductsOpen}>
+        <Card>
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between p-6 cursor-pointer hover:bg-muted/50 transition-colors">
+              <h3 className="text-lg font-semibold">Produtos</h3>
+              <ChevronDown className={`h-5 w-5 transition-transform ${productsOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="px-6 pb-6">
+              <div className="flex justify-end items-center mb-4 gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -1345,57 +1379,59 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
           </DialogContent>
         </Dialog>
           </div>
-        </div>
 
-        {categories.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg bg-secondary/20">
-          <p className="text-muted-foreground">
-            Crie categorias primeiro antes de adicionar produtos
-          </p>
-        </div>
-      ) : products.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg bg-secondary/20">
-          <p className="text-muted-foreground">Nenhum produto criado ainda</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {products
-            .filter((product) =>
-              product.name.toLowerCase().includes(searchQuery.toLowerCase())
-            )
-            .map((product) => (
-            <div
-              key={product.id}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
-            >
-              <div>
-                <p className="font-medium">{product.name}</p>
-                <p className="text-sm text-muted-foreground">{product.description}</p>
-                <p className="text-sm font-semibold text-primary mt-1">
-                  R$ {product.price.toFixed(2)}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEditDialog(product)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleDelete(product.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+          {categories.length === 0 ? (
+            <div className="text-center py-12 border rounded-lg bg-secondary/20">
+              <p className="text-muted-foreground">
+                Crie categorias primeiro antes de adicionar produtos
+              </p>
             </div>
-          ))}
+          ) : products.length === 0 ? (
+            <div className="text-center py-12 border rounded-lg bg-secondary/20">
+              <p className="text-muted-foreground">Nenhum produto criado ainda</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+          {products
+              .filter((product) =>
+                product.name.toLowerCase().includes(searchQuery.toLowerCase())
+              )
+              .map((product) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium">{product.name}</p>
+                    <p className="text-sm text-muted-foreground">{product.description}</p>
+                    <p className="text-sm font-semibold text-primary mt-1">
+                      R$ {product.price.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(product)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(product.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        )}
-      </div>
+        </CollapsibleContent>
+      </Card>
+      </Collapsible>
     </div>
   );
 };

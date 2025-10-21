@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Package, AlertTriangle, Search } from "lucide-react";
+import { Plus, Trash2, Package, AlertTriangle, Search, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface StockCategory {
@@ -34,6 +35,8 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [stockItemsOpen, setStockItemsOpen] = useState(false);
   
   const [itemForm, setItemForm] = useState({
     name: "",
@@ -220,38 +223,48 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
       )}
 
       {/* Categorias */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Categorias de Estoque</h2>
-          <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+      <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
+        <Card>
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between p-6 cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">Categorias de Estoque</h2>
+              </div>
+              <ChevronDown className={`h-5 w-5 transition-transform ${categoriesOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="px-6 pb-6">
+              <div className="flex items-center justify-end mb-4">
+                <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Categoria
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Nova Categoria de Estoque</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div>
-                  <Label>Nome da Categoria</Label>
-                  <Input
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="Ex: Carnes, Frios, Bebidas..."
-                  />
-                </div>
-                <Button onClick={handleCreateCategory} className="w-full">
-                  Criar Categoria
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nova Categoria de Estoque</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div>
+                    <Label>Nome da Categoria</Label>
+                    <Input
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Ex: Carnes, Frios, Bebidas..."
+                    />
+                  </div>
+                  <Button onClick={handleCreateCategory} className="w-full">
+                    Criar Categoria
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {categories.map((cat) => (
             <Card key={cat.id} className="p-3 flex items-center justify-between">
               <span className="text-sm font-medium">{cat.name}</span>
@@ -263,40 +276,52 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
                 <Trash2 className="h-4 w-4" />
               </Button>
             </Card>
-          ))}
-          {categories.length === 0 && (
-            <p className="text-muted-foreground col-span-full text-center py-4">
-              Nenhuma categoria criada
-            </p>
-          )}
+            ))}
+            {categories.length === 0 && (
+              <p className="text-muted-foreground col-span-full text-center py-4">
+                Nenhuma categoria criada
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+        </CollapsibleContent>
+      </Card>
+      </Collapsible>
 
       {/* Insumos */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Insumos / Ingredientes</h2>
-          <div className="flex gap-2">
+      <Collapsible open={stockItemsOpen} onOpenChange={setStockItemsOpen}>
+        <Card>
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between p-6 cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">Insumos / Ingredientes</h2>
+              </div>
+              <ChevronDown className={`h-5 w-5 transition-transform ${stockItemsOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="px-6 pb-6">
+              <div className="flex items-center justify-end mb-4 gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar insumo..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64"
-              />
-            </div>
-            <Dialog open={itemDialogOpen} onOpenChange={(open) => {
-              setItemDialogOpen(open);
-              if (!open) resetItemForm();
-            }}>
+                  placeholder="Buscar insumo..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-64"
+                />
+              </div>
+              <Dialog open={itemDialogOpen} onOpenChange={(open) => {
+                setItemDialogOpen(open);
+                if (!open) resetItemForm();
+              }}>
               <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Insumo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>{editingItem ? "Editar Insumo" : "Novo Insumo"}</DialogTitle>
               </DialogHeader>
@@ -383,12 +408,11 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
                   {editingItem ? "Atualizar" : "Criar"} Insumo
                 </Button>
               </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
           </div>
-        </div>
 
-        <div className="space-y-2">
+          <div className="space-y-2">
           {stockItems
             .filter((item) =>
               item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -438,14 +462,17 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
                 </div>
               </div>
             </Card>
-          ))}
-          {stockItems.length === 0 && (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">Nenhum insumo cadastrado</p>
-            </Card>
-          )}
+            ))}
+            {stockItems.length === 0 && (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground">Nenhum insumo cadastrado</p>
+              </Card>
+            )}
+          </div>
         </div>
-      </div>
+        </CollapsibleContent>
+      </Card>
+      </Collapsible>
     </div>
   );
 }
