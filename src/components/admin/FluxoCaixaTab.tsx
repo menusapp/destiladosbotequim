@@ -1,0 +1,584 @@
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle } from "lucide-react";
+import { format } from "date-fns";
+
+interface FluxoCaixaTabProps {
+  restaurantId: string;
+}
+
+interface CashSession {
+  id: string;
+  opened_by: string;
+  closed_by: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  opening_balance: number;
+  closing_balance: number | null;
+  expected_balance: number | null;
+  difference: number | null;
+  status: string;
+  notes: string | null;
+}
+
+interface CashMovement {
+  id: string;
+  cash_session_id: string;
+  movement_type: string;
+  amount: number;
+  description: string;
+  category: string | null;
+  payment_method: string | null;
+  created_by: string;
+  created_at: string;
+  bill_id: string | null;
+}
+
+export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
+  const [currentSession, setCurrentSession] = useState<CashSession | null>(null);
+  const [movements, setMovements] = useState<CashMovement[]>([]);
+  const [lastClosedSession, setLastClosedSession] = useState<CashSession | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [openingBalance, setOpeningBalance] = useState("");
+  const [openedBy, setOpenedBy] = useState("");
+  const [closingBalance, setClosingBalance] = useState("");
+  const [closedBy, setClosedBy] = useState("");
+  const [closeNotes, setCloseNotes] = useState("");
+  const [movementType, setMovementType] = useState("entrada");
+  const [movementAmount, setMovementAmount] = useState("");
+  const [movementDescription, setMovementDescription] = useState("");
+  const [movementCategory, setMovementCategory] = useState("");
+  const [movementPaymentMethod, setMovementPaymentMethod] = useState("dinheiro");
+  const [movementCreatedBy, setMovementCreatedBy] = useState("");
+
+  useEffect(() => {
+    fetchCurrentSession();
+  }, [restaurantId]);
+
+  useEffect(() => {
+    if (currentSession) {
+      fetchMovements();
+    }
+  }, [currentSession]);
+
+  const fetchCurrentSession = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("cash_register_sessions")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "open")
+        .order("opened_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      setCurrentSession(data);
+
+      if (!data) {
+        const { data: lastClosed, error: lastError } = await supabase
+          .from("cash_register_sessions")
+          .select("*")
+          .eq("restaurant_id", restaurantId)
+          .eq("status", "closed")
+          .order("closed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lastError) throw lastError;
+        setLastClosedSession(lastClosed);
+
+        if (lastClosed) {
+          const { data: lastMovements, error: movError } = await supabase
+            .from("cash_movements")
+            .select("*")
+            .eq("cash_session_id", lastClosed.id)
+            .order("created_at", { ascending: false });
+
+          if (movError) throw movError;
+          setMovements(lastMovements || []);
+        }
+      } else {
+        setLastClosedSession(null);
+      }
+    } catch (error: any) {
+      toast.error("Erro ao buscar sessão de caixa: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMovements = async () => {
+    if (!currentSession) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("cash_movements")
+        .select("*")
+        .eq("cash_session_id", currentSession.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setMovements(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao buscar movimentações: " + error.message);
+    }
+  };
+
+  const handleOpenCashRegister = async () => {
+    if (!openedBy || !openingBalance) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("cash_register_sessions").insert({
+        restaurant_id: restaurantId,
+        opened_by: openedBy,
+        opening_balance: parseFloat(openingBalance),
+        status: "open"
+      });
+
+      if (error) throw error;
+      
+      toast.success("Caixa aberto com sucesso!");
+      setOpenedBy("");
+      setOpeningBalance("");
+      fetchCurrentSession();
+    } catch (error: any) {
+      toast.error("Erro ao abrir caixa: " + error.message);
+    }
+  };
+
+  const handleCloseCashRegister = async () => {
+    if (!currentSession || !closedBy || !closingBalance) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    const expectedBalance = calculateExpectedBalance();
+    const difference = parseFloat(closingBalance) - expectedBalance;
+
+    try {
+      const { error } = await supabase
+        .from("cash_register_sessions")
+        .update({
+          closed_by: closedBy,
+          closed_at: new Date().toISOString(),
+          closing_balance: parseFloat(closingBalance),
+          expected_balance: expectedBalance,
+          difference: difference,
+          status: "closed",
+          notes: closeNotes
+        })
+        .eq("id", currentSession.id);
+
+      if (error) throw error;
+      
+      toast.success("Caixa fechado com sucesso!");
+      setClosedBy("");
+      setClosingBalance("");
+      setCloseNotes("");
+      setCurrentSession(null);
+      fetchCurrentSession();
+    } catch (error: any) {
+      toast.error("Erro ao fechar caixa: " + error.message);
+    }
+  };
+
+  const handleAddMovement = async () => {
+    if (!currentSession || !movementAmount || !movementDescription || !movementCreatedBy) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("cash_movements").insert({
+        cash_session_id: currentSession.id,
+        restaurant_id: restaurantId,
+        movement_type: movementType,
+        amount: parseFloat(movementAmount),
+        description: movementDescription,
+        category: movementCategory || null,
+        payment_method: movementPaymentMethod,
+        created_by: movementCreatedBy
+      });
+
+      if (error) throw error;
+      
+      toast.success("Movimentação registrada!");
+      setMovementAmount("");
+      setMovementDescription("");
+      setMovementCategory("");
+      setMovementCreatedBy("");
+      fetchMovements();
+    } catch (error: any) {
+      toast.error("Erro ao registrar movimentação: " + error.message);
+    }
+  };
+
+  const calculateExpectedBalance = () => {
+    if (!currentSession) return 0;
+    
+    let balance = currentSession.opening_balance;
+    
+    movements.forEach(mov => {
+      if (mov.movement_type === "entrada") {
+        balance += mov.amount;
+      } else {
+        balance -= mov.amount;
+      }
+    });
+
+    return balance;
+  };
+
+  const calculateTotalSales = () => {
+    return movements
+      .filter(m => m.movement_type === "entrada")
+      .reduce((sum, m) => sum + m.amount, 0);
+  };
+
+  const calculateTotalExpenses = () => {
+    return movements
+      .filter(m => m.movement_type === "saida")
+      .reduce((sum, m) => sum + m.amount, 0);
+  };
+
+  if (loading) {
+    return <div className="p-4">Carregando...</div>;
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold">Fluxo de Caixa</h2>
+          <p className="text-muted-foreground">Controle completo do fluxo de caixa</p>
+        </div>
+        
+        {!currentSession ? (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button size="lg" className="gap-2">
+                <Wallet className="h-5 w-5" />
+                Abrir Caixa
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Abrir Caixa</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div>
+                  <Label>Responsável pela abertura</Label>
+                  <Input
+                    value={openedBy}
+                    onChange={(e) => setOpenedBy(e.target.value)}
+                    placeholder="Nome do responsável"
+                  />
+                </div>
+                <div>
+                  <Label>Saldo inicial (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={openingBalance}
+                    onChange={(e) => setOpeningBalance(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <Button onClick={handleOpenCashRegister} className="w-full">
+                  Abrir Caixa
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="destructive" size="lg" className="gap-2">
+                <Wallet className="h-5 w-5" />
+                Fechar Caixa
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Fechar Caixa</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="bg-muted p-4 rounded-lg space-y-2">
+                  <div className="flex justify-between">
+                    <span>Saldo inicial:</span>
+                    <span className="font-bold">R$ {currentSession.opening_balance.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Saldo esperado:</span>
+                    <span className="font-bold">R$ {calculateExpectedBalance().toFixed(2)}</span>
+                  </div>
+                </div>
+                <div>
+                  <Label>Responsável pelo fechamento</Label>
+                  <Input
+                    value={closedBy}
+                    onChange={(e) => setClosedBy(e.target.value)}
+                    placeholder="Nome do responsável"
+                  />
+                </div>
+                <div>
+                  <Label>Saldo real no caixa (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={closingBalance}
+                    onChange={(e) => setClosingBalance(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                {closingBalance && (
+                  <div className={`p-3 rounded-lg ${
+                    parseFloat(closingBalance) - calculateExpectedBalance() >= 0 
+                      ? "bg-green-100 text-green-800" 
+                      : "bg-red-100 text-red-800"
+                  }`}>
+                    Diferença: R$ {(parseFloat(closingBalance) - calculateExpectedBalance()).toFixed(2)}
+                  </div>
+                )}
+                <div>
+                  <Label>Observações</Label>
+                  <Textarea
+                    value={closeNotes}
+                    onChange={(e) => setCloseNotes(e.target.value)}
+                    placeholder="Observações sobre o fechamento..."
+                  />
+                </div>
+                <Button onClick={handleCloseCashRegister} className="w-full">
+                  Confirmar Fechamento
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      {currentSession && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Caixa Atual
+            </CardTitle>
+            <CardDescription>
+              Aberto por {currentSession.opened_by} em {format(new Date(currentSession.opened_at), "dd/MM/yyyy 'às' HH:mm")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Saldo Inicial</p>
+                <p className="text-2xl font-bold">R$ {currentSession.opening_balance.toFixed(2)}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Entradas</p>
+                <p className="text-2xl font-bold text-green-600">R$ {calculateTotalSales().toFixed(2)}</p>
+              </div>
+              <div className="bg-red-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Saídas</p>
+                <p className="text-2xl font-bold text-red-600">R$ {calculateTotalExpenses().toFixed(2)}</p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Saldo Esperado</p>
+                <p className="text-2xl font-bold text-purple-600">R$ {calculateExpectedBalance().toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!currentSession && lastClosedSession && (
+        <Card className="bg-secondary/20 border-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Último Caixa Fechado - Histórico
+            </CardTitle>
+            <CardDescription>
+              Fechado em {format(new Date(lastClosedSession.closed_at!), "dd/MM/yyyy 'às' HH:mm")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Saldo Inicial</p>
+                <p className="text-2xl font-bold">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Saldo Esperado</p>
+                <p className="text-2xl font-bold">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Saldo Final</p>
+                <p className="text-2xl font-bold">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground">Diferença</p>
+                <p className={`text-2xl font-bold ${(lastClosedSession.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  R$ {(lastClosedSession.difference || 0).toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!currentSession && !lastClosedSession && (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Nenhum caixa aberto. Abra um caixa para registrar movimentações.
+          </CardContent>
+        </Card>
+      )}
+      
+      {currentSession && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Registrar Movimentação</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo de Movimentação</Label>
+                <Select value={movementType} onValueChange={setMovementType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="entrada">Entrada</SelectItem>
+                    <SelectItem value="saida">Saída</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Valor (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={movementAmount}
+                  onChange={(e) => setMovementAmount(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <Label>Descrição</Label>
+                <Input
+                  value={movementDescription}
+                  onChange={(e) => setMovementDescription(e.target.value)}
+                  placeholder="Descrição da movimentação"
+                />
+              </div>
+              <div>
+                <Label>Categoria (opcional)</Label>
+                <Input
+                  value={movementCategory}
+                  onChange={(e) => setMovementCategory(e.target.value)}
+                  placeholder="Ex: Alimentação, Limpeza..."
+                />
+              </div>
+              <div>
+                <Label>Forma de Pagamento</Label>
+                <Select value={movementPaymentMethod} onValueChange={setMovementPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="credito">Crédito</SelectItem>
+                    <SelectItem value="debito">Débito</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Responsável</Label>
+                <Input
+                  value={movementCreatedBy}
+                  onChange={(e) => setMovementCreatedBy(e.target.value)}
+                  placeholder="Nome do responsável"
+                />
+              </div>
+            </div>
+            <Button onClick={handleAddMovement} className="w-full mt-4">
+              {movementType === "entrada" ? (
+                <PlusCircle className="h-4 w-4 mr-2" />
+              ) : (
+                <MinusCircle className="h-4 w-4 mr-2" />
+              )}
+              Registrar Movimentação
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Histórico de Movimentações</CardTitle>
+          <CardDescription>
+            {currentSession 
+              ? `${movements.length} movimentações registradas nesta sessão`
+              : lastClosedSession
+                ? `${movements.length} movimentações do último caixa fechado`
+                : "Abra o caixa para ver as movimentações"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {movements.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhuma movimentação registrada
+              </p>
+            ) : (
+              movements.map((mov) => (
+                <div key={mov.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    {mov.movement_type === "entrada" ? (
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <TrendingDown className="h-5 w-5 text-red-600" />
+                    )}
+                    <div>
+                      <p className="font-medium">{mov.description}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {mov.movement_type} • {mov.payment_method} • {mov.created_by}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(mov.created_at), "dd/MM/yyyy 'às' HH:mm")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className={`text-lg font-bold ${
+                    mov.movement_type === "entrada"
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}>
+                    {mov.movement_type === "entrada" ? "+" : "-"}
+                    R$ {mov.amount.toFixed(2)}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

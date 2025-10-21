@@ -94,6 +94,41 @@ export type Database = {
           },
         ]
       }
+      card_fees: {
+        Row: {
+          card_brand: string
+          created_at: string | null
+          fee_percentage: number
+          id: string
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          card_brand: string
+          created_at?: string | null
+          fee_percentage?: number
+          id?: string
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          card_brand?: string
+          created_at?: string | null
+          fee_percentage?: number
+          id?: string
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_fees_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_movements: {
         Row: {
           amount: number
@@ -307,6 +342,50 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "extra_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operational_costs: {
+        Row: {
+          created_at: string | null
+          fixed_cost: number
+          id: string
+          labor_cost: number
+          month_year: string
+          restaurant_id: string
+          updated_at: string | null
+          variable_cost: number
+          variable_cost_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          fixed_cost?: number
+          id?: string
+          labor_cost?: number
+          month_year: string
+          restaurant_id: string
+          updated_at?: string | null
+          variable_cost?: number
+          variable_cost_type?: string
+        }
+        Update: {
+          created_at?: string | null
+          fixed_cost?: number
+          id?: string
+          labor_cost?: number
+          month_year?: string
+          restaurant_id?: string
+          updated_at?: string | null
+          variable_cost?: number
+          variable_cost_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_costs_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
         ]
