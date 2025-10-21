@@ -286,21 +286,38 @@ const Comanda = () => {
       
       setTableId(tableData.id);
 
-      // Buscar pedidos e conta em paralelo
+      // Buscar última conta paga para essa mesa e CPF
+      const { data: lastPaidBill } = await supabase
+        .from("bills")
+        .select("paid_at")
+        .eq("table_id", tableData.id)
+        .eq("status", "paid")
+        .order("paid_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Construir query de pedidos
+      let ordersQuery = supabase
+        .from("orders")
+        .select(`
+          id, status, created_at, customer_name, notes,
+          order_items(
+            id, quantity, price_at_order, notes,
+            products(name),
+            order_item_extras(price_at_order, product_extras(name))
+          )
+        `)
+        .eq("table_id", tableData.id)
+        .eq("customer_cpf", customerCPF || "");
+
+      // Se existe conta paga, buscar apenas pedidos criados após ela
+      if (lastPaidBill?.paid_at) {
+        ordersQuery = ordersQuery.gt("created_at", lastPaidBill.paid_at);
+      }
+
+      // Buscar pedidos e conta ativa em paralelo
       const [ordersResult, billResult] = await Promise.all([
-        supabase
-          .from("orders")
-          .select(`
-            id, status, created_at, customer_name, notes,
-            order_items(
-              id, quantity, price_at_order, notes,
-              products(name),
-              order_item_extras(price_at_order, product_extras(name))
-            )
-          `)
-          .eq("table_id", tableData.id)
-          .eq("customer_cpf", customerCPF || "")
-          .order("created_at", { ascending: false }),
+        ordersQuery.order("created_at", { ascending: false }),
         
         supabase
           .from("bills")
