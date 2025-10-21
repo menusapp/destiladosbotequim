@@ -322,7 +322,7 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
             <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Custo Fixo (R$/mês)</Label>
+              <Label>Custo Fixo (R$/dia)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -333,7 +333,7 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
             </div>
 
             <div className="space-y-2">
-              <Label>CMO - Custo de Mão de Obra (R$/mês)</Label>
+              <Label>CMO - Custo de Mão de Obra (R$/dia)</Label>
               <Input
                 type="number"
                 step="0.01"

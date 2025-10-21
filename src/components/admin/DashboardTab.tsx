@@ -364,8 +364,8 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
     let variableCost = 0;
 
     if (operationalCosts) {
-      fixedCost = (operationalCosts.fixed_cost / 30) * daysInPeriod;
-      laborCost = (operationalCosts.labor_cost / 30) * daysInPeriod;
+      fixedCost = operationalCosts.fixed_cost * daysInPeriod;
+      laborCost = operationalCosts.labor_cost * daysInPeriod;
       
       if (operationalCosts.variable_cost_type === 'percentage') {
         variableCost = stats.totalRevenue * (operationalCosts.variable_cost / 100);
