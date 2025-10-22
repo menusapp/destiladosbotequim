@@ -74,8 +74,8 @@ const CEODashboard = () => {
 
   const handleCEOLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Senha CEO: "ceo123" (você pode mudar isso)
-    if (ceoPassword === "ceo123") {
+    // Senha CEO: "menus123"
+    if (ceoPassword === "menus123") {
       localStorage.setItem('is_ceo_authenticated', 'true');
       setShowPasswordPrompt(false);
       fetchRestaurants();
