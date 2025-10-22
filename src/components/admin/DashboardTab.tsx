@@ -142,10 +142,12 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
     try {
       const { startDate, endDate } = getDateRange();
 
+      // Buscar pedidos aceitos no período
       const { data: acceptedOrders, error: ordersError } = await supabase
         .from("orders")
         .select(`
           id,
+          table_id,
           created_at,
           tables!inner(restaurant_id)
         `)
@@ -174,87 +176,125 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
 
       const orderIds = acceptedOrders.map(o => o.id);
 
-      const { data: movements, error: movError } = await supabase
-        .from("cash_movements")
-        .select("movement_type, amount, payment_method, category, description")
-        .eq("restaurant_id", restaurantId)
-        .eq("category", "Pedido")
-        .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString());
+      // Buscar configurações do restaurante para taxa de serviço
+      const { data: restaurant } = await supabase
+        .from("restaurants")
+        .select("service_fee_enabled, service_fee_percentage")
+        .eq("id", restaurantId)
+        .single();
 
-      if (movError) throw movError;
+      // Buscar itens dos pedidos com extras
+      const { data: orderItems } = await supabase
+        .from("order_items")
+        .select(`
+          id,
+          order_id,
+          quantity,
+          price_at_order,
+          products (name),
+          order_item_extras (price_at_order)
+        `)
+        .in("order_id", orderIds);
 
-      const pedidos = (movements || []).filter((m) => {
-        const match = m.description?.match(/Pedido #([a-f0-9-]+)/);
-        return match && orderIds.includes(match[1]);
+      // Calcular valor de cada pedido
+      const orderTotals = new Map<string, number>();
+      const productMap = new Map<string, { quantity: number; revenue: number }>();
+
+      orderItems?.forEach((item: any) => {
+        const orderId = item.order_id;
+        const itemSubtotal = item.price_at_order * item.quantity;
+        const extrasTotal = (item.order_item_extras || []).reduce(
+          (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
+          0
+        );
+        const itemTotal = itemSubtotal + extrasTotal;
+        
+        orderTotals.set(orderId, (orderTotals.get(orderId) || 0) + itemTotal);
+
+        // Para top produtos
+        const productName = item.products?.name || "Produto desconhecido";
+        const existing = productMap.get(productName);
+        if (existing) {
+          existing.quantity += item.quantity;
+          existing.revenue += itemSubtotal;
+        } else {
+          productMap.set(productName, {
+            quantity: item.quantity,
+            revenue: itemSubtotal
+          });
+        }
       });
 
-      const totalRevenue = pedidos.reduce((sum, m) => sum + Number(m.amount || 0), 0);
+      // Aplicar taxa de serviço
+      const serviceFeeEnabled = restaurant?.service_fee_enabled || false;
+      const serviceFeePercentage = restaurant?.service_fee_percentage || 0;
 
-      const isCash = (method?: string | null) => method === "cash" || method === "dinheiro";
-      const isPix = (method?: string | null) => method === "pix";
-      const isCard = (method?: string | null) => method === "card" || method === "credito" || method === "debito";
+      orderTotals.forEach((subtotal, orderId) => {
+        if (serviceFeeEnabled) {
+          const serviceFee = subtotal * (serviceFeePercentage / 100);
+          orderTotals.set(orderId, subtotal + serviceFee);
+        }
+      });
 
-      const cardCount = pedidos.filter((v) => isCard(v.payment_method)).length;
-      const pixCount = pedidos.filter((v) => isPix(v.payment_method)).length;
-      const cashCount = pedidos.filter((v) => isCash(v.payment_method)).length;
+      // Buscar bills para identificar formas de pagamento
+      const tableIds = [...new Set(acceptedOrders.map(o => o.table_id))];
+      const { data: bills } = await supabase
+        .from("bills")
+        .select("table_id, payment_method, status")
+        .in("table_id", tableIds);
 
-      const cardRevenue = pedidos.filter((v) => isCard(v.payment_method)).reduce((sum, v) => sum + Number(v.amount || 0), 0);
-      const pixRevenue = pedidos.filter((v) => isPix(v.payment_method)).reduce((sum, v) => sum + Number(v.amount || 0), 0);
-      const cashRevenue = pedidos.filter((v) => isCash(v.payment_method)).reduce((sum, v) => sum + Number(v.amount || 0), 0);
+      // Mapear pedidos com suas formas de pagamento
+      const orderPayments = new Map<string, string>();
+      acceptedOrders.forEach(order => {
+        const bill = bills?.find(b => b.table_id === order.table_id && b.status === 'paid');
+        orderPayments.set(order.id, bill?.payment_method || 'pending');
+      });
+
+      // Calcular estatísticas
+      let totalRevenue = 0;
+      let cardCount = 0, pixCount = 0, cashCount = 0;
+      let cardRevenue = 0, pixRevenue = 0, cashRevenue = 0;
+
+      const isCash = (method: string) => method === "cash" || method === "dinheiro";
+      const isPix = (method: string) => method === "pix";
+      const isCard = (method: string) => method === "card" || method === "credito" || method === "debito";
+
+      orderTotals.forEach((total, orderId) => {
+        totalRevenue += total;
+        const paymentMethod = orderPayments.get(orderId) || 'pending';
+        
+        if (isCard(paymentMethod)) {
+          cardCount++;
+          cardRevenue += total;
+        } else if (isPix(paymentMethod)) {
+          pixCount++;
+          pixRevenue += total;
+        } else if (isCash(paymentMethod)) {
+          cashCount++;
+          cashRevenue += total;
+        }
+      });
 
       setStats({
         totalRevenue,
-        totalOrders: pedidos.length,
-        averageTicket: pedidos.length > 0 ? totalRevenue / pedidos.length : 0,
+        totalOrders: orderTotals.size,
+        averageTicket: orderTotals.size > 0 ? totalRevenue / orderTotals.size : 0,
         cardPayments: { count: cardCount, total: cardRevenue },
         pixPayments: { count: pixCount, total: pixRevenue },
         cashPayments: { count: cashCount, total: cashRevenue }
       });
 
-      if (orderIds.length > 0) {
-        const { data: orderItems } = await supabase
-          .from("order_items")
-          .select(`
-            quantity,
-            price_at_order,
-            products (
-              name
-            )
-          `)
-          .in("order_id", orderIds);
+      // Top produtos
+      const topProductsList = Array.from(productMap.entries())
+        .map(([name, data]) => ({
+          name,
+          quantity: data.quantity,
+          revenue: data.revenue
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
 
-        if (orderItems && orderItems.length > 0) {
-          const productMap = new Map<string, { quantity: number; revenue: number }>();
-
-          orderItems.forEach((item: any) => {
-            const productName = item.products?.name || "Produto desconhecido";
-            const existing = productMap.get(productName);
-            const itemRevenue = item.price_at_order * item.quantity;
-
-            if (existing) {
-              existing.quantity += item.quantity;
-              existing.revenue += itemRevenue;
-            } else {
-              productMap.set(productName, {
-                quantity: item.quantity,
-                revenue: itemRevenue
-              });
-            }
-          });
-
-          const topProductsList = Array.from(productMap.entries())
-            .map(([name, data]) => ({
-              name,
-              quantity: data.quantity,
-              revenue: data.revenue
-            }))
-            .sort((a, b) => b.revenue - a.revenue)
-            .slice(0, 5);
-
-          setTopProducts(topProductsList);
-        }
-      }
+      setTopProducts(topProductsList);
 
       await calculateCMV(orderIds);
       await calculateOperationalExpenses(startDate, endDate);
