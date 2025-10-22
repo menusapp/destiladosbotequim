@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { DollarSign, ShoppingCart, CreditCard, Smartphone, Banknote, Calendar as CalendarIcon, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfDay, endOfDay, subDays } from "date-fns";
+import { format, startOfDay, endOfDay, subDays, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
@@ -397,7 +397,10 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
 
   const calculateDREValues = () => {
     const { startDate, endDate } = getDateRange();
-    const daysInPeriod = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    // Calcular número de dias EXATAMENTE dentro do intervalo selecionado (inclusivo)
+    const startDay = startOfDay(startDate);
+    const endDay = startOfDay(endDate);
+    const daysInPeriod = differenceInCalendarDays(endDay, startDay) + 1;
     
     let fixedCost = 0;
     let laborCost = 0;
