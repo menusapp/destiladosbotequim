@@ -1031,7 +1031,15 @@ export type Database = {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_delete_bill_and_orders: {
+        Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_delete_order: {
+        Args: { p_order_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_order_and_bill: {
         Args: { p_order_id: string; p_restaurant_id: string }
         Returns: undefined
       }

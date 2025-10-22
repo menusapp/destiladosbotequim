@@ -284,15 +284,14 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         cashPayments: { count: cashCount, total: cashRevenue }
       });
 
-      // Top produtos
+      // Todos os produtos vendidos ordenados por quantidade (crescente)
       const topProductsList = Array.from(productMap.entries())
         .map(([name, data]) => ({
           name,
           quantity: data.quantity,
           revenue: data.revenue
         }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
+        .sort((a, b) => a.quantity - b.quantity); // Ordenar por quantidade crescente
 
       setTopProducts(topProductsList);
 
@@ -543,24 +542,19 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Top 5 Produtos Mais Vendidos</CardTitle>
-            <CardDescription>Produtos com maior volume de vendas no período</CardDescription>
+            <CardTitle>Produtos Vendidos</CardTitle>
+            <CardDescription>Lista completa de produtos vendidos no período (ordenados por quantidade)</CardDescription>
           </CardHeader>
           <CardContent>
             {topProducts.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">Nenhum produto vendido no período</p>
             ) : (
               <div className="space-y-4">
-                {topProducts.map((product, index) => (
+                {topProducts.map((product) => (
                   <div key={product.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                        <span className="text-sm font-bold text-primary">#{index + 1}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">{product.quantity} unidades vendidas</p>
-                      </div>
+                    <div>
+                      <p className="font-medium">{product.name}</p>
+                      <p className="text-sm text-muted-foreground">{product.quantity} unidades vendidas</p>
                     </div>
                     <div className="text-right">
                       <p className="font-bold">R$ {product.revenue.toFixed(2)}</p>

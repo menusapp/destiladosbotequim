@@ -157,7 +157,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const deleteBill = async (billId: string) => {
-    const { error } = await (supabase as any).rpc('admin_delete_bill', {
+    const { error } = await (supabase as any).rpc('admin_delete_bill_and_orders', {
       p_bill_id: billId,
       p_restaurant_id: restaurantId,
     });
@@ -168,7 +168,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
       return;
     }
 
-    toast.success("Conta excluída!");
+    toast.success("Conta e pedidos excluídos!");
     fetchBills();
   };
 
