@@ -191,7 +191,7 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
           order_id,
           quantity,
           price_at_order,
-          products (name, deleted),
+          products (name),
           order_item_extras (price_at_order)
         `)
         .in("order_id", orderIds);
@@ -211,10 +211,8 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         
         orderTotals.set(orderId, (orderTotals.get(orderId) || 0) + itemTotal);
 
-        // Para top produtos - adicionar " - excluído" se necessário
-        const productName = item.products 
-          ? (item.products.deleted ? `${item.products.name} - excluído` : item.products.name)
-          : "Produto excluído";
+        // Para top produtos
+        const productName = item.products?.name || "Produto excluído";
         const existing = productMap.get(productName);
         if (existing) {
           existing.quantity += item.quantity;

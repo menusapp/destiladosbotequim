@@ -144,7 +144,7 @@ const Menu = () => {
       fetchData();
     }
 
-// Configurar realtime para produtos excluídos (deleted=true)
+// Configurar realtime para produtos
 const channel = supabase
   .channel('menu-products-changes')
   .on(
@@ -154,30 +154,9 @@ const channel = supabase
       schema: 'public',
       table: 'products',
     },
-    (payload) => {
-      try {
-        const updated: any = payload?.new;
-        if (updated?.deleted === true) {
-          // Remover produto das categorias e do carrinho
-          setCategories((prev) =>
-            prev
-              .map((cat) => ({
-                ...cat,
-                products: cat.products.filter((p) => p.id !== updated.id),
-              }))
-              .filter((cat) => cat.products.length > 0)
-          );
-          setCart((prev) =>
-            prev.filter((item) => item.product.id !== updated.id)
-          );
-          return;
-        }
-
-        // Se foi restaurado ou atualizado, refetch
-        fetchData();
-      } catch (e) {
-        console.warn("Erro ao processar evento realtime de produtos:", e);
-      }
+    () => {
+      // Para qualquer mudança, refetch os dados
+      fetchData();
     }
   )
   .subscribe();
@@ -319,19 +298,15 @@ const channel = supabase
         const categoriesWithProducts = await Promise.all(
           categoriesResult.data.map(async (category: any) => {
             const { data: products } = await supabase
-  .from("products")
-  .select("id, name, description, price, available, image_url, deleted")
-  .eq("category_id", category.id)
-  .eq("deleted", false); // filtra apenas produtos não excluídos
-
-// Filtra produtos com deleted=false caso o realtime traga algo inconsistente
-const validProducts = (products || []).filter((p: any) => !p.deleted);
+              .from("products")
+              .select("id, name, description, price, available, image_url")
+              .eq("category_id", category.id);
 
             if (!products) return { ...category, products: [] };
 
             // Verificar disponibilidade baseada no estoque para cada produto
             const productsWithAvailability = await Promise.all(
-              validProducts.map(async (product: any) => {
+              products.map(async (product: any) => {
                 // Verificar se tem ingredientes zerados
                 const { data: outOfStock } = await supabase
                   .from("product_ingredients")

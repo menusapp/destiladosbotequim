@@ -59,8 +59,7 @@ export default function CMVDashboardTab({ restaurantId }: { restaurantId: string
           stock_items(price_per_unit)
         )
       `)
-      .eq("categories.restaurant_id", restaurantId)
-      .eq("deleted", false);
+      .eq("categories.restaurant_id", restaurantId);
 
     if (prodError || !products) return;
 

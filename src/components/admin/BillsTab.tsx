@@ -18,7 +18,6 @@ interface OrderItem {
   notes: string | null;
   products: { 
     name: string;
-    deleted: boolean;
   } | null;
   order_item_extras: {
     price_at_order: number;
@@ -99,7 +98,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     // Buscar os pedidos completos de cada conta
     const billsWithOrders = await Promise.all(
       (billsData || []).map(async (bill: any) => {
-        const { data: ordersData } = await supabase
+          const { data: ordersData } = await supabase
           .from("orders")
           .select(`
             customer_name,
@@ -109,7 +108,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
               quantity,
               price_at_order,
               notes,
-              products(name, deleted),
+              products(name),
               order_item_extras(
                 price_at_order,
                 product_extras(name)
@@ -199,9 +198,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
         order.order_items.map(item => {
           const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
           const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
-          const productName = item.products 
-            ? (item.products.deleted ? `${item.products.name} - excluído` : item.products.name)
-            : "Produto excluído";
+          const productName = item.products?.name || "Produto excluído";
           const extras = item.order_item_extras && item.order_item_extras.length > 0
             ? `<div style="font-size: 11px; padding-left: 20px; margin-top: 2px;">+ ${item.order_item_extras.map(e => e.product_extras?.name || "Extra excluído").join(', ')}</div>`
             : '';

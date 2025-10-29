@@ -33,7 +33,6 @@ interface Order {
     notes: string | null;
     products: {
       name: string;
-      deleted: boolean;
     } | null;
     order_item_extras: OrderItemExtra[];
   }[];
@@ -77,7 +76,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
           quantity,
           price_at_order,
           notes,
-          products(name, deleted),
+          products(name),
           order_item_extras(
             price_at_order,
             product_extras(name)
@@ -230,9 +229,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     const orderItems = order.order_items.map((item, idx) => {
       const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
       const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
-      const productName = item.products 
-        ? (item.products.deleted ? `${item.products.name} - excluído` : item.products.name)
-        : "Produto excluído";
+      const productName = item.products?.name || "Produto excluído";
       const extras = item.order_item_extras && item.order_item_extras.length > 0
         ? `<div style="font-size: 11px; padding-left: 20px; margin-top: 2px;">+ ${item.order_item_extras.map(e => e.product_extras?.name || "Extra excluído").join(', ')}</div>`
         : '';
@@ -405,14 +402,12 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 {order.order_items.map((item, idx) => {
                   const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
                   const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
-                  const productName = item.products 
-                    ? (item.products.deleted ? `${item.products.name} - excluído` : item.products.name)
-                    : "Produto excluído";
+                  const productName = item.products?.name || "Produto excluído";
                   
                   return (
                     <div key={idx} className="space-y-0.5">
                       <div className="flex justify-between text-sm">
-                        <span className={!item.products || item.products.deleted ? "text-muted-foreground" : ""}>
+                        <span className={!item.products ? "text-muted-foreground" : ""}>
                           {item.quantity}x {productName}
                         </span>
                         <span className="text-primary font-medium">

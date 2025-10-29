@@ -128,28 +128,18 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     fetchExtraCategories();
     fetchStockItems();
 
-    // Configurar realtime para atualização de produtos excluídos
+    // Configurar realtime para atualizações de produtos
     const channel = supabase
       .channel('products-changes')
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'products',
         },
-        (payload) => {
-          try {
-            const updated: any = payload?.new;
-            if (updated && updated.deleted === true) {
-              // Remover imediatamente sem refetch para evitar "reaparecer"
-              setProducts((prev) => prev.filter((p) => p.id !== updated.id));
-              return;
-            }
-          } catch (e) {
-            console.warn('Erro ao processar payload de realtime de produtos:', e);
-          }
-          // Para outras atualizações, apenas refetch
+        () => {
+          // Para qualquer mudança, apenas refetch
           fetchProducts();
         }
       )
@@ -193,12 +183,11 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
 
     const categoryIds = restaurantCategories.map(c => c.id);
 
-    // Buscar apenas produtos não deletados dessas categorias
+    // Buscar produtos dessas categorias
     const { data, error } = await supabase
       .from("products")
       .select("*")
-      .in("category_id", categoryIds)
-      .eq("deleted", false);
+      .in("category_id", categoryIds);
 
     if (error) {
       toast.error("Erro ao carregar produtos");
@@ -695,7 +684,7 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
 const handleDelete = async (id: string) => {
-  if (!confirm("Tem certeza que deseja excluir este produto? Os pedidos já feitos com este produto serão mantidos no histórico.")) return;
+  if (!confirm("Tem certeza que deseja excluir este produto permanentemente?")) return;
 
   if (isRestaurantOpen) {
     toast.error("Feche o restaurante para excluir produtos");
@@ -703,7 +692,24 @@ const handleDelete = async (id: string) => {
   }
 
   try {
-    // Soft delete: marcar como excluído e ocultar de forma imediata
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Erro ao excluir produto:", error);
+      toast.error(`Erro ao excluir produto: ${error.message}`);
+      return;
+    }
+
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    toast.success("Produto excluído permanentemente!");
+  } catch (error) {
+    console.error("Erro ao excluir produto:", error);
+    toast.error("Erro ao excluir produto");
+  }
+};
     const { error } = await supabase
       .from("products")
       .update({
