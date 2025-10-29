@@ -412,7 +412,7 @@ export default function StockTab({ restaurantId }: { restaurantId: string }) {
             </Dialog>
           </div>
 
-          <div className="space-y-2">
+          <div className="max-h-[500px] overflow-y-auto space-y-2 pr-2">
           {stockItems
             .filter((item) =>
               item.name.toLowerCase().includes(searchQuery.toLowerCase())

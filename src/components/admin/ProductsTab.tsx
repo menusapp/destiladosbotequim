@@ -1391,7 +1391,7 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
               <p className="text-muted-foreground">Nenhum produto criado ainda</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="max-h-[500px] overflow-y-auto space-y-2 pr-2">
           {products
               .filter((product) =>
                 product.name.toLowerCase().includes(searchQuery.toLowerCase())

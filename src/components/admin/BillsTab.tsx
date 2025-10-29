@@ -4,9 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Clock, Check, CreditCard, Smartphone, Banknote, Printer, Search, Trash2 } from "lucide-react";
+import { Clock, Check, CreditCard, Smartphone, Banknote, Printer, Search, Trash2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { startOfDay, endOfDay, format } from "date-fns";
+import { pt } from "date-fns/locale";
 
 interface OrderItem {
   quantity: number;
@@ -43,6 +47,8 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [startDate, setStartDate] = useState<Date>(startOfDay(new Date()));
+  const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
 
   useEffect(() => {
     fetchBills();
@@ -64,7 +70,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurantId]);
+  }, [restaurantId, startDate, endDate]);
 
   const fetchBills = async () => {
     setLoading(true);
@@ -76,6 +82,8 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
         tables!inner(table_number, restaurant_id)
       `)
       .eq("tables.restaurant_id", restaurantId)
+      .gte("created_at", startDate.toISOString())
+      .lte("created_at", endDate.toISOString())
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -323,26 +331,58 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 flex flex-col h-full">
+      <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold">Contas Solicitadas</h3>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por mesa ou cliente..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 w-64"
-          />
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Calendar className="h-4 w-4 mr-2" />
+                {format(startDate, "dd/MM/yy", { locale: pt })} - {format(endDate, "dd/MM/yy", { locale: pt })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="p-3 space-y-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Data inicial</label>
+                  <CalendarComponent
+                    mode="single"
+                    selected={startDate}
+                    onSelect={(date) => date && setStartDate(startOfDay(date))}
+                    locale={pt}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Data final</label>
+                  <CalendarComponent
+                    mode="single"
+                    selected={endDate}
+                    onSelect={(date) => date && setEndDate(endOfDay(date))}
+                    locale={pt}
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por mesa ou cliente..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-64"
+            />
+          </div>
         </div>
       </div>
 
       {bills.length === 0 ? (
         <div className="text-center py-12 border rounded-lg bg-secondary/20">
-          <p className="text-muted-foreground">Nenhuma conta solicitada</p>
+          <p className="text-muted-foreground">Nenhuma conta neste período</p>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
           {bills
             .filter((bill) => {
               const searchLower = searchQuery.toLowerCase();
