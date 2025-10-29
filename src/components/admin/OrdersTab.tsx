@@ -323,8 +323,8 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   return (
-    <div className="space-y-4 flex flex-col h-full">
-      <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between gap-4 mb-4">
         <h3 className="text-lg font-semibold">Pedidos em Tempo Real</h3>
         <div className="flex items-center gap-2">
           <Popover>

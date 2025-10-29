@@ -292,11 +292,11 @@ const RestaurantAdmin = () => {
                 <TablesTab restaurantId={restaurant.id} />
               </TabsContent>
 
-              <TabsContent value="orders">
+              <TabsContent value="orders" className="h-[calc(100vh-28rem)]">
                 <OrdersTab restaurantId={restaurant.id} />
               </TabsContent>
 
-              <TabsContent value="bills">
+              <TabsContent value="bills" className="h-[calc(100vh-28rem)]">
                 <BillsTab restaurantId={restaurant.id} />
               </TabsContent>
 
