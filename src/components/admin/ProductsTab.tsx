@@ -690,6 +690,9 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       }
 
       toast.success("Produto excluído! Pedidos históricos foram mantidos.");
+      // Remover imediatamente da lista local para evitar reaparecimento por cache/estado
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      // Recarregar da base para garantir consistência
       fetchProducts();
     } catch (error) {
       console.error("Erro ao excluir produto:", error);

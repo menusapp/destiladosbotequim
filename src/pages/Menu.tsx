@@ -314,6 +314,19 @@ const Menu = () => {
         );
         setCategories(filteredCategories);
         
+        // Remover do carrinho itens de produtos que não estão mais disponíveis/listados (ex.: deletados)
+        const validProductIds = new Set(
+          filteredCategories.flatMap((cat: any) => cat.products.map((p: any) => p.id))
+        );
+        setCart((prev) => {
+          const pruned = prev.filter((item) => validProductIds.has(item.product.id));
+          if (pruned.length !== prev.length) {
+            sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(pruned));
+            toast.error("Alguns itens foram removidos do carrinho pois não estão mais disponíveis.");
+          }
+          return pruned;
+        });
+        
         if (filteredCategories.length > 0 && !selectedCategoryId) {
           setSelectedCategoryId(filteredCategories[0].id);
         }
