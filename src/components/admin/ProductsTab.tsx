@@ -127,6 +127,28 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     fetchProducts();
     fetchExtraCategories();
     fetchStockItems();
+
+    // Configurar realtime para atualização de produtos excluídos
+    const channel = supabase
+      .channel('products-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'products',
+        },
+        (payload) => {
+          console.log("Produto atualizado:", payload);
+          // Recarregar produtos quando houver update (incluindo soft delete)
+          fetchProducts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [restaurantId]);
 
   const fetchStockItems = async () => {

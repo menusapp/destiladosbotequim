@@ -230,7 +230,8 @@ export default function CostsMarginsTab({ restaurantId }: CostsMarginsTabProps) 
             )
           )
         `)
-        .eq("categories.restaurant_id", restaurantId);
+        .eq("categories.restaurant_id", restaurantId)
+        .eq("deleted", false);
 
       if (error) throw error;
 

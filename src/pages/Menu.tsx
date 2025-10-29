@@ -143,6 +143,28 @@ const Menu = () => {
       setShowCustomerDialog(true);
       fetchData();
     }
+
+    // Configurar realtime para produtos excluídos
+    const channel = supabase
+      .channel('menu-products-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'products',
+        },
+        (payload) => {
+          console.log("Produto atualizado no menu:", payload);
+          // Recarregar dados quando produto for atualizado (incluindo soft delete)
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [restaurantSlug, tableNumber]);
 
   useEffect(() => {
