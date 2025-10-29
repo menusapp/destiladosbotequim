@@ -139,8 +139,17 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
           table: 'products',
         },
         (payload) => {
-          console.log("Produto atualizado:", payload);
-          // Recarregar produtos quando houver update (incluindo soft delete)
+          try {
+            const updated: any = payload?.new;
+            if (updated && updated.deleted === true) {
+              // Remover imediatamente sem refetch para evitar "reaparecer"
+              setProducts((prev) => prev.filter((p) => p.id !== updated.id));
+              return;
+            }
+          } catch (e) {
+            console.warn('Erro ao processar payload de realtime de produtos:', e);
+          }
+          // Para outras atualizações, apenas refetch
           fetchProducts();
         }
       )

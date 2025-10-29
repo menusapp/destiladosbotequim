@@ -155,8 +155,26 @@ const Menu = () => {
           table: 'products',
         },
         (payload) => {
-          console.log("Produto atualizado no menu:", payload);
-          // Recarregar dados quando produto for atualizado (incluindo soft delete)
+          try {
+            const updated: any = payload?.new;
+            if (updated && updated.deleted === true) {
+              // Remover produto das categorias imediatamente
+              setCategories((prev) =>
+                prev
+                  .map((cat) => ({
+                    ...cat,
+                    products: cat.products.filter((p) => p.id !== updated.id),
+                  }))
+                  .filter((cat) => cat.products.length > 0)
+              );
+              // Remover do carrinho
+              setCart((prev) => prev.filter((item) => item.product.id !== updated.id));
+              return;
+            }
+          } catch (e) {
+            console.warn('Erro ao processar payload de realtime no menu:', e);
+          }
+          // Outras atualizações: refetch
           fetchData();
         }
       )
