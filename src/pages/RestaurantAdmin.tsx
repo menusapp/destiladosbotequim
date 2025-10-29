@@ -288,7 +288,7 @@ const RestaurantAdmin = () => {
                 <ProductsTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />
               </TabsContent>
 
-              <TabsContent value="tables">
+              <TabsContent value="tables" className="h-[calc(100vh-28rem)]">
                 <TablesTab restaurantId={restaurant.id} />
               </TabsContent>
 

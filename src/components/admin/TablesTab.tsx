@@ -138,9 +138,9 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col h-full">
       {/* Resumo de Ocupação */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <div className="p-4 border rounded-lg bg-card">
           <p className="text-sm text-muted-foreground mb-1">Total de Mesas</p>
           <p className="text-3xl font-bold">{tables.length}</p>
@@ -167,7 +167,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         </div>
       </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold">Mesas do Restaurante</h3>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -204,12 +204,13 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         </Dialog>
       </div>
 
-      {tables.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg bg-secondary/20">
-          <p className="text-muted-foreground">Nenhuma mesa criada ainda</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
+      <div className="flex-1 overflow-y-auto pr-2">
+        {tables.length === 0 ? (
+          <div className="text-center py-12 border rounded-lg bg-secondary/20">
+            <p className="text-muted-foreground">Nenhuma mesa criada ainda</p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
           {tables.map((table) => (
             <div
               key={table.id}
@@ -284,8 +285,9 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
               </div>
             </div>
           ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
