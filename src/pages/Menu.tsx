@@ -278,7 +278,8 @@ const Menu = () => {
             const { data: products } = await supabase
               .from("products")
               .select("id, name, description, price, available, image_url")
-              .eq("category_id", category.id);
+              .eq("category_id", category.id)
+              .eq("deleted", false);
 
             if (!products) return { ...category, products: [] };
 

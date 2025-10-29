@@ -162,11 +162,12 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
 
     const categoryIds = restaurantCategories.map(c => c.id);
 
-    // Buscar apenas produtos dessas categorias
+    // Buscar apenas produtos não deletados dessas categorias
     const { data, error } = await supabase
       .from("products")
       .select("*")
-      .in("category_id", categoryIds);
+      .in("category_id", categoryIds)
+      .eq("deleted", false);
 
     if (error) {
       toast.error("Erro ao carregar produtos");
@@ -671,30 +672,16 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     }
 
     try {
-      // 1. Buscar todos os extras do produto
-      const { data: productExtras } = await supabase
-        .from("product_extras")
-        .select("id")
-        .eq("product_id", id);
-
-      // 2. Deletar ingredientes dos extras
-      if (productExtras && productExtras.length > 0) {
-        const extraIds = productExtras.map(e => e.id);
-        await supabase
-          .from("product_extra_ingredients")
-          .delete()
-          .in("product_extra_id", extraIds);
-      }
-
-      // 3. Deletar os extras
-      await supabase.from("product_extras").delete().eq("product_id", id);
-
-      // 4. Deletar ingredientes do produto
-      await supabase.from("product_ingredients").delete().eq("product_id", id);
-
-      // 5. Deletar o produto
-      // Os order_items permanecem para histórico de faturamento
-      const { error } = await supabase.from("products").delete().eq("id", id);
+      // Soft delete: marcar como excluído em vez de deletar fisicamente
+      // Isso mantém o histórico de pedidos e métricas funcionando
+      const { error } = await supabase
+        .from("products")
+        .update({ 
+          deleted: true, 
+          deleted_at: new Date().toISOString(),
+          available: false // Marca como indisponível também
+        })
+        .eq("id", id);
 
       if (error) {
         console.error("Erro ao excluir produto:", error);

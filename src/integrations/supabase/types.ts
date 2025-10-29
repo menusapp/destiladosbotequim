@@ -672,6 +672,8 @@ export type Database = {
           available: boolean | null
           category_id: string
           created_at: string | null
+          deleted: boolean | null
+          deleted_at: string | null
           description: string | null
           id: string
           image_url: string | null
@@ -683,6 +685,8 @@ export type Database = {
           available?: boolean | null
           category_id: string
           created_at?: string | null
+          deleted?: boolean | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
@@ -694,6 +698,8 @@ export type Database = {
           available?: boolean | null
           category_id?: string
           created_at?: string | null
+          deleted?: boolean | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
