@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
 import ProductDetailDialog from "@/components/menu/ProductDetailDialog";
+import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
 
 interface Product {
   id: string;
@@ -269,8 +270,9 @@ const channel = supabase
       }
 
       if (!restData.is_open) {
-        toast.error("Restaurante está fechado no momento");
-        navigate("/");
+        // Restaurante fechado - não mostrar erro, apenas a tela de fechado
+        setRestaurant(restData);
+        setLoading(false);
         return;
       }
 
@@ -468,6 +470,17 @@ const channel = supabase
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-muted-foreground">Restaurante não encontrado</p>
       </div>
+    );
+  }
+
+  // Se restaurante está fechado, mostrar tela de fechado
+  if (!restaurant.is_open) {
+    return (
+      <RestaurantClosedScreen 
+        restaurantName={restaurant.name}
+        logoUrl={restaurant.logo_url}
+        primaryColor={restaurant.primary_color}
+      />
     );
   }
 

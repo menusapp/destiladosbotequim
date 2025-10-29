@@ -710,35 +710,6 @@ const handleDelete = async (id: string) => {
     toast.error("Erro ao excluir produto");
   }
 };
-    const { error } = await supabase
-      .from("products")
-      .update({
-        deleted: true,
-        deleted_at: new Date().toISOString(),
-        available: false
-      })
-      .eq("id", id)
-      .select();
-
-    if (error) {
-      console.error("Erro ao excluir produto:", error);
-      toast.error(`Erro ao excluir produto: ${error.message}`);
-      return;
-    }
-
-    // Remover da lista imediatamente (sem refetch)
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-
-    // Garantir que o realtime não faça o produto “reaparecer”
-    await supabase.removeAllChannels();
-
-    toast.success("Produto excluído! Pedidos históricos foram mantidos.");
-
-  } catch (error) {
-    console.error("Erro ao excluir produto:", error);
-    toast.error("Erro ao excluir produto");
-  }
-};
 
   const openEditDialog = async (product: Product) => {
     if (isRestaurantOpen) {
