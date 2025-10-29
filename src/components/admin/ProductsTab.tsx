@@ -671,21 +671,41 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     }
 
     try {
-      // Apenas deletar product_extras e o produto
-      // Os order_items permanecem para histórico de faturamento
+      // 1. Buscar todos os extras do produto
+      const { data: productExtras } = await supabase
+        .from("product_extras")
+        .select("id")
+        .eq("product_id", id);
+
+      // 2. Deletar ingredientes dos extras
+      if (productExtras && productExtras.length > 0) {
+        const extraIds = productExtras.map(e => e.id);
+        await supabase
+          .from("product_extra_ingredients")
+          .delete()
+          .in("product_extra_id", extraIds);
+      }
+
+      // 3. Deletar os extras
       await supabase.from("product_extras").delete().eq("product_id", id);
 
+      // 4. Deletar ingredientes do produto
+      await supabase.from("product_ingredients").delete().eq("product_id", id);
+
+      // 5. Deletar o produto
+      // Os order_items permanecem para histórico de faturamento
       const { error } = await supabase.from("products").delete().eq("id", id);
 
       if (error) {
-        toast.error("Erro ao excluir produto");
+        console.error("Erro ao excluir produto:", error);
+        toast.error(`Erro ao excluir produto: ${error.message}`);
         return;
       }
 
       toast.success("Produto excluído! Pedidos históricos foram mantidos.");
       fetchProducts();
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao excluir produto:", error);
       toast.error("Erro ao excluir produto");
     }
   };
