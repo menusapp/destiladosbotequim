@@ -692,10 +692,10 @@ const handleDelete = async (id: string) => {
   }
 
   try {
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.rpc('admin_delete_product', {
+      p_product_id: id,
+      p_restaurant_id: restaurantId,
+    });
 
     if (error) {
       console.error("Erro ao excluir produto:", error);

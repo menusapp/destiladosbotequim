@@ -1035,12 +1035,28 @@ export type Database = {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_delete_category: {
+        Args: { p_category_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_delete_order: {
         Args: { p_order_id: string; p_restaurant_id: string }
         Returns: undefined
       }
       admin_delete_order_and_bill: {
         Args: { p_order_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_product: {
+        Args: { p_product_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_product_extra: {
+        Args: { p_product_extra_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_stock_item: {
+        Args: { p_restaurant_id: string; p_stock_item_id: string }
         Returns: undefined
       }
       admin_mark_bill_on_the_way: {
