@@ -694,42 +694,45 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     fetchProducts();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este produto? Os pedidos já feitos com este produto serão mantidos no histórico.")) return;
+const handleDelete = async (id: string) => {
+  if (!confirm("Tem certeza que deseja excluir este produto? Os pedidos já feitos com este produto serão mantidos no histórico.")) return;
 
-    if (isRestaurantOpen) {
-      toast.error("Feche o restaurante para excluir produtos");
+  if (isRestaurantOpen) {
+    toast.error("Feche o restaurante para excluir produtos");
+    return;
+  }
+
+  try {
+    // Soft delete: marcar como excluído e ocultar de forma imediata
+    const { error } = await supabase
+      .from("products")
+      .update({
+        deleted: true,
+        deleted_at: new Date().toISOString(),
+        available: false
+      })
+      .eq("id", id)
+      .select();
+
+    if (error) {
+      console.error("Erro ao excluir produto:", error);
+      toast.error(`Erro ao excluir produto: ${error.message}`);
       return;
     }
 
-    try {
-      // Soft delete: marcar como excluído em vez de deletar fisicamente
-      // Isso mantém o histórico de pedidos e métricas funcionando
-      const { error } = await supabase
-        .from("products")
-        .update({ 
-          deleted: true, 
-          deleted_at: new Date().toISOString(),
-          available: false // Marca como indisponível também
-        })
-        .eq("id", id);
+    // Remover da lista imediatamente (sem refetch)
+    setProducts((prev) => prev.filter((p) => p.id !== id));
 
-      if (error) {
-        console.error("Erro ao excluir produto:", error);
-        toast.error(`Erro ao excluir produto: ${error.message}`);
-        return;
-      }
+    // Garantir que o realtime não faça o produto “reaparecer”
+    await supabase.removeAllChannels();
 
-      toast.success("Produto excluído! Pedidos históricos foram mantidos.");
-      // Remover imediatamente da lista local para evitar reaparecimento por cache/estado
-      setProducts((prev) => prev.filter((p) => p.id !== id));
-      // Recarregar da base para garantir consistência
-      fetchProducts();
-    } catch (error) {
-      console.error("Erro ao excluir produto:", error);
-      toast.error("Erro ao excluir produto");
-    }
-  };
+    toast.success("Produto excluído! Pedidos históricos foram mantidos.");
+
+  } catch (error) {
+    console.error("Erro ao excluir produto:", error);
+    toast.error("Erro ao excluir produto");
+  }
+};
 
   const openEditDialog = async (product: Product) => {
     if (isRestaurantOpen) {
