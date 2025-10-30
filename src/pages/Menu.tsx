@@ -145,9 +145,9 @@ const Menu = () => {
       fetchData();
     }
 
-// Configurar realtime para produtos
+// Configurar realtime para produtos e restaurante
 const channel = supabase
-  .channel('menu-products-changes')
+  .channel('menu-changes')
   .on(
     'postgres_changes',
     {
@@ -155,10 +155,16 @@ const channel = supabase
       schema: 'public',
       table: 'products',
     },
-    () => {
-      // Para qualquer mudança, refetch os dados
-      fetchData();
-    }
+    () => fetchData()
+  )
+  .on(
+    'postgres_changes',
+    {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'restaurants',
+    },
+    () => fetchData()
   )
   .subscribe();
 

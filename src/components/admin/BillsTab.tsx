@@ -4,13 +4,16 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Clock, Check, CreditCard, Smartphone, Banknote, Printer, Search, Trash2, Calendar } from "lucide-react";
+import { Clock, Check, CreditCard, Smartphone, Banknote, Printer, Search, Trash2, Calendar, Plus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { startOfDay, endOfDay, format } from "date-fns";
 import { pt } from "date-fns/locale";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface OrderItem {
   quantity: number;
@@ -51,9 +54,19 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState<Date>(startOfDay(new Date()));
   const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
+  
+  // Manual bill states
+  const [tables, setTables] = useState<any[]>([]);
+  const [manualBill, setManualBill] = useState({
+    tableId: '',
+    customerName: '',
+    totalAmount: '',
+    paymentMethod: 'cash',
+  });
 
   useEffect(() => {
     fetchBills();
+    fetchTables();
     
     // Realtime subscription
     const channel = supabase
@@ -73,6 +86,16 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
       supabase.removeChannel(channel);
     };
   }, [restaurantId, startDate, endDate]);
+
+  const fetchTables = async () => {
+    const { data } = await supabase
+      .from('tables')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .order('table_number');
+    
+    setTables(data || []);
+  };
 
   const fetchBills = async () => {
     setLoading(true);
@@ -180,6 +203,59 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
     toast.success("Conta e pedidos excluídos!");
     fetchBills();
+  };
+
+  const handleCreateManualBill = async () => {
+    if (!manualBill.tableId || !manualBill.totalAmount) {
+      toast.error('Preencha mesa e valor total');
+      return;
+    }
+
+    try {
+      const totalAmount = parseFloat(manualBill.totalAmount);
+      
+      // Create bill directly as paid
+      const { error: billError } = await supabase
+        .from('bills')
+        .insert({
+          table_id: manualBill.tableId,
+          subtotal: totalAmount,
+          service_fee: 0,
+          total_amount: totalAmount,
+          payment_method: manualBill.paymentMethod,
+          status: 'paid',
+          paid_at: new Date().toISOString()
+        });
+
+      if (billError) throw billError;
+
+      // Create order for the bill
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          table_id: manualBill.tableId,
+          customer_name: manualBill.customerName || 'Cliente Balcão',
+          customer_cpf: '000.000.000-00',
+          status: 'accepted',
+          notes: 'Conta Manual'
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      toast.success('Conta manual criada com sucesso!');
+      setManualBill({
+        tableId: '',
+        customerName: '',
+        totalAmount: '',
+        paymentMethod: 'cash'
+      });
+      fetchBills();
+    } catch (error) {
+      console.error('Error creating manual bill:', error);
+      toast.error('Erro ao criar conta manual');
+    }
   };
 
   const printBill = (bill: Bill) => {
@@ -333,8 +409,84 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between gap-4 mb-4">
+    <div className="flex flex-col h-full space-y-4">
+      {/* Manual Bill Creation */}
+      <Collapsible defaultOpen={false}>
+        <Card>
+          <CardHeader>
+            <CollapsibleTrigger className="w-full">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="h-5 w-5" />
+                  Criar Conta Manual
+                </CardTitle>
+                <ChevronDown className="h-5 w-5 transition-transform" />
+              </div>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Mesa</Label>
+                  <Select value={manualBill.tableId} onValueChange={(value) => setManualBill({ ...manualBill, tableId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a mesa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tables.map(table => (
+                        <SelectItem key={table.id} value={table.id}>
+                          Mesa {table.table_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Nome do Cliente (Opcional)</Label>
+                  <Input
+                    placeholder="Nome do cliente"
+                    value={manualBill.customerName}
+                    onChange={(e) => setManualBill({ ...manualBill, customerName: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Valor Total (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={manualBill.totalAmount}
+                    onChange={(e) => setManualBill({ ...manualBill, totalAmount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Método de Pagamento</Label>
+                  <Select value={manualBill.paymentMethod} onValueChange={(value) => setManualBill({ ...manualBill, paymentMethod: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Dinheiro</SelectItem>
+                      <SelectItem value="card">Cartão</SelectItem>
+                      <SelectItem value="pix">PIX</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button onClick={handleCreateManualBill} className="w-full">
+                Criar Conta Manual (Paga)
+              </Button>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold">Contas Solicitadas</h3>
         <div className="flex items-center gap-2">
           <Popover>

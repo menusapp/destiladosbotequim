@@ -3,13 +3,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Clock, Check, Printer, Search, Trash2, Calendar } from "lucide-react";
+import { Clock, Check, Printer, Search, Trash2, Calendar, Plus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { startOfDay, endOfDay, format } from "date-fns";
 import { pt } from "date-fns/locale";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -43,9 +47,21 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState<Date>(startOfDay(new Date()));
   const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
+  
+  // Manual order states
+  const [tables, setTables] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [manualOrder, setManualOrder] = useState({
+    tableId: '',
+    customerName: '',
+    customerCPF: '',
+    selectedProducts: [] as { productId: string; quantity: number; price: number; name: string }[],
+  });
 
   useEffect(() => {
     fetchOrders();
+    fetchTables();
+    fetchProducts();
     
     // Realtime subscription
     const channel = supabase
@@ -65,6 +81,27 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       supabase.removeChannel(channel);
     };
   }, [restaurantId, startDate, endDate]);
+
+  const fetchTables = async () => {
+    const { data } = await supabase
+      .from('tables')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .order('table_number');
+    
+    setTables(data || []);
+  };
+
+  const fetchProducts = async () => {
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, price, categories!inner(restaurant_id)')
+      .eq('categories.restaurant_id', restaurantId)
+      .eq('available', true)
+      .order('name');
+    
+    setProducts(data || []);
+  };
 
   const fetchOrders = async () => {
     const { data, error } = await supabase
@@ -222,6 +259,101 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     fetchOrders();
   };
 
+  const handleAddProductToManualOrder = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    const existing = manualOrder.selectedProducts.find(p => p.productId === productId);
+    if (existing) {
+      setManualOrder({
+        ...manualOrder,
+        selectedProducts: manualOrder.selectedProducts.map(p =>
+          p.productId === productId ? { ...p, quantity: p.quantity + 1 } : p
+        )
+      });
+    } else {
+      setManualOrder({
+        ...manualOrder,
+        selectedProducts: [...manualOrder.selectedProducts, {
+          productId: product.id,
+          quantity: 1,
+          price: product.price,
+          name: product.name
+        }]
+      });
+    }
+  };
+
+  const handleRemoveProductFromManualOrder = (productId: string) => {
+    setManualOrder({
+      ...manualOrder,
+      selectedProducts: manualOrder.selectedProducts.filter(p => p.productId !== productId)
+    });
+  };
+
+  const handleUpdateProductQuantity = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      handleRemoveProductFromManualOrder(productId);
+      return;
+    }
+    setManualOrder({
+      ...manualOrder,
+      selectedProducts: manualOrder.selectedProducts.map(p =>
+        p.productId === productId ? { ...p, quantity } : p
+      )
+    });
+  };
+
+  const handleCreateManualOrder = async () => {
+    if (!manualOrder.tableId || !manualOrder.customerName || !manualOrder.customerCPF || manualOrder.selectedProducts.length === 0) {
+      toast.error('Preencha todos os campos e adicione pelo menos um produto');
+      return;
+    }
+
+    try {
+      // Create order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          table_id: manualOrder.tableId,
+          customer_name: manualOrder.customerName,
+          customer_cpf: manualOrder.customerCPF,
+          status: 'accepted',
+          notes: 'Pedido Manual'
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Create order items
+      const orderItems = manualOrder.selectedProducts.map(p => ({
+        order_id: order.id,
+        product_id: p.productId,
+        quantity: p.quantity,
+        price_at_order: p.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      toast.success('Pedido manual criado com sucesso!');
+      setManualOrder({
+        tableId: '',
+        customerName: '',
+        customerCPF: '',
+        selectedProducts: []
+      });
+      fetchOrders();
+    } catch (error) {
+      console.error('Error creating manual order:', error);
+      toast.error('Erro ao criar pedido manual');
+    }
+  };
+
   const printOrder = (order: Order) => {
     const printWindow = window.open('', '', 'height=600,width=400');
     if (!printWindow) return;
@@ -323,8 +455,128 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between gap-4 mb-4">
+    <div className="flex flex-col h-full space-y-4">
+      {/* Manual Order Creation */}
+      <Collapsible defaultOpen={false}>
+        <Card>
+          <CardHeader>
+            <CollapsibleTrigger className="w-full">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="h-5 w-5" />
+                  Criar Pedido Manual (Balcão)
+                </CardTitle>
+                <ChevronDown className="h-5 w-5 transition-transform" />
+              </div>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label>Mesa</Label>
+                  <Select value={manualOrder.tableId} onValueChange={(value) => setManualOrder({ ...manualOrder, tableId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a mesa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tables.map(table => (
+                        <SelectItem key={table.id} value={table.id}>
+                          Mesa {table.table_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Nome do Cliente</Label>
+                  <Input
+                    placeholder="Nome completo"
+                    value={manualOrder.customerName}
+                    onChange={(e) => setManualOrder({ ...manualOrder, customerName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>CPF do Cliente</Label>
+                  <Input
+                    placeholder="000.000.000-00"
+                    value={manualOrder.customerCPF}
+                    onChange={(e) => setManualOrder({ ...manualOrder, customerCPF: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Adicionar Produtos</Label>
+                <Select onValueChange={handleAddProductToManualOrder}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um produto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map(product => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.name} - R$ {product.price.toFixed(2)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {manualOrder.selectedProducts.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Produtos Selecionados:</Label>
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {manualOrder.selectedProducts.map(product => (
+                      <div key={product.productId} className="flex items-center justify-between p-2 bg-secondary/30 rounded">
+                        <span>{product.name}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateProductQuantity(product.productId, product.quantity - 1)}
+                            >
+                              -
+                            </Button>
+                            <span className="w-8 text-center">{product.quantity}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateProductQuantity(product.productId, product.quantity + 1)}
+                            >
+                              +
+                            </Button>
+                          </div>
+                          <span className="font-bold">R$ {(product.price * product.quantity).toFixed(2)}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRemoveProductFromManualOrder(product.productId)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t">
+                    <span className="font-bold text-lg">Total:</span>
+                    <span className="font-bold text-lg">
+                      R$ {manualOrder.selectedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleCreateManualOrder} className="w-full">
+                Criar Pedido Manual
+              </Button>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold">Pedidos em Tempo Real</h3>
         <div className="flex items-center gap-2">
           <Popover>

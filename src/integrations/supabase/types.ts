@@ -129,6 +129,41 @@ export type Database = {
           },
         ]
       }
+      card_fees_config: {
+        Row: {
+          created_at: string | null
+          credit_fee: number
+          debit_fee: number
+          id: string
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          credit_fee?: number
+          debit_fee?: number
+          id?: string
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          credit_fee?: number
+          debit_fee?: number
+          id?: string
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_fees_config_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_movements: {
         Row: {
           amount: number
@@ -381,6 +416,82 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "extra_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fixed_costs: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fixed_costs_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      labor_costs: {
+        Row: {
+          created_at: string | null
+          employee_name: string
+          id: string
+          restaurant_id: string
+          role: string | null
+          salary: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          employee_name: string
+          id?: string
+          restaurant_id: string
+          role?: string | null
+          salary?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          employee_name?: string
+          id?: string
+          restaurant_id?: string
+          role?: string | null
+          salary?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labor_costs_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
         ]
@@ -1015,6 +1126,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_roles_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      variable_costs: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          percentage: number | null
+          restaurant_id: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          percentage?: number | null
+          restaurant_id: string
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          percentage?: number | null
+          restaurant_id?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "variable_costs_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"

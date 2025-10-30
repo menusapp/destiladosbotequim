@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp, Wallet } from "lucide-react";
+import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp, Wallet, Target } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import ProductsTab from "@/components/admin/ProductsTab";
@@ -15,7 +15,8 @@ import DashboardTab from "@/components/admin/DashboardTab";
 import BillsTab from "@/components/admin/BillsTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
-import CostsMarginsTab from "@/components/admin/CostsMarginsTab";
+import CostosTab from "@/components/admin/CostosTab";
+import MargensTab from "@/components/admin/MargensTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
@@ -223,18 +224,22 @@ const RestaurantAdmin = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-9 text-xs">
+              <TabsList className="grid w-full grid-cols-10 text-xs">
                 <TabsTrigger value="dashboard">
                   <BarChart3 className="h-4 w-4 mr-1" />
                   Dashboard
                 </TabsTrigger>
                 <TabsTrigger value="custos">
                   <TrendingUp className="h-4 w-4 mr-1" />
-                  Custos & Margens
+                  Custos
+                </TabsTrigger>
+                <TabsTrigger value="margens">
+                  <Target className="h-4 w-4 mr-1" />
+                  Margens
                 </TabsTrigger>
                 <TabsTrigger value="fluxo-caixa">
                   <Wallet className="h-4 w-4 mr-1" />
-                  Fluxo de Caixa
+                  Caixa
                 </TabsTrigger>
                 <TabsTrigger value="stock">
                   <Warehouse className="h-4 w-4 mr-1" />
@@ -273,7 +278,11 @@ const RestaurantAdmin = () => {
               </TabsContent>
 
               <TabsContent value="custos">
-                <CostsMarginsTab restaurantId={restaurant.id} />
+                <CostosTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="margens">
+                <MargensTab restaurantId={restaurant.id} />
               </TabsContent>
 
               <TabsContent value="fluxo-caixa">
