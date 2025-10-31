@@ -402,30 +402,71 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
 
   const calculateDREValues = () => {
     const { startDate, endDate } = getDateRange();
-    const startDay = startOfDay(startDate);
-    const endDay = startOfDay(endDate);
-    const daysInPeriod = differenceInCalendarDays(endDay, startDay) + 1;
     
-    // Fixed costs (proportional to days)
-    const totalFixedCosts = fixedCosts.reduce((sum, cost) => sum + Number(cost.amount), 0) * daysInPeriod;
+    // Helper: calcular rateio mensal proporcional aos dias do filtro
+    const calculateMonthlyProration = (monthlyCost: number): number => {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      // Se mesma data, é 1 dia
+      if (start.getTime() === end.getTime()) {
+        const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+        return monthlyCost * (1 / daysInMonth);
+      }
+      
+      let totalProration = 0;
+      const currentMonth = new Date(start);
+      currentMonth.setDate(1); // Primeiro dia do mês inicial
+      
+      while (currentMonth <= end) {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        // Primeiro e último dia do mês atual
+        const firstDayOfMonth = new Date(year, month, 1);
+        const lastDayOfMonth = new Date(year, month, daysInMonth);
+        
+        // Interseção do filtro com o mês atual
+        const periodStart = start > firstDayOfMonth ? start : firstDayOfMonth;
+        const periodEnd = end < lastDayOfMonth ? end : lastDayOfMonth;
+        
+        // Dias do filtro dentro deste mês (inclusive)
+        const daysInPeriod = Math.floor((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        
+        // Rateio proporcional deste mês
+        totalProration += monthlyCost * (daysInPeriod / daysInMonth);
+        
+        // Avançar para o próximo mês
+        currentMonth.setMonth(currentMonth.getMonth() + 1);
+      }
+      
+      return totalProration;
+    };
     
-    // Labor costs (proportional to days)
-    const totalLaborCosts = laborCosts.reduce((sum, cost) => sum + Number(cost.salary), 0) * daysInPeriod;
+    // Custos Fixos Mensais (rateados proporcionalmente)
+    const totalFixedCostsMonthly = fixedCosts.reduce((sum, cost) => sum + Number(cost.amount), 0);
+    const totalFixedCosts = calculateMonthlyProration(totalFixedCostsMonthly);
     
-    // Variable costs
+    // CMO - Custo de Mão de Obra Mensal (rateado proporcionalmente)
+    const totalLaborCostsMonthly = laborCosts.reduce((sum, cost) => sum + Number(cost.salary), 0);
+    const totalLaborCosts = calculateMonthlyProration(totalLaborCostsMonthly);
+    
+    // Custos Variáveis
     let totalVariableCosts = 0;
     variableCosts.forEach(cost => {
       if (cost.type === 'percentage') {
+        // Percentuais sobre vendas do período
         totalVariableCosts += stats.totalRevenue * (Number(cost.percentage) / 100);
       } else {
-        totalVariableCosts += Number(cost.amount || 0);
+        // Valores absolutos são mensais, ratear proporcionalmente
+        totalVariableCosts += calculateMonthlyProration(Number(cost.amount || 0));
       }
     });
 
-    // Card taxes
+    // Taxas de Cartão (percentuais sobre vendas do período)
     let cardTaxes = 0;
     if (cardFeesConfig && stats.cardPayments.total > 0) {
-      // Apply average of debit and credit fees to card payments
       const avgFee = (cardFeesConfig.debit_fee + cardFeesConfig.credit_fee) / 2;
       cardTaxes = stats.cardPayments.total * (avgFee / 100);
     }

@@ -283,7 +283,12 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
           <CardHeader>
             <CollapsibleTrigger className="w-full">
               <div className="flex items-center justify-between">
-                <CardTitle>Custos Fixos</CardTitle>
+                <div>
+                  <CardTitle>Custos Fixos Mensais</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Custos mensais fixos (aluguel, internet, etc.)
+                  </p>
+                </div>
                 <ChevronDown className="h-5 w-5 transition-transform" />
               </div>
             </CollapsibleTrigger>
@@ -308,7 +313,7 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
                   />
                 </div>
                 <div>
-                  <Label>Valor (R$)</Label>
+                  <Label>Valor Mensal (R$)</Label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
@@ -353,7 +358,12 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
           <CardHeader>
             <CollapsibleTrigger className="w-full">
               <div className="flex items-center justify-between">
-                <CardTitle>Custos Variáveis</CardTitle>
+                <div>
+                  <CardTitle>Custos Variáveis</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Valores mensais fixos ou % sobre vendas
+                  </p>
+                </div>
                 <ChevronDown className="h-5 w-5 transition-transform" />
               </div>
             </CollapsibleTrigger>
@@ -387,13 +397,13 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="fixed">Valor Fixo (R$)</SelectItem>
-                      <SelectItem value="percentage">Percentual (%)</SelectItem>
+                      <SelectItem value="fixed">Valor Mensal (R$)</SelectItem>
+                      <SelectItem value="percentage">% sobre Vendas</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Valor</Label>
+                  <Label>{newVariableCost.type === 'percentage' ? 'Percentual (%)' : 'Valor Mensal (R$)'}</Label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
@@ -440,7 +450,12 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
           <CardHeader>
             <CollapsibleTrigger className="w-full">
               <div className="flex items-center justify-between">
-                <CardTitle>CMO - Custo de Mão de Obra</CardTitle>
+                <div>
+                  <CardTitle>CMO - Custo de Mão de Obra Mensal</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Salários mensais dos funcionários
+                  </p>
+                </div>
                 <ChevronDown className="h-5 w-5 transition-transform" />
               </div>
             </CollapsibleTrigger>
@@ -465,7 +480,7 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
                   />
                 </div>
                 <div>
-                  <Label>Salário (R$)</Label>
+                  <Label>Salário Mensal (R$)</Label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
