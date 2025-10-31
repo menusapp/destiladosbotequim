@@ -31,16 +31,26 @@ interface TopProduct {
   revenue: number;
 }
 
-interface OperationalCost {
-  fixed_cost: number;
-  variable_cost: number;
-  variable_cost_type: 'fixed' | 'percentage';
-  labor_cost: number;
+interface FixedCost {
+  name: string;
+  amount: number;
 }
 
-interface CardFee {
-  card_brand: string;
-  fee_percentage: number;
+interface VariableCost {
+  name: string;
+  type: string;
+  amount: number;
+  percentage: number;
+}
+
+interface LaborCost {
+  employee_name: string;
+  salary: number;
+}
+
+interface CardFeesConfig {
+  debit_fee: number;
+  credit_fee: number;
 }
 
 export default function DashboardTab({ restaurantId }: DashboardTabProps) {
@@ -56,15 +66,16 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
   const [dateFilter, setDateFilter] = useState<string>("today");
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
   const [loading, setLoading] = useState(true);
-  const [operationalCosts, setOperationalCosts] = useState<OperationalCost | null>(null);
-  const [cardFees, setCardFees] = useState<CardFee[]>([]);
+  const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
+  const [variableCosts, setVariableCosts] = useState<VariableCost[]>([]);
+  const [laborCosts, setLaborCosts] = useState<LaborCost[]>([]);
+  const [cardFeesConfig, setCardFeesConfig] = useState<CardFeesConfig | null>(null);
   const [cmv, setCmv] = useState(0);
   const [operationalExpenses, setOperationalExpenses] = useState(0);
 
   useEffect(() => {
     fetchStats();
-    fetchOperationalCosts();
-    fetchCardFees();
+    fetchCosts();
   }, [dateFilter, customDateRange, restaurantId]);
 
   const getDateRange = () => {
@@ -101,40 +112,35 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
     return { startDate, endDate };
   };
 
-  const fetchOperationalCosts = async () => {
-    const currentMonth = format(new Date(), 'yyyy-MM');
-    const { data, error } = await supabase
-      .from("operational_costs")
-      .select("*")
-      .eq("restaurant_id", restaurantId)
-      .eq("month_year", currentMonth)
-      .maybeSingle();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error("Erro ao buscar custos operacionais:", error);
-      return;
-    }
-
-    if (data) {
-      setOperationalCosts({
-        ...data,
-        variable_cost_type: data.variable_cost_type as 'fixed' | 'percentage'
-      });
-    }
-  };
-
-  const fetchCardFees = async () => {
-    const { data, error } = await supabase
-      .from("card_fees")
-      .select("*")
+  const fetchCosts = async () => {
+    // Fetch fixed costs
+    const { data: fixedData } = await supabase
+      .from("fixed_costs")
+      .select("name, amount")
       .eq("restaurant_id", restaurantId);
+    setFixedCosts(fixedData || []);
 
-    if (error) {
-      console.error("Erro ao buscar taxas de cartões:", error);
-      return;
-    }
+    // Fetch variable costs
+    const { data: variableData } = await supabase
+      .from("variable_costs")
+      .select("name, type, amount, percentage")
+      .eq("restaurant_id", restaurantId);
+    setVariableCosts(variableData || []);
 
-    setCardFees(data || []);
+    // Fetch labor costs
+    const { data: laborData } = await supabase
+      .from("labor_costs")
+      .select("employee_name, salary")
+      .eq("restaurant_id", restaurantId);
+    setLaborCosts(laborData || []);
+
+    // Fetch card fees config
+    const { data: cardData } = await supabase
+      .from("card_fees_config")
+      .select("debit_fee, credit_fee")
+      .eq("restaurant_id", restaurantId)
+      .maybeSingle();
+    setCardFeesConfig(cardData);
   };
 
   const fetchStats = async () => {
@@ -396,33 +402,35 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
 
   const calculateDREValues = () => {
     const { startDate, endDate } = getDateRange();
-    // Calcular número de dias EXATAMENTE dentro do intervalo selecionado (inclusivo)
     const startDay = startOfDay(startDate);
     const endDay = startOfDay(endDate);
     const daysInPeriod = differenceInCalendarDays(endDay, startDay) + 1;
     
-    let fixedCost = 0;
-    let laborCost = 0;
-    let variableCost = 0;
-
-    if (operationalCosts) {
-      fixedCost = operationalCosts.fixed_cost * daysInPeriod;
-      laborCost = operationalCosts.labor_cost * daysInPeriod;
-      
-      if (operationalCosts.variable_cost_type === 'percentage') {
-        variableCost = stats.totalRevenue * (operationalCosts.variable_cost / 100);
+    // Fixed costs (proportional to days)
+    const totalFixedCosts = fixedCosts.reduce((sum, cost) => sum + Number(cost.amount), 0) * daysInPeriod;
+    
+    // Labor costs (proportional to days)
+    const totalLaborCosts = laborCosts.reduce((sum, cost) => sum + Number(cost.salary), 0) * daysInPeriod;
+    
+    // Variable costs
+    let totalVariableCosts = 0;
+    variableCosts.forEach(cost => {
+      if (cost.type === 'percentage') {
+        totalVariableCosts += stats.totalRevenue * (Number(cost.percentage) / 100);
       } else {
-        variableCost = operationalCosts.variable_cost;
+        totalVariableCosts += Number(cost.amount || 0);
       }
-    }
+    });
 
+    // Card taxes
     let cardTaxes = 0;
-    if (cardFees.length > 0 && stats.cardPayments.total > 0) {
-      const avgFee = cardFees.reduce((sum, f) => sum + f.fee_percentage, 0) / cardFees.length;
+    if (cardFeesConfig && stats.cardPayments.total > 0) {
+      // Apply average of debit and credit fees to card payments
+      const avgFee = (cardFeesConfig.debit_fee + cardFeesConfig.credit_fee) / 2;
       cardTaxes = stats.cardPayments.total * (avgFee / 100);
     }
 
-    const totalCosts = cmv + operationalExpenses + fixedCost + variableCost + laborCost + cardTaxes;
+    const totalCosts = cmv + operationalExpenses + totalFixedCosts + totalVariableCosts + totalLaborCosts + cardTaxes;
     const operationalProfit = stats.totalRevenue - totalCosts;
 
     return {
@@ -430,9 +438,9 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       cmv,
       grossProfit: stats.totalRevenue - cmv,
       operationalExpenses,
-      fixedCost,
-      variableCost,
-      laborCost,
+      fixedCost: totalFixedCosts,
+      variableCost: totalVariableCosts,
+      laborCost: totalLaborCosts,
       cardTaxes,
       totalCosts,
       operationalProfit

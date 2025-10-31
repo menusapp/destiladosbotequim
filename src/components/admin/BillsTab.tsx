@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Clock, Check, CreditCard, Smartphone, Banknote, Printer, Search, Trash2, Calendar, Plus, ChevronDown } from "lucide-react";
+import { Clock, Check, CreditCard, Smartphone, Banknote, Printer, Search, Trash2, Calendar, Plus, ChevronDown, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,6 +14,7 @@ import { pt } from "date-fns/locale";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface OrderItem {
   quantity: number;
@@ -63,6 +64,9 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     totalAmount: '',
     paymentMethod: 'cash',
   });
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
     fetchBills();
@@ -95,6 +99,47 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
       .order('table_number');
     
     setTables(data || []);
+  };
+
+  const fetchRecentOrders = async () => {
+    const today = startOfDay(new Date());
+    const { data } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        tables!inner(table_number, restaurant_id),
+        order_items(
+          quantity,
+          price_at_order,
+          products(name),
+          order_item_extras(price_at_order)
+        )
+      `)
+      .eq('tables.restaurant_id', restaurantId)
+      .eq('status', 'accepted')
+      .gte('created_at', today.toISOString())
+      .order('created_at', { ascending: false });
+
+    setRecentOrders(data || []);
+  };
+
+  const handleSelectOrder = (order: any) => {
+    // Calculate total from order items
+    const total = order.order_items.reduce((sum: number, item: any) => {
+      const itemTotal = item.price_at_order * item.quantity;
+      const extrasTotal = item.order_item_extras?.reduce((eSum: number, extra: any) => 
+        eSum + extra.price_at_order, 0) || 0;
+      return sum + itemTotal + extrasTotal;
+    }, 0);
+
+    setManualBill({
+      tableId: order.table_id,
+      customerName: order.customer_name,
+      totalAmount: total.toFixed(2),
+      paymentMethod: 'cash'
+    });
+    setIsSheetOpen(false);
+    toast.success('Dados do pedido carregados!');
   };
 
   const fetchBills = async () => {
@@ -212,10 +257,23 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     }
 
     try {
+      // Check if cash register is open
+      const { data: cashSession } = await supabase
+        .from('cash_register_sessions')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .eq('status', 'open')
+        .maybeSingle();
+
+      if (!cashSession) {
+        toast.error('Abra o caixa primeiro para registrar contas manuais');
+        return;
+      }
+
       const totalAmount = parseFloat(manualBill.totalAmount);
       
       // Create bill directly as paid
-      const { error: billError } = await supabase
+      const { data: bill, error: billError } = await supabase
         .from('bills')
         .insert({
           table_id: manualBill.tableId,
@@ -225,7 +283,9 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
           payment_method: manualBill.paymentMethod,
           status: 'paid',
           paid_at: new Date().toISOString()
-        });
+        })
+        .select()
+        .single();
 
       if (billError) throw billError;
 
@@ -244,7 +304,22 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (orderError) throw orderError;
 
-      toast.success('Conta manual criada com sucesso!');
+      // Register in cash movements
+      await supabase
+        .from('cash_movements')
+        .insert({
+          cash_session_id: cashSession.id,
+          restaurant_id: restaurantId,
+          movement_type: 'entrada',
+          amount: totalAmount,
+          payment_method: manualBill.paymentMethod,
+          category: 'Pedido',
+          description: `Conta Manual #${bill.id} - ${manualBill.customerName || 'Cliente Balcão'}`,
+          created_by: 'Admin',
+          bill_id: bill.id
+        });
+
+      toast.success('Conta manual criada e registrada no caixa!');
       setManualBill({
         tableId: '',
         customerName: '',
@@ -478,9 +553,67 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
                 </div>
               </div>
 
-              <Button onClick={handleCreateManualBill} className="w-full">
-                Criar Conta Manual (Paga)
-              </Button>
+              <div className="flex gap-2">
+                <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" className="flex-1" onClick={fetchRecentOrders}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Puxar Pedido Recente
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:max-w-lg">
+                    <SheetHeader>
+                      <SheetTitle>Pedidos de Hoje</SheetTitle>
+                    </SheetHeader>
+                    <div className="mt-4 space-y-4">
+                      <Input
+                        placeholder="Buscar por nome, mesa..."
+                        value={orderSearchQuery}
+                        onChange={(e) => setOrderSearchQuery(e.target.value)}
+                      />
+                      <div className="space-y-2 max-h-[70vh] overflow-y-auto">
+                        {recentOrders
+                          .filter(order => 
+                            order.customer_name.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+                            order.tables.table_number.toString().includes(orderSearchQuery)
+                          )
+                          .map(order => {
+                            const total = order.order_items.reduce((sum: number, item: any) => {
+                              const itemTotal = item.price_at_order * item.quantity;
+                              const extrasTotal = item.order_item_extras?.reduce((eSum: number, extra: any) => 
+                                eSum + extra.price_at_order, 0) || 0;
+                              return sum + itemTotal + extrasTotal;
+                            }, 0);
+
+                            return (
+                              <Card key={order.id} className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => handleSelectOrder(order)}>
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <p className="font-semibold">Mesa {order.tables.table_number}</p>
+                                    <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {format(new Date(order.created_at), "HH:mm", { locale: pt })}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-bold">R$ {total.toFixed(2)}</p>
+                                    <p className="text-xs text-muted-foreground">{order.order_items.length} itens</p>
+                                  </div>
+                                </div>
+                              </Card>
+                            );
+                          })}
+                        {recentOrders.length === 0 && (
+                          <p className="text-center text-muted-foreground py-8">Nenhum pedido hoje</p>
+                        )}
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+                <Button onClick={handleCreateManualBill} className="flex-1">
+                  Criar Conta Manual
+                </Button>
+              </div>
             </CardContent>
           </CollapsibleContent>
         </Card>

@@ -123,6 +123,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       .eq("tables.restaurant_id", restaurantId)
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString())
+      .neq("notes", "Conta Manual")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -311,6 +312,19 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     }
 
     try {
+      // Check if cash register is open
+      const { data: cashSession } = await supabase
+        .from('cash_register_sessions')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .eq('status', 'open')
+        .maybeSingle();
+
+      if (!cashSession) {
+        toast.error('Abra o caixa primeiro para registrar pedidos manuais');
+        return;
+      }
+
       // Create order
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -340,7 +354,24 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (itemsError) throw itemsError;
 
-      toast.success('Pedido manual criado com sucesso!');
+      // Calculate total
+      const total = manualOrder.selectedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+
+      // Register in cash movements
+      await supabase
+        .from('cash_movements')
+        .insert({
+          cash_session_id: cashSession.id,
+          restaurant_id: restaurantId,
+          movement_type: 'entrada',
+          amount: total,
+          payment_method: 'pending',
+          category: 'Pedido',
+          description: `Pedido Manual #${order.id} - ${manualOrder.customerName}`,
+          created_by: 'Admin'
+        });
+
+      toast.success('Pedido manual criado e registrado no caixa!');
       setManualOrder({
         tableId: '',
         customerName: '',
