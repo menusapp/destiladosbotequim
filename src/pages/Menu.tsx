@@ -120,7 +120,6 @@ const Menu = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
 
   useEffect(() => {
@@ -259,119 +258,62 @@ const channel = supabase
     if (!restaurantSlug || !tableNumber) return;
     
     try {
-      // Buscar restaurante primeiro
-      const restResult = await supabase
+      const { data: restData, error: restError } = await supabase
         .from("restaurants")
         .select("id, name, logo_url, primary_color, is_open")
         .eq("slug", restaurantSlug)
-        .maybeSingle();
+        .single();
 
-      if (restResult.error) throw restResult.error;
-      const restData = restResult.data;
-
-      if (!restData) {
-        toast.error("Restaurante não encontrado");
-        navigate("/");
-        return;
-      }
-
-      if (!restData.is_open) {
-        // Restaurante fechado - não mostrar erro, apenas a tela de fechado
-        setRestaurant(restData);
-        setLoading(false);
-        return;
-      }
-
+      if (restError) throw restError;
       setRestaurant(restData);
 
-      // Agora buscar mesa e categorias DO RESTAURANTE ESPECÍFICO
-      const [tableResult, categoriesResult] = await Promise.all([
-        supabase
-          .from("tables")
-          .select("id")
-          .eq("table_number", parseInt(tableNumber))
-          .eq("restaurant_id", restData.id)
-          .limit(1)
-          .maybeSingle(),
-        
-        supabase
-          .from("categories")
-          .select("id, name, display_order")
-          .eq("restaurant_id", restData.id)
-          .order("display_order")
-      ]);
+      const { data: tableData, error: tableError } = await supabase
+        .from("tables")
+        .select("id")
+        .eq("restaurant_id", restData.id)
+        .eq("table_number", parseInt(tableNumber || "0"))
+        .single();
 
-      // Buscar produtos e verificar disponibilidade por estoque
-      if (categoriesResult.data) {
-        const categoriesWithProducts = await Promise.all(
-          categoriesResult.data.map(async (category: any) => {
-            const { data: products } = await supabase
-              .from("products")
-              .select("id, name, description, price, available, image_url")
-              .eq("category_id", category.id);
+      if (tableError) throw tableError;
+      setTableId(tableData.id);
 
-            if (!products) return { ...category, products: [] };
+      const { data: categoriesData, error: catError } = await supabase
+        .from("categories")
+        .select(`
+          id,
+          name,
+          display_order,
+          products (
+            id,
+            name,
+            description,
+            price,
+            available,
+            image_url
+          )
+        `)
+        .eq("restaurant_id", restData.id)
+        .order("display_order");
 
-            // Verificar disponibilidade baseada no estoque para cada produto
-            const productsWithAvailability = await Promise.all(
-              products.map(async (product: any) => {
-                // Verificar se tem ingredientes zerados
-                const { data: outOfStock } = await supabase
-                  .from("product_ingredients")
-                  .select("stock_items!inner(current_quantity)")
-                  .eq("product_id", product.id)
-                  .lte("stock_items.current_quantity", 0)
-                  .limit(1);
+      if (catError) throw catError;
 
-                // Se tem ingredientes zerados, marcar como indisponível
-                const stockAvailable = !outOfStock || outOfStock.length === 0;
-                
-                return {
-                  ...product,
-                  available: product.available && stockAvailable
-                };
-              })
-            );
+      const sortedCategories = (categoriesData || [])
+        .map((cat: any) => ({
+          ...cat,
+          products: (cat.products || []).sort((a: Product, b: Product) =>
+            a.name.localeCompare(b.name)
+          ),
+        }))
+        .filter((cat: Category) => cat.products.length > 0);
 
-            return { ...category, products: productsWithAvailability };
-          })
-        );
-
-        // Filtrar categorias com produtos
-        const filteredCategories = categoriesWithProducts.filter(
-          (cat: any) => cat.products.some((p: any) => p)
-        );
-        setCategories(filteredCategories);
-        
-        // Remover do carrinho itens de produtos que não estão mais disponíveis/listados (ex.: deletados)
-        const validProductIds = new Set(
-          filteredCategories.flatMap((cat: any) => cat.products.map((p: any) => p.id))
-        );
-        setCart((prev) => {
-          const pruned = prev.filter((item) => validProductIds.has(item.product.id));
-          if (pruned.length !== prev.length) {
-            sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(pruned));
-            toast.error("Alguns itens foram removidos do carrinho pois não estão mais disponíveis.");
-          }
-          return pruned;
-        });
-        
-        if (filteredCategories.length > 0 && !selectedCategoryId) {
-          setSelectedCategoryId(filteredCategories[0].id);
-        }
-      }
-
-      if (tableResult.error) throw tableResult.error;
-      if (tableResult.data) {
-        setTableId(tableResult.data.id);
-      }
+      setCategories(sortedCategories);
     } catch (error: any) {
-      toast.error("Erro ao carregar cardápio");
+      toast.error("Erro ao carregar dados");
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [restaurantSlug, tableNumber, navigate, selectedCategoryId]);
+  }, [restaurantSlug, tableNumber]);
 
   const handleCustomerInfoSubmit = (name: string, cpf: string) => {
     setCustomerName(name);
@@ -445,10 +387,19 @@ const channel = supabase
       return sum + (item.product.price + extrasTotal) * item.quantity;
     }, 0);
   };
-  // Memoizar produtos da categoria selecionada
-  const selectedCategoryProducts = useMemo(() => {
-    return categories.find(cat => cat.id === selectedCategoryId)?.products || [];
-  }, [categories, selectedCategoryId]);
+
+  // Função para scroll suave até a categoria
+  const scrollToCategory = (categoryId: string) => {
+    const element = document.getElementById(`category-${categoryId}`);
+    if (element) {
+      const offset = 200; // Altura do header + categorias
+      const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({
+        top: elementPosition - offset,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   // Verificar se precisa mostrar indicador de scroll
   useEffect(() => {
@@ -543,15 +494,8 @@ const channel = supabase
               {categories.map((category) => (
                 <button
                   key={category.id}
-                  onClick={() => setSelectedCategoryId(category.id)}
-                  className={`
-                    whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium text-white
-                    transition-all duration-200
-                    ${selectedCategoryId === category.id 
-                      ? 'bg-white/25 shadow-md' 
-                      : 'hover:bg-white/10'
-                    }
-                  `}
+                  onClick={() => scrollToCategory(category.id)}
+                  className="whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium text-white hover:bg-white/10 transition-all duration-200"
                 >
                   {category.name}
                 </button>
@@ -565,18 +509,25 @@ const channel = supabase
           </div>
         </div>
 
-        {/* Produtos da categoria selecionada */}
+        {/* Todas as categorias com seus produtos */}
         <div className="container mx-auto px-4 pt-4 pb-6">
-          <div className="space-y-3">
-            {selectedCategoryProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                restaurantColor={restaurant.primary_color}
-                onProductClick={handleProductClick}
-              />
-            ))}
-          </div>
+          {categories.map((category) => (
+            <div key={category.id} id={`category-${category.id}`} className="mb-8">
+              <h2 className="text-2xl font-bold mb-4" style={{ color: restaurant.primary_color }}>
+                {category.name}
+              </h2>
+              <div className="space-y-3">
+                {category.products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    restaurantColor={restaurant.primary_color}
+                    onProductClick={handleProductClick}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Botão Fixo Ver Comanda com Badge */}

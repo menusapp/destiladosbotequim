@@ -265,11 +265,6 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
         .eq('status', 'open')
         .maybeSingle();
 
-      if (!cashSession) {
-        toast.error('Abra o caixa primeiro para registrar contas manuais');
-        return;
-      }
-
       const totalAmount = parseFloat(manualBill.totalAmount);
       
       // Create bill directly as paid
@@ -304,22 +299,10 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (orderError) throw orderError;
 
-      // Register in cash movements
-      await supabase
-        .from('cash_movements')
-        .insert({
-          cash_session_id: cashSession.id,
-          restaurant_id: restaurantId,
-          movement_type: 'entrada',
-          amount: totalAmount,
-          payment_method: manualBill.paymentMethod,
-          category: 'Pedido',
-          description: `Conta Manual #${bill.id} - ${manualBill.customerName || 'Cliente Balcão'}`,
-          created_by: 'Admin',
-          bill_id: bill.id
-        });
+      // Trigger automático registrará no caixa quando order.status='accepted'
+      // (não registrar manualmente para evitar duplicação)
 
-      toast.success('Conta manual criada e registrada no caixa!');
+      toast.success('Conta manual criada!');
       setManualBill({
         tableId: '',
         customerName: '',

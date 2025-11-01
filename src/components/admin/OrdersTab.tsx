@@ -154,96 +154,12 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
     toast.success(newStatus === "accepted" ? "Pedido aceito!" : "Status atualizado!");
 
-    // Processa baixa de estoque em segundo plano para evitar travar o clique
-    if (newStatus === "accepted") {
-      processStockDeduction(orderId).catch((err) => {
-        console.error("Erro ao processar baixa de estoque:", err);
-      });
-    }
-
+    // Trigger process_order_stock_movement dá baixa automática no estoque
+    // Trigger add_order_to_cash registra automaticamente no caixa
+    
     // Garante consistência com o backend
     fetchOrders();
   };
-  const processStockDeduction = async (orderId: string) => {
-    try {
-      // Buscar os itens do pedido
-      const { data: orderItems, error: itemsError } = await supabase
-        .from("order_items")
-        .select("product_id, quantity")
-        .eq("order_id", orderId);
-
-      if (itemsError || !orderItems || orderItems.length === 0) {
-        console.error("Erro ao buscar itens do pedido:", itemsError);
-        return;
-      }
-
-      const productIds = Array.from(
-        new Set(orderItems.map((i) => i.product_id).filter(Boolean))
-      ) as string[];
-      if (productIds.length === 0) return;
-
-      // Buscar ingredientes de todos os produtos em uma única chamada
-      const { data: ingredients, error: ingredientsError } = await supabase
-        .from("product_ingredients")
-        .select("product_id, stock_item_id, quantity")
-        .in("product_id", productIds);
-
-      if (ingredientsError || !ingredients || ingredients.length === 0) return;
-
-      // Agregar total de baixa por insumo
-      const deductions = new Map<string, number>();
-      for (const item of orderItems) {
-        if (!item.product_id) continue;
-        const ingForProduct = ingredients.filter(
-          (ing) => ing.product_id === item.product_id
-        );
-        for (const ing of ingForProduct) {
-          const toDeduct = Number(ing.quantity) * Number(item.quantity);
-          deductions.set(
-            ing.stock_item_id,
-            (deductions.get(ing.stock_item_id) || 0) + toDeduct,
-          );
-        }
-      }
-
-      const stockItemIds = Array.from(deductions.keys());
-      if (stockItemIds.length === 0) return;
-
-      // Buscar quantidades atuais de todos os insumos de uma vez
-      const { data: currentStocks, error: currentError } = await supabase
-        .from("stock_items")
-        .select("id, current_quantity")
-        .in("id", stockItemIds);
-
-      if (currentError || !currentStocks) return;
-
-      // Atualizar insumos em paralelo para reduzir delay
-      await Promise.all(
-        currentStocks.map((stock) => {
-          const deduct = deductions.get(stock.id) || 0;
-          const newQty = Math.max(0, Number(stock.current_quantity) - Number(deduct));
-          return supabase
-            .from("stock_items")
-            .update({ current_quantity: newQty })
-            .eq("id", stock.id);
-        }),
-      );
-
-      // Registrar movimentações em uma única inserção
-      const movementRows = stockItemIds.map((id) => ({
-        stock_item_id: id,
-        movement_type: "out",
-        quantity: deductions.get(id) || 0,
-        reason: `Venda - Pedido ${orderId}`,
-        // order_id: orderId, // omitido para evitar erros de FK e atrasos
-      }));
-
-      await supabase.from("stock_movements").insert(movementRows);
-    } catch (error) {
-      console.error("Erro ao processar baixa de estoque:", error);
-    }
-  };
-
   const deleteOrder = async (orderId: string) => {
     const { error } = await (supabase as any).rpc('admin_delete_order_and_bill', {
       p_order_id: orderId,
@@ -312,7 +228,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     }
 
     try {
-      // Check if cash register is open
+      // Check if cash register is open (para feedback ao usuário)
       const { data: cashSession } = await supabase
         .from('cash_register_sessions')
         .select('id')
@@ -325,7 +241,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         return;
       }
 
-      // Create order
+      // Create order with status='accepted' (triggers will handle stock and cash)
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -354,24 +270,10 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (itemsError) throw itemsError;
 
-      // Calculate total
-      const total = manualOrder.selectedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+      // Trigger automático registrará no caixa quando status='accepted'
+      // (não registrar manualmente para evitar duplicação)
 
-      // Register in cash movements
-      await supabase
-        .from('cash_movements')
-        .insert({
-          cash_session_id: cashSession.id,
-          restaurant_id: restaurantId,
-          movement_type: 'entrada',
-          amount: total,
-          payment_method: 'pending',
-          category: 'Pedido',
-          description: `Pedido Manual #${order.id} - ${manualOrder.customerName}`,
-          created_by: 'Admin'
-        });
-
-      toast.success('Pedido manual criado e registrado no caixa!');
+      toast.success('Pedido manual criado!');
       setManualOrder({
         tableId: '',
         customerName: '',
