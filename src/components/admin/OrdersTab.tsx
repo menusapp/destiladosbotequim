@@ -123,7 +123,6 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       .eq("tables.restaurant_id", restaurantId)
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString())
-      .neq("notes", "Conta Manual")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -241,14 +240,14 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         return;
       }
 
-      // Create order with status='accepted' (triggers will handle stock and cash)
+      // Create order with status='pending' first
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
           table_id: manualOrder.tableId,
           customer_name: manualOrder.customerName,
           customer_cpf: manualOrder.customerCPF,
-          status: 'accepted',
+          status: 'pending',
           notes: 'Pedido Manual'
         })
         .select()
@@ -270,8 +269,13 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (itemsError) throw itemsError;
 
-      // Trigger automático registrará no caixa quando status='accepted'
-      // (não registrar manualmente para evitar duplicação)
+      // Now update status to 'accepted' to trigger cash register and stock
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'accepted' })
+        .eq('id', order.id);
+
+      if (updateError) throw updateError;
 
       toast.success('Pedido manual criado!');
       setManualOrder({
