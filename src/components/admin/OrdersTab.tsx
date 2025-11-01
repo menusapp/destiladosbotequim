@@ -123,7 +123,6 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       .eq("tables.restaurant_id", restaurantId)
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString())
-      .neq("notes", "Conta Manual")
       .order("created_at", { ascending: false });
 
     if (error) {
