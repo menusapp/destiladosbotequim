@@ -2,7 +2,17 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Clock, Check, Printer, Search, Trash2, Calendar, Plus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,14 +57,14 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState<Date>(startOfDay(new Date()));
   const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
-  
+
   // Manual order states
   const [tables, setTables] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [manualOrder, setManualOrder] = useState({
-    tableId: '',
-    customerName: '',
-    customerCPF: '',
+    tableId: "",
+    customerName: "",
+    customerCPF: "",
     selectedProducts: [] as { productId: string; quantity: number; price: number; name: string }[],
   });
 
@@ -62,18 +72,18 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     fetchOrders();
     fetchTables();
     fetchProducts();
-    
+
     // Realtime subscription
     const channel = supabase
-      .channel('orders-changes')
+      .channel("orders-changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
+          event: "*",
+          schema: "public",
+          table: "orders",
         },
-        () => fetchOrders()
+        () => fetchOrders(),
       )
       .subscribe();
 
@@ -83,30 +93,27 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   }, [restaurantId, startDate, endDate]);
 
   const fetchTables = async () => {
-    const { data } = await supabase
-      .from('tables')
-      .select('*')
-      .eq('restaurant_id', restaurantId)
-      .order('table_number');
-    
+    const { data } = await supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("table_number");
+
     setTables(data || []);
   };
 
   const fetchProducts = async () => {
     const { data } = await supabase
-      .from('products')
-      .select('id, name, price, categories!inner(restaurant_id)')
-      .eq('categories.restaurant_id', restaurantId)
-      .eq('available', true)
-      .order('name');
-    
+      .from("products")
+      .select("id, name, price, categories!inner(restaurant_id)")
+      .eq("categories.restaurant_id", restaurantId)
+      .eq("available", true)
+      .order("name");
+
     setProducts(data || []);
   };
 
   const fetchOrders = async () => {
     const { data, error } = await supabase
       .from("orders")
-      .select(`
+      .select(
+        `
         *,
         tables!inner(table_number, restaurant_id),
         order_items(
@@ -119,9 +126,10 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
             product_extras(name)
           )
         )
-      `)
+      `,
+      )
       .eq("tables.restaurant_id", restaurantId)
-      .neq("notes", "Conta Manual")
+      .or('notes.is.null,not.eq.notes."Conta Manual"')
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString())
       .order("created_at", { ascending: false });
@@ -139,7 +147,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
 
     // Atualiza status via função segura (bypassa RLS)
-    const { error } = await (supabase as any).rpc('admin_update_order_status', {
+    const { error } = await (supabase as any).rpc("admin_update_order_status", {
       p_order_id: orderId,
       p_new_status: newStatus,
       p_restaurant_id: restaurantId,
@@ -156,12 +164,12 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
     // Trigger process_order_stock_movement dá baixa automática no estoque
     // Trigger add_order_to_cash registra automaticamente no caixa
-    
+
     // Garante consistência com o backend
     fetchOrders();
   };
   const deleteOrder = async (orderId: string) => {
-    const { error } = await (supabase as any).rpc('admin_delete_order_and_bill', {
+    const { error } = await (supabase as any).rpc("admin_delete_order_and_bill", {
       p_order_id: orderId,
       p_restaurant_id: restaurantId,
     });
@@ -177,26 +185,29 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleAddProductToManualOrder = (productId: string) => {
-    const product = products.find(p => p.id === productId);
+    const product = products.find((p) => p.id === productId);
     if (!product) return;
 
-    const existing = manualOrder.selectedProducts.find(p => p.productId === productId);
+    const existing = manualOrder.selectedProducts.find((p) => p.productId === productId);
     if (existing) {
       setManualOrder({
         ...manualOrder,
-        selectedProducts: manualOrder.selectedProducts.map(p =>
-          p.productId === productId ? { ...p, quantity: p.quantity + 1 } : p
-        )
+        selectedProducts: manualOrder.selectedProducts.map((p) =>
+          p.productId === productId ? { ...p, quantity: p.quantity + 1 } : p,
+        ),
       });
     } else {
       setManualOrder({
         ...manualOrder,
-        selectedProducts: [...manualOrder.selectedProducts, {
-          productId: product.id,
-          quantity: 1,
-          price: product.price,
-          name: product.name
-        }]
+        selectedProducts: [
+          ...manualOrder.selectedProducts,
+          {
+            productId: product.id,
+            quantity: 1,
+            price: product.price,
+            name: product.name,
+          },
+        ],
       });
     }
   };
@@ -204,7 +215,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const handleRemoveProductFromManualOrder = (productId: string) => {
     setManualOrder({
       ...manualOrder,
-      selectedProducts: manualOrder.selectedProducts.filter(p => p.productId !== productId)
+      selectedProducts: manualOrder.selectedProducts.filter((p) => p.productId !== productId),
     });
   };
 
@@ -215,41 +226,44 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     }
     setManualOrder({
       ...manualOrder,
-      selectedProducts: manualOrder.selectedProducts.map(p =>
-        p.productId === productId ? { ...p, quantity } : p
-      )
+      selectedProducts: manualOrder.selectedProducts.map((p) => (p.productId === productId ? { ...p, quantity } : p)),
     });
   };
 
   const handleCreateManualOrder = async () => {
-    if (!manualOrder.tableId || !manualOrder.customerName || !manualOrder.customerCPF || manualOrder.selectedProducts.length === 0) {
-      toast.error('Preencha todos os campos e adicione pelo menos um produto');
+    if (
+      !manualOrder.tableId ||
+      !manualOrder.customerName ||
+      !manualOrder.customerCPF ||
+      manualOrder.selectedProducts.length === 0
+    ) {
+      toast.error("Preencha todos os campos e adicione pelo menos um produto");
       return;
     }
 
     try {
       // Check if cash register is open (para feedback ao usuário)
       const { data: cashSession } = await supabase
-        .from('cash_register_sessions')
-        .select('id')
-        .eq('restaurant_id', restaurantId)
-        .eq('status', 'open')
+        .from("cash_register_sessions")
+        .select("id")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "open")
         .maybeSingle();
 
       if (!cashSession) {
-        toast.error('Abra o caixa primeiro para registrar pedidos manuais');
+        toast.error("Abra o caixa primeiro para registrar pedidos manuais");
         return;
       }
 
       // Create order with status='pending' first
       const { data: order, error: orderError } = await supabase
-        .from('orders')
+        .from("orders")
         .insert({
           table_id: manualOrder.tableId,
           customer_name: manualOrder.customerName,
           customer_cpf: manualOrder.customerCPF,
-          status: 'pending',
-          notes: 'Pedido Manual'
+          status: "pending",
+          notes: "Pedido Manual",
         })
         .select()
         .single();
@@ -257,57 +271,54 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       if (orderError) throw orderError;
 
       // Create order items
-      const orderItems = manualOrder.selectedProducts.map(p => ({
+      const orderItems = manualOrder.selectedProducts.map((p) => ({
         order_id: order.id,
         product_id: p.productId,
         quantity: p.quantity,
-        price_at_order: p.price
+        price_at_order: p.price,
       }));
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
+      const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
 
       if (itemsError) throw itemsError;
 
       // Now update status to 'accepted' to trigger cash register and stock
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ status: 'accepted' })
-        .eq('id', order.id);
+      const { error: updateError } = await supabase.from("orders").update({ status: "accepted" }).eq("id", order.id);
 
       if (updateError) throw updateError;
 
-      toast.success('Pedido manual criado!');
+      toast.success("Pedido manual criado!");
       setManualOrder({
-        tableId: '',
-        customerName: '',
-        customerCPF: '',
-        selectedProducts: []
+        tableId: "",
+        customerName: "",
+        customerCPF: "",
+        selectedProducts: [],
       });
       fetchOrders();
     } catch (error) {
-      console.error('Error creating manual order:', error);
-      toast.error('Erro ao criar pedido manual');
+      console.error("Error creating manual order:", error);
+      toast.error("Erro ao criar pedido manual");
     }
   };
 
   const printOrder = (order: Order) => {
-    const printWindow = window.open('', '', 'height=600,width=400');
+    const printWindow = window.open("", "", "height=600,width=400");
     if (!printWindow) return;
 
-    const orderItems = order.order_items.map((item, idx) => {
-      const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
-      const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
-      const productName = item.products?.name || "Produto excluído";
-      const extras = item.order_item_extras && item.order_item_extras.length > 0
-        ? `<div style="font-size: 11px; padding-left: 20px; margin-top: 2px;">+ ${item.order_item_extras.map(e => e.product_extras?.name || "Extra excluído").join(', ')}</div>`
-        : '';
-      const notes = item.notes
-        ? `<div style="font-size: 11px; padding-left: 20px; margin-top: 2px; font-style: italic; color: #b45309;">Obs: ${item.notes}</div>`
-        : '';
-      
-      return `
+    const orderItems = order.order_items
+      .map((item, idx) => {
+        const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
+        const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
+        const productName = item.products?.name || "Produto excluído";
+        const extras =
+          item.order_item_extras && item.order_item_extras.length > 0
+            ? `<div style="font-size: 11px; padding-left: 20px; margin-top: 2px;">+ ${item.order_item_extras.map((e) => e.product_extras?.name || "Extra excluído").join(", ")}</div>`
+            : "";
+        const notes = item.notes
+          ? `<div style="font-size: 11px; padding-left: 20px; margin-top: 2px; font-style: italic; color: #b45309;">Obs: ${item.notes}</div>`
+          : "";
+
+        return `
         <div style="margin: 8px 0; border-bottom: 1px dashed #ddd; padding-bottom: 8px;">
           <div style="display: flex; justify-content: space-between; font-size: 13px;">
             <span><strong>${item.quantity}x</strong> ${productName}</span>
@@ -317,14 +328,15 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
           ${notes}
         </div>
       `;
-    }).join('');
+      })
+      .join("");
 
     const orderNotes = order.notes
       ? `<div style="background: #fef3c7; border: 1px solid #fbbf24; padding: 10px; margin: 10px 0; border-radius: 4px;">
            <strong style="color: #92400e;">Observação do Pedido:</strong>
            <div style="color: #78350f; font-style: italic; margin-top: 4px;">${order.notes}</div>
          </div>`
-      : '';
+      : "";
 
     const html = `
       <!DOCTYPE html>
@@ -349,7 +361,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
             <h2 style="margin: 5px 0;">PEDIDO - COZINHA</h2>
             <div style="font-size: 16px; font-weight: bold; margin-top: 8px;">MESA ${order.tables.table_number}</div>
             <div style="font-size: 12px; margin-top: 5px;">Cliente: ${order.customer_name}</div>
-            <div style="font-size: 11px; color: #666; margin-top: 5px;">${new Date(order.created_at).toLocaleString('pt-BR')}</div>
+            <div style="font-size: 11px; color: #666; margin-top: 5px;">${new Date(order.created_at).toLocaleString("pt-BR")}</div>
           </div>
           
           <div style="margin: 15px 0;">
@@ -413,12 +425,15 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label>Mesa</Label>
-                  <Select value={manualOrder.tableId} onValueChange={(value) => setManualOrder({ ...manualOrder, tableId: value })}>
+                  <Select
+                    value={manualOrder.tableId}
+                    onValueChange={(value) => setManualOrder({ ...manualOrder, tableId: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a mesa" />
                     </SelectTrigger>
                     <SelectContent>
-                      {tables.map(table => (
+                      {tables.map((table) => (
                         <SelectItem key={table.id} value={table.id}>
                           Mesa {table.table_number}
                         </SelectItem>
@@ -451,7 +466,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                     <SelectValue placeholder="Selecione um produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {products.map(product => (
+                    {products.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
                         {product.name} - R$ {product.price.toFixed(2)}
                       </SelectItem>
@@ -464,8 +479,11 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 <div className="space-y-2">
                   <Label>Produtos Selecionados:</Label>
                   <div className="max-h-48 overflow-y-auto space-y-2">
-                    {manualOrder.selectedProducts.map(product => (
-                      <div key={product.productId} className="flex items-center justify-between p-2 bg-secondary/30 rounded">
+                    {manualOrder.selectedProducts.map((product) => (
+                      <div
+                        key={product.productId}
+                        className="flex items-center justify-between p-2 bg-secondary/30 rounded"
+                      >
                         <span>{product.name}</span>
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
@@ -500,7 +518,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                   <div className="flex justify-between items-center pt-3 border-t">
                     <span className="font-bold text-lg">Total:</span>
                     <span className="font-bold text-lg">
-                      R$ {manualOrder.selectedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2)}
+                      R$ {manualOrder.selectedProducts.reduce((sum, p) => sum + p.price * p.quantity, 0).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -574,101 +592,80 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
               );
             })
             .map((order) => (
-            <div
-              key={order.id}
-              className="p-4 border rounded-lg space-y-3 hover:bg-secondary/50 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold">Mesa {order.tables.table_number}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Cliente: {order.customer_name}
-                  </p>
+              <div key={order.id} className="p-4 border rounded-lg space-y-3 hover:bg-secondary/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold">Mesa {order.tables.table_number}</p>
+                    <p className="text-sm text-muted-foreground">Cliente: {order.customer_name}</p>
+                  </div>
+                  {getStatusBadge(order.status)}
                 </div>
-                {getStatusBadge(order.status)}
-              </div>
 
-              <div className="space-y-1">
-                {order.order_items.map((item, idx) => {
-                  const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
-                  const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
-                  const productName = item.products?.name || "Produto excluído";
-                  
-                  return (
-                    <div key={idx} className="space-y-0.5">
-                      <div className="flex justify-between text-sm">
-                        <span className={!item.products ? "text-muted-foreground" : ""}>
-                          {item.quantity}x {productName}
-                        </span>
-                        <span className="text-primary font-medium">
-                          R$ {itemTotal.toFixed(2)}
-                        </span>
+                <div className="space-y-1">
+                  {order.order_items.map((item, idx) => {
+                    const extrasTotal =
+                      item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
+                    const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
+                    const productName = item.products?.name || "Produto excluído";
+
+                    return (
+                      <div key={idx} className="space-y-0.5">
+                        <div className="flex justify-between text-sm">
+                          <span className={!item.products ? "text-muted-foreground" : ""}>
+                            {item.quantity}x {productName}
+                          </span>
+                          <span className="text-primary font-medium">R$ {itemTotal.toFixed(2)}</span>
+                        </div>
+                        {item.order_item_extras && item.order_item_extras.length > 0 && (
+                          <div className="text-xs text-muted-foreground pl-4">
+                            + {item.order_item_extras.map((e) => e.product_extras?.name || "Extra excluído").join(", ")}
+                          </div>
+                        )}
+                        {item.notes && <div className="text-xs text-amber-600 pl-4 italic">Obs: {item.notes}</div>}
                       </div>
-                      {item.order_item_extras && item.order_item_extras.length > 0 && (
-                        <div className="text-xs text-muted-foreground pl-4">
-                          + {item.order_item_extras.map(e => e.product_extras?.name || "Extra excluído").join(', ')}
-                        </div>
-                      )}
-                      {item.notes && (
-                        <div className="text-xs text-amber-600 pl-4 italic">
-                          Obs: {item.notes}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {order.notes && (
-                <div className="text-sm p-2 bg-amber-50 border border-amber-200 rounded">
-                  <span className="font-semibold text-amber-800">Observação do Pedido:</span>
-                  <p className="text-amber-700 italic">{order.notes}</p>
+                    );
+                  })}
                 </div>
-              )}
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => printOrder(order)}
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimir
-                </Button>
-                {order.status === "pending" && (
-                  <Button
-                    className="flex-1"
-                    size="sm"
-                    onClick={() => updateOrderStatus(order.id, "accepted")}
-                  >
-                    Aceitar Pedido
-                  </Button>
+                {order.notes && (
+                  <div className="text-sm p-2 bg-amber-50 border border-amber-200 rounded">
+                    <span className="font-semibold text-amber-800">Observação do Pedido:</span>
+                    <p className="text-amber-700 italic">{order.notes}</p>
+                  </div>
                 )}
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
-                      <Trash2 className="h-4 w-4" />
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => printOrder(order)}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Imprimir
+                  </Button>
+                  {order.status === "pending" && (
+                    <Button className="flex-1" size="sm" onClick={() => updateOrderStatus(order.id, "accepted")}>
+                      Aceitar Pedido
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Excluir Pedido</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => deleteOrder(order.id)}>
-                        Excluir
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                  )}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir Pedido</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteOrder(order.id)}>Excluir</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       )}
     </div>
