@@ -1,46 +1,10 @@
--- Corrigir bugs do sistema
-
--- 1. Garantir que contas manuais não apareçam em Pedidos
--- (já existe filtro no OrdersTab.tsx com .neq("notes", "Conta Manual"))
-
--- 2. Função para liberar mesas automaticamente após 1h sem pedido
-CREATE OR REPLACE FUNCTION public.auto_release_idle_tables()
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  -- Liberar mesas que estão ocupadas há mais de 1 hora
-  -- e que não têm pedidos confirmados nem contas pendentes/a caminho
-  UPDATE tables
-  SET 
-    is_occupied = false,
-    occupied_by = NULL,
-    occupied_at = NULL
-  WHERE 
-    is_occupied = true
-    AND occupied_at < NOW() - INTERVAL '1 hour'
-    AND NOT EXISTS (
-      SELECT 1 FROM orders 
-      WHERE orders.table_id = tables.id 
-      AND orders.status IN ('pending', 'accepted', 'preparing', 'ready')
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM bills 
-      WHERE bills.table_id = tables.id 
-      AND bills.status IN ('pending', 'on_the_way')
-    );
-END;
-$$;
-
--- 3. Corrigir a função add_order_to_cash_register para evitar duplicação
--- e garantir que pedidos do cardápio digital também sejam registrados
+-- Fix add_order_to_cash_register to prevent duplicate entries and exclude manual bills
 CREATE OR REPLACE FUNCTION public.add_order_to_cash_register()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 DECLARE
   v_restaurant_id uuid;
   v_cash_session_id uuid;
@@ -52,9 +16,9 @@ DECLARE
   v_existing_movement_id uuid;
 BEGIN
   -- Apenas processar quando o status mudar para 'accepted'
-  -- E NÃO processar contas manuais (que são registradas manualmente via BillsTab)
+  -- E NÃO processar contas manuais (que são registradas via trigger de bill payment)
   IF NEW.status = 'accepted' 
-     AND (OLD.status IS NULL OR OLD.status != 'accepted')
+     AND (OLD IS NULL OR OLD.status IS NULL OR OLD.status != 'accepted')
      AND (NEW.notes IS NULL OR NEW.notes != 'Conta Manual') THEN
     
     -- Buscar restaurant_id e configurações da mesa
@@ -78,7 +42,7 @@ BEGIN
       SELECT id INTO v_existing_movement_id
       FROM cash_movements
       WHERE cash_session_id = v_cash_session_id
-        AND description LIKE 'Pedido #' || NEW.id::text || '%'
+        AND description LIKE 'Pedido #' || NEW.id || '%'
       LIMIT 1;
       
       -- Só inserir se não existir movimentação
@@ -119,7 +83,7 @@ BEGIN
           v_bill_total,
           'pending',
           'Pedido',
-          'Pedido #' || NEW.id || ' - ' || COALESCE(NEW.customer_name, 'Cliente') || 
+          'Pedido #' || NEW.id || ' - ' || NEW.customer_name || 
           ' (Subtotal: R$ ' || ROUND(v_bill_subtotal, 2) || 
           CASE WHEN v_service_fee > 0 THEN ' + Taxa: R$ ' || ROUND(v_service_fee, 2) ELSE '' END || ')',
           'Sistema'
@@ -130,15 +94,4 @@ BEGIN
   
   RETURN NEW;
 END;
-$$;
-
--- 4. Verificar se o trigger existe e recriá-lo se necessário
-DROP TRIGGER IF EXISTS trigger_add_order_to_cash ON orders;
-CREATE TRIGGER trigger_add_order_to_cash
-  AFTER UPDATE ON orders
-  FOR EACH ROW
-  EXECUTE FUNCTION add_order_to_cash_register();
-
--- 5. Garantir que a baixa de adicionais no estoque está funcionando
--- (o trigger process_order_stock_movement já contempla isso, mas vamos verificar)
--- O trigger já existe e processa tanto ingredientes do produto quanto dos adicionais
+$function$;

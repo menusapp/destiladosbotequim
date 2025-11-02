@@ -267,18 +267,9 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
       const totalAmount = parseFloat(manualBill.totalAmount);
       
-      // Verificar se há caixa aberto
-      const { data: openSession } = await supabase
-        .from('cash_register_sessions')
-        .select('id')
-        .eq('restaurant_id', restaurantId)
-        .eq('status', 'open')
-        .order('opened_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!openSession) {
-        toast.error('Não há caixa aberto. Abra o caixa primeiro.');
+      // Check if cash register is open before creating
+      if (!cashSession) {
+        toast.error('Abra o caixa primeiro para registrar contas manuais');
         return;
       }
 
@@ -299,7 +290,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (billError) throw billError;
 
-      // Create order for the bill (with notes='Conta Manual' to exclude from Orders tab)
+      // Create order for the bill (will NOT trigger cash register due to notes='Conta Manual')
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -314,22 +305,18 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (orderError) throw orderError;
 
-      // Registrar manualmente no caixa (trigger não processa contas manuais)
-      const { error: cashError } = await supabase
-        .from('cash_movements')
-        .insert({
-          cash_session_id: openSession.id,
-          restaurant_id: restaurantId,
-          movement_type: 'entrada',
-          amount: totalAmount,
-          payment_method: manualBill.paymentMethod,
-          category: 'Conta Manual',
-          description: `Conta Manual - ${manualBill.customerName || 'Cliente Balcão'}`,
-          created_by: 'Sistema',
-          bill_id: bill.id
-        });
-
-      if (cashError) throw cashError;
+      // Register in cash register manually since order trigger is skipped for manual bills
+      await supabase.from('cash_movements').insert({
+        cash_session_id: cashSession.id,
+        restaurant_id: restaurantId,
+        movement_type: 'entrada',
+        amount: totalAmount,
+        payment_method: manualBill.paymentMethod,
+        category: 'Conta Manual',
+        description: `Conta Manual - ${manualBill.customerName || 'Cliente Balcão'} - Mesa ${tables.find(t => t.id === manualBill.tableId)?.table_number || '?'}`,
+        created_by: 'Administrador',
+        bill_id: bill.id
+      });
 
       toast.success('Conta manual criada!');
       setManualBill({

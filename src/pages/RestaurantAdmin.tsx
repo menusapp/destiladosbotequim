@@ -5,46 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { 
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { 
-  LogOut, 
-  Package, 
-  TableIcon, 
-  ShoppingCart, 
-  Receipt, 
-  Warehouse, 
-  TrendingUp, 
-  Wallet, 
-  Target,
-  Settings,
-  CreditCard,
-  DollarSign,
-  FileText
-} from "lucide-react";
+import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp, Wallet, Target } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
+import DashboardTab from "@/components/admin/DashboardTab";
 import BillsTab from "@/components/admin/BillsTab";
+import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
 import CostosTab from "@/components/admin/CostosTab";
 import MargensTab from "@/components/admin/MargensTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
-import ConfiguracoesTab from "@/components/admin/ConfiguracoesTab";
-import PlanosTab from "@/components/admin/PlanosTab";
-import DRETab from "@/components/admin/DRETab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 interface Restaurant {
@@ -58,8 +31,7 @@ const RestaurantAdmin = () => {
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeGroup, setActiveGroup] = useState("financeiro");
-  const [activeSubTab, setActiveSubTab] = useState("custos");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [hasNewBills, setHasNewBills] = useState(false);
   
@@ -80,6 +52,7 @@ const RestaurantAdmin = () => {
   }, [navigate]);
 
   const setupNotifications = (restaurantId: string) => {
+    // Canal para novos pedidos
     const ordersChannel = supabase
       .channel('new-orders-notification')
       .on(
@@ -90,13 +63,14 @@ const RestaurantAdmin = () => {
           table: 'orders',
         },
         (payload) => {
+          // Verificar se o pedido é do restaurante atual através da mesa
           supabase
             .from('tables')
             .select('restaurant_id')
             .eq('id', (payload.new as any).table_id)
             .single()
             .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId && activeGroup !== 'operacional') {
+              if (data?.restaurant_id === restaurantId && activeTab !== 'orders') {
                 setHasNewOrders(true);
                 toast.info("Novo pedido recebido!");
               }
@@ -105,6 +79,7 @@ const RestaurantAdmin = () => {
       )
       .subscribe();
 
+    // Canal para novas contas
     const billsChannel = supabase
       .channel('new-bills-notification')
       .on(
@@ -115,13 +90,14 @@ const RestaurantAdmin = () => {
           table: 'bills',
         },
         (payload) => {
+          // Verificar se a conta é do restaurante atual através da mesa
           supabase
             .from('tables')
             .select('restaurant_id')
             .eq('id', (payload.new as any).table_id)
             .single()
             .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId && activeGroup !== 'operacional') {
+              if (data?.restaurant_id === restaurantId && activeTab !== 'bills') {
                 setHasNewBills(true);
                 toast.info("Nova conta solicitada!");
               }
@@ -137,13 +113,14 @@ const RestaurantAdmin = () => {
   };
 
   useEffect(() => {
-    if (activeGroup === 'operacional' && activeSubTab === 'pedidos') {
+    // Limpar notificações quando mudar de aba
+    if (activeTab === 'orders') {
       setHasNewOrders(false);
     }
-    if (activeGroup === 'operacional' && activeSubTab === 'contas') {
+    if (activeTab === 'bills') {
       setHasNewBills(false);
     }
-  }, [activeGroup, activeSubTab]);
+  }, [activeTab]);
 
   const fetchRestaurant = async (restaurantId: string) => {
     try {
@@ -187,7 +164,7 @@ const RestaurantAdmin = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <p className="text-muted-foreground">Carregando...</p>
       </div>
     );
@@ -195,8 +172,8 @@ const RestaurantAdmin = () => {
 
   if (!restaurant) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="max-w-md w-full shadow-md">
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle>Sem sessão ativa</CardTitle>
           </CardHeader>
@@ -211,170 +188,135 @@ const RestaurantAdmin = () => {
     );
   }
 
-  const menuGroups = [
-    {
-      id: "financeiro",
-      label: "💰 Financeiro",
-      icon: DollarSign,
-      tabs: [
-        { id: "custos", label: "Custos" },
-        { id: "margens", label: "Margens" },
-        { id: "caixa", label: "Caixa" },
-        { id: "dre", label: "DRE" },
-      ]
-    },
-    {
-      id: "operacional",
-      label: "⚙️ Operacional",
-      icon: Settings,
-      tabs: [
-        { id: "mesas", label: "Mesas" },
-        { id: "pedidos", label: "Pedidos" },
-        { id: "contas", label: "Contas" },
-      ]
-    },
-    {
-      id: "gestao",
-      label: "📋 Gestão de Itens",
-      icon: Package,
-      tabs: [
-        { id: "produtos", label: "Produtos" },
-        { id: "estoque", label: "Estoque" },
-      ]
-    },
-    {
-      id: "administrativo",
-      label: "🧾 Administrativo",
-      icon: FileText,
-      tabs: [
-        { id: "configuracoes", label: "Configurações" },
-        { id: "planos", label: "Planos" },
-      ]
-    },
-  ];
-
-  const renderTabContent = () => {
-    if (!restaurant) return null;
-
-    switch (activeSubTab) {
-      case "custos":
-        return <CostosTab restaurantId={restaurant.id} />;
-      case "margens":
-        return <MargensTab restaurantId={restaurant.id} />;
-      case "caixa":
-        return <FluxoCaixaTab restaurantId={restaurant.id} />;
-      case "dre":
-        return <DRETab />;
-      case "mesas":
-        return <TablesTab restaurantId={restaurant.id} />;
-      case "pedidos":
-        return <OrdersTab restaurantId={restaurant.id} />;
-      case "contas":
-        return <BillsTab restaurantId={restaurant.id} />;
-      case "produtos":
-        return <ProductsTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
-      case "estoque":
-        return <StockTab restaurantId={restaurant.id} />;
-      case "configuracoes":
-        return <ConfiguracoesTab />;
-      case "planos":
-        return <PlanosTab />;
-      default:
-        return null;
-    }
-  };
-
-  const currentGroup = menuGroups.find(g => g.id === activeGroup);
-
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-gray-50">
-        <Sidebar className="border-r bg-white">
-          <SidebarContent>
-            <div className="p-6 border-b">
-              <h1 className="text-xl font-bold" style={{ color: "#fe9516" }}>
-                Menu's
-              </h1>
-              <p className="text-sm text-muted-foreground">{restaurant.name}</p>
-            </div>
-            
-            <SidebarMenu>
-              {menuGroups.map((group) => (
-                <SidebarMenuItem key={group.id}>
-                  <SidebarMenuButton
-                    onClick={() => {
-                      setActiveGroup(group.id);
-                      setActiveSubTab(group.tabs[0].id);
-                    }}
-                    isActive={activeGroup === group.id}
-                    className="w-full justify-start text-base py-6"
-                  >
-                    <span>{group.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarContent>
-        </Sidebar>
-
-        <main className="flex-1 overflow-auto">
-          <div className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <h2 className="text-lg font-semibold">{currentGroup?.label}</h2>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="restaurant-status"
-                  checked={restaurant.is_open}
-                  onCheckedChange={handleToggleRestaurant}
-                />
-                <Label htmlFor="restaurant-status" className="cursor-pointer text-sm">
-                  {restaurant.is_open ? "Aberto" : "Fechado"}
-                </Label>
-              </div>
-              <Button onClick={handleLogout} variant="outline" size="sm">
-                <LogOut className="h-4 w-4 mr-2" />
-                Sair
-              </Button>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              {restaurant.name}
+            </h1>
+            <p className="text-muted-foreground mt-1">Painel Administrativo</p>
           </div>
-
-          <div className="p-6">
-            <Card className="shadow-md rounded-2xl">
-              <CardContent className="p-6">
-                <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="w-full">
-                  <TabsList className="mb-6">
-                    {currentGroup?.tabs.map((tab) => (
-                      <TabsTrigger 
-                        key={tab.id} 
-                        value={tab.id}
-                        className="relative"
-                      >
-                        {tab.label}
-                        {tab.id === "pedidos" && hasNewOrders && (
-                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full" style={{ backgroundColor: "#fe9516" }}></span>
-                        )}
-                        {tab.id === "contas" && hasNewBills && (
-                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full" style={{ backgroundColor: "#fe9516" }}></span>
-                        )}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-
-                  {currentGroup?.tabs.map((tab) => (
-                    <TabsContent key={tab.id} value={tab.id}>
-                      {renderTabContent()}
-                    </TabsContent>
-                  ))}
-                </Tabs>
-              </CardContent>
-            </Card>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="restaurant-status"
+                checked={restaurant.is_open}
+                onCheckedChange={handleToggleRestaurant}
+              />
+              <Label htmlFor="restaurant-status" className="cursor-pointer">
+                {restaurant.is_open ? "Aberto" : "Fechado"}
+              </Label>
+            </div>
+            <Button onClick={handleLogout} variant="outline">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sair
+            </Button>
           </div>
-        </main>
+        </div>
+
+        {/* Tabs */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Gerenciar Restaurante</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-10 text-xs">
+                <TabsTrigger value="dashboard">
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  Dashboard
+                </TabsTrigger>
+                <TabsTrigger value="custos">
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  Custos
+                </TabsTrigger>
+                <TabsTrigger value="margens">
+                  <Target className="h-4 w-4 mr-1" />
+                  Margens
+                </TabsTrigger>
+                <TabsTrigger value="fluxo-caixa">
+                  <Wallet className="h-4 w-4 mr-1" />
+                  Caixa
+                </TabsTrigger>
+                <TabsTrigger value="stock">
+                  <Warehouse className="h-4 w-4 mr-1" />
+                  Estoque
+                </TabsTrigger>
+                <TabsTrigger value="products">
+                  <Package className="h-4 w-4 mr-1" />
+                  Produtos
+                </TabsTrigger>
+                <TabsTrigger value="tables">
+                  <TableIcon className="h-4 w-4 mr-1" />
+                  Mesas
+                </TabsTrigger>
+                <TabsTrigger value="orders" className="relative">
+                  <ShoppingCart className="h-4 w-4 mr-1" />
+                  Pedidos
+                  {hasNewOrders && (
+                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="bills" className="relative">
+                  <Receipt className="h-4 w-4 mr-1" />
+                  Contas
+                  {hasNewBills && (
+                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="settings">
+                  <Settings className="h-4 w-4 mr-1" />
+                  Config
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="dashboard">
+                <DashboardTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="custos">
+                <CostosTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="margens">
+                <MargensTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="fluxo-caixa">
+                <FluxoCaixaTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="stock">
+                <StockTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="products">
+                <ProductsTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />
+              </TabsContent>
+
+              <TabsContent value="tables" className="h-[calc(100vh-28rem)]">
+                <TablesTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="orders" className="h-[calc(100vh-28rem)]">
+                <OrdersTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="bills" className="h-[calc(100vh-28rem)]">
+                <BillsTab restaurantId={restaurant.id} />
+              </TabsContent>
+
+              <TabsContent value="settings">
+                <SettingsTab restaurantId={restaurant.id} />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
-    </SidebarProvider>
+    </div>
   );
 };
 

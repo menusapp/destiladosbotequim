@@ -1241,7 +1241,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      auto_release_idle_tables: { Args: never; Returns: undefined }
       check_product_availability: {
         Args: { p_product_id: string }
         Returns: boolean
