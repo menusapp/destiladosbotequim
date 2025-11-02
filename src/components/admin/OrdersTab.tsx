@@ -121,6 +121,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         )
       `)
       .eq("tables.restaurant_id", restaurantId)
+      .neq("notes", "Conta Manual")
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString())
       .order("created_at", { ascending: false });

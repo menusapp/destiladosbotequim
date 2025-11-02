@@ -63,6 +63,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     customerName: '',
     totalAmount: '',
     paymentMethod: 'cash',
+    selectedOrderId: null as string | null,
   });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
@@ -136,10 +137,11 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
       tableId: order.table_id,
       customerName: order.customer_name,
       totalAmount: total.toFixed(2),
-      paymentMethod: 'cash'
+      paymentMethod: 'cash',
+      selectedOrderId: order.id
     });
     setIsSheetOpen(false);
-    toast.success('Dados do pedido carregados!');
+    toast.success('Pedido carregado com sucesso!');
   };
 
   const fetchBills = async () => {
@@ -184,6 +186,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
             )
           `)
           .eq("table_id", bill.table_id)
+          .lte("created_at", bill.created_at)
           .order("created_at", { ascending: false });
 
         return {
@@ -251,8 +254,8 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleCreateManualBill = async () => {
-    if (!manualBill.tableId || !manualBill.totalAmount) {
-      toast.error('Preencha mesa e valor total');
+    if (!manualBill.selectedOrderId) {
+      toast.error('Selecione um pedido recente primeiro');
       return;
     }
 
@@ -265,9 +268,14 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
         .eq('status', 'open')
         .maybeSingle();
 
+      if (!cashSession) {
+        toast.error('Abra o caixa primeiro para registrar contas');
+        return;
+      }
+
       const totalAmount = parseFloat(manualBill.totalAmount);
       
-      // Create bill directly as paid
+      // Create bill with status 'pending' or 'requested'
       const { data: bill, error: billError } = await supabase
         .from('bills')
         .insert({
@@ -276,38 +284,20 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
           service_fee: 0,
           total_amount: totalAmount,
           payment_method: manualBill.paymentMethod,
-          status: 'paid',
-          paid_at: new Date().toISOString()
+          status: 'pending'
         })
         .select()
         .single();
 
       if (billError) throw billError;
 
-      // Create order for the bill
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          table_id: manualBill.tableId,
-          customer_name: manualBill.customerName || 'Cliente Balcão',
-          customer_cpf: '000.000.000-00',
-          status: 'accepted',
-          notes: 'Conta Manual'
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Trigger automático registrará no caixa quando order.status='accepted'
-      // (não registrar manualmente para evitar duplicação)
-
-      toast.success('Conta manual criada!');
+      toast.success('Conta criada! Agora você pode marcá-la como "A caminho" ou "Paga".');
       setManualBill({
         tableId: '',
         customerName: '',
         totalAmount: '',
-        paymentMethod: 'cash'
+        paymentMethod: 'cash',
+        selectedOrderId: null
       });
       fetchBills();
     } catch (error) {
@@ -484,119 +474,114 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
           </CardHeader>
           <CollapsibleContent>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Mesa</Label>
-                  <Select value={manualBill.tableId} onValueChange={(value) => setManualBill({ ...manualBill, tableId: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a mesa" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tables.map(table => (
-                        <SelectItem key={table.id} value={table.id}>
-                          Mesa {table.table_number}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Nome do Cliente (Opcional)</Label>
-                  <Input
-                    placeholder="Nome do cliente"
-                    value={manualBill.customerName}
-                    onChange={(e) => setManualBill({ ...manualBill, customerName: e.target.value })}
-                  />
-                </div>
-              </div>
+              {!manualBill.selectedOrderId ? (
+                <div className="text-center py-8 space-y-4">
+                  <p className="text-muted-foreground">Selecione um pedido recente para criar uma conta</p>
+                  <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                    <SheetTrigger asChild>
+                      <Button onClick={fetchRecentOrders}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Puxar Pedido Recente
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-full sm:max-w-lg">
+                      <SheetHeader>
+                        <SheetTitle>Pedidos de Hoje</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-4 space-y-4">
+                        <Input
+                          placeholder="Buscar por nome, mesa..."
+                          value={orderSearchQuery}
+                          onChange={(e) => setOrderSearchQuery(e.target.value)}
+                        />
+                        <div className="space-y-2 max-h-[70vh] overflow-y-auto">
+                          {recentOrders
+                            .filter(order => 
+                              order.customer_name.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+                              order.tables.table_number.toString().includes(orderSearchQuery)
+                            )
+                            .map(order => {
+                              const total = order.order_items.reduce((sum: number, item: any) => {
+                                const itemTotal = item.price_at_order * item.quantity;
+                                const extrasTotal = item.order_item_extras?.reduce((eSum: number, extra: any) => 
+                                  eSum + extra.price_at_order, 0) || 0;
+                                return sum + itemTotal + extrasTotal;
+                              }, 0);
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Valor Total (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={manualBill.totalAmount}
-                    onChange={(e) => setManualBill({ ...manualBill, totalAmount: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Método de Pagamento</Label>
-                  <Select value={manualBill.paymentMethod} onValueChange={(value) => setManualBill({ ...manualBill, paymentMethod: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Dinheiro</SelectItem>
-                      <SelectItem value="card">Cartão</SelectItem>
-                      <SelectItem value="pix">PIX</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" className="flex-1" onClick={fetchRecentOrders}>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Puxar Pedido Recente
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-full sm:max-w-lg">
-                    <SheetHeader>
-                      <SheetTitle>Pedidos de Hoje</SheetTitle>
-                    </SheetHeader>
-                    <div className="mt-4 space-y-4">
-                      <Input
-                        placeholder="Buscar por nome, mesa..."
-                        value={orderSearchQuery}
-                        onChange={(e) => setOrderSearchQuery(e.target.value)}
-                      />
-                      <div className="space-y-2 max-h-[70vh] overflow-y-auto">
-                        {recentOrders
-                          .filter(order => 
-                            order.customer_name.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-                            order.tables.table_number.toString().includes(orderSearchQuery)
-                          )
-                          .map(order => {
-                            const total = order.order_items.reduce((sum: number, item: any) => {
-                              const itemTotal = item.price_at_order * item.quantity;
-                              const extrasTotal = item.order_item_extras?.reduce((eSum: number, extra: any) => 
-                                eSum + extra.price_at_order, 0) || 0;
-                              return sum + itemTotal + extrasTotal;
-                            }, 0);
-
-                            return (
-                              <Card key={order.id} className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => handleSelectOrder(order)}>
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <p className="font-semibold">Mesa {order.tables.table_number}</p>
-                                    <p className="text-sm text-muted-foreground">{order.customer_name}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {format(new Date(order.created_at), "HH:mm", { locale: pt })}
-                                    </p>
+                              return (
+                                <Card key={order.id} className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => handleSelectOrder(order)}>
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <p className="font-semibold">Mesa {order.tables.table_number}</p>
+                                      <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        {format(new Date(order.created_at), "HH:mm", { locale: pt })}
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="font-bold">R$ {total.toFixed(2)}</p>
+                                      <p className="text-xs text-muted-foreground">{order.order_items.length} itens</p>
+                                    </div>
                                   </div>
-                                  <div className="text-right">
-                                    <p className="font-bold">R$ {total.toFixed(2)}</p>
-                                    <p className="text-xs text-muted-foreground">{order.order_items.length} itens</p>
-                                  </div>
-                                </div>
-                              </Card>
-                            );
-                          })}
-                        {recentOrders.length === 0 && (
-                          <p className="text-center text-muted-foreground py-8">Nenhum pedido hoje</p>
-                        )}
+                                </Card>
+                              );
+                            })}
+                          {recentOrders.length === 0 && (
+                            <p className="text-center text-muted-foreground py-8">Nenhum pedido hoje</p>
+                          )}
+                        </div>
                       </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Check className="h-5 w-5 text-green-600" />
+                      <p className="font-semibold text-green-800">Pedido carregado com sucesso!</p>
                     </div>
-                  </SheetContent>
-                </Sheet>
-                <Button onClick={handleCreateManualBill} className="flex-1">
-                  Criar Conta Manual
-                </Button>
-              </div>
+                    <div className="space-y-1 text-sm text-green-700">
+                      <p><strong>Cliente:</strong> {manualBill.customerName}</p>
+                      <p><strong>Mesa:</strong> {tables.find(t => t.id === manualBill.tableId)?.table_number}</p>
+                      <p><strong>Valor:</strong> R$ {manualBill.totalAmount}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Método de Pagamento</Label>
+                    <Select value={manualBill.paymentMethod} onValueChange={(value) => setManualBill({ ...manualBill, paymentMethod: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Dinheiro</SelectItem>
+                        <SelectItem value="card">Cartão</SelectItem>
+                        <SelectItem value="pix">PIX</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => setManualBill({
+                        tableId: '',
+                        customerName: '',
+                        totalAmount: '',
+                        paymentMethod: 'cash',
+                        selectedOrderId: null
+                      })}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleCreateManualBill} className="flex-1">
+                      Criar Conta
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </CollapsibleContent>
         </Card>
