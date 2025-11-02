@@ -110,36 +110,43 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const fetchOrders = async () => {
+    // BUSCA DO BANCO (sem filtrar por "notes" no SQL)
     const { data, error } = await supabase
       .from("orders")
       .select(
         `
-        *,
-        tables!inner(table_number, restaurant_id),
-        order_items(
-          quantity,
-          price_at_order,
-          notes,
-          products(name),
-          order_item_extras(
-            price_at_order,
-            product_extras(name)
-          )
-        )
-      `,
+    id,
+    created_at,
+    status,
+    notes,
+    table_id,
+    total_value,
+    tables!inner(restaurant_id, name),
+    order_items (
+      id,
+      product_id,
+      quantity,
+      unit_price,
+      products ( id, name )
+    )
+  `,
       )
       .eq("tables.restaurant_id", restaurantId)
-      .or('notes.is.null,not.eq.notes."Conta Manual"')
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString())
       .order("created_at", { ascending: false });
 
     if (error) {
+      console.error("Supabase error (orders):", error);
       toast.error("Erro ao carregar pedidos");
       return;
     }
 
-    setOrders(data || []);
+    // FILTRO NO FRONT: mantém pedidos sem nota (cardápio digital) e exclui "Conta Manual"
+    const ordersOnly = (data ?? []).filter((o) => o.notes !== "Conta Manual");
+
+    // segue o fluxo normal
+    setOrders(ordersOnly);
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
