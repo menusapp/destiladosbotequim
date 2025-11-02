@@ -191,29 +191,45 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     // Buscar os pedidos completos de cada conta
     const billsWithOrders = await Promise.all(
       (billsData || []).map(async (bill: any) => {
+        // ----- INÍCIO DA NOVA LÓGICA -----
+
+        // 1. Encontrar a data de criação da ÚLTIMA conta PAGA *antes* desta conta atual
+        const { data: lastPaidBill } = await supabase
+          .from("bills")
+          .select("created_at")
+          .eq("table_id", bill.table_id) // Da mesma mesa
+          .eq("status", "paid") // Que já foi paga
+          .lt("created_at", bill.created_at) // Criada ANTES da conta atual
+          .order("created_at", { ascending: false }) // A mais recente
+          .limit(1)
+          .maybeSingle(); // Se não houver conta paga anterior, usamos a data mais antiga possível (01/01/1970)
+
+        const startDateFilter = lastPaidBill ? lastPaidBill.created_at : new Date(0).toISOString(); // 2. Buscar os pedidos usando o filtro de data
         const { data: ordersData } = await supabase
           .from("orders")
           .select(
             `
-            customer_name,
-            customer_cpf,
-            notes,
-            order_items(
-              quantity,
-              price_at_order,
-              notes,
-              products(name),
-              order_item_extras(
-                price_at_order,
-                product_extras(name)
-              )
-            )
-          `,
+            customer_name,
+            customer_cpf,
+            notes,
+            order_items(
+              quantity,
+              price_at_order,
+              notes,
+              products(name),
+              order_item_extras(
+                price_at_order,
+                product_extras(name)
+              )
+            )
+          `,
           )
           .eq("table_id", bill.table_id)
-          .eq("status", "accepted")
-          .lte("created_at", bill.created_at)
+          .gte("created_at", startDateFilter) // <-- Criados DEPOIS da última conta paga
+          .lte("created_at", bill.created_at) // <-- Criados ANTES desta conta ser gerada
           .order("created_at", { ascending: false });
+
+        // ----- FIM DA NOVA LÓGICA -----
 
         return {
           ...bill,
