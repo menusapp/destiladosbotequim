@@ -317,7 +317,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
 
       const totalAmount = parseFloat(manualBill.totalAmount);
 
-      // Create bill with status 'pending' or 'requested'
+      // Create bill with status 'active'
       const { data: bill, error: billError } = await supabase
         .from("bills")
         .insert({
@@ -326,7 +326,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
           service_fee: 0,
           total_amount: totalAmount,
           payment_method: manualBill.paymentMethod,
-          status: "pending",
+          status: "active",
         })
         .select()
         .single();
