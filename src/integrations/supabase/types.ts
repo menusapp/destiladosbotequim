@@ -322,6 +322,44 @@ export type Database = {
           },
         ]
       }
+      delivery_config: {
+        Row: {
+          created_at: string | null
+          delivery_fee: number | null
+          estimated_time_minutes: number | null
+          id: string
+          min_order_value: number | null
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_fee?: number | null
+          estimated_time_minutes?: number | null
+          id?: string
+          min_order_value?: number | null
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delivery_fee?: number | null
+          estimated_time_minutes?: number | null
+          id?: string
+          min_order_value?: number | null
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_config_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extra_categories: {
         Row: {
           created_at: string | null
@@ -629,8 +667,14 @@ export type Database = {
           created_at: string | null
           customer_cpf: string
           customer_name: string
+          delivery_address: string | null
+          delivery_city: string | null
+          delivery_neighborhood: string | null
+          delivery_phone: string | null
           id: string
           notes: string | null
+          order_type: string | null
+          payment_type: string | null
           status: string | null
           table_id: string
           updated_at: string | null
@@ -639,8 +683,14 @@ export type Database = {
           created_at?: string | null
           customer_cpf: string
           customer_name: string
+          delivery_address?: string | null
+          delivery_city?: string | null
+          delivery_neighborhood?: string | null
+          delivery_phone?: string | null
           id?: string
           notes?: string | null
+          order_type?: string | null
+          payment_type?: string | null
           status?: string | null
           table_id: string
           updated_at?: string | null
@@ -649,8 +699,14 @@ export type Database = {
           created_at?: string | null
           customer_cpf?: string
           customer_name?: string
+          delivery_address?: string | null
+          delivery_city?: string | null
+          delivery_neighborhood?: string | null
+          delivery_phone?: string | null
           id?: string
           notes?: string | null
+          order_type?: string | null
+          payment_type?: string | null
           status?: string | null
           table_id?: string
           updated_at?: string | null
@@ -1177,6 +1233,53 @@ export type Database = {
           },
         ]
       }
+      whatsapp_config: {
+        Row: {
+          api_token: string | null
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          message_accepted: string | null
+          message_delivered: string | null
+          message_out_for_delivery: string | null
+          phone_number: string | null
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          api_token?: string | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          message_accepted?: string | null
+          message_delivered?: string | null
+          message_out_for_delivery?: string | null
+          phone_number?: string | null
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          api_token?: string | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          message_accepted?: string | null
+          message_delivered?: string | null
+          message_out_for_delivery?: string | null
+          phone_number?: string | null
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_config_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1241,6 +1344,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      auto_release_idle_tables: { Args: never; Returns: undefined }
       check_product_availability: {
         Args: { p_product_id: string }
         Returns: boolean

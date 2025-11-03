@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { LogOut, Package, TableIcon, ShoppingCart, BarChart3, Receipt, Settings, Warehouse, TrendingUp, Wallet, Target } from "lucide-react";
+import { LogOut, Package, TableIcon, ShoppingCart, Receipt, Warehouse, TrendingUp, Wallet, Target } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/admin/AppSidebar";
 import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
@@ -18,6 +20,7 @@ import StockTab from "@/components/admin/StockTab";
 import CostosTab from "@/components/admin/CostosTab";
 import MargensTab from "@/components/admin/MargensTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
+import DeliveryTab from "@/components/admin/DeliveryTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 interface Restaurant {
@@ -31,7 +34,8 @@ const RestaurantAdmin = () => {
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("");
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [hasNewBills, setHasNewBills] = useState(false);
   
@@ -188,135 +192,156 @@ const RestaurantAdmin = () => {
     );
   }
 
+  const renderContent = () => {
+    switch (activeSection) {
+      case "dashboard":
+        return <DashboardTab restaurantId={restaurant.id} />;
+      
+      case "financas":
+        return (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="custos">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Custos
+              </TabsTrigger>
+              <TabsTrigger value="margens">
+                <Target className="h-4 w-4 mr-2" />
+                Margens
+              </TabsTrigger>
+              <TabsTrigger value="caixa">
+                <Wallet className="h-4 w-4 mr-2" />
+                Caixa
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="custos">
+              <CostosTab restaurantId={restaurant.id} />
+            </TabsContent>
+            <TabsContent value="margens">
+              <MargensTab restaurantId={restaurant.id} />
+            </TabsContent>
+            <TabsContent value="caixa">
+              <FluxoCaixaTab restaurantId={restaurant.id} />
+            </TabsContent>
+          </Tabs>
+        );
+      
+      case "operacoes":
+        return (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="produtos">
+                <Package className="h-4 w-4 mr-2" />
+                Produtos
+              </TabsTrigger>
+              <TabsTrigger value="estoque">
+                <Warehouse className="h-4 w-4 mr-2" />
+                Estoque
+              </TabsTrigger>
+              <TabsTrigger value="mesas">
+                <TableIcon className="h-4 w-4 mr-2" />
+                Mesas
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="produtos">
+              <ProductsTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />
+            </TabsContent>
+            <TabsContent value="estoque">
+              <StockTab restaurantId={restaurant.id} />
+            </TabsContent>
+            <TabsContent value="mesas">
+              <TablesTab restaurantId={restaurant.id} />
+            </TabsContent>
+          </Tabs>
+        );
+      
+      case "atendimento":
+        return (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="pedidos" className="relative">
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Pedidos
+                {hasNewOrders && (
+                  <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="contas" className="relative">
+                <Receipt className="h-4 w-4 mr-2" />
+                Contas
+                {hasNewBills && (
+                  <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="pedidos">
+              <OrdersTab restaurantId={restaurant.id} />
+            </TabsContent>
+            <TabsContent value="contas">
+              <BillsTab restaurantId={restaurant.id} />
+            </TabsContent>
+          </Tabs>
+        );
+      
+      case "delivery":
+        return <DeliveryTab restaurantId={restaurant.id} />;
+      
+      case "configuracoes":
+        return <SettingsTab restaurantId={restaurant.id} />;
+      
+      default:
+        return <DashboardTab restaurantId={restaurant.id} />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
-      <div className="container mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              {restaurant.name}
-            </h1>
-            <p className="text-muted-foreground mt-1">Painel Administrativo</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="restaurant-status"
-                checked={restaurant.is_open}
-                onCheckedChange={handleToggleRestaurant}
-              />
-              <Label htmlFor="restaurant-status" className="cursor-pointer">
-                {restaurant.is_open ? "Aberto" : "Fechado"}
-              </Label>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-secondary/20 to-background">
+        <AppSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+        
+        <main className="flex-1 flex flex-col">
+          {/* Header */}
+          <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex h-16 items-center justify-between px-6">
+              <div className="flex items-center gap-4">
+                <SidebarTrigger />
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                    {restaurant.name}
+                  </h1>
+                  <p className="text-sm text-muted-foreground">Painel Administrativo</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="restaurant-status"
+                    checked={restaurant.is_open}
+                    onCheckedChange={handleToggleRestaurant}
+                  />
+                  <Label htmlFor="restaurant-status" className="cursor-pointer">
+                    {restaurant.is_open ? "Aberto" : "Fechado"}
+                  </Label>
+                </div>
+                <Button onClick={handleLogout} variant="outline" size="sm">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </Button>
+              </div>
             </div>
-            <Button onClick={handleLogout} variant="outline">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
-            </Button>
+          </header>
+
+          {/* Content */}
+          <div className="flex-1 p-6">
+            <Card className="h-full">
+              <CardContent className="pt-6">
+                {renderContent()}
+              </CardContent>
+            </Card>
           </div>
-        </div>
-
-        {/* Tabs */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Gerenciar Restaurante</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-10 text-xs">
-                <TabsTrigger value="dashboard">
-                  <BarChart3 className="h-4 w-4 mr-1" />
-                  Dashboard
-                </TabsTrigger>
-                <TabsTrigger value="custos">
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                  Custos
-                </TabsTrigger>
-                <TabsTrigger value="margens">
-                  <Target className="h-4 w-4 mr-1" />
-                  Margens
-                </TabsTrigger>
-                <TabsTrigger value="fluxo-caixa">
-                  <Wallet className="h-4 w-4 mr-1" />
-                  Caixa
-                </TabsTrigger>
-                <TabsTrigger value="stock">
-                  <Warehouse className="h-4 w-4 mr-1" />
-                  Estoque
-                </TabsTrigger>
-                <TabsTrigger value="products">
-                  <Package className="h-4 w-4 mr-1" />
-                  Produtos
-                </TabsTrigger>
-                <TabsTrigger value="tables">
-                  <TableIcon className="h-4 w-4 mr-1" />
-                  Mesas
-                </TabsTrigger>
-                <TabsTrigger value="orders" className="relative">
-                  <ShoppingCart className="h-4 w-4 mr-1" />
-                  Pedidos
-                  {hasNewOrders && (
-                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="bills" className="relative">
-                  <Receipt className="h-4 w-4 mr-1" />
-                  Contas
-                  {hasNewBills && (
-                    <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="settings">
-                  <Settings className="h-4 w-4 mr-1" />
-                  Config
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="dashboard">
-                <DashboardTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="custos">
-                <CostosTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="margens">
-                <MargensTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="fluxo-caixa">
-                <FluxoCaixaTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="stock">
-                <StockTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="products">
-                <ProductsTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />
-              </TabsContent>
-
-              <TabsContent value="tables" className="h-[calc(100vh-28rem)]">
-                <TablesTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="orders" className="h-[calc(100vh-28rem)]">
-                <OrdersTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="bills" className="h-[calc(100vh-28rem)]">
-                <BillsTab restaurantId={restaurant.id} />
-              </TabsContent>
-
-              <TabsContent value="settings">
-                <SettingsTab restaurantId={restaurant.id} />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        </main>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 
