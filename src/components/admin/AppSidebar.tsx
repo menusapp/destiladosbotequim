@@ -15,8 +15,7 @@ import {
   ClipboardList, 
   Receipt, 
   Truck, 
-  MapPin,
-  ChevronDown
+  MapPin
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,11 +31,6 @@ import {
   SidebarMenuSubButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
 interface AppSidebarProps {
   activeSection: string;
@@ -106,7 +100,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         <SidebarGroup>
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {/* Dashboard direto */}
               {menuStructure.direct.map((item) => (
                 <SidebarMenuItem key={item.id}>
@@ -121,62 +115,64 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                 </SidebarMenuItem>
               ))}
 
-              {/* Seções com sub-itens */}
+              {/* Seções com sub-itens - sempre abertas */}
               {menuStructure.sections.map((section) => (
-                <Collapsible key={section.id} defaultOpen className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip={section.label} className="cursor-pointer">
+                <div key={section.id} className="space-y-1">
+                  {!collapsed && (
+                    <div className="px-2 py-2 mt-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        <section.icon className="h-3.5 w-3.5" />
+                        <span>{section.label}</span>
+                      </div>
+                    </div>
+                  )}
+                  {collapsed && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton tooltip={section.label} disabled>
                         <section.icon className="h-4 w-4" />
-                        {!collapsed && (
-                          <>
-                            <span>{section.label}</span>
-                            <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                          </>
-                        )}
                       </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    {!collapsed && (
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {section.items.map((subItem) => (
-                            <SidebarMenuSubItem key={subItem.id}>
-                              <SidebarMenuSubButton
-                                onClick={() => onSectionChange(subItem.id)}
-                                isActive={activeSection === subItem.id}
-                                className="relative"
-                              >
-                                <subItem.icon className="h-4 w-4" />
-                                <span>{subItem.label}</span>
-                                {subItem.id === 'pedidos' && hasNewOrders && (
-                                  <span className="absolute right-2 h-2 w-2 bg-orange-500 rounded-full"></span>
-                                )}
-                                {subItem.id === 'comandas' && hasNewBills && (
-                                  <span className="absolute right-2 h-2 w-2 bg-orange-500 rounded-full"></span>
-                                )}
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    )}
-                  </SidebarMenuItem>
-                </Collapsible>
+                    </SidebarMenuItem>
+                  )}
+                  {!collapsed && (
+                    <SidebarMenuSub>
+                      {section.items.map((subItem) => (
+                        <SidebarMenuSubItem key={subItem.id}>
+                          <SidebarMenuSubButton
+                            onClick={() => onSectionChange(subItem.id)}
+                            isActive={activeSection === subItem.id}
+                            className="relative"
+                          >
+                            <subItem.icon className="h-4 w-4" />
+                            <span>{subItem.label}</span>
+                            {subItem.id === 'pedidos' && hasNewOrders && (
+                              <span className="absolute right-2 h-2 w-2 bg-orange-500 rounded-full"></span>
+                            )}
+                            {subItem.id === 'comandas' && hasNewBills && (
+                              <span className="absolute right-2 h-2 w-2 bg-orange-500 rounded-full"></span>
+                            )}
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  )}
+                </div>
               ))}
 
               {/* Configurações no final */}
-              {menuStructure.bottom.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    onClick={() => onSectionChange(item.id)}
-                    isActive={activeSection === item.id}
-                    tooltip={item.label}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {!collapsed && <span>{item.label}</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <div className="pt-4">
+                {menuStructure.bottom.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      onClick={() => onSectionChange(item.id)}
+                      isActive={activeSection === item.id}
+                      tooltip={item.label}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.label}</span>}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </div>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

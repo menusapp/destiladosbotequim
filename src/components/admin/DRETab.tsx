@@ -4,30 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { DollarSign, ShoppingCart, CreditCard, Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
 
-interface DashboardTabProps {
+interface DRETabProps {
   restaurantId: string;
-}
-
-interface DashboardStats {
-  totalRevenue: number;
-  totalOrders: number;
-  averageTicket: number;
-  cardPayments: { count: number; total: number };
-  pixPayments: { count: number; total: number };
-  cashPayments: { count: number; total: number };
-}
-
-interface TopProduct {
-  name: string;
-  quantity: number;
-  revenue: number;
 }
 
 interface FixedCost {
@@ -52,16 +37,7 @@ interface CardFeesConfig {
   credit_fee: number;
 }
 
-export default function DashboardTab({ restaurantId }: DashboardTabProps) {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalRevenue: 0,
-    totalOrders: 0,
-    averageTicket: 0,
-    cardPayments: { count: 0, total: 0 },
-    pixPayments: { count: 0, total: 0 },
-    cashPayments: { count: 0, total: 0 }
-  });
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+export default function DRETab({ restaurantId }: DRETabProps) {
   const [dateFilter, setDateFilter] = useState<string>("today");
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
   const [loading, setLoading] = useState(true);
@@ -71,10 +47,11 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
   const [cardFeesConfig, setCardFeesConfig] = useState<CardFeesConfig | null>(null);
   const [cmv, setCmv] = useState(0);
   const [operationalExpenses, setOperationalExpenses] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [cardPayments, setCardPayments] = useState({ count: 0, total: 0 });
 
   useEffect(() => {
-    fetchStats();
-    fetchCosts();
+    fetchDREData();
   }, [dateFilter, customDateRange, restaurantId]);
 
   const getDateRange = () => {
@@ -111,41 +88,36 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
     return { startDate, endDate };
   };
 
-  const fetchCosts = async () => {
-    // Fetch fixed costs
-    const { data: fixedData } = await supabase
-      .from("fixed_costs")
-      .select("name, amount")
-      .eq("restaurant_id", restaurantId);
-    setFixedCosts(fixedData || []);
-
-    // Fetch variable costs
-    const { data: variableData } = await supabase
-      .from("variable_costs")
-      .select("name, type, amount, percentage")
-      .eq("restaurant_id", restaurantId);
-    setVariableCosts(variableData || []);
-
-    // Fetch labor costs
-    const { data: laborData } = await supabase
-      .from("labor_costs")
-      .select("employee_name, salary")
-      .eq("restaurant_id", restaurantId);
-    setLaborCosts(laborData || []);
-
-    // Fetch card fees config
-    const { data: cardData } = await supabase
-      .from("card_fees_config")
-      .select("debit_fee, credit_fee")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
-    setCardFeesConfig(cardData);
-  };
-
-  const fetchStats = async () => {
+  const fetchDREData = async () => {
     setLoading(true);
     try {
       const { startDate, endDate } = getDateRange();
+
+      // Fetch costs
+      const { data: fixedData } = await supabase
+        .from("fixed_costs")
+        .select("name, amount")
+        .eq("restaurant_id", restaurantId);
+      setFixedCosts(fixedData || []);
+
+      const { data: variableData } = await supabase
+        .from("variable_costs")
+        .select("name, type, amount, percentage")
+        .eq("restaurant_id", restaurantId);
+      setVariableCosts(variableData || []);
+
+      const { data: laborData } = await supabase
+        .from("labor_costs")
+        .select("employee_name, salary")
+        .eq("restaurant_id", restaurantId);
+      setLaborCosts(laborData || []);
+
+      const { data: cardData } = await supabase
+        .from("card_fees_config")
+        .select("debit_fee, credit_fee")
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
+      setCardFeesConfig(cardData);
 
       // Buscar pedidos aceitos no período
       const { data: acceptedOrders, error: ordersError } = await supabase
@@ -164,17 +136,10 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       if (ordersError) throw ordersError;
 
       if (!acceptedOrders || acceptedOrders.length === 0) {
-        setStats({
-          totalRevenue: 0,
-          totalOrders: 0,
-          averageTicket: 0,
-          cardPayments: { count: 0, total: 0 },
-          pixPayments: { count: 0, total: 0 },
-          cashPayments: { count: 0, total: 0 }
-        });
-        setTopProducts([]);
+        setTotalRevenue(0);
         setCmv(0);
         setOperationalExpenses(0);
+        setCardPayments({ count: 0, total: 0 });
         setLoading(false);
         return;
       }
@@ -196,14 +161,12 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
           order_id,
           quantity,
           price_at_order,
-          products (name),
           order_item_extras (price_at_order)
         `)
         .in("order_id", orderIds);
 
       // Calcular valor de cada pedido
       const orderTotals = new Map<string, number>();
-      const productMap = new Map<string, { quantity: number; revenue: number }>();
 
       orderItems?.forEach((item: any) => {
         const orderId = item.order_id;
@@ -215,19 +178,6 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         const itemTotal = itemSubtotal + extrasTotal;
         
         orderTotals.set(orderId, (orderTotals.get(orderId) || 0) + itemTotal);
-
-        // Para top produtos
-        const productName = item.products?.name || "Produto excluído";
-        const existing = productMap.get(productName);
-        if (existing) {
-          existing.quantity += item.quantity;
-          existing.revenue += itemSubtotal;
-        } else {
-          productMap.set(productName, {
-            quantity: item.quantity,
-            revenue: itemSubtotal
-          });
-        }
       });
 
       // Aplicar taxa de serviço
@@ -256,49 +206,24 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       });
 
       // Calcular estatísticas
-      let totalRevenue = 0;
-      let cardCount = 0, pixCount = 0, cashCount = 0;
-      let cardRevenue = 0, pixRevenue = 0, cashRevenue = 0;
+      let revenue = 0;
+      let cardCount = 0;
+      let cardRevenue = 0;
 
-      const isCash = (method: string) => method === "cash" || method === "dinheiro";
-      const isPix = (method: string) => method === "pix";
       const isCard = (method: string) => method === "card" || method === "credito" || method === "debito";
 
       orderTotals.forEach((total, orderId) => {
-        totalRevenue += total;
+        revenue += total;
         const paymentMethod = orderPayments.get(orderId) || 'pending';
         
         if (isCard(paymentMethod)) {
           cardCount++;
           cardRevenue += total;
-        } else if (isPix(paymentMethod)) {
-          pixCount++;
-          pixRevenue += total;
-        } else if (isCash(paymentMethod)) {
-          cashCount++;
-          cashRevenue += total;
         }
       });
 
-      setStats({
-        totalRevenue,
-        totalOrders: orderTotals.size,
-        averageTicket: orderTotals.size > 0 ? totalRevenue / orderTotals.size : 0,
-        cardPayments: { count: cardCount, total: cardRevenue },
-        pixPayments: { count: pixCount, total: pixRevenue },
-        cashPayments: { count: cashCount, total: cashRevenue }
-      });
-
-      // Todos os produtos vendidos ordenados por quantidade (crescente)
-      const topProductsList = Array.from(productMap.entries())
-        .map(([name, data]) => ({
-          name,
-          quantity: data.quantity,
-          revenue: data.revenue
-        }))
-        .sort((a, b) => a.quantity - b.quantity); // Ordenar por quantidade crescente
-
-      setTopProducts(topProductsList);
+      setTotalRevenue(revenue);
+      setCardPayments({ count: cardCount, total: cardRevenue });
 
       await calculateCMV(orderIds);
       await calculateOperationalExpenses(startDate, endDate);
@@ -317,7 +242,6 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
     }
 
     try {
-      // Buscar itens do pedido com ingredientes dos produtos
       const { data: items, error } = await supabase
         .from("order_items")
         .select(`
@@ -352,7 +276,6 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       items?.forEach((item: any) => {
         const itemQty = item.quantity;
         
-        // Custo dos ingredientes do produto
         const ingredients = item.products?.product_ingredients || [];
         ingredients.forEach((ing: any) => {
           const ingQty = ing.quantity || 0;
@@ -360,7 +283,6 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
           totalCmv += ingQty * pricePerUnit * itemQty;
         });
         
-        // Custo dos ingredientes dos adicionais
         const extras = item.order_item_extras || [];
         extras.forEach((extra: any) => {
           const extraIngredients = extra.product_extras?.product_extra_ingredients || [];
@@ -402,12 +324,10 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
   const calculateDREValues = () => {
     const { startDate, endDate } = getDateRange();
     
-    // Helper: calcular rateio mensal proporcional aos dias do filtro
     const calculateMonthlyProration = (monthlyCost: number): number => {
       const start = new Date(startDate);
       const end = new Date(endDate);
       
-      // Se mesma data, é 1 dia
       if (start.getTime() === end.getTime()) {
         const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
         return monthlyCost * (1 / daysInMonth);
@@ -415,68 +335,57 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       
       let totalProration = 0;
       const currentMonth = new Date(start);
-      currentMonth.setDate(1); // Primeiro dia do mês inicial
+      currentMonth.setDate(1);
       
       while (currentMonth <= end) {
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         
-        // Primeiro e último dia do mês atual
         const firstDayOfMonth = new Date(year, month, 1);
         const lastDayOfMonth = new Date(year, month, daysInMonth);
         
-        // Interseção do filtro com o mês atual
         const periodStart = start > firstDayOfMonth ? start : firstDayOfMonth;
         const periodEnd = end < lastDayOfMonth ? end : lastDayOfMonth;
         
-        // Dias do filtro dentro deste mês (inclusive)
         const daysInPeriod = Math.floor((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         
-        // Rateio proporcional deste mês
         totalProration += monthlyCost * (daysInPeriod / daysInMonth);
         
-        // Avançar para o próximo mês
         currentMonth.setMonth(currentMonth.getMonth() + 1);
       }
       
       return totalProration;
     };
     
-    // Custos Fixos Mensais (rateados proporcionalmente)
     const totalFixedCostsMonthly = fixedCosts.reduce((sum, cost) => sum + Number(cost.amount), 0);
     const totalFixedCosts = calculateMonthlyProration(totalFixedCostsMonthly);
     
-    // CMO - Custo de Mão de Obra Mensal (rateado proporcionalmente)
     const totalLaborCostsMonthly = laborCosts.reduce((sum, cost) => sum + Number(cost.salary), 0);
     const totalLaborCosts = calculateMonthlyProration(totalLaborCostsMonthly);
     
-    // Custos Variáveis
     let totalVariableCosts = 0;
     variableCosts.forEach(cost => {
       if (cost.type === 'percentage') {
-        // Percentuais sobre vendas do período
-        totalVariableCosts += stats.totalRevenue * (Number(cost.percentage) / 100);
+        totalVariableCosts += totalRevenue * (Number(cost.percentage) / 100);
       } else {
-        // Valores absolutos são mensais, ratear proporcionalmente
         totalVariableCosts += calculateMonthlyProration(Number(cost.amount || 0));
       }
     });
 
-    // Taxas de Cartão (percentuais sobre vendas do período)
     let cardTaxes = 0;
-    if (cardFeesConfig && stats.cardPayments.total > 0) {
+    if (cardFeesConfig && cardPayments.total > 0) {
       const avgFee = (cardFeesConfig.debit_fee + cardFeesConfig.credit_fee) / 2;
-      cardTaxes = stats.cardPayments.total * (avgFee / 100);
+      cardTaxes = cardPayments.total * (avgFee / 100);
     }
 
     const totalCosts = cmv + operationalExpenses + totalFixedCosts + totalVariableCosts + totalLaborCosts + cardTaxes;
-    const operationalProfit = stats.totalRevenue - totalCosts;
+    const operationalProfit = totalRevenue - totalCosts;
 
     return {
-      grossRevenue: stats.totalRevenue,
+      grossRevenue: totalRevenue,
       cmv,
-      grossProfit: stats.totalRevenue - cmv,
+      grossProfit: totalRevenue - cmv,
       operationalExpenses,
       fixedCost: totalFixedCosts,
       variableCost: totalVariableCosts,
@@ -495,119 +404,105 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
 
   return (
     <div className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <Button variant={dateFilter === "today" ? "default" : "outline"} onClick={() => setDateFilter("today")}>Hoje</Button>
-          <Button variant={dateFilter === "yesterday" ? "default" : "outline"} onClick={() => setDateFilter("yesterday")}>Ontem</Button>
-          <Button variant={dateFilter === "7days" ? "default" : "outline"} onClick={() => setDateFilter("7days")}>7 Dias</Button>
-          <Button variant={dateFilter === "30days" ? "default" : "outline"} onClick={() => setDateFilter("30days")}>30 Dias</Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant={dateFilter === "custom" ? "default" : "outline"} className={cn("justify-start text-left font-normal")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFilter === "custom" && customDateRange?.from
-                  ? customDateRange.to
-                    ? `${format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateRange.to, "dd/MM/yyyy", { locale: ptBR })}`
-                    : format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })
-                  : "Personalizado"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarComponent
-                mode="range"
-                selected={customDateRange}
-                onSelect={(range) => {
-                  setCustomDateRange(range);
-                  if (range?.from) setDateFilter("custom");
-                }}
-                locale={ptBR}
-                numberOfMonths={2}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+      <div className="flex flex-wrap gap-2">
+        <Button variant={dateFilter === "today" ? "default" : "outline"} onClick={() => setDateFilter("today")}>Hoje</Button>
+        <Button variant={dateFilter === "yesterday" ? "default" : "outline"} onClick={() => setDateFilter("yesterday")}>Ontem</Button>
+        <Button variant={dateFilter === "7days" ? "default" : "outline"} onClick={() => setDateFilter("7days")}>7 Dias</Button>
+        <Button variant={dateFilter === "30days" ? "default" : "outline"} onClick={() => setDateFilter("30days")}>30 Dias</Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant={dateFilter === "custom" ? "default" : "outline"} className={cn("justify-start text-left font-normal")}>
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateFilter === "custom" && customDateRange?.from
+                ? customDateRange.to
+                  ? `${format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateRange.to, "dd/MM/yyyy", { locale: ptBR })}`
+                  : format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })
+                : "Personalizado"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarComponent
+              mode="range"
+              selected={customDateRange}
+              onSelect={(range) => {
+                setCustomDateRange(range);
+                if (range?.from) setDateFilter("custom");
+              }}
+              locale={ptBR}
+              numberOfMonths={2}
+              className="pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Faturamento Total</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">R$ {stats.totalRevenue.toFixed(2)}</div>
-            </CardContent>
-          </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Demonstrativo de Resultados (DRE)
+          </CardTitle>
+          <CardDescription>Análise financeira completa do período selecionado</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center border-b pb-2">
+              <span className="font-semibold text-lg">Receita Bruta</span>
+              <span className="font-bold text-lg text-green-600">R$ {dreValues.grossRevenue.toFixed(2)}</span>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Pedidos</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalOrders}</div>
-            </CardContent>
-          </Card>
+          <div className="space-y-2 pl-4">
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">(-) CMV dos Produtos</span>
+              <span className="font-semibold text-red-600">R$ {dreValues.cmv.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center border-b pb-2">
+              <span className="font-semibold">Lucro Bruto</span>
+              <span className="font-bold text-green-600">R$ {dreValues.grossProfit.toFixed(2)}</span>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">R$ {stats.averageTicket.toFixed(2)}</div>
-            </CardContent>
-          </Card>
+          <div className="space-y-2 pl-4">
+            <h3 className="font-semibold text-sm text-muted-foreground mb-2">Despesas Operacionais:</h3>
+            <div className="flex justify-between items-center pl-4">
+              <span className="text-sm">Despesas Registradas (Saídas do Caixa)</span>
+              <span className="text-sm text-red-600">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center pl-4">
+              <span className="text-sm">Custo Fixo (proporcional)</span>
+              <span className="text-sm text-red-600">R$ {dreValues.fixedCost.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center pl-4">
+              <span className="text-sm">Custo Variável</span>
+              <span className="text-sm text-red-600">R$ {dreValues.variableCost.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center pl-4">
+              <span className="text-sm">CMO - Custo de Mão de Obra (proporcional)</span>
+              <span className="text-sm text-red-600">R$ {dreValues.laborCost.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center pl-4">
+              <span className="text-sm">Taxas de Cartões</span>
+              <span className="text-sm text-red-600">R$ {dreValues.cardTaxes.toFixed(2)}</span>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Formas de Pagamento</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span>Cartão:</span>
-                  <span className="font-bold">{stats.cardPayments.count} (R$ {stats.cardPayments.total.toFixed(2)})</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>PIX:</span>
-                  <span className="font-bold">{stats.pixPayments.count} (R$ {stats.pixPayments.total.toFixed(2)})</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Dinheiro:</span>
-                  <span className="font-bold">{stats.cashPayments.count} (R$ {stats.cashPayments.total.toFixed(2)})</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Produtos Vendidos</CardTitle>
-            <CardDescription>Lista completa de produtos vendidos no período (ordenados por quantidade)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {topProducts.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">Nenhum produto vendido no período</p>
-            ) : (
-              <div className="space-y-4">
-                {topProducts.map((product) => (
-                  <div key={product.name} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-muted-foreground">{product.quantity} unidades vendidas</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">R$ {product.revenue.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">faturado</p>
-                    </div>
-                  </div>
-                ))}
+          <div className="space-y-2 border-t-2 pt-4">
+            <div className="flex justify-between items-center bg-primary/5 p-4 rounded-lg">
+              <span className="font-bold text-lg">Lucro Operacional Final</span>
+              <span className={`font-bold text-2xl ${dreValues.operationalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                R$ {dreValues.operationalProfit.toFixed(2)}
+              </span>
+            </div>
+            {dreValues.grossRevenue > 0 && (
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span>Margem Operacional</span>
+                <span className="font-semibold">{((dreValues.operationalProfit / dreValues.grossRevenue) * 100).toFixed(2)}%</span>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -22,6 +22,7 @@ import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
 import CategoriesTab from "@/components/admin/CategoriesTab";
 import DeliveryTab from "@/components/admin/DeliveryTab";
+import DRETab from "@/components/admin/DRETab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 interface Restaurant {
@@ -205,7 +206,7 @@ const RestaurantAdmin = () => {
       case "margens":
         return <MargensTab restaurantId={restaurant.id} />;
       case "dre":
-        return <CMVDashboardTab restaurantId={restaurant.id} />;
+        return <DRETab restaurantId={restaurant.id} />;
       
       // Operações - sub-itens
       case "estoque":
