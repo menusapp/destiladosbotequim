@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { LogOut, Package, TableIcon, ShoppingCart, Receipt, Warehouse, TrendingUp, Wallet, Target } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -20,6 +19,8 @@ import StockTab from "@/components/admin/StockTab";
 import CostosTab from "@/components/admin/CostosTab";
 import MargensTab from "@/components/admin/MargensTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
+import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
+import CategoriesTab from "@/components/admin/CategoriesTab";
 import DeliveryTab from "@/components/admin/DeliveryTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
@@ -35,7 +36,6 @@ const RestaurantAdmin = () => {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("dashboard");
-  const [activeTab, setActiveTab] = useState("");
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [hasNewBills, setHasNewBills] = useState(false);
   
@@ -74,7 +74,7 @@ const RestaurantAdmin = () => {
             .eq('id', (payload.new as any).table_id)
             .single()
             .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId && activeTab !== 'orders') {
+              if (data?.restaurant_id === restaurantId && activeSection !== 'pedidos') {
                 setHasNewOrders(true);
                 toast.info("Novo pedido recebido!");
               }
@@ -101,7 +101,7 @@ const RestaurantAdmin = () => {
             .eq('id', (payload.new as any).table_id)
             .single()
             .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId && activeTab !== 'bills') {
+              if (data?.restaurant_id === restaurantId && activeSection !== 'comandas') {
                 setHasNewBills(true);
                 toast.info("Nova conta solicitada!");
               }
@@ -117,14 +117,14 @@ const RestaurantAdmin = () => {
   };
 
   useEffect(() => {
-    // Limpar notificações quando mudar de aba
-    if (activeTab === 'orders') {
+    // Limpar notificações quando mudar de seção
+    if (activeSection === 'pedidos') {
       setHasNewOrders(false);
     }
-    if (activeTab === 'bills') {
+    if (activeSection === 'comandas') {
       setHasNewBills(false);
     }
-  }, [activeTab]);
+  }, [activeSection]);
 
   const fetchRestaurant = async (restaurantId: string) => {
     try {
@@ -197,93 +197,36 @@ const RestaurantAdmin = () => {
       case "dashboard":
         return <DashboardTab restaurantId={restaurant.id} />;
       
-      case "financas":
-        return (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="custos">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Custos
-              </TabsTrigger>
-              <TabsTrigger value="margens">
-                <Target className="h-4 w-4 mr-2" />
-                Margens
-              </TabsTrigger>
-              <TabsTrigger value="caixa">
-                <Wallet className="h-4 w-4 mr-2" />
-                Caixa
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="custos">
-              <CostosTab restaurantId={restaurant.id} />
-            </TabsContent>
-            <TabsContent value="margens">
-              <MargensTab restaurantId={restaurant.id} />
-            </TabsContent>
-            <TabsContent value="caixa">
-              <FluxoCaixaTab restaurantId={restaurant.id} />
-            </TabsContent>
-          </Tabs>
-        );
+      // Finanças - sub-itens
+      case "caixa":
+        return <FluxoCaixaTab restaurantId={restaurant.id} />;
+      case "custos":
+        return <CostosTab restaurantId={restaurant.id} />;
+      case "margens":
+        return <MargensTab restaurantId={restaurant.id} />;
+      case "dre":
+        return <CMVDashboardTab restaurantId={restaurant.id} />;
       
-      case "operacoes":
-        return (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="produtos">
-                <Package className="h-4 w-4 mr-2" />
-                Produtos
-              </TabsTrigger>
-              <TabsTrigger value="estoque">
-                <Warehouse className="h-4 w-4 mr-2" />
-                Estoque
-              </TabsTrigger>
-              <TabsTrigger value="mesas">
-                <TableIcon className="h-4 w-4 mr-2" />
-                Mesas
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="produtos">
-              <ProductsTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />
-            </TabsContent>
-            <TabsContent value="estoque">
-              <StockTab restaurantId={restaurant.id} />
-            </TabsContent>
-            <TabsContent value="mesas">
-              <TablesTab restaurantId={restaurant.id} />
-            </TabsContent>
-          </Tabs>
-        );
+      // Operações - sub-itens
+      case "estoque":
+        return <StockTab restaurantId={restaurant.id} />;
+      case "produtos":
+        return <ProductsTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
+      case "ingredientes":
+        return <CategoriesTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
       
-      case "atendimento":
-        return (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="pedidos" className="relative">
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Pedidos
-                {hasNewOrders && (
-                  <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="contas" className="relative">
-                <Receipt className="h-4 w-4 mr-2" />
-                Contas
-                {hasNewBills && (
-                  <span className="absolute top-1 right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
-                )}
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="pedidos">
-              <OrdersTab restaurantId={restaurant.id} />
-            </TabsContent>
-            <TabsContent value="contas">
-              <BillsTab restaurantId={restaurant.id} />
-            </TabsContent>
-          </Tabs>
-        );
+      // Atendimento - sub-itens
+      case "mesas":
+        return <TablesTab restaurantId={restaurant.id} />;
+      case "pedidos":
+        return <OrdersTab restaurantId={restaurant.id} />;
+      case "comandas":
+        return <BillsTab restaurantId={restaurant.id} />;
       
-      case "delivery":
+      // Delivery - sub-itens
+      case "areas-entrega":
+        return <DeliveryTab restaurantId={restaurant.id} />;
+      case "delivery-config":
         return <DeliveryTab restaurantId={restaurant.id} />;
       
       case "configuracoes":
@@ -297,7 +240,12 @@ const RestaurantAdmin = () => {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-secondary/20 to-background">
-        <AppSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+        <AppSidebar 
+          activeSection={activeSection} 
+          onSectionChange={setActiveSection}
+          hasNewOrders={hasNewOrders}
+          hasNewBills={hasNewBills}
+        />
         
         <main className="flex-1 flex flex-col">
           {/* Header */}
