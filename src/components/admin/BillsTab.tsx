@@ -95,6 +95,11 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   useEffect(() => {
     fetchBills();
     fetchTables();
+    
+    // Fetch recent orders when sheet opens
+    if (isSheetOpen) {
+      fetchRecentOrders();
+    }
 
     // Realtime subscription
     const channel = supabase
@@ -113,7 +118,7 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurantId, startDate, endDate]);
+  }, [restaurantId, startDate, endDate, isSheetOpen]);
 
   const fetchTables = async () => {
     const { data } = await supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("table_number");
