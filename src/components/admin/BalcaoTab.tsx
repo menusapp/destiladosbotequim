@@ -346,9 +346,194 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
     });
   };
 
-  const handlePrint = (order: any) => {
-    // Implementar impressão
-    toast.info("Função de impressão em desenvolvimento");
+  const handlePrint = async (order: any) => {
+    try {
+      // Buscar informações do restaurante
+      const { data: restaurant } = await supabase
+        .from("restaurants")
+        .select("name")
+        .eq("id", restaurantId)
+        .single();
+
+      const restaurantName = restaurant?.name || "Restaurante";
+      
+      // Preparar itens para impressão
+      const itemsHtml = order.counter_order_items.map((item: any) => {
+        const extrasText = item.counter_order_item_extras?.length > 0
+          ? `<br><span style="font-size: 11px; color: #666;">+ ${item.counter_order_item_extras.map((e: any) => e.product_extras.name).join(", ")}</span>`
+          : '';
+        
+        const itemTotal = (item.price_at_order * item.quantity) + 
+          (item.counter_order_item_extras?.reduce((sum: number, e: any) => sum + e.price_at_order, 0) || 0) * item.quantity;
+        
+        return `
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">
+              ${item.quantity}x ${item.products.name}${extrasText}
+              ${item.notes ? `<br><span style="font-size: 11px; font-style: italic; color: #666;">${item.notes}</span>` : ''}
+            </td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">
+              R$ ${itemTotal.toFixed(2)}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      const paymentMethodText = order.payment_method === 'cash' ? 'Dinheiro' :
+        order.payment_method === 'debit' ? 'Débito' :
+        order.payment_method === 'credit' ? 'Crédito' :
+        order.payment_method === 'pix' ? 'PIX' : '-';
+
+      // HTML do comprovante
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Comprovante - ${restaurantName}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: 'Courier New', monospace;
+              padding: 20px;
+              max-width: 300px;
+              margin: 0 auto;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+              padding-bottom: 15px;
+              border-bottom: 2px dashed #000;
+            }
+            .header h1 {
+              font-size: 18px;
+              margin-bottom: 5px;
+            }
+            .header p {
+              font-size: 12px;
+              color: #666;
+            }
+            .info {
+              margin-bottom: 15px;
+              font-size: 13px;
+            }
+            .info p {
+              margin: 4px 0;
+            }
+            table {
+              width: 100%;
+              margin: 15px 0;
+              font-size: 13px;
+            }
+            .totals {
+              border-top: 2px solid #000;
+              padding-top: 10px;
+              margin-top: 15px;
+            }
+            .totals p {
+              display: flex;
+              justify-content: space-between;
+              margin: 5px 0;
+              font-size: 13px;
+            }
+            .totals .total {
+              font-size: 16px;
+              font-weight: bold;
+              margin-top: 10px;
+              padding-top: 10px;
+              border-top: 1px solid #000;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 20px;
+              padding-top: 15px;
+              border-top: 2px dashed #000;
+              font-size: 12px;
+              color: #666;
+            }
+            @media print {
+              body { padding: 10px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${restaurantName}</h1>
+            <p>COMPROVANTE DE PEDIDO</p>
+          </div>
+
+          <div class="info">
+            <p><strong>Pedido:</strong> #${order.id.slice(0, 8)}</p>
+            <p><strong>Mesa:</strong> ${order.tables.table_number}</p>
+            <p><strong>Cliente:</strong> ${order.customer_name}</p>
+            ${order.customer_cpf ? `<p><strong>CPF:</strong> ${order.customer_cpf}</p>` : ''}
+            <p><strong>Data:</strong> ${format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+            <p><strong>Atendente:</strong> ${order.created_by}</p>
+          </div>
+
+          <table>
+            <thead>
+              <tr style="border-bottom: 2px solid #000;">
+                <th style="text-align: left; padding: 8px 0;">Item</th>
+                <th style="text-align: right; padding: 8px 0;">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <div class="totals">
+            <p>
+              <span>Subtotal:</span>
+              <span>R$ ${order.subtotal.toFixed(2)}</span>
+            </p>
+            ${order.fee_amount > 0 ? `
+              <p>
+                <span>Taxa de Serviço ${order.fee_type === 'percentage' ? `(${order.fee_value}%)` : ''}:</span>
+                <span>R$ ${order.fee_amount.toFixed(2)}</span>
+              </p>
+            ` : ''}
+            <p class="total">
+              <span>TOTAL:</span>
+              <span>R$ ${order.total_amount.toFixed(2)}</span>
+            </p>
+            ${order.payment_method ? `
+              <p style="margin-top: 15px;">
+                <span>Forma de Pagamento:</span>
+                <span><strong>${paymentMethodText}</strong></span>
+              </p>
+            ` : ''}
+          </div>
+
+          <div class="footer">
+            <p>Obrigado pela preferência!</p>
+            <p>Volte sempre!</p>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              // Fecha a janela após impressão ou cancelamento
+              setTimeout(() => window.close(), 100);
+            };
+          </script>
+        </body>
+        </html>
+      `;
+
+      // Abrir janela de impressão
+      const printWindow = window.open('', '_blank', 'width=400,height=600');
+      if (printWindow) {
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+      } else {
+        toast.error("Não foi possível abrir a janela de impressão. Verifique se pop-ups estão bloqueados.");
+      }
+    } catch (error) {
+      console.error("Erro ao imprimir:", error);
+      toast.error("Erro ao gerar comprovante");
+    }
   };
 
   const filteredOrders = orders?.filter(order =>
