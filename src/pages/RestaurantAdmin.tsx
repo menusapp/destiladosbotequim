@@ -23,6 +23,7 @@ import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
 import CategoriesTab from "@/components/admin/CategoriesTab";
 import DeliveryTab from "@/components/admin/DeliveryTab";
 import DRETab from "@/components/admin/DRETab";
+import BalcaoTab from "@/components/admin/BalcaoTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 interface Restaurant {
@@ -223,6 +224,8 @@ const RestaurantAdmin = () => {
         return <OrdersTab restaurantId={restaurant.id} />;
       case "comandas":
         return <BillsTab restaurantId={restaurant.id} />;
+      case "balcao":
+        return <BalcaoTab restaurantId={restaurant.id} />;
       
       // Delivery - sub-itens
       case "areas-entrega":

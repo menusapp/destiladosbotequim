@@ -322,6 +322,168 @@ export type Database = {
           },
         ]
       }
+      counter_order_item_extras: {
+        Row: {
+          counter_order_item_id: string
+          created_at: string
+          id: string
+          price_at_order: number
+          product_extra_id: string | null
+        }
+        Insert: {
+          counter_order_item_id: string
+          created_at?: string
+          id?: string
+          price_at_order: number
+          product_extra_id?: string | null
+        }
+        Update: {
+          counter_order_item_id?: string
+          created_at?: string
+          id?: string
+          price_at_order?: number
+          product_extra_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "counter_order_item_extras_counter_order_item_id_fkey"
+            columns: ["counter_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "counter_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "counter_order_item_extras_product_extra_id_fkey"
+            columns: ["product_extra_id"]
+            isOneToOne: false
+            referencedRelation: "product_extras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      counter_order_items: {
+        Row: {
+          cost_snapshot: number | null
+          counter_order_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          price_at_order: number
+          product_id: string | null
+          quantity: number
+        }
+        Insert: {
+          cost_snapshot?: number | null
+          counter_order_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          price_at_order: number
+          product_id?: string | null
+          quantity?: number
+        }
+        Update: {
+          cost_snapshot?: number | null
+          counter_order_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          price_at_order?: number
+          product_id?: string | null
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "counter_order_items_counter_order_id_fkey"
+            columns: ["counter_order_id"]
+            isOneToOne: false
+            referencedRelation: "counter_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "counter_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      counter_orders: {
+        Row: {
+          created_at: string
+          created_by: string
+          customer_cpf: string | null
+          customer_name: string
+          fee_amount: number | null
+          fee_type: string | null
+          fee_value: number | null
+          finalized_at: string | null
+          id: string
+          notes: string | null
+          payment_method: string | null
+          restaurant_id: string
+          status: string
+          subtotal: number
+          table_id: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          customer_cpf?: string | null
+          customer_name: string
+          fee_amount?: number | null
+          fee_type?: string | null
+          fee_value?: number | null
+          finalized_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          restaurant_id: string
+          status?: string
+          subtotal?: number
+          table_id: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          customer_cpf?: string | null
+          customer_name?: string
+          fee_amount?: number | null
+          fee_type?: string | null
+          fee_value?: number | null
+          finalized_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          restaurant_id?: string
+          status?: string
+          subtotal?: number
+          table_id?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "counter_orders_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "counter_orders_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_config: {
         Row: {
           created_at: string | null

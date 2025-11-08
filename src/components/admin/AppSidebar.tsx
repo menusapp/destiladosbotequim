@@ -75,8 +75,9 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         icon: ShoppingCart,
         items: [
           { id: "mesas", label: "Mesas", icon: TableIcon },
-          { id: "pedidos", label: "Pedidos", icon: ClipboardList },
-          { id: "comandas", label: "Comandas", icon: Receipt },
+          { id: "pedidos", label: "Pedidos", icon: ClipboardList, hasNotification: hasNewOrders },
+          { id: "comandas", label: "Comandas", icon: Receipt, hasNotification: hasNewBills },
+          { id: "balcao", label: "Balcão", icon: ShoppingBag },
         ],
       },
       {
