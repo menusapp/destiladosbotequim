@@ -14,9 +14,11 @@ export default {
     },
     extend: {
       colors: {
-        "primary-orange": "hsl(var(--primary-orange))",
-        "primary-orange-light": "hsl(var(--primary-orange-light))",
-        "primary-orange-dark": "hsl(var(--primary-orange-dark))",
+        "primary-orange": "hsl(var(--primary))",
+        "primary-hover": "hsl(var(--primary-hover))",
+        "primary-light": "hsl(var(--primary-light))",
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -62,9 +64,14 @@ export default {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "var(--radius)", /* 12px */
+        md: "calc(var(--radius) - 2px)", /* 10px */
+        sm: "calc(var(--radius) - 4px)", /* 8px */
+        button: "var(--radius-button)", /* 10px */
+      },
+      boxShadow: {
+        card: "var(--shadow-card)",
+        hover: "var(--shadow-hover)",
       },
       keyframes: {
         "accordion-down": {

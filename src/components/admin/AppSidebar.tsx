@@ -1,22 +1,27 @@
-import { 
-  BarChart3, 
-  Wallet, 
-  Package, 
-  ShoppingCart, 
-  Settings, 
-  DollarSign, 
-  TrendingDown, 
-  Target, 
-  FileText, 
-  Warehouse, 
-  ShoppingBag, 
-  Beef, 
-  TableIcon, 
-  ClipboardList, 
-  Receipt, 
-  Truck, 
-  MapPin
+import {
+  LayoutDashboard,
+  Table2,
+  UtensilsCrossed,
+  ShoppingCart,
+  FileText,
+  ChefHat,
+  Receipt,
+  Package,
+  BarChart3,
+  Settings,
+  DollarSign,
+  TrendingDown,
+  Target,
+  Warehouse,
+  ShoppingBag,
+  Beef,
+  TableIcon,
+  ClipboardList,
+  Truck,
+  MapPin,
+  Wallet,
 } from "lucide-react";
+import menusLogo from "/logo-menus.png";
 import {
   Sidebar,
   SidebarContent,
@@ -96,12 +101,29 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r">
-      <SidebarContent>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-white w-60">
+      <SidebarContent className="bg-white">
+        {/* Logo Header */}
+        <div className="p-4 border-b border-sidebar-border">
+          {!collapsed && (
+            <div className="flex items-center gap-3">
+              <img src={menusLogo} alt="Menus" className="h-10 w-10" />
+              <div className="flex flex-col">
+                <span className="text-base font-bold text-foreground">Menus</span>
+                <span className="text-xs text-muted-foreground">Sistema de Gestão</span>
+              </div>
+            </div>
+          )}
+          {collapsed && (
+            <div className="flex justify-center">
+              <img src={menusLogo} alt="Menus" className="h-8 w-8" />
+            </div>
+          )}
+        </div>
+
         <SidebarGroup>
-          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
+            <SidebarMenu className="space-y-1 px-2 pt-4">
               {/* Dashboard direto */}
               {menuStructure.direct.map((item) => (
                 <SidebarMenuItem key={item.id}>

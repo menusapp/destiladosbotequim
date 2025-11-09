@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import ProductsTab from "@/components/admin/ProductsTab";
 import TablesTab from "@/components/admin/TablesTab";
@@ -243,55 +243,42 @@ const RestaurantAdmin = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-secondary/20 to-background">
+      <div className="min-h-screen flex w-full" style={{ background: "radial-gradient(circle at top left, hsl(0 0% 100%), hsl(40 100% 97% / 0.3))" }}>
         <AppSidebar 
-          activeSection={activeSection} 
+          activeSection={activeSection}
           onSectionChange={setActiveSection}
           hasNewOrders={hasNewOrders}
           hasNewBills={hasNewBills}
         />
-        
-        <main className="flex-1 flex flex-col">
-          {/* Header */}
-          <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-16 items-center justify-between px-6">
-              <div className="flex items-center gap-4">
-                <SidebarTrigger />
+        <SidebarInset className="flex-1">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white/80 backdrop-blur-sm px-6">
+            <SidebarTrigger className="-ml-1" />
+            <div className="flex-1 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img src="/logo-menus.png" alt="Menus" className="h-8 w-8" />
                 <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                    {restaurant.name}
-                  </h1>
-                  <p className="text-sm text-muted-foreground">Painel Administrativo</p>
+                  <h1 className="text-lg font-bold text-foreground">Menus</h1>
+                  <p className="text-xs text-muted-foreground">Sistema de Gestão</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="restaurant-status"
-                    checked={restaurant.is_open}
-                    onCheckedChange={handleToggleRestaurant}
-                  />
-                  <Label htmlFor="restaurant-status" className="cursor-pointer">
-                    {restaurant.is_open ? "Aberto" : "Fechado"}
-                  </Label>
-                </div>
-                <Button onClick={handleLogout} variant="outline" size="sm">
-                  <LogOut className="h-4 w-4 mr-2" />
+                <Button
+                  variant={restaurant?.is_open ? "default" : "outline"}
+                  onClick={() => handleToggleRestaurant(!restaurant?.is_open)}
+                  className={restaurant?.is_open ? "bg-primary hover:bg-primary-hover" : ""}
+                >
+                  {restaurant?.is_open ? "Restaurante Aberto" : "Restaurante Fechado"}
+                </Button>
+                <Button variant="outline" onClick={handleLogout}>
                   Sair
                 </Button>
               </div>
             </div>
           </header>
-
-          {/* Content */}
-          <div className="flex-1 p-6">
-            <Card className="h-full">
-              <CardContent className="pt-6">
-                {renderContent()}
-              </CardContent>
-            </Card>
-          </div>
-        </main>
+          <main className="flex-1 overflow-auto p-6">
+            {renderContent()}
+          </main>
+        </SidebarInset>
       </div>
     </SidebarProvider>
   );

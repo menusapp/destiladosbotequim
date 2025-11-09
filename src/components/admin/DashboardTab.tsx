@@ -1,308 +1,145 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { DollarSign, ShoppingCart, CreditCard, Calendar as CalendarIcon } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { DollarSign, TrendingUp, Users, Clock } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfDay, endOfDay, subDays } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
-import type { DateRange } from "react-day-picker";
+import { startOfDay, endOfDay } from "date-fns";
 
 interface DashboardTabProps {
   restaurantId: string;
 }
 
 interface DashboardStats {
-  totalRevenue: number;
-  totalOrders: number;
+  salesToday: number;
+  ordersCount: number;
   averageTicket: number;
-  cardPayments: { count: number; total: number };
-  pixPayments: { count: number; total: number };
-  cashPayments: { count: number; total: number };
+  occupiedTables: number;
+  inPreparation: number;
 }
 
-interface TopProduct {
-  name: string;
-  quantity: number;
-  revenue: number;
+interface RecentOrder {
+  id: string;
+  customer_name: string;
+  created_at: string;
+  status: string;
+  table_number: number;
 }
 
-interface FixedCost {
-  name: string;
-  amount: number;
-}
-
-interface VariableCost {
-  name: string;
-  type: string;
-  amount: number;
-  percentage: number;
-}
-
-interface LaborCost {
-  employee_name: string;
-  salary: number;
-}
-
-interface CardFeesConfig {
-  debit_fee: number;
-  credit_fee: number;
+interface OpenBill {
+  id: string;
+  table_number: number;
+  total_amount: number;
+  created_at: string;
 }
 
 export default function DashboardTab({ restaurantId }: DashboardTabProps) {
   const [stats, setStats] = useState<DashboardStats>({
-    totalRevenue: 0,
-    totalOrders: 0,
+    salesToday: 0,
+    ordersCount: 0,
     averageTicket: 0,
-    cardPayments: { count: 0, total: 0 },
-    pixPayments: { count: 0, total: 0 },
-    cashPayments: { count: 0, total: 0 }
+    occupiedTables: 0,
+    inPreparation: 0,
   });
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [dateFilter, setDateFilter] = useState<string>("today");
-  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [openBills, setOpenBills] = useState<OpenBill[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
-  const [variableCosts, setVariableCosts] = useState<VariableCost[]>([]);
-  const [laborCosts, setLaborCosts] = useState<LaborCost[]>([]);
-  const [cardFeesConfig, setCardFeesConfig] = useState<CardFeesConfig | null>(null);
-  const [cmv, setCmv] = useState(0);
-  const [operationalExpenses, setOperationalExpenses] = useState(0);
 
   useEffect(() => {
-    fetchStats();
-    fetchCosts();
-  }, [dateFilter, customDateRange, restaurantId]);
+    fetchDashboardData();
+  }, [restaurantId]);
 
-  const getDateRange = () => {
-    const now = new Date();
-    let startDate: Date;
-    let endDate: Date = endOfDay(now);
-
-    switch (dateFilter) {
-      case "today":
-        startDate = startOfDay(now);
-        break;
-      case "yesterday":
-        startDate = startOfDay(subDays(now, 1));
-        endDate = endOfDay(subDays(now, 1));
-        break;
-      case "7days":
-        startDate = startOfDay(subDays(now, 6));
-        break;
-      case "30days":
-        startDate = startOfDay(subDays(now, 29));
-        break;
-      case "custom":
-        if (customDateRange?.from) {
-          startDate = startOfDay(customDateRange.from);
-          endDate = customDateRange.to ? endOfDay(customDateRange.to) : endOfDay(customDateRange.from);
-        } else {
-          startDate = startOfDay(now);
-        }
-        break;
-      default:
-        startDate = startOfDay(now);
-    }
-
-    return { startDate, endDate };
-  };
-
-  const fetchCosts = async () => {
-    // Fetch fixed costs
-    const { data: fixedData } = await supabase
-      .from("fixed_costs")
-      .select("name, amount")
-      .eq("restaurant_id", restaurantId);
-    setFixedCosts(fixedData || []);
-
-    // Fetch variable costs
-    const { data: variableData } = await supabase
-      .from("variable_costs")
-      .select("name, type, amount, percentage")
-      .eq("restaurant_id", restaurantId);
-    setVariableCosts(variableData || []);
-
-    // Fetch labor costs
-    const { data: laborData } = await supabase
-      .from("labor_costs")
-      .select("employee_name, salary")
-      .eq("restaurant_id", restaurantId);
-    setLaborCosts(laborData || []);
-
-    // Fetch card fees config
-    const { data: cardData } = await supabase
-      .from("card_fees_config")
-      .select("debit_fee, credit_fee")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
-    setCardFeesConfig(cardData);
-  };
-
-  const fetchStats = async () => {
+  const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const { startDate, endDate } = getDateRange();
+      const today = new Date();
+      const startDate = startOfDay(today);
+      const endDate = endOfDay(today);
 
-      // Buscar pedidos aceitos no período
-      const { data: acceptedOrders, error: ordersError } = await supabase
-        .from("orders")
+      // Buscar pedidos pagos do dia (através das contas)
+      const { data: paidBills } = await supabase
+        .from("bills")
         .select(`
-          id,
-          table_id,
-          created_at,
+          total_amount,
           tables!inner(restaurant_id)
         `)
         .eq("tables.restaurant_id", restaurantId)
-        .eq("status", "accepted")
-        .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString());
+        .eq("status", "paid")
+        .gte("paid_at", startDate.toISOString())
+        .lte("paid_at", endDate.toISOString());
 
-      if (ordersError) throw ordersError;
+      const salesData = paidBills || [];
+      const salesTotal = salesData.reduce((sum, bill) => sum + Number(bill.total_amount), 0);
+      const ordersCount = salesData.length;
+      const avgTicket = ordersCount > 0 ? salesTotal / ordersCount : 0;
 
-      if (!acceptedOrders || acceptedOrders.length === 0) {
-        setStats({
-          totalRevenue: 0,
-          totalOrders: 0,
-          averageTicket: 0,
-          cardPayments: { count: 0, total: 0 },
-          pixPayments: { count: 0, total: 0 },
-          cashPayments: { count: 0, total: 0 }
-        });
-        setTopProducts([]);
-        setCmv(0);
-        setOperationalExpenses(0);
-        setLoading(false);
-        return;
-      }
+      // Mesas ocupadas
+      const { data: occupiedTablesData } = await supabase
+        .from("tables")
+        .select("id")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_occupied", true);
 
-      const orderIds = acceptedOrders.map(o => o.id);
-
-      // Buscar configurações do restaurante para taxa de serviço
-      const { data: restaurant } = await supabase
-        .from("restaurants")
-        .select("service_fee_enabled, service_fee_percentage")
-        .eq("id", restaurantId)
-        .single();
-
-      // Buscar itens dos pedidos com extras
-      const { data: orderItems } = await supabase
-        .from("order_items")
+      // Pedidos em preparo
+      const { data: inPrepData } = await supabase
+        .from("orders")
         .select(`
           id,
-          order_id,
-          quantity,
-          price_at_order,
-          products (name),
-          order_item_extras (price_at_order)
+          tables!inner(restaurant_id)
         `)
-        .in("order_id", orderIds);
+        .eq("tables.restaurant_id", restaurantId)
+        .in("status", ["pending", "accepted", "preparing"]);
 
-      // Calcular valor de cada pedido
-      const orderTotals = new Map<string, number>();
-      const productMap = new Map<string, { quantity: number; revenue: number }>();
+      // Pedidos recentes (últimos 10)
+      const { data: ordersData } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          customer_name,
+          created_at,
+          status,
+          tables!inner(table_number, restaurant_id)
+        `)
+        .eq("tables.restaurant_id", restaurantId)
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-      orderItems?.forEach((item: any) => {
-        const orderId = item.order_id;
-        const itemSubtotal = item.price_at_order * item.quantity;
-        const extrasTotal = (item.order_item_extras || []).reduce(
-          (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
-          0
-        );
-        const itemTotal = itemSubtotal + extrasTotal;
-        
-        orderTotals.set(orderId, (orderTotals.get(orderId) || 0) + itemTotal);
+      const recentOrdersFormatted = (ordersData || []).map((order: any) => ({
+        id: order.id,
+        customer_name: order.customer_name,
+        created_at: order.created_at,
+        status: order.status,
+        table_number: order.tables?.table_number || 0,
+      }));
 
-        // Para top produtos
-        const productName = item.products?.name || "Produto excluído";
-        const existing = productMap.get(productName);
-        if (existing) {
-          existing.quantity += item.quantity;
-          existing.revenue += itemSubtotal;
-        } else {
-          productMap.set(productName, {
-            quantity: item.quantity,
-            revenue: itemSubtotal
-          });
-        }
-      });
-
-      // Aplicar taxa de serviço
-      const serviceFeeEnabled = restaurant?.service_fee_enabled || false;
-      const serviceFeePercentage = restaurant?.service_fee_percentage || 0;
-
-      orderTotals.forEach((subtotal, orderId) => {
-        if (serviceFeeEnabled) {
-          const serviceFee = subtotal * (serviceFeePercentage / 100);
-          orderTotals.set(orderId, subtotal + serviceFee);
-        }
-      });
-
-      // Buscar bills para identificar formas de pagamento
-      const tableIds = [...new Set(acceptedOrders.map(o => o.table_id))];
-      const { data: bills } = await supabase
+      // Contas abertas
+      const { data: billsData } = await supabase
         .from("bills")
-        .select("table_id, payment_method, status")
-        .in("table_id", tableIds);
+        .select(`
+          id,
+          total_amount,
+          created_at,
+          tables!inner(table_number, restaurant_id)
+        `)
+        .eq("tables.restaurant_id", restaurantId)
+        .in("status", ["pending", "on_the_way"]);
 
-      // Mapear pedidos com suas formas de pagamento
-      const orderPayments = new Map<string, string>();
-      acceptedOrders.forEach(order => {
-        const bill = bills?.find(b => b.table_id === order.table_id && b.status === 'paid');
-        orderPayments.set(order.id, bill?.payment_method || 'pending');
-      });
-
-      // Calcular estatísticas
-      let totalRevenue = 0;
-      let cardCount = 0, pixCount = 0, cashCount = 0;
-      let cardRevenue = 0, pixRevenue = 0, cashRevenue = 0;
-
-      const isCash = (method: string) => method === "cash" || method === "dinheiro";
-      const isPix = (method: string) => method === "pix";
-      const isCard = (method: string) => method === "card" || method === "credito" || method === "debito";
-
-      orderTotals.forEach((total, orderId) => {
-        totalRevenue += total;
-        const paymentMethod = orderPayments.get(orderId) || 'pending';
-        
-        if (isCard(paymentMethod)) {
-          cardCount++;
-          cardRevenue += total;
-        } else if (isPix(paymentMethod)) {
-          pixCount++;
-          pixRevenue += total;
-        } else if (isCash(paymentMethod)) {
-          cashCount++;
-          cashRevenue += total;
-        }
-      });
+      const openBillsFormatted = (billsData || []).map((bill: any) => ({
+        id: bill.id,
+        table_number: bill.tables?.table_number || 0,
+        total_amount: Number(bill.total_amount),
+        created_at: bill.created_at,
+      }));
 
       setStats({
-        totalRevenue,
-        totalOrders: orderTotals.size,
-        averageTicket: orderTotals.size > 0 ? totalRevenue / orderTotals.size : 0,
-        cardPayments: { count: cardCount, total: cardRevenue },
-        pixPayments: { count: pixCount, total: pixRevenue },
-        cashPayments: { count: cashCount, total: cashRevenue }
+        salesToday: salesTotal,
+        ordersCount,
+        averageTicket: avgTicket,
+        occupiedTables: occupiedTablesData?.length || 0,
+        inPreparation: inPrepData?.length || 0,
       });
 
-      // Todos os produtos vendidos ordenados por quantidade (crescente)
-      const topProductsList = Array.from(productMap.entries())
-        .map(([name, data]) => ({
-          name,
-          quantity: data.quantity,
-          revenue: data.revenue
-        }))
-        .sort((a, b) => a.quantity - b.quantity); // Ordenar por quantidade crescente
-
-      setTopProducts(topProductsList);
-
-      await calculateCMV(orderIds);
-      await calculateOperationalExpenses(startDate, endDate);
-
+      setRecentOrders(recentOrdersFormatted);
+      setOpenBills(openBillsFormatted);
     } catch (error: any) {
       toast.error("Erro ao carregar dados: " + error.message);
     } finally {
@@ -310,304 +147,155 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
     }
   };
 
-  const calculateCMV = async (orderIds: string[]) => {
-    if (orderIds.length === 0) {
-      setCmv(0);
-      return;
-    }
-
-    try {
-      // Buscar itens do pedido com ingredientes dos produtos
-      const { data: items, error } = await supabase
-        .from("order_items")
-        .select(`
-          id,
-          quantity,
-          products (
-            product_ingredients (
-              quantity,
-              stock_items (
-                price_per_unit
-              )
-            )
-          ),
-          order_item_extras (
-            product_extra_id,
-            product_extras (
-              product_extra_ingredients (
-                quantity,
-                stock_items (
-                  price_per_unit
-                )
-              )
-            )
-          )
-        `)
-        .in("order_id", orderIds);
-
-      if (error) throw error;
-
-      let totalCmv = 0;
-      
-      items?.forEach((item: any) => {
-        const itemQty = item.quantity;
-        
-        // Custo dos ingredientes do produto
-        const ingredients = item.products?.product_ingredients || [];
-        ingredients.forEach((ing: any) => {
-          const ingQty = ing.quantity || 0;
-          const pricePerUnit = ing.stock_items?.price_per_unit || 0;
-          totalCmv += ingQty * pricePerUnit * itemQty;
-        });
-        
-        // Custo dos ingredientes dos adicionais
-        const extras = item.order_item_extras || [];
-        extras.forEach((extra: any) => {
-          const extraIngredients = extra.product_extras?.product_extra_ingredients || [];
-          extraIngredients.forEach((ing: any) => {
-            const ingQty = ing.quantity || 0;
-            const pricePerUnit = ing.stock_items?.price_per_unit || 0;
-            totalCmv += ingQty * pricePerUnit * itemQty;
-          });
-        });
-      });
-
-      setCmv(totalCmv);
-    } catch (error) {
-      console.error("Erro ao calcular CMV:", error);
-      setCmv(0);
-    }
-  };
-
-  const calculateOperationalExpenses = async (startDate: Date, endDate: Date) => {
-    try {
-      const { data, error } = await supabase
-        .from("cash_movements")
-        .select("amount")
-        .eq("restaurant_id", restaurantId)
-        .eq("movement_type", "saida")
-        .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString());
-
-      if (error) throw error;
-
-      const total = data?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
-      setOperationalExpenses(total);
-    } catch (error) {
-      console.error("Erro ao calcular despesas operacionais:", error);
-      setOperationalExpenses(0);
-    }
-  };
-
-  const calculateDREValues = () => {
-    const { startDate, endDate } = getDateRange();
-    
-    // Helper: calcular rateio mensal proporcional aos dias do filtro
-    const calculateMonthlyProration = (monthlyCost: number): number => {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      
-      // Se mesma data, é 1 dia
-      if (start.getTime() === end.getTime()) {
-        const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-        return monthlyCost * (1 / daysInMonth);
-      }
-      
-      let totalProration = 0;
-      const currentMonth = new Date(start);
-      currentMonth.setDate(1); // Primeiro dia do mês inicial
-      
-      while (currentMonth <= end) {
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        
-        // Primeiro e último dia do mês atual
-        const firstDayOfMonth = new Date(year, month, 1);
-        const lastDayOfMonth = new Date(year, month, daysInMonth);
-        
-        // Interseção do filtro com o mês atual
-        const periodStart = start > firstDayOfMonth ? start : firstDayOfMonth;
-        const periodEnd = end < lastDayOfMonth ? end : lastDayOfMonth;
-        
-        // Dias do filtro dentro deste mês (inclusive)
-        const daysInPeriod = Math.floor((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        
-        // Rateio proporcional deste mês
-        totalProration += monthlyCost * (daysInPeriod / daysInMonth);
-        
-        // Avançar para o próximo mês
-        currentMonth.setMonth(currentMonth.getMonth() + 1);
-      }
-      
-      return totalProration;
-    };
-    
-    // Custos Fixos Mensais (rateados proporcionalmente)
-    const totalFixedCostsMonthly = fixedCosts.reduce((sum, cost) => sum + Number(cost.amount), 0);
-    const totalFixedCosts = calculateMonthlyProration(totalFixedCostsMonthly);
-    
-    // CMO - Custo de Mão de Obra Mensal (rateado proporcionalmente)
-    const totalLaborCostsMonthly = laborCosts.reduce((sum, cost) => sum + Number(cost.salary), 0);
-    const totalLaborCosts = calculateMonthlyProration(totalLaborCostsMonthly);
-    
-    // Custos Variáveis
-    let totalVariableCosts = 0;
-    variableCosts.forEach(cost => {
-      if (cost.type === 'percentage') {
-        // Percentuais sobre vendas do período
-        totalVariableCosts += stats.totalRevenue * (Number(cost.percentage) / 100);
-      } else {
-        // Valores absolutos são mensais, ratear proporcionalmente
-        totalVariableCosts += calculateMonthlyProration(Number(cost.amount || 0));
-      }
-    });
-
-    // Taxas de Cartão (percentuais sobre vendas do período)
-    let cardTaxes = 0;
-    if (cardFeesConfig && stats.cardPayments.total > 0) {
-      const avgFee = (cardFeesConfig.debit_fee + cardFeesConfig.credit_fee) / 2;
-      cardTaxes = stats.cardPayments.total * (avgFee / 100);
-    }
-
-    const totalCosts = cmv + operationalExpenses + totalFixedCosts + totalVariableCosts + totalLaborCosts + cardTaxes;
-    const operationalProfit = stats.totalRevenue - totalCosts;
-
-    return {
-      grossRevenue: stats.totalRevenue,
-      cmv,
-      grossProfit: stats.totalRevenue - cmv,
-      operationalExpenses,
-      fixedCost: totalFixedCosts,
-      variableCost: totalVariableCosts,
-      laborCost: totalLaborCosts,
-      cardTaxes,
-      totalCosts,
-      operationalProfit
-    };
-  };
-
-  const dreValues = calculateDREValues();
-
   if (loading) {
-    return <div className="p-4">Carregando...</div>;
+    return <div className="p-6 text-muted-foreground">Carregando...</div>;
   }
 
   return (
-    <div className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <Button variant={dateFilter === "today" ? "default" : "outline"} onClick={() => setDateFilter("today")}>Hoje</Button>
-          <Button variant={dateFilter === "yesterday" ? "default" : "outline"} onClick={() => setDateFilter("yesterday")}>Ontem</Button>
-          <Button variant={dateFilter === "7days" ? "default" : "outline"} onClick={() => setDateFilter("7days")}>7 Dias</Button>
-          <Button variant={dateFilter === "30days" ? "default" : "outline"} onClick={() => setDateFilter("30days")}>30 Dias</Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant={dateFilter === "custom" ? "default" : "outline"} className={cn("justify-start text-left font-normal")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFilter === "custom" && customDateRange?.from
-                  ? customDateRange.to
-                    ? `${format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateRange.to, "dd/MM/yyyy", { locale: ptBR })}`
-                    : format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })
-                  : "Personalizado"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarComponent
-                mode="range"
-                selected={customDateRange}
-                onSelect={(range) => {
-                  setCustomDateRange(range);
-                  if (range?.from) setDateFilter("custom");
-                }}
-                locale={ptBR}
-                numberOfMonths={2}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-[32px] font-bold text-foreground">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
+          {new Date().toLocaleDateString("pt-BR", { 
+            weekday: "long", 
+            day: "numeric", 
+            month: "long" 
+          })}
+        </p>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Faturamento Total</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">R$ {stats.totalRevenue.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Pedidos</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalOrders}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">R$ {stats.averageTicket.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Formas de Pagamento</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span>Cartão:</span>
-                  <span className="font-bold">{stats.cardPayments.count} (R$ {stats.cardPayments.total.toFixed(2)})</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>PIX:</span>
-                  <span className="font-bold">{stats.pixPayments.count} (R$ {stats.pixPayments.total.toFixed(2)})</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Dinheiro:</span>
-                  <span className="font-bold">{stats.cashPayments.count} (R$ {stats.cashPayments.total.toFixed(2)})</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Produtos Vendidos</CardTitle>
-            <CardDescription>Lista completa de produtos vendidos no período (ordenados por quantidade)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {topProducts.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">Nenhum produto vendido no período</p>
-            ) : (
-              <div className="space-y-4">
-                {topProducts.map((product) => (
-                  <div key={product.name} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-muted-foreground">{product.quantity} unidades vendidas</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">R$ {product.revenue.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">faturado</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
+      {/* Cards de Métricas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Vendas Hoje */}
+        <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100/50 border-green-200 shadow-card hover:shadow-hover transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-green-700">Vendas Hoje</p>
+              <p className="text-3xl font-bold text-green-900">
+                R$ {stats.salesToday.toFixed(2).replace(".", ",")}
+              </p>
+              <p className="text-xs text-green-600">{stats.ordersCount} pedidos</p>
+            </div>
+            <div className="p-3 bg-green-500 rounded-xl">
+              <DollarSign className="h-6 w-6 text-white" />
+            </div>
+          </div>
         </Card>
+
+        {/* Ticket Médio */}
+        <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200 shadow-card hover:shadow-hover transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-blue-700">Ticket Médio</p>
+              <p className="text-3xl font-bold text-blue-900">
+                R$ {stats.averageTicket.toFixed(2).replace(".", ",")}
+              </p>
+              <p className="text-xs text-blue-600">Por pedido pago</p>
+            </div>
+            <div className="p-3 bg-blue-500 rounded-xl">
+              <TrendingUp className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </Card>
+
+        {/* Mesas Ocupadas */}
+        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-orange-700">Mesas Ocupadas</p>
+              <p className="text-3xl font-bold text-orange-900">{stats.occupiedTables}</p>
+              <p className="text-xs text-orange-600">de 4 mesas</p>
+            </div>
+            <div className="p-3 bg-orange-500 rounded-xl">
+              <Users className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </Card>
+
+        {/* Em Preparo */}
+        <Card className="p-6 bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200 shadow-card hover:shadow-hover transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-purple-700">Em Preparo</p>
+              <p className="text-3xl font-bold text-purple-900">{stats.inPreparation}</p>
+              <p className="text-xs text-purple-600">0 pendentes</p>
+            </div>
+            <div className="p-3 bg-purple-500 rounded-xl">
+              <Clock className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Seções: Pedidos Recentes e Contas Abertas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pedidos Recentes */}
+        <Card className="p-6 shadow-card">
+          <h2 className="text-lg font-bold text-foreground mb-4">Pedidos Recentes</h2>
+          {recentOrders.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Clock className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Nenhum pedido hoje</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentOrders.slice(0, 5).map((order) => (
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium text-sm text-foreground">{order.customer_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Mesa {order.table_number} • {new Date(order.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    order.status === "accepted" ? "bg-green-100 text-green-700" :
+                    order.status === "pending" ? "bg-yellow-100 text-yellow-700" :
+                    "bg-gray-100 text-gray-700"
+                  }`}>
+                    {order.status === "pending" ? "Pendente" : 
+                     order.status === "accepted" ? "Aceito" : 
+                     order.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Contas Abertas */}
+        <Card className="p-6 shadow-card">
+          <h2 className="text-lg font-bold text-foreground mb-4">Contas Abertas</h2>
+          {openBills.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Nenhuma conta aberta</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {openBills.slice(0, 5).map((bill) => (
+                <div
+                  key={bill.id}
+                  className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium text-sm text-foreground">Mesa {bill.table_number}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(bill.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-primary">
+                    R$ {bill.total_amount.toFixed(2).replace(".", ",")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
