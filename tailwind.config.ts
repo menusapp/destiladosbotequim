@@ -14,6 +14,9 @@ export default {
     },
     extend: {
       colors: {
+        "primary-orange": "hsl(var(--primary-orange))",
+        "primary-orange-light": "hsl(var(--primary-orange-light))",
+        "primary-orange-dark": "hsl(var(--primary-orange-dark))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
