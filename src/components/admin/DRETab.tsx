@@ -135,7 +135,21 @@ export default function DRETab({ restaurantId }: DRETabProps) {
 
       if (ordersError) throw ordersError;
 
-      if (!acceptedOrders || acceptedOrders.length === 0) {
+      // Buscar pedidos de balcão finalizados no período
+      const { data: counterOrders } = await supabase
+        .from("counter_orders")
+        .select(`
+          id,
+          total_amount,
+          payment_method,
+          finalized_at
+        `)
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "finalized")
+        .gte("finalized_at", startDate.toISOString())
+        .lte("finalized_at", endDate.toISOString());
+
+      if ((!acceptedOrders || acceptedOrders.length === 0) && (!counterOrders || counterOrders.length === 0)) {
         setTotalRevenue(0);
         setCmv(0);
         setOperationalExpenses(0);
@@ -144,7 +158,8 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         return;
       }
 
-      const orderIds = acceptedOrders.map(o => o.id);
+      const orderIds = (acceptedOrders || []).map(o => o.id);
+      const counterOrderIds = (counterOrders || []).map(o => o.id);
 
       // Buscar configurações do restaurante para taxa de serviço
       const { data: restaurant } = await supabase
@@ -205,7 +220,7 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         orderPayments.set(order.id, bill?.payment_method || 'pending');
       });
 
-      // Calcular estatísticas
+      // Calcular estatísticas incluindo pedidos de balcão
       let revenue = 0;
       let cardCount = 0;
       let cardRevenue = 0;
@@ -222,10 +237,21 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         }
       });
 
+      // Adicionar pedidos de balcão à receita
+      (counterOrders || []).forEach(counterOrder => {
+        const total = Number(counterOrder.total_amount);
+        revenue += total;
+        
+        if (counterOrder.payment_method && isCard(counterOrder.payment_method)) {
+          cardCount++;
+          cardRevenue += total;
+        }
+      });
+
       setTotalRevenue(revenue);
       setCardPayments({ count: cardCount, total: cardRevenue });
 
-      await calculateCMV(orderIds);
+      await calculateCMV(orderIds, counterOrderIds);
       await calculateOperationalExpenses(startDate, endDate);
 
     } catch (error: any) {
@@ -235,64 +261,118 @@ export default function DRETab({ restaurantId }: DRETabProps) {
     }
   };
 
-  const calculateCMV = async (orderIds: string[]) => {
-    if (orderIds.length === 0) {
+  const calculateCMV = async (orderIds: string[], counterOrderIds: string[]) => {
+    if (orderIds.length === 0 && counterOrderIds.length === 0) {
       setCmv(0);
       return;
     }
 
     try {
-      const { data: items, error } = await supabase
-        .from("order_items")
-        .select(`
-          id,
-          quantity,
-          products (
-            product_ingredients (
-              quantity,
-              stock_items (
-                price_per_unit
-              )
-            )
-          ),
-          order_item_extras (
-            product_extra_id,
-            product_extras (
-              product_extra_ingredients (
+      let totalCmv = 0;
+
+      // CMV dos pedidos normais
+      if (orderIds.length > 0) {
+        const { data: items, error } = await supabase
+          .from("order_items")
+          .select(`
+            id,
+            quantity,
+            products (
+              product_ingredients (
                 quantity,
                 stock_items (
                   price_per_unit
                 )
               )
+            ),
+            order_item_extras (
+              product_extra_id,
+              product_extras (
+                product_extra_ingredients (
+                  quantity,
+                  stock_items (
+                    price_per_unit
+                  )
+                )
+              )
             )
-          )
-        `)
-        .in("order_id", orderIds);
+          `)
+          .in("order_id", orderIds);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      let totalCmv = 0;
-      
-      items?.forEach((item: any) => {
-        const itemQty = item.quantity;
-        
-        const ingredients = item.products?.product_ingredients || [];
-        ingredients.forEach((ing: any) => {
-          const ingQty = ing.quantity || 0;
-          const pricePerUnit = ing.stock_items?.price_per_unit || 0;
-          totalCmv += ingQty * pricePerUnit * itemQty;
-        });
-        
-        const extras = item.order_item_extras || [];
-        extras.forEach((extra: any) => {
-          const extraIngredients = extra.product_extras?.product_extra_ingredients || [];
-          extraIngredients.forEach((ing: any) => {
+        items?.forEach((item: any) => {
+          const itemQty = item.quantity;
+          
+          const ingredients = item.products?.product_ingredients || [];
+          ingredients.forEach((ing: any) => {
             const ingQty = ing.quantity || 0;
             const pricePerUnit = ing.stock_items?.price_per_unit || 0;
             totalCmv += ingQty * pricePerUnit * itemQty;
           });
+          
+          const extras = item.order_item_extras || [];
+          extras.forEach((extra: any) => {
+            const extraIngredients = extra.product_extras?.product_extra_ingredients || [];
+            extraIngredients.forEach((ing: any) => {
+              const ingQty = ing.quantity || 0;
+              const pricePerUnit = ing.stock_items?.price_per_unit || 0;
+              totalCmv += ingQty * pricePerUnit * itemQty;
+            });
+          });
         });
-      });
+      }
+
+      // CMV dos pedidos de balcão
+      if (counterOrderIds.length > 0) {
+        const { data: counterItems } = await supabase
+          .from("counter_order_items")
+          .select(`
+            id,
+            quantity,
+            products (
+              product_ingredients (
+                quantity,
+                stock_items (
+                  price_per_unit
+                )
+              )
+            ),
+            counter_order_item_extras (
+              product_extra_id,
+              product_extras (
+                product_extra_ingredients (
+                  quantity,
+                  stock_items (
+                    price_per_unit
+                  )
+                )
+              )
+            )
+          `)
+          .in("counter_order_id", counterOrderIds);
+
+        counterItems?.forEach((item: any) => {
+          const itemQty = item.quantity;
+          
+          const ingredients = item.products?.product_ingredients || [];
+          ingredients.forEach((ing: any) => {
+            const ingQty = ing.quantity || 0;
+            const pricePerUnit = ing.stock_items?.price_per_unit || 0;
+            totalCmv += ingQty * pricePerUnit * itemQty;
+          });
+          
+          const extras = item.counter_order_item_extras || [];
+          extras.forEach((extra: any) => {
+            const extraIngredients = extra.product_extras?.product_extra_ingredients || [];
+            extraIngredients.forEach((ing: any) => {
+              const ingQty = ing.quantity || 0;
+              const pricePerUnit = ing.stock_items?.price_per_unit || 0;
+              totalCmv += ingQty * pricePerUnit * itemQty;
+            });
+          });
+        });
+      }
 
       setCmv(totalCmv);
     } catch (error) {

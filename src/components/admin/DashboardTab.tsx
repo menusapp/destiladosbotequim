@@ -67,9 +67,20 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         .gte("paid_at", startDate.toISOString())
         .lte("paid_at", endDate.toISOString());
 
-      const salesData = paidBills || [];
-      const salesTotal = salesData.reduce((sum, bill) => sum + Number(bill.total_amount), 0);
-      const ordersCount = salesData.length;
+      // Buscar pedidos de balcão finalizados do dia
+      const { data: counterOrders } = await supabase
+        .from("counter_orders")
+        .select("total_amount")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "finalized")
+        .gte("finalized_at", startDate.toISOString())
+        .lte("finalized_at", endDate.toISOString());
+
+      const billsTotal = (paidBills || []).reduce((sum, bill) => sum + Number(bill.total_amount), 0);
+      const counterTotal = (counterOrders || []).reduce((sum, order) => sum + Number(order.total_amount), 0);
+      
+      const salesTotal = billsTotal + counterTotal;
+      const ordersCount = (paidBills?.length || 0) + (counterOrders?.length || 0);
       const avgTicket = ordersCount > 0 ? salesTotal / ordersCount : 0;
 
       // Mesas ocupadas
