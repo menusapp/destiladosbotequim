@@ -70,8 +70,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         icon: Package,
         items: [
           { id: "estoque", label: "Estoque", icon: Warehouse },
-          { id: "produtos", label: "Produtos", icon: ShoppingBag },
-          { id: "ingredientes", label: "Ingredientes", icon: Beef },
+          { id: "produtos", label: "Cardápio", icon: UtensilsCrossed },
         ],
       },
       {

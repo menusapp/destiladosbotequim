@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
-import ProductsTab from "@/components/admin/ProductsTab";
+import CardapioTab from "@/components/admin/CardapioTab";
 import TablesTab from "@/components/admin/TablesTab";
 import OrdersTab from "@/components/admin/OrdersTab";
 import DashboardTab from "@/components/admin/DashboardTab";
@@ -20,7 +20,6 @@ import CostosTab from "@/components/admin/CostosTab";
 import MargensTab from "@/components/admin/MargensTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
-import CategoriesTab from "@/components/admin/CategoriesTab";
 import DeliveryTab from "@/components/admin/DeliveryTab";
 import DRETab from "@/components/admin/DRETab";
 import BalcaoTab from "@/components/admin/BalcaoTab";
@@ -213,9 +212,7 @@ const RestaurantAdmin = () => {
       case "estoque":
         return <StockTab restaurantId={restaurant.id} />;
       case "produtos":
-        return <ProductsTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
-      case "ingredientes":
-        return <CategoriesTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
+        return <CardapioTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
       
       // Atendimento - sub-itens
       case "mesas":
