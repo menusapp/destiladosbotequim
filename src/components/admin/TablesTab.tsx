@@ -235,7 +235,9 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                       <div className="mt-2 space-y-1">
                         <div className="flex items-center gap-1 text-xs text-red-700 dark:text-red-400">
                           <User className="h-3 w-3" />
-                          <span className="font-medium">{table.occupied_by}</span>
+                          <span className="font-medium">
+                            {table.occupied_by}
+                          </span>
                         </div>
                         {table.occupied_at && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">

@@ -9,6 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { validateCPF } from "@/lib/cpfValidator";
+import { toast } from "sonner";
 
 interface CustomerInfoDialogProps {
   open: boolean;
@@ -23,13 +25,36 @@ const CustomerInfoDialog = ({
 }: CustomerInfoDialogProps) => {
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
+  const [cpfError, setCpfError] = useState("");
+
+  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCpf(value);
+    setCpfError("");
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim() && cpf.trim()) {
-      const sanitizedCPF = cpf.replace(/\D/g, "");
-      onSubmit(name.trim(), sanitizedCPF);
+    
+    if (!name.trim()) {
+      toast.error("Por favor, informe seu nome");
+      return;
     }
+
+    if (!cpf.trim()) {
+      toast.error("Por favor, informe seu CPF");
+      return;
+    }
+
+    const sanitizedCPF = cpf.replace(/\D/g, "");
+    
+    if (!validateCPF(sanitizedCPF)) {
+      setCpfError("CPF inválido");
+      toast.error("CPF inválido. Por favor, verifique o número digitado.");
+      return;
+    }
+
+    onSubmit(name.trim(), sanitizedCPF);
   };
   return (
     <Dialog open={open} onOpenChange={() => {}}>
@@ -57,10 +82,15 @@ const CustomerInfoDialog = ({
             <Input
               id="customer-cpf"
               value={cpf}
-              onChange={(e) => setCpf(e.target.value)}
+              onChange={handleCPFChange}
               placeholder="000.000.000-00"
               required
+              maxLength={14}
+              className={cpfError ? "border-destructive" : ""}
             />
+            {cpfError && (
+              <p className="text-sm text-destructive">{cpfError}</p>
+            )}
           </div>
           <Button 
             type="submit" 

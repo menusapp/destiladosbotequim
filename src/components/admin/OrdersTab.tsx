@@ -35,6 +35,7 @@ interface OrderItemExtra {
 interface Order {
   id: string;
   customer_name: string;
+  customer_cpf: string;
   status: string;
   created_at: string;
   notes: string | null;
@@ -360,6 +361,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
             <h2 style="margin: 5px 0;">PEDIDO - COZINHA</h2>
             <div style="font-size: 16px; font-weight: bold; margin-top: 8px;">MESA ${order.tables.table_number}</div>
             <div style="font-size: 12px; margin-top: 5px;">Cliente: ${order.customer_name}</div>
+            ${order.customer_cpf ? `<div style="font-size: 11px; margin-top: 2px;">CPF: ${order.customer_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</div>` : ''}
             <div style="font-size: 11px; color: #666; margin-top: 5px;">${new Date(order.created_at).toLocaleString("pt-BR")}</div>
           </div>
           
@@ -471,7 +473,12 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold">Mesa {order.tables.table_number}</p>
-                    <p className="text-sm text-muted-foreground">Cliente: {order.customer_name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Cliente: {order.customer_name}
+                      {order.customer_cpf && (
+                        <span className="ml-1">- CPF: {order.customer_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</span>
+                      )}
+                    </p>
                   </div>
                   {getStatusBadge(order.status)}
                 </div>

@@ -185,12 +185,13 @@ const channel = supabase
     const markTableOccupied = async () => {
       if (tableId && customerName && customerCPF) {
         try {
+          const formattedCPF = customerCPF.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
           await supabase
             .from("tables")
             .update({
               is_occupied: true,
               occupied_at: new Date().toISOString(),
-              occupied_by: customerName
+              occupied_by: `${customerName} - ${formattedCPF}`
             })
             .eq("id", tableId);
         } catch (error) {
