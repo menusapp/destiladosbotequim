@@ -227,6 +227,12 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       return;
     }
 
+    // Validação: verificar se já existe extra com mesmo nome
+    if (extras.some(e => e.name.toLowerCase() === extraName.toLowerCase())) {
+      toast.error("Já existe um adicional com este nome");
+      return;
+    }
+
     setExtras([...extras, {
       id: crypto.randomUUID(),
       name: extraName,
@@ -333,30 +339,79 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       }));
       await supabase.from("product_ingredients").insert(ingredientsData);
 
-      // Update extras
-      await supabase.from("product_extras").delete().eq("product_id", editingProduct.id);
-      if (extras.length > 0) {
-        const extrasData = extras.map(extra => ({
-          product_id: editingProduct.id,
-          name: extra.name,
-          price: extra.price
-        }));
-        const { data: insertedExtras } = await supabase
-          .from("product_extras")
-          .insert(extrasData)
-          .select();
+      // Update extras - UPSERT inteligente para evitar duplicação
+      // 1. Buscar extras existentes
+      const { data: existingExtras } = await supabase
+        .from("product_extras")
+        .select("id, name, price")
+        .eq("product_id", editingProduct.id);
 
-        if (insertedExtras) {
-          for (let i = 0; i < insertedExtras.length; i++) {
-            const extra = extras[i];
-            if (extra.ingredients && extra.ingredients.length > 0) {
-              const extraIngredientsData = extra.ingredients.map(ing => ({
-                product_extra_id: insertedExtras[i].id,
-                stock_item_id: ing.stock_item_id,
-                quantity: ing.quantity
-              }));
-              await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
-            }
+      const existingExtrasMap = new Map(
+        (existingExtras || []).map(e => [e.name.toLowerCase(), e])
+      );
+      const processedExtraNames = new Set<string>();
+
+      // 2. Processar extras do formulário
+      for (const extra of extras) {
+        const extraNameLower = extra.name.toLowerCase();
+        processedExtraNames.add(extraNameLower);
+        
+        const existing = existingExtrasMap.get(extraNameLower);
+        
+        if (existing) {
+          // Atualizar preço se mudou
+          if (existing.price !== extra.price) {
+            await supabase
+              .from("product_extras")
+              .update({ price: extra.price })
+              .eq("id", existing.id);
+          }
+          
+          // Atualizar ingredientes do extra
+          await supabase.from("product_extra_ingredients").delete().eq("product_extra_id", existing.id);
+          if (extra.ingredients && extra.ingredients.length > 0) {
+            const extraIngredientsData = extra.ingredients.map(ing => ({
+              product_extra_id: existing.id,
+              stock_item_id: ing.stock_item_id,
+              quantity: ing.quantity
+            }));
+            await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
+          }
+        } else {
+          // Inserir novo extra
+          const { data: newExtra } = await supabase
+            .from("product_extras")
+            .insert({
+              product_id: editingProduct.id,
+              name: extra.name,
+              price: extra.price
+            })
+            .select()
+            .single();
+          
+          // Inserir ingredientes do novo extra
+          if (newExtra && extra.ingredients && extra.ingredients.length > 0) {
+            const extraIngredientsData = extra.ingredients.map(ing => ({
+              product_extra_id: newExtra.id,
+              stock_item_id: ing.stock_item_id,
+              quantity: ing.quantity
+            }));
+            await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
+          }
+        }
+      }
+
+      // 3. Deletar extras que foram removidos (ignorar erros de constraint)
+      for (const [name, existing] of existingExtrasMap.entries()) {
+        if (!processedExtraNames.has(name)) {
+          try {
+            await supabase
+              .from("product_extras")
+              .delete()
+              .eq("id", existing.id);
+            console.log(`Extra "${existing.name}" removido com sucesso`);
+          } catch (err) {
+            console.warn(`Não foi possível remover extra "${existing.name}" (pode estar em uso):`, err);
           }
         }
       }

@@ -499,8 +499,17 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                           <span className="text-primary font-medium">R$ {itemTotal.toFixed(2)}</span>
                         </div>
                         {item.order_item_extras && item.order_item_extras.length > 0 && (
-                          <div className="text-xs text-muted-foreground pl-4">
-                            + {item.order_item_extras.map((e) => e.product_extras?.name || "Extra excluído").join(", ")}
+                          <div className="pl-4 space-y-0.5">
+                            {item.order_item_extras.map((extra, extraIdx) => (
+                              <div key={extraIdx} className="text-xs flex justify-between">
+                                <span className="text-orange-600 font-medium">
+                                  + {extra.product_extras?.name || "Extra excluído"}
+                                </span>
+                                <span className="text-orange-600">
+                                  R$ {extra.price_at_order.toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         )}
                         {item.notes && <div className="text-xs text-amber-600 pl-4 italic">Obs: {item.notes}</div>}
