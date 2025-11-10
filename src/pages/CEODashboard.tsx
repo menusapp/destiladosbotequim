@@ -16,7 +16,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
-import { useAuth } from "@/hooks/useAuth";
 
 interface Restaurant {
   id: string;
@@ -30,11 +29,12 @@ interface Restaurant {
 
 const CEODashboard = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading, isCEO, signOut } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(null);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(true);
+  const [ceoPassword, setCeoPassword] = useState("");
   
   useInactivityLogout();
   
@@ -47,15 +47,14 @@ const CEODashboard = () => {
   const [formPassword, setFormPassword] = useState("");
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user || !isCEO) {
-        toast.error("Acesso negado. Você precisa ser CEO para acessar esta página.");
-        navigate("/");
-      } else {
-        fetchRestaurants();
-      }
+    const isCEOAuthenticated = localStorage.getItem('is_ceo_authenticated');
+    if (isCEOAuthenticated === 'true') {
+      setShowPasswordPrompt(false);
+      fetchRestaurants();
+    } else {
+      setLoading(false);
     }
-  }, [authLoading, user, isCEO, navigate]);
+  }, []);
 
   const fetchRestaurants = async () => {
     try {
@@ -73,9 +72,23 @@ const CEODashboard = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
+  const handleCEOLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Senha CEO: "menus123"
+    if (ceoPassword === "menus123") {
+      localStorage.setItem('is_ceo_authenticated', 'true');
+      setShowPasswordPrompt(false);
+      fetchRestaurants();
+      toast.success("Acesso CEO autorizado");
+    } else {
+      toast.error("Senha incorreta");
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('is_ceo_authenticated');
     toast.success("Logout realizado com sucesso");
+    navigate("/");
   };
 
   const handleOpenDialog = async (restaurant?: Restaurant) => {
@@ -175,7 +188,43 @@ const CEODashboard = () => {
     }
   };
 
-  if (authLoading || loading) {
+  if (showPasswordPrompt) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Acesso CEO</CardTitle>
+            <CardDescription>Digite a senha de CEO para continuar</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCEOLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="ceo-password">Senha CEO</Label>
+                <Input
+                  id="ceo-password"
+                  type="password"
+                  value={ceoPassword}
+                  onChange={(e) => setCeoPassword(e.target.value)}
+                  placeholder="Digite a senha"
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1">
+                  Entrar
+                </Button>
+                <Button type="button" variant="outline" onClick={() => navigate("/")}>
+                  Voltar
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-muted-foreground">Carregando...</p>
