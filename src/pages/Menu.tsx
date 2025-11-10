@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
 import ProductDetailDialog from "@/components/menu/ProductDetailDialog";
 import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
+import { useMenuInactivityLogout } from "@/hooks/useMenuInactivityLogout";
 
 interface Product {
   id: string;
@@ -121,6 +122,9 @@ const Menu = () => {
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+
+  // Hook de logout por inatividade (1 hora)
+  useMenuInactivityLogout(tableId, tableNumber, restaurantSlug);
 
   useEffect(() => {
     // Verificar se já tem info do cliente no sessionStorage
