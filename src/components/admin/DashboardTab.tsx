@@ -72,7 +72,7 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         .from("counter_orders")
         .select("total_amount")
         .eq("restaurant_id", restaurantId)
-        .eq("status", "finalized")
+        .eq("status", "paid")
         .gte("finalized_at", startDate.toISOString())
         .lte("finalized_at", endDate.toISOString());
 

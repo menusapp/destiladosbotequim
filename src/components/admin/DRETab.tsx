@@ -145,7 +145,7 @@ export default function DRETab({ restaurantId }: DRETabProps) {
           finalized_at
         `)
         .eq("restaurant_id", restaurantId)
-        .eq("status", "finalized")
+        .eq("status", "paid")
         .gte("finalized_at", startDate.toISOString())
         .lte("finalized_at", endDate.toISOString());
 
