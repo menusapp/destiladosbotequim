@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useMenuInactivityLogout } from "@/hooks/useMenuInactivityLogout";
@@ -16,6 +16,7 @@ import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/m
 
 const Menu = () => {
   const { restaurantSlug, tableNumber } = useParams();
+  const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -307,7 +308,7 @@ const Menu = () => {
         onAddMoreItems={() => setShowCartDrawer(false)}
         onContinue={() => {
           setShowCartDrawer(false);
-          toast.info("Continuando para finalização...");
+          navigate(`/menu/${restaurantSlug}/${tableNumber}/comanda`);
         }}
         mode="local"
       />
