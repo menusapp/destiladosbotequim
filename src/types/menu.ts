@@ -22,10 +22,13 @@ export interface Category {
 export interface Restaurant {
   id: string;
   name: string;
+  slug?: string;
   logo_url: string | null;
+  banner_url?: string | null;
   primary_color: string;
   is_open: boolean;
   service_fee_percentage?: number;
+  service_fee_enabled?: boolean;
   prep_time_minutes?: number;
 }
 

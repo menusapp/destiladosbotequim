@@ -29,6 +29,8 @@ const Menu = () => {
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showCartDrawer, setShowCartDrawer] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useMenuInactivityLogout(customerName, tableNumber || "", tableId);
 
@@ -36,7 +38,7 @@ const Menu = () => {
     if (!restaurantSlug || !tableNumber) return;
     try {
       const { data: restaurantData, error: restError } = await supabase
-        .from("restaurants").select("*").eq("slug", restaurantSlug).single();
+        .from("restaurants").select("id, name, slug, is_open, logo_url, banner_url, primary_color, prep_time_minutes, service_fee_enabled, service_fee_percentage").eq("slug", restaurantSlug).single();
       if (restError) throw restError;
       setRestaurant(restaurantData);
 
@@ -221,11 +223,30 @@ const Menu = () => {
   const primaryColor = restaurant.primary_color || "#fe9516";
   const allProducts = categories.flatMap((c) => c.products);
 
+  // Filtrar produtos pela busca
+  const filteredCategories = searchQuery.trim() 
+    ? categories.map(cat => ({
+        ...cat,
+        products: cat.products.filter(p => 
+          p.name.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      })).filter(cat => cat.products.length > 0)
+    : categories;
+
+  const filteredProducts = searchQuery.trim()
+    ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : allProducts;
+
   return (
     <div className="min-h-screen bg-background pb-32">
       <div className="relative">
         <div className="h-48 overflow-hidden">
-          {restaurant.logo_url ? (
+          {restaurant.banner_url ? (
+            <div
+              className="w-full h-full bg-cover bg-center blur-lg scale-110"
+              style={{ backgroundImage: `url(${restaurant.banner_url})` }}
+            />
+          ) : restaurant.logo_url ? (
             <div
               className="w-full h-full bg-cover bg-center blur-lg scale-110"
               style={{ backgroundImage: `url(${restaurant.logo_url})` }}
@@ -238,7 +259,16 @@ const Menu = () => {
           )}
         </div>
 
-        <MenuHeader />
+        <MenuHeader 
+          searchOpen={searchOpen}
+          searchQuery={searchQuery}
+          onSearchClick={() => setSearchOpen(true)}
+          onSearchChange={setSearchQuery}
+          onSearchClose={() => {
+            setSearchOpen(false);
+            setSearchQuery("");
+          }}
+        />
 
         <RestaurantInfoCard
           name={restaurant.name}
@@ -250,17 +280,56 @@ const Menu = () => {
         />
       </div>
 
-      <FeaturedProducts
-        products={allProducts.filter(p => p.available)}
-        primaryColor={primaryColor}
-        onProductClick={handleProductClick}
-      />
+      {searchQuery.trim() ? (
+        <div className="px-4 py-6">
+          <h2 className="text-lg font-semibold mb-4">Resultados da busca</h2>
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {filteredProducts.filter(p => p.available).map((product) => (
+                <div
+                  key={product.id}
+                  onClick={() => handleProductClick(product)}
+                  className="bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-transform"
+                >
+                  <div className="aspect-square bg-muted">
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        Sem imagem
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <h3 className="font-semibold text-sm mb-1">{product.name}</h3>
+                    <p className="text-lg font-bold" style={{ color: primaryColor }}>
+                      R$ {product.price.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">
+              Nenhum produto encontrado para "{searchQuery}"
+            </p>
+          )}
+        </div>
+      ) : (
+        <>
+          <FeaturedProducts
+            products={allProducts.filter(p => p.available)}
+            primaryColor={primaryColor}
+            onProductClick={handleProductClick}
+          />
 
-      <CategoryProducts
-        categories={categories}
-        primaryColor={primaryColor}
-        onProductClick={handleProductClick}
-      />
+          <CategoryProducts
+            categories={filteredCategories}
+            primaryColor={primaryColor}
+            onProductClick={handleProductClick}
+          />
+        </>
+      )}
 
       <CartBottomBar
         itemCount={getTotalItemCount()}
@@ -308,7 +377,7 @@ const Menu = () => {
         onAddMoreItems={() => setShowCartDrawer(false)}
         onContinue={() => {
           setShowCartDrawer(false);
-          navigate(`/menu/${restaurantSlug}/${tableNumber}/comanda`);
+          navigate(`/comanda/${restaurantSlug}/${tableNumber}`);
         }}
         mode="local"
       />

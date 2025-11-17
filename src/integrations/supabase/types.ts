@@ -1101,6 +1101,7 @@ export type Database = {
       }
       restaurants: {
         Row: {
+          banner_url: string | null
           created_at: string | null
           id: string
           is_open: boolean | null
@@ -1116,6 +1117,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          banner_url?: string | null
           created_at?: string | null
           id?: string
           is_open?: boolean | null
@@ -1131,6 +1133,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          banner_url?: string | null
           created_at?: string | null
           id?: string
           is_open?: boolean | null

@@ -10,6 +10,7 @@ import { Upload, Palette } from "lucide-react";
 
 interface Settings {
   logo_url: string | null;
+  banner_url: string | null;
   primary_color: string;
   service_fee_enabled: boolean;
   service_fee_percentage: number;
@@ -20,6 +21,7 @@ interface Settings {
 const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
   const [settings, setSettings] = useState<Settings>({
     logo_url: null,
+    banner_url: null,
     primary_color: "#FF6B35",
     service_fee_enabled: false,
     service_fee_percentage: 10,
@@ -28,6 +30,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -37,7 +40,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, target_cmv_percentage")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, target_cmv_percentage")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -46,6 +49,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
       if (data) {
         setSettings({
           logo_url: data.logo_url,
+          banner_url: data.banner_url,
           primary_color: data.primary_color || "#FF6B35",
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
@@ -119,6 +123,56 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor, selecione uma imagem");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 5MB");
+      return;
+    }
+
+    setUploadingBanner(true);
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${restaurantId}-banner-${Date.now()}.${fileExt}`;
+      const filePath = `banners/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("product-images")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("product-images")
+        .getPublicUrl(filePath);
+
+      const bannerUrl = urlData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("restaurants")
+        .update({ banner_url: bannerUrl })
+        .eq("id", restaurantId);
+
+      if (updateError) throw updateError;
+
+      setSettings({ ...settings, banner_url: bannerUrl });
+      toast.success("Banner atualizado!");
+    } catch (error) {
+      toast.error("Erro ao fazer upload do banner");
+      console.error(error);
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
   const handleSaveSettings = async () => {
     try {
       const { error } = await (supabase as any).rpc('admin_update_restaurant_settings', {
@@ -150,8 +204,86 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
 
   return (
     <div className="space-y-6">
-      {/* Logo */}
       <Card>
+        <CardHeader>
+          <CardTitle>Personalização do Cardápio Digital</CardTitle>
+          <CardDescription>
+            Configure as imagens que aparecerão no seu cardápio digital
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Banner */}
+          <div className="space-y-4">
+            <div>
+              <Label className="text-base font-semibold">Banner do Cardápio</Label>
+              <p className="text-sm text-muted-foreground">
+                Imagem de fundo que aparece no topo do cardápio
+              </p>
+            </div>
+            {settings.banner_url && (
+              <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
+                <img 
+                  src={settings.banner_url} 
+                  alt="Banner atual" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            <div>
+              <Label htmlFor="banner-upload">Selecionar Banner</Label>
+              <Input
+                id="banner-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleBannerUpload}
+                disabled={uploadingBanner}
+                className="cursor-pointer"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Recomendado: imagem horizontal 16:9, mínimo 1600x900px, máximo 5MB
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t pt-6" />
+
+          {/* Logo */}
+          <div className="space-y-4">
+            <div>
+              <Label className="text-base font-semibold">Logo Principal</Label>
+              <p className="text-sm text-muted-foreground">
+                Logo que aparece no centro do cardápio (formato circular)
+              </p>
+            </div>
+            {settings.logo_url && (
+              <div className="flex justify-center">
+                <img 
+                  src={settings.logo_url} 
+                  alt="Logo atual" 
+                  className="w-32 h-32 object-cover rounded-full border-4 border-border"
+                />
+              </div>
+            )}
+            <div>
+              <Label htmlFor="logo-upload">Selecionar Logo</Label>
+              <Input
+                id="logo-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                disabled={uploading}
+                className="cursor-pointer"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Recomendado: imagem quadrada, mínimo 512x512px, máximo 2MB
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Logo Antigo - Remover depois */}
+      <Card style={{ display: 'none' }}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
