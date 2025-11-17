@@ -14,12 +14,14 @@ import { toast } from "sonner";
 
 interface CustomerInfoDialogProps {
   open: boolean;
+  onClose: () => void;
   onSubmit: (name: string, cpf: string) => void;
   restaurantColor?: string;
 }
 
 const CustomerInfoDialog = ({ 
-  open, 
+  open,
+  onClose, 
   onSubmit, 
   restaurantColor = "#FF6B35"
 }: CustomerInfoDialogProps) => {
@@ -57,7 +59,7 @@ const CustomerInfoDialog = ({
     onSubmit(name.trim(), sanitizedCPF);
   };
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Bem-vindo!</DialogTitle>
