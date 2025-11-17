@@ -1,114 +1,26 @@
-import { useEffect, useState, useMemo, useCallback, memo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Receipt, ChevronRight } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
-import ProductDetailDialog from "@/components/menu/ProductDetailDialog";
-import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
 import { useMenuInactivityLogout } from "@/hooks/useMenuInactivityLogout";
 
-interface Product {
-  id: string;
-  name: string;
-  description: string | null;
-  price: number;
-  available: boolean;
-  image_url: string | null;
-}
+// Novos componentes de UI
+import { MenuHeader } from "@/components/menu/MenuHeader";
+import { RestaurantInfoCard } from "@/components/menu/RestaurantInfoCard";
+import { FeaturedProducts } from "@/components/menu/FeaturedProducts";
+import { CategoryProducts } from "@/components/menu/CategoryProducts";
+import { CartBottomBar } from "@/components/menu/CartBottomBar";
+import { CartDrawer } from "@/components/menu/CartDrawer";
+import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
+import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
+import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
 
-interface ProductExtra {
-  id: string;
-  name: string;
-  price: number;
-}
+// Types
+import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
 
-interface Category {
-  id: string;
-  name: string;
-  products: Product[];
-}
-
-interface Restaurant {
-  id: string;
-  name: string;
-  logo_url: string | null;
-  primary_color: string;
-  is_open: boolean;
-}
-
-
-interface CartItemExtra {
-  id: string;
-  name: string;
-  price: number;
-}
-
-interface CartItem {
-  id: string;
-  product: Product;
-  quantity: number;
-  extras: CartItemExtra[];
-  notes?: string;
-}
-
-// Componente memoizado para produtos individuais
-const ProductCard = memo(({ 
-  product, 
-  restaurantColor, 
-  onProductClick 
-}: { 
-  product: Product; 
-  restaurantColor: string; 
-  onProductClick: (product: Product) => void;
-}) => (
-  <Card
-    className="cursor-pointer hover:shadow-md transition-shadow"
-    onClick={() => product.available && onProductClick(product)}
-  >
-    <CardContent className="p-4">
-      <div className="flex items-start gap-3">
-        {product.image_url && (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            className="w-24 h-24 object-cover rounded"
-            loading="lazy"
-          />
-        )}
-          <div className="flex-1">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="font-semibold text-lg">{product.name}</p>
-                {product.description && (
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                    {product.description}
-                  </p>
-                )}
-              </div>
-              {!product.available && (
-                <Badge variant="secondary">Indisponível</Badge>
-              )}
-            </div>
-          <p 
-            className="text-xl font-bold mt-2"
-            style={{ color: restaurantColor }}
-          >
-            R$ {product.price.toFixed(2)}
-          </p>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-));
-ProductCard.displayName = "ProductCard";
 
 const Menu = () => {
   const { restaurantSlug, tableNumber } = useParams();
-  const navigate = useNavigate();
   
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -121,7 +33,7 @@ const Menu = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [showProductDialog, setShowProductDialog] = useState(false);
-  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+  const [showCartDrawer, setShowCartDrawer] = useState(false);
 
   // Hook de logout por inatividade (1 hora)
   useMenuInactivityLogout(tableId, tableNumber, restaurantSlug);
@@ -132,7 +44,6 @@ const Menu = () => {
     const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
     
     if (savedName && savedCPF) {
-      // Se tem informações do cliente, carregar o carrinho
       const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
       if (savedCart) {
         setCart(JSON.parse(savedCart));
@@ -141,50 +52,32 @@ const Menu = () => {
       setCustomerCPF(savedCPF);
       fetchData();
     } else {
-      // Se não tem informações do cliente, limpar tudo e mostrar diálogo
       sessionStorage.removeItem(`cart_${tableNumber}`);
       setCart([]);
       setShowCustomerDialog(true);
       fetchData();
     }
 
-// Configurar realtime para produtos e restaurante
-const channel = supabase
-  .channel('menu-changes')
-  .on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'products',
-    },
-    () => fetchData()
-  )
-  .on(
-    'postgres_changes',
-    {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'restaurants',
-    },
-    () => fetchData()
-  )
-  .subscribe();
-
+    // Configurar realtime
+    const channel = supabase
+      .channel('menu-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchData())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'restaurants' }, () => fetchData())
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurantSlug, tableNumber]);
+  }, [restaurantSlug, tableNumber, fetchData]);
 
   useEffect(() => {
-    // Salvar carrinho no sessionStorage apenas se houver cliente logado
+    // Salvar carrinho no sessionStorage
     if (customerName && customerCPF) {
       sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
     }
   }, [cart, tableNumber, customerName, customerCPF]);
 
-  // Marcar mesa como ocupada quando cliente fizer login
+  // Marcar mesa como ocupada
   useEffect(() => {
     const markTableOccupied = async () => {
       if (tableId && customerName && customerCPF) {
@@ -206,10 +99,8 @@ const channel = supabase
 
     markTableOccupied();
 
-    // Cleanup: desocupar mesa quando sair do cardápio
     const handleBeforeUnload = async () => {
       if (tableId) {
-        // Usar sendBeacon para garantir que a requisição seja enviada mesmo ao fechar
         const { data: hasUnpaidBills } = await supabase
           .from("bills")
           .select("id")
@@ -217,7 +108,6 @@ const channel = supabase
           .neq("status", "paid")
           .limit(1);
 
-        // Só desocupa se não houver contas não pagas
         if (!hasUnpaidBills || hasUnpaidBills.length === 0) {
           await supabase
             .from("tables")
@@ -235,7 +125,6 @@ const channel = supabase
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      // Quando o componente desmontar (navegação), desocupar se não houver contas
       if (tableId) {
         supabase
           .from("bills")
@@ -259,29 +148,33 @@ const channel = supabase
     };
   }, [tableId, customerName, customerCPF]);
 
+  // Buscar dados do restaurante e menu
   const fetchData = useCallback(async () => {
     if (!restaurantSlug || !tableNumber) return;
-    
+
     try {
-      const { data: restData, error: restError } = await supabase
+      // Buscar restaurante
+      const { data: restaurantData, error: restError } = await supabase
         .from("restaurants")
-        .select("id, name, logo_url, primary_color, is_open")
+        .select("*")
         .eq("slug", restaurantSlug)
         .single();
 
       if (restError) throw restError;
-      setRestaurant(restData);
+      setRestaurant(restaurantData);
 
+      // Buscar mesa
       const { data: tableData, error: tableError } = await supabase
         .from("tables")
         .select("id")
-        .eq("restaurant_id", restData.id)
-        .eq("table_number", parseInt(tableNumber || "0"))
+        .eq("restaurant_id", restaurantData.id)
+        .eq("table_number", parseInt(tableNumber))
         .single();
 
       if (tableError) throw tableError;
       setTableId(tableData.id);
 
+      // Buscar categorias com produtos
       const { data: categoriesData, error: catError } = await supabase
         .from("categories")
         .select(`
@@ -297,7 +190,7 @@ const channel = supabase
             image_url
           )
         `)
-        .eq("restaurant_id", restData.id)
+        .eq("restaurant_id", restaurantData.id)
         .order("display_order");
 
       if (catError) throw catError;
@@ -372,7 +265,7 @@ const channel = supabase
     });
     
     const extrasText = extras.length > 0 ? ` com ${extras.length} adicional(is)` : '';
-    toast.success(`${product.name}${extrasText} adicionado ao carrinho`);
+    toast.success(`${product.name}${extrasText} adicionado`);
   }, []);
 
   const updateQuantity = (itemId: string, delta: number) => {
@@ -386,11 +279,31 @@ const channel = supabase
     });
   };
 
+  const clearCart = () => {
+    setCart([]);
+    toast.success("Carrinho limpo");
+  };
+
   const getCartTotal = () => {
     return cart.reduce((sum, item) => {
       const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
       return sum + (item.product.price + extrasTotal) * item.quantity;
     }, 0);
+  };
+
+  const getTotalItemCount = () => {
+    return cart.reduce((sum, item) => sum + item.quantity, 0);
+  };
+
+  const handleViewCart = () => {
+    setShowCartDrawer(true);
+  };
+
+  const handleContinueFromCart = () => {
+    setShowCartDrawer(false);
+    // Aqui você navegaria para a tela de comanda/pedido
+    toast.info("Navegando para finalização...");
+    // navigate(`/comanda/${restaurantSlug}/${tableNumber}`);
   };
 
   // Função para scroll suave até a categoria
