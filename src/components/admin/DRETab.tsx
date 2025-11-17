@@ -32,11 +32,6 @@ interface LaborCost {
   salary: number;
 }
 
-interface CardFeesConfig {
-  debit_fee: number;
-  credit_fee: number;
-}
-
 export default function DRETab({ restaurantId }: DRETabProps) {
   const [dateFilter, setDateFilter] = useState<string>("today");
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
@@ -44,11 +39,9 @@ export default function DRETab({ restaurantId }: DRETabProps) {
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
   const [variableCosts, setVariableCosts] = useState<VariableCost[]>([]);
   const [laborCosts, setLaborCosts] = useState<LaborCost[]>([]);
-  const [cardFeesConfig, setCardFeesConfig] = useState<CardFeesConfig | null>(null);
   const [cmv, setCmv] = useState(0);
   const [operationalExpenses, setOperationalExpenses] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
-  const [cardPayments, setCardPayments] = useState({ count: 0, total: 0 });
 
   useEffect(() => {
     fetchDREData();
@@ -112,13 +105,6 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         .eq("restaurant_id", restaurantId);
       setLaborCosts(laborData || []);
 
-      const { data: cardData } = await supabase
-        .from("card_fees_config")
-        .select("debit_fee, credit_fee")
-        .eq("restaurant_id", restaurantId)
-        .maybeSingle();
-      setCardFeesConfig(cardData);
-
       // Buscar pedidos aceitos no período
       const { data: acceptedOrders, error: ordersError } = await supabase
         .from("orders")
@@ -153,7 +139,6 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         setTotalRevenue(0);
         setCmv(0);
         setOperationalExpenses(0);
-        setCardPayments({ count: 0, total: 0 });
         setLoading(false);
         return;
       }
@@ -220,36 +205,20 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         orderPayments.set(order.id, bill?.payment_method || 'pending');
       });
 
-      // Calcular estatísticas incluindo pedidos de balcão
+      // Calcular receita total incluindo pedidos de balcão
       let revenue = 0;
-      let cardCount = 0;
-      let cardRevenue = 0;
 
-      const isCard = (method: string) => method === "card" || method === "credito" || method === "debito";
-
-      orderTotals.forEach((total, orderId) => {
+      orderTotals.forEach((total) => {
         revenue += total;
-        const paymentMethod = orderPayments.get(orderId) || 'pending';
-        
-        if (isCard(paymentMethod)) {
-          cardCount++;
-          cardRevenue += total;
-        }
       });
 
       // Adicionar pedidos de balcão à receita
       (counterOrders || []).forEach(counterOrder => {
         const total = Number(counterOrder.total_amount);
         revenue += total;
-        
-        if (counterOrder.payment_method && isCard(counterOrder.payment_method)) {
-          cardCount++;
-          cardRevenue += total;
-        }
       });
 
       setTotalRevenue(revenue);
-      setCardPayments({ count: cardCount, total: cardRevenue });
 
       await calculateCMV(orderIds, counterOrderIds);
       await calculateOperationalExpenses(startDate, endDate);
@@ -453,13 +422,7 @@ export default function DRETab({ restaurantId }: DRETabProps) {
       }
     });
 
-    let cardTaxes = 0;
-    if (cardFeesConfig && cardPayments.total > 0) {
-      const avgFee = (cardFeesConfig.debit_fee + cardFeesConfig.credit_fee) / 2;
-      cardTaxes = cardPayments.total * (avgFee / 100);
-    }
-
-    const totalCosts = cmv + operationalExpenses + totalFixedCosts + totalVariableCosts + totalLaborCosts + cardTaxes;
+    const totalCosts = cmv + operationalExpenses + totalFixedCosts + totalVariableCosts + totalLaborCosts;
     const operationalProfit = totalRevenue - totalCosts;
 
     return {
@@ -470,7 +433,6 @@ export default function DRETab({ restaurantId }: DRETabProps) {
       fixedCost: totalFixedCosts,
       variableCost: totalVariableCosts,
       laborCost: totalLaborCosts,
-      cardTaxes,
       totalCosts,
       operationalProfit
     };
@@ -560,10 +522,6 @@ export default function DRETab({ restaurantId }: DRETabProps) {
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">CMO - Custo de Mão de Obra (proporcional)</span>
               <span className="text-sm text-red-600">R$ {dreValues.laborCost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center pl-4">
-              <span className="text-sm">Taxas de Cartões</span>
-              <span className="text-sm text-red-600">R$ {dreValues.cardTaxes.toFixed(2)}</span>
             </div>
           </div>
 

@@ -37,16 +37,10 @@ interface LaborCost {
   salary: number;
 }
 
-interface CardFeesConfig {
-  debit_fee: number;
-  credit_fee: number;
-}
-
 export default function CostosTab({ restaurantId }: CostosTabProps) {
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
   const [variableCosts, setVariableCosts] = useState<VariableCost[]>([]);
   const [laborCosts, setLaborCosts] = useState<LaborCost[]>([]);
-  const [cardFees, setCardFees] = useState<CardFeesConfig>({ debit_fee: 0, credit_fee: 0 });
 
   // Form states
   const [newFixedCost, setNewFixedCost] = useState({ name: '', description: '', amount: '' });
@@ -61,8 +55,7 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
     await Promise.all([
       fetchFixedCosts(),
       fetchVariableCosts(),
-      fetchLaborCosts(),
-      fetchCardFees()
+      fetchLaborCosts()
     ]);
   };
 
@@ -108,21 +101,6 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
     setLaborCosts(data || []);
   };
 
-  const fetchCardFees = async () => {
-    const { data, error } = await supabase
-      .from('card_fees_config')
-      .select('*')
-      .eq('restaurant_id', restaurantId)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error fetching card fees:', error);
-      return;
-    }
-    if (data) {
-      setCardFees({ debit_fee: data.debit_fee, credit_fee: data.credit_fee });
-    }
-  };
 
   const handleAddFixedCost = async () => {
     if (!newFixedCost.name || !newFixedCost.amount) {
@@ -257,23 +235,6 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
     fetchLaborCosts();
   };
 
-  const handleSaveCardFees = async () => {
-    const { error } = await supabase
-      .from('card_fees_config')
-      .upsert({
-        restaurant_id: restaurantId,
-        debit_fee: cardFees.debit_fee,
-        credit_fee: cardFees.credit_fee
-      });
-
-    if (error) {
-      toast.error('Erro ao salvar taxas');
-      console.error(error);
-      return;
-    }
-
-    toast.success('Taxas salvas!');
-  };
 
   return (
     <div className="space-y-6">
@@ -519,39 +480,6 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
         </Card>
       </Collapsible>
 
-      {/* Taxas de Cartões */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Taxas de Cartões</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Taxa Débito (%)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={cardFees.debit_fee}
-                onChange={(e) => setCardFees({ ...cardFees, debit_fee: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-            <div>
-              <Label>Taxa Crédito (%)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={cardFees.credit_fee}
-                onChange={(e) => setCardFees({ ...cardFees, credit_fee: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-          </div>
-          <Button onClick={handleSaveCardFees} className="w-full">
-            Salvar Taxas
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }
