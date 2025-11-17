@@ -131,9 +131,8 @@ export const ProductDetailDrawer = ({
           {extras.length > 0 && (
             <div className="mb-6">
               <h3 className="font-bold text-foreground mb-3">
-                Deseja incluir Combo ao lanche?
+                Adicionais
               </h3>
-              <p className="text-sm text-muted-foreground mb-3">Escolha até 1 opção</p>
               <div className="space-y-3">
                 {extras.map((extra) => {
                   const isSelected = selectedExtras.includes(extra.id);
@@ -153,9 +152,6 @@ export const ProductDetailDrawer = ({
                       />
                       <div className="flex-1">
                         <p className="font-medium text-foreground">{extra.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Combo composto por Coca-Cola lata 220ml + Batata frita.
-                        </p>
                       </div>
                       <p className="font-bold text-sm" style={{ color: primaryColor }}>
                         + R$ {extra.price.toFixed(2)}

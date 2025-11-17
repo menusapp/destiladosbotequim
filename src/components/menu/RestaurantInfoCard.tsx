@@ -1,4 +1,4 @@
-import { Star, ChevronRight, Clock, DollarSign } from "lucide-react";
+import { Star, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 interface RestaurantInfoCardProps {
@@ -48,7 +48,6 @@ export const RestaurantInfoCard = ({
         {/* Nome do Restaurante */}
         <div className="flex items-center justify-between mt-8">
           <h1 className="text-2xl font-bold text-foreground">{name}</h1>
-          <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </div>
 
         {/* Informações */}
@@ -65,12 +64,11 @@ export const RestaurantInfoCard = ({
         )}
 
         {/* Avaliação */}
-        <button className="flex items-center gap-1.5 mt-3 hover:bg-accent/50 px-2 py-1 -ml-2 rounded-lg transition-colors">
+        <div className="flex items-center gap-1.5 mt-3">
           <Star className="w-4 h-4 fill-warning text-warning" />
           <span className="font-semibold text-foreground">{rating}</span>
           <span className="text-sm text-muted-foreground">({reviewCount} avaliações)</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />
-        </button>
+        </div>
 
         {/* Tempo e Taxa */}
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
