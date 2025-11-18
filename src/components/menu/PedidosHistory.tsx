@@ -79,12 +79,11 @@ export const PedidosHistory = ({
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      pending: "Pendente",
-      accepted: "Aceito",
-      preparing: "Preparando",
-      ready: "Pronto",
-      on_the_way: "A caminho",
+      pending: "Em Análise",
+      accepted: "Em Produção",
+      ready: "Pronto para Entrega/Retirada",
       delivered: "Entregue",
+      picked_up: "Retirado",
       cancelled: "Cancelado",
     };
     return labels[status] || status;
@@ -94,10 +93,9 @@ export const PedidosHistory = ({
     const colors: Record<string, string> = {
       pending: "bg-yellow-500",
       accepted: "bg-blue-500",
-      preparing: "bg-orange-500",
-      ready: "bg-green-500",
-      on_the_way: "bg-purple-500",
-      delivered: "bg-gray-500",
+      ready: "bg-orange-500",
+      delivered: "bg-green-500",
+      picked_up: "bg-purple-500",
       cancelled: "bg-red-500",
     };
     return colors[status] || "bg-gray-500";
