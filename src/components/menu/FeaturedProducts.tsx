@@ -4,20 +4,24 @@ interface FeaturedProductsProps {
   products: Product[];
   primaryColor: string;
   onProductClick: (product: Product) => void;
+  title?: string;
 }
 
 export const FeaturedProducts = ({
   products,
   primaryColor,
   onProductClick,
+  title = "Destaques",
 }: FeaturedProductsProps) => {
   if (products.length === 0) return null;
 
   return (
     <div className="px-4 py-6">
-      <h2 className="text-2xl font-bold text-foreground mb-4">Destaques</h2>
+      {title && (
+        <h2 className="text-2xl font-bold text-foreground mb-4">{title}</h2>
+      )}
       <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
-        {products.slice(0, 6).map((product) => (
+        {products.map((product) => (
           <button
             key={product.id}
             onClick={() => product.available && onProductClick(product)}

@@ -1002,8 +1002,10 @@ export type Database = {
           category_id: string
           created_at: string | null
           description: string | null
+          featured_display_order: number | null
           id: string
           image_url: string | null
+          is_featured: boolean | null
           name: string
           prep_time_minutes: number | null
           price: number
@@ -1014,8 +1016,10 @@ export type Database = {
           category_id: string
           created_at?: string | null
           description?: string | null
+          featured_display_order?: number | null
           id?: string
           image_url?: string | null
+          is_featured?: boolean | null
           name: string
           prep_time_minutes?: number | null
           price: number
@@ -1026,8 +1030,10 @@ export type Database = {
           category_id?: string
           created_at?: string | null
           description?: string | null
+          featured_display_order?: number | null
           id?: string
           image_url?: string | null
+          is_featured?: boolean | null
           name?: string
           prep_time_minutes?: number | null
           price?: number
@@ -1171,6 +1177,8 @@ export type Database = {
         Row: {
           banner_url: string | null
           created_at: string | null
+          featured_section_enabled: boolean | null
+          featured_section_title: string | null
           id: string
           is_open: boolean | null
           logo_url: string | null
@@ -1189,6 +1197,8 @@ export type Database = {
         Insert: {
           banner_url?: string | null
           created_at?: string | null
+          featured_section_enabled?: boolean | null
+          featured_section_title?: string | null
           id?: string
           is_open?: boolean | null
           logo_url?: string | null
@@ -1207,6 +1217,8 @@ export type Database = {
         Update: {
           banner_url?: string | null
           created_at?: string | null
+          featured_section_enabled?: boolean | null
+          featured_section_title?: string | null
           id?: string
           is_open?: boolean | null
           logo_url?: string | null

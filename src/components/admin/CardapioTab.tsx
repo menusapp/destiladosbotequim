@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProductsGrid from "./ProductsGrid";
 import CategoriesTab from "./CategoriesTab";
+import DestaquesTab from "./DestaquesTab";
 
 interface CardapioTabProps {
   restaurantId: string;
@@ -16,7 +17,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
       {/* Header */}
       <div>
         <h1 className="text-[32px] font-bold text-foreground leading-tight">Cardápio</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gerencie produtos e categorias</p>
+        <p className="text-sm text-muted-foreground mt-1">Gerencie produtos, categorias e destaques</p>
       </div>
 
       {/* Tabs */}
@@ -34,6 +35,12 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
           >
             Categorias
           </TabsTrigger>
+          <TabsTrigger 
+            value="destaques"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
+          >
+            Destaques
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="produtos" className="mt-6">
@@ -42,6 +49,10 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
 
         <TabsContent value="categorias" className="mt-6">
           <CategoriesTab restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
+        </TabsContent>
+
+        <TabsContent value="destaques" className="mt-6">
+          <DestaquesTab restaurantId={restaurantId} />
         </TabsContent>
       </Tabs>
     </div>
