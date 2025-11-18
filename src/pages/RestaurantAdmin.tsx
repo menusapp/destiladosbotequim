@@ -11,9 +11,7 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import CardapioTab from "@/components/admin/CardapioTab";
 import TablesTab from "@/components/admin/TablesTab";
-import OrdersTab from "@/components/admin/OrdersTab";
 import DashboardTab from "@/components/admin/DashboardTab";
-import BillsTab from "@/components/admin/BillsTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
 import CostosTab from "@/components/admin/CostosTab";
@@ -23,6 +21,8 @@ import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
 import DeliveryTab from "@/components/admin/DeliveryTab";
 import DRETab from "@/components/admin/DRETab";
 import BalcaoTab from "@/components/admin/BalcaoTab";
+import LocalOrdersTab from "@/components/admin/LocalOrdersTab";
+import DeliveryOrdersTab from "@/components/admin/DeliveryOrdersTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 interface Restaurant {
@@ -39,6 +39,7 @@ const RestaurantAdmin = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [hasNewBills, setHasNewBills] = useState(false);
+  const [hasNewDeliveryOrders, setHasNewDeliveryOrders] = useState(false);
   
   useInactivityLogout();
 
@@ -68,6 +69,8 @@ const RestaurantAdmin = () => {
           table: 'orders',
         },
         (payload) => {
+          const orderType = (payload.new as any).order_type;
+          
           // Verificar se o pedido é do restaurante atual através da mesa
           supabase
             .from('tables')
@@ -75,9 +78,14 @@ const RestaurantAdmin = () => {
             .eq('id', (payload.new as any).table_id)
             .single()
             .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId && activeSection !== 'pedidos') {
-                setHasNewOrders(true);
-                toast.info("Novo pedido recebido!");
+              if (data?.restaurant_id === restaurantId) {
+                if (orderType === 'delivery' && activeSection !== 'pedidos-delivery') {
+                  setHasNewDeliveryOrders(true);
+                  toast.info("Novo pedido de delivery recebido!");
+                } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos-locais') {
+                  setHasNewOrders(true);
+                  toast.info("Novo pedido recebido!");
+                }
               }
             });
         }
@@ -102,7 +110,7 @@ const RestaurantAdmin = () => {
             .eq('id', (payload.new as any).table_id)
             .single()
             .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId && activeSection !== 'comandas') {
+              if (data?.restaurant_id === restaurantId && activeSection !== 'pedidos-locais') {
                 setHasNewBills(true);
                 toast.info("Nova conta solicitada!");
               }
@@ -119,11 +127,12 @@ const RestaurantAdmin = () => {
 
   useEffect(() => {
     // Limpar notificações quando mudar de seção
-    if (activeSection === 'pedidos') {
+    if (activeSection === 'pedidos-locais') {
       setHasNewOrders(false);
-    }
-    if (activeSection === 'comandas') {
       setHasNewBills(false);
+    }
+    if (activeSection === 'pedidos-delivery') {
+      setHasNewDeliveryOrders(false);
     }
   }, [activeSection]);
 
@@ -217,10 +226,10 @@ const RestaurantAdmin = () => {
       // Atendimento - sub-itens
       case "mesas":
         return <TablesTab restaurantId={restaurant.id} />;
-      case "pedidos":
-        return <OrdersTab restaurantId={restaurant.id} />;
-      case "comandas":
-        return <BillsTab restaurantId={restaurant.id} />;
+      case "pedidos-locais":
+        return <LocalOrdersTab restaurantId={restaurant.id} />;
+      case "pedidos-delivery":
+        return <DeliveryOrdersTab restaurantId={restaurant.id} />;
       case "balcao":
         return <BalcaoTab restaurantId={restaurant.id} />;
       
@@ -241,12 +250,13 @@ const RestaurantAdmin = () => {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full" style={{ background: "radial-gradient(circle at top left, hsl(0 0% 100%), hsl(40 100% 97% / 0.3))" }}>
-        <AppSidebar 
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          hasNewOrders={hasNewOrders}
-          hasNewBills={hasNewBills}
-        />
+          <AppSidebar 
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            hasNewOrders={hasNewOrders}
+            hasNewBills={hasNewBills}
+            hasNewDeliveryOrders={hasNewDeliveryOrders}
+          />
         <SidebarInset className="flex-1">
           <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white/80 backdrop-blur-sm px-6">
             <SidebarTrigger className="-ml-1" />
