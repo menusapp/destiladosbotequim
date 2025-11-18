@@ -73,36 +73,12 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
   const [tables, setTables] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
-  const [orderSearchQuery, setOrderSearchQuery] = useState("");
-
-  // Manual order states
-  const [manualOrder, setManualOrder] = useState({
-    tableId: "",
-    customerName: "",
-    customerCpf: "",
-    items: [] as { productId: string; quantity: number; price: number }[],
-  });
-
-  // Manual bill states
-  const [manualBill, setManualBill] = useState({
-    tableId: "",
-    customerName: "",
-    totalAmount: "",
-    paymentMethod: "cash",
-    selectedOrderId: null as string | null,
-  });
 
   useEffect(() => {
     fetchOrders();
     fetchBills();
     fetchTables();
     fetchProducts();
-
-    if (isSheetOpen) {
-      fetchRecentOrders();
-    }
 
     // Realtime subscriptions
     const ordersChannel = supabase
@@ -119,7 +95,7 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(billsChannel);
     };
-  }, [restaurantId, startDate, endDate, isSheetOpen]);
+  }, [restaurantId, startDate, endDate]);
 
   const fetchTables = async () => {
     const { data } = await supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("table_number");
@@ -133,18 +109,6 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       .eq("categories.restaurant_id", restaurantId)
       .eq("available", true);
     setProducts(data || []);
-  };
-
-  const fetchRecentOrders = async () => {
-    const today = startOfDay(new Date());
-    const { data } = await supabase
-      .from("orders")
-      .select(`*, tables!inner(table_number, restaurant_id), order_items(quantity, price_at_order, products(name), order_item_extras(price_at_order))`)
-      .eq("tables.restaurant_id", restaurantId)
-      .eq("status", "accepted")
-      .gte("created_at", today.toISOString())
-      .order("created_at", { ascending: false });
-    setRecentOrders(data || []);
   };
 
   const fetchOrders = async () => {
@@ -284,121 +248,6 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
     toast.success("Conta excluída!");
     fetchBills();
-  };
-
-  const handleCreateManualOrder = async () => {
-    if (!manualOrder.tableId || !manualOrder.customerName || manualOrder.items.length === 0) {
-      toast.error("Preencha todos os campos e adicione pelo menos um item");
-      return;
-    }
-
-    try {
-      const { data: cashSession } = await supabase
-        .from("cash_register_sessions")
-        .select("id")
-        .eq("restaurant_id", restaurantId)
-        .eq("status", "open")
-        .maybeSingle();
-
-      if (!cashSession) {
-        toast.error("Abra o caixa primeiro para registrar pedidos");
-        return;
-      }
-
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          table_id: manualOrder.tableId,
-          customer_name: manualOrder.customerName,
-          customer_cpf: manualOrder.customerCpf || "000.000.000-00",
-          status: "accepted",
-          order_type: "local",
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      const orderItems = manualOrder.items.map((item) => ({
-        order_id: order.id,
-        product_id: item.productId,
-        quantity: item.quantity,
-        price_at_order: item.price,
-      }));
-
-      const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
-      if (itemsError) throw itemsError;
-
-      toast.success("Pedido criado com sucesso!");
-      setManualOrder({ tableId: "", customerName: "", customerCpf: "", items: [] });
-      fetchOrders();
-    } catch (error) {
-      console.error("Error creating manual order:", error);
-      toast.error("Erro ao criar pedido manual");
-    }
-  };
-
-  const handleCreateManualBill = async () => {
-    if (!manualBill.selectedOrderId) {
-      toast.error("Selecione um pedido recente primeiro");
-      return;
-    }
-
-    try {
-      const { data: cashSession } = await supabase
-        .from("cash_register_sessions")
-        .select("id")
-        .eq("restaurant_id", restaurantId)
-        .eq("status", "open")
-        .maybeSingle();
-
-      if (!cashSession) {
-        toast.error("Abra o caixa primeiro para registrar contas");
-        return;
-      }
-
-      const totalAmount = parseFloat(manualBill.totalAmount);
-
-      const { data: bill, error: billError } = await supabase
-        .from("bills")
-        .insert({
-          table_id: manualBill.tableId,
-          subtotal: totalAmount,
-          service_fee: 0,
-          total_amount: totalAmount,
-          payment_method: manualBill.paymentMethod,
-          status: "requested",
-        })
-        .select()
-        .single();
-
-      if (billError) throw billError;
-
-      toast.success('Conta criada! Agora você pode marcá-la como "A caminho" ou "Paga".');
-      setManualBill({ tableId: "", customerName: "", totalAmount: "", paymentMethod: "cash", selectedOrderId: null });
-      fetchBills();
-    } catch (error) {
-      console.error("Error creating manual bill:", error);
-      toast.error("Erro ao criar conta manual");
-    }
-  };
-
-  const handleSelectOrder = (order: any) => {
-    const total = order.order_items.reduce((sum: number, item: any) => {
-      const itemTotal = item.price_at_order * item.quantity;
-      const extrasTotal = item.order_item_extras?.reduce((eSum: number, extra: any) => eSum + extra.price_at_order, 0) || 0;
-      return sum + itemTotal + extrasTotal;
-    }, 0);
-
-    setManualBill({
-      tableId: order.table_id,
-      customerName: order.customer_name,
-      totalAmount: total.toFixed(2),
-      paymentMethod: "cash",
-      selectedOrderId: order.id,
-    });
-    setIsSheetOpen(false);
-    toast.success("Pedido carregado com sucesso!");
   };
 
   const printOrder = (order: Order) => {
@@ -742,76 +591,10 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       {/* Seção de Comandas */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Comandas
-            </CardTitle>
-            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Criar Comanda Manual
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>Criar Comanda Manual</SheetTitle>
-                </SheetHeader>
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <Label>Buscar Pedido Recente</Label>
-                    <Input value={orderSearchQuery} onChange={(e) => setOrderSearchQuery(e.target.value)} placeholder="Buscar por mesa ou cliente..." />
-                  </div>
-                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                    {recentOrders
-                      .filter(
-                        (order) =>
-                          order.tables.table_number.toString().includes(orderSearchQuery) || order.customer_name.toLowerCase().includes(orderSearchQuery.toLowerCase())
-                      )
-                      .map((order) => (
-                        <Button key={order.id} variant="outline" className="w-full justify-start" onClick={() => handleSelectOrder(order)}>
-                          <div className="text-left">
-                            <p className="font-semibold">Mesa {order.tables.table_number} - {order.customer_name}</p>
-                            <p className="text-xs text-muted-foreground">{format(new Date(order.created_at), "dd/MM HH:mm", { locale: pt })}</p>
-                          </div>
-                        </Button>
-                      ))}
-                  </div>
-                  <Separator />
-                  {manualBill.selectedOrderId && (
-                    <>
-                      <div>
-                        <Label>Cliente</Label>
-                        <Input value={manualBill.customerName} disabled />
-                      </div>
-                      <div>
-                        <Label>Valor Total</Label>
-                        <Input value={manualBill.totalAmount} onChange={(e) => setManualBill({ ...manualBill, totalAmount: e.target.value })} placeholder="0.00" type="number" step="0.01" />
-                      </div>
-                      <div>
-                        <Label>Forma de Pagamento</Label>
-                        <Select value={manualBill.paymentMethod} onValueChange={(value) => setManualBill({ ...manualBill, paymentMethod: value })}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cash">Dinheiro</SelectItem>
-                            <SelectItem value="debit">Cartão de Débito</SelectItem>
-                            <SelectItem value="credit">Cartão de Crédito</SelectItem>
-                            <SelectItem value="pix">Pix</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button onClick={handleCreateManualBill} className="w-full">
-                        Criar Comanda
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Comandas
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {filteredBills.length === 0 ? (
