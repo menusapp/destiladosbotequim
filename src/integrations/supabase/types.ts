@@ -1104,6 +1104,7 @@ export type Database = {
       }
       restaurant_reviews: {
         Row: {
+          bill_id: string | null
           comment: string | null
           counter_order_id: string | null
           created_at: string
@@ -1114,6 +1115,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bill_id?: string | null
           comment?: string | null
           counter_order_id?: string | null
           created_at?: string
@@ -1124,6 +1126,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bill_id?: string | null
           comment?: string | null
           counter_order_id?: string | null
           created_at?: string
@@ -1134,6 +1137,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "restaurant_reviews_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "restaurant_reviews_counter_order_id_fkey"
             columns: ["counter_order_id"]
