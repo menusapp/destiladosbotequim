@@ -42,6 +42,8 @@ const Menu = () => {
   const [comandaStatus, setComandaStatus] = useState<string>("");
   const [showComandaBar, setShowComandaBar] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [featuredSectionTitle, setFeaturedSectionTitle] = useState("Destaques");
 
   useMenuInactivityLogout(customerName, tableNumber || "", tableId);
 
@@ -70,9 +72,14 @@ const Menu = () => {
     if (!restaurantSlug || !tableNumber) return;
     try {
       const { data: restaurantData, error: restError } = await supabase
-        .from("restaurants").select("id, name, slug, is_open, logo_url, banner_url, primary_color, prep_time_minutes, service_fee_enabled, service_fee_percentage").eq("slug", restaurantSlug).single();
+        .from("restaurants").select("id, name, slug, is_open, logo_url, banner_url, primary_color, prep_time_minutes, service_fee_enabled, service_fee_percentage, featured_section_enabled, featured_section_title").eq("slug", restaurantSlug).single();
       if (restError) throw restError;
       setRestaurant(restaurantData);
+      
+      // Configurar título da seção de destaques
+      if (restaurantData.featured_section_title) {
+        setFeaturedSectionTitle(restaurantData.featured_section_title);
+      }
 
       const { data: tableData, error: tableError } = await supabase
         .from("tables").select("id")
@@ -90,6 +97,25 @@ const Menu = () => {
         .map((cat: any) => ({ ...cat, products: (cat.products || []).sort((a: Product, b: Product) => a.name.localeCompare(b.name)) }))
         .filter((cat: Category) => cat.products.length > 0);
       setCategories(sortedCategories);
+
+      // Buscar produtos em destaque se a seção estiver habilitada
+      if (restaurantData.featured_section_enabled) {
+        const { data: featuredData, error: featuredError } = await supabase
+          .from("products")
+          .select("id, name, description, price, available, image_url, prep_time_minutes, is_featured, featured_display_order, categories!inner(restaurant_id)")
+          .eq("categories.restaurant_id", restaurantData.id)
+          .eq("is_featured", true)
+          .eq("available", true)
+          .order("featured_display_order", { ascending: true });
+        
+        if (featuredError) {
+          console.error("Erro ao buscar produtos em destaque:", featuredError);
+        } else {
+          setFeaturedProducts(featuredData || []);
+        }
+      } else {
+        setFeaturedProducts([]);
+      }
 
       // Verificar se existe comanda aberta
       if (tableData.id) {
@@ -473,11 +499,14 @@ const Menu = () => {
         </div>
       ) : (
         <>
-          <FeaturedProducts
-            products={allProducts.filter(p => p.available)}
-            primaryColor={primaryColor}
-            onProductClick={handleProductClick}
-          />
+          {featuredProducts.length > 0 && (
+            <FeaturedProducts
+              products={featuredProducts}
+              primaryColor={primaryColor}
+              onProductClick={handleProductClick}
+              title={featuredSectionTitle}
+            />
+          )}
 
           <CategoryProducts
             categories={filteredCategories}
