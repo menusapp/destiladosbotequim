@@ -147,82 +147,66 @@ export const ProductForm = ({
   const cmvPercentage = parsedProductPrice > 0 ? (productCost / parsedProductPrice) * 100 : 0;
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
-      {/* Bloco 1: Dados Básicos */}
-      <Card className="p-5 bg-card/50 border-primary/20 shadow-sm">
-        <h3 className="text-lg font-semibold mb-4 text-primary flex items-center gap-2">
-          <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm">1</span>
-          Dados Básicos
-        </h3>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="product-name" className="text-base">Nome do Produto *</Label>
-            <Input
-              id="product-name"
-              value={productName}
-              onChange={(e) => setProductName(e.target.value)}
-              placeholder="Ex: Pizza Margherita"
-              required
-              className="h-11"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="product-description" className="text-base">Descrição</Label>
-            <Textarea
-              id="product-description"
-              value={productDescription}
-              onChange={(e) => setProductDescription(e.target.value)}
-              placeholder="Descreva o produto de forma atrativa para o cliente..."
-              rows={3}
-              className="resize-none"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="product-image" className="text-base">Foto do Produto</Label>
-            {productImageUrl && !productImage && (
-              <div className="mb-2">
-                <img 
-                  src={productImageUrl} 
-                  alt="Preview" 
-                  className="w-40 h-40 object-cover rounded-lg border-2 border-primary/20 shadow-sm" 
-                />
-              </div>
-            )}
-            <Input
-              id="product-image"
-              type="file"
-              accept="image/*"
-              onChange={(e) => setProductImage(e.target.files?.[0] || null)}
-              className="cursor-pointer"
-            />
-            <p className="text-xs text-muted-foreground">Recomendado: imagem quadrada, mínimo 500x500px</p>
-          </div>
+    <form onSubmit={onSubmit} className="space-y-5">
+      {/* INFORMAÇÕES BÁSICAS */}
+      <div className="bg-gradient-to-br from-background to-muted/20 rounded-xl border border-border/50 overflow-hidden">
+        <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
+          <h3 className="text-base font-semibold text-foreground">Informações Básicas</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">Dados principais do produto</p>
         </div>
-      </Card>
-
-      {/* Bloco 2: Preço, Custo, Margem e CMV */}
-      <Card className="p-5 bg-card/50 border-primary/20 shadow-sm">
-        <h3 className="text-lg font-semibold mb-4 text-primary flex items-center gap-2">
-          <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm">2</span>
-          Preço e Análise Financeira
-        </h3>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="product-price" className="text-base">Preço de Venda (R$) *</Label>
+        
+        <div className="p-6 space-y-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="lg:col-span-2 space-y-2">
+              <Label htmlFor="product-name" className="text-sm font-medium">
+                Nome do Produto <span className="text-destructive">*</span>
+              </Label>
               <Input
-                id="product-price"
-                type="number"
-                step="0.01"
-                value={productPrice}
-                onChange={(e) => setProductPrice(e.target.value)}
-                placeholder="0.00"
+                id="product-name"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                placeholder="Ex: Pizza Margherita"
                 required
-                className="h-11 text-lg font-semibold"
+                className="h-11"
               />
             </div>
+
+            <div className="lg:col-span-2 space-y-2">
+              <Label htmlFor="product-description" className="text-sm font-medium">
+                Descrição
+              </Label>
+              <Textarea
+                id="product-description"
+                value={productDescription}
+                onChange={(e) => setProductDescription(e.target.value)}
+                placeholder="Descreva o produto..."
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="product-prep-time" className="text-base">Tempo de Preparo (min)</Label>
+              <Label htmlFor="product-category" className="text-sm font-medium">
+                Categoria <span className="text-destructive">*</span>
+              </Label>
+              <Select value={productCategoryId} onValueChange={setProductCategoryId}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="product-prep-time" className="text-sm font-medium">
+                Tempo de Preparo (min)
+              </Label>
               <Input
                 id="product-prep-time"
                 type="number"
@@ -232,124 +216,142 @@ export const ProductForm = ({
                 placeholder="30"
                 className="h-11"
               />
-              <p className="text-xs text-muted-foreground">Tempo estimado de preparo</p>
+            </div>
+
+            <div className="lg:col-span-2 space-y-2">
+              <Label htmlFor="product-image" className="text-sm font-medium">
+                Imagem do Produto
+              </Label>
+              {productImageUrl && !productImage && (
+                <img 
+                  src={productImageUrl} 
+                  alt="Preview" 
+                  className="w-32 h-32 object-cover rounded-lg border border-border mb-2" 
+                />
+              )}
+              <Input
+                id="product-image"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setProductImage(e.target.files?.[0] || null)}
+                className="cursor-pointer"
+              />
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Indicadores de Custo e Margem */}
+      {/* PREÇO E ANÁLISE */}
+      <div className="bg-gradient-to-br from-background to-muted/20 rounded-xl border border-border/50 overflow-hidden">
+        <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
+          <h3 className="text-base font-semibold text-foreground">Preço e Análise</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">Precificação e indicadores financeiros</p>
+        </div>
+        
+        <div className="p-6 space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="product-price" className="text-sm font-medium">
+              Preço de Venda (R$) <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="product-price"
+              type="number"
+              step="0.01"
+              value={productPrice}
+              onChange={(e) => setProductPrice(e.target.value)}
+              placeholder="0.00"
+              required
+              className="h-11 text-lg font-semibold"
+            />
+          </div>
+
           {productCost > 0 && parsedProductPrice > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg border border-primary/20">
-              <div className="text-center p-3 bg-background/50 rounded-md">
-                <p className="text-xs text-muted-foreground mb-1">Custo Total</p>
-                <p className="text-xl font-bold text-foreground">R$ {productCost.toFixed(2)}</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-muted/50 rounded-lg p-4 text-center border border-border/50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Custo</p>
+                <p className="text-lg font-bold text-foreground">R$ {productCost.toFixed(2)}</p>
               </div>
-              <div className="text-center p-3 bg-background/50 rounded-md">
-                <p className="text-xs text-muted-foreground mb-1">Margem de Lucro</p>
-                <p className="text-xl font-bold text-green-600">
+              <div className="bg-muted/50 rounded-lg p-4 text-center border border-border/50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Margem</p>
+                <p className="text-lg font-bold text-green-600">
                   {((parsedProductPrice - productCost) / parsedProductPrice * 100).toFixed(1)}%
                 </p>
               </div>
-              <div className="text-center p-3 bg-background/50 rounded-md">
-                <p className="text-xs text-muted-foreground mb-1">CMV</p>
-                <p className={`text-xl font-bold ${cmvPercentage > 35 ? 'text-red-600' : cmvPercentage > 30 ? 'text-yellow-600' : 'text-green-600'}`}>
+              <div className="bg-muted/50 rounded-lg p-4 text-center border border-border/50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">CMV</p>
+                <p className={`text-lg font-bold ${
+                  cmvPercentage > 35 ? 'text-red-600' : 
+                  cmvPercentage > 30 ? 'text-yellow-600' : 
+                  'text-green-600'
+                }`}>
                   {cmvPercentage.toFixed(1)}%
                 </p>
               </div>
             </div>
           )}
         </div>
-      </Card>
+      </div>
 
-      {/* Bloco 3: Categoria */}
-      <Card className="p-5 bg-card/50 border-primary/20 shadow-sm">
-        <h3 className="text-lg font-semibold mb-4 text-primary flex items-center gap-2">
-          <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm">3</span>
-          Categoria
-        </h3>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="product-category" className="text-base">Categoria *</Label>
-            <Select value={productCategoryId} onValueChange={setProductCategoryId}>
-              <SelectTrigger className="h-11">
-                <SelectValue placeholder="Selecione uma categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              A categoria define onde o produto aparece no cardápio digital
-            </p>
+      {/* RECEITA (INSUMOS) */}
+      <div className="bg-gradient-to-br from-background to-muted/20 rounded-xl border border-border/50 overflow-hidden">
+        <div className="bg-primary/5 px-6 py-4 border-b border-border/50 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-foreground">
+              Receita (Insumos) <span className="text-destructive">*</span>
+            </h3>
+            <p className="text-sm text-muted-foreground mt-0.5">Configure os insumos do produto</p>
           </div>
-        </div>
-      </Card>
-
-      {/* Bloco 4: Insumos */}
-      <Card className="p-5 bg-card/50 border-primary/20 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
-            <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm">4</span>
-            Insumos * (Obrigatório)
-          </h3>
           {productCost > 0 && (
-            <div className="text-sm bg-primary/10 px-3 py-1.5 rounded-full font-semibold">
-              Custo: R$ {productCost.toFixed(2)}
+            <div className="bg-primary/10 px-3 py-1.5 rounded-full">
+              <span className="text-sm font-semibold">R$ {productCost.toFixed(2)}</span>
             </div>
           )}
         </div>
         
-        <p className="text-sm text-muted-foreground mb-4">
-          Configure os insumos utilizados neste produto para cálculo automático de custo e controle de estoque
-        </p>
-
-        <div className="space-y-3">
+        <div className="p-6 space-y-4">
           {/* Adicionar Insumo */}
-          <div className="p-4 bg-muted/30 rounded-lg border border-border">
-            <div className="flex gap-2 flex-wrap">
+          <div className="bg-muted/30 rounded-lg p-4 border border-dashed border-border">
+            <div className="flex gap-2 flex-col sm:flex-row">
               <div className="flex-1 min-w-[200px]">
                 <Select value={selectedStockItem} onValueChange={setSelectedStockItem}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="Selecione um insumo" />
                   </SelectTrigger>
                   <SelectContent>
                     {stockItems.map((item) => (
                       <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.unit})
+                        {item.name} - R$ {item.price_per_unit.toFixed(2)}/{item.unit}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="w-32">
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="Qtd"
-                  value={ingredientQuantity}
-                  onChange={(e) => setIngredientQuantity(e.target.value)}
-                />
-              </div>
-              <Button type="button" onClick={handleAddIngredient} size="sm">
-                <Plus className="h-4 w-4" />
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Quantidade"
+                value={ingredientQuantity}
+                onChange={(e) => setIngredientQuantity(e.target.value)}
+                className="w-full sm:w-32 h-10"
+              />
+              <Button type="button" onClick={handleAddIngredient} size="default" className="h-10">
+                <Plus className="h-4 w-4 mr-1" />
+                Adicionar
               </Button>
             </div>
           </div>
 
           {/* Lista de Insumos */}
-          {ingredients.length > 0 && (
+          {ingredients.length > 0 ? (
             <div className="space-y-2">
               {ingredients.map((ing) => (
                 <div 
                   key={ing.id} 
-                  className="flex items-center justify-between p-3 bg-background rounded-md border border-border hover:border-primary/50 transition-colors"
+                  className="flex items-center justify-between p-3 bg-background rounded-lg border border-border hover:border-primary/50 transition-colors"
                 >
                   <div className="flex-1">
-                    <p className="font-medium">{ing.stock_item_name}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-medium text-sm">{ing.stock_item_name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {ing.quantity} {ing.stock_item_unit} × R$ {ing.stock_item_price?.toFixed(2)} = 
                       <span className="font-semibold text-foreground ml-1">
                         R$ {(ing.quantity * (ing.stock_item_price || 0)).toFixed(2)}
@@ -361,84 +363,77 @@ export const ProductForm = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => handleRemoveIngredient(ing.id)}
+                    className="h-8 w-8 p-0"
                   >
                     <X className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               ))}
             </div>
-          )}
-
-          {ingredients.length === 0 && (
-            <div className="text-center p-6 bg-muted/20 rounded-lg border-2 border-dashed">
+          ) : (
+            <div className="text-center py-8 bg-muted/20 rounded-lg border border-dashed">
               <p className="text-sm text-muted-foreground">
-                Nenhum insumo adicionado. Adicione pelo menos 1 insumo para continuar.
+                Nenhum insumo adicionado. Adicione pelo menos 1 insumo.
               </p>
             </div>
           )}
         </div>
-      </Card>
+      </div>
 
-      {/* Bloco 5: Adicionais */}
-      <Card className="p-5 bg-card/50 border-primary/20 shadow-sm">
-        <h3 className="text-lg font-semibold mb-4 text-primary flex items-center gap-2">
-          <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm">5</span>
-          Adicionais (Opcional)
-        </h3>
+      {/* ADICIONAIS */}
+      <div className="bg-gradient-to-br from-background to-muted/20 rounded-xl border border-border/50 overflow-hidden">
+        <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
+          <h3 className="text-base font-semibold text-foreground">Adicionais</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">Configure opções extras para o produto (opcional)</p>
+        </div>
+        
+        <div className="p-6 space-y-4">
+          {/* Carregar de Categoria */}
+          {extraCategories.length > 0 && (
+            <div className="bg-muted/30 rounded-lg p-4 border border-border">
+              <Label className="text-xs font-medium mb-2 block">Importar de categoria:</Label>
+              <Select onValueChange={handleLoadExtrasFromCategory}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {extraCategories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-        <p className="text-sm text-muted-foreground mb-4">
-          Configure adicionais que o cliente pode escolher ao pedir este produto
-        </p>
-
-        {/* Carregar de Categoria */}
-        {extraCategories.length > 0 && (
-          <div className="mb-4 p-4 bg-muted/30 rounded-lg border border-border">
-            <Label className="text-sm mb-2 block">Carregar adicionais de uma categoria existente:</Label>
-            <Select onValueChange={handleLoadExtrasFromCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione uma categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {extraCategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Formulário de Adicional */}
-        <div className="p-4 bg-muted/30 rounded-lg border border-border mb-4">
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  placeholder="Nome do adicional (ex: Bacon extra)"
-                  value={extraName}
-                  onChange={(e) => setExtraName(e.target.value)}
-                />
-              </div>
-              <div className="w-32">
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="Preço"
-                  value={extraPrice}
-                  onChange={(e) => setExtraPrice(e.target.value)}
-                />
-              </div>
+          {/* Formulário de Adicional */}
+          <div className="bg-muted/30 rounded-lg p-4 border border-dashed border-border space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                placeholder="Nome do adicional"
+                value={extraName}
+                onChange={(e) => setExtraName(e.target.value)}
+                className="h-10"
+              />
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Preço (R$)"
+                value={extraPrice}
+                onChange={(e) => setExtraPrice(e.target.value)}
+                className="h-10"
+              />
             </div>
 
             {/* Insumos do Adicional */}
-            <div className="space-y-2">
-              <Label className="text-xs">Insumos do adicional (opcional):</Label>
-              <div className="flex gap-2 flex-wrap">
+            <div className="space-y-2 pt-2 border-t border-border/50">
+              <Label className="text-xs font-medium">Insumos do adicional (opcional):</Label>
+              <div className="flex gap-2 flex-col sm:flex-row">
                 <div className="flex-1 min-w-[150px]">
                   <Select value={selectedExtraStockItem} onValueChange={setSelectedExtraStockItem}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Insumo" />
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Selecione insumo" />
                     </SelectTrigger>
                     <SelectContent>
                       {stockItems.map((item) => (
@@ -449,16 +444,15 @@ export const ProductForm = ({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="w-24">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Qtd"
-                    value={extraIngredientQuantity}
-                    onChange={(e) => setExtraIngredientQuantity(e.target.value)}
-                  />
-                </div>
-                <Button type="button" onClick={handleAddExtraIngredient} size="sm" variant="outline">
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Qtd"
+                  value={extraIngredientQuantity}
+                  onChange={(e) => setExtraIngredientQuantity(e.target.value)}
+                  className="w-full sm:w-24 h-10"
+                />
+                <Button type="button" onClick={handleAddExtraIngredient} size="default" variant="outline" className="h-10">
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -466,13 +460,14 @@ export const ProductForm = ({
               {extraIngredients.length > 0 && (
                 <div className="space-y-1 mt-2">
                   {extraIngredients.map((ing) => (
-                    <div key={ing.id} className="flex items-center justify-between text-xs p-2 bg-background rounded">
-                      <span>{ing.stock_item_name}: {ing.quantity} {ing.stock_item_unit}</span>
+                    <div key={ing.id} className="flex items-center justify-between text-xs p-2 bg-background rounded border border-border">
+                      <span className="text-muted-foreground">{ing.stock_item_name}: {ing.quantity} {ing.stock_item_unit}</span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleRemoveExtraIngredient(ing.id)}
+                        className="h-6 w-6 p-0"
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -482,58 +477,61 @@ export const ProductForm = ({
               )}
             </div>
 
-            <Button type="button" onClick={handleAddExtra} variant="default" className="w-full">
+            <Button type="button" onClick={handleAddExtra} className="w-full h-10">
               {editingExtraIndex !== null ? 'Atualizar Adicional' : 'Adicionar Adicional'}
             </Button>
           </div>
+
+          {/* Lista de Adicionais */}
+          {extras.length > 0 && (
+            <div className="space-y-2">
+              {extras.map((extra) => (
+                <div 
+                  key={extra.id} 
+                  className="flex items-center justify-between p-3 bg-background rounded-lg border border-border hover:border-primary/50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{extra.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      R$ {extra.price.toFixed(2)}
+                      {extra.cost && extra.cost > 0 && (
+                        <span className="ml-2">• Custo: R$ {extra.cost.toFixed(2)}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const index = extras.indexOf(extra);
+                        handleEditExtra(index);
+                      }}
+                      className="h-8"
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveExtra(extra.id)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+      </div>
 
-        {extras.length > 0 && (
-          <div className="space-y-2">
-            {extras.map((extra) => (
-              <div 
-                key={extra.id} 
-                className="flex items-center justify-between p-3 bg-background rounded-md border border-border hover:border-primary/50 transition-colors"
-              >
-                <div className="flex-1">
-                  <p className="font-medium">{extra.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    R$ {extra.price.toFixed(2)}
-                    {extra.cost && extra.cost > 0 && (
-                      <span className="ml-2">• Custo: R$ {extra.cost.toFixed(2)}</span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const index = extras.indexOf(extra);
-                      handleEditExtra(index);
-                    }}
-                  >
-                    Editar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveExtra(extra.id)}
-                  >
-                    <X className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Botão de Salvar */}
-      <div className="flex gap-3 pt-4">
-        <Button type="submit" className="flex-1 h-11 text-base font-semibold">
+      {/* BOTÃO DE SALVAR */}
+      <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border pt-4 pb-2">
+        <Button type="submit" className="w-full h-12 text-base font-semibold">
           {editingProduct ? "Atualizar Produto" : "Criar Produto"}
         </Button>
       </div>
