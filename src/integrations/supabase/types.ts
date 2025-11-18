@@ -1102,6 +1102,61 @@ export type Database = {
           },
         ]
       }
+      restaurant_reviews: {
+        Row: {
+          comment: string | null
+          counter_order_id: string | null
+          created_at: string
+          id: string
+          order_id: string | null
+          rating: number
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          comment?: string | null
+          counter_order_id?: string | null
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          rating: number
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          comment?: string | null
+          counter_order_id?: string | null
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          rating?: number
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_reviews_counter_order_id_fkey"
+            columns: ["counter_order_id"]
+            isOneToOne: false
+            referencedRelation: "counter_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_reviews_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restaurants: {
         Row: {
           banner_url: string | null
@@ -1522,6 +1577,13 @@ export type Database = {
       check_product_availability: {
         Args: { p_product_id: string }
         Returns: boolean
+      }
+      get_restaurant_rating_stats: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          average_rating: number
+          total_reviews: number
+        }[]
       }
       has_role: {
         Args: {

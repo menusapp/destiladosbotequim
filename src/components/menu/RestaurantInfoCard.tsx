@@ -1,13 +1,14 @@
 import { Star, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface RestaurantInfoCardProps {
+  restaurantId: string;
   name: string;
   logoUrl: string | null;
   distance?: string;
   minOrder?: number;
-  rating?: number;
-  reviewCount?: number;
   deliveryTime?: string;
   deliveryFee?: number;
   primaryColor?: string;
@@ -15,17 +16,38 @@ interface RestaurantInfoCardProps {
 }
 
 export const RestaurantInfoCard = ({
+  restaurantId,
   name,
   logoUrl,
   distance = "0.7 km",
   minOrder,
-  rating = 4.8,
-  reviewCount = 12,
   deliveryTime = "50-60 min",
   deliveryFee = 3.0,
   primaryColor = "#fe9516",
   tableInfo,
 }: RestaurantInfoCardProps) => {
+  const [rating, setRating] = useState<number>(0);
+  const [reviewCount, setReviewCount] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchRatingStats = async () => {
+      const { data, error } = await supabase.rpc("get_restaurant_rating_stats", {
+        p_restaurant_id: restaurantId,
+      });
+
+      if (error) {
+        console.error("Erro ao buscar avaliações:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setRating(Number(data[0].average_rating) || 0);
+        setReviewCount(Number(data[0].total_reviews) || 0);
+      }
+    };
+
+    fetchRatingStats();
+  }, [restaurantId]);
   return (
     <Card className="bg-white rounded-3xl shadow-lg overflow-visible -mt-8 mx-4 relative z-20">
       <div className="p-4">
@@ -64,10 +86,25 @@ export const RestaurantInfoCard = ({
         )}
 
         {/* Avaliação */}
-        <div className="flex items-center gap-1.5 mt-3">
-          <Star className="w-4 h-4 fill-warning text-warning" />
-          <span className="font-semibold text-foreground">{rating}</span>
-          <span className="text-sm text-muted-foreground">({reviewCount} avaliações)</span>
+        <div className="flex items-center gap-2 mt-3">
+          <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star
+                key={star}
+                className={`w-4 h-4 ${
+                  rating > 0 && star <= Math.round(rating)
+                    ? "fill-yellow-400 text-yellow-400"
+                    : "text-gray-300"
+                }`}
+              />
+            ))}
+          </div>
+          <span className="font-semibold text-foreground">
+            {rating > 0 ? rating.toFixed(1) : "0,0"}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            ({reviewCount} {reviewCount === 1 ? 'avaliação' : 'avaliações'})
+          </span>
         </div>
 
         {/* Tempo e Taxa */}
