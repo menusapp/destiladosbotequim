@@ -76,12 +76,25 @@ const Menu = () => {
 
   const checkOpenComanda = async (tableId: string) => {
     try {
-      // Buscar pedidos pendentes, aceitos ou em preparo
+      // Obter informações do cliente da sessão atual
+      const savedCustomerInfo = sessionStorage.getItem("customerInfo");
+      if (!savedCustomerInfo) {
+        setHasOpenComanda(false);
+        setComandaTotal(0);
+        setComandaStatus("");
+        return;
+      }
+
+      const currentCustomer = JSON.parse(savedCustomerInfo);
+
+      // Buscar apenas pedidos do cliente atual (sessão atual)
       const { data: orders, error } = await supabase
         .from("orders")
         .select(`
           id,
           status,
+          customer_name,
+          customer_cpf,
           order_items (
             quantity,
             price_at_order,
@@ -91,6 +104,8 @@ const Menu = () => {
           )
         `)
         .eq("table_id", tableId)
+        .eq("customer_name", currentCustomer.name)
+        .eq("customer_cpf", currentCustomer.cpf)
         .in("status", ["pending", "accepted", "preparing", "ready"]);
 
       if (error) throw error;
@@ -98,7 +113,7 @@ const Menu = () => {
       if (orders && orders.length > 0) {
         setHasOpenComanda(true);
         
-        // Calcular total (mesma lógica da página Comanda)
+        // Calcular total apenas dos pedidos da sessão atual
         let total = 0;
         orders.forEach((order: any) => {
           order.order_items?.forEach((item: any) => {
