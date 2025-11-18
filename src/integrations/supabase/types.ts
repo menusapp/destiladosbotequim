@@ -1112,8 +1112,6 @@ export type Database = {
           name: string
           prep_time_minutes: number | null
           primary_color: string | null
-          rating: number | null
-          review_count: number | null
           secondary_color: string | null
           service_fee_enabled: boolean | null
           service_fee_percentage: number | null
@@ -1130,8 +1128,6 @@ export type Database = {
           name: string
           prep_time_minutes?: number | null
           primary_color?: string | null
-          rating?: number | null
-          review_count?: number | null
           secondary_color?: string | null
           service_fee_enabled?: boolean | null
           service_fee_percentage?: number | null
@@ -1148,8 +1144,6 @@ export type Database = {
           name?: string
           prep_time_minutes?: number | null
           primary_color?: string | null
-          rating?: number | null
-          review_count?: number | null
           secondary_color?: string | null
           service_fee_enabled?: boolean | null
           service_fee_percentage?: number | null

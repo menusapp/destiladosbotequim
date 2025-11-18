@@ -44,7 +44,7 @@ const Menu = () => {
     if (!restaurantSlug || !tableNumber) return;
     try {
       const { data: restaurantData, error: restError } = await supabase
-        .from("restaurants").select("id, name, slug, is_open, logo_url, banner_url, primary_color, prep_time_minutes, service_fee_enabled, service_fee_percentage, rating, review_count").eq("slug", restaurantSlug).single();
+        .from("restaurants").select("id, name, slug, is_open, logo_url, banner_url, primary_color, prep_time_minutes, service_fee_enabled, service_fee_percentage").eq("slug", restaurantSlug).single();
       if (restError) throw restError;
       setRestaurant(restaurantData);
 
