@@ -149,7 +149,7 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
 
   return (
     <Tabs defaultValue="config" className="w-full">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="config">
           <Settings className="h-4 w-4 mr-2" />
           Configurações
@@ -162,167 +162,183 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
           <Gift className="h-4 w-4 mr-2" />
           Fidelidade
         </TabsTrigger>
-        <TabsTrigger value="relatorios">
-          <Truck className="h-4 w-4 mr-2" />
-          Relatórios
-        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="config" className="space-y-4">
-        {/* WhatsApp Integration */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              Integração WhatsApp
-            </CardTitle>
-            <CardDescription>
-              Configure mensagens automáticas para clientes do delivery
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="whatsapp-enabled">Ativar WhatsApp Automático</Label>
-              <Switch
-                id="whatsapp-enabled"
-                checked={whatsappConfig.enabled}
-                onCheckedChange={(checked) =>
-                  setWhatsappConfig({ ...whatsappConfig, enabled: checked })
-                }
-              />
-            </div>
+        <Tabs defaultValue="delivery" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="delivery">
+              <Truck className="h-4 w-4 mr-2" />
+              Configurações
+            </TabsTrigger>
+            <TabsTrigger value="integrations">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Integrações
+            </TabsTrigger>
+          </TabsList>
 
-            {whatsappConfig.enabled && (
-              <>
+          <TabsContent value="delivery" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Truck className="h-5 w-5" />
+                  Configurações de Delivery
+                </CardTitle>
+                <CardDescription>
+                  Configure taxas, valores mínimos e tempo de entrega
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="api-token">Token da API</Label>
+                  <Label htmlFor="min-order">Valor Mínimo do Pedido (R$)</Label>
                   <Input
-                    id="api-token"
-                    type="password"
-                    placeholder="Seu token de API do WhatsApp Business"
-                    value={whatsappConfig.apiToken}
+                    id="min-order"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={deliveryConfig.minOrderValue}
                     onChange={(e) =>
-                      setWhatsappConfig({ ...whatsappConfig, apiToken: e.target.value })
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Configure sua API do WhatsApp Business para envio automático
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone-number">Número do WhatsApp</Label>
-                  <Input
-                    id="phone-number"
-                    placeholder="5511999999999"
-                    value={whatsappConfig.phoneNumber}
-                    onChange={(e) =>
-                      setWhatsappConfig({ ...whatsappConfig, phoneNumber: e.target.value })
+                      setDeliveryConfig({ ...deliveryConfig, minOrderValue: parseFloat(e.target.value) || 0 })
                     }
                   />
                 </div>
 
-                <div className="space-y-4 pt-4 border-t">
-                  <h4 className="font-medium">Mensagens Personalizadas</h4>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="msg-accepted">Pedido Aceito</Label>
-                    <Input
-                      id="msg-accepted"
-                      value={whatsappConfig.messageAccepted}
-                      onChange={(e) =>
-                        setWhatsappConfig({ ...whatsappConfig, messageAccepted: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="msg-out">Saiu para Entrega</Label>
-                    <Input
-                      id="msg-out"
-                      value={whatsappConfig.messageOutForDelivery}
-                      onChange={(e) =>
-                        setWhatsappConfig({
-                          ...whatsappConfig,
-                          messageOutForDelivery: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="msg-delivered">Pedido Entregue</Label>
-                    <Input
-                      id="msg-delivered"
-                      value={whatsappConfig.messageDelivered}
-                      onChange={(e) =>
-                        setWhatsappConfig({ ...whatsappConfig, messageDelivered: e.target.value })
-                      }
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-fee">Taxa de Entrega (R$)</Label>
+                  <Input
+                    id="delivery-fee"
+                    type="number"
+                    step="0.01"
+                    placeholder="5.00"
+                    value={deliveryConfig.deliveryFee}
+                    onChange={(e) =>
+                      setDeliveryConfig({ ...deliveryConfig, deliveryFee: parseFloat(e.target.value) || 0 })
+                    }
+                  />
                 </div>
 
-                <Button onClick={handleSaveWhatsApp} className="w-full">
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-time">Tempo Estimado de Entrega (min)</Label>
+                  <Input
+                    id="delivery-time"
+                    type="number"
+                    placeholder="30"
+                    value={deliveryConfig.estimatedTime}
+                    onChange={(e) =>
+                      setDeliveryConfig({ ...deliveryConfig, estimatedTime: parseInt(e.target.value) || 30 })
+                    }
+                  />
+                </div>
+
+                <Button onClick={handleSaveDelivery} className="w-full">
                   Salvar Configurações
                 </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Delivery Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Configurações de Entrega</CardTitle>
-            <CardDescription>Configure as opções de delivery do seu restaurante</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="min-order">Pedido Mínimo (R$)</Label>
-              <Input
-                id="min-order"
-                type="number"
-                placeholder="0.00"
-                step="0.01"
-                value={deliveryConfig.minOrderValue}
-                onChange={(e) =>
-                  setDeliveryConfig({ ...deliveryConfig, minOrderValue: parseFloat(e.target.value) || 0 })
-                }
-              />
-            </div>
+          <TabsContent value="integrations" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Integração WhatsApp
+                </CardTitle>
+                <CardDescription>
+                  Configure mensagens automáticas para clientes do delivery
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="whatsapp-enabled">Ativar WhatsApp Automático</Label>
+                  <Switch
+                    id="whatsapp-enabled"
+                    checked={whatsappConfig.enabled}
+                    onCheckedChange={(checked) =>
+                      setWhatsappConfig({ ...whatsappConfig, enabled: checked })
+                    }
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="delivery-fee">Taxa de Entrega (R$)</Label>
-              <Input
-                id="delivery-fee"
-                type="number"
-                placeholder="0.00"
-                step="0.01"
-                value={deliveryConfig.deliveryFee}
-                onChange={(e) =>
-                  setDeliveryConfig({ ...deliveryConfig, deliveryFee: parseFloat(e.target.value) || 0 })
-                }
-              />
-            </div>
+                {whatsappConfig.enabled && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="api-token">Token da API</Label>
+                      <Input
+                        id="api-token"
+                        type="password"
+                        placeholder="Seu token de API do WhatsApp Business"
+                        value={whatsappConfig.apiToken}
+                        onChange={(e) =>
+                          setWhatsappConfig({ ...whatsappConfig, apiToken: e.target.value })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Configure sua API do WhatsApp Business para envio automático
+                      </p>
+                    </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="delivery-time">Tempo Estimado de Entrega (min)</Label>
-              <Input
-                id="delivery-time"
-                type="number"
-                placeholder="30"
-                value={deliveryConfig.estimatedTime}
-                onChange={(e) =>
-                  setDeliveryConfig({ ...deliveryConfig, estimatedTime: parseInt(e.target.value) || 30 })
-                }
-              />
-            </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone-number">Número do WhatsApp</Label>
+                      <Input
+                        id="phone-number"
+                        placeholder="5511999999999"
+                        value={whatsappConfig.phoneNumber}
+                        onChange={(e) =>
+                          setWhatsappConfig({ ...whatsappConfig, phoneNumber: e.target.value })
+                        }
+                      />
+                    </div>
 
-            <Button onClick={handleSaveDelivery} className="w-full">
-              Salvar Configurações
-            </Button>
-          </CardContent>
-        </Card>
+                    <div className="space-y-4 pt-4 border-t">
+                      <h4 className="font-medium">Mensagens Personalizadas</h4>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="msg-accepted">Pedido Aceito</Label>
+                        <Input
+                          id="msg-accepted"
+                          value={whatsappConfig.messageAccepted}
+                          onChange={(e) =>
+                            setWhatsappConfig({ ...whatsappConfig, messageAccepted: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="msg-out">Saiu para Entrega</Label>
+                        <Input
+                          id="msg-out"
+                          value={whatsappConfig.messageOutForDelivery}
+                          onChange={(e) =>
+                            setWhatsappConfig({
+                              ...whatsappConfig,
+                              messageOutForDelivery: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="msg-delivered">Pedido Entregue</Label>
+                        <Input
+                          id="msg-delivered"
+                          value={whatsappConfig.messageDelivered}
+                          onChange={(e) =>
+                            setWhatsappConfig({ ...whatsappConfig, messageDelivered: e.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <Button onClick={handleSaveWhatsApp} className="w-full">
+                      Salvar Configurações WhatsApp
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </TabsContent>
 
       <TabsContent value="coupons">
@@ -331,21 +347,6 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
 
       <TabsContent value="loyalty">
         <LoyaltyManagement restaurantId={restaurantId} />
-      </TabsContent>
-
-      <TabsContent value="relatorios">
-        <Card>
-          <CardHeader>
-            <CardTitle>Relatórios de Delivery</CardTitle>
-            <CardDescription>Análise de entregas realizadas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-12 text-muted-foreground">
-              <Truck className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Relatórios de delivery em desenvolvimento</p>
-            </div>
-          </CardContent>
-        </Card>
       </TabsContent>
     </Tabs>
   );
