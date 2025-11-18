@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Truck, MessageSquare, Settings, Ticket, Gift } from "lucide-react";
+import { Truck, MessageSquare, Settings, Ticket, Gift, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import CouponsManagement from "./CouponsManagement";
@@ -32,6 +32,7 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
   });
 
   const [loading, setLoading] = useState(true);
+  const [restaurantSlug, setRestaurantSlug] = useState("");
 
   useEffect(() => {
     fetchConfigs();
@@ -39,6 +40,17 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
 
   const fetchConfigs = async () => {
     try {
+      // Fetch restaurant slug
+      const { data: restaurantData } = await supabase
+        .from("restaurants")
+        .select("slug")
+        .eq("id", restaurantId)
+        .single();
+
+      if (restaurantData) {
+        setRestaurantSlug(restaurantData.slug);
+      }
+
       // Fetch WhatsApp config
       const { data: whatsappData } = await supabase
         .from("whatsapp_config")
@@ -143,6 +155,12 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
     }
   };
 
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/delivery/${restaurantSlug}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link copiado para a área de transferência!");
+  };
+
   if (loading) {
     return <div className="p-4">Carregando...</div>;
   }
@@ -189,6 +207,24 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-link">Link do Cardápio Delivery</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="delivery-link"
+                      value={`${window.location.origin}/delivery/${restaurantSlug}`}
+                      readOnly
+                      className="flex-1"
+                    />
+                    <Button onClick={handleCopyLink} variant="outline" size="icon">
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Compartilhe este link com seus clientes para que eles possam fazer pedidos online
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="min-order">Valor Mínimo do Pedido (R$)</Label>
                   <Input
