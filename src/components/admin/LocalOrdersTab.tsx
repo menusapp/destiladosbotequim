@@ -554,12 +554,6 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                               Aceitar
                             </Button>
                           )}
-                          {order.status === "accepted" && (
-                            <Button size="sm" onClick={() => updateOrderStatus(order.id, "delivered")}>
-                              <Check className="h-4 w-4 mr-1" />
-                              Concluir
-                            </Button>
-                          )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm">
