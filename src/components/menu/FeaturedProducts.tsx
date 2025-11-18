@@ -25,9 +25,9 @@ export const FeaturedProducts = ({
           <div
             key={product.id}
             onClick={() => product.available && onProductClick(product)}
-            className="flex-none w-40 bg-card rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-all hover:shadow-md"
+            className="flex-none w-40 bg-card rounded-2xl shadow-sm cursor-pointer active:scale-95 transition-all hover:shadow-md p-3"
           >
-            <div className="relative aspect-square bg-muted">
+            <div className="relative aspect-square bg-muted rounded-xl overflow-hidden mb-3">
               {product.image_url ? (
                 <img
                   src={product.image_url}
@@ -50,13 +50,13 @@ export const FeaturedProducts = ({
                 </div>
               )}
             </div>
-            <div className="p-3">
-              <p className="text-lg font-bold mb-1" style={{ color: primaryColor }}>
-                R$ {product.price.toFixed(2)}
-              </p>
-              <h3 className="text-sm font-medium text-foreground line-clamp-2">
+            <div>
+              <h3 className="text-sm font-medium text-foreground line-clamp-2 mb-1">
                 {product.name}
               </h3>
+              <p className="text-lg font-bold" style={{ color: primaryColor }}>
+                R$ {product.price.toFixed(2)}
+              </p>
             </div>
           </div>
         ))}
