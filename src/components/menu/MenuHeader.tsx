@@ -10,6 +10,7 @@ interface MenuHeaderProps {
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   onSearchClose?: () => void;
+  primaryColor?: string;
 }
 
 export const MenuHeader = ({ 
@@ -18,7 +19,8 @@ export const MenuHeader = ({
   searchOpen = false,
   searchQuery = "",
   onSearchChange,
-  onSearchClose
+  onSearchClose,
+  primaryColor = "#FF6B35"
 }: MenuHeaderProps) => {
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/60 to-transparent px-4 py-3">
@@ -30,11 +32,13 @@ export const MenuHeader = ({
             placeholder="Buscar produtos..."
             value={searchQuery}
             onChange={(e) => onSearchChange?.(e.target.value)}
-            className="flex-1 bg-white/90 backdrop-blur-sm border-none text-foreground placeholder:text-muted-foreground"
+            className="flex-1 backdrop-blur-sm border-none text-white placeholder:text-white/70"
+            style={{ backgroundColor: `${primaryColor}dd` }}
           />
           <button
             onClick={onSearchClose}
-            className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
+            className="w-12 h-12 rounded-full backdrop-blur-sm flex items-center justify-center text-white hover:opacity-80 transition-opacity"
+            style={{ backgroundColor: `${primaryColor}66` }}
           >
             <X className="w-5 h-5" />
           </button>
@@ -44,7 +48,8 @@ export const MenuHeader = ({
           {showSearch && (
             <button
               onClick={onSearchClick}
-              className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
+              className="w-12 h-12 rounded-full backdrop-blur-sm flex items-center justify-center text-white hover:opacity-80 transition-opacity"
+              style={{ backgroundColor: `${primaryColor}66` }}
             >
               <Search className="w-5 h-5" />
             </button>

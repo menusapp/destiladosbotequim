@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, Palette } from "lucide-react";
@@ -14,6 +15,9 @@ interface Settings {
   primary_color: string;
   service_fee_enabled: boolean;
   service_fee_percentage: number;
+  rating: number;
+  review_count: number;
+  prep_time_minutes: number;
 }
 
 const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
@@ -23,6 +27,9 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     primary_color: "#FF6B35",
     service_fee_enabled: false,
     service_fee_percentage: 10,
+    rating: 4.5,
+    review_count: 100,
+    prep_time_minutes: 30,
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -36,7 +43,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, rating, review_count, prep_time_minutes")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -49,6 +56,9 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           primary_color: data.primary_color || "#FF6B35",
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
+          rating: data.rating || 4.5,
+          review_count: data.review_count || 100,
+          prep_time_minutes: data.prep_time_minutes || 30,
         });
       } else {
         // Nenhuma configuração encontrada para este restaurante
@@ -198,197 +208,228 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Personalização do Cardápio Digital</CardTitle>
-          <CardDescription>
-            Configure as imagens que aparecerão no seu cardápio digital
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Banner */}
-          <div className="space-y-4">
-            <div>
-              <Label className="text-base font-semibold">Banner do Cardápio</Label>
-              <p className="text-sm text-muted-foreground">
-                Imagem de fundo que aparece no topo do cardápio
-              </p>
-            </div>
-            {settings.banner_url && (
-              <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
-                <img 
-                  src={settings.banner_url} 
-                  alt="Banner atual" 
-                  className="w-full h-full object-cover"
+      <Tabs defaultValue="menu-digital" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="menu-digital">Cardápio Digital</TabsTrigger>
+          <TabsTrigger value="taxa-servico">Taxa de Serviço</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="menu-digital" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Banner e Logo</CardTitle>
+              <CardDescription>
+                Configure as imagens que aparecerão no seu cardápio digital
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Banner */}
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base font-semibold">Banner do Cardápio</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Imagem de fundo que aparece no topo do cardápio
+                  </p>
+                </div>
+                {settings.banner_url && (
+                  <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
+                    <img 
+                      src={settings.banner_url} 
+                      alt="Banner atual" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div>
+                  <Label htmlFor="banner-upload">Selecionar Banner</Label>
+                  <Input
+                    id="banner-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBannerUpload}
+                    disabled={uploadingBanner}
+                    className="cursor-pointer"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Recomendado: imagem horizontal 16:9, mínimo 1600x900px, máximo 5MB
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t pt-6" />
+
+              {/* Logo */}
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base font-semibold">Logo Principal</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Logo que aparece no centro do cardápio (formato circular)
+                  </p>
+                </div>
+                {settings.logo_url && (
+                  <div className="flex justify-center">
+                    <img 
+                      src={settings.logo_url} 
+                      alt="Logo atual" 
+                      className="w-32 h-32 object-cover rounded-full border-4 border-border"
+                    />
+                  </div>
+                )}
+                <div>
+                  <Label htmlFor="logo-upload">Selecionar Logo</Label>
+                  <Input
+                    id="logo-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    disabled={uploading}
+                    className="cursor-pointer"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Recomendado: imagem quadrada, mínimo 512x512px, máximo 2MB
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                Cor Principal
+              </CardTitle>
+              <CardDescription>
+                Personalize a cor principal do seu cardápio
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="primary-color">Cor Principal</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="primary-color"
+                    type="color"
+                    value={settings.primary_color}
+                    onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                    className="w-20 h-10"
+                  />
+                  <Input
+                    type="text"
+                    value={settings.primary_color}
+                    onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                    className="flex-1"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Esta cor será aplicada em todo o cardápio digital
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações do Restaurante</CardTitle>
+              <CardDescription>
+                Configure as informações exibidas no cardápio
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="rating">Avaliação (Estrelas)</Label>
+                <Input
+                  id="rating"
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={settings.rating}
+                  onChange={(e) => setSettings({ ...settings, rating: parseFloat(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Avaliação exibida no cardápio (0.0 a 5.0)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="review-count">Número de Avaliações</Label>
+                <Input
+                  id="review-count"
+                  type="number"
+                  min="0"
+                  value={settings.review_count}
+                  onChange={(e) => setSettings({ ...settings, review_count: parseInt(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Quantidade de avaliações exibida
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="prep-time">Tempo Estimado (minutos)</Label>
+                <Input
+                  id="prep-time"
+                  type="number"
+                  min="0"
+                  value={settings.prep_time_minutes}
+                  onChange={(e) => setSettings({ ...settings, prep_time_minutes: parseInt(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Tempo médio de preparo geral do restaurante
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Button onClick={handleSaveSettings} className="w-full">
+            Salvar Configurações
+          </Button>
+        </TabsContent>
+
+        <TabsContent value="taxa-servico" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Taxa de Serviço</CardTitle>
+              <CardDescription>
+                Configure se deseja cobrar taxa de serviço e qual a porcentagem
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="service-fee-enabled">Cobrar Taxa de Serviço</Label>
+                <Switch
+                  id="service-fee-enabled"
+                  checked={settings.service_fee_enabled}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, service_fee_enabled: checked })
+                  }
                 />
               </div>
-            )}
-            <div>
-              <Label htmlFor="banner-upload">Selecionar Banner</Label>
-              <Input
-                id="banner-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleBannerUpload}
-                disabled={uploadingBanner}
-                className="cursor-pointer"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Recomendado: imagem horizontal 16:9, mínimo 1600x900px, máximo 5MB
-              </p>
-            </div>
-          </div>
+              {settings.service_fee_enabled && (
+                <div className="space-y-2">
+                  <Label htmlFor="service-fee-percentage">Porcentagem (%)</Label>
+                  <Input
+                    id="service-fee-percentage"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={settings.service_fee_percentage}
+                    onChange={(e) =>
+                      setSettings({ ...settings, service_fee_percentage: parseFloat(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          <div className="border-t pt-6" />
-
-          {/* Logo */}
-          <div className="space-y-4">
-            <div>
-              <Label className="text-base font-semibold">Logo Principal</Label>
-              <p className="text-sm text-muted-foreground">
-                Logo que aparece no centro do cardápio (formato circular)
-              </p>
-            </div>
-            {settings.logo_url && (
-              <div className="flex justify-center">
-                <img 
-                  src={settings.logo_url} 
-                  alt="Logo atual" 
-                  className="w-32 h-32 object-cover rounded-full border-4 border-border"
-                />
-              </div>
-            )}
-            <div>
-              <Label htmlFor="logo-upload">Selecionar Logo</Label>
-              <Input
-                id="logo-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-                disabled={uploading}
-                className="cursor-pointer"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Recomendado: imagem quadrada, mínimo 512x512px, máximo 2MB
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Logo Antigo - Remover depois */}
-      <Card style={{ display: 'none' }}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Logo do Restaurante
-          </CardTitle>
-          <CardDescription>
-            Faça upload da logo do seu restaurante (máx. 2MB)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {settings.logo_url && (
-            <div className="flex justify-center">
-              <img
-                src={settings.logo_url}
-                alt="Logo"
-                className="h-32 w-32 object-contain rounded-lg border"
-              />
-            </div>
-          )}
-          <div>
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={handleLogoUpload}
-              disabled={uploading}
-            />
-            {uploading && (
-              <p className="text-sm text-muted-foreground mt-2">Fazendo upload...</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Cores */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Cor Principal
-          </CardTitle>
-          <CardDescription>
-            Personalize a cor principal do seu cardápio
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="primary-color">Cor Principal</Label>
-            <div className="flex gap-2">
-              <Input
-                id="primary-color"
-                type="color"
-                value={settings.primary_color}
-                onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
-                className="w-20 h-10"
-              />
-              <Input
-                type="text"
-                value={settings.primary_color}
-                onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
-                className="flex-1"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Esta cor será aplicada em todo o cardápio digital
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Taxa de Serviço */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Taxa de Serviço</CardTitle>
-          <CardDescription>
-            Configure se deseja cobrar taxa de serviço e qual a porcentagem
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="service-fee-enabled">Cobrar Taxa de Serviço</Label>
-            <Switch
-              id="service-fee-enabled"
-              checked={settings.service_fee_enabled}
-              onCheckedChange={(checked) =>
-                setSettings({ ...settings, service_fee_enabled: checked })
-              }
-            />
-          </div>
-          {settings.service_fee_enabled && (
-            <div className="space-y-2">
-              <Label htmlFor="service-fee-percentage">Porcentagem (%)</Label>
-              <Input
-                id="service-fee-percentage"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={settings.service_fee_percentage}
-                onChange={(e) =>
-                  setSettings({ ...settings, service_fee_percentage: parseFloat(e.target.value) || 0 })
-                }
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Botão Salvar */}
-      <Button onClick={handleSaveSettings} className="w-full">
-        Salvar Configurações
-      </Button>
+          <Button onClick={handleSaveSettings} className="w-full">
+            Salvar Configurações
+          </Button>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
