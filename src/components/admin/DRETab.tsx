@@ -105,13 +105,14 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         .eq("restaurant_id", restaurantId);
       setLaborCosts(laborData || []);
 
-      // Buscar pedidos aceitos no período
+      // Buscar pedidos locais aceitos no período
       const { data: acceptedOrders, error: ordersError } = await supabase
         .from("orders")
         .select(`
           id,
           table_id,
           created_at,
+          order_type,
           tables!inner(restaurant_id)
         `)
         .eq("tables.restaurant_id", restaurantId)
@@ -217,6 +218,9 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         const total = Number(counterOrder.total_amount);
         revenue += total;
       });
+      
+      // Pedidos de delivery já estão incluídos em orderTotals, pois vêm da query de orders
+      // Não precisamos somar novamente, apenas garantir que estão sendo contados
 
       setTotalRevenue(revenue);
 
