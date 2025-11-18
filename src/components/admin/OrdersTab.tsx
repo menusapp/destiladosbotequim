@@ -39,6 +39,9 @@ interface Order {
   status: string;
   created_at: string;
   notes: string | null;
+  order_type?: string;
+  delivery_phone?: string;
+  delivery_address?: string;
   tables: {
     table_number: number;
   };
@@ -305,6 +308,8 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     const printWindow = window.open("", "", "height=600,width=400");
     if (!printWindow) return;
 
+    const isDelivery = order.order_type === "delivery" || order.tables.table_number === 9999;
+
     const orderItems = order.order_items
       .map((item, idx) => {
         const extrasTotal = item.order_item_extras?.reduce((sum, extra) => sum + extra.price_at_order, 0) || 0;
@@ -338,11 +343,24 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
          </div>`
       : "";
 
+    const deliveryInfo = isDelivery 
+      ? `<div style="background: #dbeafe; border: 1px solid #3b82f6; padding: 10px; margin: 10px 0; border-radius: 4px;">
+           <strong style="color: #1e40af;">🚚 DELIVERY</strong>
+           <div style="margin-top: 5px; font-size: 12px;">
+             <div><strong>Cliente:</strong> ${order.customer_name}</div>
+             ${order.customer_cpf ? `<div><strong>CPF:</strong> ${order.customer_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</div>` : ''}
+             ${order.delivery_phone ? `<div><strong>Telefone:</strong> ${order.delivery_phone}</div>` : ''}
+             ${order.delivery_address ? `<div style="margin-top: 5px;"><strong>Endereço:</strong><br/>${order.delivery_address}</div>` : ''}
+           </div>
+         </div>`
+      : `<div style="font-size: 12px; margin-top: 5px;">Cliente: ${order.customer_name}</div>
+         ${order.customer_cpf ? `<div style="font-size: 11px; margin-top: 2px;">CPF: ${order.customer_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</div>` : ''}`;
+
     const html = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Pedido Mesa ${order.tables.table_number}</title>
+          <title>Pedido ${isDelivery ? 'Delivery' : 'Mesa ' + order.tables.table_number}</title>
           <style>
             @media print {
               @page { margin: 10mm; }
@@ -359,12 +377,14 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         <body>
           <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
             <h2 style="margin: 5px 0;">PEDIDO - COZINHA</h2>
-            <div style="font-size: 16px; font-weight: bold; margin-top: 8px;">MESA ${order.tables.table_number}</div>
-            <div style="font-size: 12px; margin-top: 5px;">Cliente: ${order.customer_name}</div>
-            ${order.customer_cpf ? `<div style="font-size: 11px; margin-top: 2px;">CPF: ${order.customer_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</div>` : ''}
+            <div style="font-size: 16px; font-weight: bold; margin-top: 8px;">
+              ${isDelivery ? '🚚 DELIVERY' : 'MESA ' + order.tables.table_number}
+            </div>
             <div style="font-size: 11px; color: #666; margin-top: 5px;">${new Date(order.created_at).toLocaleString("pt-BR")}</div>
           </div>
           
+          ${deliveryInfo}
+
           <div style="margin: 15px 0;">
             <h3 style="margin: 0 0 10px 0; font-size: 14px; border-bottom: 1px solid #000; padding-bottom: 5px;">ITENS</h3>
             ${orderItems}
@@ -472,13 +492,22 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
               <div key={order.id} className="p-4 border rounded-lg space-y-3 hover:bg-secondary/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold">Mesa {order.tables.table_number}</p>
+                    <p className="font-semibold">
+                      {order.order_type === "delivery" || order.tables.table_number === 9999 
+                        ? "🚚 Delivery" 
+                        : `Mesa ${order.tables.table_number}`}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       Cliente: {order.customer_name}
                       {order.customer_cpf && (
                         <span className="ml-1">- CPF: {order.customer_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</span>
                       )}
                     </p>
+                    {(order.order_type === "delivery" || order.tables.table_number === 9999) && order.delivery_address && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        📍 {order.delivery_address}
+                      </p>
+                    )}
                   </div>
                   {getStatusBadge(order.status)}
                 </div>

@@ -11,9 +11,10 @@ import { MapPin, Trash2 } from "lucide-react";
 interface AddressStepProps {
   onBack: () => void;
   onContinue: (data: any) => void;
+  restaurantSlug?: string;
 }
 
-export const AddressStep = ({ onBack, onContinue }: AddressStepProps) => {
+export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepProps) => {
   const [customerName, setCustomerName] = useState("");
   const [customerCPF, setCustomerCPF] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -30,6 +31,17 @@ export const AddressStep = ({ onBack, onContinue }: AddressStepProps) => {
     city: "",
     state: "",
   });
+
+  // Carregar dados do sessionStorage
+  useEffect(() => {
+    if (restaurantSlug) {
+      const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
+      const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
+      
+      if (storedName) setCustomerName(storedName);
+      if (storedCPF) setCustomerCPF(storedCPF);
+    }
+  }, [restaurantSlug]);
 
   useEffect(() => {
     if (customerCPF.length === 11) {
