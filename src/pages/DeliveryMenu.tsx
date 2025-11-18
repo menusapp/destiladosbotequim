@@ -1,38 +1,60 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { MenuHeader } from "@/components/menu/MenuHeader";
+import { RestaurantInfoCard } from "@/components/menu/RestaurantInfoCard";
 import { FeaturedProducts } from "@/components/menu/FeaturedProducts";
 import { CategoryProducts } from "@/components/menu/CategoryProducts";
 import { CartBottomBar } from "@/components/menu/CartBottomBar";
 import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
 import { CheckoutDrawer } from "@/components/menu/CheckoutDrawer";
+import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
 import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "sonner";
 
 export default function DeliveryMenu() {
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>();
-  const navigate = useNavigate();
   
   const [restaurant, setRestaurant] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [customerName, setCustomerName] = useState("");
+  const [showCustomerDialog, setShowCustomerDialog] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (restaurantSlug) {
       fetchRestaurantData();
       loadCartFromStorage();
+      loadCustomerInfo();
     }
   }, [restaurantSlug]);
 
   useEffect(() => {
     saveCartToStorage();
   }, [cart]);
+
+  const loadCustomerInfo = () => {
+    const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
+    if (storedName) {
+      setCustomerName(storedName);
+    } else {
+      setShowCustomerDialog(true);
+    }
+  };
+
+  const handleCustomerInfoSubmit = (name: string) => {
+    setCustomerName(name);
+    sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
+    setShowCustomerDialog(false);
+  };
 
   const fetchRestaurantData = async () => {
     try {
@@ -80,6 +102,17 @@ export default function DeliveryMenu() {
 
   const saveCartToStorage = () => {
     localStorage.setItem(`delivery-cart-${restaurantSlug}`, JSON.stringify(cart));
+  };
+
+  const handleProductClick = async (product: Product) => {
+    // Buscar extras do produto
+    const { data: extrasData } = await supabase
+      .from("product_extras")
+      .select("*")
+      .eq("product_id", product.id);
+
+    setProductExtras(extrasData || []);
+    setSelectedProduct(product);
   };
 
   const handleAddToCart = (product: Product, selectedExtras: ProductExtra[], notes?: string, quantity?: number) => {
@@ -146,45 +179,153 @@ export default function DeliveryMenu() {
     return <RestaurantClosedScreen restaurantName={restaurant.name} primaryColor={restaurant.primary_color} />;
   }
 
+  const primaryColor = restaurant.primary_color || "#fe9516";
+  const allProducts = categories.flatMap((c) => c.products);
+
+  // Filtrar produtos pela busca
+  const filteredCategories = searchQuery.trim() 
+    ? categories.map(cat => ({
+        ...cat,
+        products: cat.products.filter(p => 
+          p.name.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      })).filter(cat => cat.products.length > 0)
+    : categories;
+
+  const filteredProducts = searchQuery.trim()
+    ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : allProducts;
+
   return (
     <div className="min-h-screen bg-background pb-32">
-      <MenuHeader showSearch={false} />
+      <div className="relative">
+        <div className="h-48 overflow-hidden relative">
+          {restaurant.banner_url ? (
+            <div
+              className="w-full h-full bg-cover bg-center"
+              style={{ backgroundImage: `url(${restaurant.banner_url})` }}
+            />
+          ) : restaurant.logo_url ? (
+            <div
+              className="w-full h-full bg-cover bg-center"
+              style={{ backgroundImage: `url(${restaurant.logo_url})` }}
+            />
+          ) : (
+            <div
+              className="w-full h-full"
+              style={{ backgroundColor: primaryColor }}
+            />
+          )}
+        </div>
 
-      <div className="px-4">
-        {restaurant.featured_section_enabled && featuredProducts.length > 0 && (
-          <FeaturedProducts
-            title={restaurant.featured_section_title}
-            products={featuredProducts}
-            primaryColor={restaurant.primary_color}
-            onProductClick={setSelectedProduct}
-          />
-        )}
+        <MenuHeader 
+          searchOpen={searchOpen}
+          searchQuery={searchQuery}
+          onSearchClick={() => setSearchOpen(true)}
+          onSearchChange={setSearchQuery}
+          onSearchClose={() => {
+            setSearchOpen(false);
+            setSearchQuery("");
+          }}
+        />
 
-        <CategoryProducts
-          categories={categories}
-          primaryColor={restaurant.primary_color}
-          onProductClick={setSelectedProduct}
+        <RestaurantInfoCard
+          restaurantId={restaurant.id}
+          name={restaurant.name}
+          logoUrl={restaurant.logo_url}
+          primaryColor={primaryColor}
+          tableInfo={customerName}
+          deliveryTime={`${restaurant.prep_time_minutes || 50}-${(restaurant.prep_time_minutes || 50) + 10} min`}
+          deliveryFee={0}
         />
       </div>
 
-      <CartBottomBar
-        itemCount={cart.length}
-        total={calculateTotal()}
-        primaryColor={restaurant.primary_color}
-        onViewCart={() => setCheckoutOpen(true)}
-        label="Ver Sacola"
+      {searchQuery.trim() ? (
+        <div className="px-4 py-6">
+          <h2 className="text-lg font-semibold mb-4">Resultados da busca</h2>
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {filteredProducts.filter(p => p.available).map((product) => (
+                <div
+                  key={product.id}
+                  onClick={() => handleProductClick(product)}
+                  className="bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-transform"
+                >
+                  <div className="aspect-square bg-muted">
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        Sem imagem
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <h3 className="font-semibold text-sm mb-1">{product.name}</h3>
+                    <p className="text-lg font-bold" style={{ color: primaryColor }}>
+                      R$ {product.price.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">
+              Nenhum produto encontrado para "{searchQuery}"
+            </p>
+          )}
+        </div>
+      ) : (
+        <>
+          {restaurant.featured_section_enabled && featuredProducts.length > 0 && (
+            <FeaturedProducts
+              products={featuredProducts}
+              primaryColor={primaryColor}
+              onProductClick={handleProductClick}
+              title={restaurant.featured_section_title || "Destaques"}
+            />
+          )}
+
+          <CategoryProducts
+            categories={filteredCategories}
+            primaryColor={primaryColor}
+            onProductClick={handleProductClick}
+          />
+        </>
+      )}
+
+      {cart.length > 0 && (
+        <CartBottomBar
+          itemCount={cart.length}
+          total={calculateTotal()}
+          primaryColor={primaryColor}
+          onViewCart={() => setCheckoutOpen(true)}
+          label="Ver Sacola"
+        />
+      )}
+
+      <CustomerInfoDialog
+        open={showCustomerDialog}
+        onClose={() => setShowCustomerDialog(false)}
+        onSubmit={handleCustomerInfoSubmit}
+        restaurantColor={primaryColor}
+        isDelivery={true}
       />
 
       {selectedProduct && (
         <ProductDetailDrawer
           product={selectedProduct}
+          extras={productExtras}
           open={!!selectedProduct}
-          onClose={() => setSelectedProduct(null)}
+          onClose={() => {
+            setSelectedProduct(null);
+            setProductExtras([]);
+          }}
           onAddToCart={handleAddToCart}
-          primaryColor={restaurant.primary_color}
-          extras={[]}
+          primaryColor={primaryColor}
           restaurantName={restaurant.name}
           restaurantLogo={restaurant.logo_url}
+          deliveryTime={`${restaurant.prep_time_minutes || 50}-${(restaurant.prep_time_minutes || 50) + 10} min`}
         />
       )}
 
