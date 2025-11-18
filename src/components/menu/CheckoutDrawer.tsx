@@ -21,6 +21,7 @@ interface CheckoutDrawerProps {
   onUpdateQuantity: (itemId: string, delta: number) => void;
   onClearCart: () => void;
   mode: "delivery" | "local";
+  restaurantSlug?: string;
 }
 
 export const CheckoutDrawer = ({
@@ -31,6 +32,7 @@ export const CheckoutDrawer = ({
   onUpdateQuantity,
   onClearCart,
   mode,
+  restaurantSlug,
 }: CheckoutDrawerProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>("cart");
@@ -286,6 +288,7 @@ export const CheckoutDrawer = ({
                 fetchLoyaltyPoints(data.customerCPF);
               }
             }}
+            restaurantSlug={restaurantSlug}
           />
         );
       case "payment":

@@ -17,15 +17,13 @@ interface CustomerInfoDialogProps {
   onClose: () => void;
   onSubmit: (name: string, cpf?: string) => void;
   restaurantColor?: string;
-  isDelivery?: boolean;
 }
 
 const CustomerInfoDialog = ({ 
   open,
   onClose, 
   onSubmit, 
-  restaurantColor = "#FF6B35",
-  isDelivery = false
+  restaurantColor = "#FF6B35"
 }: CustomerInfoDialogProps) => {
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -42,12 +40,6 @@ const CustomerInfoDialog = ({
     
     if (!name.trim()) {
       toast.error("Por favor, informe seu nome");
-      return;
-    }
-
-    // Para delivery, CPF é opcional no início
-    if (isDelivery) {
-      onSubmit(name.trim());
       return;
     }
 
@@ -72,9 +64,7 @@ const CustomerInfoDialog = ({
         <DialogHeader>
           <DialogTitle>Bem-vindo!</DialogTitle>
           <DialogDescription>
-            {isDelivery 
-              ? "Para começar, informe seu nome" 
-              : "Para começar seu pedido, precisamos de algumas informações"}
+            Para começar seu pedido, precisamos de algumas informações
           </DialogDescription>
         </DialogHeader>
 
@@ -89,23 +79,21 @@ const CustomerInfoDialog = ({
               required
             />
           </div>
-          {!isDelivery && (
-            <div className="space-y-2">
-              <Label htmlFor="customer-cpf">CPF</Label>
-              <Input
-                id="customer-cpf"
-                value={cpf}
-                onChange={handleCPFChange}
-                placeholder="000.000.000-00"
-                required
-                maxLength={14}
-                className={cpfError ? "border-destructive" : ""}
-              />
-              {cpfError && (
-                <p className="text-sm text-destructive">{cpfError}</p>
-              )}
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label htmlFor="customer-cpf">CPF</Label>
+            <Input
+              id="customer-cpf"
+              value={cpf}
+              onChange={handleCPFChange}
+              placeholder="000.000.000-00"
+              required
+              maxLength={14}
+              className={cpfError ? "border-destructive" : ""}
+            />
+            {cpfError && (
+              <p className="text-sm text-destructive">{cpfError}</p>
+            )}
+          </div>
           <Button 
             type="submit" 
             className="w-full text-white"

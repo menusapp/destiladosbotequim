@@ -25,6 +25,7 @@ export default function DeliveryMenu() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [customerName, setCustomerName] = useState("");
+  const [customerCPF, setCustomerCPF] = useState("");
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,16 +44,20 @@ export default function DeliveryMenu() {
 
   const loadCustomerInfo = () => {
     const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
-    if (storedName) {
+    const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
+    if (storedName && storedCPF) {
       setCustomerName(storedName);
+      setCustomerCPF(storedCPF);
     } else {
       setShowCustomerDialog(true);
     }
   };
 
-  const handleCustomerInfoSubmit = (name: string) => {
+  const handleCustomerInfoSubmit = (name: string, cpf?: string) => {
     setCustomerName(name);
+    setCustomerCPF(cpf || "");
     sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
+    sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, cpf || "");
     setShowCustomerDialog(false);
   };
 
@@ -309,7 +314,6 @@ export default function DeliveryMenu() {
         onClose={() => setShowCustomerDialog(false)}
         onSubmit={handleCustomerInfoSubmit}
         restaurantColor={primaryColor}
-        isDelivery={true}
       />
 
       {selectedProduct && (
@@ -337,6 +341,7 @@ export default function DeliveryMenu() {
         onUpdateQuantity={handleUpdateQuantity}
         onClearCart={handleClearCart}
         mode="delivery"
+        restaurantSlug={restaurantSlug}
       />
     </div>
   );
