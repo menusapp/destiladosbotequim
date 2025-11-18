@@ -2,7 +2,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -147,50 +146,54 @@ export const ProductForm = ({
   const cmvPercentage = parsedProductPrice > 0 ? (productCost / parsedProductPrice) * 100 : 0;
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form onSubmit={onSubmit} className="space-y-4">
       {/* INFORMAÇÕES BÁSICAS */}
-      <div className="bg-gradient-to-br from-background to-muted/20 rounded-xl border border-border/50 overflow-hidden">
-        <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
-          <h3 className="text-base font-semibold text-foreground">Informações Básicas</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">Dados principais do produto</p>
+      <div className="bg-gradient-to-br from-card via-card to-muted/10 rounded-xl border-2 border-border/60 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-primary/10 px-5 py-3.5 border-b-2 border-border/60">
+          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+            <span className="text-lg">📝</span>
+            Informações Básicas
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Dados principais do produto</p>
         </div>
         
-        <div className="p-6 space-y-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="lg:col-span-2 space-y-2">
-              <Label htmlFor="product-name" className="text-sm font-medium">
-                Nome do Produto <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="product-name"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder="Ex: Pizza Margherita"
-                required
-                className="h-11"
-              />
-            </div>
+        <div className="p-5 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="product-name" className="text-sm font-medium">
+              Nome do Produto <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="product-name"
+              value={productName}
+              onChange={(e) => setProductName(e.target.value)}
+              placeholder="Ex: Pizza Margherita"
+              required
+              className="h-11 border-2 focus:border-primary"
+            />
+          </div>
 
-            <div className="lg:col-span-2 space-y-2">
-              <Label htmlFor="product-description" className="text-sm font-medium">
-                Descrição
-              </Label>
-              <Textarea
-                id="product-description"
-                value={productDescription}
-                onChange={(e) => setProductDescription(e.target.value)}
-                placeholder="Descreva o produto..."
-                rows={3}
-                className="resize-none"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="product-description" className="text-sm font-medium">
+              Descrição
+            </Label>
+            <Textarea
+              id="product-description"
+              value={productDescription}
+              onChange={(e) => setProductDescription(e.target.value)}
+              placeholder="Descreva o produto..."
+              rows={3}
+              className="resize-none border-2 focus:border-primary"
+            />
+          </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="product-category" className="text-sm font-medium">
+              <Label htmlFor="product-category" className="text-sm font-medium flex items-center gap-2">
+                <span className="text-base">🏷️</span>
                 Categoria <span className="text-destructive">*</span>
               </Label>
               <Select value={productCategoryId} onValueChange={setProductCategoryId}>
-                <SelectTrigger className="h-11">
+                <SelectTrigger className="h-11 border-2">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
@@ -204,7 +207,8 @@ export const ProductForm = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="product-prep-time" className="text-sm font-medium">
+              <Label htmlFor="product-prep-time" className="text-sm font-medium flex items-center gap-2">
+                <span className="text-base">⏱️</span>
                 Tempo de Preparo (min)
               </Label>
               <Input
@@ -214,43 +218,50 @@ export const ProductForm = ({
                 value={productPrepTime}
                 onChange={(e) => setProductPrepTime(e.target.value)}
                 placeholder="30"
-                className="h-11"
+                className="h-11 border-2 focus:border-primary"
               />
+              <p className="text-xs text-muted-foreground">Tempo estimado em minutos</p>
             </div>
+          </div>
 
-            <div className="lg:col-span-2 space-y-2">
-              <Label htmlFor="product-image" className="text-sm font-medium">
-                Imagem do Produto
-              </Label>
-              {productImageUrl && !productImage && (
-                <img 
-                  src={productImageUrl} 
-                  alt="Preview" 
-                  className="w-32 h-32 object-cover rounded-lg border border-border mb-2" 
-                />
-              )}
-              <Input
-                id="product-image"
-                type="file"
-                accept="image/*"
-                onChange={(e) => setProductImage(e.target.files?.[0] || null)}
-                className="cursor-pointer"
+          <div className="space-y-2">
+            <Label htmlFor="product-image" className="text-sm font-medium flex items-center gap-2">
+              <span className="text-base">🖼️</span>
+              Imagem do Produto
+            </Label>
+            {productImageUrl && !productImage && (
+              <img 
+                src={productImageUrl} 
+                alt="Preview" 
+                className="w-32 h-32 object-cover rounded-xl border-2 border-primary/30 shadow-sm mb-2" 
               />
-            </div>
+            )}
+            <Input
+              id="product-image"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setProductImage(e.target.files?.[0] || null)}
+              className="cursor-pointer border-2"
+            />
+            <p className="text-xs text-muted-foreground">Formato: JPG, PNG (recomendado: 800x800px)</p>
           </div>
         </div>
       </div>
 
       {/* PREÇO E ANÁLISE */}
-      <div className="bg-gradient-to-br from-background to-muted/20 rounded-xl border border-border/50 overflow-hidden">
-        <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
-          <h3 className="text-base font-semibold text-foreground">Preço e Análise</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">Precificação e indicadores financeiros</p>
+      <div className="bg-gradient-to-br from-card via-card to-muted/10 rounded-xl border-2 border-border/60 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-primary/10 px-5 py-3.5 border-b-2 border-border/60">
+          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+            <span className="text-lg">💰</span>
+            Preço e Análise
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Precificação e indicadores financeiros</p>
         </div>
         
-        <div className="p-6 space-y-5">
+        <div className="p-5 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="product-price" className="text-sm font-medium">
+            <Label htmlFor="product-price" className="text-sm font-medium flex items-center gap-2">
+              <span className="text-base">💵</span>
               Preço de Venda (R$) <span className="text-destructive">*</span>
             </Label>
             <Input
@@ -261,7 +272,7 @@ export const ProductForm = ({
               onChange={(e) => setProductPrice(e.target.value)}
               placeholder="0.00"
               required
-              className="h-11 text-lg font-semibold"
+              className="h-12 text-xl font-bold border-2 focus:border-primary"
             />
           </div>
 
@@ -293,13 +304,14 @@ export const ProductForm = ({
       </div>
 
       {/* RECEITA (INSUMOS) */}
-      <div className="bg-gradient-to-br from-background to-muted/20 rounded-xl border border-border/50 overflow-hidden">
-        <div className="bg-primary/5 px-6 py-4 border-b border-border/50 flex items-center justify-between">
+      <div className="bg-gradient-to-br from-card via-card to-muted/10 rounded-xl border-2 border-border/60 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-primary/10 px-5 py-3.5 border-b-2 border-border/60 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-foreground">
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+              <span className="text-lg">🍳</span>
               Receita (Insumos) <span className="text-destructive">*</span>
             </h3>
-            <p className="text-sm text-muted-foreground mt-0.5">Configure os insumos do produto</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Configure os insumos do produto</p>
           </div>
           {productCost > 0 && (
             <div className="bg-primary/10 px-3 py-1.5 rounded-full">
@@ -308,13 +320,12 @@ export const ProductForm = ({
           )}
         </div>
         
-        <div className="p-6 space-y-4">
-          {/* Adicionar Insumo */}
+        <div className="p-5 space-y-4">
           <div className="bg-muted/30 rounded-lg p-4 border border-dashed border-border">
             <div className="flex gap-2 flex-col sm:flex-row">
               <div className="flex-1 min-w-[200px]">
                 <Select value={selectedStockItem} onValueChange={setSelectedStockItem}>
-                  <SelectTrigger className="h-10">
+                  <SelectTrigger className="h-10 border-2">
                     <SelectValue placeholder="Selecione um insumo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -332,7 +343,7 @@ export const ProductForm = ({
                 placeholder="Quantidade"
                 value={ingredientQuantity}
                 onChange={(e) => setIngredientQuantity(e.target.value)}
-                className="w-full sm:w-32 h-10"
+                className="w-full sm:w-32 h-10 border-2"
               />
               <Button type="button" onClick={handleAddIngredient} size="default" className="h-10">
                 <Plus className="h-4 w-4 mr-1" />
@@ -341,13 +352,12 @@ export const ProductForm = ({
             </div>
           </div>
 
-          {/* Lista de Insumos */}
           {ingredients.length > 0 ? (
             <div className="space-y-2">
               {ingredients.map((ing) => (
                 <div 
                   key={ing.id} 
-                  className="flex items-center justify-between p-3 bg-background rounded-lg border border-border hover:border-primary/50 transition-colors"
+                  className="flex items-center justify-between p-3 bg-background rounded-lg border-2 border-border hover:border-primary/50 transition-colors"
                 >
                   <div className="flex-1">
                     <p className="font-medium text-sm">{ing.stock_item_name}</p>
@@ -371,7 +381,7 @@ export const ProductForm = ({
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 bg-muted/20 rounded-lg border border-dashed">
+            <div className="text-center py-8 bg-muted/20 rounded-lg border-2 border-dashed">
               <p className="text-sm text-muted-foreground">
                 Nenhum insumo adicionado. Adicione pelo menos 1 insumo.
               </p>
@@ -381,19 +391,21 @@ export const ProductForm = ({
       </div>
 
       {/* ADICIONAIS */}
-      <div className="bg-gradient-to-br from-background to-muted/20 rounded-xl border border-border/50 overflow-hidden">
-        <div className="bg-primary/5 px-6 py-4 border-b border-border/50">
-          <h3 className="text-base font-semibold text-foreground">Adicionais</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">Configure opções extras para o produto (opcional)</p>
+      <div className="bg-gradient-to-br from-card via-card to-muted/10 rounded-xl border-2 border-border/60 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-primary/10 px-5 py-3.5 border-b-2 border-border/60">
+          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+            <span className="text-lg">➕</span>
+            Adicionais
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Configure opções extras para o produto (opcional)</p>
         </div>
         
-        <div className="p-6 space-y-4">
-          {/* Carregar de Categoria */}
+        <div className="p-5 space-y-4">
           {extraCategories.length > 0 && (
             <div className="bg-muted/30 rounded-lg p-4 border border-border">
               <Label className="text-xs font-medium mb-2 block">Importar de categoria:</Label>
               <Select onValueChange={handleLoadExtrasFromCategory}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-10 border-2">
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
@@ -407,14 +419,13 @@ export const ProductForm = ({
             </div>
           )}
 
-          {/* Formulário de Adicional */}
           <div className="bg-muted/30 rounded-lg p-4 border border-dashed border-border space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 placeholder="Nome do adicional"
                 value={extraName}
                 onChange={(e) => setExtraName(e.target.value)}
-                className="h-10"
+                className="h-10 border-2"
               />
               <Input
                 type="number"
@@ -422,17 +433,16 @@ export const ProductForm = ({
                 placeholder="Preço (R$)"
                 value={extraPrice}
                 onChange={(e) => setExtraPrice(e.target.value)}
-                className="h-10"
+                className="h-10 border-2"
               />
             </div>
 
-            {/* Insumos do Adicional */}
             <div className="space-y-2 pt-2 border-t border-border/50">
               <Label className="text-xs font-medium">Insumos do adicional (opcional):</Label>
               <div className="flex gap-2 flex-col sm:flex-row">
                 <div className="flex-1 min-w-[150px]">
                   <Select value={selectedExtraStockItem} onValueChange={setSelectedExtraStockItem}>
-                    <SelectTrigger className="h-10">
+                    <SelectTrigger className="h-10 border-2">
                       <SelectValue placeholder="Selecione insumo" />
                     </SelectTrigger>
                     <SelectContent>
@@ -450,7 +460,7 @@ export const ProductForm = ({
                   placeholder="Qtd"
                   value={extraIngredientQuantity}
                   onChange={(e) => setExtraIngredientQuantity(e.target.value)}
-                  className="w-full sm:w-24 h-10"
+                  className="w-full sm:w-24 h-10 border-2"
                 />
                 <Button type="button" onClick={handleAddExtraIngredient} size="default" variant="outline" className="h-10">
                   <Plus className="h-4 w-4" />
@@ -460,7 +470,7 @@ export const ProductForm = ({
               {extraIngredients.length > 0 && (
                 <div className="space-y-1 mt-2">
                   {extraIngredients.map((ing) => (
-                    <div key={ing.id} className="flex items-center justify-between text-xs p-2 bg-background rounded border border-border">
+                    <div key={ing.id} className="flex items-center justify-between text-xs p-2 bg-background rounded border-2 border-border">
                       <span className="text-muted-foreground">{ing.stock_item_name}: {ing.quantity} {ing.stock_item_unit}</span>
                       <Button
                         type="button"
@@ -482,13 +492,12 @@ export const ProductForm = ({
             </Button>
           </div>
 
-          {/* Lista de Adicionais */}
           {extras.length > 0 && (
             <div className="space-y-2">
               {extras.map((extra) => (
                 <div 
                   key={extra.id} 
-                  className="flex items-center justify-between p-3 bg-background rounded-lg border border-border hover:border-primary/50 transition-colors"
+                  className="flex items-center justify-between p-3 bg-background rounded-lg border-2 border-border hover:border-primary/50 transition-colors"
                 >
                   <div className="flex-1">
                     <p className="font-medium text-sm">{extra.name}</p>
@@ -530,9 +539,9 @@ export const ProductForm = ({
       </div>
 
       {/* BOTÃO DE SALVAR */}
-      <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border pt-4 pb-2">
-        <Button type="submit" className="w-full h-12 text-base font-semibold">
-          {editingProduct ? "Atualizar Produto" : "Criar Produto"}
+      <div className="sticky bottom-0 bg-gradient-to-t from-background via-background to-transparent pt-6 pb-2 border-t-2">
+        <Button type="submit" className="w-full h-12 text-base font-semibold shadow-lg">
+          {editingProduct ? "💾 Atualizar Produto" : "✅ Criar Produto"}
         </Button>
       </div>
     </form>
