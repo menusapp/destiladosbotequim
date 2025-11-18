@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -637,9 +638,16 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         </div>
       </div>
 
-      {/* Seção de Pedidos */}
-      <Card>
-        <CardHeader>
+      {/* Tabs Pedidos e Comandas */}
+      <Tabs defaultValue="pedidos" className="space-y-4">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
+          <TabsTrigger value="comandas">Comandas</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pedidos">
+          <Card>
+            <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -1018,6 +1026,8 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

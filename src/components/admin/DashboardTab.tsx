@@ -76,11 +76,35 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         .gte("finalized_at", startDate.toISOString())
         .lte("finalized_at", endDate.toISOString());
 
+      // Buscar pedidos de delivery pagos do dia
+      const { data: deliveryOrders } = await supabase
+        .from("orders")
+        .select(`
+          order_items(quantity, price_at_order, order_item_extras(price_at_order)),
+          tables!inner(restaurant_id)
+        `)
+        .eq("tables.restaurant_id", restaurantId)
+        .eq("order_type", "delivery")
+        .eq("status", "accepted")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+
+      // Calcular total dos pedidos de delivery
+      const deliveryTotal = (deliveryOrders || []).reduce((sum, order: any) => {
+        const orderTotal = (order.order_items || []).reduce((itemSum: number, item: any) => {
+          const itemTotal = item.price_at_order * item.quantity;
+          const extrasTotal = (item.order_item_extras || []).reduce((extraSum: number, extra: any) => 
+            extraSum + extra.price_at_order, 0);
+          return itemSum + itemTotal + extrasTotal;
+        }, 0);
+        return sum + orderTotal;
+      }, 0);
+
       const billsTotal = (paidBills || []).reduce((sum, bill) => sum + Number(bill.total_amount), 0);
       const counterTotal = (counterOrders || []).reduce((sum, order) => sum + Number(order.total_amount), 0);
       
-      const salesTotal = billsTotal + counterTotal;
-      const ordersCount = (paidBills?.length || 0) + (counterOrders?.length || 0);
+      const salesTotal = billsTotal + counterTotal + deliveryTotal;
+      const ordersCount = (paidBills?.length || 0) + (counterOrders?.length || 0) + (deliveryOrders?.length || 0);
       const avgTicket = ordersCount > 0 ? salesTotal / ordersCount : 0;
 
       // Mesas ocupadas
