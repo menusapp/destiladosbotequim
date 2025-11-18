@@ -5,9 +5,11 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Truck, MessageSquare, Settings } from "lucide-react";
+import { Truck, MessageSquare, Settings, Ticket, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import CouponsManagement from "./CouponsManagement";
+import LoyaltyManagement from "./LoyaltyManagement";
 
 interface DeliveryTabProps {
   restaurantId: string;
@@ -147,10 +149,18 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
 
   return (
     <Tabs defaultValue="config" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="config">
           <Settings className="h-4 w-4 mr-2" />
           Configurações
+        </TabsTrigger>
+        <TabsTrigger value="coupons">
+          <Ticket className="h-4 w-4 mr-2" />
+          Cupons
+        </TabsTrigger>
+        <TabsTrigger value="loyalty">
+          <Gift className="h-4 w-4 mr-2" />
+          Fidelidade
         </TabsTrigger>
         <TabsTrigger value="relatorios">
           <Truck className="h-4 w-4 mr-2" />
@@ -313,6 +323,14 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
             </Button>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="coupons">
+        <CouponsManagement restaurantId={restaurantId} />
+      </TabsContent>
+
+      <TabsContent value="loyalty">
+        <LoyaltyManagement restaurantId={restaurantId} />
       </TabsContent>
 
       <TabsContent value="relatorios">

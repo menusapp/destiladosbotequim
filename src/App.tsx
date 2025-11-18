@@ -9,6 +9,7 @@ import RestaurantAdmin from "./pages/RestaurantAdmin";
 import Menu from "./pages/Menu";
 import Comanda from "./pages/Comanda";
 import DeliveryMenu from "./pages/DeliveryMenu";
+import OrderConfirmation from "./pages/OrderConfirmation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/menu/:restaurantSlug/:tableNumber" element={<Menu />} />
           <Route path="/comanda/:restaurantSlug/:tableNumber" element={<Comanda />} />
           <Route path="/delivery/:restaurantSlug" element={<DeliveryMenu />} />
+          <Route path="/delivery/:restaurantSlug/pedido/:orderId" element={<OrderConfirmation />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
