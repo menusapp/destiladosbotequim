@@ -13,6 +13,7 @@ import { CartDrawer } from "@/components/menu/CartDrawer";
 import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
 import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
+import { ReviewModal } from "@/components/menu/ReviewModal";
 import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
 
 const Menu = () => {
@@ -32,6 +33,8 @@ const Menu = () => {
   const [showCartDrawer, setShowCartDrawer] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [hasOpenComanda, setHasOpenComanda] = useState(false);
   const [comandaTotal, setComandaTotal] = useState(0);
   const [comandaStatus, setComandaStatus] = useState<string>("");
@@ -400,6 +403,7 @@ const Menu = () => {
         />
 
         <RestaurantInfoCard
+          restaurantId={restaurant.id}
           name={restaurant.name}
           logoUrl={restaurant.logo_url}
           primaryColor={primaryColor}
@@ -513,6 +517,17 @@ const Menu = () => {
           navigate(`/comanda/${restaurantSlug}/${tableNumber}`);
         }}
         mode="local"
+      />
+
+      <ReviewModal
+        open={reviewModalOpen}
+        onClose={() => {
+          setReviewModalOpen(false);
+          setLastOrderId(null);
+        }}
+        restaurantId={restaurant.id}
+        restaurantName={restaurant.name}
+        orderId={lastOrderId || undefined}
       />
     </div>
   );

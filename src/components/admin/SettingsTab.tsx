@@ -15,6 +15,7 @@ interface Settings {
   primary_color: string;
   service_fee_enabled: boolean;
   service_fee_percentage: number;
+  prep_time_minutes: number;
 }
 
 const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
@@ -24,6 +25,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     primary_color: "#FF6B35",
     service_fee_enabled: false,
     service_fee_percentage: 10,
+    prep_time_minutes: 30,
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -37,7 +39,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -50,6 +52,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           primary_color: data.primary_color || "#FF6B35",
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
+          prep_time_minutes: data.prep_time_minutes || 30,
         });
       } else {
         // Nenhuma configuração encontrada para este restaurante
@@ -176,6 +179,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           primary_color: settings.primary_color,
           service_fee_enabled: settings.service_fee_enabled,
           service_fee_percentage: settings.service_fee_percentage,
+          prep_time_minutes: settings.prep_time_minutes,
         })
         .eq('id', restaurantId);
 
@@ -314,6 +318,32 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Esta cor será aplicada em todo o cardápio digital
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Tempo Estimado Geral</CardTitle>
+              <CardDescription>
+                Tempo médio de preparo exibido no cardápio
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="prep-time">Tempo Estimado (minutos)</Label>
+                <Input
+                  id="prep-time"
+                  type="number"
+                  min="0"
+                  value={settings.prep_time_minutes}
+                  onChange={(e) =>
+                    setSettings({ ...settings, prep_time_minutes: parseInt(e.target.value) || 0 })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Tempo médio de preparo geral do restaurante
                 </p>
               </div>
             </CardContent>
