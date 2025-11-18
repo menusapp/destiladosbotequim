@@ -56,7 +56,7 @@ const Menu = () => {
       setTableId(tableData.id);
 
       const { data: categoriesData, error: catError } = await supabase
-        .from("categories").select("id, name, display_order, products(id, name, description, price, available, image_url)")
+        .from("categories").select("id, name, display_order, products(id, name, description, price, available, image_url, prep_time_minutes)")
         .eq("restaurant_id", restaurantData.id).order("display_order");
       if (catError) throw catError;
 
