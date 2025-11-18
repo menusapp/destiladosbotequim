@@ -486,14 +486,16 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         </div>
       </div>
 
-      {/* Seção de Pedidos */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Pedidos
-          </CardTitle>
-        </CardHeader>
+      {/* Seção de Pedidos e Comandas lado a lado */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Seção de Pedidos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Pedidos
+            </CardTitle>
+          </CardHeader>
         <CardContent>
           {loading ? (
             <p className="text-center text-muted-foreground py-8">Carregando pedidos...</p>
@@ -584,18 +586,16 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
 
-      <Separator />
-
-      {/* Seção de Comandas */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Comandas
-          </CardTitle>
-        </CardHeader>
+        {/* Seção de Comandas */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Comandas
+            </CardTitle>
+          </CardHeader>
         <CardContent>
           {filteredBills.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">Nenhuma comanda encontrada</p>
@@ -706,7 +706,8 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };
