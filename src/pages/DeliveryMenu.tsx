@@ -10,6 +10,9 @@ import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
 import { CheckoutDrawer } from "@/components/menu/CheckoutDrawer";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
 import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
+import { DeliveryBottomNav } from "@/components/menu/DeliveryBottomNav";
+import { PedidosHistory } from "@/components/menu/PedidosHistory";
+import { ProfileView } from "@/components/menu/ProfileView";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "sonner";
 
@@ -29,6 +32,7 @@ export default function DeliveryMenu() {
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "perfil">("menu");
 
   useEffect(() => {
     if (restaurantSlug) {
@@ -59,6 +63,11 @@ export default function DeliveryMenu() {
     sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
     sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, cpf || "");
     setShowCustomerDialog(false);
+  };
+
+  const handleNameUpdate = (name: string) => {
+    setCustomerName(name);
+    sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
   };
 
   const fetchRestaurantData = async () => {
@@ -202,146 +211,178 @@ export default function DeliveryMenu() {
     : allProducts;
 
   return (
-    <div className="min-h-screen bg-background pb-32">
-      <div className="relative">
-        <div className="h-48 overflow-hidden relative">
-          {restaurant.banner_url ? (
-            <div
-              className="w-full h-full bg-cover bg-center"
-              style={{ backgroundImage: `url(${restaurant.banner_url})` }}
-            />
-          ) : restaurant.logo_url ? (
-            <div
-              className="w-full h-full bg-cover bg-center"
-              style={{ backgroundImage: `url(${restaurant.logo_url})` }}
-            />
-          ) : (
-            <div
-              className="w-full h-full"
-              style={{ backgroundColor: primaryColor }}
-            />
-          )}
-        </div>
-
-        <MenuHeader 
-          searchOpen={searchOpen}
-          searchQuery={searchQuery}
-          onSearchClick={() => setSearchOpen(true)}
-          onSearchChange={setSearchQuery}
-          onSearchClose={() => {
-            setSearchOpen(false);
-            setSearchQuery("");
-          }}
-        />
-
-        <RestaurantInfoCard
-          restaurantId={restaurant.id}
-          name={restaurant.name}
-          logoUrl={restaurant.logo_url}
-          primaryColor={primaryColor}
-          tableInfo={customerName}
-          deliveryTime={`${restaurant.prep_time_minutes || 50}-${(restaurant.prep_time_minutes || 50) + 10} min`}
-          deliveryFee={0}
-        />
-      </div>
-
-      {searchQuery.trim() ? (
-        <div className="px-4 py-6">
-          <h2 className="text-lg font-semibold mb-4">Resultados da busca</h2>
-          {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3">
-              {filteredProducts.filter(p => p.available).map((product) => (
+    <div className="min-h-screen bg-background pb-14">
+      {activeTab === "menu" && (
+        <>
+          <div className="relative">
+            <div className="h-48 overflow-hidden relative">
+              {restaurant.banner_url ? (
                 <div
-                  key={product.id}
-                  onClick={() => handleProductClick(product)}
-                  className="bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-transform"
-                >
-                  <div className="aspect-square bg-muted">
-                    {product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        Sem imagem
+                  className="w-full h-full bg-cover bg-center"
+                  style={{ backgroundImage: `url(${restaurant.banner_url})` }}
+                />
+              ) : restaurant.logo_url ? (
+                <div
+                  className="w-full h-full bg-cover bg-center"
+                  style={{ backgroundImage: `url(${restaurant.logo_url})` }}
+                />
+              ) : (
+                <div
+                  className="w-full h-full"
+                  style={{ backgroundColor: primaryColor }}
+                />
+              )}
+            </div>
+
+            <MenuHeader 
+              searchOpen={searchOpen}
+              searchQuery={searchQuery}
+              onSearchClick={() => setSearchOpen(true)}
+              onSearchChange={setSearchQuery}
+              onSearchClose={() => {
+                setSearchOpen(false);
+                setSearchQuery("");
+              }}
+            />
+
+            <RestaurantInfoCard
+              restaurantId={restaurant.id}
+              name={restaurant.name}
+              logoUrl={restaurant.logo_url}
+              primaryColor={primaryColor}
+              tableInfo={customerName}
+              deliveryTime={`${restaurant.prep_time_minutes || 50}-${(restaurant.prep_time_minutes || 50) + 10} min`}
+              deliveryFee={0}
+            />
+          </div>
+
+          {searchQuery.trim() ? (
+            <div className="px-4 py-6">
+              <h2 className="text-lg font-semibold mb-4">Resultados da busca</h2>
+              {filteredProducts.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {filteredProducts.filter(p => p.available).map((product) => (
+                    <div
+                      key={product.id}
+                      onClick={() => handleProductClick(product)}
+                      className="bg-white rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-transform"
+                    >
+                      <div className="aspect-square bg-muted">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            Sem imagem
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-semibold text-sm mb-1">{product.name}</h3>
-                    <p className="text-lg font-bold" style={{ color: primaryColor }}>
-                      R$ {product.price.toFixed(2)}
-                    </p>
-                  </div>
+                      <div className="p-3">
+                        <h3 className="font-semibold text-sm mb-1">{product.name}</h3>
+                        <p className="text-lg font-bold" style={{ color: primaryColor }}>
+                          R$ {product.price.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <p className="text-muted-foreground text-center py-8">
+                  Nenhum produto encontrado para "{searchQuery}"
+                </p>
+              )}
             </div>
           ) : (
-            <p className="text-muted-foreground text-center py-8">
-              Nenhum produto encontrado para "{searchQuery}"
-            </p>
+            <>
+              {restaurant.featured_section_enabled && featuredProducts.length > 0 && (
+                <FeaturedProducts
+                  products={featuredProducts}
+                  primaryColor={primaryColor}
+                  onProductClick={handleProductClick}
+                  title={restaurant.featured_section_title || "Destaques"}
+                />
+              )}
+
+              <CategoryProducts
+                categories={filteredCategories}
+                primaryColor={primaryColor}
+                onProductClick={handleProductClick}
+              />
+            </>
           )}
-        </div>
-      ) : (
-        <>
-          {restaurant.featured_section_enabled && featuredProducts.length > 0 && (
-            <FeaturedProducts
-              products={featuredProducts}
+
+          {cart.length > 0 && (
+            <CartBottomBar
+              itemCount={cart.length}
+              total={calculateTotal()}
               primaryColor={primaryColor}
-              onProductClick={handleProductClick}
-              title={restaurant.featured_section_title || "Destaques"}
+              onViewCart={() => setCheckoutOpen(true)}
+              label="Ver Sacola"
             />
           )}
 
-          <CategoryProducts
-            categories={filteredCategories}
-            primaryColor={primaryColor}
-            onProductClick={handleProductClick}
+          {selectedProduct && (
+            <ProductDetailDrawer
+              product={selectedProduct}
+              extras={productExtras}
+              open={!!selectedProduct}
+              onClose={() => {
+                setSelectedProduct(null);
+                setProductExtras([]);
+              }}
+              onAddToCart={handleAddToCart}
+              primaryColor={primaryColor}
+              restaurantName={restaurant.name}
+              restaurantLogo={restaurant.logo_url}
+              deliveryTime={`${restaurant.prep_time_minutes || 50}-${(restaurant.prep_time_minutes || 50) + 10} min`}
+            />
+          )}
+
+          <CheckoutDrawer
+            open={checkoutOpen}
+            onClose={() => setCheckoutOpen(false)}
+            cart={cart}
+            restaurant={restaurant}
+            onUpdateQuantity={handleUpdateQuantity}
+            onClearCart={handleClearCart}
+            mode="delivery"
+            restaurantSlug={restaurantSlug}
+          />
+
+          <CustomerInfoDialog
+            open={showCustomerDialog}
+            onClose={() => setShowCustomerDialog(false)}
+            onSubmit={handleCustomerInfoSubmit}
+            restaurantColor={primaryColor}
           />
         </>
       )}
 
-      {cart.length > 0 && (
-        <CartBottomBar
-          itemCount={cart.length}
-          total={calculateTotal()}
-          primaryColor={primaryColor}
-          onViewCart={() => setCheckoutOpen(true)}
-          label="Ver Sacola"
-        />
+      {activeTab === "pedidos" && customerCPF && (
+        <div className="pt-4">
+          <h1 className="text-2xl font-bold px-4 mb-4">Meus Pedidos</h1>
+          <PedidosHistory
+            customerCPF={customerCPF}
+            restaurantId={restaurant.id}
+          />
+        </div>
       )}
 
-      <CustomerInfoDialog
-        open={showCustomerDialog}
-        onClose={() => setShowCustomerDialog(false)}
-        onSubmit={handleCustomerInfoSubmit}
-        restaurantColor={primaryColor}
-      />
-
-      {selectedProduct && (
-        <ProductDetailDrawer
-          product={selectedProduct}
-          extras={productExtras}
-          open={!!selectedProduct}
-          onClose={() => {
-            setSelectedProduct(null);
-            setProductExtras([]);
-          }}
-          onAddToCart={handleAddToCart}
-          primaryColor={primaryColor}
-          restaurantName={restaurant.name}
-          restaurantLogo={restaurant.logo_url}
-          deliveryTime={`${restaurant.prep_time_minutes || 50}-${(restaurant.prep_time_minutes || 50) + 10} min`}
-        />
+      {activeTab === "perfil" && customerCPF && (
+        <div className="pt-4">
+          <h1 className="text-2xl font-bold px-4 mb-4">Meu Perfil</h1>
+          <ProfileView
+            customerName={customerName}
+            customerCPF={customerCPF}
+            restaurantId={restaurant.id}
+            onNameUpdate={handleNameUpdate}
+          />
+        </div>
       )}
 
-      <CheckoutDrawer
-        open={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
-        cart={cart}
-        restaurant={restaurant}
-        onUpdateQuantity={handleUpdateQuantity}
-        onClearCart={handleClearCart}
-        mode="delivery"
-        restaurantSlug={restaurantSlug}
+      <DeliveryBottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        primaryColor={primaryColor}
       />
     </div>
   );

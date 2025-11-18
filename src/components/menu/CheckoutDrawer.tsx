@@ -182,7 +182,7 @@ export const CheckoutDrawer = ({
       }
 
       // 9. Limpar carrinho
-      localStorage.removeItem(`delivery-cart-${restaurant.slug}`);
+      localStorage.removeItem(`delivery-cart-${restaurantSlug}`);
       onClearCart();
 
       // 10. Redirecionar
