@@ -452,6 +452,7 @@ const Menu = () => {
           primaryColor={primaryColor}
           status={comandaStatus}
           isVisible={showComandaBar}
+          hasSubmittedOrders={hasOpenComanda}
           onViewComanda={() => navigate(`/comanda/${restaurantSlug}/${tableNumber}`)}
         />
       )}
