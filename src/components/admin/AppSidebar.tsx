@@ -42,9 +42,10 @@ interface AppSidebarProps {
   onSectionChange: (section: string) => void;
   hasNewOrders?: boolean;
   hasNewBills?: boolean;
+  hasNewDeliveryOrders?: boolean;
 }
 
-export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills }: AppSidebarProps) {
+export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
 
@@ -79,8 +80,8 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         icon: ShoppingCart,
         items: [
           { id: "mesas", label: "Mesas", icon: TableIcon },
-          { id: "pedidos", label: "Pedidos", icon: ClipboardList, hasNotification: hasNewOrders },
-          { id: "comandas", label: "Comandas", icon: Receipt, hasNotification: hasNewBills },
+          { id: "pedidos-locais", label: "Pedidos locais", icon: ClipboardList, hasNotification: hasNewOrders || hasNewBills },
+          { id: "pedidos-delivery", label: "Pedidos delivery", icon: Truck, hasNotification: hasNewOrders },
           { id: "balcao", label: "Balcão", icon: ShoppingBag },
         ],
       },
@@ -166,10 +167,10 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                           >
                             <subItem.icon className="h-4 w-4" />
                             <span>{subItem.label}</span>
-                            {subItem.id === 'pedidos' && hasNewOrders && (
+                            {subItem.id === 'pedidos-locais' && (hasNewOrders || hasNewBills) && (
                               <span className="absolute right-2 h-2 w-2 bg-orange-500 rounded-full"></span>
                             )}
-                            {subItem.id === 'comandas' && hasNewBills && (
+                            {subItem.id === 'pedidos-delivery' && hasNewDeliveryOrders && (
                               <span className="absolute right-2 h-2 w-2 bg-orange-500 rounded-full"></span>
                             )}
                           </SidebarMenuSubButton>
