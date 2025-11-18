@@ -1099,17 +1099,18 @@ const handleDelete = async (id: string) => {
                 Novo Produto
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-2xl">
-                {editingProduct ? "Editar Produto" : "Novo Produto"}
+          <DialogContent className="max-w-4xl max-h-[95vh] overflow-hidden flex flex-col p-0 gap-0">
+            <DialogHeader className="px-6 py-5 border-b bg-gradient-to-r from-primary/5 to-primary/10 sticky top-0 z-10">
+              <DialogTitle className="text-xl font-bold text-foreground">
+                {editingProduct ? "✏️ Editar Produto" : "➕ Novo Produto"}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-sm text-muted-foreground mt-1">
                 {editingProduct
-                  ? "Altere os dados do produto e mantenha seu cardápio atualizado"
-                  : "Preencha os campos abaixo para adicionar um novo produto ao cardápio"}
+                  ? "Atualize as informações do produto no seu cardápio"
+                  : "Adicione um novo produto ao cardápio digital"}
               </DialogDescription>
             </DialogHeader>
+            <div className="overflow-y-auto px-6 py-5 flex-1">
             <ProductForm
               productName={productName}
               setProductName={setProductName}
@@ -1154,6 +1155,7 @@ const handleDelete = async (id: string) => {
               onSubmit={handleSubmit}
               editingProduct={editingProduct}
             />
+            </div>
           </DialogContent>
         </Dialog>
           </div>
