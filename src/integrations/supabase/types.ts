@@ -484,6 +484,116 @@ export type Database = {
           },
         ]
       }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string | null
+          discount_type: string
+          discount_value: number
+          id: string
+          is_active: boolean | null
+          max_discount: number | null
+          min_order_value: number | null
+          restaurant_id: string
+          updated_at: string | null
+          usage_limit: number | null
+          used_count: number | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          discount_type: string
+          discount_value: number
+          id?: string
+          is_active?: boolean | null
+          max_discount?: number | null
+          min_order_value?: number | null
+          restaurant_id: string
+          updated_at?: string | null
+          usage_limit?: number | null
+          used_count?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          is_active?: boolean | null
+          max_discount?: number | null
+          min_order_value?: number | null
+          restaurant_id?: string
+          updated_at?: string | null
+          usage_limit?: number | null
+          used_count?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_addresses: {
+        Row: {
+          city: string
+          complement: string | null
+          created_at: string | null
+          customer_cpf: string
+          customer_name: string
+          customer_phone: string
+          id: string
+          is_default: boolean | null
+          neighborhood: string
+          number: string
+          state: string
+          street: string
+          updated_at: string | null
+          zip_code: string
+        }
+        Insert: {
+          city: string
+          complement?: string | null
+          created_at?: string | null
+          customer_cpf: string
+          customer_name: string
+          customer_phone: string
+          id?: string
+          is_default?: boolean | null
+          neighborhood: string
+          number: string
+          state: string
+          street: string
+          updated_at?: string | null
+          zip_code: string
+        }
+        Update: {
+          city?: string
+          complement?: string | null
+          created_at?: string | null
+          customer_cpf?: string
+          customer_name?: string
+          customer_phone?: string
+          id?: string
+          is_default?: boolean | null
+          neighborhood?: string
+          number?: string
+          state?: string
+          street?: string
+          updated_at?: string | null
+          zip_code?: string
+        }
+        Relationships: []
+      }
       delivery_config: {
         Row: {
           created_at: string | null
@@ -696,6 +806,92 @@ export type Database = {
           },
         ]
       }
+      loyalty_points: {
+        Row: {
+          created_at: string | null
+          customer_cpf: string
+          id: string
+          last_updated: string | null
+          points_balance: number | null
+          restaurant_id: string
+          total_earned: number | null
+          total_redeemed: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_cpf: string
+          id?: string
+          last_updated?: string | null
+          points_balance?: number | null
+          restaurant_id: string
+          total_earned?: number | null
+          total_redeemed?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_cpf?: string
+          id?: string
+          last_updated?: string | null
+          points_balance?: number | null
+          restaurant_id?: string
+          total_earned?: number | null
+          total_redeemed?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_points_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loyalty_transactions: {
+        Row: {
+          created_at: string | null
+          customer_cpf: string
+          id: string
+          order_id: string | null
+          points: number
+          restaurant_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_cpf: string
+          id?: string
+          order_id?: string | null
+          points: number
+          restaurant_id: string
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_cpf?: string
+          id?: string
+          order_id?: string | null
+          points?: number
+          restaurant_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_transactions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operational_costs: {
         Row: {
           created_at: string | null
@@ -826,14 +1022,19 @@ export type Database = {
       }
       orders: {
         Row: {
+          coupon_code: string | null
+          coupon_discount: number | null
           created_at: string | null
           customer_cpf: string
           customer_name: string
           delivery_address: string | null
           delivery_city: string | null
+          delivery_fee: number | null
           delivery_neighborhood: string | null
           delivery_phone: string | null
           id: string
+          loyalty_points_earned: number | null
+          loyalty_points_used: number | null
           notes: string | null
           order_type: string | null
           payment_type: string | null
@@ -842,14 +1043,19 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          coupon_code?: string | null
+          coupon_discount?: number | null
           created_at?: string | null
           customer_cpf: string
           customer_name: string
           delivery_address?: string | null
           delivery_city?: string | null
+          delivery_fee?: number | null
           delivery_neighborhood?: string | null
           delivery_phone?: string | null
           id?: string
+          loyalty_points_earned?: number | null
+          loyalty_points_used?: number | null
           notes?: string | null
           order_type?: string | null
           payment_type?: string | null
@@ -858,14 +1064,19 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          coupon_code?: string | null
+          coupon_discount?: number | null
           created_at?: string | null
           customer_cpf?: string
           customer_name?: string
           delivery_address?: string | null
           delivery_city?: string | null
+          delivery_fee?: number | null
           delivery_neighborhood?: string | null
           delivery_phone?: string | null
           id?: string
+          loyalty_points_earned?: number | null
+          loyalty_points_used?: number | null
           notes?: string | null
           order_type?: string | null
           payment_type?: string | null
@@ -1182,6 +1393,9 @@ export type Database = {
           id: string
           is_open: boolean | null
           logo_url: string | null
+          loyalty_enabled: boolean | null
+          loyalty_points_per_real: number | null
+          loyalty_real_per_point: number | null
           name: string
           prep_time_minutes: number | null
           primary_color: string | null
@@ -1202,6 +1416,9 @@ export type Database = {
           id?: string
           is_open?: boolean | null
           logo_url?: string | null
+          loyalty_enabled?: boolean | null
+          loyalty_points_per_real?: number | null
+          loyalty_real_per_point?: number | null
           name: string
           prep_time_minutes?: number | null
           primary_color?: string | null
@@ -1222,6 +1439,9 @@ export type Database = {
           id?: string
           is_open?: boolean | null
           logo_url?: string | null
+          loyalty_enabled?: boolean | null
+          loyalty_points_per_real?: number | null
+          loyalty_real_per_point?: number | null
           name?: string
           prep_time_minutes?: number | null
           primary_color?: string | null
