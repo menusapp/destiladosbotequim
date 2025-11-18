@@ -78,11 +78,17 @@ const Menu = () => {
 
   const checkOpenComanda = useCallback(async (currentTableId: string, currentCart: CartItem[]) => {
     try {
+      // Calcular total do carrinho SEMPRE (mesmo sem customer info)
+      const cartTotal = currentCart.reduce((sum, item) => {
+        const extrasSum = item.extras?.reduce((extraSum, extra) => extraSum + extra.price, 0) || 0;
+        return sum + (item.product.price + extrasSum) * item.quantity;
+      }, 0);
+
       // Obter informações do cliente da sessão atual
       const savedCustomerInfo = sessionStorage.getItem("customerInfo");
       if (!savedCustomerInfo) {
         setHasOpenComanda(false);
-        setComandaTotal(0);
+        setComandaTotal(cartTotal); // Mostrar total do carrinho mesmo sem customer info
         setComandaStatus("");
         return;
       }
@@ -132,12 +138,6 @@ const Menu = () => {
         setHasOpenComanda(false);
         setComandaStatus("");
       }
-
-      // Calcular total do carrinho (itens não enviados)
-      const cartTotal = currentCart.reduce((sum, item) => {
-        const extrasSum = item.extras?.reduce((extraSum, extra) => extraSum + extra.price, 0) || 0;
-        return sum + (item.product.price + extrasSum) * item.quantity;
-      }, 0);
 
       // Total da comanda = pedidos enviados + carrinho
       setComandaTotal(ordersTotal + cartTotal);
