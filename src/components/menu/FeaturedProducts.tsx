@@ -20,13 +20,12 @@ export const FeaturedProducts = ({
       {title && (
         <h2 className="text-2xl font-bold text-foreground mb-4">{title}</h2>
       )}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
         {products.map((product) => (
-          <button
+          <div
             key={product.id}
             onClick={() => product.available && onProductClick(product)}
-            className="bg-card rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!product.available}
+            className="flex-none w-40 bg-card rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-all hover:shadow-md"
           >
             <div className="relative aspect-square bg-muted">
               {product.image_url ? (
@@ -51,15 +50,15 @@ export const FeaturedProducts = ({
                 </div>
               )}
             </div>
-            <div className="p-3 text-left">
-              <h3 className="font-semibold text-sm mb-1 line-clamp-2">
-                {product.name}
-              </h3>
-              <p className="text-lg font-bold" style={{ color: primaryColor }}>
+            <div className="p-3">
+              <p className="text-lg font-bold mb-1" style={{ color: primaryColor }}>
                 R$ {product.price.toFixed(2)}
               </p>
+              <h3 className="text-sm font-medium text-foreground line-clamp-2">
+                {product.name}
+              </h3>
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </div>
