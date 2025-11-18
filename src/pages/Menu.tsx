@@ -67,7 +67,7 @@ const Menu = () => {
 
       // Verificar se existe comanda aberta
       if (tableData.id) {
-        await checkOpenComanda(tableData.id);
+        await checkOpenComanda(tableData.id, cart);
       }
     } catch (error: any) {
       toast.error("Erro ao carregar dados");
@@ -76,7 +76,7 @@ const Menu = () => {
     }
   }, [restaurantSlug, tableNumber]);
 
-  const checkOpenComanda = async (tableId: string) => {
+  const checkOpenComanda = useCallback(async (currentTableId: string, currentCart: CartItem[]) => {
     try {
       // Obter informações do cliente da sessão atual
       const savedCustomerInfo = sessionStorage.getItem("customerInfo");
@@ -105,7 +105,7 @@ const Menu = () => {
             )
           )
         `)
-        .eq("table_id", tableId)
+        .eq("table_id", currentTableId)
         .eq("customer_name", currentCustomer.name)
         .eq("customer_cpf", currentCustomer.cpf)
         .in("status", ["pending", "accepted", "preparing", "ready"]);
@@ -134,7 +134,7 @@ const Menu = () => {
       }
 
       // Calcular total do carrinho (itens não enviados)
-      const cartTotal = cart.reduce((sum, item) => {
+      const cartTotal = currentCart.reduce((sum, item) => {
         const extrasSum = item.extras?.reduce((extraSum, extra) => extraSum + extra.price, 0) || 0;
         return sum + (item.product.price + extrasSum) * item.quantity;
       }, 0);
@@ -144,7 +144,7 @@ const Menu = () => {
     } catch (error) {
       console.error("Erro ao verificar comanda:", error);
     }
-  };
+  }, []);
 
   // Detectar direção do scroll para esconder/mostrar barra
   useEffect(() => {
@@ -169,12 +169,27 @@ const Menu = () => {
     };
   }, [lastScrollY]);
 
-  // Atualizar total da comanda sempre que o cart mudar
+  // Atualizar total da comanda sempre que o cart ou tableId mudar
   useEffect(() => {
     if (tableId && customerName) {
-      checkOpenComanda(tableId);
+      checkOpenComanda(tableId, cart);
     }
-  }, [cart, tableId, customerName]);
+  }, [cart, tableId, customerName, checkOpenComanda]);
+
+  // Polling para verificar mudanças nos pedidos em tempo real
+  useEffect(() => {
+    if (!tableId || !customerName) return;
+
+    // Verificar imediatamente
+    checkOpenComanda(tableId, cart);
+
+    // Verificar a cada 3 segundos para pegar mudanças de status
+    const interval = setInterval(() => {
+      checkOpenComanda(tableId, cart);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [tableId, customerName, cart, checkOpenComanda]);
 
   useEffect(() => {
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
@@ -195,7 +210,7 @@ const Menu = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchData)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'restaurants' }, fetchData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        if (tableId) checkOpenComanda(tableId);
+        if (tableId) checkOpenComanda(tableId, cart);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
