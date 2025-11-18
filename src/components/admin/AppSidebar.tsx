@@ -90,7 +90,6 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         label: "Delivery",
         icon: Truck,
         items: [
-          { id: "areas-entrega", label: "Áreas de Entrega", icon: MapPin },
           { id: "delivery-config", label: "Configurações", icon: Settings },
         ],
       },
