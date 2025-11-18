@@ -60,18 +60,35 @@ export const CheckoutDrawer = ({
     
     setSubmitting(true);
     try {
-      // 1. Criar mesa virtual para delivery
-      const { data: virtualTable, error: tableError } = await supabase
-        .from("tables")
-        .insert({
-          restaurant_id: restaurant.id,
-          table_number: 9999,
-          is_occupied: false,
-        })
-        .select()
-        .single();
+      // 1. Buscar ou criar mesa virtual para delivery
+      let virtualTable;
 
-      if (tableError) throw tableError;
+      // Primeiro tenta buscar mesa virtual existente
+      const { data: existingTable } = await supabase
+        .from("tables")
+        .select("*")
+        .eq("restaurant_id", restaurant.id)
+        .eq("table_number", 9999)
+        .maybeSingle();
+
+      if (existingTable) {
+        // Usa a mesa existente
+        virtualTable = existingTable;
+      } else {
+        // Cria nova mesa virtual apenas se não existir
+        const { data: newTable, error: tableError } = await supabase
+          .from("tables")
+          .insert({
+            restaurant_id: restaurant.id,
+            table_number: 9999,
+            is_occupied: false,
+          })
+          .select()
+          .single();
+
+        if (tableError) throw tableError;
+        virtualTable = newTable;
+      }
 
       // 2. Calcular valores
       const subtotal = cart.reduce((sum, item) => {

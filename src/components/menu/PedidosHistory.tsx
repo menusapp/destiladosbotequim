@@ -65,6 +65,7 @@ export const PedidosHistory = ({
         )
         .eq("customer_cpf", customerCPF)
         .eq("tables.restaurant_id", restaurantId)
+        .eq("order_type", "delivery")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
