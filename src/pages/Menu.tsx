@@ -407,19 +407,8 @@ const Menu = () => {
         </>
       )}
 
-      {/* Barra de carrinho - só mostra se não há comanda aberta */}
-      {!hasOpenComanda && (
-        <CartBottomBar
-          itemCount={getTotalItemCount()}
-          total={getCartTotal()}
-          primaryColor={primaryColor}
-          onViewCart={() => setShowCartDrawer(true)}
-          label="Ver comanda"
-        />
-      )}
-
-      {/* Barra de comanda aberta - só aparece quando há comanda */}
-      {hasOpenComanda && (
+      {/* Barra de comanda - sempre visível no modo consumo local quando cliente está logado */}
+      {customerName && (
         <ComandaBottomBar
           total={comandaTotal}
           primaryColor={primaryColor}
