@@ -64,17 +64,12 @@ export const PedidosHistory = ({
         `
         )
         .eq("customer_cpf", customerCPF)
+        .eq("tables.restaurant_id", restaurantId)
         .eq("order_type", "delivery")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      
-      // Filtrar pelo restaurant_id após buscar os dados
-      const filteredOrders = (data || []).filter(
-        (order: any) => order.tables?.restaurant_id === restaurantId
-      );
-      
-      setOrders(filteredOrders);
+      setOrders(data || []);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {

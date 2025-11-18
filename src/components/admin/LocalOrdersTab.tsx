@@ -637,10 +637,8 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         </div>
       </div>
 
-      {/* Grid com Pedidos e Comandas lado a lado */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Seção de Pedidos */}
-        <Card>
+      {/* Seção de Pedidos */}
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -799,6 +797,12 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                               Aceitar
                             </Button>
                           )}
+                          {order.status === "accepted" && (
+                            <Button size="sm" onClick={() => updateOrderStatus(order.id, "delivered")}>
+                              <Check className="h-4 w-4 mr-1" />
+                              Concluir
+                            </Button>
+                          )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm">
@@ -826,6 +830,8 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
           )}
         </CardContent>
       </Card>
+
+      <Separator />
 
       {/* Seção de Comandas */}
       <Card>
@@ -1012,7 +1018,6 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
           )}
         </CardContent>
       </Card>
-      </div>
     </div>
   );
 };
