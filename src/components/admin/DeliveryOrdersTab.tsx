@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { CalendarIcon, Printer, Trash2, Clock, User, Phone, MapPin, Package, Check, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -273,6 +274,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
   const pendingOrders = filteredOrders.filter((o) => o.status === "pending");
   const acceptedOrders = filteredOrders.filter((o) => o.status === "accepted");
   const readyOrders = filteredOrders.filter((o) => o.status === "ready");
+  const finishedOrders = filteredOrders.filter((o) => o.status === "delivered" || o.status === "picked_up");
 
   const OrderCard = ({ order }: { order: Order }) => {
     const isDelivery = isDeliveryOrder(order);
@@ -407,6 +409,80 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
     );
   };
 
+  const FinishedOrderCard = ({ order }: { order: Order }) => {
+    const isDelivery = isDeliveryOrder(order);
+    const total = calculateTotal(order);
+    const itemCount = order.order_items.reduce((sum, item) => sum + item.quantity, 0);
+
+    return (
+      <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+        {/* Coluna 1: ID + Status */}
+        <div className="flex items-center gap-3 min-w-[180px]">
+          <span className="font-semibold text-sm">#{order.id.slice(0, 8)}</span>
+          <Badge variant={order.status === "delivered" ? "default" : "outline"} className="text-xs">
+            {order.status === "delivered" ? "✓ Entregue" : "✓ Retirado"}
+          </Badge>
+        </div>
+
+        {/* Coluna 2: Data/Hora */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-[140px]">
+          <Clock className="w-4 h-4" />
+          {order.created_at ? format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : ""}
+        </div>
+
+        {/* Coluna 3: Cliente */}
+        <div className="flex-1 min-w-[200px]">
+          <div className="font-medium text-sm">{order.customer_name}</div>
+          <div className="text-xs text-muted-foreground">{order.customer_cpf}</div>
+        </div>
+
+        {/* Coluna 4: Tipo + Itens */}
+        <div className="min-w-[120px]">
+          <Badge variant={isDelivery ? "default" : "secondary"} className="text-xs">
+            {isDelivery ? "🚚 Delivery" : "📦 Retirada"}
+          </Badge>
+          <span className="text-xs text-muted-foreground ml-2">
+            {itemCount} {itemCount === 1 ? "item" : "itens"}
+          </span>
+        </div>
+
+        {/* Coluna 5: Total */}
+        <div className="font-semibold text-primary min-w-[100px] text-right">
+          R$ {total.toFixed(2)}
+        </div>
+
+        {/* Coluna 6: Ações */}
+        <div className="flex items-center gap-2 ml-4">
+          <Button size="sm" variant="outline" onClick={() => printOrder(order)}>
+            <Printer className="w-4 h-4" />
+          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="ghost">
+                <Trash2 className="w-4 h-4 text-destructive" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir pedido finalizado?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => deleteOrder(order.id)}>
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -479,15 +555,17 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
             <h3 className="font-semibold text-lg">Em Análise</h3>
             <Badge variant="secondary">{pendingOrders.length}</Badge>
           </div>
-          <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
-            {pendingOrders.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                Nenhum pedido pendente
-              </div>
-            ) : (
-              pendingOrders.map((order) => <OrderCard key={order.id} order={order} />)
-            )}
-          </div>
+          <ScrollArea className="h-[calc(100vh-450px)]">
+            <div className="space-y-3 pr-2">
+              {pendingOrders.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  Nenhum pedido pendente
+                </div>
+              ) : (
+                pendingOrders.map((order) => <OrderCard key={order.id} order={order} />)
+              )}
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Column 2: Em Produção */}
@@ -496,15 +574,17 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
             <h3 className="font-semibold text-lg">Em Produção</h3>
             <Badge variant="secondary">{acceptedOrders.length}</Badge>
           </div>
-          <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
-            {acceptedOrders.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                Nenhum pedido em produção
-              </div>
-            ) : (
-              acceptedOrders.map((order) => <OrderCard key={order.id} order={order} />)
-            )}
-          </div>
+          <ScrollArea className="h-[calc(100vh-450px)]">
+            <div className="space-y-3 pr-2">
+              {acceptedOrders.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  Nenhum pedido em produção
+                </div>
+              ) : (
+                acceptedOrders.map((order) => <OrderCard key={order.id} order={order} />)
+              )}
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Column 3: Pronto */}
@@ -513,16 +593,47 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
             <h3 className="font-semibold text-lg">Pronto p/ Entrega/Retirada</h3>
             <Badge variant="secondary">{readyOrders.length}</Badge>
           </div>
-          <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
-            {readyOrders.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                Nenhum pedido pronto
-              </div>
-            ) : (
-              readyOrders.map((order) => <OrderCard key={order.id} order={order} />)
-            )}
-          </div>
+          <ScrollArea className="h-[calc(100vh-450px)]">
+            <div className="space-y-3 pr-2">
+              {readyOrders.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  Nenhum pedido pronto
+                </div>
+              ) : (
+                readyOrders.map((order) => <OrderCard key={order.id} order={order} />)
+              )}
+            </div>
+          </ScrollArea>
         </div>
+      </div>
+
+      {/* Card de Pedidos Finalizados */}
+      <div className="mt-6">
+        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg mb-3">
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            Pedidos Finalizados
+          </h3>
+          <Badge variant="secondary">{finishedOrders.length}</Badge>
+        </div>
+        
+        {finishedOrders.length === 0 ? (
+          <Card className="p-8">
+            <div className="text-center text-muted-foreground">
+              Nenhum pedido finalizado no período selecionado
+            </div>
+          </Card>
+        ) : (
+          <Card className="p-4">
+            <ScrollArea className="h-[200px]">
+              <div className="space-y-2 pr-2">
+                {finishedOrders.map((order) => (
+                  <FinishedOrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            </ScrollArea>
+          </Card>
+        )}
       </div>
     </div>
   );
