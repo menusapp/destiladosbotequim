@@ -98,13 +98,13 @@ const Menu = () => {
       if (orders && orders.length > 0) {
         setHasOpenComanda(true);
         
-        // Calcular total
+        // Calcular total (mesma lógica da página Comanda)
         let total = 0;
         orders.forEach((order: any) => {
           order.order_items?.forEach((item: any) => {
-            const itemTotal = item.price_at_order * item.quantity;
-            const extrasTotal = item.order_item_extras?.reduce((sum: number, extra: any) => sum + extra.price_at_order, 0) || 0;
-            total += itemTotal + extrasTotal * item.quantity;
+            const extrasSum = item.order_item_extras?.reduce((sum: number, extra: any) => sum + extra.price_at_order, 0) || 0;
+            const itemTotal = (item.price_at_order + extrasSum) * item.quantity;
+            total += itemTotal;
           });
         });
 
@@ -301,20 +301,20 @@ const Menu = () => {
   return (
     <div className="min-h-screen bg-background pb-32">
       <div className="relative">
-        <div className="h-48 overflow-hidden">
+        <div className="h-48 overflow-hidden relative">
           {restaurant.banner_url ? (
             <div
-              className="w-full h-full bg-cover bg-center blur-lg scale-110"
+              className="w-full h-full bg-cover bg-center"
               style={{ backgroundImage: `url(${restaurant.banner_url})` }}
             />
           ) : restaurant.logo_url ? (
             <div
-              className="w-full h-full bg-cover bg-center blur-lg scale-110"
+              className="w-full h-full bg-cover bg-center"
               style={{ backgroundImage: `url(${restaurant.logo_url})` }}
             />
           ) : (
             <div
-              className="w-full h-full blur-lg scale-110"
+              className="w-full h-full"
               style={{ backgroundColor: primaryColor }}
             />
           )}
