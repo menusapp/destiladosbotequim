@@ -19,11 +19,11 @@ export const CartBottomBar = ({
   if (itemCount === 0) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-border shadow-lg">
-      <div className="px-4 py-3">
+    <div className="fixed bottom-16 left-0 right-0 z-40 bg-white border-t border-border shadow-lg">
+      <div className="px-3 py-2">
         <Button
           onClick={onViewCart}
-          className="w-full h-14 text-base font-bold rounded-xl shadow-lg hover:shadow-xl transition-all"
+          className="w-full h-11 text-sm font-bold rounded-lg shadow-lg hover:shadow-xl transition-all"
           style={{
             backgroundColor: primaryColor,
             color: "white",
@@ -31,22 +31,19 @@ export const CartBottomBar = ({
         >
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
-              <div
-                className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold"
+            <div
+                className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold"
               >
                 {itemCount}
               </div>
-              <span>{label}</span>
+              <span className="text-sm">{label}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span>R$ {total.toFixed(2)}</span>
-              <ShoppingBag className="w-5 h-5" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold">R$ {total.toFixed(2)}</span>
+              <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
         </Button>
-      </div>
-      <div className="text-center text-xs text-muted-foreground pb-2">
-        Total sem a entrega
       </div>
     </div>
   );
