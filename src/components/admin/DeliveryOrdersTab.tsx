@@ -44,12 +44,7 @@ const DeliveryOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  // Período padrão: últimos 30 dias até hoje
-  const [startDate, setStartDate] = useState<Date>(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return startOfDay(date);
-  });
+  const [startDate, setStartDate] = useState<Date>(startOfDay(new Date()));
   const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
 
   useEffect(() => {
