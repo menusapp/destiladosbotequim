@@ -142,6 +142,11 @@ const Comanda = () => {
             } else if (updatedBill.status === "paid") {
               console.log("Conta paga! Redirecionando...");
               toast.success("Conta paga! Obrigado pela preferência!");
+              
+              // Salvar informações para abrir modal de avaliação
+              sessionStorage.setItem('shouldShowReview', 'true');
+              sessionStorage.setItem('reviewBillId', updatedBill.id);
+              
               // Limpar dados da comanda do sessionStorage
               sessionStorage.removeItem(`customer_name_${tableNumber}`);
               sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
@@ -160,9 +165,17 @@ const Comanda = () => {
             table: 'bills',
             filter: `table_id=eq.${tableData.id}`,
           },
-          () => {
+          (payload) => {
             // Conta removida (paga e encerrada) -> agradecer e sair
+            const deletedBill = payload.old as any;
             toast.success("Conta paga! Obrigado pela preferência!");
+            
+            // Salvar informações para abrir modal de avaliação
+            sessionStorage.setItem('shouldShowReview', 'true');
+            if (deletedBill?.id) {
+              sessionStorage.setItem('reviewBillId', deletedBill.id);
+            }
+            
             sessionStorage.removeItem(`customer_name_${tableNumber}`);
             sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
             sessionStorage.removeItem(`cart_${tableNumber}`);

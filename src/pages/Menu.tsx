@@ -34,7 +34,8 @@ const Menu = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+  const [reviewOrderId, setReviewOrderId] = useState<string | undefined>();
+  const [reviewCounterOrderId, setReviewCounterOrderId] = useState<string | undefined>();
   const [hasOpenComanda, setHasOpenComanda] = useState(false);
   const [comandaTotal, setComandaTotal] = useState(0);
   const [comandaStatus, setComandaStatus] = useState<string>("");
@@ -42,6 +43,27 @@ const Menu = () => {
   const [lastScrollY, setLastScrollY] = useState(0);
 
   useMenuInactivityLogout(customerName, tableNumber || "", tableId);
+
+  // Verificar se deve abrir modal de avaliação ao carregar
+  useEffect(() => {
+    const shouldShowReview = sessionStorage.getItem('shouldShowReview');
+    if (shouldShowReview === 'true') {
+      const billId = sessionStorage.getItem('reviewBillId');
+      const counterOrderId = sessionStorage.getItem('reviewCounterOrderId');
+      
+      // Limpar flags do sessionStorage
+      sessionStorage.removeItem('shouldShowReview');
+      sessionStorage.removeItem('reviewBillId');
+      sessionStorage.removeItem('reviewCounterOrderId');
+      
+      // Abrir modal após um pequeno delay
+      setTimeout(() => {
+        if (billId) setReviewOrderId(billId);
+        if (counterOrderId) setReviewCounterOrderId(counterOrderId);
+        setReviewModalOpen(true);
+      }, 500);
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     if (!restaurantSlug || !tableNumber) return;
@@ -523,11 +545,13 @@ const Menu = () => {
         open={reviewModalOpen}
         onClose={() => {
           setReviewModalOpen(false);
-          setLastOrderId(null);
+          setReviewOrderId(undefined);
+          setReviewCounterOrderId(undefined);
         }}
         restaurantId={restaurant.id}
         restaurantName={restaurant.name}
-        orderId={lastOrderId || undefined}
+        orderId={reviewOrderId}
+        counterOrderId={reviewCounterOrderId}
       />
     </div>
   );

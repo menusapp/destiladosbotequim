@@ -290,7 +290,7 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
 
   // Finalize mutation (for pending orders)
   const finalizeMutation = useMutation({
-    mutationFn: async ({ orderId, paymentMethod }: { orderId: string; paymentMethod: string }) => {
+    mutationFn: async ({ orderId, paymentMethod, tableNumber }: { orderId: string; paymentMethod: string; tableNumber?: number }) => {
       const { error } = await supabase
         .from("counter_orders")
         .update({
@@ -301,10 +301,16 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
         .eq("id", orderId);
 
       if (error) throw error;
+      return { orderId, tableNumber };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["counter-orders"] });
       toast.success("Pedido finalizado!");
+      
+      // Salvar informações para abrir modal de avaliação
+      sessionStorage.setItem('shouldShowReview', 'true');
+      sessionStorage.setItem('reviewCounterOrderId', data.orderId);
+      
       setIsEditOpen(false);
       setSelectedOrder(null);
     },
@@ -893,6 +899,7 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
                                       finalizeMutation.mutate({
                                         orderId: order.id,
                                         paymentMethod: value,
+                                        tableNumber: order.tables.table_number,
                                       });
                                     }}
                                   >
