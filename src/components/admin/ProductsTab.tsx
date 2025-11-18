@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ProductForm } from "./ProductForm";
 
 interface Product {
   id: string;
@@ -1098,320 +1099,61 @@ const handleDelete = async (id: string) => {
                 Novo Produto
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-2xl">
                 {editingProduct ? "Editar Produto" : "Novo Produto"}
               </DialogTitle>
               <DialogDescription>
                 {editingProduct
-                  ? "Altere os dados do produto"
-                  : "Adicione um novo produto ao cardápio"}
+                  ? "Altere os dados do produto e mantenha seu cardápio atualizado"
+                  : "Preencha os campos abaixo para adicionar um novo produto ao cardápio"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="product-name">Nome</Label>
-                <Input
-                  id="product-name"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  placeholder="Ex: Pizza Margherita"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-description">Descrição</Label>
-                <Textarea
-                  id="product-description"
-                  value={productDescription}
-                  onChange={(e) => setProductDescription(e.target.value)}
-                  placeholder="Descreva o produto..."
-                  rows={3}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-price">Preço (R$)</Label>
-                <Input
-                  id="product-price"
-                  type="number"
-                  step="0.01"
-                  value={productPrice}
-                  onChange={(e) => setProductPrice(e.target.value)}
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-category">Categoria</Label>
-                <Select value={productCategoryId} onValueChange={setProductCategoryId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-prep-time">Tempo de Preparo (minutos)</Label>
-                <Input
-                  id="product-prep-time"
-                  type="number"
-                  min="1"
-                  value={productPrepTime}
-                  onChange={(e) => setProductPrepTime(e.target.value)}
-                  placeholder="30"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-image">Foto do Produto</Label>
-                {productImageUrl && !productImage && (
-                  <img src={productImageUrl} alt="Preview" className="w-32 h-32 object-cover rounded" />
-                )}
-                <Input
-                  id="product-image"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setProductImage(e.target.files?.[0] || null)}
-                />
-              </div>
-
-              {/* Seção de Insumos (Obrigatório) */}
-              <div className="space-y-3 p-4 border rounded-lg bg-primary/10">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-sm">Insumos * (Obrigatório)</h4>
-                  {productCost > 0 && (
-                    <div className="text-sm space-y-1">
-                      <p className="text-muted-foreground">Custo total: <span className="font-semibold text-foreground">R$ {productCost.toFixed(2)}</span></p>
-                      {parsedProductPrice > 0 && (
-                        <p className="text-muted-foreground">CMV: <span className={`font-semibold ${cmvPercentage > 35 ? 'text-destructive' : 'text-green-600'}`}>{cmvPercentage.toFixed(1)}%</span></p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Select value={selectedStockItem} onValueChange={setSelectedStockItem}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um insumo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stockItems.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name} ({item.unit}) - R$ {item.price_per_unit.toFixed(2)}/{item.unit}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-32">
-                    <Input
-                      type="number"
-                      step="0.001"
-                      placeholder="Qtd"
-                      value={ingredientQuantity}
-                      onChange={(e) => setIngredientQuantity(e.target.value)}
-                    />
-                  </div>
-                  <Button type="button" variant="outline" size="sm" onClick={handleAddIngredient}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                {ingredients.length > 0 && (
-                  <div className="space-y-2 mt-3">
-                    {ingredients.map((ing) => (
-                      <div key={ing.id} className="flex items-center justify-between p-2 bg-background rounded">
-                        <div className="flex-1">
-                          <span className="text-sm font-medium">{ing.stock_item_name}</span>
-                          <p className="text-xs text-muted-foreground">
-                            {ing.quantity} {ing.stock_item_unit} × R$ {ing.stock_item_price?.toFixed(2)} = R$ {(ing.quantity * (ing.stock_item_price || 0)).toFixed(2)}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveIngredient(ing.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              <div className="space-y-3 p-4 border rounded-lg bg-secondary/20">
-                <h4 className="font-semibold text-sm">Adicionais</h4>
-                <p className="text-xs text-muted-foreground">Cada adicional deve ter pelo menos 1 insumo configurado</p>
-                
-                {extraCategories.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Ou selecione uma categoria de adicionais:</Label>
-                    <Select onValueChange={handleLoadExtrasFromCategory}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {extraCategories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="space-y-3 p-3 border rounded bg-primary/5">
-                  <div className="flex items-center justify-between">
-                    <h5 className="font-medium text-sm">{editingExtraIndex !== null ? 'Editar Adicional' : 'Novo Adicional'}</h5>
-                    {extraIngredients.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Custo: <span className="font-semibold text-foreground">R$ {extraIngredients.reduce((sum, ing) => sum + (ing.quantity * (ing.stock_item_price || 0)), 0).toFixed(2)}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <Input
-                        placeholder="Nome do adicional"
-                        value={extraName}
-                        onChange={(e) => setExtraName(e.target.value)}
-                      />
-                    </div>
-                    <div className="w-32">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Preço"
-                        value={extraPrice}
-                        onChange={(e) => setExtraPrice(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">Insumos do Adicional *</Label>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <Select value={selectedExtraStockItem} onValueChange={setSelectedExtraStockItem}>
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Selecione um insumo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stockItems.map((item) => (
-                              <SelectItem key={item.id} value={item.id}>
-                                {item.name} ({item.unit}) - R$ {item.price_per_unit.toFixed(2)}/{item.unit}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Input
-                        className="w-24 h-9"
-                        type="number"
-                        step="0.001"
-                        placeholder="Qtd"
-                        value={extraIngredientQuantity}
-                        onChange={(e) => setExtraIngredientQuantity(e.target.value)}
-                      />
-                      <Button type="button" variant="outline" size="sm" onClick={handleAddExtraIngredient}>
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-
-                    {extraIngredients.length > 0 && (
-                      <div className="space-y-1 mt-2">
-                        {extraIngredients.map((ing) => (
-                          <div key={ing.id} className="flex items-center justify-between p-1.5 bg-background rounded text-xs">
-                            <div className="flex-1">
-                              <span className="font-medium">{ing.stock_item_name}</span>
-                              <span className="text-muted-foreground ml-1">
-                                {ing.quantity} {ing.stock_item_unit} × R$ {ing.stock_item_price?.toFixed(2)} = R$ {(ing.quantity * (ing.stock_item_price || 0)).toFixed(2)}
-                              </span>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => handleRemoveExtraIngredient(ing.id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <Button 
-                    type="button" 
-                    variant="secondary" 
-                    size="sm" 
-                    onClick={handleAddExtra}
-                    className="w-full"
-                  >
-                    {editingExtraIndex !== null ? 'Atualizar Adicional' : 'Adicionar Adicional'}
-                  </Button>
-                </div>
-                
-                {extras.length > 0 && (
-                  <div className="space-y-2 mt-3">
-                    <Label className="text-xs">Adicionais do Produto:</Label>
-                    {extras.map((extra, index) => (
-                      <div key={extra.id} className="flex items-center justify-between p-2 bg-background rounded border">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{extra.name}</span>
-                            <span className="text-xs text-muted-foreground">+ R$ {extra.price.toFixed(2)}</span>
-                          </div>
-                          {extra.cost !== undefined && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Custo: R$ {extra.cost.toFixed(2)} | {extra.ingredients?.length || 0} insumo(s)
-                            </p>
-                          )}
-                          {(!extra.ingredients || extra.ingredients.length === 0) && (
-                            <p className="text-xs text-amber-600 mt-0.5">⚠️ Configurar custo</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditExtra(index)}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveExtra(extra.id)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <Button type="submit" className="w-full">
-                {editingProduct ? "Atualizar" : "Criar"}
-              </Button>
-            </form>
+            <ProductForm
+              productName={productName}
+              setProductName={setProductName}
+              productDescription={productDescription}
+              setProductDescription={setProductDescription}
+              productPrice={productPrice}
+              setProductPrice={setProductPrice}
+              productPrepTime={productPrepTime}
+              setProductPrepTime={setProductPrepTime}
+              productCategoryId={productCategoryId}
+              setProductCategoryId={setProductCategoryId}
+              productImageUrl={productImageUrl}
+              setProductImage={setProductImage}
+              productImage={productImage}
+              categories={categories}
+              ingredients={ingredients}
+              stockItems={stockItems}
+              selectedStockItem={selectedStockItem}
+              setSelectedStockItem={setSelectedStockItem}
+              ingredientQuantity={ingredientQuantity}
+              setIngredientQuantity={setIngredientQuantity}
+              handleAddIngredient={handleAddIngredient}
+              handleRemoveIngredient={handleRemoveIngredient}
+              extras={extras}
+              extraName={extraName}
+              setExtraName={setExtraName}
+              extraPrice={extraPrice}
+              setExtraPrice={setExtraPrice}
+              extraIngredients={extraIngredients}
+              selectedExtraStockItem={selectedExtraStockItem}
+              setSelectedExtraStockItem={setSelectedExtraStockItem}
+              extraIngredientQuantity={extraIngredientQuantity}
+              setExtraIngredientQuantity={setExtraIngredientQuantity}
+              editingExtraIndex={editingExtraIndex}
+              handleAddExtra={handleAddExtra}
+              handleEditExtra={handleEditExtra}
+              handleRemoveExtra={handleRemoveExtra}
+              handleAddExtraIngredient={handleAddExtraIngredient}
+              handleRemoveExtraIngredient={handleRemoveExtraIngredient}
+              extraCategories={extraCategories}
+              handleLoadExtrasFromCategory={handleLoadExtrasFromCategory}
+              onSubmit={handleSubmit}
+              editingProduct={editingProduct}
+            />
           </DialogContent>
         </Dialog>
           </div>
