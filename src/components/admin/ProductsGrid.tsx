@@ -93,6 +93,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const [extraIngredients, setExtraIngredients] = useState<ProductIngredient[]>([]);
   const [selectedExtraStockItem, setSelectedExtraStockItem] = useState("");
   const [extraIngredientQuantity, setExtraIngredientQuantity] = useState("");
+  const [productPrepTime, setProductPrepTime] = useState("");
 
   useEffect(() => {
     fetchCategories();
@@ -171,7 +172,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
           ...product,
           cost,
           margin,
-          prep_time: 30, // TODO: Add prep_time field to products table
+          prep_time: product.prep_time_minutes || 30,
           sku: product.name.substring(0, 3).toUpperCase() + String(product.id).substring(0, 4).toUpperCase()
         };
       })
@@ -317,6 +318,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       price: parseFloat(productPrice),
       category_id: productCategoryId,
       image_url: imageUrl,
+      prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : null,
     };
 
     if (editingProduct) {
@@ -483,6 +485,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductPrice(product.price.toString());
     setProductCategoryId(product.category_id);
     setProductImageUrl(product.image_url);
+    setProductPrepTime(product.prep_time?.toString() || "");
 
     // Fetch ingredients
     const { data: ingredientsData } = await supabase
@@ -537,6 +540,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductCategoryId("");
     setProductImage(null);
     setProductImageUrl(null);
+    setProductPrepTime("");
     setIngredients([]);
     setExtras([]);
     setExtraName("");
@@ -672,6 +676,21 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div>
+                <Label htmlFor="product-prep-time">Tempo de Preparo (minutos)</Label>
+                <Input
+                  id="product-prep-time"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={productPrepTime}
+                  onChange={(e) => setProductPrepTime(e.target.value)}
+                  placeholder="Ex: 30"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tempo médio de preparo do produto
+                </p>
               </div>
               <div>
                 <Label htmlFor="product-image">Foto do Produto</Label>
