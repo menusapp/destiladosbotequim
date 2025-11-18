@@ -1005,6 +1005,7 @@ export type Database = {
           id: string
           image_url: string | null
           name: string
+          prep_time_minutes: number | null
           price: number
           updated_at: string | null
         }
@@ -1016,6 +1017,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           name: string
+          prep_time_minutes?: number | null
           price: number
           updated_at?: string | null
         }
@@ -1027,6 +1029,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           name?: string
+          prep_time_minutes?: number | null
           price?: number
           updated_at?: string | null
         }

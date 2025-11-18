@@ -117,7 +117,12 @@ export const ProductDetailDrawer = ({
           {/* Product Info */}
           <h2 className="text-2xl font-bold text-foreground mb-2">{product.name}</h2>
           {product.description && (
-            <p className="text-sm text-muted-foreground mb-4">{product.description}</p>
+            <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
+          )}
+          {product.prep_time_minutes && (
+            <p className="text-xs text-muted-foreground mb-4">
+              ⏱️ Tempo de preparo: {product.prep_time_minutes} min
+            </p>
           )}
 
           <div

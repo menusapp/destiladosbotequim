@@ -96,6 +96,7 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [productDescription, setProductDescription] = useState("");
   const [productPrice, setProductPrice] = useState("");
   const [productCategoryId, setProductCategoryId] = useState("");
+  const [productPrepTime, setProductPrepTime] = useState("");
   const [productImage, setProductImage] = useState<File | null>(null);
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
   const [extras, setExtras] = useState<ProductExtra[]>([]);
@@ -569,6 +570,7 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       description: productDescription,
       price: parseFloat(productPrice),
       category_id: productCategoryId,
+      prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : 30,
       image_url: imageUrl,
     };
 
@@ -721,6 +723,7 @@ const handleDelete = async (id: string) => {
     setProductDescription(product.description || "");
     setProductPrice(product.price.toString());
     setProductCategoryId(product.category_id);
+    setProductPrepTime((product as any).prep_time_minutes?.toString() || "30");
     setProductImageUrl(product.image_url);
     
     // Buscar extras do produto com ingredientes
@@ -779,6 +782,7 @@ const handleDelete = async (id: string) => {
     setProductDescription("");
     setProductPrice("");
     setProductCategoryId("");
+    setProductPrepTime("");
     setProductImage(null);
     setProductImageUrl(null);
     setExtras([]);
@@ -1152,6 +1156,17 @@ const handleDelete = async (id: string) => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="product-prep-time">Tempo de Preparo (minutos)</Label>
+                <Input
+                  id="product-prep-time"
+                  type="number"
+                  min="1"
+                  value={productPrepTime}
+                  onChange={(e) => setProductPrepTime(e.target.value)}
+                  placeholder="30"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="product-image">Foto do Produto</Label>

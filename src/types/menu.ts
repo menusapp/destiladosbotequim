@@ -5,6 +5,7 @@ export interface Product {
   price: number;
   available: boolean;
   image_url: string | null;
+  prep_time_minutes?: number;
 }
 
 export interface ProductExtra {
