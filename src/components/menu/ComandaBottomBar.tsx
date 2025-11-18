@@ -1,4 +1,5 @@
 import { Receipt } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface ComandaBottomBarProps {
   total: number;
@@ -15,6 +16,21 @@ export const ComandaBottomBar = ({
   isVisible = true,
   onViewComanda,
 }: ComandaBottomBarProps) => {
+  const [prevTotal, setPrevTotal] = useState(total);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  useEffect(() => {
+    if (total !== prevTotal && total > 0) {
+      setShouldAnimate(true);
+      setPrevTotal(total);
+      
+      const timer = setTimeout(() => {
+        setShouldAnimate(false);
+      }, 600);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [total, prevTotal]);
   return (
     <div 
       className={`fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
@@ -35,7 +51,11 @@ export const ComandaBottomBar = ({
             <span className="text-sm font-medium">Ver comanda</span>
           </div>
           {total > 0 && (
-            <span className="text-sm font-semibold">
+            <span 
+              className={`text-sm font-semibold transition-all duration-300 ${
+                shouldAnimate ? 'scale-110 animate-pulse' : 'scale-100'
+              }`}
+            >
               R$ {total.toFixed(2)}
             </span>
           )}
