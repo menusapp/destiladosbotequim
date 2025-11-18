@@ -1,5 +1,4 @@
 import { Receipt } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface ComandaBottomBarProps {
   total: number;
@@ -15,28 +14,26 @@ export const ComandaBottomBar = ({
   onViewComanda,
 }: ComandaBottomBarProps) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-border shadow-lg">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
       <div className="px-4 py-3">
-        <Button
+        <button
           onClick={onViewComanda}
-          className="w-full h-14 text-base font-bold rounded-xl shadow-lg hover:shadow-xl transition-all"
+          className="w-full flex items-center justify-between h-12 px-4 rounded-lg transition-all"
           style={{
             backgroundColor: primaryColor,
             color: "white",
           }}
         >
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2">
-              <Receipt className="w-5 h-5" />
-              <span>Ver comanda</span>
-            </div>
-            {total > 0 && (
-              <span className="text-base font-bold">
-                R$ {total.toFixed(2)}
-              </span>
-            )}
+          <div className="flex items-center gap-2">
+            <Receipt className="w-4 h-4" />
+            <span className="text-sm font-medium">Ver comanda</span>
           </div>
-        </Button>
+          {total > 0 && (
+            <span className="text-sm font-semibold">
+              R$ {total.toFixed(2)}
+            </span>
+          )}
+        </button>
       </div>
     </div>
   );
