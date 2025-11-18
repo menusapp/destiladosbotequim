@@ -73,36 +73,12 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
   const [tables, setTables] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
-  const [orderSearchQuery, setOrderSearchQuery] = useState("");
-
-  // Manual order states
-  const [manualOrder, setManualOrder] = useState({
-    tableId: "",
-    customerName: "",
-    customerCpf: "",
-    items: [] as { productId: string; quantity: number; price: number }[],
-  });
-
-  // Manual bill states
-  const [manualBill, setManualBill] = useState({
-    tableId: "",
-    customerName: "",
-    totalAmount: "",
-    paymentMethod: "cash",
-    selectedOrderId: null as string | null,
-  });
 
   useEffect(() => {
     fetchOrders();
     fetchBills();
     fetchTables();
     fetchProducts();
-
-    if (isSheetOpen) {
-      fetchRecentOrders();
-    }
 
     // Realtime subscriptions
     const ordersChannel = supabase
@@ -119,7 +95,7 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(billsChannel);
     };
-  }, [restaurantId, startDate, endDate, isSheetOpen]);
+  }, [restaurantId, startDate, endDate]);
 
   const fetchTables = async () => {
     const { data } = await supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("table_number");
@@ -133,18 +109,6 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       .eq("categories.restaurant_id", restaurantId)
       .eq("available", true);
     setProducts(data || []);
-  };
-
-  const fetchRecentOrders = async () => {
-    const today = startOfDay(new Date());
-    const { data } = await supabase
-      .from("orders")
-      .select(`*, tables!inner(table_number, restaurant_id), order_items(quantity, price_at_order, products(name), order_item_extras(price_at_order))`)
-      .eq("tables.restaurant_id", restaurantId)
-      .eq("status", "accepted")
-      .gte("created_at", today.toISOString())
-      .order("created_at", { ascending: false });
-    setRecentOrders(data || []);
   };
 
   const fetchOrders = async () => {
