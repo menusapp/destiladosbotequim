@@ -55,22 +55,7 @@ const RestaurantAdmin = () => {
 
     fetchRestaurant(restaurantId);
     setupNotifications(restaurantId);
-    
-    // Limpar mesas inativas e órfãs ao carregar o painel
-    cleanupTables();
   }, [navigate]);
-
-  const cleanupTables = async () => {
-    try {
-      // Liberar mesas ocupadas há mais de 1 hora sem pedidos
-      await supabase.rpc('auto_release_inactive_tables');
-      
-      // Liberar mesas com contas pagas mas ainda ocupadas
-      await supabase.rpc('cleanup_abandoned_tables');
-    } catch (error) {
-      console.error('Erro ao limpar mesas:', error);
-    }
-  };
 
   const setupNotifications = (restaurantId: string) => {
     // Canal para novos pedidos
