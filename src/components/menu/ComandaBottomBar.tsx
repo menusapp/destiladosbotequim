@@ -30,17 +30,11 @@ export const ComandaBottomBar = ({
               <Receipt className="w-5 h-5" />
               <span>Ver comanda</span>
             </div>
-            <div className="flex flex-col items-end text-sm">
-              <span>R$ {total.toFixed(2)}</span>
-              {status && (
-                <span className="text-xs opacity-90">
-                  {status === "pending" && "Aguardando"}
-                  {status === "accepted" && "Aceito"}
-                  {status === "preparing" && "Em preparo"}
-                  {status === "ready" && "Pronto"}
-                </span>
-              )}
-            </div>
+            {total > 0 && (
+              <span className="text-base font-bold">
+                R$ {total.toFixed(2)}
+              </span>
+            )}
           </div>
         </Button>
       </div>
