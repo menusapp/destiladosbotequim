@@ -640,104 +640,10 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       {/* Seção de Pedidos */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Pedidos
-            </CardTitle>
-            <Collapsible>
-              <CollapsibleTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Criar Pedido Manual
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-4">
-                <div className="space-y-4 p-4 border rounded-lg">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Mesa</Label>
-                      <Select value={manualOrder.tableId} onValueChange={(value) => setManualOrder({ ...manualOrder, tableId: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a mesa" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tables.map((table) => (
-                            <SelectItem key={table.id} value={table.id}>
-                              Mesa {table.table_number}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Nome do Cliente</Label>
-                      <Input value={manualOrder.customerName} onChange={(e) => setManualOrder({ ...manualOrder, customerName: e.target.value })} placeholder="Nome do cliente" />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>CPF (opcional)</Label>
-                    <Input value={manualOrder.customerCpf} onChange={(e) => setManualOrder({ ...manualOrder, customerCpf: e.target.value })} placeholder="000.000.000-00" />
-                  </div>
-                  <div>
-                    <Label>Produtos</Label>
-                    <Select
-                      onValueChange={(productId) => {
-                        const product = products.find((p) => p.id === productId);
-                        if (product) {
-                          setManualOrder({
-                            ...manualOrder,
-                            items: [...manualOrder.items, { productId: product.id, quantity: 1, price: product.price }],
-                          });
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Adicionar produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} - R$ {product.price.toFixed(2)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {manualOrder.items.length > 0 && (
-                    <div className="space-y-2">
-                      {manualOrder.items.map((item, index) => {
-                        const product = products.find((p) => p.id === item.productId);
-                        return (
-                          <div key={index} className="flex items-center gap-2 p-2 border rounded">
-                            <span className="flex-1">{product?.name}</span>
-                            <Input type="number" min="1" value={item.quantity} onChange={(e) => {
-                                const newItems = [...manualOrder.items];
-                                newItems[index].quantity = parseInt(e.target.value) || 1;
-                                setManualOrder({ ...manualOrder, items: newItems });
-                              }}
-                              className="w-20"
-                            />
-                            <Button variant="ghost" size="sm" onClick={() => {
-                                const newItems = manualOrder.items.filter((_, i) => i !== index);
-                                setManualOrder({ ...manualOrder, items: newItems });
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <Button onClick={handleCreateManualOrder} className="w-full">
-                    Criar Pedido
-                  </Button>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Pedidos
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
