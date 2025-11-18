@@ -95,7 +95,7 @@ export const ProductDetailDrawer = ({
             </div>
           )}
           {/* Restaurant info overlay */}
-          <div className="absolute bottom-4 left-4 bg-white rounded-full px-3 py-2 shadow-lg flex items-center gap-2">
+          <div className="absolute bottom-4 left-4 bg-white rounded-lg px-3 py-2 shadow-lg flex items-center gap-2">
             {restaurantLogo ? (
               <img src={restaurantLogo} alt={restaurantName} className="w-6 h-6 rounded-full object-cover" />
             ) : (
