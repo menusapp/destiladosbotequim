@@ -8,6 +8,7 @@ import { RestaurantInfoCard } from "@/components/menu/RestaurantInfoCard";
 import { FeaturedProducts } from "@/components/menu/FeaturedProducts";
 import { CategoryProducts } from "@/components/menu/CategoryProducts";
 import { CartBottomBar } from "@/components/menu/CartBottomBar";
+import { ComandaBottomBar } from "@/components/menu/ComandaBottomBar";
 import { CartDrawer } from "@/components/menu/CartDrawer";
 import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
@@ -31,6 +32,9 @@ const Menu = () => {
   const [showCartDrawer, setShowCartDrawer] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [hasOpenComanda, setHasOpenComanda] = useState(false);
+  const [comandaTotal, setComandaTotal] = useState(0);
+  const [comandaStatus, setComandaStatus] = useState<string>("");
 
   useMenuInactivityLogout(customerName, tableNumber || "", tableId);
 
@@ -58,12 +62,66 @@ const Menu = () => {
         .map((cat: any) => ({ ...cat, products: (cat.products || []).sort((a: Product, b: Product) => a.name.localeCompare(b.name)) }))
         .filter((cat: Category) => cat.products.length > 0);
       setCategories(sortedCategories);
+
+      // Verificar se existe comanda aberta
+      if (tableData.id) {
+        await checkOpenComanda(tableData.id);
+      }
     } catch (error: any) {
       toast.error("Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
   }, [restaurantSlug, tableNumber]);
+
+  const checkOpenComanda = async (tableId: string) => {
+    try {
+      // Buscar pedidos pendentes, aceitos ou em preparo
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          status,
+          order_items (
+            quantity,
+            price_at_order,
+            order_item_extras (
+              price_at_order
+            )
+          )
+        `)
+        .eq("table_id", tableId)
+        .in("status", ["pending", "accepted", "preparing", "ready"]);
+
+      if (error) throw error;
+
+      if (orders && orders.length > 0) {
+        setHasOpenComanda(true);
+        
+        // Calcular total
+        let total = 0;
+        orders.forEach((order: any) => {
+          order.order_items?.forEach((item: any) => {
+            const itemTotal = item.price_at_order * item.quantity;
+            const extrasTotal = item.order_item_extras?.reduce((sum: number, extra: any) => sum + extra.price_at_order, 0) || 0;
+            total += itemTotal + extrasTotal * item.quantity;
+          });
+        });
+
+        setComandaTotal(total);
+        
+        // Pegar status do pedido mais recente
+        const latestOrder = orders[orders.length - 1];
+        setComandaStatus(latestOrder.status);
+      } else {
+        setHasOpenComanda(false);
+        setComandaTotal(0);
+        setComandaStatus("");
+      }
+    } catch (error) {
+      console.error("Erro ao verificar comanda:", error);
+    }
+  };
 
   useEffect(() => {
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
@@ -83,9 +141,12 @@ const Menu = () => {
     const channel = supabase.channel('menu-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchData)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'restaurants' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        if (tableId) checkOpenComanda(tableId);
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchData, restaurantSlug, tableNumber]);
+  }, [fetchData, restaurantSlug, tableNumber, tableId]);
 
   useEffect(() => {
     if (customerName && customerCPF) {
@@ -331,13 +392,26 @@ const Menu = () => {
         </>
       )}
 
-      <CartBottomBar
-        itemCount={getTotalItemCount()}
-        total={getCartTotal()}
-        primaryColor={primaryColor}
-        onViewCart={() => setShowCartDrawer(true)}
-        label="Ver comanda"
-      />
+      {/* Barra de carrinho - só mostra se não há comanda aberta */}
+      {!hasOpenComanda && (
+        <CartBottomBar
+          itemCount={getTotalItemCount()}
+          total={getCartTotal()}
+          primaryColor={primaryColor}
+          onViewCart={() => setShowCartDrawer(true)}
+          label="Ver comanda"
+        />
+      )}
+
+      {/* Barra de comanda aberta - só aparece quando há comanda */}
+      {hasOpenComanda && (
+        <ComandaBottomBar
+          total={comandaTotal}
+          primaryColor={primaryColor}
+          status={comandaStatus}
+          onViewComanda={() => navigate(`/comanda/${restaurantSlug}/${tableNumber}`)}
+        />
+      )}
 
       <CustomerInfoDialog
         open={showCustomerDialog}
