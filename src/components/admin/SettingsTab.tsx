@@ -15,9 +15,6 @@ interface Settings {
   primary_color: string;
   service_fee_enabled: boolean;
   service_fee_percentage: number;
-  rating: number;
-  review_count: number;
-  prep_time_minutes: number;
 }
 
 const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
@@ -27,9 +24,6 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     primary_color: "#FF6B35",
     service_fee_enabled: false,
     service_fee_percentage: 10,
-    rating: 4.8,
-    review_count: 12,
-    prep_time_minutes: 30,
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -43,7 +37,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, rating, review_count, prep_time_minutes")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -56,9 +50,6 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           primary_color: data.primary_color || "#FF6B35",
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
-          rating: data.rating || 4.8,
-          review_count: data.review_count || 12,
-          prep_time_minutes: data.prep_time_minutes || 30,
         });
       } else {
         // Nenhuma configuração encontrada para este restaurante
@@ -185,15 +176,12 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           primary_color: settings.primary_color,
           service_fee_enabled: settings.service_fee_enabled,
           service_fee_percentage: settings.service_fee_percentage,
-          rating: settings.rating,
-          review_count: settings.review_count,
-          prep_time_minutes: settings.prep_time_minutes,
         })
         .eq('id', restaurantId);
 
       if (error) throw error;
 
-      toast.success("Configurações salvas com sucesso!");
+      toast.success("Configurações salvas!");
       await fetchSettings();
     } catch (error) {
       toast.error("Erro ao salvar configurações");
@@ -326,60 +314,6 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Esta cor será aplicada em todo o cardápio digital
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Informações do Restaurante</CardTitle>
-              <CardDescription>
-                Configure as informações exibidas no cardápio
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="rating">Avaliação (Estrelas)</Label>
-                <Input
-                  id="rating"
-                  type="number"
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  value={settings.rating}
-                  onChange={(e) => setSettings({ ...settings, rating: parseFloat(e.target.value) || 0 })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Avaliação exibida no cardápio (0.0 a 5.0 estrelas)
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="review-count">Número de Avaliações</Label>
-                <Input
-                  id="review-count"
-                  type="number"
-                  min="0"
-                  value={settings.review_count}
-                  onChange={(e) => setSettings({ ...settings, review_count: parseInt(e.target.value) || 0 })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Quantidade de avaliações exibida (ex: 12 avaliações)
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="prep-time">Tempo Estimado (minutos)</Label>
-                <Input
-                  id="prep-time"
-                  type="number"
-                  min="0"
-                  value={settings.prep_time_minutes}
-                  onChange={(e) => setSettings({ ...settings, prep_time_minutes: parseInt(e.target.value) || 0 })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Tempo médio de preparo geral do restaurante (ex: 30 min)
                 </p>
               </div>
             </CardContent>

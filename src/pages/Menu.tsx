@@ -397,7 +397,6 @@ const Menu = () => {
             setSearchOpen(false);
             setSearchQuery("");
           }}
-          primaryColor={primaryColor}
         />
 
         <RestaurantInfoCard
