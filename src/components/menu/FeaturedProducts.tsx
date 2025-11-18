@@ -20,46 +20,43 @@ export const FeaturedProducts = ({
       {title && (
         <h2 className="text-2xl font-bold text-foreground mb-4">{title}</h2>
       )}
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
+      <div className="grid grid-cols-2 gap-3">
         {products.map((product) => (
           <button
             key={product.id}
             onClick={() => product.available && onProductClick(product)}
-            className="flex-none w-36 group"
+            className="bg-card rounded-2xl shadow-sm overflow-hidden cursor-pointer active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!product.available}
           >
-            <div className="relative">
+            <div className="relative aspect-square bg-muted">
               {product.image_url ? (
                 <img
                   src={product.image_url}
                   alt={product.name}
-                  className="w-36 h-36 object-cover rounded-2xl shadow-md group-hover:shadow-lg transition-shadow"
+                  className="w-full h-full object-cover"
                 />
               ) : (
                 <div
-                  className="w-36 h-36 rounded-2xl shadow-md flex items-center justify-center text-white text-xl font-bold"
+                  className="w-full h-full flex items-center justify-center text-white text-2xl font-bold"
                   style={{ backgroundColor: primaryColor }}
                 >
                   {product.name.charAt(0)}
                 </div>
               )}
               {!product.available && (
-                <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <span className="text-white text-xs font-semibold bg-black/70 px-2 py-1 rounded">
                     Indisponível
                   </span>
                 </div>
               )}
-              <div className="absolute top-2 left-2 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-md">
-                Mais pedido
-              </div>
             </div>
-            <div className="mt-2">
-              <p className="font-bold text-foreground" style={{ color: primaryColor }}>
-                R$ {product.price.toFixed(2)}
-              </p>
-              <p className="text-sm font-medium text-foreground line-clamp-2">
+            <div className="p-3 text-left">
+              <h3 className="font-semibold text-sm mb-1 line-clamp-2">
                 {product.name}
+              </h3>
+              <p className="text-lg font-bold" style={{ color: primaryColor }}>
+                R$ {product.price.toFixed(2)}
               </p>
             </div>
           </button>
