@@ -13,6 +13,7 @@ interface ReviewModalProps {
   restaurantName: string;
   orderId?: string;
   counterOrderId?: string;
+  billId?: string;
 }
 
 export const ReviewModal = ({
@@ -22,6 +23,7 @@ export const ReviewModal = ({
   restaurantName,
   orderId,
   counterOrderId,
+  billId,
 }: ReviewModalProps) => {
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
@@ -41,6 +43,7 @@ export const ReviewModal = ({
         restaurant_id: restaurantId,
         order_id: orderId || null,
         counter_order_id: counterOrderId || null,
+        bill_id: billId || null,
         rating,
         comment: comment.trim() || null,
       });

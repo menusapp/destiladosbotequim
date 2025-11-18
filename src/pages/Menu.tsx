@@ -36,6 +36,7 @@ const Menu = () => {
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewOrderId, setReviewOrderId] = useState<string | undefined>();
   const [reviewCounterOrderId, setReviewCounterOrderId] = useState<string | undefined>();
+  const [reviewBillId, setReviewBillId] = useState<string | undefined>();
   const [hasOpenComanda, setHasOpenComanda] = useState(false);
   const [comandaTotal, setComandaTotal] = useState(0);
   const [comandaStatus, setComandaStatus] = useState<string>("");
@@ -58,7 +59,7 @@ const Menu = () => {
       
       // Abrir modal após um pequeno delay
       setTimeout(() => {
-        if (billId) setReviewOrderId(billId);
+        if (billId) setReviewBillId(billId);
         if (counterOrderId) setReviewCounterOrderId(counterOrderId);
         setReviewModalOpen(true);
       }, 500);
@@ -547,11 +548,13 @@ const Menu = () => {
           setReviewModalOpen(false);
           setReviewOrderId(undefined);
           setReviewCounterOrderId(undefined);
+          setReviewBillId(undefined);
         }}
         restaurantId={restaurant.id}
         restaurantName={restaurant.name}
         orderId={reviewOrderId}
         counterOrderId={reviewCounterOrderId}
+        billId={reviewBillId}
       />
     </div>
   );
