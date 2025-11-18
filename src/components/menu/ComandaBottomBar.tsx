@@ -4,6 +4,7 @@ interface ComandaBottomBarProps {
   total: number;
   primaryColor: string;
   status?: string;
+  isVisible?: boolean;
   onViewComanda: () => void;
 }
 
@@ -11,10 +12,15 @@ export const ComandaBottomBar = ({
   total,
   primaryColor,
   status,
+  isVisible = true,
   onViewComanda,
 }: ComandaBottomBarProps) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
+    <div 
+      className={`fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
+        isVisible ? 'translate-y-0' : 'translate-y-full'
+      }`}
+    >
       <div className="px-4 py-3">
         <button
           onClick={onViewComanda}

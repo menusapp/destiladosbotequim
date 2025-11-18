@@ -35,6 +35,8 @@ const Menu = () => {
   const [hasOpenComanda, setHasOpenComanda] = useState(false);
   const [comandaTotal, setComandaTotal] = useState(0);
   const [comandaStatus, setComandaStatus] = useState<string>("");
+  const [showComandaBar, setShowComandaBar] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
 
   useMenuInactivityLogout(customerName, tableNumber || "", tableId);
 
@@ -110,33 +112,69 @@ const Menu = () => {
 
       if (error) throw error;
 
+      // Calcular total dos pedidos já enviados
+      let ordersTotal = 0;
       if (orders && orders.length > 0) {
         setHasOpenComanda(true);
         
-        // Calcular total apenas dos pedidos da sessão atual
-        let total = 0;
         orders.forEach((order: any) => {
           order.order_items?.forEach((item: any) => {
             const extrasSum = item.order_item_extras?.reduce((sum: number, extra: any) => sum + extra.price_at_order, 0) || 0;
             const itemTotal = (item.price_at_order + extrasSum) * item.quantity;
-            total += itemTotal;
+            ordersTotal += itemTotal;
           });
         });
-
-        setComandaTotal(total);
         
         // Pegar status do pedido mais recente
         const latestOrder = orders[orders.length - 1];
         setComandaStatus(latestOrder.status);
       } else {
         setHasOpenComanda(false);
-        setComandaTotal(0);
         setComandaStatus("");
       }
+
+      // Calcular total do carrinho (itens não enviados)
+      const cartTotal = cart.reduce((sum, item) => {
+        const extrasSum = item.extras?.reduce((extraSum, extra) => extraSum + extra.price, 0) || 0;
+        return sum + (item.product.price + extrasSum) * item.quantity;
+      }, 0);
+
+      // Total da comanda = pedidos enviados + carrinho
+      setComandaTotal(ordersTotal + cartTotal);
     } catch (error) {
       console.error("Erro ao verificar comanda:", error);
     }
   };
+
+  // Detectar direção do scroll para esconder/mostrar barra
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        // Scrolling down - esconder barra
+        setShowComandaBar(false);
+      } else if (currentScrollY < lastScrollY) {
+        // Scrolling up - mostrar barra
+        setShowComandaBar(true);
+      }
+      
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [lastScrollY]);
+
+  // Atualizar total da comanda sempre que o cart mudar
+  useEffect(() => {
+    if (tableId && customerName) {
+      checkOpenComanda(tableId);
+    }
+  }, [cart, tableId, customerName]);
 
   useEffect(() => {
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
@@ -413,6 +451,7 @@ const Menu = () => {
           total={comandaTotal}
           primaryColor={primaryColor}
           status={comandaStatus}
+          isVisible={showComandaBar}
           onViewComanda={() => navigate(`/comanda/${restaurantSlug}/${tableNumber}`)}
         />
       )}
