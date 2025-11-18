@@ -1816,10 +1816,12 @@ export type Database = {
         Returns: undefined
       }
       auto_release_idle_tables: { Args: never; Returns: undefined }
+      auto_release_inactive_tables: { Args: never; Returns: undefined }
       check_product_availability: {
         Args: { p_product_id: string }
         Returns: boolean
       }
+      cleanup_abandoned_tables: { Args: never; Returns: undefined }
       get_restaurant_rating_stats: {
         Args: { p_restaurant_id: string }
         Returns: {
