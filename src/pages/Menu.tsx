@@ -50,23 +50,32 @@ const Menu = () => {
   // Verificar se deve abrir modal de avaliação ao carregar
   useEffect(() => {
     const shouldShowReview = sessionStorage.getItem('shouldShowReview');
+    console.log('🔍 Verificando se deve mostrar review:', {
+      shouldShowReview,
+      reviewBillId: sessionStorage.getItem('reviewBillId'),
+      customerName,
+      showCustomerDialog
+    });
+    
     if (shouldShowReview === 'true') {
       const billId = sessionStorage.getItem('reviewBillId');
       const counterOrderId = sessionStorage.getItem('reviewCounterOrderId');
+      
+      console.log('⭐ Preparando para abrir modal de avaliação!');
       
       // Limpar flags do sessionStorage
       sessionStorage.removeItem('shouldShowReview');
       sessionStorage.removeItem('reviewBillId');
       sessionStorage.removeItem('reviewCounterOrderId');
       
-      // Abrir modal após um pequeno delay
-      setTimeout(() => {
-        if (billId) setReviewBillId(billId);
-        if (counterOrderId) setReviewCounterOrderId(counterOrderId);
-        setReviewModalOpen(true);
-      }, 500);
+      // Abrir modal IMEDIATAMENTE
+      if (billId) setReviewBillId(billId);
+      if (counterOrderId) setReviewCounterOrderId(counterOrderId);
+      setReviewModalOpen(true);
+      
+      console.log('✅ Modal de avaliação aberto!');
     }
-  }, []);
+  }, []); // Executar apenas UMA VEZ ao montar
 
   const fetchData = useCallback(async () => {
     if (!restaurantSlug || !tableNumber) return;
@@ -266,7 +275,7 @@ const Menu = () => {
   // Realtime subscription para pedidos da mesa (subscription já existe nas linhas 279-285)
 
   const handleBillPaid = useCallback(async (billId: string) => {
-    console.log('🔔 handleBillPaid chamado!', { 
+    console.log('🔔 handleBillPaid chamado - INICIANDO LOGOUT COMPLETO!', { 
       billId, 
       tableNumber, 
       restaurantSlug,
@@ -274,47 +283,49 @@ const Menu = () => {
       tempoAtual: new Date().toISOString()
     });
     
-    // Verificar se mesa foi liberada
-    if (tableId) {
-      const { data: tableData } = await supabase
-        .from('tables')
-        .select('is_occupied, occupied_by')
-        .eq('id', tableId)
-        .single();
-      
-      console.log('📋 Status da mesa:', tableData);
-    }
+    // 1️⃣ PRIMEIRO: Limpar TODOS os estados (isso previne useEffects de salvar de volta)
+    setCustomerName("");
+    setCustomerCPF("");
+    setTableId(null);
+    setCart([]);
+    setHasOpenComanda(false);
+    setComandaTotal(0);
     
-    // Limpar dados da sessão
-    sessionStorage.removeItem(`customer_name_${tableNumber}`);
-    sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
-    sessionStorage.removeItem(`cart_${tableNumber}`);
-    sessionStorage.removeItem('customerInfo');
+    console.log('✅ Estados limpos');
     
-    console.log('✅ SessionStorage limpo');
+    // 2️⃣ SEGUNDO: Limpar sessionStorage
+    sessionStorage.clear(); // Limpar TUDO de uma vez
     
-    // Marcar para abrir modal de avaliação após reload
+    console.log('✅ SessionStorage COMPLETAMENTE limpo');
+    
+    // 3️⃣ TERCEIRO: Setar APENAS as flags de review
     sessionStorage.setItem('shouldShowReview', 'true');
     sessionStorage.setItem('reviewBillId', billId);
+    sessionStorage.setItem('forceLogout', 'true'); // Flag extra de segurança
     
-    console.log('✅ Flags de avaliação setadas:', {
-      shouldShowReview: sessionStorage.getItem('shouldShowReview'),
-      reviewBillId: sessionStorage.getItem('reviewBillId')
-    });
+    console.log('✅ Flags de avaliação setadas');
     
-    // Mostrar mensagem e recarregar
-    toast.success("Conta paga! Obrigado pela preferência! 🎉", {
-      duration: 1500,
-    });
-    
-    // Recarregar página para forçar novo login
-    setTimeout(() => {
-      console.log('🔄 Recarregando página em 3... 2... 1...');
-      window.location.href = `/menu/${restaurantSlug}/${tableNumber}`;
-    }, 1500);
+    // 4️⃣ QUARTO: Reload IMEDIATO (sem delay!)
+    console.log('🔄 Recarregando AGORA...');
+    window.location.href = `/menu/${restaurantSlug}/${tableNumber}`;
   }, [tableNumber, restaurantSlug, tableId]);
 
   useEffect(() => {
+    // Verificar se é um logout forçado
+    const forceLogout = sessionStorage.getItem('forceLogout');
+    
+    if (forceLogout === 'true') {
+      console.log('🚪 Logout forçado detectado - limpando tudo!');
+      sessionStorage.removeItem('forceLogout');
+      sessionStorage.removeItem(`customer_name_${tableNumber}`);
+      sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+      sessionStorage.removeItem(`cart_${tableNumber}`);
+      sessionStorage.removeItem('customerInfo');
+      setShowCustomerDialog(true);
+      fetchData();
+      return; // ❌ NÃO tentar restaurar sessão
+    }
+    
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
     const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
     if (savedName && savedCPF) {
@@ -444,16 +455,7 @@ const Menu = () => {
   const handleCompleteLogout = useCallback(() => {
     console.log('🚪 Deslogando cliente completamente...');
     
-    // Limpar TODOS os dados do sessionStorage
-    sessionStorage.removeItem(`customer_name_${tableNumber}`);
-    sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
-    sessionStorage.removeItem(`cart_${tableNumber}`);
-    sessionStorage.removeItem('customerInfo');
-    sessionStorage.removeItem('shouldShowReview');
-    sessionStorage.removeItem('reviewBillId');
-    sessionStorage.removeItem('reviewCounterOrderId');
-    
-    // Resetar TODOS os estados
+    // Limpar TODOS os estados
     setCustomerName("");
     setCustomerCPF("");
     setTableId(null);
@@ -465,11 +467,21 @@ const Menu = () => {
     setReviewOrderId(undefined);
     setReviewCounterOrderId(undefined);
     
+    // Limpar sessionStorage
+    sessionStorage.removeItem(`customer_name_${tableNumber}`);
+    sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+    sessionStorage.removeItem(`cart_${tableNumber}`);
+    sessionStorage.removeItem('customerInfo');
+    sessionStorage.removeItem('shouldShowReview');
+    sessionStorage.removeItem('reviewBillId');
+    sessionStorage.removeItem('reviewCounterOrderId');
+    sessionStorage.removeItem('forceLogout');
+    
     // Forçar dialog de login
     setShowCustomerDialog(true);
     
     console.log('✅ Cliente deslogado com sucesso');
-    toast.info("Obrigado pela visita! Por favor, faça login novamente para um novo pedido.");
+    toast.info("Obrigado pela visita! 🙏");
   }, [tableNumber]);
 
   const handleCustomerInfoSubmit = async (name: string, cpf: string) => {
