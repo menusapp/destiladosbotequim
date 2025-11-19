@@ -403,16 +403,17 @@ const Menu = () => {
         if (tableId) checkOpenComanda(tableId, cart);
       })
       .on('postgres_changes', { 
-        event: '*', 
+        event: 'UPDATE', 
         schema: 'public', 
-        table: 'bills',
-        filter: tableId ? `table_id=eq.${tableId}` : undefined
+        table: 'bills'
       }, (payload) => {
         console.log('💳 Conta atualizada em tempo real:', payload);
         const bill = payload.new as any;
         
-        if (bill?.status === 'paid' && bill?.id) {
-          console.log('✅ Conta foi paga! Deslogando cliente...');
+        if (bill?.status === 'paid' && 
+            bill?.table_id === tableId && 
+            bill?.id) {
+          console.log('✅ Conta da NOSSA mesa foi paga! Deslogando cliente...');
           handleBillPaid(bill.id);
         }
       })
