@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +12,15 @@ import { ptBR } from "date-fns/locale";
 interface PedidosHistoryProps {
   customerCPF: string;
   restaurantId: string;
+  restaurantSlug: string;
 }
 
 export const PedidosHistory = ({
   customerCPF,
   restaurantId,
+  restaurantSlug,
 }: PedidosHistoryProps) => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -135,7 +139,11 @@ export const PedidosHistory = ({
     <ScrollArea className="h-[calc(100vh-180px)]">
       <div className="space-y-4 p-4 pb-20">
         {orders.map((order) => (
-          <Card key={order.id}>
+          <Card 
+            key={order.id}
+            className="cursor-pointer hover:bg-accent transition-colors"
+            onClick={() => navigate(`/delivery/${restaurantSlug}/pedido/${order.id}`)}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">

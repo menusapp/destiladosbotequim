@@ -363,6 +363,7 @@ export default function DeliveryMenu() {
           <PedidosHistory
             customerCPF={customerCPF}
             restaurantId={restaurant.id}
+            restaurantSlug={restaurantSlug || ""}
           />
         </div>
       )}
