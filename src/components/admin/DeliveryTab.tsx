@@ -29,6 +29,7 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
     minOrderValue: 0,
     deliveryFee: 0,
     estimatedTime: 30,
+    storeAddress: "",
   });
 
   const [loading, setLoading] = useState(true);
@@ -81,6 +82,7 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
           minOrderValue: parseFloat(String(deliveryData.min_order_value)) || 0,
           deliveryFee: parseFloat(String(deliveryData.delivery_fee)) || 0,
           estimatedTime: deliveryData.estimated_time_minutes || 30,
+          storeAddress: deliveryData.store_address || "",
         });
       }
     } catch (error) {
@@ -137,6 +139,7 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
         min_order_value: deliveryConfig.minOrderValue,
         delivery_fee: deliveryConfig.deliveryFee,
         estimated_time_minutes: deliveryConfig.estimatedTime,
+        store_address: deliveryConfig.storeAddress,
       };
 
       if (existing) {
@@ -255,6 +258,22 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
                   setDeliveryConfig({ ...deliveryConfig, estimatedTime: parseInt(e.target.value) || 30 })
                 }
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="store-address">Endereço da Loja</Label>
+              <textarea
+                id="store-address"
+                className="w-full min-h-[80px] px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Rua, número, bairro, cidade - CEP"
+                value={deliveryConfig.storeAddress}
+                onChange={(e) =>
+                  setDeliveryConfig({ ...deliveryConfig, storeAddress: e.target.value })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Endereço que será exibido para clientes que escolherem retirada
+              </p>
             </div>
 
             <Button onClick={handleSaveDelivery} className="w-full">

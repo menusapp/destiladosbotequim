@@ -31,6 +31,7 @@ interface Order {
   coupon_discount: number;
   loyalty_points_used: number;
   restaurant_id: string;
+  delivery_type?: string;
   order_items: OrderItem[];
 }
 
@@ -260,24 +261,23 @@ export default function OrderConfirmation() {
         {/* Timeline de status */}
         <Card className="mb-6">
           <CardContent className="p-6 space-y-4">
-            <StatusStep
-              completed={true}
-              label="Pedido recebido"
-              time={format(new Date(order.created_at), "HH:mm")}
-            />
-            <StatusStep
-              completed={["accepted", "preparing", "ready", "delivered"].includes(order.status)}
-              label="Pedido aceito"
-            />
-            <StatusStep
-              completed={["preparing", "ready", "delivered"].includes(order.status)}
-              label="Em preparo"
-            />
-            <StatusStep
-              completed={["ready", "delivered"].includes(order.status)}
-              label="Saiu para entrega"
-            />
-            <StatusStep completed={order.status === "delivered"} label="Entregue" />
+              <StatusStep
+                completed={true}
+                label="Pedido recebido"
+                time={format(new Date(order.created_at), "HH:mm")}
+              />
+              <StatusStep
+                completed={["accepted", "ready", "delivered", "picked_up"].includes(order.status)}
+                label="Em Preparo"
+              />
+              <StatusStep
+                completed={["ready", "delivered", "picked_up"].includes(order.status)}
+                label={order.delivery_type === "pickup" ? "Pronto para Retirada" : "Saiu para Entrega"}
+              />
+              <StatusStep 
+                completed={["delivered", "picked_up"].includes(order.status)} 
+                label={order.delivery_type === "pickup" ? "Retirado" : "Entregue"} 
+              />
           </CardContent>
         </Card>
 

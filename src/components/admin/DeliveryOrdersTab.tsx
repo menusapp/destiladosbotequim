@@ -57,6 +57,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -73,7 +74,10 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
           table: "orders",
         },
         () => {
-          fetchOrders();
+          // Só refetch se NÃO estiver fazendo update otimista
+          if (!isUpdating) {
+            fetchOrders();
+          }
         }
       )
       .subscribe();
@@ -131,6 +135,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    setIsUpdating(true);
     try {
       // Update otimista: atualizar UI ANTES da chamada RPC
       setOrders(prevOrders => 
@@ -161,14 +166,18 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
       };
 
       toast.success(statusMessages[newStatus] || "Status atualizado");
-      // Realtime faz o refetch automático
+      
+      // Aguardar 500ms antes de permitir novo refetch
+      setTimeout(() => setIsUpdating(false), 500);
     } catch (error) {
+      setIsUpdating(false);
       console.error("Error updating order:", error);
       toast.error("Erro ao atualizar pedido");
     }
   };
 
   const deleteOrder = async (orderId: string) => {
+    setIsUpdating(true);
     try {
       // Update otimista: remover da UI ANTES da chamada RPC
       setOrders(prevOrders => 
@@ -187,8 +196,9 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
       }
 
       toast.success("Pedido excluído com sucesso");
-      // Realtime faz o refetch automático
+      setTimeout(() => setIsUpdating(false), 500);
     } catch (error) {
+      setIsUpdating(false);
       console.error("Error deleting order:", error);
       toast.error("Erro ao excluir pedido");
     }
