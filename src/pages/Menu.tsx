@@ -274,38 +274,6 @@ const Menu = () => {
 
   // Realtime subscription para pedidos da mesa (subscription já existe nas linhas 279-285)
 
-  const handleBillPaid = useCallback(async (billId: string) => {
-    console.log('🔔 handleBillPaid chamado - INICIANDO LOGOUT COMPLETO!', { 
-      billId, 
-      tableNumber, 
-      restaurantSlug,
-      tableId,
-      tempoAtual: new Date().toISOString()
-    });
-    
-    // ❌ NÃO limpar estados locais aqui! Isso dispara outros useEffects
-    // Vamos deixar os estados como estão e só limpar sessionStorage
-    
-    // 1️⃣ Limpar sessionStorage COMPLETAMENTE
-    sessionStorage.clear();
-    
-    console.log('✅ SessionStorage COMPLETAMENTE limpo');
-    
-    // 2️⃣ Setar APENAS as flags necessárias
-    sessionStorage.setItem('shouldShowReview', 'true');
-    sessionStorage.setItem('reviewBillId', billId);
-    sessionStorage.setItem('forceLogout', 'true');
-    
-    console.log('✅ Flags setadas:', {
-      shouldShowReview: 'true',
-      reviewBillId: billId,
-      forceLogout: 'true'
-    });
-    
-    // 3️⃣ Reload IMEDIATO (sem delay!)
-    console.log('🔄 Recarregando AGORA...');
-    window.location.href = `/menu/${restaurantSlug}/${tableNumber}`;
-  }, [tableNumber, restaurantSlug, tableId]);
 
   useEffect(() => {
     console.log('🔄 useEffect de inicialização executado');
@@ -402,21 +370,6 @@ const Menu = () => {
         console.log('📝 Pedidos atualizados em tempo real!');
         if (tableId) checkOpenComanda(tableId, cart);
       })
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'bills'
-      }, (payload) => {
-        console.log('💳 Conta atualizada em tempo real:', payload);
-        const bill = payload.new as any;
-        
-        if (bill?.status === 'paid' && 
-            bill?.table_id === tableId && 
-            bill?.id) {
-          console.log('✅ Conta da NOSSA mesa foi paga! Deslogando cliente...');
-          handleBillPaid(bill.id);
-        }
-      })
       .subscribe((status) => {
         console.log('📡 Status da subscrição Menu:', status);
       });
@@ -425,7 +378,7 @@ const Menu = () => {
       console.log('🔌 Removendo canal de realtime');
       supabase.removeChannel(channel); 
     };
-  }, [fetchData, restaurantSlug, tableNumber, tableId, handleBillPaid, checkOpenComanda]);
+  }, [fetchData, restaurantSlug, tableNumber, tableId, checkOpenComanda]);
 
   useEffect(() => {
     // ✅ Só salvar se temos dados válidos (não strings vazias)

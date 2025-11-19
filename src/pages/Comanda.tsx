@@ -144,12 +144,33 @@ const Comanda = () => {
             }
             
             if (bill?.status === "paid") {
-              console.log("✅ Conta foi paga!");
-              // Conta foi paga - cliente será deslogado pelo Menu.tsx
-              toast.success("Conta paga! Obrigado! 🎉");
+              console.log("✅ Conta foi paga! Redirecionando...");
+              toast.success("Conta paga! Obrigado pela preferência!");
+              
+              // Liberar a mesa no banco de dados
+              if (tableData?.id) {
+                supabase.from("tables").update({
+                  is_occupied: false,
+                  occupied_at: null,
+                  occupied_by: null
+                }).eq("id", tableData.id);
+              }
+              
+              // Salvar informações para abrir modal de avaliação
+              sessionStorage.setItem('shouldShowReview', 'true');
+              if (bill?.id) {
+                sessionStorage.setItem('reviewBillId', bill.id);
+              }
+              
+              // Limpar TODOS os dados do cliente da sessão
+              sessionStorage.removeItem(`customer_name_${tableNumber}`);
+              sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+              sessionStorage.removeItem(`cart_${tableNumber}`);
+              sessionStorage.removeItem("customerInfo");
+              
               setTimeout(() => {
                 navigate(`/menu/${restaurantSlug}/${tableNumber}`);
-              }, 1500);
+              }, 2000);
             }
             
             // Recarregar dados de qualquer forma
