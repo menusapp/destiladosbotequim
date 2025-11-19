@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Product } from "@/types/menu";
 
 interface FeaturedProductsProps {
@@ -7,7 +8,7 @@ interface FeaturedProductsProps {
   title?: string;
 }
 
-export const FeaturedProducts = ({
+export const FeaturedProducts = memo(({
   products,
   primaryColor,
   onProductClick,
@@ -63,4 +64,9 @@ export const FeaturedProducts = ({
       </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.products === nextProps.products &&
+    prevProps.primaryColor === nextProps.primaryColor
+  );
+});

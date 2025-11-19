@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Product, Category } from "@/types/menu";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,7 @@ interface CategoryProductsProps {
   onProductClick: (product: Product) => void;
 }
 
-export const CategoryProducts = ({
+export const CategoryProducts = memo(({
   categories,
   primaryColor,
   onProductClick,
@@ -68,4 +69,9 @@ export const CategoryProducts = ({
       ))}
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.categories === nextProps.categories &&
+    prevProps.primaryColor === nextProps.primaryColor
+  );
+});

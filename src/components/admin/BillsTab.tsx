@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,6 +79,8 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState<Date>(startOfDay(new Date()));
   const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
+  
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
   // Manual bill states
   const [tables, setTables] = useState<any[]>([]);

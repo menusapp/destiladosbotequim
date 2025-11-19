@@ -71,8 +71,26 @@ const Menu = () => {
   const fetchData = useCallback(async () => {
     if (!restaurantSlug || !tableNumber) return;
     try {
+      // Single optimized query with all related data
       const { data: restaurantData, error: restError } = await supabase
-        .from("restaurants").select("id, name, slug, is_open, logo_url, banner_url, primary_color, prep_time_minutes, service_fee_enabled, service_fee_percentage, featured_section_enabled, featured_section_title").eq("slug", restaurantSlug).single();
+        .from("restaurants")
+        .select(`
+          id, name, slug, is_open, logo_url, banner_url, primary_color, 
+          prep_time_minutes, service_fee_enabled, service_fee_percentage,
+          featured_section_enabled, featured_section_title,
+          categories (
+            id, name, display_order,
+            products (
+              id, name, description, price, available, image_url, 
+              is_featured, prep_time_minutes, featured_display_order,
+              product_extras (id, name, price)
+            )
+          )
+        `)
+        .eq("slug", restaurantSlug)
+        .order("display_order", { foreignTable: "categories" })
+        .single();
+      
       if (restError) throw restError;
       setRestaurant(restaurantData);
       

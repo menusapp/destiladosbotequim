@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ interface ProductCardProps {
   onToggleAvailable: (id: string, available: boolean) => void;
 }
 
-const ProductCard = ({ product, onEdit, onToggleAvailable }: ProductCardProps) => {
+const ProductCard = memo(({ product, onEdit, onToggleAvailable }: ProductCardProps) => {
   const margin = product.margin || 0;
   const marginColor = margin >= 70 ? "text-success" : margin >= 50 ? "text-warning" : "text-foreground";
 
@@ -95,6 +96,8 @@ const ProductCard = ({ product, onEdit, onToggleAvailable }: ProductCardProps) =
       </div>
     </Card>
   );
-};
+});
+
+ProductCard.displayName = "ProductCard";
 
 export default ProductCard;

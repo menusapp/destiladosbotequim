@@ -69,25 +69,19 @@ const RestaurantAdmin = () => {
           table: 'orders',
         },
         (payload) => {
+          const orderRestaurantId = (payload.new as any).restaurant_id;
           const orderType = (payload.new as any).order_type;
           
-          // Verificar se o pedido é do restaurante atual através da mesa
-          supabase
-            .from('tables')
-            .select('restaurant_id')
-            .eq('id', (payload.new as any).table_id)
-            .single()
-            .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId) {
-                if (orderType === 'delivery' && activeSection !== 'pedidos-delivery') {
-                  setHasNewDeliveryOrders(true);
-                  toast.info("Novo pedido de delivery recebido!");
-                } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos-locais') {
-                  setHasNewOrders(true);
-                  toast.info("Novo pedido recebido!");
-                }
-              }
-            });
+          // Verificar diretamente pelo restaurant_id do pedido
+          if (orderRestaurantId === restaurantId) {
+            if (orderType === 'delivery' && activeSection !== 'pedidos-delivery') {
+              setHasNewDeliveryOrders(true);
+              toast.info("Novo pedido de delivery recebido! 🚚");
+            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos-locais') {
+              setHasNewOrders(true);
+              toast.info("Novo pedido recebido! 🍽️");
+            }
+          }
         }
       )
       .subscribe();
