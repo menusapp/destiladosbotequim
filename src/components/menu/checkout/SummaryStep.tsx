@@ -12,6 +12,7 @@ interface SummaryStepProps {
   paymentData: any;
   coupon: any;
   loyaltyPointsUsed: number;
+  deliveryType: "delivery" | "pickup";
   onBack: () => void;
   onConfirm: () => void;
   submitting: boolean;
@@ -25,6 +26,7 @@ export const SummaryStep = ({
   paymentData,
   coupon,
   loyaltyPointsUsed,
+  deliveryType,
   onBack,
   onConfirm,
   submitting,
@@ -44,7 +46,7 @@ export const SummaryStep = ({
     : 0;
 
   const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
-  const deliveryFee = restaurant.delivery_fee || 0;
+  const deliveryFee = deliveryType === "delivery" ? (restaurant.delivery_fee || 0) : 0;
   const serviceFee = restaurant.service_fee_enabled
     ? (subtotal * restaurant.service_fee_percentage) / 100
     : 0;
@@ -63,6 +65,9 @@ export const SummaryStep = ({
   };
 
   const formatAddress = () => {
+    if (deliveryType === "pickup") {
+      return restaurant.store_address || "Retirada na loja";
+    }
     const addr = addressData.address;
     return `${addr.street}, ${addr.number}${addr.complement ? `, ${addr.complement}` : ""} - ${addr.neighborhood}, ${addr.city}/${addr.state}`;
   };
@@ -105,17 +110,25 @@ export const SummaryStep = ({
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <MapPin className="w-4 h-4" />
-            Endereço de entrega
+            {deliveryType === "pickup" ? "Local de retirada" : "Endereço de entrega"}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm">{formatAddress()}</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            CEP: {addressData.address.zip_code}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Telefone: {customerData.phone}
-          </p>
+          {deliveryType === "delivery" ? (
+            <>
+              <p className="text-sm text-muted-foreground mt-1">
+                CEP: {addressData.address.zip_code}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Telefone: {customerData.phone}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-1">
+              {customerData.name} - {customerData.phone}
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -147,10 +160,12 @@ export const SummaryStep = ({
             <span>Subtotal</span>
             <span>R$ {subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span>Taxa de entrega</span>
-            <span>R$ {deliveryFee.toFixed(2)}</span>
-          </div>
+          {deliveryType === "delivery" && (
+            <div className="flex justify-between text-sm">
+              <span>Taxa de entrega</span>
+              <span>R$ {deliveryFee.toFixed(2)}</span>
+            </div>
+          )}
           {serviceFee > 0 && (
             <div className="flex justify-between text-sm">
               <span>Taxa de serviço ({restaurant.service_fee_percentage}%)</span>
