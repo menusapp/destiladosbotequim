@@ -258,11 +258,23 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         return;
       }
 
+      // Get restaurant_id from the table
+      const { data: tableData } = await supabase
+        .from("tables")
+        .select("restaurant_id")
+        .eq("id", manualOrder.tableId)
+        .single();
+
+      if (!tableData) {
+        throw new Error("Mesa não encontrada");
+      }
+
       // Create order with status='pending' first
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
           table_id: manualOrder.tableId,
+          restaurant_id: tableData.restaurant_id,
           customer_name: manualOrder.customerName,
           customer_cpf: manualOrder.customerCPF,
           status: "pending",

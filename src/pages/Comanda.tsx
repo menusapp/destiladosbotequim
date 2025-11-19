@@ -404,11 +404,23 @@ const Comanda = () => {
     const customerCPF = (rawCustomerCPF || '').replace(/\D/g, '');
 
     try {
+      // Get restaurant_id from the table
+      const { data: tableData } = await supabase
+        .from("tables")
+        .select("restaurant_id")
+        .eq("id", tableId)
+        .single();
+
+      if (!tableData) {
+        throw new Error("Mesa não encontrada");
+      }
+
       // Criar pedido
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
           table_id: tableId,
+          restaurant_id: tableData.restaurant_id,
           customer_name: customerName || "",
           customer_cpf: customerCPF || "",
           status: "pending",

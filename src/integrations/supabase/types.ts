@@ -1038,8 +1038,9 @@ export type Database = {
           notes: string | null
           order_type: string | null
           payment_type: string | null
+          restaurant_id: string
           status: string | null
-          table_id: string
+          table_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1059,8 +1060,9 @@ export type Database = {
           notes?: string | null
           order_type?: string | null
           payment_type?: string | null
+          restaurant_id: string
           status?: string | null
-          table_id: string
+          table_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1080,11 +1082,19 @@ export type Database = {
           notes?: string | null
           order_type?: string | null
           payment_type?: string | null
+          restaurant_id?: string
           status?: string | null
-          table_id?: string
+          table_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_table_id_fkey"
             columns: ["table_id"]
