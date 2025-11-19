@@ -7,8 +7,8 @@ const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hora em milissegundos
 
 export const useMenuInactivityLogout = (
   tableId: string | null,
-  tableNumber: string | undefined,
-  restaurantSlug: string | undefined
+  tableNumber: string,
+  restaurantSlug: string
 ) => {
   const navigate = useNavigate();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
