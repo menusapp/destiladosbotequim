@@ -128,46 +128,30 @@ const Comanda = () => {
         .on(
           'postgres_changes',
           {
-            event: 'UPDATE',
+            event: '*',
             schema: 'public',
             table: 'bills',
             filter: `table_id=eq.${tableData.id}`,
           },
           (payload) => {
-            console.log("Bill atualizada:", payload);
-            const updatedBill = payload.new as any;
-            if (updatedBill.status === "on_the_way") {
+            console.log("Conta atualizada em tempo real:", payload);
+            const bill = payload.new as any;
+            
+            if (bill?.status === "on_the_way") {
               setBillOnTheWay(true);
-              toast.success("A conta está a caminho!");
-            } else if (updatedBill.status === "paid") {
-              console.log("Conta paga! Liberando mesa e redirecionando...");
-              toast.success("Conta paga! Obrigado pela preferência!");
-              
-              // Liberar a mesa no banco de dados
-              if (tableData?.id) {
-                supabase.from("tables").update({
-                  is_occupied: false,
-                  occupied_at: null,
-                  occupied_by: null
-                }).eq("id", tableData.id).then(() => {
-                  console.log("Mesa liberada com sucesso");
-                });
-              }
-              
-              // Salvar informações para abrir modal de avaliação
-              sessionStorage.setItem('shouldShowReview', 'true');
-              sessionStorage.setItem('reviewBillId', updatedBill.id);
-              
-              // Limpar TODOS os dados do cliente da sessão
-              sessionStorage.removeItem(`customer_name_${tableNumber}`);
-              sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
-              sessionStorage.removeItem(`cart_${tableNumber}`);
-              sessionStorage.removeItem("customerInfo");
-              
+              toast.success("A conta está a caminho! 💳");
+            }
+            
+            if (bill?.status === "paid") {
+              // Conta foi paga - cliente será deslogado pelo Menu.tsx
+              toast.success("Conta paga! Obrigado! 🎉");
               setTimeout(() => {
                 navigate(`/menu/${restaurantSlug}/${tableNumber}`);
-              }, 2000);
+              }, 1500);
             }
+            
+            // Recarregar dados de qualquer forma
+            fetchData();
           }
         )
         .on(

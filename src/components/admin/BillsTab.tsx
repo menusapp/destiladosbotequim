@@ -104,9 +104,9 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
       fetchRecentOrders();
     }
 
-    // Realtime subscription
+    // Realtime subscription COM filtro
     const channel = supabase
-      .channel("bills-changes")
+      .channel(`bills-changes-${restaurantId}`)
       .on(
         "postgres_changes",
         {
@@ -114,7 +114,25 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
           schema: "public",
           table: "bills",
         },
-        () => fetchBills(),
+        async (payload) => {
+          const bill = payload.new as any;
+          
+          // Verificar se pertence ao restaurante
+          if (bill?.table_id) {
+            const { data: table } = await supabase
+              .from("tables")
+              .select("restaurant_id")
+              .eq("id", bill.table_id)
+              .single();
+            
+            if (table?.restaurant_id === restaurantId) {
+              fetchBills();
+            }
+          } else {
+            // Recarregar de qualquer forma (por segurança)
+            fetchBills();
+          }
+        },
       )
       .subscribe();
 

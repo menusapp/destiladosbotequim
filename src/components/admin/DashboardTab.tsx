@@ -55,26 +55,47 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       const startDate = startOfDay(today);
       const endDate = endOfDay(today);
 
-      // Buscar pedidos finalizados do dia (incluindo delivery)
-      const { data: acceptedOrders } = await supabase
+      // Buscar bills PAGAS do dia (pedidos locais)
+      const { data: paidBills } = await supabase
+        .from("bills")
+        .select(`
+          id,
+          total_amount,
+          tables!inner(restaurant_id)
+        `)
+        .eq("tables.restaurant_id", restaurantId)
+        .eq("status", "paid")
+        .gte("paid_at", startDate.toISOString())
+        .lte("paid_at", endDate.toISOString());
+
+      // Calcular total das bills pagas
+      let billsTotal = 0;
+      let billsCount = 0;
+      if (paidBills && paidBills.length > 0) {
+        billsTotal = paidBills.reduce((sum, bill) => sum + Number(bill.total_amount), 0);
+        billsCount = paidBills.length;
+      }
+
+      // Buscar pedidos DELIVERY finalizados do dia
+      const { data: deliveryOrders } = await supabase
         .from("orders")
         .select(`
           id,
           order_items (
-            id,
             quantity,
             price_at_order,
             order_item_extras (price_at_order)
           )
         `)
         .eq("restaurant_id", restaurantId)
+        .eq("order_type", "delivery")
         .eq("status", "delivered")
         .gte("updated_at", startDate.toISOString())
         .lte("updated_at", endDate.toISOString());
 
-      // Calcular total dos pedidos (subtotal + extras + taxa de serviço)
-      let ordersTotal = 0;
-      acceptedOrders?.forEach((order: any) => {
+      // Calcular total dos pedidos delivery
+      let deliveryTotal = 0;
+      deliveryOrders?.forEach((order: any) => {
         let orderSubtotal = 0;
         order.order_items?.forEach((item: any) => {
           const itemTotal = item.price_at_order * item.quantity;
@@ -84,19 +105,19 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
           );
           orderSubtotal += itemTotal + extrasTotal;
         });
-        ordersTotal += orderSubtotal;
+        deliveryTotal += orderSubtotal;
       });
 
-      // Buscar configuração de taxa de serviço
+      // Buscar configuração de taxa de serviço para pedidos delivery
       const { data: restaurant } = await supabase
         .from("restaurants")
         .select("service_fee_enabled, service_fee_percentage")
         .eq("id", restaurantId)
         .single();
 
-      // Aplicar taxa de serviço se habilitada
+      // Aplicar taxa de serviço nos pedidos delivery
       if (restaurant?.service_fee_enabled) {
-        ordersTotal += ordersTotal * (Number(restaurant.service_fee_percentage) / 100);
+        deliveryTotal += deliveryTotal * (Number(restaurant.service_fee_percentage) / 100);
       }
 
       // Buscar pedidos de balcão finalizados do dia
@@ -110,8 +131,9 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
 
       const counterTotal = (counterOrders || []).reduce((sum, order) => sum + Number(order.total_amount), 0);
       
-      const salesTotal = ordersTotal + counterTotal;
-      const ordersCount = (acceptedOrders?.length || 0) + (counterOrders?.length || 0);
+      // Total geral = bills pagas (locais) + delivery + balcão
+      const salesTotal = billsTotal + deliveryTotal + counterTotal;
+      const ordersCount = billsCount + (deliveryOrders?.length || 0) + (counterOrders?.length || 0);
       const avgTicket = ordersCount > 0 ? salesTotal / ordersCount : 0;
 
       // Mesas ocupadas
