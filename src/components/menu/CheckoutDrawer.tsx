@@ -60,10 +60,7 @@ export const CheckoutDrawer = ({
     
     setSubmitting(true);
     try {
-      // 1. Buscar ou criar mesa virtual para delivery
-      let virtualTable;
-
-      // 2. Calcular valores
+      // 1. Calcular valores
       const subtotal = cart.reduce((sum, item) => {
         const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
         return sum + (item.product.price + extrasTotal) * item.quantity;
@@ -76,13 +73,11 @@ export const CheckoutDrawer = ({
         ? (subtotal * restaurant.service_fee_percentage / 100) 
         : 0;
 
-      // 3. Criar pedido (SEM mesa virtual - delivery não precisa de table_id)
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          table_id: null, // Pedidos delivery não têm mesa
-          restaurant_id: restaurant.id, // Restaurant ID direto
-          customer_name: customerData.name,
+      // 2. Criar pedido (delivery sem table_id)
+      const orderData: any = {
+        table_id: null,
+        restaurant_id: restaurant.id,
+        customer_name: customerData.name,
           customer_cpf: customerData.cpf,
           order_type: "delivery",
           delivery_address: formatAddress(addressData.address),
@@ -97,11 +92,18 @@ export const CheckoutDrawer = ({
           loyalty_points_earned: Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1)),
           status: "pending",
           notes: paymentData.changeFor ? `Troco para: R$ ${paymentData.changeFor}` : null,
-        })
+        };
+
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert(orderData)
         .select()
         .single();
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error("Erro ao criar pedido:", orderError);
+        throw orderError;
+      }
 
       // 4. Criar itens do pedido
       for (const item of cart) {
@@ -179,9 +181,16 @@ export const CheckoutDrawer = ({
       // 10. Redirecionar
       navigate(`/delivery/${restaurant.slug}/pedido/${order.id}`);
       toast.success("Pedido realizado com sucesso! 🎉");
-    } catch (error) {
-      console.error("Error finishing order:", error);
-      toast.error("Erro ao finalizar pedido. Tente novamente.");
+    } catch (error: any) {
+      console.error("Erro ao finalizar pedido:", error);
+      console.error("Detalhes do erro:", error?.message || error);
+      
+      // Mensagem de erro mais específica
+      const errorMessage = error?.message 
+        ? `Erro: ${error.message}` 
+        : "Erro ao finalizar pedido. Tente novamente.";
+      
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
