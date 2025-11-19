@@ -78,6 +78,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       .from("tables")
       .select("*")
       .eq("restaurant_id", restaurantId)
+      .neq("table_number", 9999)
       .order("table_number");
 
     if (error) {
