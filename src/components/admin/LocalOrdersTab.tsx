@@ -80,15 +80,42 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     fetchTables();
     fetchProducts();
 
-    // Realtime subscriptions
+    // Realtime subscriptions com filtro por restaurant_id
     const ordersChannel = supabase
-      .channel("orders-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchOrders())
+      .channel(`orders-changes-${restaurantId}`)
+      .on("postgres_changes", { 
+        event: "*", 
+        schema: "public", 
+        table: "orders",
+        filter: `restaurant_id=eq.${restaurantId}`
+      }, () => {
+        console.log('Novo pedido detectado em tempo real!');
+        fetchOrders();
+      })
       .subscribe();
 
     const billsChannel = supabase
-      .channel("bills-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, () => fetchBills())
+      .channel(`bills-changes-${restaurantId}`)
+      .on("postgres_changes", { 
+        event: "*", 
+        schema: "public", 
+        table: "bills"
+      }, async (payload) => {
+        console.log('Nova conta detectada em tempo real!');
+        // Verificar se a conta pertence ao restaurante
+        const bill = payload.new as any;
+        if (bill?.table_id) {
+          const { data: table } = await supabase
+            .from("tables")
+            .select("restaurant_id")
+            .eq("id", bill.table_id)
+            .single();
+          
+          if (table?.restaurant_id === restaurantId) {
+            fetchBills();
+          }
+        }
+      })
       .subscribe();
 
     return () => {

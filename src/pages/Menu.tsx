@@ -45,7 +45,7 @@ const Menu = () => {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [featuredSectionTitle, setFeaturedSectionTitle] = useState("Destaques");
 
-  useMenuInactivityLogout(customerName, tableNumber || "", tableId);
+  useMenuInactivityLogout(tableId, tableNumber || "", restaurantSlug || "");
 
   // Verificar se deve abrir modal de avaliação ao carregar
   useEffect(() => {
@@ -165,6 +165,23 @@ const Menu = () => {
 
       const currentCustomer = JSON.parse(savedCustomerInfo);
 
+      // Verificar se a conta já foi paga (sessão finalizada)
+      const { data: paidBills } = await supabase
+        .from("bills")
+        .select("id, status")
+        .eq("table_id", currentTableId)
+        .eq("status", "paid")
+        .limit(1);
+
+      // Se existe conta paga, zerar comanda (sessão finalizada)
+      if (paidBills && paidBills.length > 0) {
+        console.log('Conta já foi paga, resetando comanda');
+        setHasOpenComanda(false);
+        setComandaTotal(cartTotal); // Só mostrar carrinho
+        setComandaStatus("");
+        return;
+      }
+
       // Buscar apenas pedidos do cliente atual (sessão atual)
       const { data: orders, error } = await supabase
         .from("orders")
@@ -248,6 +265,40 @@ const Menu = () => {
 
   // Realtime subscription para pedidos da mesa (subscription já existe nas linhas 279-285)
 
+  const handleBillPaid = useCallback(async () => {
+    console.log('Conta paga! Deslogando cliente...');
+    
+    // Limpar dados da sessão
+    sessionStorage.removeItem(`customer_name_${tableNumber}`);
+    sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+    sessionStorage.removeItem(`cart_${tableNumber}`);
+    sessionStorage.removeItem('customerInfo');
+    
+    // Liberar mesa
+    if (tableId) {
+      await supabase
+        .from("tables")
+        .update({
+          is_occupied: false,
+          occupied_at: null,
+          occupied_by: null
+        })
+        .eq("id", tableId);
+    }
+    
+    // Marcar para abrir modal de avaliação após reload
+    sessionStorage.setItem('shouldShowReview', 'true');
+    if (tableId) sessionStorage.setItem('reviewBillId', tableId);
+    
+    // Mostrar mensagem e recarregar
+    toast.success("Conta paga! Obrigado pela preferência! 🎉");
+    
+    // Recarregar página para forçar novo login
+    setTimeout(() => {
+      window.location.href = `/menu/${restaurantSlug}/${tableNumber}`;
+    }, 1500);
+  }, [tableId, tableNumber, restaurantSlug]);
+
   useEffect(() => {
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
     const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
@@ -269,9 +320,23 @@ const Menu = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         if (tableId) checkOpenComanda(tableId, cart);
       })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'bills',
+        filter: tableId ? `table_id=eq.${tableId}` : undefined
+      }, (payload) => {
+        console.log('Conta atualizada em tempo real:', payload);
+        const bill = payload.new as any;
+        
+        // Se a conta foi marcada como paga, deslogar cliente
+        if (bill?.status === 'paid') {
+          handleBillPaid();
+        }
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchData, restaurantSlug, tableNumber, tableId]);
+  }, [fetchData, restaurantSlug, tableNumber, tableId, handleBillPaid, cart, checkOpenComanda]);
 
   useEffect(() => {
     if (customerName && customerCPF) {
