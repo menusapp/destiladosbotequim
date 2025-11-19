@@ -55,7 +55,7 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       const startDate = startOfDay(today);
       const endDate = endOfDay(today);
 
-      // Buscar pedidos aceitos do dia (incluindo delivery)
+      // Buscar pedidos finalizados do dia (incluindo delivery)
       const { data: acceptedOrders } = await supabase
         .from("orders")
         .select(`
@@ -68,9 +68,9 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
           )
         `)
         .eq("restaurant_id", restaurantId)
-        .eq("status", "accepted")
-        .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString());
+        .eq("status", "delivered")
+        .gte("updated_at", startDate.toISOString())
+        .lte("updated_at", endDate.toISOString());
 
       // Calcular total dos pedidos (subtotal + extras + taxa de serviço)
       let ordersTotal = 0;
