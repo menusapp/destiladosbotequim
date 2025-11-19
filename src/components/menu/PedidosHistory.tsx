@@ -82,9 +82,9 @@ export const PedidosHistory = ({
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      pending: "Em Análise",
-      accepted: "Em Produção",
-      ready: "Pronto para Entrega/Retirada",
+      pending: "Pedido Recebido",
+      accepted: "Em Preparo",
+      ready: "Saiu para Entrega/Retirada",
       delivered: "Entregue",
       picked_up: "Retirado",
       cancelled: "Cancelado",
