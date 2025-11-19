@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,12 +10,24 @@ import { toast } from "sonner";
 interface PaymentStepProps {
   onBack: () => void;
   onContinue: (data: any) => void;
+  requireCustomerInfo?: boolean;
 }
 
-export const PaymentStep = ({ onBack, onContinue }: PaymentStepProps) => {
+export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo }: PaymentStepProps) => {
   const [paymentType, setPaymentType] = useState<"delivery" | "online">("delivery");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [changeFor, setChangeFor] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerCPF, setCustomerCPF] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+
+  useEffect(() => {
+    if (requireCustomerInfo) {
+      setCustomerName(sessionStorage.getItem("customer_name") || "");
+      setCustomerCPF(sessionStorage.getItem("customer_cpf") || "");
+      setCustomerPhone(sessionStorage.getItem("customer_phone") || "");
+    }
+  }, [requireCustomerInfo]);
 
   const paymentMethods = [
     { value: "cash", label: "Dinheiro", icon: Banknote },
@@ -30,6 +42,16 @@ export const PaymentStep = ({ onBack, onContinue }: PaymentStepProps) => {
       return;
     }
 
+    if (requireCustomerInfo) {
+      if (!customerName || !customerCPF || !customerPhone) {
+        toast.error("Preencha todos os dados");
+        return;
+      }
+      sessionStorage.setItem("customer_name", customerName);
+      sessionStorage.setItem("customer_cpf", customerCPF);
+      sessionStorage.setItem("customer_phone", customerPhone);
+    }
+
     onContinue({
       type: paymentType,
       method: paymentMethod,
@@ -39,6 +61,41 @@ export const PaymentStep = ({ onBack, onContinue }: PaymentStepProps) => {
 
   return (
     <div className="p-4 space-y-6">
+      {requireCustomerInfo && (
+        <div className="space-y-4 pb-4 border-b">
+          <h3 className="text-lg font-semibold">Seus Dados</h3>
+          <div className="space-y-2">
+            <Label htmlFor="customer-name">Nome Completo</Label>
+            <Input
+              id="customer-name"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Digite seu nome"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="customer-cpf">CPF</Label>
+            <Input
+              id="customer-cpf"
+              value={customerCPF}
+              onChange={(e) => setCustomerCPF(e.target.value)}
+              placeholder="000.000.000-00"
+              maxLength={14}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="customer-phone">Telefone</Label>
+            <Input
+              id="customer-phone"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              placeholder="(00) 00000-0000"
+              maxLength={15}
+            />
+          </div>
+        </div>
+      )}
+      
       <h2 className="text-xl font-bold">Como você quer pagar?</h2>
 
       {/* Payment Type Selection */}

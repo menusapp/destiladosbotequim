@@ -80,11 +80,11 @@ export const PedidosHistory = ({
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string, deliveryType?: string) => {
     const labels: Record<string, string> = {
       pending: "Pedido Recebido",
       accepted: "Em Preparo",
-      ready: "Saiu para Entrega/Retirada",
+      ready: deliveryType === "pickup" ? "Pronto para Retirada" : "Saiu para Entrega",
       delivered: "Entregue",
       picked_up: "Retirado",
       cancelled: "Cancelado",
@@ -158,7 +158,7 @@ export const PedidosHistory = ({
                   </div>
                 </div>
                 <Badge className={getStatusColor(order.status)}>
-                  {getStatusLabel(order.status)}
+                  {getStatusLabel(order.status, order.delivery_type)}
                 </Badge>
               </div>
             </CardHeader>
