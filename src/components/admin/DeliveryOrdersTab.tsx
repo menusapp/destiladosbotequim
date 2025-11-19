@@ -132,13 +132,26 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
+      // Update otimista: atualizar UI ANTES da chamada RPC
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: newStatus }
+            : order
+        )
+      );
+
       const { error } = await supabase.rpc("admin_update_order_status", {
         p_order_id: orderId,
         p_new_status: newStatus,
         p_restaurant_id: restaurantId,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Se der erro, reverter o update otimista
+        fetchOrders();
+        throw error;
+      }
 
       const statusMessages: Record<string, string> = {
         accepted: "Pedido aceito e em produção",
@@ -148,7 +161,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
       };
 
       toast.success(statusMessages[newStatus] || "Status atualizado");
-      fetchOrders();
+      // Realtime faz o refetch automático
     } catch (error) {
       console.error("Error updating order:", error);
       toast.error("Erro ao atualizar pedido");
@@ -157,15 +170,24 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
 
   const deleteOrder = async (orderId: string) => {
     try {
+      // Update otimista: remover da UI ANTES da chamada RPC
+      setOrders(prevOrders => 
+        prevOrders.filter(order => order.id !== orderId)
+      );
+
       const { error } = await supabase.rpc("admin_delete_order", {
         p_order_id: orderId,
         p_restaurant_id: restaurantId,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Se der erro, reverter o update otimista
+        fetchOrders();
+        throw error;
+      }
 
       toast.success("Pedido excluído com sucesso");
-      fetchOrders();
+      // Realtime faz o refetch automático
     } catch (error) {
       console.error("Error deleting order:", error);
       toast.error("Erro ao excluir pedido");
