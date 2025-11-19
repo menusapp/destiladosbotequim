@@ -79,6 +79,44 @@ export default function DeliveryMenu() {
     };
   }, [restaurantSlug]);
 
+  // Realtime subscription para pedidos do cliente logado
+  useEffect(() => {
+    if (!customerCPF || !restaurant?.id) return;
+
+    const ordersChannel = supabase
+      .channel(`delivery-orders-${customerCPF}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `customer_cpf=eq.${customerCPF},restaurant_id=eq.${restaurant.id}`
+      }, (payload) => {
+        console.log('Pedido do cliente atualizado:', payload);
+        
+        const order = payload.new as any;
+        if (payload.eventType === 'INSERT') {
+          toast.success('Pedido enviado com sucesso!');
+        } else if (payload.eventType === 'UPDATE' && order?.status) {
+          const statusMessages: Record<string, string> = {
+            accepted: '✅ Pedido aceito! Está sendo preparado.',
+            ready: '🍔 Pedido pronto! Saindo para entrega.',
+            out_for_delivery: '🚚 Pedido saiu para entrega!',
+            delivered: '🎉 Pedido entregue! Bom apetite!',
+            picked_up: '📦 Pedido retirado!',
+          };
+          
+          if (statusMessages[order.status]) {
+            toast.success(statusMessages[order.status]);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [customerCPF, restaurant?.id]);
+
   const loadCustomerInfo = () => {
     const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
     const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);

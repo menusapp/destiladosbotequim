@@ -221,18 +221,23 @@ const Comanda = () => {
         .on(
           'postgres_changes',
           {
-            event: 'UPDATE',
+            event: '*',
             schema: 'public',
             table: 'orders',
             filter: `table_id=eq.${tableData.id}`,
           },
           (payload) => {
-            console.log("Order atualizada:", payload);
+            console.log("Order atualizada em tempo real:", payload);
             const updatedOrder = payload.new as any;
-            if (updatedOrder.status === "accepted") {
-              toast.success("Seu pedido foi aceito e está em preparo!");
+            
+            if (updatedOrder?.status === "accepted") {
+              setHasAcceptedOrder(true);
+              const prepTimeMs = (prepTimeMinutes || 30) * 60 * 1000;
+              setPrepTimerSeconds(Math.floor(prepTimeMs / 1000));
+              toast.success("Pedido aceito! Preparação iniciada.");
             }
-            // Atualiza dados para refletir status e iniciar timer via efeito
+            
+            // Atualiza dados para refletir status
             fetchData();
           }
         )
