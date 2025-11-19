@@ -283,63 +283,89 @@ const Menu = () => {
       tempoAtual: new Date().toISOString()
     });
     
-    // 1️⃣ PRIMEIRO: Limpar TODOS os estados (isso previne useEffects de salvar de volta)
-    setCustomerName("");
-    setCustomerCPF("");
-    setTableId(null);
-    setCart([]);
-    setHasOpenComanda(false);
-    setComandaTotal(0);
+    // ❌ NÃO limpar estados locais aqui! Isso dispara outros useEffects
+    // Vamos deixar os estados como estão e só limpar sessionStorage
     
-    console.log('✅ Estados limpos');
-    
-    // 2️⃣ SEGUNDO: Limpar sessionStorage
-    sessionStorage.clear(); // Limpar TUDO de uma vez
+    // 1️⃣ Limpar sessionStorage COMPLETAMENTE
+    sessionStorage.clear();
     
     console.log('✅ SessionStorage COMPLETAMENTE limpo');
     
-    // 3️⃣ TERCEIRO: Setar APENAS as flags de review
+    // 2️⃣ Setar APENAS as flags necessárias
     sessionStorage.setItem('shouldShowReview', 'true');
     sessionStorage.setItem('reviewBillId', billId);
-    sessionStorage.setItem('forceLogout', 'true'); // Flag extra de segurança
+    sessionStorage.setItem('forceLogout', 'true');
     
-    console.log('✅ Flags de avaliação setadas');
+    console.log('✅ Flags setadas:', {
+      shouldShowReview: 'true',
+      reviewBillId: billId,
+      forceLogout: 'true'
+    });
     
-    // 4️⃣ QUARTO: Reload IMEDIATO (sem delay!)
+    // 3️⃣ Reload IMEDIATO (sem delay!)
     console.log('🔄 Recarregando AGORA...');
     window.location.href = `/menu/${restaurantSlug}/${tableNumber}`;
   }, [tableNumber, restaurantSlug, tableId]);
 
   useEffect(() => {
-    // Verificar se é um logout forçado
+    console.log('🔄 useEffect de inicialização executado');
+    
+    // 🚨 PRIMEIRA PRIORIDADE: Verificar se é um logout forçado
     const forceLogout = sessionStorage.getItem('forceLogout');
     
     if (forceLogout === 'true') {
-      console.log('🚪 Logout forçado detectado - limpando tudo!');
+      console.log('🚪 Logout forçado detectado - limpando TUDO e bloqueando restauração!');
+      
+      // Remover flag
       sessionStorage.removeItem('forceLogout');
+      
+      // Limpar TUDO relacionado à sessão
       sessionStorage.removeItem(`customer_name_${tableNumber}`);
       sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
       sessionStorage.removeItem(`cart_${tableNumber}`);
       sessionStorage.removeItem('customerInfo');
+      
+      // Resetar TODOS os estados para garantir
+      setCustomerName("");
+      setCustomerCPF("");
+      setTableId(null);
+      setCart([]);
+      setHasOpenComanda(false);
+      setComandaTotal(0);
+      
+      // Forçar dialog de login
       setShowCustomerDialog(true);
+      
+      // Buscar dados do restaurante
       fetchData();
-      return; // ❌ NÃO tentar restaurar sessão
+      
+      console.log('✅ Logout completo aplicado - cliente precisa fazer login novamente');
+      
+      // ❌ NÃO fazer return aqui - vamos continuar para configurar realtime
     }
     
-    const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
-    const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
-    if (savedName && savedCPF) {
-      const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
-      if (savedCart) setCart(JSON.parse(savedCart));
-      setCustomerName(savedName);
-      setCustomerCPF(savedCPF);
-      fetchData();
-    } else {
-      sessionStorage.removeItem(`cart_${tableNumber}`);
-      setCart([]);
-      setShowCustomerDialog(true);
-      fetchData();
+    // Tentar restaurar sessão apenas se NÃO foi logout forçado
+    if (!forceLogout || forceLogout !== 'true') {
+      const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
+      const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+      
+      if (savedName && savedCPF) {
+        console.log('📦 Restaurando sessão:', { savedName, savedCPF });
+        const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
+        if (savedCart) setCart(JSON.parse(savedCart));
+        setCustomerName(savedName);
+        setCustomerCPF(savedCPF);
+        fetchData();
+      } else {
+        console.log('🆕 Nova sessão - mostrando dialog de login');
+        sessionStorage.removeItem(`cart_${tableNumber}`);
+        setCart([]);
+        setShowCustomerDialog(true);
+        fetchData();
+      }
     }
+    
+    // Configurar realtime (sempre, independente de logout)
     const channel = supabase.channel('menu-changes')
       .on('postgres_changes', { 
         event: '*', 
@@ -347,7 +373,6 @@ const Menu = () => {
         table: 'products'
       }, () => {
         console.log('📦 Produtos atualizados em tempo real!');
-        // Só atualizar se já temos restaurant carregado
         if (restaurant?.id) {
           fetchData();
         }
@@ -382,7 +407,6 @@ const Menu = () => {
         console.log('💳 Conta atualizada em tempo real:', payload);
         const bill = payload.new as any;
         
-        // Se a conta foi marcada como paga, deslogar cliente
         if (bill?.status === 'paid' && bill?.id) {
           console.log('✅ Conta foi paga! Deslogando cliente...');
           handleBillPaid(bill.id);
@@ -391,6 +415,7 @@ const Menu = () => {
       .subscribe((status) => {
         console.log('📡 Status da subscrição Menu:', status);
       });
+      
     return () => { 
       console.log('🔌 Removendo canal de realtime');
       supabase.removeChannel(channel); 
@@ -398,7 +423,9 @@ const Menu = () => {
   }, [fetchData, restaurantSlug, tableNumber, tableId, handleBillPaid, checkOpenComanda]);
 
   useEffect(() => {
-    if (customerName && customerCPF) {
+    // ✅ Só salvar se temos dados válidos (não strings vazias)
+    if (customerName && customerName.trim() !== "" && 
+        customerCPF && customerCPF.trim() !== "") {
       sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(cart));
     }
   }, [cart, tableNumber, customerName, customerCPF]);
