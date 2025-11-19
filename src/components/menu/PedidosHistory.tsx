@@ -59,13 +59,12 @@ export const PedidosHistory = ({
               *,
               product_extras(name, price)
             )
-          ),
-          tables!inner(restaurant_id)
+          )
         `
         )
         .eq("customer_cpf", customerCPF)
+        .eq("restaurant_id", restaurantId)
         .eq("order_type", "delivery")
-        .eq("tables.restaurant_id", restaurantId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
