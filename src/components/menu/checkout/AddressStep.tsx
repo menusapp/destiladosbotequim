@@ -32,15 +32,37 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
     state: "",
   });
 
-  // Carregar dados do sessionStorage
+  // Carregar dados do usuário logado ou sessionStorage
   useEffect(() => {
-    if (restaurantSlug) {
-      const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
-      const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
+    const loadUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (storedName) setCustomerName(storedName);
-      if (storedCPF) setCustomerCPF(storedCPF);
-    }
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, cpf, phone")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile) {
+          if (profile.full_name) setCustomerName(profile.full_name);
+          if (profile.cpf) setCustomerCPF(profile.cpf);
+          if (profile.phone) setCustomerPhone(profile.phone);
+          return;
+        }
+      }
+      
+      // Fallback: sessionStorage
+      if (restaurantSlug) {
+        const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
+        const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
+        
+        if (storedName) setCustomerName(storedName);
+        if (storedCPF) setCustomerCPF(storedCPF);
+      }
+    };
+    
+    loadUserData();
   }, [restaurantSlug]);
 
   useEffect(() => {

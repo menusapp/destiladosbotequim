@@ -166,8 +166,8 @@ export const CheckoutDrawer = ({
         }
       }
 
-      // 8. Salvar endereço se solicitado
-      if (addressData.saveForLater) {
+      // 8. Salvar endereço se solicitado (apenas para delivery)
+      if (deliveryType === "delivery" && addressData?.saveForLater) {
         await supabase.from("customer_addresses").insert({
           customer_cpf: customerData.cpf,
           customer_name: customerData.name,
