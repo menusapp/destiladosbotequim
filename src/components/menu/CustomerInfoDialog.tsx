@@ -59,8 +59,8 @@ const CustomerInfoDialog = ({
     onSubmit(name.trim(), sanitizedCPF);
   };
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Bem-vindo!</DialogTitle>
           <DialogDescription>

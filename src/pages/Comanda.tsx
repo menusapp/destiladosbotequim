@@ -140,17 +140,30 @@ const Comanda = () => {
               setBillOnTheWay(true);
               toast.success("A conta está a caminho!");
             } else if (updatedBill.status === "paid") {
-              console.log("Conta paga! Redirecionando...");
+              console.log("Conta paga! Liberando mesa e redirecionando...");
               toast.success("Conta paga! Obrigado pela preferência!");
+              
+              // Liberar a mesa no banco de dados
+              if (tableData?.id) {
+                supabase.from("tables").update({
+                  is_occupied: false,
+                  occupied_at: null,
+                  occupied_by: null
+                }).eq("id", tableData.id).then(() => {
+                  console.log("Mesa liberada com sucesso");
+                });
+              }
               
               // Salvar informações para abrir modal de avaliação
               sessionStorage.setItem('shouldShowReview', 'true');
               sessionStorage.setItem('reviewBillId', updatedBill.id);
               
-              // Limpar dados da comanda do sessionStorage
+              // Limpar TODOS os dados do cliente da sessão
               sessionStorage.removeItem(`customer_name_${tableNumber}`);
               sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
               sessionStorage.removeItem(`cart_${tableNumber}`);
+              sessionStorage.removeItem("customerInfo");
+              
               setTimeout(() => {
                 navigate(`/menu/${restaurantSlug}/${tableNumber}`);
               }, 2000);
@@ -170,15 +183,29 @@ const Comanda = () => {
             const deletedBill = payload.old as any;
             toast.success("Conta paga! Obrigado pela preferência!");
             
+            // Liberar a mesa no banco de dados
+            if (tableData?.id) {
+              supabase.from("tables").update({
+                is_occupied: false,
+                occupied_at: null,
+                occupied_by: null
+              }).eq("id", tableData.id).then(() => {
+                console.log("Mesa liberada com sucesso");
+              });
+            }
+            
             // Salvar informações para abrir modal de avaliação
             sessionStorage.setItem('shouldShowReview', 'true');
             if (deletedBill?.id) {
               sessionStorage.setItem('reviewBillId', deletedBill.id);
             }
             
+            // Limpar TODOS os dados do cliente da sessão
             sessionStorage.removeItem(`customer_name_${tableNumber}`);
             sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
             sessionStorage.removeItem(`cart_${tableNumber}`);
+            sessionStorage.removeItem("customerInfo");
+            
             setTimeout(() => {
               navigate(`/menu/${restaurantSlug}/${tableNumber}`);
             }, 1500);

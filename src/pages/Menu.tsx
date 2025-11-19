@@ -346,13 +346,20 @@ const Menu = () => {
     setCustomerCPF(cpf);
     sessionStorage.setItem(`customer_name_${tableNumber}`, name);
     sessionStorage.setItem(`customer_cpf_${tableNumber}`, cpf);
+    
+    // Salvar também no formato customerInfo para consistência
+    sessionStorage.setItem("customerInfo", JSON.stringify({ name, cpf }));
+    
     setShowCustomerDialog(false);
     toast.success("Bem-vindo!");
   };
 
   const handleProductClick = useCallback(async (product: Product) => {
     if (!customerName || !customerCPF) {
-      setShowCustomerDialog(true);
+      // Não abrir novamente se já está aberto
+      if (!showCustomerDialog) {
+        setShowCustomerDialog(true);
+      }
       return;
     }
     const { data: extrasData } = await supabase.from("product_extras")
@@ -360,7 +367,7 @@ const Menu = () => {
     setSelectedProduct(product);
     setProductExtras(extrasData || []);
     setShowProductDialog(true);
-  }, [customerName, customerCPF]);
+  }, [customerName, customerCPF, showCustomerDialog]);
 
   const addToCart = useCallback((product: Product, extras: ProductExtra[], notes?: string) => {
     setCart((prev) => {
@@ -548,7 +555,7 @@ const Menu = () => {
 
       <CustomerInfoDialog
         open={showCustomerDialog}
-        onClose={() => setShowCustomerDialog(false)}
+        onClose={() => {}} 
         onSubmit={handleCustomerInfoSubmit}
         restaurantColor={primaryColor}
       />
