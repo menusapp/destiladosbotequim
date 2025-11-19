@@ -323,7 +323,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
     const printWindow = window.open("", "", "height=600,width=400");
     if (!printWindow) return;
 
-    const isDelivery = order.order_type === "delivery" || order.tables.table_number === 9999;
+    const isDelivery = order.order_type === "delivery";
 
     const orderItems = order.order_items
       .map((item, idx) => {
@@ -508,7 +508,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold">
-                      {order.order_type === "delivery" || order.tables.table_number === 9999 
+                      {order.order_type === "delivery"
                         ? "🚚 Delivery" 
                         : `Mesa ${order.tables.table_number}`}
                     </p>
@@ -518,7 +518,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
                         <span className="ml-1">- CPF: {order.customer_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</span>
                       )}
                     </p>
-                    {(order.order_type === "delivery" || order.tables.table_number === 9999) && order.delivery_address && (
+                    {order.order_type === "delivery" && order.delivery_address && (
                       <p className="text-xs text-muted-foreground mt-1">
                         📍 {order.delivery_address}
                       </p>
