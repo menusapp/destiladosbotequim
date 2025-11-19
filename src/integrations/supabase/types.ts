@@ -602,6 +602,7 @@ export type Database = {
           id: string
           min_order_value: number | null
           restaurant_id: string
+          store_address: string | null
           updated_at: string | null
         }
         Insert: {
@@ -611,6 +612,7 @@ export type Database = {
           id?: string
           min_order_value?: number | null
           restaurant_id: string
+          store_address?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -620,6 +622,7 @@ export type Database = {
           id?: string
           min_order_value?: number | null
           restaurant_id?: string
+          store_address?: string | null
           updated_at?: string | null
         }
         Relationships: [
