@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,7 @@ interface StockCardProps {
   onEdit: (item: any) => void;
 }
 
-const StockCard = ({ item, onEdit }: StockCardProps) => {
+const StockCard = memo(({ item, onEdit }: StockCardProps) => {
   const totalValue = item.current_quantity * item.price_per_unit;
   const isLowStock = item.current_quantity <= item.minimum_quantity;
 
@@ -87,6 +88,8 @@ const StockCard = ({ item, onEdit }: StockCardProps) => {
       </CardContent>
     </Card>
   );
-};
+});
+
+StockCard.displayName = "StockCard";
 
 export default StockCard;

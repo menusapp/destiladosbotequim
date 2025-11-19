@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +62,8 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState<Date>(startOfDay(new Date()));
   const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
+  
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
   // Manual order states
   const [tables, setTables] = useState<any[]>([]);
@@ -494,7 +497,7 @@ const OrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         <div className="flex-1 overflow-y-auto space-y-4 pr-2">
           {orders
             .filter((order) => {
-              const searchLower = searchQuery.toLowerCase();
+              const searchLower = debouncedSearch.toLowerCase();
               return (
                 order.tables.table_number.toString().includes(searchLower) ||
                 order.customer_name.toLowerCase().includes(searchLower)
