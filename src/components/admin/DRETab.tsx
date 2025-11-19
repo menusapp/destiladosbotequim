@@ -105,20 +105,45 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         .eq("restaurant_id", restaurantId);
       setLaborCosts(laborData || []);
 
-      // Buscar pedidos aceitos no período
-      const { data: acceptedOrders, error: ordersError } = await supabase
-        .from("orders")
+      // Buscar bills pagas no período (pedidos locais)
+      const { data: paidBills } = await supabase
+        .from("bills")
         .select(`
           id,
+          total_amount,
           table_id,
-          created_at
+          tables!inner(restaurant_id)
         `)
+        .eq("tables.restaurant_id", restaurantId)
+        .eq("status", "paid")
+        .gte("paid_at", startDate.toISOString())
+        .lte("paid_at", endDate.toISOString());
+
+      // Buscar IDs dos pedidos das bills pagas
+      let localOrderIds: string[] = [];
+      if (paidBills && paidBills.length > 0) {
+        const tableIds = paidBills.map(b => b.table_id);
+        
+        const { data: localOrders } = await supabase
+          .from("orders")
+          .select("id")
+          .in("table_id", tableIds)
+          .eq("order_type", "local");
+        
+        localOrderIds = (localOrders || []).map(o => o.id);
+      }
+
+      // Buscar pedidos delivery finalizados
+      const { data: deliveryOrders } = await supabase
+        .from("orders")
+        .select("id")
         .eq("restaurant_id", restaurantId)
+        .eq("order_type", "delivery")
         .eq("status", "delivered")
         .gte("updated_at", startDate.toISOString())
         .lte("updated_at", endDate.toISOString());
 
-      if (ordersError) throw ordersError;
+      const deliveryOrderIds = (deliveryOrders || []).map(o => o.id);
 
       // Buscar pedidos de balcão finalizados no período
       const { data: counterOrders } = await supabase
@@ -134,7 +159,9 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         .gte("finalized_at", startDate.toISOString())
         .lte("finalized_at", endDate.toISOString());
 
-      if ((!acceptedOrders || acceptedOrders.length === 0) && (!counterOrders || counterOrders.length === 0)) {
+      if ((!paidBills || paidBills.length === 0) && 
+          (!deliveryOrders || deliveryOrders.length === 0) && 
+          (!counterOrders || counterOrders.length === 0)) {
         setTotalRevenue(0);
         setCmv(0);
         setOperationalExpenses(0);
@@ -142,7 +169,6 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         return;
       }
 
-      const orderIds = (acceptedOrders || []).map(o => o.id);
       const counterOrderIds = (counterOrders || []).map(o => o.id);
 
       // Buscar configurações do restaurante para taxa de serviço
@@ -152,74 +178,68 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         .eq("id", restaurantId)
         .single();
 
-      // Buscar itens dos pedidos com extras
-      const { data: orderItems } = await supabase
-        .from("order_items")
-        .select(`
-          id,
-          order_id,
-          quantity,
-          price_at_order,
-          order_item_extras (price_at_order)
-        `)
-        .in("order_id", orderIds);
+      // Buscar itens dos pedidos delivery com extras (não precisa buscar locais, já temos total nas bills)
+      // Linha vazia - não buscar orderItems aqui pois não temos orderIds
+      
+      // Calcular valor de cada pedido - não precisa mais desse mapeamento
 
-      // Calcular valor de cada pedido
-      const orderTotals = new Map<string, number>();
+      // Calcular receita total
+      
+      // 1. Bills pagas (pedidos locais)
+      let billsRevenue = 0;
+      if (paidBills && paidBills.length > 0) {
+        billsRevenue = paidBills.reduce((sum, bill) => sum + Number(bill.total_amount), 0);
+      }
 
-      orderItems?.forEach((item: any) => {
-        const orderId = item.order_id;
-        const itemSubtotal = item.price_at_order * item.quantity;
-        const extrasTotal = (item.order_item_extras || []).reduce(
-          (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
-          0
-        );
-        const itemTotal = itemSubtotal + extrasTotal;
+      // 2. Pedidos delivery
+      let deliveryRevenue = 0;
+      if (deliveryOrderIds.length > 0) {
+        const { data: deliveryItems } = await supabase
+          .from("order_items")
+          .select(`
+            quantity,
+            price_at_order,
+            order_item_extras (price_at_order)
+          `)
+          .in("order_id", deliveryOrderIds);
         
-        orderTotals.set(orderId, (orderTotals.get(orderId) || 0) + itemTotal);
-      });
-
-      // Aplicar taxa de serviço
-      const serviceFeeEnabled = restaurant?.service_fee_enabled || false;
-      const serviceFeePercentage = restaurant?.service_fee_percentage || 0;
-
-      orderTotals.forEach((subtotal, orderId) => {
-        if (serviceFeeEnabled) {
-          const serviceFee = subtotal * (serviceFeePercentage / 100);
-          orderTotals.set(orderId, subtotal + serviceFee);
+        deliveryItems?.forEach((item: any) => {
+          const itemTotal = item.price_at_order * item.quantity;
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
+            0
+          );
+          deliveryRevenue += itemTotal + extrasTotal;
+        });
+        
+        // Aplicar taxa de serviço nos pedidos delivery
+        const { data: restaurant } = await supabase
+          .from("restaurants")
+          .select("service_fee_enabled, service_fee_percentage")
+          .eq("id", restaurantId)
+          .single();
+        
+        if (restaurant?.service_fee_enabled) {
+          deliveryRevenue += deliveryRevenue * (Number(restaurant.service_fee_percentage) / 100);
         }
-      });
+      }
 
-      // Buscar bills para identificar formas de pagamento
-      const tableIds = [...new Set(acceptedOrders.map(o => o.table_id))];
-      const { data: bills } = await supabase
-        .from("bills")
-        .select("table_id, payment_method, status")
-        .in("table_id", tableIds);
+      // 3. Pedidos de balcão
+      let counterRevenue = 0;
+      if (counterOrderIds.length > 0) {
+        const { data: counterOrders } = await supabase
+          .from("counter_orders")
+          .select("total_amount")
+          .in("id", counterOrderIds);
+        
+        counterRevenue = (counterOrders || []).reduce((sum, order) => sum + Number(order.total_amount), 0);
+      }
 
-      // Mapear pedidos com suas formas de pagamento
-      const orderPayments = new Map<string, string>();
-      acceptedOrders.forEach(order => {
-        const bill = bills?.find(b => b.table_id === order.table_id && b.status === 'paid');
-        orderPayments.set(order.id, bill?.payment_method || 'pending');
-      });
-
-      // Calcular receita total incluindo pedidos de balcão
-      let revenue = 0;
-
-      orderTotals.forEach((total) => {
-        revenue += total;
-      });
-
-      // Adicionar pedidos de balcão à receita
-      (counterOrders || []).forEach(counterOrder => {
-        const total = Number(counterOrder.total_amount);
-        revenue += total;
-      });
+      const revenue = billsRevenue + deliveryRevenue + counterRevenue;
 
       setTotalRevenue(revenue);
 
-      await calculateCMV(orderIds, counterOrderIds);
+      await calculateCMV([...localOrderIds, ...deliveryOrderIds], counterOrderIds);
       await calculateOperationalExpenses(startDate, endDate);
 
     } catch (error: any) {

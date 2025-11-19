@@ -102,8 +102,9 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         table: "bills"
       }, async (payload) => {
         console.log('Nova conta detectada em tempo real!');
-        // Verificar se a conta pertence ao restaurante
         const bill = payload.new as any;
+        
+        // Verificar se pertence ao restaurante
         if (bill?.table_id) {
           const { data: table } = await supabase
             .from("tables")
@@ -114,6 +115,9 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
           if (table?.restaurant_id === restaurantId) {
             fetchBills();
           }
+        } else {
+          // Se não tem table_id, recarregar de qualquer forma (por segurança)
+          fetchBills();
         }
       })
       .subscribe();

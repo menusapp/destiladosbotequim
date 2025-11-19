@@ -265,8 +265,8 @@ const Menu = () => {
 
   // Realtime subscription para pedidos da mesa (subscription já existe nas linhas 279-285)
 
-  const handleBillPaid = useCallback(async () => {
-    console.log('Conta paga! Deslogando cliente...');
+  const handleBillPaid = useCallback(async (billId: string) => {
+    console.log('Conta paga! Deslogando cliente...', billId);
     
     // Limpar dados da sessão
     sessionStorage.removeItem(`customer_name_${tableNumber}`);
@@ -274,21 +274,11 @@ const Menu = () => {
     sessionStorage.removeItem(`cart_${tableNumber}`);
     sessionStorage.removeItem('customerInfo');
     
-    // Liberar mesa
-    if (tableId) {
-      await supabase
-        .from("tables")
-        .update({
-          is_occupied: false,
-          occupied_at: null,
-          occupied_by: null
-        })
-        .eq("id", tableId);
-    }
+    // NÃO precisa liberar mesa aqui, função admin_mark_bill_paid já faz isso
     
     // Marcar para abrir modal de avaliação após reload
     sessionStorage.setItem('shouldShowReview', 'true');
-    if (tableId) sessionStorage.setItem('reviewBillId', tableId);
+    sessionStorage.setItem('reviewBillId', billId);
     
     // Mostrar mensagem e recarregar
     toast.success("Conta paga! Obrigado pela preferência! 🎉");
@@ -297,7 +287,7 @@ const Menu = () => {
     setTimeout(() => {
       window.location.href = `/menu/${restaurantSlug}/${tableNumber}`;
     }, 1500);
-  }, [tableId, tableNumber, restaurantSlug]);
+  }, [tableNumber, restaurantSlug]);
 
   useEffect(() => {
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
@@ -318,9 +308,13 @@ const Menu = () => {
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'products',
-        filter: restaurant?.id ? `category_id=in.(select id from categories where restaurant_id = '${restaurant.id}')` : undefined
-      }, fetchData)
+        table: 'products'
+      }, () => {
+        // Só atualizar se já temos restaurant carregado
+        if (restaurant?.id) {
+          fetchData();
+        }
+      })
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
@@ -340,13 +334,13 @@ const Menu = () => {
         const bill = payload.new as any;
         
         // Se a conta foi marcada como paga, deslogar cliente
-        if (bill?.status === 'paid') {
-          handleBillPaid();
+        if (bill?.status === 'paid' && bill?.id) {
+          handleBillPaid(bill.id);
         }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchData, restaurantSlug, tableNumber, tableId, handleBillPaid, checkOpenComanda, restaurant?.id]);
+  }, [fetchData, restaurantSlug, tableNumber, tableId, handleBillPaid, checkOpenComanda]);
 
   useEffect(() => {
     if (customerName && customerCPF) {
