@@ -46,6 +46,39 @@ export default function DeliveryMenu() {
     saveCartToStorage();
   }, [cart]);
 
+  // Realtime subscription para mudanças no restaurante e produtos
+  useEffect(() => {
+    if (!restaurantSlug) return;
+
+    const channel = supabase
+      .channel('delivery-menu-realtime')
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'restaurants',
+        filter: `slug=eq.${restaurantSlug}`
+      }, (payload) => {
+        console.log('Restaurante atualizado:', payload);
+        setRestaurant((prev: any) => ({
+          ...prev,
+          ...payload.new
+        }));
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'products'
+      }, () => {
+        console.log('Produtos atualizados! Recarregando...');
+        fetchRestaurantData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [restaurantSlug]);
+
   const loadCustomerInfo = () => {
     const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
     const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
@@ -190,7 +223,7 @@ export default function DeliveryMenu() {
   }
 
   if (!restaurant.is_open) {
-    return <RestaurantClosedScreen restaurantName={restaurant.name} primaryColor={restaurant.primary_color} />;
+    return <RestaurantClosedScreen restaurantName={restaurant.name} logoUrl={restaurant.logo_url} primaryColor={restaurant.primary_color} />;
   }
 
   const primaryColor = restaurant.primary_color || "#fe9516";
