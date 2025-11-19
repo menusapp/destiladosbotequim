@@ -246,20 +246,7 @@ const Menu = () => {
     }
   }, [cart, tableId, customerName, checkOpenComanda]);
 
-  // Polling para verificar mudanças nos pedidos em tempo real
-  useEffect(() => {
-    if (!tableId || !customerName) return;
-
-    // Verificar imediatamente
-    checkOpenComanda(tableId, cart);
-
-    // Verificar a cada 3 segundos para pegar mudanças de status
-    const interval = setInterval(() => {
-      checkOpenComanda(tableId, cart);
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [tableId, customerName, cart, checkOpenComanda]);
+  // Realtime subscription para pedidos da mesa (subscription já existe nas linhas 279-285)
 
   useEffect(() => {
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
