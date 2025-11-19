@@ -63,33 +63,6 @@ export const CheckoutDrawer = ({
       // 1. Buscar ou criar mesa virtual para delivery
       let virtualTable;
 
-      // Primeiro tenta buscar mesa virtual existente
-      const { data: existingTable } = await supabase
-        .from("tables")
-        .select("*")
-        .eq("restaurant_id", restaurant.id)
-        .eq("table_number", 9999)
-        .maybeSingle();
-
-      if (existingTable) {
-        // Usa a mesa existente
-        virtualTable = existingTable;
-      } else {
-        // Cria nova mesa virtual apenas se não existir
-        const { data: newTable, error: tableError } = await supabase
-          .from("tables")
-          .insert({
-            restaurant_id: restaurant.id,
-            table_number: 9999,
-            is_occupied: false,
-          })
-          .select()
-          .single();
-
-        if (tableError) throw tableError;
-        virtualTable = newTable;
-      }
-
       // 2. Calcular valores
       const subtotal = cart.reduce((sum, item) => {
         const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
@@ -103,11 +76,12 @@ export const CheckoutDrawer = ({
         ? (subtotal * restaurant.service_fee_percentage / 100) 
         : 0;
 
-      // 3. Criar pedido
+      // 3. Criar pedido (SEM mesa virtual - delivery não precisa de table_id)
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
-          table_id: virtualTable.id,
+          table_id: null, // Pedidos delivery não têm mesa
+          restaurant_id: restaurant.id, // Restaurant ID direto
           customer_name: customerData.name,
           customer_cpf: customerData.cpf,
           order_type: "delivery",

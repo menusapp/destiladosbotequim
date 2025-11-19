@@ -98,11 +98,10 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
               product_extra_id,
               product_extras(name, price)
             )
-          ),
-          tables!inner(restaurant_id)
+          )
         `
         )
-        .eq("tables.restaurant_id", restaurantId)
+        .eq("restaurant_id", restaurantId)
         .eq("order_type", "delivery")
         .order("created_at", { ascending: false });
 
