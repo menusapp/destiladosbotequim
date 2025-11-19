@@ -114,9 +114,9 @@ export default function DRETab({ restaurantId }: DRETabProps) {
           created_at
         `)
         .eq("restaurant_id", restaurantId)
-        .eq("status", "accepted")
-        .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString());
+        .eq("status", "delivered")
+        .gte("updated_at", startDate.toISOString())
+        .lte("updated_at", endDate.toISOString());
 
       if (ordersError) throw ordersError;
 
