@@ -113,11 +113,19 @@ export default function DeliveryMenu() {
         table: 'restaurants',
         filter: `slug=eq.${restaurantSlug}`
       }, (payload) => {
-        console.log('Restaurante atualizado:', payload);
+        console.log('🏪 Restaurante atualizado em tempo real!', payload);
+        const updatedRestaurant = payload.new as any;
+        
         setRestaurant((prev: any) => ({
           ...prev,
-          ...payload.new
+          ...updatedRestaurant
         }));
+        
+        if (!updatedRestaurant.is_open) {
+          toast.info("O restaurante acabou de fechar! 🔒");
+        } else {
+          toast.success("O restaurante acabou de abrir! 🎉");
+        }
       })
       .on('postgres_changes', {
         event: '*',

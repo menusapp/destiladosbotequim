@@ -120,7 +120,7 @@ const Comanda = () => {
       
       if (!tableData) return;
       
-      console.log("Configurando realtime para table_id:", tableData.id);
+      console.log("🔔 Configurando realtime para Comanda - table_id:", tableData.id);
       
       // Configurar realtime para atualizar status da conta
       billChannel = supabase
@@ -134,15 +134,17 @@ const Comanda = () => {
             filter: `table_id=eq.${tableData.id}`,
           },
           (payload) => {
-            console.log("Conta atualizada em tempo real:", payload);
+            console.log("🔔 Conta atualizada em tempo real na Comanda:", payload);
             const bill = payload.new as any;
             
             if (bill?.status === "on_the_way") {
+              console.log("💳 Conta a caminho!");
               setBillOnTheWay(true);
               toast.success("A conta está a caminho! 💳");
             }
             
             if (bill?.status === "paid") {
+              console.log("✅ Conta foi paga!");
               // Conta foi paga - cliente será deslogado pelo Menu.tsx
               toast.success("Conta paga! Obrigado! 🎉");
               setTimeout(() => {
@@ -151,6 +153,7 @@ const Comanda = () => {
             }
             
             // Recarregar dados de qualquer forma
+            console.log("🔄 Recarregando dados da comanda...");
             fetchData();
           }
         )
@@ -196,7 +199,7 @@ const Comanda = () => {
           }
         )
         .subscribe((status) => {
-          console.log("Bill channel status:", status);
+          console.log('📡 Status da subscrição Comanda (Bills):', status);
         });
       
       // Configurar realtime para pedidos aceitos
