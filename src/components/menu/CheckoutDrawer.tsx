@@ -179,7 +179,7 @@ export const CheckoutDrawer = ({
       onClearCart();
 
       // 10. Redirecionar
-      navigate(`/delivery/${restaurant.slug}/pedido/${order.id}`);
+      navigate(`/delivery/${restaurantSlug}/pedido/${order.id}`);
       toast.success("Pedido realizado com sucesso! 🎉");
     } catch (error: any) {
       console.error("Erro ao finalizar pedido:", error);

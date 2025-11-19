@@ -30,10 +30,8 @@ interface Order {
   coupon_code: string | null;
   coupon_discount: number;
   loyalty_points_used: number;
+  restaurant_id: string;
   order_items: OrderItem[];
-  tables: {
-    restaurant_id: string;
-  };
 }
 
 interface Restaurant {
@@ -100,8 +98,7 @@ export default function OrderConfirmation() {
             quantity,
             price_at_order,
             products (name)
-          ),
-          tables (restaurant_id)
+          )
         `)
         .eq("id", orderId)
         .single();
@@ -109,11 +106,11 @@ export default function OrderConfirmation() {
       if (orderError) throw orderError;
       setOrder(orderData);
 
-      // Buscar dados do restaurante
+      // Buscar dados do restaurante usando restaurant_id direto do pedido
       const { data: restaurantData, error: restaurantError } = await supabase
         .from("restaurants")
         .select("name, logo_url, prep_time_minutes, service_fee_enabled, service_fee_percentage")
-        .eq("id", orderData.tables.restaurant_id)
+        .eq("id", orderData.restaurant_id)
         .single();
 
       if (restaurantError) throw restaurantError;
