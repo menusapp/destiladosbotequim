@@ -55,17 +55,49 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       const startDate = startOfDay(today);
       const endDate = endOfDay(today);
 
-      // Buscar pedidos pagos do dia (através das contas)
-      const { data: paidBills } = await supabase
-        .from("bills")
+      // Buscar pedidos aceitos do dia (incluindo delivery)
+      const { data: acceptedOrders } = await supabase
+        .from("orders")
         .select(`
-          total_amount,
-          tables!inner(restaurant_id)
+          id,
+          order_items (
+            id,
+            quantity,
+            price_at_order,
+            order_item_extras (price_at_order)
+          )
         `)
-        .eq("tables.restaurant_id", restaurantId)
-        .eq("status", "paid")
-        .gte("paid_at", startDate.toISOString())
-        .lte("paid_at", endDate.toISOString());
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "accepted")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+
+      // Calcular total dos pedidos (subtotal + extras + taxa de serviço)
+      let ordersTotal = 0;
+      acceptedOrders?.forEach((order: any) => {
+        let orderSubtotal = 0;
+        order.order_items?.forEach((item: any) => {
+          const itemTotal = item.price_at_order * item.quantity;
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
+            0
+          );
+          orderSubtotal += itemTotal + extrasTotal;
+        });
+        ordersTotal += orderSubtotal;
+      });
+
+      // Buscar configuração de taxa de serviço
+      const { data: restaurant } = await supabase
+        .from("restaurants")
+        .select("service_fee_enabled, service_fee_percentage")
+        .eq("id", restaurantId)
+        .single();
+
+      // Aplicar taxa de serviço se habilitada
+      if (restaurant?.service_fee_enabled) {
+        ordersTotal += ordersTotal * (Number(restaurant.service_fee_percentage) / 100);
+      }
 
       // Buscar pedidos de balcão finalizados do dia
       const { data: counterOrders } = await supabase
@@ -76,11 +108,10 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         .gte("finalized_at", startDate.toISOString())
         .lte("finalized_at", endDate.toISOString());
 
-      const billsTotal = (paidBills || []).reduce((sum, bill) => sum + Number(bill.total_amount), 0);
       const counterTotal = (counterOrders || []).reduce((sum, order) => sum + Number(order.total_amount), 0);
       
-      const salesTotal = billsTotal + counterTotal;
-      const ordersCount = (paidBills?.length || 0) + (counterOrders?.length || 0);
+      const salesTotal = ordersTotal + counterTotal;
+      const ordersCount = (acceptedOrders?.length || 0) + (counterOrders?.length || 0);
       const avgTicket = ordersCount > 0 ? salesTotal / ordersCount : 0;
 
       // Mesas ocupadas
@@ -93,11 +124,8 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       // Pedidos em preparo
       const { data: inPrepData } = await supabase
         .from("orders")
-        .select(`
-          id,
-          tables!inner(restaurant_id)
-        `)
-        .eq("tables.restaurant_id", restaurantId)
+        .select("id")
+        .eq("restaurant_id", restaurantId)
         .in("status", ["pending", "accepted", "preparing"]);
 
       // Pedidos recentes (últimos 10)
@@ -108,9 +136,10 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
           customer_name,
           created_at,
           status,
-          tables!inner(table_number, restaurant_id)
+          order_type,
+          tables (table_number)
         `)
-        .eq("tables.restaurant_id", restaurantId)
+        .eq("restaurant_id", restaurantId)
         .order("created_at", { ascending: false })
         .limit(10);
 
@@ -119,7 +148,9 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         customer_name: order.customer_name,
         created_at: order.created_at,
         status: order.status,
-        table_number: order.tables?.table_number || 0,
+        table_number: order.order_type === "delivery" 
+          ? "Delivery" 
+          : order.tables?.table_number || 0,
       }));
 
       // Contas abertas

@@ -111,10 +111,9 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         .select(`
           id,
           table_id,
-          created_at,
-          tables!inner(restaurant_id)
+          created_at
         `)
-        .eq("tables.restaurant_id", restaurantId)
+        .eq("restaurant_id", restaurantId)
         .eq("status", "accepted")
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString());
