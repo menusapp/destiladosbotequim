@@ -315,8 +315,18 @@ const Menu = () => {
       fetchData();
     }
     const channel = supabase.channel('menu-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchData)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'restaurants' }, fetchData)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'products',
+        filter: restaurant?.id ? `category_id=in.(select id from categories where restaurant_id = '${restaurant.id}')` : undefined
+      }, fetchData)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'restaurants',
+        filter: `slug=eq.${restaurantSlug}`
+      }, fetchData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         if (tableId) checkOpenComanda(tableId, cart);
       })
@@ -336,7 +346,7 @@ const Menu = () => {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchData, restaurantSlug, tableNumber, tableId, handleBillPaid, cart, checkOpenComanda]);
+  }, [fetchData, restaurantSlug, tableNumber, tableId, handleBillPaid, checkOpenComanda, restaurant?.id]);
 
   useEffect(() => {
     if (customerName && customerCPF) {

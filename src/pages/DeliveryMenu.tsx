@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { MenuHeader } from "@/components/menu/MenuHeader";
@@ -34,13 +34,68 @@ export default function DeliveryMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "perfil">("menu");
 
+  const fetchRestaurantData = useCallback(async () => {
+    try {
+      const { data: restaurantData, error: restaurantError } = await supabase
+        .from("restaurants")
+        .select("*")
+        .eq("slug", restaurantSlug)
+        .single();
+
+      if (restaurantError) throw restaurantError;
+      setRestaurant(restaurantData);
+
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from("categories")
+        .select("*, products(*)")
+        .eq("restaurant_id", restaurantData.id)
+        .order("display_order");
+
+      if (categoriesError) throw categoriesError;
+      setCategories(categoriesData || []);
+
+      const { data: featuredData } = await supabase
+        .from("products")
+        .select("id, name, description, price, available, image_url, prep_time_minutes, is_featured, featured_display_order, categories!inner(restaurant_id)")
+        .eq("categories.restaurant_id", restaurantData.id)
+        .eq("is_featured", true)
+        .eq("available", true)
+        .order("featured_display_order");
+
+      setFeaturedProducts(featuredData || []);
+    } catch (error) {
+      console.error("Error fetching restaurant:", error);
+      toast.error("Erro ao carregar cardápio");
+    } finally {
+      setLoading(false);
+    }
+  }, [restaurantSlug]);
+
+  const loadCustomerInfo = useCallback(() => {
+    const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
+    const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
+    if (storedName && storedCPF) {
+      setCustomerName(storedName);
+      setCustomerCPF(storedCPF);
+    } else {
+      setShowCustomerDialog(true);
+    }
+  }, [restaurantSlug]);
+
+  const loadCartFromStorage = useCallback(() => {
+    const stored = localStorage.getItem(`delivery-cart-${restaurantSlug}`);
+    if (stored) {
+      setCart(JSON.parse(stored));
+    }
+  }, [restaurantSlug]);
+
   useEffect(() => {
     if (restaurantSlug) {
       fetchRestaurantData();
       loadCartFromStorage();
       loadCustomerInfo();
     }
-  }, [restaurantSlug]);
+  }, [restaurantSlug, fetchRestaurantData, loadCartFromStorage, loadCustomerInfo]);
 
   useEffect(() => {
     saveCartToStorage();
@@ -77,7 +132,7 @@ export default function DeliveryMenu() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurantSlug]);
+  }, [restaurantSlug, fetchRestaurantData]);
 
   // Realtime subscription para pedidos do cliente logado
   useEffect(() => {
@@ -117,17 +172,6 @@ export default function DeliveryMenu() {
     };
   }, [customerCPF, restaurant?.id]);
 
-  const loadCustomerInfo = () => {
-    const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
-    const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
-    if (storedName && storedCPF) {
-      setCustomerName(storedName);
-      setCustomerCPF(storedCPF);
-    } else {
-      setShowCustomerDialog(true);
-    }
-  };
-
   const handleCustomerInfoSubmit = (name: string, cpf?: string) => {
     setCustomerName(name);
     setCustomerCPF(cpf || "");
@@ -139,50 +183,6 @@ export default function DeliveryMenu() {
   const handleNameUpdate = (name: string) => {
     setCustomerName(name);
     sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
-  };
-
-  const fetchRestaurantData = async () => {
-    try {
-      const { data: restaurantData, error: restaurantError } = await supabase
-        .from("restaurants")
-        .select("*")
-        .eq("slug", restaurantSlug)
-        .single();
-
-      if (restaurantError) throw restaurantError;
-      setRestaurant(restaurantData);
-
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("categories")
-        .select("*, products(*)")
-        .eq("restaurant_id", restaurantData.id)
-        .order("display_order");
-
-      if (categoriesError) throw categoriesError;
-      setCategories(categoriesData || []);
-
-      const { data: featuredData } = await supabase
-        .from("products")
-        .select("*, categories(restaurant_id)")
-        .eq("categories.restaurant_id", restaurantData.id)
-        .eq("is_featured", true)
-        .eq("available", true)
-        .order("featured_display_order");
-
-      setFeaturedProducts(featuredData || []);
-    } catch (error) {
-      console.error("Error fetching restaurant:", error);
-      toast.error("Erro ao carregar cardápio");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCartFromStorage = () => {
-    const stored = localStorage.getItem(`delivery-cart-${restaurantSlug}`);
-    if (stored) {
-      setCart(JSON.parse(stored));
-    }
   };
 
   const saveCartToStorage = () => {
