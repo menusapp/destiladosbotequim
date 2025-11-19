@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Banknote, CreditCard, Smartphone } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PaymentStepProps {
   onBack: () => void;
@@ -22,11 +23,44 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo }: Payment
   const [customerPhone, setCustomerPhone] = useState("");
 
   useEffect(() => {
-    if (requireCustomerInfo) {
-      setCustomerName(sessionStorage.getItem("customer_name") || "");
-      setCustomerCPF(sessionStorage.getItem("customer_cpf") || "");
-      setCustomerPhone(sessionStorage.getItem("customer_phone") || "");
-    }
+    const loadUserData = async () => {
+      // Tentar buscar dados do perfil do usuário autenticado
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, cpf, phone")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile) {
+          // Preencher automaticamente os campos
+          if (profile.full_name) {
+            setCustomerName(profile.full_name);
+            sessionStorage.setItem("customer_name", profile.full_name);
+          }
+          if (profile.cpf) {
+            setCustomerCPF(profile.cpf);
+            sessionStorage.setItem("customer_cpf", profile.cpf);
+          }
+          if (profile.phone) {
+            setCustomerPhone(profile.phone);
+            sessionStorage.setItem("customer_phone", profile.phone);
+          }
+          return; // Se encontrou perfil, não busca do sessionStorage
+        }
+      }
+      
+      // Fallback: buscar do sessionStorage se não estiver autenticado
+      if (requireCustomerInfo) {
+        setCustomerName(sessionStorage.getItem("customer_name") || "");
+        setCustomerCPF(sessionStorage.getItem("customer_cpf") || "");
+        setCustomerPhone(sessionStorage.getItem("customer_phone") || "");
+      }
+    };
+    
+    loadUserData();
   }, [requireCustomerInfo]);
 
   const paymentMethods = [
@@ -109,7 +143,7 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo }: Payment
           onClick={() => setPaymentType("delivery")}
         >
           <CardContent className="p-4">
-            <h3 className="font-medium mb-1">Pagar na entrega</h3>
+            <h3 className="font-medium mb-1">Pagar pessoalmente</h3>
             <p className="text-sm text-muted-foreground">
               Quando você receber o pedido
             </p>
