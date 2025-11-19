@@ -270,8 +270,20 @@ const Menu = () => {
       billId, 
       tableNumber, 
       restaurantSlug,
+      tableId,
       tempoAtual: new Date().toISOString()
     });
+    
+    // Verificar se mesa foi liberada
+    if (tableId) {
+      const { data: tableData } = await supabase
+        .from('tables')
+        .select('is_occupied, occupied_by')
+        .eq('id', tableId)
+        .single();
+      
+      console.log('📋 Status da mesa:', tableData);
+    }
     
     // Limpar dados da sessão
     sessionStorage.removeItem(`customer_name_${tableNumber}`);
@@ -280,8 +292,6 @@ const Menu = () => {
     sessionStorage.removeItem('customerInfo');
     
     console.log('✅ SessionStorage limpo');
-    
-    // NÃO precisa liberar mesa aqui, função admin_mark_bill_paid já faz isso
     
     // Marcar para abrir modal de avaliação após reload
     sessionStorage.setItem('shouldShowReview', 'true');
@@ -302,7 +312,7 @@ const Menu = () => {
       console.log('🔄 Recarregando página em 3... 2... 1...');
       window.location.href = `/menu/${restaurantSlug}/${tableNumber}`;
     }, 1500);
-  }, [tableNumber, restaurantSlug]);
+  }, [tableNumber, restaurantSlug, tableId]);
 
   useEffect(() => {
     const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
@@ -431,17 +441,93 @@ const Menu = () => {
     };
   }, [tableId, customerName, customerCPF]);
 
-  const handleCustomerInfoSubmit = (name: string, cpf: string) => {
-    setCustomerName(name);
-    setCustomerCPF(cpf);
-    sessionStorage.setItem(`customer_name_${tableNumber}`, name);
-    sessionStorage.setItem(`customer_cpf_${tableNumber}`, cpf);
+  const handleCompleteLogout = useCallback(() => {
+    console.log('🚪 Deslogando cliente completamente...');
     
-    // Salvar também no formato customerInfo para consistência
-    sessionStorage.setItem("customerInfo", JSON.stringify({ name, cpf }));
+    // Limpar TODOS os dados do sessionStorage
+    sessionStorage.removeItem(`customer_name_${tableNumber}`);
+    sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+    sessionStorage.removeItem(`cart_${tableNumber}`);
+    sessionStorage.removeItem('customerInfo');
+    sessionStorage.removeItem('shouldShowReview');
+    sessionStorage.removeItem('reviewBillId');
+    sessionStorage.removeItem('reviewCounterOrderId');
     
-    setShowCustomerDialog(false);
-    toast.success("Bem-vindo!");
+    // Resetar TODOS os estados
+    setCustomerName("");
+    setCustomerCPF("");
+    setTableId(null);
+    setCart([]);
+    setHasOpenComanda(false);
+    setComandaTotal(0);
+    setReviewModalOpen(false);
+    setReviewBillId(undefined);
+    setReviewOrderId(undefined);
+    setReviewCounterOrderId(undefined);
+    
+    // Forçar dialog de login
+    setShowCustomerDialog(true);
+    
+    console.log('✅ Cliente deslogado com sucesso');
+    toast.info("Obrigado pela visita! Por favor, faça login novamente para um novo pedido.");
+  }, [tableNumber]);
+
+  const handleCustomerInfoSubmit = async (name: string, cpf: string) => {
+    console.log('👤 Tentando login:', { name, cpf, tableNumber });
+    
+    if (!restaurant || !tableNumber) return;
+
+    try {
+      const { data: tableData, error: tableError } = await supabase
+        .from("tables")
+        .select("id, is_occupied, occupied_by")
+        .eq("restaurant_id", restaurant.id)
+        .eq("table_number", parseInt(tableNumber))
+        .single();
+
+      if (tableError || !tableData) {
+        toast.error("Mesa não encontrada");
+        return;
+      }
+
+      // Verificar se mesa está ocupada por OUTRO cliente
+      if (tableData.is_occupied && tableData.occupied_by && tableData.occupied_by !== cpf) {
+        toast.error("Esta mesa já está ocupada por outro cliente!");
+        return;
+      }
+
+      // Ocupar a mesa com os dados do cliente
+      const { error: updateError } = await supabase
+        .from("tables")
+        .update({
+          is_occupied: true,
+          occupied_at: new Date().toISOString(),
+          occupied_by: cpf,
+        })
+        .eq("id", tableData.id);
+
+      if (updateError) throw updateError;
+
+      // Salvar dados no sessionStorage
+      sessionStorage.setItem(`customer_name_${tableNumber}`, name);
+      sessionStorage.setItem(`customer_cpf_${tableNumber}`, cpf);
+      sessionStorage.setItem("customerInfo", JSON.stringify({ name, cpf }));
+      
+      // Atualizar estados
+      setCustomerName(name);
+      setCustomerCPF(cpf);
+      setTableId(tableData.id);
+      setShowCustomerDialog(false);
+      
+      console.log('✅ Cliente logado com sucesso!', { tableId: tableData.id });
+      toast.success(`Bem-vindo, ${name}!`);
+      
+      // Carregar dados
+      fetchData();
+    } catch (error) {
+      console.error("Erro ao registrar cliente:", error);
+      toast.error("Erro ao fazer login");
+    }
   };
 
   const handleProductClick = useCallback(async (product: Product) => {
@@ -693,6 +779,8 @@ const Menu = () => {
           setReviewOrderId(undefined);
           setReviewCounterOrderId(undefined);
           setReviewBillId(undefined);
+          // ✅ Logout completo após fechar avaliação
+          handleCompleteLogout();
         }}
         restaurantId={restaurant.id}
         restaurantName={restaurant.name}
