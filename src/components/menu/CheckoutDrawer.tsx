@@ -7,11 +7,12 @@ import { CartStep } from "./checkout/CartStep";
 import { AddressStep } from "./checkout/AddressStep";
 import { PaymentStep } from "./checkout/PaymentStep";
 import { SummaryStep } from "./checkout/SummaryStep";
+import { DeliveryTypeStep } from "./checkout/DeliveryTypeStep";
 import { CartItem } from "@/types/menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type CheckoutStep = "cart" | "address" | "payment" | "summary";
+type CheckoutStep = "cart" | "delivery-type" | "address" | "payment" | "summary";
 
 interface CheckoutDrawerProps {
   open: boolean;
@@ -36,6 +37,7 @@ export const CheckoutDrawer = ({
 }: CheckoutDrawerProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>("cart");
+  const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("delivery");
   const [coupon, setCoupon] = useState<any>(null);
   const [customerData, setCustomerData] = useState<any>(null);
   const [addressData, setAddressData] = useState<any>(null);
@@ -51,7 +53,7 @@ export const CheckoutDrawer = ({
   }, [open]);
 
   const getProgressValue = () => {
-    const steps = { cart: 25, address: 50, payment: 75, summary: 100 };
+    const steps = { cart: 20, "delivery-type": 40, address: 60, payment: 80, summary: 100 };
     return steps[step];
   };
 
@@ -78,21 +80,22 @@ export const CheckoutDrawer = ({
         table_id: null,
         restaurant_id: restaurant.id,
         customer_name: customerData.name,
-          customer_cpf: customerData.cpf,
-          order_type: "delivery",
-          delivery_address: formatAddress(addressData.address),
-          delivery_phone: customerData.phone,
-          delivery_neighborhood: addressData.address.neighborhood,
-          delivery_city: addressData.address.city,
-          payment_type: paymentData.method,
-          coupon_code: coupon?.code,
-          coupon_discount: couponDiscount,
-          delivery_fee: deliveryFee,
-          loyalty_points_used: loyaltyPointsUsed,
-          loyalty_points_earned: Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1)),
-          status: "pending",
-          notes: paymentData.changeFor ? `Troco para: R$ ${paymentData.changeFor}` : null,
-        };
+        customer_cpf: customerData.cpf,
+        order_type: "delivery",
+        delivery_type: deliveryType,
+        delivery_address: deliveryType === "delivery" ? formatAddress(addressData?.address) : null,
+        delivery_phone: customerData.phone,
+        delivery_neighborhood: deliveryType === "delivery" ? addressData?.address?.neighborhood : null,
+        delivery_city: deliveryType === "delivery" ? addressData?.address?.city : null,
+        payment_type: paymentData.method,
+        coupon_code: coupon?.code,
+        coupon_discount: couponDiscount,
+        delivery_fee: deliveryType === "delivery" ? deliveryFee : 0,
+        loyalty_points_used: loyaltyPointsUsed,
+        loyalty_points_earned: Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1)),
+        status: "pending",
+        notes: paymentData.changeFor ? `Troco para: R$ ${paymentData.changeFor}` : null,
+      };
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -271,13 +274,29 @@ export const CheckoutDrawer = ({
             loyaltyPoints={loyaltyPoints}
             loyaltyPointsUsed={loyaltyPointsUsed}
             onRedeemPoints={setLoyaltyPointsUsed}
-            onContinue={() => setStep("address")}
+            onContinue={() => setStep("delivery-type")}
+          />
+        );
+      case "delivery-type":
+        return (
+          <DeliveryTypeStep
+            selected={deliveryType}
+            onSelect={setDeliveryType}
+            onBack={() => setStep("cart")}
+            onContinue={() => {
+              if (deliveryType === "delivery") {
+                setStep("address");
+              } else {
+                setStep("payment");
+              }
+            }}
+            storeAddress={restaurant.store_address}
           />
         );
       case "address":
         return (
           <AddressStep
-            onBack={() => setStep("cart")}
+            onBack={() => setStep("delivery-type")}
             onContinue={(data) => {
               setCustomerData({ name: data.customerName, cpf: data.customerCPF, phone: data.customerPhone });
               setAddressData(data);
@@ -294,9 +313,24 @@ export const CheckoutDrawer = ({
       case "payment":
         return (
           <PaymentStep
-            onBack={() => setStep("address")}
+            onBack={() => deliveryType === "delivery" ? setStep("address") : setStep("delivery-type")}
+            requireCustomerInfo={deliveryType === "pickup"}
             onContinue={(data) => {
               setPaymentData(data);
+              
+              // Se for retirada, pegar dados do cliente aqui
+              if (deliveryType === "pickup") {
+                const cpf = sessionStorage.getItem("customer_cpf") || "";
+                const name = sessionStorage.getItem("customer_name") || "";
+                const phone = sessionStorage.getItem("customer_phone") || "";
+                setCustomerData({ name, cpf, phone });
+                
+                // Buscar pontos de fidelidade se habilitado
+                if (restaurant.loyalty_enabled && cpf) {
+                  fetchLoyaltyPoints(cpf);
+                }
+              }
+              
               setStep("summary");
             }}
           />
@@ -345,6 +379,7 @@ export const CheckoutDrawer = ({
             </button>
             <DrawerTitle className="text-lg font-bold">
               {step === "cart" && "Sacola"}
+              {step === "delivery-type" && "Tipo de Entrega"}
               {step === "address" && "Endereço de Entrega"}
               {step === "payment" && "Forma de Pagamento"}
               {step === "summary" && "Confirmar Pedido"}

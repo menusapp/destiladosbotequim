@@ -32,6 +32,7 @@ interface Order {
   delivery_address: string | null;
   delivery_neighborhood: string | null;
   delivery_city: string | null;
+  delivery_type?: string | null;
   status: string | null;
   notes: string | null;
   created_at: string | null;
@@ -322,8 +323,8 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-lg">#{order.id.slice(0, 8)}</span>
-              <Badge variant={isDelivery ? "default" : "secondary"}>
-                {isDelivery ? "🚚 Delivery" : "📦 Retirada"}
+              <Badge variant={order.delivery_type === "pickup" ? "secondary" : "default"}>
+                {order.delivery_type === "pickup" ? "🏪 Retirada" : "🚚 Delivery"}
               </Badge>
             </div>
             <div className="flex items-center gap-1 text-muted-foreground text-sm">
@@ -453,8 +454,8 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
         {/* Coluna 1: ID + Status */}
         <div className="flex items-center gap-3 min-w-[180px]">
           <span className="font-semibold text-sm">#{order.id.slice(0, 8)}</span>
-          <Badge variant={order.status === "delivered" ? "default" : "outline"} className="text-xs">
-            {order.status === "delivered" ? "✓ Entregue" : "✓ Retirado"}
+          <Badge variant={order.status === "delivered" || order.status === "picked_up" ? "default" : "outline"} className="text-xs">
+            {order.delivery_type === "pickup" ? "🏪 Retirado" : "🚚 Entregue"}
           </Badge>
         </div>
 

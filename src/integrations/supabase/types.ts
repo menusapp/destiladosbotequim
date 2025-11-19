@@ -1035,6 +1035,7 @@ export type Database = {
           delivery_fee: number | null
           delivery_neighborhood: string | null
           delivery_phone: string | null
+          delivery_type: string | null
           id: string
           loyalty_points_earned: number | null
           loyalty_points_used: number | null
@@ -1057,6 +1058,7 @@ export type Database = {
           delivery_fee?: number | null
           delivery_neighborhood?: string | null
           delivery_phone?: string | null
+          delivery_type?: string | null
           id?: string
           loyalty_points_earned?: number | null
           loyalty_points_used?: number | null
@@ -1079,6 +1081,7 @@ export type Database = {
           delivery_fee?: number | null
           delivery_neighborhood?: string | null
           delivery_phone?: string | null
+          delivery_type?: string | null
           id?: string
           loyalty_points_earned?: number | null
           loyalty_points_used?: number | null
