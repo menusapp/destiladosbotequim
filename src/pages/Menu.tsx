@@ -319,11 +319,12 @@ const Menu = () => {
       // Remover flag
       sessionStorage.removeItem('forceLogout');
       
-      // Limpar TUDO relacionado à sessão
-      sessionStorage.removeItem(`customer_name_${tableNumber}`);
-      sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
-      sessionStorage.removeItem(`cart_${tableNumber}`);
-      sessionStorage.removeItem('customerInfo');
+    // Limpar TUDO relacionado à sessão
+    sessionStorage.removeItem(`customer_name_${tableNumber}`);
+    sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+    sessionStorage.removeItem(`cart_${tableNumber}`);
+    sessionStorage.removeItem(`table_id_${tableNumber}`);
+    sessionStorage.removeItem('customerInfo');
       
       // Resetar TODOS os estados para garantir
       setCustomerName("");
@@ -344,26 +345,29 @@ const Menu = () => {
       // ❌ NÃO fazer return aqui - vamos continuar para configurar realtime
     }
     
-    // Tentar restaurar sessão apenas se NÃO foi logout forçado
-    if (!forceLogout || forceLogout !== 'true') {
-      const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
-      const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
-      
-      if (savedName && savedCPF) {
-        console.log('📦 Restaurando sessão:', { savedName, savedCPF });
-        const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
-        if (savedCart) setCart(JSON.parse(savedCart));
-        setCustomerName(savedName);
-        setCustomerCPF(savedCPF);
-        fetchData();
-      } else {
-        console.log('🆕 Nova sessão - mostrando dialog de login');
-        sessionStorage.removeItem(`cart_${tableNumber}`);
-        setCart([]);
-        setShowCustomerDialog(true);
-        fetchData();
-      }
+  // Tentar restaurar sessão apenas se NÃO foi logout forçado
+  if (!forceLogout || forceLogout !== 'true') {
+    const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
+    const savedCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+    const savedTableId = sessionStorage.getItem(`table_id_${tableNumber}`);
+    
+    if (savedName && savedCPF) {
+      console.log('📦 Restaurando sessão:', { savedName, savedCPF, savedTableId });
+      const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
+      if (savedCart) setCart(JSON.parse(savedCart));
+      setCustomerName(savedName);
+      setCustomerCPF(savedCPF);
+      if (savedTableId) setTableId(savedTableId);
+      fetchData();
+    } else {
+      console.log('🆕 Nova sessão - mostrando dialog de login');
+      sessionStorage.removeItem(`cart_${tableNumber}`);
+      sessionStorage.removeItem(`table_id_${tableNumber}`);
+      setCart([]);
+      setShowCustomerDialog(true);
+      fetchData();
     }
+  }
     
     // Configurar realtime (sempre, independente de logout)
     const channel = supabase.channel('menu-changes')
@@ -498,6 +502,7 @@ const Menu = () => {
     sessionStorage.removeItem(`customer_name_${tableNumber}`);
     sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
     sessionStorage.removeItem(`cart_${tableNumber}`);
+    sessionStorage.removeItem(`table_id_${tableNumber}`);
     sessionStorage.removeItem('customerInfo');
     sessionStorage.removeItem('shouldShowReview');
     sessionStorage.removeItem('reviewBillId');
@@ -547,10 +552,11 @@ const Menu = () => {
 
       if (updateError) throw updateError;
 
-      // Salvar dados no sessionStorage
-      sessionStorage.setItem(`customer_name_${tableNumber}`, name);
-      sessionStorage.setItem(`customer_cpf_${tableNumber}`, cpf);
-      sessionStorage.setItem("customerInfo", JSON.stringify({ name, cpf }));
+    // Salvar dados no sessionStorage
+    sessionStorage.setItem(`customer_name_${tableNumber}`, name);
+    sessionStorage.setItem(`customer_cpf_${tableNumber}`, cpf);
+    sessionStorage.setItem(`table_id_${tableNumber}`, tableData.id);
+    sessionStorage.setItem("customerInfo", JSON.stringify({ name, cpf }));
       
       // Atualizar estados
       setCustomerName(name);
