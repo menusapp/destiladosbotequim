@@ -266,7 +266,12 @@ const Menu = () => {
   // Realtime subscription para pedidos da mesa (subscription já existe nas linhas 279-285)
 
   const handleBillPaid = useCallback(async (billId: string) => {
-    console.log('Conta paga! Deslogando cliente...', billId);
+    console.log('🔔 handleBillPaid chamado!', { 
+      billId, 
+      tableNumber, 
+      restaurantSlug,
+      tempoAtual: new Date().toISOString()
+    });
     
     // Limpar dados da sessão
     sessionStorage.removeItem(`customer_name_${tableNumber}`);
@@ -274,17 +279,27 @@ const Menu = () => {
     sessionStorage.removeItem(`cart_${tableNumber}`);
     sessionStorage.removeItem('customerInfo');
     
+    console.log('✅ SessionStorage limpo');
+    
     // NÃO precisa liberar mesa aqui, função admin_mark_bill_paid já faz isso
     
     // Marcar para abrir modal de avaliação após reload
     sessionStorage.setItem('shouldShowReview', 'true');
     sessionStorage.setItem('reviewBillId', billId);
     
+    console.log('✅ Flags de avaliação setadas:', {
+      shouldShowReview: sessionStorage.getItem('shouldShowReview'),
+      reviewBillId: sessionStorage.getItem('reviewBillId')
+    });
+    
     // Mostrar mensagem e recarregar
-    toast.success("Conta paga! Obrigado pela preferência! 🎉");
+    toast.success("Conta paga! Obrigado pela preferência! 🎉", {
+      duration: 1500,
+    });
     
     // Recarregar página para forçar novo login
     setTimeout(() => {
+      console.log('🔄 Recarregando página em 3... 2... 1...');
       window.location.href = `/menu/${restaurantSlug}/${tableNumber}`;
     }, 1500);
   }, [tableNumber, restaurantSlug]);
@@ -310,6 +325,7 @@ const Menu = () => {
         schema: 'public', 
         table: 'products'
       }, () => {
+        console.log('📦 Produtos atualizados em tempo real!');
         // Só atualizar se já temos restaurant carregado
         if (restaurant?.id) {
           fetchData();
@@ -320,8 +336,20 @@ const Menu = () => {
         schema: 'public', 
         table: 'restaurants',
         filter: `slug=eq.${restaurantSlug}`
-      }, fetchData)
+      }, (payload) => {
+        console.log('🏪 Restaurante atualizado em tempo real!', payload);
+        const updatedRestaurant = payload.new as any;
+        
+        setRestaurant((prev: any) => ({...prev, ...updatedRestaurant}));
+        
+        if (!updatedRestaurant.is_open && restaurant?.is_open) {
+          toast.info("O restaurante acabou de fechar! 🔒");
+        } else if (updatedRestaurant.is_open && !restaurant?.is_open) {
+          toast.success("O restaurante acabou de abrir! 🎉");
+        }
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        console.log('📝 Pedidos atualizados em tempo real!');
         if (tableId) checkOpenComanda(tableId, cart);
       })
       .on('postgres_changes', { 
@@ -330,16 +358,22 @@ const Menu = () => {
         table: 'bills',
         filter: tableId ? `table_id=eq.${tableId}` : undefined
       }, (payload) => {
-        console.log('Conta atualizada em tempo real:', payload);
+        console.log('💳 Conta atualizada em tempo real:', payload);
         const bill = payload.new as any;
         
         // Se a conta foi marcada como paga, deslogar cliente
         if (bill?.status === 'paid' && bill?.id) {
+          console.log('✅ Conta foi paga! Deslogando cliente...');
           handleBillPaid(bill.id);
         }
       })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .subscribe((status) => {
+        console.log('📡 Status da subscrição Menu:', status);
+      });
+    return () => { 
+      console.log('🔌 Removendo canal de realtime');
+      supabase.removeChannel(channel); 
+    };
   }, [fetchData, restaurantSlug, tableNumber, tableId, handleBillPaid, checkOpenComanda]);
 
   useEffect(() => {
