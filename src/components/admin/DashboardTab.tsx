@@ -76,22 +76,22 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         billsCount = paidBills.length;
       }
 
-      // Buscar pedidos DELIVERY finalizados do dia
-      const { data: deliveryOrders } = await supabase
-        .from("orders")
-        .select(`
-          id,
-          order_items (
-            quantity,
-            price_at_order,
-            order_item_extras (price_at_order)
-          )
-        `)
-        .eq("restaurant_id", restaurantId)
-        .eq("order_type", "delivery")
-        .eq("status", "delivered")
-        .gte("updated_at", startDate.toISOString())
-        .lte("updated_at", endDate.toISOString());
+    // Buscar pedidos DELIVERY finalizados do dia (delivered ou picked_up)
+    const { data: deliveryOrders } = await supabase
+      .from("orders")
+      .select(`
+        id,
+        order_items (
+          quantity,
+          price_at_order,
+          order_item_extras (price_at_order)
+        )
+      `)
+      .eq("restaurant_id", restaurantId)
+      .eq("order_type", "delivery")
+      .in("status", ["delivered", "picked_up"])
+      .gte("updated_at", startDate.toISOString())
+      .lte("updated_at", endDate.toISOString());
 
       // Calcular total dos pedidos delivery
       let deliveryTotal = 0;
