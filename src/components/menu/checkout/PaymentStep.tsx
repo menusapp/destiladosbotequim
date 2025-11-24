@@ -12,9 +12,10 @@ interface PaymentStepProps {
   onBack: () => void;
   onContinue: (data: any) => void;
   requireCustomerInfo?: boolean;
+  orderTotal?: number;
 }
 
-export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo }: PaymentStepProps) => {
+export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTotal = 0 }: PaymentStepProps) => {
   const [paymentType, setPaymentType] = useState<"delivery" | "online">("delivery");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [changeFor, setChangeFor] = useState("");
@@ -74,6 +75,19 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo }: Payment
     if (!paymentMethod) {
       toast.error("Selecione uma forma de pagamento");
       return;
+    }
+
+    // Validar troco em dinheiro
+    if (paymentMethod === "cash" && changeFor) {
+      const changeValue = parseFloat(changeFor);
+      if (isNaN(changeValue)) {
+        toast.error("Digite um valor válido para o troco");
+        return;
+      }
+      if (changeValue < orderTotal) {
+        toast.error(`O valor para troco deve ser maior ou igual ao total do pedido (R$ ${orderTotal.toFixed(2).replace('.', ',')})`);
+        return;
+      }
     }
 
     if (requireCustomerInfo) {
