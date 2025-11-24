@@ -284,7 +284,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
     printWindow.print();
   };
 
-  const isDeliveryOrder = (order: Order) => !!order.delivery_address;
+  const isDeliveryOrder = (order: Order) => order.delivery_type === "delivery";
 
   const calculateTotal = (order: Order) => {
     return order.order_items.reduce((sum, item) => {
@@ -312,7 +312,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
   const finishedOrders = filteredOrders.filter((o) => o.status === "delivered" || o.status === "picked_up");
 
   const OrderCard = ({ order }: { order: Order }) => {
-    const isDelivery = isDeliveryOrder(order);
+    const isDelivery = order.delivery_type === "delivery";
     const total = calculateTotal(order);
     const itemCount = order.order_items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -404,12 +404,12 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
               <Button
                 size="sm"
                 onClick={() =>
-                  updateOrderStatus(order.id, isDelivery ? "delivered" : "picked_up")
+                  updateOrderStatus(order.id, order.delivery_type === "delivery" ? "delivered" : "picked_up")
                 }
                 className="flex-1"
               >
                 <Check className="w-4 h-4 mr-1" />
-                {isDelivery ? "Confirmar Entrega" : "Confirmar Retirada"}
+                {order.delivery_type === "delivery" ? "Confirmar Entrega" : "Confirmar Retirada"}
               </Button>
             )}
 
@@ -445,7 +445,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
   };
 
   const FinishedOrderCard = ({ order }: { order: Order }) => {
-    const isDelivery = isDeliveryOrder(order);
+    const isDelivery = order.delivery_type === "delivery";
     const total = calculateTotal(order);
     const itemCount = order.order_items.reduce((sum, item) => sum + item.quantity, 0);
 

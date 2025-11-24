@@ -41,39 +41,51 @@ interface Restaurant {
   prep_time_minutes: number;
   service_fee_enabled: boolean;
   service_fee_percentage: number;
+  store_address?: string | null;
 }
 
-const STATUS_CONFIG = {
-  pending: {
-    icon: Clock,
-    label: "Aguardando confirmação",
-    description: "Estamos recebendo seu pedido...",
-    color: "bg-yellow-500",
-  },
-  accepted: {
-    icon: CheckCircle2,
-    label: "Pedido aceito",
-    description: "Seu pedido foi confirmado!",
-    color: "bg-blue-500",
-  },
-  preparing: {
-    icon: Package,
-    label: "Em preparo",
-    description: "Estamos preparando seu pedido com carinho",
-    color: "bg-orange-500",
-  },
-  ready: {
-    icon: Truck,
-    label: "Saiu para entrega",
-    description: "Seu pedido está a caminho!",
-    color: "bg-purple-500",
-  },
-  delivered: {
-    icon: CheckCircle2,
-    label: "Entregue",
-    description: "Pedido entregue! Bom apetite!",
-    color: "bg-green-500",
-  },
+const getStatusConfig = (status: string, deliveryType?: string) => {
+  const configs: Record<string, any> = {
+    pending: {
+      icon: Clock,
+      label: "Aguardando confirmação",
+      description: "Estamos recebendo seu pedido...",
+      color: "bg-yellow-500",
+    },
+    accepted: {
+      icon: CheckCircle2,
+      label: "Pedido aceito",
+      description: "Seu pedido foi confirmado!",
+      color: "bg-blue-500",
+    },
+    preparing: {
+      icon: Package,
+      label: "Em preparo",
+      description: "Estamos preparando seu pedido com carinho",
+      color: "bg-orange-500",
+    },
+    ready: {
+      icon: deliveryType === "pickup" ? Package : Truck,
+      label: deliveryType === "pickup" ? "Pronto para retirada" : "Saiu para entrega",
+      description: deliveryType === "pickup" 
+        ? "Seu pedido está pronto! Pode retirar." 
+        : "Seu pedido está a caminho!",
+      color: "bg-purple-500",
+    },
+    delivered: {
+      icon: CheckCircle2,
+      label: "Entregue",
+      description: "Pedido entregue! Bom apetite!",
+      color: "bg-green-500",
+    },
+    picked_up: {
+      icon: CheckCircle2,
+      label: "Retirado",
+      description: "Pedido retirado! Bom apetite!",
+      color: "bg-green-500",
+    },
+  };
+  return configs[status] || configs.pending;
 };
 
 export default function OrderConfirmation() {
@@ -110,12 +122,22 @@ export default function OrderConfirmation() {
       // Buscar dados do restaurante usando restaurant_id direto do pedido
       const { data: restaurantData, error: restaurantError } = await supabase
         .from("restaurants")
-        .select("name, logo_url, prep_time_minutes, service_fee_enabled, service_fee_percentage")
+        .select(`
+          name, 
+          logo_url, 
+          prep_time_minutes, 
+          service_fee_enabled, 
+          service_fee_percentage,
+          delivery_config(store_address)
+        `)
         .eq("id", orderData.restaurant_id)
         .single();
 
       if (restaurantError) throw restaurantError;
-      setRestaurant(restaurantData);
+      
+      // Extrair store_address do delivery_config
+      const storeAddress = (restaurantData as any).delivery_config?.store_address;
+      setRestaurant({ ...restaurantData, store_address: storeAddress });
     } catch (error) {
       console.error("Error fetching order:", error);
       toast.error("Erro ao carregar pedido");
@@ -140,14 +162,22 @@ export default function OrderConfirmation() {
 
           // Notificações de mudança de status
           const newStatus = payload.new.status;
+          const deliveryType = payload.new.delivery_type;
+          
           if (newStatus === "accepted") {
             toast.success("Seu pedido foi aceito! 🎉");
           } else if (newStatus === "preparing") {
             toast.info("Seu pedido está sendo preparado! 👨‍🍳");
           } else if (newStatus === "ready") {
-            toast.success("Seu pedido está a caminho! 🚚");
+            toast.success(
+              deliveryType === "pickup" 
+                ? "Seu pedido está pronto para retirada! 📦" 
+                : "Seu pedido está a caminho! 🚚"
+            );
           } else if (newStatus === "delivered") {
             toast.success("Pedido entregue! Bom apetite! 🎉");
+          } else if (newStatus === "picked_up") {
+            toast.success("Pedido retirado! Bom apetite! 🎉");
           }
         }
       )
@@ -226,7 +256,7 @@ export default function OrderConfirmation() {
     );
   }
 
-  const statusInfo = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
+  const statusInfo = getStatusConfig(order.status, order.delivery_type);
   const StatusIcon = statusInfo.icon;
 
   return (
@@ -326,20 +356,32 @@ export default function OrderConfirmation() {
           </CardContent>
         </Card>
 
-        {/* Endereço de entrega */}
+        {/* Endereço de entrega/retirada */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="w-5 h-5" />
-              Endereço de Entrega
+              {order.delivery_type === "pickup" ? "Local de Retirada" : "Endereço de Entrega"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-2">{order.delivery_address}</p>
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <Phone className="w-4 h-4" />
-              {order.delivery_phone}
-            </p>
+            {order.delivery_type === "pickup" ? (
+              <>
+                <p className="mb-2">{restaurant.store_address || "Retirar na loja"}</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Phone className="w-4 h-4" />
+                  {order.delivery_phone}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mb-2">{order.delivery_address}</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Phone className="w-4 h-4" />
+                  {order.delivery_phone}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
