@@ -133,15 +133,15 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         localOrderIds = (localOrders || []).map(o => o.id);
       }
 
-      // Buscar pedidos delivery finalizados
-      const { data: deliveryOrders } = await supabase
-        .from("orders")
-        .select("id")
-        .eq("restaurant_id", restaurantId)
-        .eq("order_type", "delivery")
-        .eq("status", "delivered")
-        .gte("updated_at", startDate.toISOString())
-        .lte("updated_at", endDate.toISOString());
+    // Buscar pedidos delivery finalizados (delivered ou picked_up)
+    const { data: deliveryOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("restaurant_id", restaurantId)
+      .eq("order_type", "delivery")
+      .in("status", ["delivered", "picked_up"])
+      .gte("updated_at", startDate.toISOString())
+      .lte("updated_at", endDate.toISOString());
 
       const deliveryOrderIds = (deliveryOrders || []).map(o => o.id);
 

@@ -77,13 +77,19 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTota
       return;
     }
 
-    // Validar troco em dinheiro
-    if (paymentMethod === "cash" && changeFor) {
+    // Validação obrigatória de troco para pagamento em dinheiro
+    if (paymentMethod === "cash") {
+      if (!changeFor || changeFor.trim() === "") {
+        toast.error("Informe o valor para troco");
+        return;
+      }
+      
       const changeValue = parseFloat(changeFor);
-      if (isNaN(changeValue)) {
+      if (isNaN(changeValue) || changeValue <= 0) {
         toast.error("Digite um valor válido para o troco");
         return;
       }
+      
       if (changeValue < orderTotal) {
         toast.error(`O valor para troco deve ser maior ou igual ao total do pedido (R$ ${orderTotal.toFixed(2).replace('.', ',')})`);
         return;
@@ -206,7 +212,9 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTota
 
           {paymentMethod === "cash" && (
             <div className="mt-4">
-              <Label htmlFor="changeFor">Troco para quanto?</Label>
+                  <Label htmlFor="changeFor">
+                    Troco para quanto? <span className="text-red-500">*</span>
+                  </Label>
               <Input
                 id="changeFor"
                 type="number"
