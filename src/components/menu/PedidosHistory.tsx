@@ -5,24 +5,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Clock, MapPin, Package } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Clock, MapPin, Package, Star, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ReviewModal } from "./ReviewModal";
+import { toast } from "sonner";
 
 interface PedidosHistoryProps {
   customerCPF: string;
   restaurantId: string;
   restaurantSlug: string;
+  onAddToCart: (items: any[]) => void;
 }
 
 export const PedidosHistory = ({
   customerCPF,
   restaurantId,
   restaurantSlug,
+  onAddToCart,
 }: PedidosHistoryProps) => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState<Record<string, any>>({});
+  const [selectedOrderForReview, setSelectedOrderForReview] = useState<any>(null);
+  const [restaurantName, setRestaurantName] = useState("");
 
   useEffect(() => {
     fetchOrders();
@@ -58,10 +66,10 @@ export const PedidosHistory = ({
           *,
           order_items(
             *,
-            products(name, price),
+            products(name, price, id, category_id),
             order_item_extras(
               *,
-              product_extras(name, price)
+              product_extras(name, price, id)
             )
           )
         `
@@ -72,6 +80,34 @@ export const PedidosHistory = ({
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      
+      // Buscar nome do restaurante
+      if (data && data.length > 0) {
+        const { data: restaurantData } = await supabase
+          .from("restaurants")
+          .select("name")
+          .eq("id", restaurantId)
+          .single();
+        
+        if (restaurantData) {
+          setRestaurantName(restaurantData.name);
+        }
+        
+        // Buscar reviews para todos os pedidos
+        const orderIds = data.map(o => o.id);
+        const { data: reviewsData } = await supabase
+          .from("restaurant_reviews")
+          .select("*")
+          .in("order_id", orderIds);
+        
+        // Criar mapa de reviews por order_id
+        const reviewsMap: Record<string, any> = {};
+        reviewsData?.forEach(r => {
+          if (r.order_id) reviewsMap[r.order_id] = r;
+        });
+        setReviews(reviewsMap);
+      }
+      
       setOrders(data || []);
     } catch (error) {
       console.error("Error fetching orders:", error);
@@ -113,6 +149,29 @@ export const PedidosHistory = ({
       ) || 0;
       return sum + itemTotal + extrasTotal;
     }, 0) || 0;
+  };
+
+  const handleReorder = (order: any) => {
+    const items = order.order_items.map((item: any) => ({
+      id: crypto.randomUUID(),
+      product: {
+        id: item.products.id,
+        name: item.products.name,
+        price: item.products.price,
+        category_id: item.products.category_id,
+        available: true,
+      },
+      quantity: item.quantity,
+      extras: item.order_item_extras?.map((extra: any) => ({
+        id: extra.product_extras?.id,
+        name: extra.product_extras?.name,
+        price: extra.product_extras?.price,
+      })) || [],
+      notes: item.notes || ""
+    }));
+    
+    onAddToCart(items);
+    toast.success(`${items.length} ${items.length === 1 ? 'item adicionado' : 'itens adicionados'} à sacola!`);
   };
 
   if (loading) {
@@ -202,10 +261,76 @@ export const PedidosHistory = ({
                 <span>Total</span>
                 <span>R$ {calculateTotal(order).toFixed(2)}</span>
               </div>
+
+              {/* Review Section */}
+              {(order.status === "delivered" || order.status === "picked_up") && (
+                <>
+                  <Separator className="my-3" />
+                  <div className="space-y-3">
+                    {/* Estrelas */}
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!reviews[order.id]) {
+                              setSelectedOrderForReview(order);
+                            }
+                          }}
+                          disabled={!!reviews[order.id]}
+                          className={`transition-all ${!reviews[order.id] ? 'hover:scale-110' : ''}`}
+                        >
+                          <Star
+                            className={`w-5 h-5 ${
+                              reviews[order.id] && star <= reviews[order.id].rating
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                      {reviews[order.id] && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          Avaliado
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Botão Reordenar */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReorder(order);
+                      }}
+                      className="w-full"
+                    >
+                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      Adicione à sacola
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Review Modal */}
+      {selectedOrderForReview && (
+        <ReviewModal
+          open={!!selectedOrderForReview}
+          onClose={() => {
+            setSelectedOrderForReview(null);
+            fetchOrders();
+          }}
+          restaurantId={restaurantId}
+          restaurantName={restaurantName}
+          orderId={selectedOrderForReview.id}
+        />
+      )}
     </ScrollArea>
   );
 };

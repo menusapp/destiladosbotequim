@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Clock, Phone, CheckCircle2, Package, Truck, MapPin } from "lucide-react";
+import { ReviewModal } from "@/components/menu/ReviewModal";
 
 interface OrderItem {
   id: string;
@@ -36,6 +37,7 @@ interface Order {
 }
 
 interface Restaurant {
+  id: string;
   name: string;
   logo_url: string | null;
   prep_time_minutes: number;
@@ -94,6 +96,8 @@ export default function OrderConfirmation() {
   const [order, setOrder] = useState<Order | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showReview, setShowReview] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -123,6 +127,7 @@ export default function OrderConfirmation() {
       const { data: restaurantData, error: restaurantError } = await supabase
         .from("restaurants")
         .select(`
+          id,
           name, 
           logo_url, 
           prep_time_minutes, 
@@ -137,13 +142,36 @@ export default function OrderConfirmation() {
       
       // Extrair store_address do delivery_config
       const storeAddress = (restaurantData as any).delivery_config?.store_address;
-      setRestaurant({ ...restaurantData, store_address: storeAddress });
+      setRestaurant({ 
+        id: restaurantData.id,
+        name: restaurantData.name,
+        logo_url: restaurantData.logo_url,
+        prep_time_minutes: restaurantData.prep_time_minutes,
+        service_fee_enabled: restaurantData.service_fee_enabled,
+        service_fee_percentage: restaurantData.service_fee_percentage,
+        store_address: storeAddress 
+      });
+      
+      // Verificar se pedido já foi avaliado
+      await checkExistingReview();
     } catch (error) {
       console.error("Error fetching order:", error);
       toast.error("Erro ao carregar pedido");
     } finally {
       setLoading(false);
     }
+  };
+
+  const checkExistingReview = async () => {
+    if (!orderId) return;
+    
+    const { data } = await supabase
+      .from("restaurant_reviews")
+      .select("id")
+      .eq("order_id", orderId)
+      .single();
+    
+    setHasReviewed(!!data);
   };
 
   const subscribeToOrderUpdates = () => {
@@ -176,8 +204,20 @@ export default function OrderConfirmation() {
             );
           } else if (newStatus === "delivered") {
             toast.success("Pedido entregue! Bom apetite! 🎉");
+            setTimeout(async () => {
+              await checkExistingReview();
+              if (!hasReviewed) {
+                setShowReview(true);
+              }
+            }, 2000);
           } else if (newStatus === "picked_up") {
             toast.success("Pedido retirado! Bom apetite! 🎉");
+            setTimeout(async () => {
+              await checkExistingReview();
+              if (!hasReviewed) {
+                setShowReview(true);
+              }
+            }, 2000);
           }
         }
       )
@@ -405,6 +445,18 @@ export default function OrderConfirmation() {
         >
           Fazer Novo Pedido
         </Button>
+        
+        {/* Review Modal */}
+        <ReviewModal
+          open={showReview}
+          onClose={() => {
+            setShowReview(false);
+            setHasReviewed(true);
+          }}
+          restaurantId={restaurant.id}
+          restaurantName={restaurant.name}
+          orderId={order.id}
+        />
       </div>
     </div>
   );

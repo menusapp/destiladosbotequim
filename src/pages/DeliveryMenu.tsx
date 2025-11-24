@@ -242,6 +242,12 @@ export default function DeliveryMenu() {
     toast.success("Sacola limpa");
   };
 
+  const handleBulkAddToCart = (items: CartItem[]) => {
+    setCart(prevCart => [...prevCart, ...items]);
+    setActiveTab("menu");
+    setCheckoutOpen(true);
+  };
+
   const calculateTotal = () => {
     return cart.reduce((sum, item) => {
       const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
@@ -443,6 +449,7 @@ export default function DeliveryMenu() {
             customerCPF={customerCPF}
             restaurantId={restaurant.id}
             restaurantSlug={restaurantSlug || ""}
+            onAddToCart={handleBulkAddToCart}
           />
         </div>
       )}
