@@ -311,10 +311,26 @@ export const CheckoutDrawer = ({
           />
         );
       case "payment":
+        // Calcular total do pedido
+        const subtotal = cart.reduce((sum, item) => {
+          const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+          return sum + (item.product.price + extrasTotal) * item.quantity;
+        }, 0);
+
+        const couponDiscount = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
+        const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
+        const deliveryFee = deliveryType === "delivery" ? (restaurant.delivery_fee || 0) : 0;
+        const serviceFee = restaurant.service_fee_enabled 
+          ? (subtotal * restaurant.service_fee_percentage / 100) 
+          : 0;
+        
+        const orderTotal = subtotal + serviceFee + deliveryFee - couponDiscount - loyaltyDiscount;
+
         return (
           <PaymentStep
             onBack={() => deliveryType === "delivery" ? setStep("address") : setStep("delivery-type")}
             requireCustomerInfo={deliveryType === "pickup"}
+            orderTotal={orderTotal}
             onContinue={(data) => {
               setPaymentData(data);
               
