@@ -5,11 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Clock, Check, ChefHat, PackageCheck, Truck, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, Truck, ShoppingBag, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { NewOrderNotification } from "./NewOrderNotification";
+import { OrderDetailModal } from "./OrderDetailModal";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -31,10 +32,16 @@ interface Order {
   created_at: string;
   customer_name: string;
   customer_cpf: string;
-  delivery_type: string;
+  delivery_type?: string;
+  order_type?: string;
   delivery_address?: string;
   delivery_phone?: string;
   notes?: string;
+  payment_type?: string;
+  table_id?: string;
+  tables?: {
+    table_number: number;
+  };
   order_items: OrderItem[];
 }
 
@@ -45,19 +52,38 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
     from: new Date(),
     to: new Date(),
   });
+  const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
+  const [newOrderNotification, setNewOrderNotification] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchOrders();
     setupRealtime();
+    
+    // Load notified orders from localStorage
+    const stored = localStorage.getItem("notifiedOrders");
+    if (stored) {
+      setNotifiedOrders(new Set(JSON.parse(stored)));
+    }
   }, [restaurantId, dateRange]);
 
   const setupRealtime = () => {
     const channel = supabase
-      .channel(`delivery-orders-${restaurantId}`)
+      .channel(`all-orders-${restaurantId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
-        () => fetchOrders()
+        (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new.status === 'pending') {
+            // New pending order - check if not already notified
+            if (!notifiedOrders.has(payload.new.id)) {
+              fetchOrders();
+              // Will trigger notification in useEffect when orders update
+            }
+          } else {
+            fetchOrders();
+          }
+        }
       )
       .subscribe();
 
@@ -65,6 +91,25 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
       supabase.removeChannel(channel);
     };
   };
+
+  useEffect(() => {
+    // Check for new pending orders to notify
+    const newPendingOrders = orders.filter(
+      (order) => order.status === 'pending' && !notifiedOrders.has(order.id)
+    );
+
+    if (newPendingOrders.length > 0) {
+      // Show notification for the first new order
+      const orderToNotify = newPendingOrders[0];
+      setNewOrderNotification(orderToNotify);
+      
+      // Mark as notified
+      const updated = new Set(notifiedOrders);
+      updated.add(orderToNotify.id);
+      setNotifiedOrders(updated);
+      localStorage.setItem("notifiedOrders", JSON.stringify(Array.from(updated)));
+    }
+  }, [orders]);
 
   const fetchOrders = async () => {
     try {
@@ -77,9 +122,13 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
           customer_name,
           customer_cpf,
           delivery_type,
+          order_type,
           delivery_address,
           delivery_phone,
           notes,
+          payment_type,
+          table_id,
+          tables (table_number),
           order_items (
             id,
             quantity,
@@ -93,7 +142,6 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
           )
         `)
         .eq("restaurant_id", restaurantId)
-        .eq("order_type", "delivery")
         .gte("created_at", dateRange.from.toISOString())
         .lte("created_at", dateRange.to.toISOString())
         .order("created_at", { ascending: false });
@@ -108,63 +156,44 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    try {
-      const { error } = await supabase.rpc("admin_update_order_status", {
-        p_order_id: orderId,
-        p_new_status: newStatus,
-        p_restaurant_id: restaurantId,
-      });
-
-      if (error) throw error;
-      toast.success("Status atualizado!");
-    } catch (error) {
-      console.error("Erro ao atualizar status:", error);
-      toast.error("Erro ao atualizar status");
-    }
+  const calculateTotal = (order: Order) => {
+    return order.order_items.reduce((total, item) => {
+      const itemTotal = item.price_at_order * item.quantity;
+      const extrasTotal = item.order_item_extras.reduce(
+        (sum, extra) => sum + extra.price_at_order,
+        0
+      ) * item.quantity;
+      return total + itemTotal + extrasTotal;
+    }, 0);
   };
 
-  const getStatusColumn = (status: string) => {
-    const columns: Record<string, string> = {
-      pending: "pending",
-      accepted: "accepted",
-      preparing: "preparing",
-      ready: "ready",
-      out_for_delivery: "out_for_delivery",
-      delivered: "delivered",
-      picked_up: "delivered",
-    };
-    return columns[status] || "pending";
+  const getElapsedMinutes = (createdAt: string) => {
+    return Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+  };
+
+  const getElapsedColor = (minutes: number) => {
+    if (minutes < 5) return "text-green-600 bg-green-50 border-green-200";
+    if (minutes < 15) return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    return "text-red-600 bg-red-50 border-red-200";
   };
 
   const groupedOrders = {
     pending: orders.filter((o) => o.status === "pending"),
-    accepted: orders.filter((o) => o.status === "accepted"),
-    preparing: orders.filter((o) => o.status === "preparing"),
+    preparing: orders.filter((o) => ["accepted", "preparing"].includes(o.status)),
     ready: orders.filter((o) => o.status === "ready"),
     out_for_delivery: orders.filter((o) => o.status === "out_for_delivery"),
     delivered: orders.filter((o) => ["delivered", "picked_up"].includes(o.status)),
+    cancelled: orders.filter((o) => o.status === "cancelled"),
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusMap = {
-      pending: { label: "Aguardando", icon: Clock, variant: "secondary" as const },
-      accepted: { label: "Aceito", icon: Check, variant: "default" as const },
-      preparing: { label: "Preparando", icon: ChefHat, variant: "default" as const },
-      ready: { label: "Pronto", icon: PackageCheck, variant: "default" as const },
-      out_for_delivery: { label: "Saiu p/ Entrega", icon: Truck, variant: "default" as const },
-      delivered: { label: "Entregue", icon: CheckCircle2, variant: "default" as const },
-    };
-
-    const config = statusMap[status as keyof typeof statusMap] || statusMap.pending;
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant}>
-        <Icon className="w-3 h-3 mr-1" />
-        {config.label}
-      </Badge>
-    );
+  const getOrderTypeIcon = (order: Order) => {
+    if (order.order_type === "local") {
+      return <UtensilsCrossed className="w-4 h-4" />;
+    }
+    if (order.delivery_type === "delivery") {
+      return <Truck className="w-4 h-4" />;
+    }
+    return <ShoppingBag className="w-4 h-4" />;
   };
 
   if (loading) {
@@ -173,10 +202,11 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Pedidos Delivery</h2>
-          <p className="text-sm text-muted-foreground">Pedidos de entrega e retirada</p>
+          <h2 className="text-2xl font-bold">Pedidos</h2>
+          <p className="text-sm text-muted-foreground">Todos os pedidos (delivery, retirada e mesa)</p>
         </div>
         <Popover>
           <PopoverTrigger asChild>
@@ -202,118 +232,129 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
 
       {/* Kanban Board */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-        {Object.entries(groupedOrders).map(([status, statusOrders]) => (
-          <div key={status} className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">
-                {status === "pending" && "Aguardando"}
-                {status === "accepted" && "Aceito"}
-                {status === "preparing" && "Preparando"}
-                {status === "ready" && "Pronto"}
-                {status === "out_for_delivery" && "Saiu p/ Entrega"}
-                {status === "delivered" && "Entregue"}
-              </h3>
-              <Badge variant="secondary">{statusOrders.length}</Badge>
+        {[
+          { key: "pending", title: "Aguardando confirmação", bg: "bg-red-50" },
+          { key: "preparing", title: "Preparando", bg: "bg-orange-50" },
+          { key: "ready", title: "Pronto para entrega", bg: "bg-blue-50" },
+          { key: "out_for_delivery", title: "Saiu para entrega", bg: "bg-sky-50" },
+          { key: "delivered", title: "Entregue", bg: "bg-green-50" },
+          { key: "cancelled", title: "Cancelado", bg: "bg-gray-50" },
+        ].map(({ key, title, bg }) => {
+          const columnOrders = groupedOrders[key as keyof typeof groupedOrders];
+          
+          return (
+            <div key={key} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm">{title}</h3>
+                <Badge variant="secondary">{columnOrders.length}</Badge>
+              </div>
+
+              <div className="space-y-2">
+                {columnOrders.map((order) => {
+                  const total = calculateTotal(order);
+                  const elapsed = getElapsedMinutes(order.created_at);
+
+                  return (
+                    <Card
+                      key={order.id}
+                      className={`cursor-pointer hover:shadow-md transition-shadow ${bg}`}
+                      onClick={() => setSelectedOrder(order)}
+                    >
+                      <CardContent className="p-4 space-y-2">
+                        {/* Header with ID and Total */}
+                        <div className="flex items-start justify-between">
+                          <p className="font-bold text-sm">#{order.id.slice(0, 8)}</p>
+                          <p className="font-bold text-sm">R$ {total.toFixed(2)}</p>
+                        </div>
+
+                        {/* Mesa badge or Type */}
+                        <div className="flex items-center gap-2">
+                          {order.order_type === "local" && order.tables ? (
+                            <Badge className="bg-green-500 text-white hover:bg-green-600">
+                              Mesa {order.tables.table_number}
+                            </Badge>
+                          ) : (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              {getOrderTypeIcon(order)}
+                              <span>
+                                {order.delivery_type === "delivery" ? "Entrega" : "Retirada"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Customer name */}
+                        <p className="text-sm font-medium flex items-center gap-1">
+                          👤 {order.customer_name}
+                        </p>
+
+                        {/* Items */}
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p className="font-medium">Itens:</p>
+                          {order.order_items.slice(0, 2).map((item) => (
+                            <p key={item.id}>
+                              {item.quantity}x {item.products?.name || "Produto"}
+                            </p>
+                          ))}
+                          {order.order_items.length > 2 && (
+                            <p>+{order.order_items.length - 2} itens</p>
+                          )}
+                        </div>
+
+                        {/* Date and elapsed time */}
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">
+                            📅 {format(new Date(order.created_at), "dd/MM/yyyy HH:mm")}
+                          </span>
+                          <Badge className={getElapsedColor(elapsed)}>
+                            ⏱️ {elapsed} min
+                          </Badge>
+                        </div>
+
+                        {/* Ver detalhes link */}
+                        <Button
+                          variant="link"
+                          className="w-full p-0 h-auto text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedOrder(order);
+                          }}
+                        >
+                          🔗 Ver detalhes
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
-
-            <div className="space-y-2">
-              {statusOrders.map((order) => (
-                <Card key={order.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-medium text-sm">#{order.id.slice(0, 8)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(order.created_at), {
-                            addSuffix: true,
-                            locale: ptBR,
-                          })}
-                        </p>
-                      </div>
-                      {getStatusBadge(order.status)}
-                    </div>
-
-                    <p className="text-sm font-medium mb-1">{order.customer_name}</p>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {order.delivery_type === "delivery" ? "Entrega" : "Retirada"}
-                    </p>
-
-                    <div className="text-xs space-y-1 mb-3">
-                      {order.order_items.slice(0, 2).map((item) => (
-                        <p key={item.id}>
-                          {item.quantity}x {item.products?.name || "Produto"}
-                        </p>
-                      ))}
-                      {order.order_items.length > 2 && (
-                        <p className="text-muted-foreground">
-                          +{order.order_items.length - 2} itens
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex gap-1">
-                      {order.status === "pending" && (
-                        <Button
-                          size="sm"
-                          className="w-full text-xs"
-                          onClick={() => updateOrderStatus(order.id, "accepted")}
-                        >
-                          Aceitar
-                        </Button>
-                      )}
-                      {order.status === "accepted" && (
-                        <Button
-                          size="sm"
-                          className="w-full text-xs"
-                          onClick={() => updateOrderStatus(order.id, "preparing")}
-                        >
-                          Preparar
-                        </Button>
-                      )}
-                      {order.status === "preparing" && (
-                        <Button
-                          size="sm"
-                          className="w-full text-xs"
-                          onClick={() => updateOrderStatus(order.id, "ready")}
-                        >
-                          Pronto
-                        </Button>
-                      )}
-                      {order.status === "ready" && order.delivery_type === "delivery" && (
-                        <Button
-                          size="sm"
-                          className="w-full text-xs"
-                          onClick={() => updateOrderStatus(order.id, "out_for_delivery")}
-                        >
-                          Saiu
-                        </Button>
-                      )}
-                      {order.status === "ready" && order.delivery_type === "pickup" && (
-                        <Button
-                          size="sm"
-                          className="w-full text-xs"
-                          onClick={() => updateOrderStatus(order.id, "picked_up")}
-                        >
-                          Retirado
-                        </Button>
-                      )}
-                      {order.status === "out_for_delivery" && (
-                        <Button
-                          size="sm"
-                          className="w-full text-xs"
-                          onClick={() => updateOrderStatus(order.id, "delivered")}
-                        >
-                          Entregue
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {/* Notifications */}
+      {newOrderNotification && (
+        <NewOrderNotification
+          orderId={newOrderNotification.id}
+          customerName={newOrderNotification.customer_name}
+          total={calculateTotal(newOrderNotification)}
+          onView={() => {
+            setSelectedOrder(newOrderNotification);
+            setNewOrderNotification(null);
+          }}
+          onDismiss={() => setNewOrderNotification(null)}
+        />
+      )}
+
+      {/* Order Detail Modal */}
+      {selectedOrder && (
+        <OrderDetailModal
+          order={selectedOrder}
+          restaurantId={restaurantId}
+          onClose={() => setSelectedOrder(null)}
+          onStatusUpdate={fetchOrders}
+        />
+      )}
     </div>
   );
 };
