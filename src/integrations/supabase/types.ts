@@ -1416,6 +1416,7 @@ export type Database = {
           loyalty_points_per_real: number | null
           loyalty_real_per_point: number | null
           name: string
+          pickup_time_minutes: number | null
           prep_time_minutes: number | null
           primary_color: string | null
           rating: number | null
@@ -1439,6 +1440,7 @@ export type Database = {
           loyalty_points_per_real?: number | null
           loyalty_real_per_point?: number | null
           name: string
+          pickup_time_minutes?: number | null
           prep_time_minutes?: number | null
           primary_color?: string | null
           rating?: number | null
@@ -1462,6 +1464,7 @@ export type Database = {
           loyalty_points_per_real?: number | null
           loyalty_real_per_point?: number | null
           name?: string
+          pickup_time_minutes?: number | null
           prep_time_minutes?: number | null
           primary_color?: string | null
           rating?: number | null
