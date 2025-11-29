@@ -113,6 +113,17 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   }, [orders]);
 
+  // Stop notification sound when order is accepted
+  useEffect(() => {
+    if (newOrderNotification) {
+      const currentOrder = orders.find(o => o.id === newOrderNotification.id);
+      if (currentOrder && currentOrder.status !== 'pending') {
+        // Order was accepted, dismiss notification
+        setNewOrderNotification(null);
+      }
+    }
+  }, [orders, newOrderNotification]);
+
   const fetchOrders = async () => {
     try {
       const { data, error } = await supabase
