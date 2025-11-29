@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { NewOrderNotification } from "./NewOrderNotification";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -73,12 +74,20 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
   const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
   const [tables, setTables] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
+  const [newOrderNotification, setNewOrderNotification] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchOrders();
     fetchBills();
     fetchTables();
     fetchProducts();
+
+    // Load notified orders from localStorage
+    const stored = localStorage.getItem("notifiedLocalOrders");
+    if (stored) {
+      setNotifiedOrders(new Set(JSON.parse(stored)));
+    }
 
     // Realtime subscriptions com filtro por restaurant_id
     const ordersChannel = supabase
@@ -127,6 +136,33 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
       supabase.removeChannel(billsChannel);
     };
   }, [restaurantId, startDate, endDate]);
+
+  // Check for new pending orders to notify
+  useEffect(() => {
+    const newPendingOrders = orders.filter(
+      (order) => order.status === 'pending' && !notifiedOrders.has(order.id)
+    );
+
+    if (newPendingOrders.length > 0) {
+      const orderToNotify = newPendingOrders[0];
+      setNewOrderNotification(orderToNotify);
+      
+      const updated = new Set(notifiedOrders);
+      updated.add(orderToNotify.id);
+      setNotifiedOrders(updated);
+      localStorage.setItem("notifiedLocalOrders", JSON.stringify(Array.from(updated)));
+    }
+  }, [orders]);
+
+  // Stop notification sound when order is accepted
+  useEffect(() => {
+    if (newOrderNotification) {
+      const currentOrder = orders.find(o => o.id === newOrderNotification.id);
+      if (currentOrder && currentOrder.status !== 'pending') {
+        setNewOrderNotification(null);
+      }
+    }
+  }, [orders, newOrderNotification]);
 
   const fetchTables = async () => {
     const { data } = await supabase.from("tables").select("*").eq("restaurant_id", restaurantId).order("table_number");
@@ -279,6 +315,13 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
 
     toast.success("Conta excluída!");
     fetchBills();
+  };
+
+  const calculateOrderTotal = (order: Order) => {
+    return order.order_items.reduce((sum, item) => {
+      const extrasTotal = item.order_item_extras?.reduce((s, e) => s + e.price_at_order, 0) || 0;
+      return sum + (item.price_at_order + extrasTotal) * item.quantity;
+    }, 0);
   };
 
   const printOrder = (order: Order) => {
@@ -733,6 +776,19 @@ const LocalOrdersTab = ({ restaurantId }: { restaurantId: string }) => {
         </CardContent>
         </Card>
       </div>
+
+      {/* Notifications */}
+      {newOrderNotification && (
+        <NewOrderNotification
+          orderId={newOrderNotification.id}
+          customerName={newOrderNotification.customer_name}
+          total={calculateOrderTotal(newOrderNotification)}
+          onView={() => {
+            setNewOrderNotification(null);
+          }}
+          onDismiss={() => setNewOrderNotification(null)}
+        />
+      )}
     </div>
   );
 };
