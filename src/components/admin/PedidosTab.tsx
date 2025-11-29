@@ -48,9 +48,11 @@ interface Order {
 const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: new Date(),
-    to: new Date(),
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
+    const today = new Date();
+    const from = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+    const to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    return { from, to };
   });
   const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
   const [newOrderNotification, setNewOrderNotification] = useState<Order | null>(null);
@@ -142,6 +144,7 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
           )
         `)
         .eq("restaurant_id", restaurantId)
+        .eq("order_type", "delivery")
         .gte("created_at", dateRange.from.toISOString())
         .lte("created_at", dateRange.to.toISOString())
         .order("created_at", { ascending: false });
@@ -205,8 +208,8 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Pedidos</h2>
-          <p className="text-sm text-muted-foreground">Todos os pedidos (delivery, retirada e mesa)</p>
+          <h2 className="text-2xl font-bold">Pedidos Online</h2>
+          <p className="text-sm text-muted-foreground">Pedidos de delivery e retirada do cardápio digital</p>
         </div>
         <Popover>
           <PopoverTrigger asChild>
@@ -221,7 +224,11 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
               selected={{ from: dateRange.from, to: dateRange.to }}
               onSelect={(range) => {
                 if (range?.from && range?.to) {
-                  setDateRange({ from: range.from, to: range.to });
+                  const from = new Date(range.from);
+                  from.setHours(0, 0, 0, 0);
+                  const to = new Date(range.to);
+                  to.setHours(23, 59, 59, 999);
+                  setDateRange({ from, to });
                 }
               }}
               locale={ptBR}
@@ -267,20 +274,12 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
                           <p className="font-bold text-sm">R$ {total.toFixed(2)}</p>
                         </div>
 
-                        {/* Mesa badge or Type */}
-                        <div className="flex items-center gap-2">
-                          {order.order_type === "local" && order.tables ? (
-                            <Badge className="bg-green-500 text-white hover:bg-green-600">
-                              Mesa {order.tables.table_number}
-                            </Badge>
-                          ) : (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              {getOrderTypeIcon(order)}
-                              <span>
-                                {order.delivery_type === "delivery" ? "Entrega" : "Retirada"}
-                              </span>
-                            </div>
-                          )}
+                        {/* Type badge */}
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          {getOrderTypeIcon(order)}
+                          <span>
+                            {order.delivery_type === "delivery" ? "Entrega" : "Retirada"}
+                          </span>
                         </div>
 
                         {/* Customer name */}
