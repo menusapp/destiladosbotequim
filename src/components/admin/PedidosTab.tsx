@@ -45,7 +45,15 @@ interface Order {
   order_items: OrderItem[];
 }
 
-const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
+const PedidosTab = ({ 
+  restaurantId, 
+  pendingOrderToOpen,
+  onOrderOpened 
+}: { 
+  restaurantId: string;
+  pendingOrderToOpen: string | null;
+  onOrderOpened: () => void;
+}) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
@@ -54,20 +62,23 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
     const to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
     return { from, to };
   });
-  const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
-  const [newOrderNotification, setNewOrderNotification] = useState<Order | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchOrders();
     setupRealtime();
-    
-    // Load notified orders from localStorage
-    const stored = localStorage.getItem("notifiedOrders");
-    if (stored) {
-      setNotifiedOrders(new Set(JSON.parse(stored)));
-    }
   }, [restaurantId, dateRange]);
+
+  // Auto-open pending order if passed from parent
+  useEffect(() => {
+    if (pendingOrderToOpen && orders.length > 0) {
+      const orderToOpen = orders.find(o => o.id === pendingOrderToOpen);
+      if (orderToOpen) {
+        setSelectedOrder(orderToOpen);
+        onOrderOpened();
+      }
+    }
+  }, [pendingOrderToOpen, orders]);
 
   const setupRealtime = () => {
     const channel = supabase
@@ -75,16 +86,8 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
-        (payload) => {
-          if (payload.eventType === 'INSERT' && payload.new.status === 'pending') {
-            // New pending order - check if not already notified
-            if (!notifiedOrders.has(payload.new.id)) {
-              fetchOrders();
-              // Will trigger notification in useEffect when orders update
-            }
-          } else {
-            fetchOrders();
-          }
+        () => {
+          fetchOrders();
         }
       )
       .subscribe();
@@ -93,36 +96,6 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
       supabase.removeChannel(channel);
     };
   };
-
-  useEffect(() => {
-    // Check for new pending orders to notify
-    const newPendingOrders = orders.filter(
-      (order) => order.status === 'pending' && !notifiedOrders.has(order.id)
-    );
-
-    if (newPendingOrders.length > 0) {
-      // Show notification for the first new order
-      const orderToNotify = newPendingOrders[0];
-      setNewOrderNotification(orderToNotify);
-      
-      // Mark as notified
-      const updated = new Set(notifiedOrders);
-      updated.add(orderToNotify.id);
-      setNotifiedOrders(updated);
-      localStorage.setItem("notifiedOrders", JSON.stringify(Array.from(updated)));
-    }
-  }, [orders]);
-
-  // Stop notification sound when order is accepted
-  useEffect(() => {
-    if (newOrderNotification) {
-      const currentOrder = orders.find(o => o.id === newOrderNotification.id);
-      if (currentOrder && currentOrder.status !== 'pending') {
-        // Order was accepted, dismiss notification
-        setNewOrderNotification(null);
-      }
-    }
-  }, [orders, newOrderNotification]);
 
   const fetchOrders = async () => {
     try {
@@ -341,20 +314,6 @@ const PedidosTab = ({ restaurantId }: { restaurantId: string }) => {
           );
         })}
       </div>
-
-      {/* Notifications */}
-      {newOrderNotification && (
-        <NewOrderNotification
-          orderId={newOrderNotification.id}
-          customerName={newOrderNotification.customer_name}
-          total={calculateTotal(newOrderNotification)}
-          onView={() => {
-            setSelectedOrder(newOrderNotification);
-            setNewOrderNotification(null);
-          }}
-          onDismiss={() => setNewOrderNotification(null)}
-        />
-      )}
 
       {/* Order Detail Modal */}
       {selectedOrder && (
