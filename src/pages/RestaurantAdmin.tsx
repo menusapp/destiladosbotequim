@@ -2,24 +2,18 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
+import { AdminHeader } from "@/components/admin/AdminHeader";
+import { DevelopmentPlaceholder } from "@/components/admin/DevelopmentPlaceholder";
+import { ReportsTab } from "@/components/admin/ReportsTab";
 import CardapioTab from "@/components/admin/CardapioTab";
 import TablesTab from "@/components/admin/TablesTab";
-import DashboardTab from "@/components/admin/DashboardTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
-import CostosTab from "@/components/admin/CostosTab";
-import MargensTab from "@/components/admin/MargensTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
-import CMVDashboardTab from "@/components/admin/CMVDashboardTab";
-import DeliveryTab from "@/components/admin/DeliveryTab";
-import DRETab from "@/components/admin/DRETab";
 import BalcaoTab from "@/components/admin/BalcaoTab";
 import LocalOrdersTab from "@/components/admin/LocalOrdersTab";
 import DeliveryOrdersTab from "@/components/admin/DeliveryOrdersTab";
@@ -30,6 +24,8 @@ interface Restaurant {
   name: string;
   slug: string;
   is_open: boolean;
+  prep_time_minutes: number;
+  pickup_time_minutes: number;
 }
 
 const RestaurantAdmin = () => {
@@ -202,84 +198,88 @@ const RestaurantAdmin = () => {
 
   const renderContent = () => {
     switch (activeSection) {
-      case "dashboard":
-        return <DashboardTab restaurantId={restaurant.id} />;
+      // Aba principal: Pedidos (unificado)
+      case "pedidos":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold text-foreground">Pedidos</h2>
+              <p className="text-muted-foreground">Gerencie todos os pedidos do restaurante</p>
+            </div>
+            <LocalOrdersTab restaurantId={restaurant.id} />
+            <DeliveryOrdersTab restaurantId={restaurant.id} />
+          </div>
+        );
       
-      // Finanças - sub-itens
-      case "caixa":
-        return <FluxoCaixaTab restaurantId={restaurant.id} />;
-      case "custos":
-        return <CostosTab restaurantId={restaurant.id} />;
-      case "margens":
-        return <MargensTab restaurantId={restaurant.id} />;
-      case "dre":
-        return <DRETab restaurantId={restaurant.id} />;
+      // PDV (em desenvolvimento)
+      case "pdv":
+        return <DevelopmentPlaceholder title="PDV - Ponto de Venda" />;
       
-      // Operações - sub-itens
-      case "estoque":
-        return <StockTab restaurantId={restaurant.id} />;
-      case "produtos":
+      // Mesas e Comandas
+      case "mesas-comandas":
+        return <TablesTab restaurantId={restaurant.id} />;
+      
+      // Cardápio
+      case "cardapio":
         return <CardapioTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
       
-      // Atendimento - sub-itens
-      case "mesas":
-        return <TablesTab restaurantId={restaurant.id} />;
-      case "pedidos-locais":
-        return <LocalOrdersTab restaurantId={restaurant.id} />;
-      case "pedidos-delivery":
-        return <DeliveryOrdersTab restaurantId={restaurant.id} />;
-      case "balcao":
-        return <BalcaoTab restaurantId={restaurant.id} />;
+      // Caixa
+      case "caixa":
+        return <FluxoCaixaTab restaurantId={restaurant.id} />;
       
-      // Delivery - sub-itens
-      case "areas-entrega":
-        return <DeliveryTab restaurantId={restaurant.id} />;
-      case "delivery-config":
-        return <DeliveryTab restaurantId={restaurant.id} />;
+      // Estoque
+      case "estoque":
+        return <StockTab restaurantId={restaurant.id} />;
       
+      // Relatórios
+      case "relatorios":
+        return <ReportsTab restaurantId={restaurant.id} />;
+      
+      // Em Desenvolvimento
+      case "entregadores":
+        return <DevelopmentPlaceholder title="Entregadores" />;
+      case "marketing":
+        return <DevelopmentPlaceholder title="Marketing" />;
+      case "clientes":
+        return <DevelopmentPlaceholder title="Clientes" />;
       case "configuracoes":
         return <SettingsTab restaurantId={restaurant.id} />;
+      case "modulos":
+        return <DevelopmentPlaceholder title="Módulos e Assinaturas" />;
       
       default:
-        return <DashboardTab restaurantId={restaurant.id} />;
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold text-foreground">Pedidos</h2>
+              <p className="text-muted-foreground">Gerencie todos os pedidos do restaurante</p>
+            </div>
+            <LocalOrdersTab restaurantId={restaurant.id} />
+            <DeliveryOrdersTab restaurantId={restaurant.id} />
+          </div>
+        );
     }
   };
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full" style={{ background: "radial-gradient(circle at top left, hsl(0 0% 100%), hsl(40 100% 97% / 0.3))" }}>
-          <AppSidebar 
-            activeSection={activeSection}
-            onSectionChange={setActiveSection}
-            hasNewOrders={hasNewOrders}
-            hasNewBills={hasNewBills}
-            hasNewDeliveryOrders={hasNewDeliveryOrders}
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar 
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          hasNewOrders={hasNewOrders}
+          hasNewBills={hasNewBills}
+          hasNewDeliveryOrders={hasNewDeliveryOrders}
+        />
+        <SidebarInset className="flex-1 flex flex-col">
+          <AdminHeader
+            restaurantId={restaurant.id}
+            restaurantSlug={restaurant.slug}
+            prepTime={restaurant.prep_time_minutes}
+            pickupTime={restaurant.pickup_time_minutes}
+            onPrepTimeUpdate={(time) => setRestaurant({ ...restaurant, prep_time_minutes: time })}
+            onPickupTimeUpdate={(time) => setRestaurant({ ...restaurant, pickup_time_minutes: time })}
           />
-        <SidebarInset className="flex-1">
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white/80 backdrop-blur-sm px-6">
-            <SidebarTrigger className="-ml-1" />
-            <div className="flex-1 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img src="/logo-menus.png" alt="Menus" className="h-8 w-8" />
-                <div>
-                  <h1 className="text-lg font-bold text-foreground">Menus</h1>
-                  <p className="text-xs text-muted-foreground">Sistema de Gestão</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <Button
-                  variant={restaurant?.is_open ? "default" : "outline"}
-                  onClick={() => handleToggleRestaurant(!restaurant?.is_open)}
-                  className={restaurant?.is_open ? "bg-primary hover:bg-primary-hover" : ""}
-                >
-                  {restaurant?.is_open ? "Restaurante Aberto" : "Restaurante Fechado"}
-                </Button>
-                <Button variant="outline" onClick={handleLogout}>
-                  Sair
-                </Button>
-              </div>
-            </div>
-          </header>
           <main className="flex-1 overflow-auto p-6">
             {renderContent()}
           </main>
