@@ -9,14 +9,12 @@ import { AppSidebar } from "@/components/admin/AppSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DevelopmentPlaceholder } from "@/components/admin/DevelopmentPlaceholder";
 import { ReportsTab } from "@/components/admin/ReportsTab";
+import PedidosTab from "@/components/admin/PedidosTab";
 import CardapioTab from "@/components/admin/CardapioTab";
 import TablesTab from "@/components/admin/TablesTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
-import BalcaoTab from "@/components/admin/BalcaoTab";
-import LocalOrdersTab from "@/components/admin/LocalOrdersTab";
-import DeliveryOrdersTab from "@/components/admin/DeliveryOrdersTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 interface Restaurant {
@@ -198,18 +196,9 @@ const RestaurantAdmin = () => {
 
   const renderContent = () => {
     switch (activeSection) {
-      // Aba principal: Pedidos (unificado)
+      // Aba principal: Pedidos (apenas delivery)
       case "pedidos":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-foreground">Pedidos</h2>
-              <p className="text-muted-foreground">Gerencie todos os pedidos do restaurante</p>
-            </div>
-            <LocalOrdersTab restaurantId={restaurant.id} />
-            <DeliveryOrdersTab restaurantId={restaurant.id} />
-          </div>
-        );
+        return <PedidosTab restaurantId={restaurant.id} />;
       
       // PDV (em desenvolvimento)
       case "pdv":
@@ -248,16 +237,7 @@ const RestaurantAdmin = () => {
         return <DevelopmentPlaceholder title="Módulos e Assinaturas" />;
       
       default:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-foreground">Pedidos</h2>
-              <p className="text-muted-foreground">Gerencie todos os pedidos do restaurante</p>
-            </div>
-            <LocalOrdersTab restaurantId={restaurant.id} />
-            <DeliveryOrdersTab restaurantId={restaurant.id} />
-          </div>
-        );
+        return <PedidosTab restaurantId={restaurant.id} />;
     }
   };
 

@@ -12,6 +12,7 @@ import Comanda from "./pages/Comanda";
 import DeliveryMenu from "./pages/DeliveryMenu";
 import OrderConfirmation from "./pages/OrderConfirmation";
 import NotFound from "./pages/NotFound";
+import { TableDetailView } from "./components/admin/TableDetailView";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/ceo" element={<CEODashboard />} />
             <Route path="/admin" element={<RestaurantAdmin />} />
+            <Route path="/admin/table/:tableId" element={<TableDetailView />} />
             <Route path="/menu/:restaurantSlug/:tableNumber" element={<Menu />} />
             <Route path="/comanda/:restaurantSlug/:tableNumber" element={<Comanda />} />
             <Route path="/delivery/:restaurantSlug" element={<DeliveryMenu />} />
