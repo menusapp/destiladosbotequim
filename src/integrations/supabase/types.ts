@@ -322,6 +322,57 @@ export type Database = {
           },
         ]
       }
+      comandas: {
+        Row: {
+          closed_at: string | null
+          created_at: string | null
+          customer_cpf: string
+          customer_name: string
+          id: string
+          restaurant_id: string
+          status: string | null
+          table_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string | null
+          customer_cpf: string
+          customer_name: string
+          id?: string
+          restaurant_id: string
+          status?: string | null
+          table_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string | null
+          customer_cpf?: string
+          customer_name?: string
+          id?: string
+          restaurant_id?: string
+          status?: string | null
+          table_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comandas_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comandas_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       counter_order_item_extras: {
         Row: {
           counter_order_item_id: string
@@ -1025,6 +1076,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          comanda_id: string | null
           coupon_code: string | null
           coupon_discount: number | null
           created_at: string | null
@@ -1048,6 +1100,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          comanda_id?: string | null
           coupon_code?: string | null
           coupon_discount?: number | null
           created_at?: string | null
@@ -1071,6 +1124,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          comanda_id?: string | null
           coupon_code?: string | null
           coupon_discount?: number | null
           created_at?: string | null
@@ -1094,6 +1148,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_comanda_id_fkey"
+            columns: ["comanda_id"]
+            isOneToOne: false
+            referencedRelation: "comandas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_restaurant_id_fkey"
             columns: ["restaurant_id"]
