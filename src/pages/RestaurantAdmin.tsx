@@ -17,6 +17,7 @@ import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
+import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 
 interface Restaurant {
   id: string;
@@ -35,6 +36,14 @@ const RestaurantAdmin = () => {
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [hasNewBills, setHasNewBills] = useState(false);
   const [hasNewDeliveryOrders, setHasNewDeliveryOrders] = useState(false);
+  const [globalNotification, setGlobalNotification] = useState<{
+    orderId: string;
+    customerName: string;
+    total: number;
+    orderType: 'local' | 'delivery';
+  } | null>(null);
+  const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
+  const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
   
   useInactivityLogout();
 
@@ -53,6 +62,12 @@ const RestaurantAdmin = () => {
   }, [navigate]);
 
   const setupNotifications = (restaurantId: string) => {
+    // Load notified orders from localStorage
+    const stored = localStorage.getItem("notifiedGlobalOrders");
+    if (stored) {
+      setNotifiedOrders(new Set(JSON.parse(stored)));
+    }
+
     // Canal para novos pedidos
     const ordersChannel = supabase
       .channel('new-orders-notification')
@@ -63,19 +78,77 @@ const RestaurantAdmin = () => {
           schema: 'public',
           table: 'orders',
         },
-        (payload) => {
-          const orderRestaurantId = (payload.new as any).restaurant_id;
-          const orderType = (payload.new as any).order_type;
+        async (payload) => {
+          const order = payload.new as any;
+          const orderRestaurantId = order.restaurant_id;
+          const orderType = order.order_type;
+          const orderId = order.id;
+          const status = order.status;
           
-          // Verificar diretamente pelo restaurant_id do pedido
-          if (orderRestaurantId === restaurantId) {
+          // Verificar diretamente pelo restaurant_id do pedido e status pending
+          if (orderRestaurantId === restaurantId && status === 'pending') {
+            // Verificar se já foi notificado
+            if (notifiedOrders.has(orderId)) return;
+
+            // Buscar detalhes completos do pedido para calcular total
+            const { data: orderData } = await supabase
+              .from('orders')
+              .select(`
+                *,
+                order_items(
+                  price_at_order,
+                  quantity,
+                  order_item_extras(price_at_order)
+                )
+              `)
+              .eq('id', orderId)
+              .single();
+
+            if (orderData) {
+              const total = orderData.order_items.reduce((sum: number, item: any) => {
+                const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
+                return sum + (item.price_at_order + extrasTotal) * item.quantity;
+              }, 0);
+
+              // Mostrar notificação global
+              setGlobalNotification({
+                orderId: orderId,
+                customerName: order.customer_name,
+                total,
+                orderType: orderType === 'delivery' ? 'delivery' : 'local',
+              });
+
+              // Marcar como notificado
+              const updated = new Set(notifiedOrders);
+              updated.add(orderId);
+              setNotifiedOrders(updated);
+              localStorage.setItem("notifiedGlobalOrders", JSON.stringify(Array.from(updated)));
+            }
+
+            // Atualizar badges da sidebar
             if (orderType === 'delivery' && activeSection !== 'pedidos-online') {
               setHasNewDeliveryOrders(true);
-              toast.info("Novo pedido online recebido! 🚚");
             } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos-locais') {
               setHasNewOrders(true);
-              toast.info("Novo pedido local recebido! 🍽️");
             }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+        },
+        (payload) => {
+          const order = payload.new as any;
+          const orderId = order.id;
+          const status = order.status;
+          
+          // Se o pedido foi aceito/mudou de status, fechar notificação
+          if (globalNotification && globalNotification.orderId === orderId && status !== 'pending') {
+            setGlobalNotification(null);
           }
         }
       )
@@ -195,15 +268,32 @@ const RestaurantAdmin = () => {
     );
   }
 
+  const handleViewOrder = () => {
+    if (!globalNotification) return;
+
+    // Navegar para a aba correta
+    if (globalNotification.orderType === 'delivery') {
+      setActiveSection('pedidos-online');
+    } else {
+      setActiveSection('pedidos-locais');
+    }
+
+    // Definir o pedido a ser aberto
+    setPendingOrderToOpen(globalNotification.orderId);
+
+    // Fechar notificação
+    setGlobalNotification(null);
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       // Pedidos Online (apenas delivery/retirada)
       case "pedidos-online":
-        return <PedidosTab restaurantId={restaurant.id} />;
+        return <PedidosTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
       
       // Pedidos Locais (mesas e comandas)
       case "pedidos-locais":
-        return <LocalOrdersTab restaurantId={restaurant.id} />;
+        return <LocalOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
       
       // PDV (em desenvolvimento)
       case "pdv":
@@ -242,7 +332,7 @@ const RestaurantAdmin = () => {
         return <DevelopmentPlaceholder title="Módulos e Assinaturas" />;
       
       default:
-        return <PedidosTab restaurantId={restaurant.id} />;
+        return <PedidosTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
     }
   };
 
@@ -269,6 +359,18 @@ const RestaurantAdmin = () => {
             {renderContent()}
           </main>
         </SidebarInset>
+
+        {/* Global Notification */}
+        {globalNotification && (
+          <NewOrderNotification
+            orderId={globalNotification.orderId}
+            customerName={globalNotification.customerName}
+            total={globalNotification.total}
+            orderType={globalNotification.orderType}
+            onView={handleViewOrder}
+            onDismiss={() => setGlobalNotification(null)}
+          />
+        )}
       </div>
     </SidebarProvider>
   );
