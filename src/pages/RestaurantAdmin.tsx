@@ -10,6 +10,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DevelopmentPlaceholder } from "@/components/admin/DevelopmentPlaceholder";
 import { ReportsTab } from "@/components/admin/ReportsTab";
 import PedidosTab from "@/components/admin/PedidosTab";
+import LocalOrdersTab from "@/components/admin/LocalOrdersTab";
 import CardapioTab from "@/components/admin/CardapioTab";
 import TablesTab from "@/components/admin/TablesTab";
 import SettingsTab from "@/components/admin/SettingsTab";
@@ -68,12 +69,12 @@ const RestaurantAdmin = () => {
           
           // Verificar diretamente pelo restaurant_id do pedido
           if (orderRestaurantId === restaurantId) {
-            if (orderType === 'delivery' && activeSection !== 'pedidos-delivery') {
+            if (orderType === 'delivery' && activeSection !== 'pedidos-online') {
               setHasNewDeliveryOrders(true);
-              toast.info("Novo pedido de delivery recebido! 🚚");
+              toast.info("Novo pedido online recebido! 🚚");
             } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos-locais') {
               setHasNewOrders(true);
-              toast.info("Novo pedido recebido! 🍽️");
+              toast.info("Novo pedido local recebido! 🍽️");
             }
           }
         }
@@ -119,7 +120,7 @@ const RestaurantAdmin = () => {
       setHasNewOrders(false);
       setHasNewBills(false);
     }
-    if (activeSection === 'pedidos-delivery') {
+    if (activeSection === 'pedidos-online') {
       setHasNewDeliveryOrders(false);
     }
   }, [activeSection]);
@@ -196,9 +197,13 @@ const RestaurantAdmin = () => {
 
   const renderContent = () => {
     switch (activeSection) {
-      // Aba principal: Pedidos (apenas delivery)
-      case "pedidos":
+      // Pedidos Online (apenas delivery/retirada)
+      case "pedidos-online":
         return <PedidosTab restaurantId={restaurant.id} />;
+      
+      // Pedidos Locais (mesas e comandas)
+      case "pedidos-locais":
+        return <LocalOrdersTab restaurantId={restaurant.id} />;
       
       // PDV (em desenvolvimento)
       case "pdv":

@@ -40,10 +40,16 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   const menuStructure = {
     main: [
       { 
-        id: "pedidos", 
-        label: "Pedidos", 
+        id: "pedidos-online", 
+        label: "Pedidos Online", 
         icon: ShoppingBag,
-        hasNotification: (hasNewOrders || hasNewBills || hasNewDeliveryOrders)
+        hasNotification: hasNewDeliveryOrders
+      },
+      { 
+        id: "pedidos-locais", 
+        label: "Pedidos Locais", 
+        icon: Utensils,
+        hasNotification: (hasNewOrders || hasNewBills)
       },
       { id: "pdv", label: "PDV", icon: CreditCard },
       { id: "mesas-comandas", label: "Mesas e Comandas", icon: Users2 },
