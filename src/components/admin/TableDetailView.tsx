@@ -157,8 +157,9 @@ export const TableDetailView = () => {
       if (ordersError) throw ordersError;
       
       // Filtrar: mostrar pedidos com comanda ativa OU pedidos sem comanda_id (backwards compatibility)
+      // Só mostrar pedidos vinculados a comandas ativas (ignora pedidos antigos sem comanda ou de comandas fechadas)
       const filteredOrders = (ordersData || []).filter(order => 
-        !order.comanda_id || activeComandaIds.includes(order.comanda_id)
+        order.comanda_id && activeComandaIds.includes(order.comanda_id)
       );
       setOrders(filteredOrders);
     } catch (error) {
