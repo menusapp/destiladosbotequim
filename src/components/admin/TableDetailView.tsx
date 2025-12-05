@@ -110,6 +110,9 @@ export const TableDetailView = () => {
 
       if (comandasError) throw comandasError;
 
+      // Extrair IDs das comandas ativas
+      const activeComandaIds = (comandasData || []).map(c => c.id);
+
       // Contar pedidos de cada comanda
       if (comandasData) {
         const comandasWithCount = await Promise.all(
@@ -117,41 +120,48 @@ export const TableDetailView = () => {
             const { count } = await supabase
               .from("orders")
               .select("*", { count: "exact", head: true })
-              .eq("comanda_id", comanda.id);
+              .eq("comanda_id", comanda.id)
+              .in("status", ["pending", "accepted", "preparing", "ready"]);
             return { ...comanda, order_count: count || 0 };
           })
         );
         setComandas(comandasWithCount);
       }
 
-      // Buscar pedidos da mesa (pendentes, aceitos, preparando, prontos)
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
-          id,
-          status,
-          created_at,
-          customer_name,
-          notes,
-          comanda_id,
-          order_items (
+      // Buscar pedidos APENAS das comandas ativas
+      // Se não houver comandas ativas, não mostrar nenhum pedido
+      if (activeComandaIds.length === 0) {
+        setOrders([]);
+      } else {
+        const { data: ordersData, error: ordersError } = await supabase
+          .from("orders")
+          .select(`
             id,
-            quantity,
-            price_at_order,
+            status,
+            created_at,
+            customer_name,
             notes,
-            products (name),
-            order_item_extras (
+            comanda_id,
+            order_items (
+              id,
+              quantity,
               price_at_order,
-              product_extras (name)
+              notes,
+              products (name),
+              order_item_extras (
+                price_at_order,
+                product_extras (name)
+              )
             )
-          )
-        `)
-        .eq("table_id", tableId)
-        .in("status", ["pending", "accepted", "preparing", "ready"])
-        .order("created_at", { ascending: false });
+          `)
+          .eq("table_id", tableId)
+          .in("comanda_id", activeComandaIds)
+          .in("status", ["pending", "accepted", "preparing", "ready"])
+          .order("created_at", { ascending: false });
 
-      if (ordersError) throw ordersError;
-      setOrders(ordersData || []);
+        if (ordersError) throw ordersError;
+        setOrders(ordersData || []);
+      }
     } catch (error) {
       console.error("Erro ao buscar dados da mesa:", error);
       toast.error("Erro ao carregar dados da mesa");
