@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Clock, Phone, CheckCircle2, Package, Truck, MapPin } from "lucide-react";
+import { Clock, Phone, CheckCircle2, Package, Truck, MapPin, XCircle } from "lucide-react";
 import { ReviewModal } from "@/components/menu/ReviewModal";
 
 interface OrderItem {
@@ -91,6 +91,12 @@ const getStatusConfig = (status: string, deliveryType?: string) => {
       label: "Retirado",
       description: "Pedido retirado! Bom apetite!",
       color: "bg-green-500",
+    },
+    cancelled: {
+      icon: XCircle,
+      label: "Pedido Cancelado",
+      description: "Infelizmente seu pedido foi cancelado.",
+      color: "bg-red-500",
     },
   };
   return configs[status] || configs.pending;
@@ -226,6 +232,8 @@ export default function OrderConfirmation() {
                 setShowReview(true);
               }
             }, 2000);
+          } else if (newStatus === "cancelled") {
+            toast.error("Seu pedido foi cancelado 😔");
           }
         }
       )
@@ -339,29 +347,45 @@ export default function OrderConfirmation() {
         {/* Timeline de status */}
         <Card className="mb-6">
           <CardContent className="p-6 space-y-4">
-              <StatusStep
-                completed={true}
-                label="Pedido recebido"
-                time={format(new Date(order.created_at), "HH:mm")}
-              />
-              <StatusStep
-                completed={["accepted", "ready", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
-                label="Em Preparo"
-              />
-              <StatusStep
-                completed={["ready", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
-                label={order.delivery_type === "pickup" ? "Pronto para Retirada" : "Pronto para Entrega"}
-              />
-              {order.delivery_type !== "pickup" && (
+            {order.status === "cancelled" ? (
+              <>
                 <StatusStep
-                  completed={["out_for_delivery", "delivered"].includes(order.status)}
-                  label="Saiu para Entrega"
+                  completed={true}
+                  label="Pedido recebido"
+                  time={format(new Date(order.created_at), "HH:mm")}
                 />
-              )}
-              <StatusStep 
-                completed={["delivered", "picked_up"].includes(order.status)} 
-                label={order.delivery_type === "pickup" ? "Retirado" : "Entregue"} 
-              />
+                <StatusStep
+                  completed={true}
+                  label="Pedido Cancelado"
+                />
+              </>
+            ) : (
+              <>
+                <StatusStep
+                  completed={true}
+                  label="Pedido recebido"
+                  time={format(new Date(order.created_at), "HH:mm")}
+                />
+                <StatusStep
+                  completed={["accepted", "preparing", "ready", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
+                  label="Em Preparo"
+                />
+                <StatusStep
+                  completed={["ready", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
+                  label={order.delivery_type === "pickup" ? "Pronto para Retirada" : "Pronto para Entrega"}
+                />
+                {order.delivery_type !== "pickup" && (
+                  <StatusStep
+                    completed={["out_for_delivery", "delivered"].includes(order.status)}
+                    label="Saiu para Entrega"
+                  />
+                )}
+                <StatusStep 
+                  completed={["delivered", "picked_up"].includes(order.status)} 
+                  label={order.delivery_type === "pickup" ? "Retirado" : "Entregue"} 
+                />
+              </>
+            )}
           </CardContent>
         </Card>
 
