@@ -529,40 +529,42 @@ const Menu = () => {
 
       if (updateError) throw updateError;
 
-      // Criar ou buscar comanda ativa para este cliente na mesa
+      // SEMPRE criar nova comanda no login - fechar comandas anteriores
       const cleanCpf = cpf.replace(/\D/g, '');
-      const { data: existingComanda } = await supabase
+      
+      // Fechar comandas ativas anteriores deste cliente nesta mesa
+      const { error: closeError } = await supabase
         .from("comandas")
-        .select("id")
+        .update({ status: "closed", closed_at: new Date().toISOString() })
         .eq("table_id", tableData.id)
         .eq("customer_cpf", cleanCpf)
-        .eq("status", "active")
-        .maybeSingle();
+        .eq("status", "active");
 
-      let comandaId = existingComanda?.id;
-
-      if (!comandaId) {
-        // Criar nova comanda
-        const { data: newComanda, error: comandaError } = await supabase
-          .from("comandas")
-          .insert({
-            restaurant_id: restaurant.id,
-            table_id: tableData.id,
-            customer_name: name,
-            customer_cpf: cleanCpf,
-            status: "active"
-          })
-          .select("id")
-          .single();
-
-        if (comandaError) {
-          console.error("Erro ao criar comanda:", comandaError);
-        } else {
-          comandaId = newComanda.id;
-          console.log('📋 Nova comanda criada:', comandaId);
-        }
+      if (closeError) {
+        console.error("Erro ao fechar comandas anteriores:", closeError);
       } else {
-        console.log('📋 Comanda existente encontrada:', comandaId);
+        console.log('📋 Comandas anteriores fechadas');
+      }
+
+      // SEMPRE criar nova comanda
+      const { data: newComanda, error: comandaError } = await supabase
+        .from("comandas")
+        .insert({
+          restaurant_id: restaurant.id,
+          table_id: tableData.id,
+          customer_name: name,
+          customer_cpf: cleanCpf,
+          status: "active"
+        })
+        .select("id")
+        .single();
+
+      let comandaId: string | undefined;
+      if (comandaError) {
+        console.error("Erro ao criar comanda:", comandaError);
+      } else {
+        comandaId = newComanda.id;
+        console.log('📋 Nova comanda criada:', comandaId);
       }
 
       // Salvar dados no sessionStorage
