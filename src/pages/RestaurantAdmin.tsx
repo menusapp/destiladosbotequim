@@ -41,6 +41,8 @@ const RestaurantAdmin = () => {
     customerName: string;
     total: number;
     orderType: 'local' | 'delivery';
+    tableNumber?: number;
+    deliveryType?: 'delivery' | 'pickup';
   } | null>(null);
   const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
@@ -110,12 +112,25 @@ const RestaurantAdmin = () => {
                 return sum + (item.price_at_order + extrasTotal) * item.quantity;
               }, 0);
 
+              // Buscar número da mesa para pedidos locais
+              let tableNumber: number | undefined;
+              if (order.table_id) {
+                const { data: tableData } = await supabase
+                  .from('tables')
+                  .select('table_number')
+                  .eq('id', order.table_id)
+                  .single();
+                tableNumber = tableData?.table_number;
+              }
+
               // Mostrar notificação global
               setGlobalNotification({
                 orderId: orderId,
                 customerName: order.customer_name,
                 total,
                 orderType: orderType === 'delivery' ? 'delivery' : 'local',
+                tableNumber,
+                deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
               });
 
               // Marcar como notificado
@@ -367,6 +382,8 @@ const RestaurantAdmin = () => {
             customerName={globalNotification.customerName}
             total={globalNotification.total}
             orderType={globalNotification.orderType}
+            tableNumber={globalNotification.tableNumber}
+            deliveryType={globalNotification.deliveryType}
             onView={handleViewOrder}
             onDismiss={() => setGlobalNotification(null)}
           />
