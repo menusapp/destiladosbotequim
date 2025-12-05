@@ -8,7 +8,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CalendarIcon, Printer, Trash2, Clock, User, Phone, MapPin, Package, Check, ArrowRight } from "lucide-react";
+import { CalendarIcon, Printer, Trash2, Clock, User, Phone, MapPin, Package, Check, ArrowRight, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -162,6 +162,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
       const statusMessages: Record<string, string> = {
         accepted: "Pedido aceito e em produção",
         ready: "Pedido marcado como pronto",
+        out_for_delivery: "Pedido saiu para entrega",
         delivered: "Entrega confirmada",
         picked_up: "Retirada confirmada",
       };
@@ -309,6 +310,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
   const pendingOrders = filteredOrders.filter((o) => o.status === "pending");
   const acceptedOrders = filteredOrders.filter((o) => o.status === "accepted");
   const readyOrders = filteredOrders.filter((o) => o.status === "ready");
+  const outForDeliveryOrders = filteredOrders.filter((o) => o.status === "out_for_delivery");
   const finishedOrders = filteredOrders.filter((o) => o.status === "delivered" || o.status === "picked_up");
 
   const OrderCard = ({ order }: { order: Order }) => {
@@ -400,16 +402,36 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
               </Button>
             )}
 
-            {order.status === "ready" && (
+            {order.status === "ready" && order.delivery_type === "delivery" && (
               <Button
                 size="sm"
-                onClick={() =>
-                  updateOrderStatus(order.id, order.delivery_type === "delivery" ? "delivered" : "picked_up")
-                }
+                onClick={() => updateOrderStatus(order.id, "out_for_delivery")}
+                className="flex-1"
+              >
+                <Truck className="w-4 h-4 mr-1" />
+                Saiu para Entrega
+              </Button>
+            )}
+
+            {order.status === "ready" && order.delivery_type === "pickup" && (
+              <Button
+                size="sm"
+                onClick={() => updateOrderStatus(order.id, "picked_up")}
                 className="flex-1"
               >
                 <Check className="w-4 h-4 mr-1" />
-                {order.delivery_type === "delivery" ? "Confirmar Entrega" : "Confirmar Retirada"}
+                Confirmar Retirada
+              </Button>
+            )}
+
+            {order.status === "out_for_delivery" && (
+              <Button
+                size="sm"
+                onClick={() => updateOrderStatus(order.id, "delivered")}
+                className="flex-1"
+              >
+                <Check className="w-4 h-4 mr-1" />
+                Confirmar Entrega
               </Button>
             )}
 
@@ -583,7 +605,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
       </div>
 
       {/* Kanban Columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Column 1: Em Análise */}
         <div className="space-y-3">
           <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
@@ -625,7 +647,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
         {/* Column 3: Pronto */}
         <div className="space-y-3">
           <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-            <h3 className="font-semibold text-lg">Pronto p/ Entrega/Retirada</h3>
+            <h3 className="font-semibold text-lg">Pronto</h3>
             <Badge variant="secondary">{readyOrders.length}</Badge>
           </div>
           <ScrollArea className="h-[calc(100vh-450px)]">
@@ -636,6 +658,25 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
                 </div>
               ) : (
                 readyOrders.map((order) => <OrderCard key={order.id} order={order} />)
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Column 4: Saiu para Entrega */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+            <h3 className="font-semibold text-lg">Saiu p/ Entrega</h3>
+            <Badge variant="secondary">{outForDeliveryOrders.length}</Badge>
+          </div>
+          <ScrollArea className="h-[calc(100vh-450px)]">
+            <div className="space-y-3 pr-2">
+              {outForDeliveryOrders.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  Nenhum pedido a caminho
+                </div>
+              ) : (
+                outForDeliveryOrders.map((order) => <OrderCard key={order.id} order={order} />)
               )}
             </div>
           </ScrollArea>

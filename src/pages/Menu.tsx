@@ -457,6 +457,7 @@ const Menu = () => {
     sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
     sessionStorage.removeItem(`cart_${tableNumber}`);
     sessionStorage.removeItem(`table_id_${tableNumber}`);
+    sessionStorage.removeItem(`comanda_id_${tableNumber}`);
     sessionStorage.removeItem('customerInfo');
     sessionStorage.removeItem('shouldShowReview');
     sessionStorage.removeItem('reviewBillId');
@@ -506,11 +507,50 @@ const Menu = () => {
 
       if (updateError) throw updateError;
 
-    // Salvar dados no sessionStorage
-    sessionStorage.setItem(`customer_name_${tableNumber}`, name);
-    sessionStorage.setItem(`customer_cpf_${tableNumber}`, cpf);
-    sessionStorage.setItem(`table_id_${tableNumber}`, tableData.id);
-    sessionStorage.setItem("customerInfo", JSON.stringify({ name, cpf }));
+      // Criar ou buscar comanda ativa para este cliente na mesa
+      const cleanCpf = cpf.replace(/\D/g, '');
+      const { data: existingComanda } = await supabase
+        .from("comandas")
+        .select("id")
+        .eq("table_id", tableData.id)
+        .eq("customer_cpf", cleanCpf)
+        .eq("status", "active")
+        .maybeSingle();
+
+      let comandaId = existingComanda?.id;
+
+      if (!comandaId) {
+        // Criar nova comanda
+        const { data: newComanda, error: comandaError } = await supabase
+          .from("comandas")
+          .insert({
+            restaurant_id: restaurant.id,
+            table_id: tableData.id,
+            customer_name: name,
+            customer_cpf: cleanCpf,
+            status: "active"
+          })
+          .select("id")
+          .single();
+
+        if (comandaError) {
+          console.error("Erro ao criar comanda:", comandaError);
+        } else {
+          comandaId = newComanda.id;
+          console.log('📋 Nova comanda criada:', comandaId);
+        }
+      } else {
+        console.log('📋 Comanda existente encontrada:', comandaId);
+      }
+
+      // Salvar dados no sessionStorage
+      sessionStorage.setItem(`customer_name_${tableNumber}`, name);
+      sessionStorage.setItem(`customer_cpf_${tableNumber}`, cpf);
+      sessionStorage.setItem(`table_id_${tableNumber}`, tableData.id);
+      sessionStorage.setItem("customerInfo", JSON.stringify({ name, cpf }));
+      if (comandaId) {
+        sessionStorage.setItem(`comanda_id_${tableNumber}`, comandaId);
+      }
       
       // Atualizar estados
       setCustomerName(name);
@@ -518,7 +558,7 @@ const Menu = () => {
       setTableId(tableData.id);
       setShowCustomerDialog(false);
       
-      console.log('✅ Cliente logado com sucesso!', { tableId: tableData.id });
+      console.log('✅ Cliente logado com sucesso!', { tableId: tableData.id, comandaId });
       toast.success(`Bem-vindo, ${name}!`);
       
       // Carregar dados

@@ -67,12 +67,18 @@ const getStatusConfig = (status: string, deliveryType?: string) => {
       color: "bg-orange-500",
     },
     ready: {
-      icon: deliveryType === "pickup" ? Package : Truck,
-      label: deliveryType === "pickup" ? "Pronto para retirada" : "Saiu para entrega",
+      icon: Package,
+      label: deliveryType === "pickup" ? "Pronto para retirada" : "Pronto para entrega",
       description: deliveryType === "pickup" 
         ? "Seu pedido está pronto! Pode retirar." 
-        : "Seu pedido está a caminho!",
+        : "Seu pedido está pronto e aguardando o entregador.",
       color: "bg-purple-500",
+    },
+    out_for_delivery: {
+      icon: Truck,
+      label: "Saiu para entrega",
+      description: "Seu pedido está a caminho!",
+      color: "bg-indigo-500",
     },
     delivered: {
       icon: CheckCircle2,
@@ -200,8 +206,10 @@ export default function OrderConfirmation() {
             toast.success(
               deliveryType === "pickup" 
                 ? "Seu pedido está pronto para retirada! 📦" 
-                : "Seu pedido está a caminho! 🚚"
+                : "Seu pedido está pronto! Aguardando entregador. 📦"
             );
+          } else if (newStatus === "out_for_delivery") {
+            toast.success("Seu pedido saiu para entrega! 🚚");
           } else if (newStatus === "delivered") {
             toast.success("Pedido entregue! Bom apetite! 🎉");
             setTimeout(async () => {
@@ -337,13 +345,19 @@ export default function OrderConfirmation() {
                 time={format(new Date(order.created_at), "HH:mm")}
               />
               <StatusStep
-                completed={["accepted", "ready", "delivered", "picked_up"].includes(order.status)}
+                completed={["accepted", "ready", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
                 label="Em Preparo"
               />
               <StatusStep
-                completed={["ready", "delivered", "picked_up"].includes(order.status)}
-                label={order.delivery_type === "pickup" ? "Pronto para Retirada" : "Saiu para Entrega"}
+                completed={["ready", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
+                label={order.delivery_type === "pickup" ? "Pronto para Retirada" : "Pronto para Entrega"}
               />
+              {order.delivery_type !== "pickup" && (
+                <StatusStep
+                  completed={["out_for_delivery", "delivered"].includes(order.status)}
+                  label="Saiu para Entrega"
+                />
+              )}
               <StatusStep 
                 completed={["delivered", "picked_up"].includes(order.status)} 
                 label={order.delivery_type === "pickup" ? "Retirado" : "Entregue"} 

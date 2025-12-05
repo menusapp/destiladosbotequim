@@ -147,6 +147,16 @@ const Comanda = () => {
               console.log("✅ Conta foi paga! Redirecionando...");
               toast.success("Conta paga! Obrigado pela preferência!");
               
+              // Fechar comanda ativa
+              const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+              if (comandaId) {
+                supabase.from("comandas").update({
+                  status: "closed",
+                  closed_at: new Date().toISOString()
+                }).eq("id", comandaId);
+                console.log("📋 Comanda fechada:", comandaId);
+              }
+              
               // Liberar a mesa no banco de dados
               if (tableData?.id) {
                 supabase.from("tables").update({
@@ -166,6 +176,7 @@ const Comanda = () => {
               sessionStorage.removeItem(`customer_name_${tableNumber}`);
               sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
               sessionStorage.removeItem(`cart_${tableNumber}`);
+              sessionStorage.removeItem(`comanda_id_${tableNumber}`);
               sessionStorage.removeItem("customerInfo");
               
               setTimeout(() => {
@@ -202,6 +213,15 @@ const Comanda = () => {
               });
             }
             
+            // Fechar comanda ativa
+            const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+            if (comandaId) {
+              supabase.from("comandas").update({
+                status: "closed",
+                closed_at: new Date().toISOString()
+              }).eq("id", comandaId);
+            }
+            
             // Salvar informações para abrir modal de avaliação
             sessionStorage.setItem('shouldShowReview', 'true');
             if (deletedBill?.id) {
@@ -212,6 +232,7 @@ const Comanda = () => {
             sessionStorage.removeItem(`customer_name_${tableNumber}`);
             sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
             sessionStorage.removeItem(`cart_${tableNumber}`);
+            sessionStorage.removeItem(`comanda_id_${tableNumber}`);
             sessionStorage.removeItem("customerInfo");
             
             setTimeout(() => {
@@ -455,6 +476,9 @@ const Comanda = () => {
         throw new Error("Mesa não encontrada");
       }
 
+      // Buscar comanda_id do sessionStorage
+      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+
       // Criar pedido
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -463,6 +487,7 @@ const Comanda = () => {
           restaurant_id: tableData.restaurant_id,
           customer_name: customerName || "",
           customer_cpf: customerCPF || "",
+          comanda_id: comandaId || null,
           status: "pending",
           notes: orderNotes || null,
         })
