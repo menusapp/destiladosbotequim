@@ -437,8 +437,30 @@ const Menu = () => {
     };
   }, [tableId, customerName, customerCPF]);
 
-  const handleCompleteLogout = useCallback(() => {
+  const handleCompleteLogout = useCallback(async () => {
     console.log('🚪 Deslogando cliente completamente...');
+    
+    // IMPORTANTE: Fechar a comanda no banco ANTES de limpar a sessão
+    const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+    if (comandaId) {
+      try {
+        const { error } = await supabase
+          .from("comandas")
+          .update({
+            status: "closed",
+            closed_at: new Date().toISOString()
+          })
+          .eq("id", comandaId);
+        
+        if (error) {
+          console.error("Erro ao fechar comanda:", error);
+        } else {
+          console.log('📋 Comanda fechada no banco:', comandaId);
+        }
+      } catch (err) {
+        console.error("Erro ao fechar comanda:", err);
+      }
+    }
     
     // Limpar TODOS os estados
     setCustomerName("");

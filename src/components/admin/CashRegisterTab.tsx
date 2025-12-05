@@ -59,6 +59,44 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
   // Estados para abrir caixa
   const [openingBalance, setOpeningBalance] = useState("");
   const [openedBy, setOpenedBy] = useState("");
+  const [showCashCount, setShowCashCount] = useState(false);
+  const [billCounts, setBillCounts] = useState({
+    bill200: 0, bill100: 0, bill50: 0, bill20: 0, bill10: 0, bill5: 0, bill2: 0
+  });
+  const [coinCounts, setCoinCounts] = useState({
+    coin100: 0, coin50: 0, coin25: 0, coin10: 0, coin05: 0
+  });
+
+  // Calcular total da contagem de cédulas e moedas
+  const calculateCashCountTotal = () => {
+    const billsTotal = 
+      billCounts.bill200 * 200 + 
+      billCounts.bill100 * 100 + 
+      billCounts.bill50 * 50 +
+      billCounts.bill20 * 20 + 
+      billCounts.bill10 * 10 + 
+      billCounts.bill5 * 5 + 
+      billCounts.bill2 * 2;
+    
+    const coinsTotal = 
+      coinCounts.coin100 * 1 + 
+      coinCounts.coin50 * 0.5 + 
+      coinCounts.coin25 * 0.25 +
+      coinCounts.coin10 * 0.1 + 
+      coinCounts.coin05 * 0.05;
+    
+    return billsTotal + coinsTotal;
+  };
+
+  // Atualizar saldo inicial quando contagem mudar
+  useEffect(() => {
+    if (showCashCount) {
+      const total = calculateCashCountTotal();
+      if (total > 0) {
+        setOpeningBalance(total.toFixed(2));
+      }
+    }
+  }, [billCounts, coinCounts, showCashCount]);
 
   // Estados para fechar caixa
   const [closingBalance, setClosingBalance] = useState("");
@@ -205,6 +243,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       toast.success("Caixa aberto com sucesso!");
       setOpenedBy("");
       setOpeningBalance("");
+      setShowCashCount(false);
+      setBillCounts({ bill200: 0, bill100: 0, bill50: 0, bill20: 0, bill10: 0, bill5: 0, bill2: 0 });
+      setCoinCounts({ coin100: 0, coin50: 0, coin25: 0, coin10: 0, coin05: 0 });
       fetchCurrentSession();
     } catch (error: any) {
       toast.error("Erro ao abrir caixa: " + error.message);
@@ -514,7 +555,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                 Abrir Caixa
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Abrir Caixa</DialogTitle>
               </DialogHeader>
@@ -527,6 +568,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     placeholder="Nome do responsável"
                   />
                 </div>
+                
                 <div>
                   <Label>Saldo inicial (R$)</Label>
                   <Input
@@ -537,6 +579,97 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     placeholder="0.00"
                   />
                 </div>
+
+                {/* Botão para expandir contagem de cédulas/moedas */}
+                <Button 
+                  variant="outline" 
+                  type="button"
+                  className="w-full"
+                  onClick={() => setShowCashCount(!showCashCount)}
+                >
+                  {showCashCount ? "Ocultar contagem de cédulas/moedas" : "Mostrar contagem de cédulas/moedas"}
+                </Button>
+
+                {showCashCount && (
+                  <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                    {/* Cédulas */}
+                    <div>
+                      <Label className="text-base font-semibold mb-3 block">Cédulas</Label>
+                      <div className="grid grid-cols-4 gap-3">
+                        {[
+                          { key: 'bill200', label: 'R$ 200', value: 200 },
+                          { key: 'bill100', label: 'R$ 100', value: 100 },
+                          { key: 'bill50', label: 'R$ 50', value: 50 },
+                          { key: 'bill20', label: 'R$ 20', value: 20 },
+                          { key: 'bill10', label: 'R$ 10', value: 10 },
+                          { key: 'bill5', label: 'R$ 5', value: 5 },
+                          { key: 'bill2', label: 'R$ 2', value: 2 },
+                        ].map((bill) => (
+                          <div key={bill.key} className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">{bill.label}</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={billCounts[bill.key as keyof typeof billCounts] || ''}
+                              onChange={(e) => setBillCounts(prev => ({
+                                ...prev,
+                                [bill.key]: parseInt(e.target.value) || 0
+                              }))}
+                              placeholder="0"
+                              className="text-center"
+                            />
+                            <p className="text-xs text-center text-muted-foreground">
+                              = R$ {((billCounts[bill.key as keyof typeof billCounts] || 0) * bill.value).toFixed(2)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Moedas */}
+                    <div>
+                      <Label className="text-base font-semibold mb-3 block">Moedas</Label>
+                      <div className="grid grid-cols-5 gap-3">
+                        {[
+                          { key: 'coin100', label: 'R$ 1,00', value: 1 },
+                          { key: 'coin50', label: 'R$ 0,50', value: 0.5 },
+                          { key: 'coin25', label: 'R$ 0,25', value: 0.25 },
+                          { key: 'coin10', label: 'R$ 0,10', value: 0.1 },
+                          { key: 'coin05', label: 'R$ 0,05', value: 0.05 },
+                        ].map((coin) => (
+                          <div key={coin.key} className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">{coin.label}</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={coinCounts[coin.key as keyof typeof coinCounts] || ''}
+                              onChange={(e) => setCoinCounts(prev => ({
+                                ...prev,
+                                [coin.key]: parseInt(e.target.value) || 0
+                              }))}
+                              placeholder="0"
+                              className="text-center"
+                            />
+                            <p className="text-xs text-center text-muted-foreground">
+                              = R$ {((coinCounts[coin.key as keyof typeof coinCounts] || 0) * coin.value).toFixed(2)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Total da contagem */}
+                    <div className="bg-primary/10 p-3 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold">Total da contagem:</span>
+                        <span className="text-xl font-bold text-primary">
+                          R$ {calculateCashCountTotal().toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <Button onClick={handleOpenCashRegister} className="w-full">
                   Abrir Caixa
                 </Button>
