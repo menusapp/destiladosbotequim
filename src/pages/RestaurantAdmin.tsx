@@ -16,7 +16,7 @@ import TablesTab from "@/components/admin/TablesTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
-import BalcaoTab from "@/components/admin/BalcaoTab";
+import PDVTab from "@/components/admin/PDVTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 
@@ -320,9 +320,9 @@ const RestaurantAdmin = () => {
       case "pedidos-locais":
         return <LocalOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
       
-      // PDV (Balcão)
+      // PDV (Balcão + Mesas)
       case "pdv":
-        return <BalcaoTab restaurantId={restaurant.id} />;
+        return <PDVTab restaurantId={restaurant.id} />;
       
       // Mesas e Comandas
       case "mesas-comandas":
