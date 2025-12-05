@@ -8,6 +8,8 @@ interface NewOrderNotificationProps {
   customerName: string;
   total: number;
   orderType: 'local' | 'delivery';
+  tableNumber?: number;
+  deliveryType?: 'delivery' | 'pickup';
   onView: () => void;
   onDismiss: () => void;
 }
@@ -17,6 +19,8 @@ export const NewOrderNotification = ({
   customerName,
   total,
   orderType,
+  tableNumber,
+  deliveryType,
   onView,
   onDismiss,
 }: NewOrderNotificationProps) => {
@@ -127,7 +131,12 @@ export const NewOrderNotification = ({
               <div>
                 <h3 className="text-xl font-bold text-green-900">Novo Pedido!</h3>
                 <p className="text-sm text-green-700">
-                  {orderType === 'local' ? '🍽️ Mesa' : '🚚 Delivery'}
+                  {orderType === 'local' 
+                    ? `🍽️ Pedido local - Mesa ${tableNumber || '?'}` 
+                    : deliveryType === 'pickup' 
+                      ? '📦 Pedido online - Retirada'
+                      : '🚚 Pedido online - Entrega'
+                  }
                 </p>
               </div>
             </div>

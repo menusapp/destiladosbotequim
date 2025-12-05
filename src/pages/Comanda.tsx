@@ -476,8 +476,50 @@ const Comanda = () => {
         throw new Error("Mesa não encontrada");
       }
 
-      // Buscar comanda_id do sessionStorage
-      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      // Buscar comanda_id do sessionStorage ou criar uma nova (fallback)
+      let comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      
+      // Se não existe comanda_id, criar uma nova (fallback para quando Menu.tsx não criou)
+      if (!comandaId && customerName && customerCPF) {
+        const cleanCpf = customerCPF.replace(/\D/g, '');
+        
+        // Verificar se já existe uma comanda ativa para este cliente
+        const { data: existingComanda } = await supabase
+          .from("comandas")
+          .select("id")
+          .eq("table_id", tableId)
+          .eq("customer_cpf", cleanCpf)
+          .eq("status", "active")
+          .maybeSingle();
+        
+        if (existingComanda) {
+          comandaId = existingComanda.id;
+          console.log('📋 Comanda existente encontrada (fallback):', comandaId);
+        } else {
+          // Criar nova comanda
+          const { data: newComanda, error: comandaError } = await supabase
+            .from("comandas")
+            .insert({
+              restaurant_id: tableData.restaurant_id,
+              table_id: tableId,
+              customer_name: customerName,
+              customer_cpf: cleanCpf,
+              status: "active"
+            })
+            .select("id")
+            .single();
+          
+          if (!comandaError && newComanda) {
+            comandaId = newComanda.id;
+            console.log('📋 Nova comanda criada (fallback):', comandaId);
+          }
+        }
+        
+        // Salvar no sessionStorage para uso futuro
+        if (comandaId) {
+          sessionStorage.setItem(`comanda_id_${tableNumber}`, comandaId);
+        }
+      }
 
       // Criar pedido
       const { data: order, error: orderError } = await supabase

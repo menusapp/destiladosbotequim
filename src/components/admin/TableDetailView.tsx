@@ -128,40 +128,39 @@ export const TableDetailView = () => {
         setComandas(comandasWithCount);
       }
 
-      // Buscar pedidos APENAS das comandas ativas
-      // Se não houver comandas ativas, não mostrar nenhum pedido
-      if (activeComandaIds.length === 0) {
-        setOrders([]);
-      } else {
-        const { data: ordersData, error: ordersError } = await supabase
-          .from("orders")
-          .select(`
+      // Buscar pedidos da mesa - tanto por comanda_id quanto pedidos sem comanda (backwards compatibility)
+      const { data: ordersData, error: ordersError } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          status,
+          created_at,
+          customer_name,
+          notes,
+          comanda_id,
+          order_items (
             id,
-            status,
-            created_at,
-            customer_name,
+            quantity,
+            price_at_order,
             notes,
-            comanda_id,
-            order_items (
-              id,
-              quantity,
+            products (name),
+            order_item_extras (
               price_at_order,
-              notes,
-              products (name),
-              order_item_extras (
-                price_at_order,
-                product_extras (name)
-              )
+              product_extras (name)
             )
-          `)
-          .eq("table_id", tableId)
-          .in("comanda_id", activeComandaIds)
-          .in("status", ["pending", "accepted", "preparing", "ready"])
-          .order("created_at", { ascending: false });
+          )
+        `)
+        .eq("table_id", tableId)
+        .in("status", ["pending", "accepted", "preparing", "ready"])
+        .order("created_at", { ascending: false });
 
-        if (ordersError) throw ordersError;
-        setOrders(ordersData || []);
-      }
+      if (ordersError) throw ordersError;
+      
+      // Filtrar: mostrar pedidos com comanda ativa OU pedidos sem comanda_id (backwards compatibility)
+      const filteredOrders = (ordersData || []).filter(order => 
+        !order.comanda_id || activeComandaIds.includes(order.comanda_id)
+      );
+      setOrders(filteredOrders);
     } catch (error) {
       console.error("Erro ao buscar dados da mesa:", error);
       toast.error("Erro ao carregar dados da mesa");
