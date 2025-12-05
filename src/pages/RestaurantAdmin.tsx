@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,7 +45,13 @@ const RestaurantAdmin = () => {
     deliveryType?: 'delivery' | 'pickup';
   } | null>(null);
   const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
+  const notifiedOrdersRef = useRef<Set<string>>(new Set());
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
+  
+  // Sync ref with state to avoid stale closure in realtime callback
+  useEffect(() => {
+    notifiedOrdersRef.current = notifiedOrders;
+  }, [notifiedOrders]);
   
   useInactivityLogout();
 
@@ -67,7 +73,9 @@ const RestaurantAdmin = () => {
     // Load notified orders from localStorage
     const stored = localStorage.getItem("notifiedGlobalOrders");
     if (stored) {
-      setNotifiedOrders(new Set(JSON.parse(stored)));
+      const storedSet = new Set<string>(JSON.parse(stored));
+      setNotifiedOrders(storedSet);
+      notifiedOrdersRef.current = storedSet;
     }
 
     // Canal para novos pedidos
@@ -89,8 +97,8 @@ const RestaurantAdmin = () => {
           
           // Verificar diretamente pelo restaurant_id do pedido e status pending
           if (orderRestaurantId === restaurantId && status === 'pending') {
-            // Verificar se já foi notificado
-            if (notifiedOrders.has(orderId)) return;
+            // Verificar se já foi notificado (usar ref para evitar stale closure)
+            if (notifiedOrdersRef.current.has(orderId)) return;
 
             // Buscar detalhes completos do pedido para calcular total
             const { data: orderData } = await supabase
@@ -133,9 +141,10 @@ const RestaurantAdmin = () => {
                 deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
               });
 
-              // Marcar como notificado
-              const updated = new Set(notifiedOrders);
+              // Marcar como notificado (atualizar ref e state)
+              const updated = new Set(notifiedOrdersRef.current);
               updated.add(orderId);
+              notifiedOrdersRef.current = updated;
               setNotifiedOrders(updated);
               localStorage.setItem("notifiedGlobalOrders", JSON.stringify(Array.from(updated)));
             }
