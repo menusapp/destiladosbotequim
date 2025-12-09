@@ -47,12 +47,17 @@ const RestaurantAdmin = () => {
   } | null>(null);
   const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
   const notifiedOrdersRef = useRef<Set<string>>(new Set());
+  const globalNotificationRef = useRef<typeof globalNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
   
-  // Sync ref with state to avoid stale closure in realtime callback
+  // Sync refs with state to avoid stale closure in realtime callback
   useEffect(() => {
     notifiedOrdersRef.current = notifiedOrders;
   }, [notifiedOrders]);
+  
+  useEffect(() => {
+    globalNotificationRef.current = globalNotification;
+  }, [globalNotification]);
   
   useInactivityLogout();
 
@@ -171,8 +176,8 @@ const RestaurantAdmin = () => {
           const orderId = order.id;
           const status = order.status;
           
-          // Se o pedido foi aceito/mudou de status, fechar notificação
-          if (globalNotification && globalNotification.orderId === orderId && status !== 'pending') {
+          // Se o pedido foi aceito/mudou de status, fechar notificação (usar ref para evitar stale closure)
+          if (globalNotificationRef.current && globalNotificationRef.current.orderId === orderId && status !== 'pending') {
             setGlobalNotification(null);
           }
         }
