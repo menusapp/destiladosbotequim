@@ -164,7 +164,18 @@ const LocalOrdersTab = ({
 
   const fetchOrders = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // Buscar IDs das comandas ativas
+    const { data: activeComandasData } = await supabase
+      .from("comandas")
+      .select("id")
+      .eq("restaurant_id", restaurantId)
+      .eq("status", "active");
+    
+    const activeComandaIds = activeComandasData?.map(c => c.id) || [];
+    
+    // Buscar pedidos apenas de comandas ativas
+    let query = supabase
       .from("orders")
       .select(`*, tables!inner(table_number, restaurant_id), order_items(quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
       .eq("tables.restaurant_id", restaurantId)
@@ -172,6 +183,18 @@ const LocalOrdersTab = ({
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString())
       .order("created_at", { ascending: false });
+    
+    // Filtrar por comandas ativas se houver alguma
+    if (activeComandaIds.length > 0) {
+      query = query.in("comanda_id", activeComandaIds);
+    } else {
+      // Se não há comandas ativas, não mostrar pedidos
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+    
+    const { data, error } = await query;
 
     if (error) {
       toast.error("Erro ao carregar pedidos");
