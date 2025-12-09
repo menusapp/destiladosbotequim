@@ -529,15 +529,14 @@ const Menu = () => {
 
       if (updateError) throw updateError;
 
-      // SEMPRE criar nova comanda no login - fechar comandas anteriores
+      // SEMPRE criar nova comanda no login - fechar TODAS as comandas ativas da mesa
       const cleanCpf = cpf.replace(/\D/g, '');
       
-      // Fechar comandas ativas anteriores deste cliente nesta mesa
+      // Fechar TODAS comandas ativas da mesa (independente do CPF)
       const { error: closeError } = await supabase
         .from("comandas")
         .update({ status: "closed", closed_at: new Date().toISOString() })
         .eq("table_id", tableData.id)
-        .eq("customer_cpf", cleanCpf)
         .eq("status", "active");
 
       if (closeError) {

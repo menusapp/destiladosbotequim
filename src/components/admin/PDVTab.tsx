@@ -85,7 +85,10 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
   const [tableOrders, setTableOrders] = useState<any[]>([]);
   const [tableComandas, setTableComandas] = useState<any[]>([]);
   const [showPayBillDialog, setShowPayBillDialog] = useState(false);
-  const [billPaymentMethod, setBillPaymentMethod] = useState<string>("cash");
+  
+  // Split payment state
+  const [splitPayments, setSplitPayments] = useState<{method: string; amount: number; receivedAmount?: number}[]>([]);
+  const [cashReceivedAmount, setCashReceivedAmount] = useState<string>("");
   
   // Fetch categories
   const { data: categories } = useQuery({
@@ -367,12 +370,80 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
     }, 0);
   };
 
+  // Helper to get total split payments
+  const getTotalSplitPayments = () => {
+    return splitPayments.reduce((sum, p) => sum + p.amount, 0);
+  };
+
+  // Helper to get remaining amount
+  const getRemainingAmount = () => {
+    return calculateTableTotal() - getTotalSplitPayments();
+  };
+
+  // Helper to get change amount for cash
+  const getChangeAmount = () => {
+    const cashPayment = splitPayments.find(p => p.method === "cash");
+    if (cashPayment && cashPayment.receivedAmount) {
+      return cashPayment.receivedAmount - cashPayment.amount;
+    }
+    return 0;
+  };
+
+  // Add split payment
+  const addSplitPayment = (method: string) => {
+    const remaining = getRemainingAmount();
+    if (remaining <= 0) {
+      toast.error("Valor total já atingido");
+      return;
+    }
+    setSplitPayments(prev => [...prev, { method, amount: remaining }]);
+  };
+
+  // Update split payment amount
+  const updateSplitPaymentAmount = (index: number, amount: number) => {
+    setSplitPayments(prev => prev.map((p, i) => i === index ? { ...p, amount: Math.max(0, amount) } : p));
+  };
+
+  // Update cash received amount
+  const updateCashReceivedAmount = (index: number, receivedAmount: number) => {
+    setSplitPayments(prev => prev.map((p, i) => i === index ? { ...p, receivedAmount } : p));
+  };
+
+  // Remove split payment
+  const removeSplitPayment = (index: number) => {
+    setSplitPayments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Reset split payments when opening dialog
+  const openPayBillDialog = () => {
+    setSplitPayments([]);
+    setCashReceivedAmount("");
+    setShowPayBillDialog(true);
+  };
+
   // Pay table bill mutation
   const payBillMutation = useMutation({
     mutationFn: async () => {
       if (!selectedTable) throw new Error("Mesa não selecionada");
-
+      if (splitPayments.length === 0) throw new Error("Adicione pelo menos uma forma de pagamento");
+      
       const total = calculateTableTotal();
+      const totalPaid = getTotalSplitPayments();
+      
+      if (totalPaid < total) {
+        throw new Error(`Valor pago (R$ ${totalPaid.toFixed(2)}) é menor que o total (R$ ${total.toFixed(2)})`);
+      }
+      
+      // Validate cash payment has sufficient received amount
+      const cashPayment = splitPayments.find(p => p.method === "cash");
+      if (cashPayment && (!cashPayment.receivedAmount || cashPayment.receivedAmount < cashPayment.amount)) {
+        throw new Error("Valor recebido em dinheiro deve ser maior ou igual ao valor pago");
+      }
+
+      // Determine payment method string
+      const paymentMethodString = splitPayments.length === 1 
+        ? splitPayments[0].method 
+        : "cash"; // For mixed, use cash as primary (database constraint)
 
       // Create bill
       const { data: bill, error: billError } = await supabase
@@ -382,9 +453,10 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
           subtotal: total,
           service_fee: 0,
           total_amount: total,
-          payment_method: billPaymentMethod,
+          payment_method: paymentMethodString,
           status: "paid",
           paid_at: new Date().toISOString(),
+          change_amount: getChangeAmount() > 0 ? getChangeAmount() : null,
         })
         .select()
         .single();
@@ -420,11 +492,12 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pdv-tables"] });
+      queryClient.invalidateQueries({ queryKey: ["local-orders"] });
       toast.success("Conta paga! Mesa liberada.");
       setShowPayBillDialog(false);
       setShowTableDetail(false);
       setSelectedTable(null);
-      setBillPaymentMethod("cash");
+      setSplitPayments([]);
     },
     onError: (error: any) => {
       toast.error(error.message || "Erro ao pagar conta");
@@ -792,20 +865,12 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
               Dinheiro
             </Button>
             <Button
-              variant={paymentMethod === "debit" ? "default" : "outline"}
+              variant={paymentMethod === "card" ? "default" : "outline"}
               className="h-20 flex-col gap-2"
-              onClick={() => setPaymentMethod("debit")}
+              onClick={() => setPaymentMethod("card")}
             >
               <CreditCard className="w-6 h-6" />
-              Débito
-            </Button>
-            <Button
-              variant={paymentMethod === "credit" ? "default" : "outline"}
-              className="h-20 flex-col gap-2"
-              onClick={() => setPaymentMethod("credit")}
-            >
-              <CreditCard className="w-6 h-6" />
-              Crédito
+              Cartão
             </Button>
             <Button
               variant={paymentMethod === "pix" ? "default" : "outline"}
@@ -902,7 +967,7 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
                 <Button
                   className="w-full"
                   disabled={tableOrders.length === 0}
-                  onClick={() => setShowPayBillDialog(true)}
+                  onClick={openPayBillDialog}
                 >
                   <DollarSign className="w-4 h-4 mr-2" />
                   Pagar Conta
@@ -921,65 +986,162 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Pagar Conta */}
+      {/* Dialog Pagar Conta com Pagamento Dividido */}
       <Dialog open={showPayBillDialog} onOpenChange={setShowPayBillDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Pagar Conta - Mesa {selectedTable?.table_number}</DialogTitle>
             <DialogDescription>
               Total: R$ {calculateTableTotal().toFixed(2)}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+          
+          <div className="space-y-4">
+            {/* Add Payment Method Buttons */}
+            <div>
+              <p className="text-sm font-medium mb-2">Adicionar forma de pagamento:</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-col gap-1 h-16"
+                  onClick={() => addSplitPayment("cash")}
+                  disabled={getRemainingAmount() <= 0}
+                >
+                  <Banknote className="w-5 h-5" />
+                  <span className="text-xs">Dinheiro</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-col gap-1 h-16"
+                  onClick={() => addSplitPayment("card")}
+                  disabled={getRemainingAmount() <= 0}
+                >
+                  <CreditCard className="w-5 h-5" />
+                  <span className="text-xs">Cartão</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-col gap-1 h-16"
+                  onClick={() => addSplitPayment("pix")}
+                  disabled={getRemainingAmount() <= 0}
+                >
+                  <QrCode className="w-5 h-5" />
+                  <span className="text-xs">PIX</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Payment List */}
+            {splitPayments.length > 0 && (
+              <div className="space-y-3 border rounded-lg p-3">
+                <p className="text-sm font-medium">Pagamentos:</p>
+                {splitPayments.map((payment, index) => (
+                  <div key={index} className="space-y-2 p-2 bg-muted rounded">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {payment.method === "cash" && <Banknote className="w-4 h-4" />}
+                        {payment.method === "card" && <CreditCard className="w-4 h-4" />}
+                        {payment.method === "pix" && <QrCode className="w-4 h-4" />}
+                        <span className="font-medium text-sm">
+                          {payment.method === "cash" ? "Dinheiro" : payment.method === "card" ? "Cartão" : "PIX"}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-destructive"
+                        onClick={() => removeSplitPayment(index)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Valor:</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={payment.amount}
+                        onChange={(e) => updateSplitPaymentAmount(index, parseFloat(e.target.value) || 0)}
+                        className="h-8 w-28"
+                      />
+                    </div>
+                    {payment.method === "cash" && (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Recebido:</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={payment.receivedAmount || ""}
+                            onChange={(e) => updateCashReceivedAmount(index, parseFloat(e.target.value) || 0)}
+                            className="h-8 w-28"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        {payment.receivedAmount && payment.receivedAmount >= payment.amount && (
+                          <p className="text-sm text-green-600 font-medium">
+                            Troco: R$ {(payment.receivedAmount - payment.amount).toFixed(2)}
+                          </p>
+                        )}
+                        {payment.receivedAmount && payment.receivedAmount < payment.amount && (
+                          <p className="text-sm text-red-600">
+                            Valor recebido insuficiente
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Summary */}
+            <div className="border-t pt-3 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span>Total da conta:</span>
+                <span className="font-medium">R$ {calculateTableTotal().toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Total pago:</span>
+                <span className="font-medium">R$ {getTotalSplitPayments().toFixed(2)}</span>
+              </div>
+              {getRemainingAmount() > 0 && (
+                <div className="flex justify-between text-sm text-red-600">
+                  <span>Falta pagar:</span>
+                  <span className="font-medium">R$ {getRemainingAmount().toFixed(2)}</span>
+                </div>
+              )}
+              {getChangeAmount() > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>Troco total:</span>
+                  <span className="font-medium">R$ {getChangeAmount().toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Warning */}
+            <div className="bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg text-sm text-amber-800 dark:text-amber-200">
+              <p className="font-medium">Ao confirmar:</p>
+              <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
+                <li>Pedidos marcados como entregues</li>
+                <li>Comandas fechadas</li>
+                <li>Mesa liberada</li>
+              </ul>
+            </div>
+
             <Button
-              variant={billPaymentMethod === "cash" ? "default" : "outline"}
-              className="h-20 flex-col gap-2"
-              onClick={() => setBillPaymentMethod("cash")}
+              className="w-full"
+              disabled={payBillMutation.isPending || splitPayments.length === 0 || getRemainingAmount() > 0}
+              onClick={() => payBillMutation.mutate()}
             >
-              <Banknote className="w-6 h-6" />
-              Dinheiro
-            </Button>
-            <Button
-              variant={billPaymentMethod === "debit" ? "default" : "outline"}
-              className="h-20 flex-col gap-2"
-              onClick={() => setBillPaymentMethod("debit")}
-            >
-              <CreditCard className="w-6 h-6" />
-              Débito
-            </Button>
-            <Button
-              variant={billPaymentMethod === "credit" ? "default" : "outline"}
-              className="h-20 flex-col gap-2"
-              onClick={() => setBillPaymentMethod("credit")}
-            >
-              <CreditCard className="w-6 h-6" />
-              Crédito
-            </Button>
-            <Button
-              variant={billPaymentMethod === "pix" ? "default" : "outline"}
-              className="h-20 flex-col gap-2"
-              onClick={() => setBillPaymentMethod("pix")}
-            >
-              <QrCode className="w-6 h-6" />
-              PIX
+              {payBillMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
             </Button>
           </div>
-          <div className="bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg text-sm text-amber-800 dark:text-amber-200">
-            <p className="font-medium">Ao confirmar:</p>
-            <ul className="list-disc list-inside mt-1 space-y-1">
-              <li>Todos os pedidos serão marcados como entregues</li>
-              <li>Comandas serão fechadas</li>
-              <li>Clientes serão deslogados</li>
-              <li>Mesa será liberada</li>
-            </ul>
-          </div>
-          <Button
-            className="w-full"
-            disabled={payBillMutation.isPending}
-            onClick={() => payBillMutation.mutate()}
-          >
-            {payBillMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
-          </Button>
         </DialogContent>
       </Dialog>
     </div>
