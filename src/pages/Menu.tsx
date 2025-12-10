@@ -48,6 +48,7 @@ const Menu = () => {
   // ⚡ Refs para manter valores atualizados nos listeners de realtime (evita stale closures)
   const tableIdRef = useRef<string | null>(null);
   const customerInfoRef = useRef<{name: string, cpf: string} | null>(null);
+  const restaurantRef = useRef<Restaurant | null>(null);
 
   // Manter refs sincronizadas com estado
   useEffect(() => {
@@ -61,6 +62,10 @@ const Menu = () => {
       customerInfoRef.current = null;
     }
   }, [customerName, customerCPF]);
+
+  useEffect(() => {
+    restaurantRef.current = restaurant;
+  }, [restaurant]);
 
   useMenuInactivityLogout(tableId, tableNumber || "", restaurantSlug || "");
 
@@ -391,7 +396,7 @@ const Menu = () => {
         table: 'products'
       }, () => {
         console.log('📦 Produtos atualizados em tempo real!');
-        if (restaurant?.id) {
+        if (restaurantRef.current?.id) {
           fetchData();
         }
       })
@@ -501,7 +506,7 @@ const Menu = () => {
       console.log('🔌 Removendo canal de realtime');
       supabase.removeChannel(channel); 
     };
-  }, [fetchData, restaurantSlug, tableNumber, tableId, checkOpenComanda, cart]);
+  }, [fetchData, restaurantSlug, tableNumber]);
 
   useEffect(() => {
     // ✅ Só salvar se temos dados válidos (não strings vazias)
