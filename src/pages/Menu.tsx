@@ -80,7 +80,7 @@ const Menu = () => {
   const fetchData = useCallback(async () => {
     if (!restaurantSlug || !tableNumber) return;
     try {
-      // Single optimized query with all related data
+      // ⚡ Query única otimizada com TODOS os dados relacionados
       const { data: restaurantData, error: restError } = await supabase
         .from("restaurants")
         .select(`
@@ -108,6 +108,7 @@ const Menu = () => {
         setFeaturedSectionTitle(restaurantData.featured_section_title);
       }
 
+      // ⚡ Buscar tableId em paralelo (única query adicional necessária)
       const { data: tableData, error: tableError } = await supabase
         .from("tables").select("id")
         .eq("restaurant_id", restaurantData.id)
@@ -115,39 +116,29 @@ const Menu = () => {
       if (tableError) throw tableError;
       setTableId(tableData.id);
 
-      const { data: categoriesData, error: catError } = await supabase
-        .from("categories").select("id, name, display_order, products(id, name, description, price, available, image_url, prep_time_minutes)")
-        .eq("restaurant_id", restaurantData.id).order("display_order");
-      if (catError) throw catError;
-
-      const sortedCategories = (categoriesData || [])
-        .map((cat: any) => ({ ...cat, products: (cat.products || []).sort((a: Product, b: Product) => a.name.localeCompare(b.name)) }))
+      // ⚡ Processar categorias dos dados JÁ CARREGADOS (sem query adicional!)
+      const sortedCategories = (restaurantData.categories || [])
+        .map((cat: any) => ({ 
+          ...cat, 
+          products: (cat.products || [])
+            .filter((p: Product) => p.available)
+            .sort((a: Product, b: Product) => a.name.localeCompare(b.name)) 
+        }))
         .filter((cat: Category) => cat.products.length > 0);
       setCategories(sortedCategories);
 
-      // Buscar produtos em destaque se a seção estiver habilitada
+      // ⚡ Extrair produtos em destaque dos dados JÁ CARREGADOS (sem query adicional!)
       if (restaurantData.featured_section_enabled) {
-        const { data: featuredData, error: featuredError } = await supabase
-          .from("products")
-          .select("id, name, description, price, available, image_url, prep_time_minutes, is_featured, featured_display_order, categories!inner(restaurant_id)")
-          .eq("categories.restaurant_id", restaurantData.id)
-          .eq("is_featured", true)
-          .eq("available", true)
-          .order("featured_display_order", { ascending: true });
-        
-        if (featuredError) {
-          console.error("Erro ao buscar produtos em destaque:", featuredError);
-        } else {
-          setFeaturedProducts(featuredData || []);
-        }
+        const allProducts = restaurantData.categories?.flatMap((cat: any) => cat.products) || [];
+        const featured = allProducts
+          .filter((p: any) => p.is_featured && p.available)
+          .sort((a: any, b: any) => (a.featured_display_order || 0) - (b.featured_display_order || 0));
+        setFeaturedProducts(featured);
       } else {
         setFeaturedProducts([]);
       }
 
-      // Verificar se existe comanda aberta
-      if (tableData.id) {
-        await checkOpenComanda(tableData.id, cart);
-      }
+      // ⚡ Não chamar checkOpenComanda aqui - useEffect cuida disso
     } catch (error: any) {
       toast.error("Erro ao carregar dados");
     } finally {
