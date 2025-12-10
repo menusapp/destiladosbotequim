@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Copy, Clock, Moon, Sun, Package } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Copy, Clock, Moon, Sun, Package, Store, StoreIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -24,8 +25,10 @@ interface AdminHeaderProps {
   restaurantSlug: string;
   prepTime: number;
   pickupTime: number;
+  isOpen: boolean;
   onPrepTimeUpdate: (time: number) => void;
   onPickupTimeUpdate: (time: number) => void;
+  onIsOpenUpdate: (isOpen: boolean) => void;
 }
 
 export const AdminHeader = ({
@@ -33,8 +36,10 @@ export const AdminHeader = ({
   restaurantSlug,
   prepTime,
   pickupTime,
+  isOpen,
   onPrepTimeUpdate,
   onPickupTimeUpdate,
+  onIsOpenUpdate,
 }: AdminHeaderProps) => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
@@ -42,6 +47,27 @@ export const AdminHeader = ({
   const [editingPickupTime, setEditingPickupTime] = useState(false);
   const [tempPrepTime, setTempPrepTime] = useState(prepTime);
   const [tempPickupTime, setTempPickupTime] = useState(pickupTime);
+  const [updatingOpen, setUpdatingOpen] = useState(false);
+
+  const handleToggleOpen = async () => {
+    setUpdatingOpen(true);
+    const newIsOpen = !isOpen;
+    
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ is_open: newIsOpen })
+      .eq("id", restaurantId);
+
+    if (error) {
+      toast.error("Erro ao atualizar status do restaurante");
+      setUpdatingOpen(false);
+      return;
+    }
+
+    onIsOpenUpdate(newIsOpen);
+    toast.success(newIsOpen ? "Restaurante aberto!" : "Restaurante fechado!");
+    setUpdatingOpen(false);
+  };
 
   const menuUrl = `${window.location.origin}/delivery/${restaurantSlug}`;
 
@@ -181,6 +207,20 @@ export const AdminHeader = ({
       </Popover>
 
       <div className="flex-1" />
+
+      {/* Toggle Abrir/Fechar Restaurante */}
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border">
+        <Store className={`h-4 w-4 ${isOpen ? 'text-green-500' : 'text-destructive'}`} />
+        <span className={`text-sm font-medium ${isOpen ? 'text-green-500' : 'text-destructive'}`}>
+          {isOpen ? 'Aberto' : 'Fechado'}
+        </span>
+        <Switch
+          checked={isOpen}
+          onCheckedChange={handleToggleOpen}
+          disabled={updatingOpen}
+          className="data-[state=checked]:bg-green-500"
+        />
+      </div>
 
       {/* Botão de Tema */}
       <Button
