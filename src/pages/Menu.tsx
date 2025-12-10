@@ -37,6 +37,7 @@ const Menu = () => {
   const [reviewOrderId, setReviewOrderId] = useState<string | undefined>();
   const [reviewCounterOrderId, setReviewCounterOrderId] = useState<string | undefined>();
   const [reviewBillId, setReviewBillId] = useState<string | undefined>();
+  const [blockLoginForReview, setBlockLoginForReview] = useState(false);
   const [hasOpenComanda, setHasOpenComanda] = useState(false);
   const [comandaTotal, setComandaTotal] = useState(0);
   const [comandaStatus, setComandaStatus] = useState<string>("");
@@ -80,6 +81,9 @@ const Menu = () => {
     });
     
     if (shouldShowReview === 'true') {
+      // BLOQUEAR dialog de login ANTES de tudo
+      setBlockLoginForReview(true);
+      
       const billId = sessionStorage.getItem('reviewBillId');
       const counterOrderId = sessionStorage.getItem('reviewCounterOrderId');
       
@@ -315,8 +319,14 @@ const Menu = () => {
   // Realtime subscription para pedidos da mesa (subscription já existe nas linhas 279-285)
 
 
-  // ⚡ Mostrar dialog de login APENAS quando dados estiverem carregados
+  // ⚡ Mostrar dialog de login APENAS quando dados estiverem carregados E não tiver avaliação pendente
   useEffect(() => {
+    // NÃO mostrar login se estiver mostrando avaliação
+    if (blockLoginForReview || reviewModalOpen) {
+      console.log('🔒 Login bloqueado - avaliação em andamento');
+      return;
+    }
+    
     if (!loading && restaurant && !customerName && !showCustomerDialog) {
       const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
       if (!savedName) {
@@ -324,7 +334,7 @@ const Menu = () => {
         setShowCustomerDialog(true);
       }
     }
-  }, [loading, restaurant, customerName, tableNumber, showCustomerDialog]);
+  }, [loading, restaurant, customerName, tableNumber, showCustomerDialog, blockLoginForReview, reviewModalOpen]);
 
   useEffect(() => {
     console.log('🔄 useEffect de inicialização executado');
@@ -1002,6 +1012,7 @@ const Menu = () => {
           setReviewOrderId(undefined);
           setReviewCounterOrderId(undefined);
           setReviewBillId(undefined);
+          setBlockLoginForReview(false); // Liberar para mostrar login agora
           // ✅ Logout completo após fechar avaliação
           handleCompleteLogout();
         }}

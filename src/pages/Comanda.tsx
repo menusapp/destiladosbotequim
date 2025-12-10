@@ -157,14 +157,8 @@ const Comanda = () => {
                 console.log("📋 Comanda fechada:", comandaId);
               }
               
-              // Liberar a mesa no banco de dados
-              if (tableData?.id) {
-                supabase.from("tables").update({
-                  is_occupied: false,
-                  occupied_at: null,
-                  occupied_by: null
-                }).eq("id", tableData.id);
-              }
+              // ⚠️ NÃO liberar mesa aqui - admin_mark_bill_paid já faz isso!
+              // A mesa é liberada pela função do banco de dados quando a conta é paga
               
               // Salvar informações para abrir modal de avaliação
               sessionStorage.setItem('shouldShowReview', 'true');
@@ -202,16 +196,8 @@ const Comanda = () => {
             const deletedBill = payload.old as any;
             toast.success("Conta paga! Obrigado pela preferência!");
             
-            // Liberar a mesa no banco de dados
-            if (tableData?.id) {
-              supabase.from("tables").update({
-                is_occupied: false,
-                occupied_at: null,
-                occupied_by: null
-              }).eq("id", tableData.id).then(() => {
-                console.log("Mesa liberada com sucesso");
-              });
-            }
+            // ⚠️ NÃO liberar mesa aqui - é responsabilidade do banco de dados
+            // Isso acontece quando admin deleta a conta manualmente
             
             // Fechar comanda ativa
             const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
