@@ -663,6 +663,7 @@ const LocalOrdersTab = ({
               <CreditCard className="h-5 w-5" />
               Comandas
             </CardTitle>
+            <p className="text-xs text-muted-foreground">Para pagar, use PDV → Mesas / Comandas</p>
           </CardHeader>
         <CardContent>
           {filteredBills.length === 0 ? (
@@ -671,11 +672,12 @@ const LocalOrdersTab = ({
             <div className="space-y-4">
               {filteredBills.map((bill) => {
                 const statusConfig: Record<string, { icon: any; label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+                  pending: { icon: Clock, label: "Solicitada", variant: "outline" },
                   requested: { icon: Clock, label: "Solicitada", variant: "outline" },
                   on_the_way: { icon: Timer, label: "A caminho", variant: "secondary" },
                   paid: { icon: Check, label: "Paga", variant: "default" },
                 };
-                const config = statusConfig[bill.status] || statusConfig.requested;
+                const config = statusConfig[bill.status] || statusConfig.pending;
                 const Icon = config.icon;
 
                 return (
@@ -736,18 +738,13 @@ const LocalOrdersTab = ({
                           <Button variant="outline" size="sm" onClick={() => printBill(bill)}>
                             <Printer className="h-4 w-4" />
                           </Button>
-                          {bill.status === "requested" && (
+                          {(bill.status === "pending" || bill.status === "requested") && (
                             <Button size="sm" onClick={() => handleMarkBillAsOnTheWay(bill.id)}>
                               <Timer className="h-4 w-4 mr-1" />
                               A caminho
                             </Button>
                           )}
-                          {(bill.status === "requested" || bill.status === "on_the_way") && (
-                            <Button size="sm" variant="default" onClick={() => handleMarkBillAsPaid(bill.id)}>
-                              <Check className="h-4 w-4 mr-1" />
-                              Finalizar
-                            </Button>
-                          )}
+                          {/* Removido botão Finalizar - pagamento apenas pelo PDV */}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm">

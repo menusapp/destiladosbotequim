@@ -90,6 +90,16 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
   const [splitPayments, setSplitPayments] = useState<{method: string; amount: number; receivedAmount?: number}[]>([]);
   const [cashReceivedAmount, setCashReceivedAmount] = useState<string>("");
   
+  // Criar comanda manual state
+  const [newComandaName, setNewComandaName] = useState("");
+  const [newComandaCpf, setNewComandaCpf] = useState("");
+  const [creatingComanda, setCreatingComanda] = useState(false);
+  
+  // Adicionar produtos à mesa state
+  const [showAddProductsDialog, setShowAddProductsDialog] = useState(false);
+  const [tableCart, setTableCart] = useState<CartItem[]>([]);
+  const [tableOrderNotes, setTableOrderNotes] = useState("");
+  
   // Fetch categories
   const { data: categories } = useQuery({
     queryKey: ["pdv-categories", restaurantId],
@@ -445,23 +455,44 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
         ? splitPayments[0].method 
         : "cash"; // For mixed, use cash as primary (database constraint)
 
-      // Create bill
-      const { data: bill, error: billError } = await supabase
+      // Check if there's an existing pending/on_the_way bill for this table
+      const { data: existingBill } = await supabase
         .from("bills")
-        .insert({
-          table_id: selectedTable.id,
-          subtotal: total,
-          service_fee: 0,
-          total_amount: total,
-          payment_method: paymentMethodString,
-          status: "paid",
-          paid_at: new Date().toISOString(),
-          change_amount: getChangeAmount() > 0 ? getChangeAmount() : null,
-        })
-        .select()
-        .single();
+        .select("id")
+        .eq("table_id", selectedTable.id)
+        .in("status", ["pending", "on_the_way"])
+        .maybeSingle();
 
-      if (billError) throw billError;
+      if (existingBill) {
+        // Update existing bill instead of creating new one
+        const { error: updateBillError } = await supabase
+          .from("bills")
+          .update({
+            status: "paid",
+            paid_at: new Date().toISOString(),
+            payment_method: paymentMethodString,
+            change_amount: getChangeAmount() > 0 ? getChangeAmount() : null,
+          })
+          .eq("id", existingBill.id);
+
+        if (updateBillError) throw updateBillError;
+      } else {
+        // Create new bill
+        const { error: billError } = await supabase
+          .from("bills")
+          .insert({
+            table_id: selectedTable.id,
+            subtotal: total,
+            service_fee: 0,
+            total_amount: total,
+            payment_method: paymentMethodString,
+            status: "paid",
+            paid_at: new Date().toISOString(),
+            change_amount: getChangeAmount() > 0 ? getChangeAmount() : null,
+          });
+
+        if (billError) throw billError;
+      }
 
       // Update all orders to delivered
       for (const order of tableOrders) {
@@ -488,7 +519,7 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
         })
         .eq("id", selectedTable.id);
 
-      return bill;
+      return true;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pdv-tables"] });
@@ -503,6 +534,205 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
       toast.error(error.message || "Erro ao pagar conta");
     },
   });
+
+  // Criar comanda manual mutation
+  const createComandaMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedTable) throw new Error("Mesa não selecionada");
+      if (!newComandaName.trim()) throw new Error("Informe o nome do cliente");
+      if (!newComandaCpf.trim()) throw new Error("Informe o CPF do cliente");
+
+      // Limpar CPF
+      const cleanCpf = newComandaCpf.replace(/\D/g, '');
+      if (cleanCpf.length !== 11) throw new Error("CPF inválido");
+
+      // Criar comanda
+      const { error: comandaError } = await supabase
+        .from("comandas")
+        .insert({
+          restaurant_id: restaurantId,
+          table_id: selectedTable.id,
+          customer_name: newComandaName.trim(),
+          customer_cpf: cleanCpf,
+          status: "active",
+        });
+
+      if (comandaError) throw comandaError;
+
+      // Marcar mesa como ocupada
+      await supabase
+        .from("tables")
+        .update({
+          is_occupied: true,
+          occupied_by: newComandaName.trim(),
+          occupied_at: new Date().toISOString(),
+        })
+        .eq("id", selectedTable.id);
+
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pdv-tables"] });
+      toast.success("Comanda criada! Mesa ocupada.");
+      setNewComandaName("");
+      setNewComandaCpf("");
+      fetchTableDetails(selectedTable!);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Erro ao criar comanda");
+    },
+  });
+
+  // Adicionar produtos à mesa mutation  
+  const addProductsToTableMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedTable) throw new Error("Mesa não selecionada");
+      if (tableCart.length === 0) throw new Error("Carrinho vazio");
+
+      // Buscar ou criar comanda ativa
+      let { data: activeComanda } = await supabase
+        .from("comandas")
+        .select("id")
+        .eq("table_id", selectedTable.id)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (!activeComanda) {
+        // Criar comanda padrão
+        const createdBy = localStorage.getItem("restaurant_name") || "PDV";
+        const { data: newComanda, error: comandaError } = await supabase
+          .from("comandas")
+          .insert({
+            restaurant_id: restaurantId,
+            table_id: selectedTable.id,
+            customer_name: selectedTable.occupied_by || "Cliente PDV",
+            customer_cpf: "00000000000",
+            status: "active",
+          })
+          .select()
+          .single();
+
+        if (comandaError) throw comandaError;
+        activeComanda = newComanda;
+      }
+
+      const createdBy = localStorage.getItem("restaurant_name") || "PDV";
+      const subtotal = tableCart.reduce((sum, item) => {
+        const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+        return sum + (item.price + extrasTotal) * item.quantity;
+      }, 0);
+
+      // Criar pedido
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          restaurant_id: restaurantId,
+          table_id: selectedTable.id,
+          comanda_id: activeComanda.id,
+          customer_name: selectedTable.occupied_by || "Cliente PDV",
+          customer_cpf: "00000000000",
+          order_type: "local",
+          status: "pending",
+          notes: tableOrderNotes || null,
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Inserir itens
+      for (const item of tableCart) {
+        const { data: orderItem, error: itemError } = await supabase
+          .from("order_items")
+          .insert({
+            order_id: order.id,
+            product_id: item.productId,
+            quantity: item.quantity,
+            price_at_order: item.price,
+            notes: item.notes || null,
+          })
+          .select()
+          .single();
+
+        if (itemError) throw itemError;
+
+        // Inserir extras
+        if (item.extras.length > 0) {
+          const extrasToInsert = item.extras.map((extra) => ({
+            order_item_id: orderItem.id,
+            product_extra_id: extra.extraId,
+            price_at_order: extra.price,
+          }));
+
+          const { error: extrasError } = await supabase
+            .from("order_item_extras")
+            .insert(extrasToInsert);
+
+          if (extrasError) throw extrasError;
+        }
+      }
+
+      return order;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pdv-tables"] });
+      queryClient.invalidateQueries({ queryKey: ["local-orders"] });
+      toast.success("Pedido lançado com sucesso!");
+      setTableCart([]);
+      setTableOrderNotes("");
+      setShowAddProductsDialog(false);
+      fetchTableDetails(selectedTable!);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Erro ao lançar pedido");
+    },
+  });
+
+  // Table cart functions
+  const addToTableCart = (product: any) => {
+    setTableCart((prev) => {
+      const existing = prev.find((item) => item.productId === product.id && item.extras.length === 0);
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === product.id && item.extras.length === 0
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          productId: product.id,
+          productName: product.name,
+          quantity: 1,
+          price: product.price,
+          extras: [],
+        },
+      ];
+    });
+    toast.success(`${product.name} adicionado`);
+  };
+
+  const updateTableCartQuantity = (index: number, delta: number) => {
+    setTableCart((prev) =>
+      prev
+        .map((item, i) =>
+          i === index ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
+  const removeFromTableCart = (index: number) => {
+    setTableCart((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const calculateTableCartSubtotal = () => {
+    return tableCart.reduce((sum, item) => {
+      const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+      return sum + (item.price + extrasTotal) * item.quantity;
+    }, 0);
+  };
 
   const occupiedTables = tables?.filter((t) => t.is_occupied).length || 0;
   const availableTables = tables?.filter((t) => !t.is_occupied).length || 0;
@@ -957,32 +1187,219 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
               </div>
 
               {/* Total e Ações */}
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center mb-4">
+              <div className="border-t pt-4 space-y-3">
+                <div className="flex justify-between items-center">
                   <span className="font-bold text-lg">Total da Mesa</span>
                   <span className="text-2xl font-bold text-primary">
                     R$ {calculateTableTotal().toFixed(2)}
                   </span>
                 </div>
-                <Button
-                  className="w-full"
-                  disabled={tableOrders.length === 0}
-                  onClick={openPayBillDialog}
-                >
-                  <DollarSign className="w-4 h-4 mr-2" />
-                  Pagar Conta
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setTableCart([]);
+                      setTableOrderNotes("");
+                      setShowAddProductsDialog(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar Produtos
+                  </Button>
+                  <Button
+                    disabled={tableOrders.length === 0}
+                    onClick={openPayBillDialog}
+                  >
+                    <DollarSign className="w-4 h-4 mr-2" />
+                    Pagar Conta
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-              <p className="text-lg font-medium">Mesa disponível</p>
-              <p className="text-muted-foreground">
-                Aguardando clientes se sentarem
-              </p>
+            <div className="space-y-6 py-4">
+              <div className="text-center">
+                <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
+                <p className="text-lg font-medium">Mesa disponível</p>
+                <p className="text-muted-foreground mb-6">
+                  Crie uma comanda para ocupar a mesa
+                </p>
+              </div>
+              
+              {/* Formulário criar comanda manual */}
+              <div className="space-y-4 border rounded-lg p-4">
+                <h4 className="font-semibold">Criar Comanda</h4>
+                <div>
+                  <label className="text-sm font-medium">Nome do cliente *</label>
+                  <Input
+                    value={newComandaName}
+                    onChange={(e) => setNewComandaName(e.target.value)}
+                    placeholder="Nome do cliente"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">CPF *</label>
+                  <Input
+                    value={newComandaCpf}
+                    onChange={(e) => setNewComandaCpf(e.target.value)}
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+                <Button 
+                  className="w-full"
+                  onClick={() => createComandaMutation.mutate()}
+                  disabled={createComandaMutation.isPending || !newComandaName.trim() || !newComandaCpf.trim()}
+                >
+                  {createComandaMutation.isPending ? "Criando..." : "Abrir Mesa"}
+                </Button>
+              </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Adicionar Produtos à Mesa */}
+      <Dialog open={showAddProductsDialog} onOpenChange={setShowAddProductsDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Adicionar Produtos - Mesa {selectedTable?.table_number}</DialogTitle>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Produtos */}
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar produto..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
+              {/* Filtro Categorias */}
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={!selectedCategory ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedCategory(null)}
+                >
+                  Todos
+                </Button>
+                {categories?.map((cat) => (
+                  <Button
+                    key={cat.id}
+                    variant={selectedCategory === cat.id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedCategory(cat.id)}
+                  >
+                    {cat.name}
+                  </Button>
+                ))}
+              </div>
+              
+              <ScrollArea className="h-[300px]">
+                <div className="grid grid-cols-2 gap-2">
+                  {filteredProducts?.map((product) => (
+                    <Card
+                      key={product.id}
+                      className="cursor-pointer hover:shadow-lg transition-shadow"
+                      onClick={() => addToTableCart(product)}
+                    >
+                      <CardContent className="p-2">
+                        <p className="font-medium text-sm truncate">{product.name}</p>
+                        <p className="text-primary font-bold text-sm">
+                          R$ {product.price.toFixed(2)}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+            
+            {/* Carrinho */}
+            <div className="space-y-3 border rounded-lg p-3">
+              <h4 className="font-semibold flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4" />
+                Carrinho
+                {tableCart.length > 0 && (
+                  <Badge variant="secondary">{tableCart.length}</Badge>
+                )}
+              </h4>
+              
+              {tableCart.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  Carrinho vazio
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {tableCart.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 bg-muted rounded-lg"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{item.productName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          R$ {item.price.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateTableCartQuantity(index, -1)}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </Button>
+                        <span className="w-6 text-center text-sm">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateTableCartQuantity(index, 1)}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => removeFromTableCart(index)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <Textarea
+                placeholder="Observações do pedido..."
+                value={tableOrderNotes}
+                onChange={(e) => setTableOrderNotes(e.target.value)}
+                className="h-16 resize-none"
+              />
+              
+              <div className="border-t pt-3 space-y-2">
+                <div className="flex justify-between font-bold">
+                  <span>Total</span>
+                  <span className="text-primary">R$ {calculateTableCartSubtotal().toFixed(2)}</span>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => addProductsToTableMutation.mutate()}
+                  disabled={tableCart.length === 0 || addProductsToTableMutation.isPending}
+                >
+                  {addProductsToTableMutation.isPending ? "Lançando..." : "Lançar Pedido"}
+                </Button>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
