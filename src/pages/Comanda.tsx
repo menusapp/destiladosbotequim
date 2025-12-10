@@ -385,12 +385,13 @@ const Comanda = () => {
       const [ordersResult, billResult] = await Promise.all([
         ordersQuery.order("created_at", { ascending: false }),
         
-        supabase
+      supabase
           .from("bills")
-          .select("status")
+          .select("id, status")
           .eq("table_id", tableData.id)
           .in("status", ["requested", "on_the_way"])
-          .maybeSingle()
+          .order("created_at", { ascending: false })
+          .limit(1)
       ]);
 
       if (ordersResult.data) {
@@ -401,9 +402,10 @@ const Comanda = () => {
       }
 
       // Só mostrar status de bill se houver pedidos
-      if (billResult.data && ordersResult.data && ordersResult.data.length > 0) {
+      const activeBill = billResult.data?.[0];
+      if (activeBill && ordersResult.data && ordersResult.data.length > 0) {
         setBillRequested(true);
-        if (billResult.data.status === "on_the_way") {
+        if (activeBill.status === "on_the_way") {
           setBillOnTheWay(true);
         }
       } else {
@@ -585,6 +587,25 @@ const Comanda = () => {
 
   const handleRequestBill = async () => {
     if (!tableId) return;
+
+    // Verificar se já existe bill ativa (não criar duplicada)
+    const { data: existingBill } = await supabase
+      .from("bills")
+      .select("id, status")
+      .eq("table_id", tableId)
+      .in("status", ["requested", "on_the_way"])
+      .limit(1);
+
+    if (existingBill && existingBill.length > 0) {
+      // Já existe bill - apenas atualizar estado local
+      setBillRequested(true);
+      if (existingBill[0].status === "on_the_way") {
+        setBillOnTheWay(true);
+      }
+      setDialogOpen(false);
+      toast.info("A conta já foi solicitada!");
+      return;
+    }
 
     // Validar troco em dinheiro
     if (paymentMethod === "cash" && changeAmount) {
