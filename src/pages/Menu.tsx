@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +44,23 @@ const Menu = () => {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [featuredSectionTitle, setFeaturedSectionTitle] = useState("Destaques");
+
+  // ⚡ Refs para manter valores atualizados nos listeners de realtime (evita stale closures)
+  const tableIdRef = useRef<string | null>(null);
+  const customerInfoRef = useRef<{name: string, cpf: string} | null>(null);
+
+  // Manter refs sincronizadas com estado
+  useEffect(() => {
+    tableIdRef.current = tableId;
+  }, [tableId]);
+
+  useEffect(() => {
+    if (customerName && customerCPF) {
+      customerInfoRef.current = { name: customerName, cpf: customerCPF };
+    } else {
+      customerInfoRef.current = null;
+    }
+  }, [customerName, customerCPF]);
 
   useMenuInactivityLogout(tableId, tableNumber || "", restaurantSlug || "");
 
@@ -395,7 +412,7 @@ const Menu = () => {
           toast.success("O restaurante acabou de abrir! 🎉");
         }
       })
-      // 🔔 Listener de pedidos com notificações de status
+      // 🔔 Listener de pedidos com notificações de status (usando refs para evitar stale closures)
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
@@ -404,10 +421,14 @@ const Menu = () => {
         const order = payload.new as any;
         const oldOrder = payload.old as any;
         
-        console.log('📝 Pedido atualizado:', { order, oldOrder, tableId, currentCustomer });
+        // Usar refs para obter valores atualizados
+        const currentTableId = tableIdRef.current;
+        const currentCustomer = customerInfoRef.current;
+        
+        console.log('📝 Pedido atualizado:', { order, oldOrder, currentTableId, currentCustomer });
         
         // Verificar se é pedido deste cliente nesta mesa
-        if (tableId && order.table_id === tableId && currentCustomer) {
+        if (currentTableId && order.table_id === currentTableId && currentCustomer) {
           const cleanCPF = currentCustomer.cpf?.replace(/\D/g, '');
           
           if (order.customer_cpf === cleanCPF || order.customer_cpf === currentCustomer.cpf) {
@@ -431,19 +452,20 @@ const Menu = () => {
           }
         }
         
-        // Atualizar dados da comanda
-        if (tableId) checkOpenComanda(tableId, cart);
+        // Atualizar dados da comanda usando ref
+        if (currentTableId) checkOpenComanda(currentTableId, cart);
       })
-      // 🔔 Listener de INSERT em pedidos
+      // 🔔 Listener de INSERT em pedidos (usando ref)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'orders'
       }, () => {
         console.log('📝 Novo pedido criado!');
-        if (tableId) checkOpenComanda(tableId, cart);
+        const currentTableId = tableIdRef.current;
+        if (currentTableId) checkOpenComanda(currentTableId, cart);
       })
-      // 💳 Listener de contas (bills) para detectar pagamento
+      // 💳 Listener de contas (bills) para detectar pagamento (usando ref)
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
@@ -452,10 +474,11 @@ const Menu = () => {
         const bill = payload.new as any;
         const oldBill = payload.old as any;
         
-        console.log('💳 Conta atualizada:', { bill, oldBill, tableId });
+        const currentTableId = tableIdRef.current;
+        console.log('💳 Conta atualizada:', { bill, oldBill, currentTableId });
         
         // Verificar se a conta foi paga e pertence à mesa atual
-        if (tableId && bill.table_id === tableId) {
+        if (currentTableId && bill.table_id === currentTableId) {
           if (bill.status === 'paid' && oldBill?.status !== 'paid') {
             console.log('💰 Conta PAGA! Iniciando avaliação e logout...');
             
@@ -488,22 +511,8 @@ const Menu = () => {
     }
   }, [cart, tableNumber, customerName, customerCPF]);
 
+  // ⚡ Listener de beforeunload para limpar mesa (removido markTableOccupied duplicado)
   useEffect(() => {
-    const markTableOccupied = async () => {
-      if (tableId && customerName && customerCPF) {
-        try {
-          const formattedCPF = customerCPF.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-          await supabase.from("tables").update({
-            is_occupied: true,
-            occupied_at: new Date().toISOString(),
-            occupied_by: `${customerName} - ${formattedCPF}`
-          }).eq("id", tableId);
-        } catch (error) {
-          console.error("Erro ao marcar mesa:", error);
-        }
-      }
-    };
-    markTableOccupied();
 
     const handleBeforeUnload = async () => {
       if (tableId) {
@@ -649,12 +658,13 @@ const Menu = () => {
       
       console.log('✅ Mesa encontrada para login:', tableData);
 
-      // Verificar se mesa está ocupada por OUTRO cliente (comparando CPFs limpos)
+      // Verificar se mesa está ocupada por OUTRO cliente (extrair últimos 11 dígitos = CPF)
       if (tableData.is_occupied && tableData.occupied_by) {
-        const occupiedByCleaned = tableData.occupied_by.replace(/\D/g, '');
-        console.log('🔍 Verificando ocupação:', { occupiedByCleaned, cleanCpf, match: occupiedByCleaned === cleanCpf });
+        const occupiedDigits = tableData.occupied_by.replace(/\D/g, '');
+        const occupiedCpf = occupiedDigits.slice(-11); // Últimos 11 dígitos = CPF
+        console.log('🔍 Verificando ocupação:', { occupiedCpf, cleanCpf, match: occupiedCpf === cleanCpf });
         
-        if (occupiedByCleaned !== cleanCpf) {
+        if (occupiedCpf !== cleanCpf) {
           console.error('❌ Mesa ocupada por outro cliente');
           toast.error("Esta mesa já está ocupada por outro cliente!");
           return;
@@ -662,13 +672,14 @@ const Menu = () => {
         console.log('✅ Mesmo cliente, permitindo relogin');
       }
 
-      // Ocupar a mesa com os dados do cliente (usando CPF limpo)
+      // Ocupar a mesa com os dados do cliente (formato: "Nome - CPF formatado" para exibição no admin)
+      const formattedCPF = cleanCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
       const { error: updateError } = await supabase
         .from("tables")
         .update({
           is_occupied: true,
           occupied_at: new Date().toISOString(),
-          occupied_by: cleanCpf,
+          occupied_by: `${name} - ${formattedCPF}`,
         })
         .eq("id", tableData.id);
 
