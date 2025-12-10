@@ -108,12 +108,39 @@ const Menu = () => {
         setFeaturedSectionTitle(restaurantData.featured_section_title);
       }
 
-      // ⚡ Buscar tableId em paralelo (única query adicional necessária)
-      const { data: tableData, error: tableError } = await supabase
-        .from("tables").select("id")
-        .eq("restaurant_id", restaurantData.id)
-        .eq("table_number", parseInt(tableNumber)).single();
-      if (tableError) throw tableError;
+      // ⚡ Buscar tableId - suporta AMBOS: table_number (int) OU id (UUID)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableNumber);
+      console.log('🔍 Buscando mesa:', { tableNumber, isUUID });
+      
+      let tableData;
+      let tableError;
+      
+      if (isUUID) {
+        // tableNumber é um UUID - buscar pelo id
+        const result = await supabase
+          .from("tables").select("id, table_number")
+          .eq("restaurant_id", restaurantData.id)
+          .eq("id", tableNumber)
+          .single();
+        tableData = result.data;
+        tableError = result.error;
+      } else {
+        // tableNumber é um número - buscar pelo table_number
+        const result = await supabase
+          .from("tables").select("id, table_number")
+          .eq("restaurant_id", restaurantData.id)
+          .eq("table_number", parseInt(tableNumber))
+          .single();
+        tableData = result.data;
+        tableError = result.error;
+      }
+      
+      if (tableError) {
+        console.error('❌ Erro ao buscar mesa:', tableError);
+        throw tableError;
+      }
+      
+      console.log('✅ Mesa encontrada:', tableData);
       setTableId(tableData.id);
 
       // ⚡ Processar categorias dos dados JÁ CARREGADOS (sem query adicional!)
@@ -575,17 +602,40 @@ const Menu = () => {
     }
 
     try {
-      const { data: tableData, error: tableError } = await supabase
-        .from("tables")
-        .select("id, is_occupied, occupied_by")
-        .eq("restaurant_id", restaurant.id)
-        .eq("table_number", parseInt(tableNumber))
-        .single();
+      // ⚡ Suportar AMBOS: table_number (int) OU id (UUID)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableNumber);
+      console.log('🔍 Buscando mesa para login:', { tableNumber, isUUID });
+      
+      let tableData;
+      let tableError;
+      
+      if (isUUID) {
+        const result = await supabase
+          .from("tables")
+          .select("id, is_occupied, occupied_by, table_number")
+          .eq("restaurant_id", restaurant.id)
+          .eq("id", tableNumber)
+          .single();
+        tableData = result.data;
+        tableError = result.error;
+      } else {
+        const result = await supabase
+          .from("tables")
+          .select("id, is_occupied, occupied_by, table_number")
+          .eq("restaurant_id", restaurant.id)
+          .eq("table_number", parseInt(tableNumber))
+          .single();
+        tableData = result.data;
+        tableError = result.error;
+      }
 
       if (tableError || !tableData) {
+        console.error('❌ Mesa não encontrada:', tableError);
         toast.error("Mesa não encontrada");
         return;
       }
+      
+      console.log('✅ Mesa encontrada para login:', tableData);
 
       // Verificar se mesa está ocupada por OUTRO cliente
       if (tableData.is_occupied && tableData.occupied_by && tableData.occupied_by !== cpf) {
