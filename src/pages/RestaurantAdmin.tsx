@@ -19,6 +19,7 @@ import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import PDVTab from "@/components/admin/PDVTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
+import { NewBillNotification } from "@/components/admin/NewBillNotification";
 
 interface Restaurant {
   id: string;
@@ -45,9 +46,17 @@ const RestaurantAdmin = () => {
     tableNumber?: number;
     deliveryType?: 'delivery' | 'pickup';
   } | null>(null);
+  const [billNotification, setBillNotification] = useState<{
+    billId: string;
+    tableNumber: number;
+    total: number;
+  } | null>(null);
   const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
+  const [notifiedBills, setNotifiedBills] = useState<Set<string>>(new Set());
   const notifiedOrdersRef = useRef<Set<string>>(new Set());
+  const notifiedBillsRef = useRef<Set<string>>(new Set());
   const globalNotificationRef = useRef<typeof globalNotification>(null);
+  const billNotificationRef = useRef<typeof billNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
   
   // Sync refs with state to avoid stale closure in realtime callback
@@ -56,8 +65,16 @@ const RestaurantAdmin = () => {
   }, [notifiedOrders]);
   
   useEffect(() => {
+    notifiedBillsRef.current = notifiedBills;
+  }, [notifiedBills]);
+  
+  useEffect(() => {
     globalNotificationRef.current = globalNotification;
   }, [globalNotification]);
+  
+  useEffect(() => {
+    billNotificationRef.current = billNotification;
+  }, [billNotification]);
   
   useInactivityLogout();
 
@@ -194,19 +211,57 @@ const RestaurantAdmin = () => {
           schema: 'public',
           table: 'bills',
         },
-        (payload) => {
+        async (payload) => {
+          const bill = payload.new as any;
+          const billId = bill.id;
+          
+          // Verificar se já foi notificado
+          if (notifiedBillsRef.current.has(billId)) return;
+          
           // Verificar se a conta é do restaurante atual através da mesa
-          supabase
+          const { data: tableData } = await supabase
             .from('tables')
-            .select('restaurant_id')
-            .eq('id', (payload.new as any).table_id)
-            .single()
-            .then(({ data }) => {
-              if (data?.restaurant_id === restaurantId && activeSection !== 'pedidos-locais') {
-                setHasNewBills(true);
-                toast.info("Nova conta solicitada!");
-              }
+            .select('restaurant_id, table_number')
+            .eq('id', bill.table_id)
+            .single();
+            
+          if (tableData?.restaurant_id === restaurantId && bill.status === 'pending') {
+            // Mostrar notificação pop-up
+            setBillNotification({
+              billId: billId,
+              tableNumber: tableData.table_number,
+              total: bill.total_amount,
             });
+            
+            // Marcar como notificado
+            const updated = new Set(notifiedBillsRef.current);
+            updated.add(billId);
+            notifiedBillsRef.current = updated;
+            setNotifiedBills(updated);
+            
+            // Atualizar badge
+            if (activeSection !== 'pedidos-locais') {
+              setHasNewBills(true);
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'bills',
+        },
+        (payload) => {
+          const bill = payload.new as any;
+          const billId = bill.id;
+          const status = bill.status;
+          
+          // Se a conta foi atualizada (não mais pending), fechar notificação
+          if (billNotificationRef.current && billNotificationRef.current.billId === billId && status !== 'pending') {
+            setBillNotification(null);
+          }
         }
       )
       .subscribe();
@@ -315,6 +370,16 @@ const RestaurantAdmin = () => {
     setGlobalNotification(null);
   };
 
+  const handleViewBill = () => {
+    if (!billNotification) return;
+
+    // Navegar para pedidos locais
+    setActiveSection('pedidos-locais');
+
+    // Fechar notificação
+    setBillNotification(null);
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       // Pedidos Online (apenas delivery/retirada)
@@ -390,7 +455,7 @@ const RestaurantAdmin = () => {
           </main>
         </SidebarInset>
 
-        {/* Global Notification */}
+        {/* Global Order Notification */}
         {globalNotification && (
           <NewOrderNotification
             orderId={globalNotification.orderId}
@@ -401,6 +466,17 @@ const RestaurantAdmin = () => {
             deliveryType={globalNotification.deliveryType}
             onView={handleViewOrder}
             onDismiss={() => setGlobalNotification(null)}
+          />
+        )}
+        
+        {/* Global Bill Notification */}
+        {billNotification && (
+          <NewBillNotification
+            billId={billNotification.billId}
+            tableNumber={billNotification.tableNumber}
+            total={billNotification.total}
+            onView={handleViewBill}
+            onDismiss={() => setBillNotification(null)}
           />
         )}
       </div>
