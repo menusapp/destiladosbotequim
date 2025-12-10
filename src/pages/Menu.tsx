@@ -338,6 +338,9 @@ const Menu = () => {
   }
     
     // Configurar realtime (sempre, independente de logout)
+    const savedCustomerInfo = sessionStorage.getItem("customerInfo");
+    const currentCustomer = savedCustomerInfo ? JSON.parse(savedCustomerInfo) : null;
+    
     const channel = supabase.channel('menu-changes')
       .on('postgres_changes', { 
         event: '*', 
@@ -366,9 +369,80 @@ const Menu = () => {
           toast.success("O restaurante acabou de abrir! 🎉");
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        console.log('📝 Pedidos atualizados em tempo real!');
+      // 🔔 Listener de pedidos com notificações de status
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'orders'
+      }, (payload) => {
+        const order = payload.new as any;
+        const oldOrder = payload.old as any;
+        
+        console.log('📝 Pedido atualizado:', { order, oldOrder, tableId, currentCustomer });
+        
+        // Verificar se é pedido deste cliente nesta mesa
+        if (tableId && order.table_id === tableId && currentCustomer) {
+          const cleanCPF = currentCustomer.cpf?.replace(/\D/g, '');
+          
+          if (order.customer_cpf === cleanCPF || order.customer_cpf === currentCustomer.cpf) {
+            // Notificar mudança de status apenas se mudou
+            if (order.status !== oldOrder?.status) {
+              const statusMessages: Record<string, { message: string; type: 'success' | 'info' }> = {
+                accepted: { message: '✅ Pedido aceito! Está sendo preparado.', type: 'success' },
+                preparing: { message: '👨‍🍳 Seu pedido está sendo preparado!', type: 'info' },
+                ready: { message: '🍔 Pedido pronto! Aguarde o garçom.', type: 'success' },
+              };
+              
+              const notification = statusMessages[order.status];
+              if (notification) {
+                if (notification.type === 'success') {
+                  toast.success(notification.message);
+                } else {
+                  toast.info(notification.message);
+                }
+              }
+            }
+          }
+        }
+        
+        // Atualizar dados da comanda
         if (tableId) checkOpenComanda(tableId, cart);
+      })
+      // 🔔 Listener de INSERT em pedidos
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'orders'
+      }, () => {
+        console.log('📝 Novo pedido criado!');
+        if (tableId) checkOpenComanda(tableId, cart);
+      })
+      // 💳 Listener de contas (bills) para detectar pagamento
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'bills'
+      }, (payload) => {
+        const bill = payload.new as any;
+        const oldBill = payload.old as any;
+        
+        console.log('💳 Conta atualizada:', { bill, oldBill, tableId });
+        
+        // Verificar se a conta foi paga e pertence à mesa atual
+        if (tableId && bill.table_id === tableId) {
+          if (bill.status === 'paid' && oldBill?.status !== 'paid') {
+            console.log('💰 Conta PAGA! Iniciando avaliação e logout...');
+            
+            // Mostrar toast
+            toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
+            
+            // Definir bill para avaliação e abrir modal
+            setReviewBillId(bill.id);
+            setReviewModalOpen(true);
+          } else if (bill.status === 'on_the_way' && oldBill?.status !== 'on_the_way') {
+            toast.info("🏃 Sua conta está a caminho!");
+          }
+        }
       })
       .subscribe((status) => {
         console.log('📡 Status da subscrição Menu:', status);
@@ -378,7 +452,7 @@ const Menu = () => {
       console.log('🔌 Removendo canal de realtime');
       supabase.removeChannel(channel); 
     };
-  }, [fetchData, restaurantSlug, tableNumber, tableId, checkOpenComanda]);
+  }, [fetchData, restaurantSlug, tableNumber, tableId, checkOpenComanda, cart]);
 
   useEffect(() => {
     // ✅ Só salvar se temos dados válidos (não strings vazias)
