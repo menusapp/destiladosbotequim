@@ -1,10 +1,16 @@
+CREATE EXTENSION IF NOT EXISTS "pg_graphql" WITH SCHEMA "graphql";
+CREATE EXTENSION IF NOT EXISTS "pg_stat_statements" WITH SCHEMA "extensions";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
+CREATE EXTENSION IF NOT EXISTS "plpgsql" WITH SCHEMA "pg_catalog";
+CREATE EXTENSION IF NOT EXISTS "supabase_vault" WITH SCHEMA "vault";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 --
 -- PostgreSQL database dump
 --
 
 
 -- Dumped from database version 17.6
--- Dumped by pg_dump version 17.7
+-- Dumped by pg_dump version 18.1
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -37,28 +43,29 @@ CREATE TYPE public.app_role AS ENUM (
 
 
 --
--- Name: add_order_to_cash_register(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: add_delivery_order_to_cash_register(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.add_order_to_cash_register() RETURNS trigger
+CREATE FUNCTION public.add_delivery_order_to_cash_register() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $_$
 DECLARE
   v_restaurant_id uuid;
   v_cash_session_id uuid;
-  v_bill_subtotal numeric;
+  v_order_subtotal numeric;
   v_service_fee numeric;
-  v_bill_total numeric;
+  v_delivery_fee numeric;
+  v_order_total numeric;
   v_service_fee_enabled boolean;
   v_service_fee_percentage numeric;
   v_existing_movement_id uuid;
 BEGIN
-  IF NEW.status = 'accepted' 
-     AND (OLD.status IS NULL OR OLD.status != 'accepted')
-     AND (NEW.notes IS NULL OR NEW.notes != 'Conta Manual') THEN
+  -- Só processar quando status mudar para 'delivered' ou 'picked_up' e for pedido DELIVERY
+  IF (NEW.status = 'delivered' OR NEW.status = 'picked_up')
+     AND (OLD.status != 'delivered' AND OLD.status != 'picked_up')
+     AND NEW.order_type = 'delivery' THEN
     
-    -- Usar restaurant_id direto da ordem
     v_restaurant_id := NEW.restaurant_id;
     
     -- Buscar configurações do restaurante
@@ -75,53 +82,187 @@ BEGIN
     ORDER BY opened_at DESC
     LIMIT 1;
     
-    IF v_cash_session_id IS NOT NULL THEN
-      SELECT id INTO v_existing_movement_id
-      FROM cash_movements
-      WHERE cash_session_id = v_cash_session_id
-        AND description LIKE 'Pedido #' || NEW.id::text || '%'
-      LIMIT 1;
-      
-      IF v_existing_movement_id IS NULL THEN
-        SELECT COALESCE(SUM(oi.price_at_order * oi.quantity + 
-          COALESCE((SELECT SUM(oie.price_at_order) 
-                    FROM order_item_extras oie 
-                    WHERE oie.order_item_id = oi.id), 0)), 0)
-        INTO v_bill_subtotal
-        FROM order_items oi
-        WHERE oi.order_id = NEW.id;
-        
-        IF v_service_fee_enabled THEN
-          v_service_fee := v_bill_subtotal * (v_service_fee_percentage / 100);
-        ELSE
-          v_service_fee := 0;
-        END IF;
-        
-        v_bill_total := v_bill_subtotal + v_service_fee;
-        
-        INSERT INTO cash_movements (
-          cash_session_id,
-          restaurant_id,
-          movement_type,
-          amount,
-          payment_method,
-          category,
-          description,
-          created_by
-        ) VALUES (
-          v_cash_session_id,
-          v_restaurant_id,
-          'entrada',
-          v_bill_total,
-          'pending',
-          'Pedido',
-          'Pedido #' || NEW.id || ' - ' || COALESCE(NEW.customer_name, 'Cliente') || 
-          ' (Subtotal: R$ ' || ROUND(v_bill_subtotal, 2) || 
-          CASE WHEN v_service_fee > 0 THEN ' + Taxa: R$ ' || ROUND(v_service_fee, 2) ELSE '' END || ')',
-          'Sistema'
-        );
-      END IF;
+    -- Se não houver caixa aberto, não registrar
+    IF v_cash_session_id IS NULL THEN
+      RETURN NEW;
     END IF;
+    
+    -- Verificar se já existe movimento para este pedido
+    SELECT id INTO v_existing_movement_id
+    FROM cash_movements
+    WHERE cash_session_id = v_cash_session_id
+      AND description LIKE 'Pedido Delivery #' || NEW.id::text || '%'
+    LIMIT 1;
+    
+    -- Se já existe, não criar duplicado
+    IF v_existing_movement_id IS NOT NULL THEN
+      RETURN NEW;
+    END IF;
+    
+    -- Calcular subtotal do pedido
+    SELECT COALESCE(SUM(oi.price_at_order * oi.quantity + 
+      COALESCE((SELECT SUM(oie.price_at_order) 
+                FROM order_item_extras oie 
+                WHERE oie.order_item_id = oi.id), 0)), 0)
+    INTO v_order_subtotal
+    FROM order_items oi
+    WHERE oi.order_id = NEW.id;
+    
+    -- Aplicar taxa de serviço se habilitada
+    IF v_service_fee_enabled THEN
+      v_service_fee := v_order_subtotal * (v_service_fee_percentage / 100);
+    ELSE
+      v_service_fee := 0;
+    END IF;
+    
+    -- Taxa de entrega (apenas para delivery, não para pickup)
+    IF NEW.delivery_type = 'delivery' THEN
+      v_delivery_fee := COALESCE(NEW.delivery_fee, 0);
+    ELSE
+      v_delivery_fee := 0;
+    END IF;
+    
+    -- Desconto de cupom e pontos de fidelidade
+    v_order_total := v_order_subtotal + v_service_fee + v_delivery_fee 
+                     - COALESCE(NEW.coupon_discount, 0) 
+                     - COALESCE((NEW.loyalty_points_used * 0.01), 0);
+    
+    -- Registrar movimento no caixa com payment_method do pedido
+    INSERT INTO cash_movements (
+      cash_session_id,
+      restaurant_id,
+      movement_type,
+      amount,
+      payment_method,
+      category,
+      description,
+      created_by
+    ) VALUES (
+      v_cash_session_id,
+      v_restaurant_id,
+      'entrada',
+      v_order_total,
+      COALESCE(NEW.payment_type, 'pending'),
+      'Delivery',
+      'Pedido Delivery #' || NEW.id || ' - ' || COALESCE(NEW.customer_name, 'Cliente') || 
+      ' (' || CASE WHEN NEW.delivery_type = 'pickup' THEN 'Retirada' ELSE 'Entrega' END || ')' ||
+      ' - Subtotal: R$ ' || ROUND(v_order_subtotal, 2) || 
+      CASE WHEN v_service_fee > 0 THEN ' + Taxa Serviço: R$ ' || ROUND(v_service_fee, 2) ELSE '' END ||
+      CASE WHEN v_delivery_fee > 0 THEN ' + Taxa Entrega: R$ ' || ROUND(v_delivery_fee, 2) ELSE '' END ||
+      CASE WHEN NEW.coupon_discount > 0 THEN ' - Cupom: R$ ' || ROUND(NEW.coupon_discount, 2) ELSE '' END,
+      'Sistema'
+    );
+  END IF;
+  
+  RETURN NEW;
+END;
+$_$;
+
+
+--
+-- Name: add_local_order_to_cash_register(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.add_local_order_to_cash_register() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+DECLARE
+  v_restaurant_id uuid;
+  v_cash_session_id uuid;
+  v_bill_subtotal numeric;
+  v_service_fee numeric;
+  v_bill_total numeric;
+  v_service_fee_enabled boolean;
+  v_service_fee_percentage numeric;
+  v_existing_movement_id uuid;
+  v_table_number integer;
+BEGIN
+  -- Só processar quando status mudar para 'accepted' e for pedido LOCAL
+  IF NEW.status = 'accepted' 
+     AND (OLD.status IS NULL OR OLD.status != 'accepted')
+     AND (NEW.order_type IS NULL OR NEW.order_type = 'local')
+     AND NEW.table_id IS NOT NULL THEN
+    
+    v_restaurant_id := NEW.restaurant_id;
+    
+    -- Buscar configurações do restaurante
+    SELECT service_fee_enabled, service_fee_percentage
+    INTO v_service_fee_enabled, v_service_fee_percentage
+    FROM restaurants
+    WHERE id = v_restaurant_id;
+    
+    -- Buscar sessão de caixa aberta
+    SELECT id INTO v_cash_session_id
+    FROM cash_register_sessions
+    WHERE restaurant_id = v_restaurant_id
+      AND status = 'open'
+    ORDER BY opened_at DESC
+    LIMIT 1;
+    
+    -- Se não houver caixa aberto, não registrar
+    IF v_cash_session_id IS NULL THEN
+      RETURN NEW;
+    END IF;
+    
+    -- Verificar se já existe movimento para este pedido
+    SELECT id INTO v_existing_movement_id
+    FROM cash_movements
+    WHERE cash_session_id = v_cash_session_id
+      AND description LIKE 'Pedido Local #' || NEW.id::text || '%'
+    LIMIT 1;
+    
+    -- Se já existe, não criar duplicado
+    IF v_existing_movement_id IS NOT NULL THEN
+      RETURN NEW;
+    END IF;
+    
+    -- Calcular total do pedido
+    SELECT COALESCE(SUM(oi.price_at_order * oi.quantity + 
+      COALESCE((SELECT SUM(oie.price_at_order) 
+                FROM order_item_extras oie 
+                WHERE oie.order_item_id = oi.id), 0)), 0)
+    INTO v_bill_subtotal
+    FROM order_items oi
+    WHERE oi.order_id = NEW.id;
+    
+    -- Aplicar taxa de serviço se habilitada
+    IF v_service_fee_enabled THEN
+      v_service_fee := v_bill_subtotal * (v_service_fee_percentage / 100);
+    ELSE
+      v_service_fee := 0;
+    END IF;
+    
+    v_bill_total := v_bill_subtotal + v_service_fee;
+    
+    -- Buscar número da mesa
+    SELECT table_number INTO v_table_number
+    FROM tables
+    WHERE id = NEW.table_id;
+    
+    -- Registrar movimento no caixa com payment_method = 'pending'
+    INSERT INTO cash_movements (
+      cash_session_id,
+      restaurant_id,
+      movement_type,
+      amount,
+      payment_method,
+      category,
+      description,
+      created_by
+    ) VALUES (
+      v_cash_session_id,
+      v_restaurant_id,
+      'entrada',
+      v_bill_total,
+      'pending',
+      'Pedido',
+      'Pedido Local #' || NEW.id || ' - Mesa ' || COALESCE(v_table_number::text, '?') || 
+      ' - ' || COALESCE(NEW.customer_name, 'Cliente') || 
+      ' (Subtotal: R$ ' || ROUND(v_bill_subtotal, 2) || 
+      CASE WHEN v_service_fee > 0 THEN ' + Taxa: R$ ' || ROUND(v_service_fee, 2) ELSE '' END || ')',
+      'Sistema'
+    );
   END IF;
   
   RETURN NEW;
@@ -511,40 +652,56 @@ CREATE FUNCTION public.admin_mark_bill_paid(p_bill_id uuid, p_restaurant_id uuid
     SET search_path TO 'public'
     AS $$
 DECLARE
-  v_table_id uuid;
+  v_table_id UUID;
   v_payment_method text;
+  v_bill_total numeric;
 BEGIN
-  -- Verifica e pega table_id e método de pagamento da conta
-  SELECT b.table_id, b.payment_method INTO v_table_id, v_payment_method
+  -- Buscar dados da conta
+  SELECT b.table_id, b.payment_method, b.total_amount
+  INTO v_table_id, v_payment_method, v_bill_total
   FROM bills b
   JOIN tables t ON t.id = b.table_id
   WHERE b.id = p_bill_id AND t.restaurant_id = p_restaurant_id;
 
   IF v_table_id IS NULL THEN
-    RAISE EXCEPTION 'Not authorized to update this bill';
+    RAISE EXCEPTION 'Conta não encontrada ou sem permissão';
   END IF;
 
-  -- Marca conta como paga (mantém o registro)
+  -- 1. Marcar conta como paga
   UPDATE bills 
-  SET status = 'paid', paid_at = now()
+  SET status = 'paid', paid_at = NOW()
   WHERE id = p_bill_id;
 
-  -- Vincula e atualiza método de pagamento nos movimentos de pedidos relacionados a esta mesa
-  -- Extrai o order_id do texto "Pedido #<uuid>" e confere se pertence à mesa desta conta
+  -- 2. Atualizar movimentos de caixa relacionados aos pedidos desta mesa
   UPDATE cash_movements m
-  SET payment_method = COALESCE(v_payment_method, 'cash'),
-      bill_id = p_bill_id
+  SET 
+    payment_method = COALESCE(v_payment_method, 'cash'),
+    bill_id = p_bill_id
   WHERE m.restaurant_id = p_restaurant_id
     AND m.category = 'Pedido'
     AND (m.payment_method IS NULL OR m.payment_method = 'pending')
     AND EXISTS (
       SELECT 1
       FROM orders o
-      WHERE o.id::text = substring(m.description from 'Pedido #([0-9a-f-]+)')
+      WHERE o.id::text = SUBSTRING(m.description FROM 'Pedido (?:Local )?#([0-9a-f-]{36})')
         AND o.table_id = v_table_id
     );
 
-  -- NÃO apagar pedidos nem a conta: manter histórico para relatórios/DRE
+  -- 3. Verificar se ainda há contas não pagas nesta mesa
+  IF NOT EXISTS (
+    SELECT 1 FROM bills 
+    WHERE table_id = v_table_id 
+    AND status != 'paid'
+  ) THEN
+    -- 4. Liberar a mesa automaticamente
+    UPDATE tables
+    SET 
+      is_occupied = false,
+      occupied_at = NULL,
+      occupied_by = NULL
+    WHERE id = v_table_id;
+  END IF;
+
 END;
 $$;
 
@@ -1198,6 +1355,55 @@ $$;
 
 
 --
+-- Name: revert_stock_on_cancel(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.revert_stock_on_cancel() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+  v_movement RECORD;
+BEGIN
+  -- Se o status mudou para cancelled e antes estava em um status que já deu baixa no estoque
+  IF NEW.status = 'cancelled' 
+     AND OLD.status IN ('accepted', 'preparing', 'ready', 'out_for_delivery') THEN
+    
+    -- Buscar todas as movimentações de saída deste pedido
+    FOR v_movement IN
+      SELECT stock_item_id, quantity
+      FROM stock_movements
+      WHERE order_id = OLD.id 
+        AND movement_type = 'saida'
+    LOOP
+      -- Repor quantidade em estoque
+      UPDATE stock_items
+      SET current_quantity = current_quantity + v_movement.quantity
+      WHERE id = v_movement.stock_item_id;
+      
+      -- Registrar movimentação de reposição
+      INSERT INTO stock_movements (
+        stock_item_id,
+        quantity,
+        movement_type,
+        order_id,
+        reason
+      ) VALUES (
+        v_movement.stock_item_id,
+        v_movement.quantity,
+        'entrada',
+        OLD.id,
+        'Cancelamento - Pedido #' || OLD.id
+      );
+    END LOOP;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: update_cash_movement_payment(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1396,6 +1602,24 @@ ALTER TABLE ONLY public.categories REPLICA IDENTITY FULL;
 
 
 --
+-- Name: comandas; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.comandas (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    restaurant_id uuid NOT NULL,
+    table_id uuid NOT NULL,
+    customer_name text NOT NULL,
+    customer_cpf text NOT NULL,
+    status text DEFAULT 'active'::text,
+    created_at timestamp with time zone DEFAULT now(),
+    closed_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT comandas_status_check CHECK ((status = ANY (ARRAY['active'::text, 'closed'::text])))
+);
+
+
+--
 -- Name: counter_order_item_extras; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1449,6 +1673,8 @@ CREATE TABLE public.counter_orders (
     CONSTRAINT counter_orders_fee_type_check CHECK ((fee_type = ANY (ARRAY['fixed'::text, 'percentage'::text]))),
     CONSTRAINT counter_orders_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'paid'::text])))
 );
+
+ALTER TABLE ONLY public.counter_orders REPLICA IDENTITY FULL;
 
 
 --
@@ -1512,7 +1738,8 @@ CREATE TABLE public.delivery_config (
     delivery_fee numeric DEFAULT 0,
     estimated_time_minutes integer DEFAULT 30,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    store_address text
 );
 
 
@@ -1691,8 +1918,10 @@ CREATE TABLE public.orders (
     loyalty_points_used integer DEFAULT 0,
     loyalty_points_earned integer DEFAULT 0,
     restaurant_id uuid NOT NULL,
+    delivery_type text DEFAULT 'delivery'::text,
+    comanda_id uuid,
     CONSTRAINT orders_order_type_check CHECK ((order_type = ANY (ARRAY['local'::text, 'delivery'::text]))),
-    CONSTRAINT orders_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'preparing'::text, 'ready'::text, 'delivered'::text])))
+    CONSTRAINT orders_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'preparing'::text, 'ready'::text, 'out_for_delivery'::text, 'delivered'::text, 'picked_up'::text, 'cancelled'::text])))
 );
 
 
@@ -1768,7 +1997,8 @@ CREATE TABLE public.profiles (
     full_name text,
     phone text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    cpf text
 );
 
 
@@ -1830,6 +2060,7 @@ CREATE TABLE public.restaurants (
     loyalty_enabled boolean DEFAULT false,
     loyalty_points_per_real numeric DEFAULT 1,
     loyalty_real_per_point numeric DEFAULT 0.01,
+    pickup_time_minutes integer DEFAULT 15,
     CONSTRAINT restaurants_target_cmv_percentage_check CHECK (((target_cmv_percentage >= (0)::numeric) AND (target_cmv_percentage <= (100)::numeric)))
 );
 
@@ -1898,6 +2129,8 @@ CREATE TABLE public.tables (
     occupied_at timestamp with time zone,
     occupied_by text
 );
+
+ALTER TABLE ONLY public.tables REPLICA IDENTITY FULL;
 
 
 --
@@ -2027,6 +2260,14 @@ ALTER TABLE ONLY public.cash_register_sessions
 
 ALTER TABLE ONLY public.categories
     ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: comandas comandas_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.comandas
+    ADD CONSTRAINT comandas_pkey PRIMARY KEY (id);
 
 
 --
@@ -2381,6 +2622,27 @@ CREATE INDEX idx_bills_table_status ON public.bills USING btree (table_id, statu
 
 
 --
+-- Name: idx_comandas_restaurant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_comandas_restaurant_id ON public.comandas USING btree (restaurant_id);
+
+
+--
+-- Name: idx_comandas_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_comandas_status ON public.comandas USING btree (status);
+
+
+--
+-- Name: idx_comandas_table_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_comandas_table_id ON public.comandas USING btree (table_id);
+
+
+--
 -- Name: idx_coupons_code; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2462,6 +2724,13 @@ CREATE INDEX idx_order_items_order ON public.order_items USING btree (order_id);
 --
 
 CREATE INDEX idx_order_items_order_product ON public.order_items USING btree (order_id, product_id);
+
+
+--
+-- Name: idx_orders_comanda_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_comanda_id ON public.orders USING btree (comanda_id);
 
 
 --
@@ -2549,6 +2818,13 @@ CREATE INDEX idx_products_featured ON public.products USING btree (is_featured, 
 
 
 --
+-- Name: idx_profiles_cpf; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profiles_cpf ON public.profiles USING btree (cpf);
+
+
+--
 -- Name: idx_restaurant_reviews_bill_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2598,10 +2874,17 @@ CREATE INDEX idx_stock_movements_order ON public.stock_movements USING btree (or
 
 
 --
--- Name: orders on_order_accepted; Type: TRIGGER; Schema: public; Owner: -
+-- Name: orders orders_add_delivery_to_cash_trigger; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER on_order_accepted AFTER UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.add_order_to_cash_register();
+CREATE TRIGGER orders_add_delivery_to_cash_trigger AFTER UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.add_delivery_order_to_cash_register();
+
+
+--
+-- Name: orders orders_add_local_to_cash_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER orders_add_local_to_cash_trigger AFTER UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.add_local_order_to_cash_register();
 
 
 --
@@ -2654,6 +2937,13 @@ CREATE TRIGGER trigger_revert_order_stock BEFORE DELETE ON public.orders FOR EAC
 
 
 --
+-- Name: orders trigger_revert_stock_on_cancel; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trigger_revert_stock_on_cancel BEFORE UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.revert_stock_on_cancel();
+
+
+--
 -- Name: bills trigger_update_cash_payment; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2700,6 +2990,13 @@ CREATE TRIGGER update_cash_register_sessions_updated_at BEFORE UPDATE ON public.
 --
 
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON public.categories FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: comandas update_comandas_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_comandas_updated_at BEFORE UPDATE ON public.comandas FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
@@ -2879,6 +3176,22 @@ ALTER TABLE ONLY public.categories
 
 
 --
+-- Name: comandas comandas_restaurant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.comandas
+    ADD CONSTRAINT comandas_restaurant_id_fkey FOREIGN KEY (restaurant_id) REFERENCES public.restaurants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: comandas comandas_table_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.comandas
+    ADD CONSTRAINT comandas_table_id_fkey FOREIGN KEY (table_id) REFERENCES public.tables(id) ON DELETE CASCADE;
+
+
+--
 -- Name: counter_order_item_extras counter_order_item_extras_counter_order_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3044,6 +3357,14 @@ ALTER TABLE ONLY public.order_items
 
 ALTER TABLE ONLY public.order_items
     ADD CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE SET NULL;
+
+
+--
+-- Name: orders orders_comanda_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_comanda_id_fkey FOREIGN KEY (comanda_id) REFERENCES public.comandas(id) ON DELETE SET NULL;
 
 
 --
@@ -3278,6 +3599,13 @@ CREATE POLICY "Allow all operations on cash sessions" ON public.cash_register_se
 --
 
 CREATE POLICY "Allow all operations on categories" ON public.categories TO authenticated, anon USING (true) WITH CHECK (true);
+
+
+--
+-- Name: comandas Allow all operations on comandas; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations on comandas" ON public.comandas USING (true) WITH CHECK (true);
 
 
 --
@@ -3587,6 +3915,12 @@ ALTER TABLE public.cash_register_sessions ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: comandas; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.comandas ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: counter_order_item_extras; Type: ROW SECURITY; Schema: public; Owner: -
