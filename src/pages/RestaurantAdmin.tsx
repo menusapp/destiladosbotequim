@@ -447,8 +447,10 @@ const RestaurantAdmin = () => {
             restaurantSlug={restaurant.slug}
             prepTime={restaurant.prep_time_minutes}
             pickupTime={restaurant.pickup_time_minutes}
+            isOpen={restaurant.is_open}
             onPrepTimeUpdate={(time) => setRestaurant({ ...restaurant, prep_time_minutes: time })}
             onPickupTimeUpdate={(time) => setRestaurant({ ...restaurant, pickup_time_minutes: time })}
+            onIsOpenUpdate={(isOpen) => setRestaurant({ ...restaurant, is_open: isOpen })}
           />
           <main className="flex-1 overflow-auto p-6">
             {renderContent()}
