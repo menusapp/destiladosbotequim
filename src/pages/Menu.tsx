@@ -594,12 +594,24 @@ const Menu = () => {
   }, [tableNumber]);
 
   const handleCustomerInfoSubmit = async (name: string, cpf: string) => {
-    console.log('👤 Tentando login:', { name, cpf, tableNumber, restaurant: !!restaurant });
+    console.log('👤 LOGIN INICIADO:', { name, cpf, tableNumber, hasRestaurant: !!restaurant });
+    
+    // Validação de CPF
+    if (!cpf || cpf.trim() === '') {
+      console.error('❌ CPF não recebido ou vazio!');
+      toast.error("CPF é obrigatório");
+      return;
+    }
     
     if (!restaurant || !tableNumber) {
+      console.error('❌ Dados não carregados:', { restaurant: !!restaurant, tableNumber });
       toast.error("Aguarde o carregamento dos dados...");
       return;
     }
+
+    // Limpar CPF uma vez no início
+    const cleanCpf = cpf.replace(/\D/g, '');
+    console.log('🔢 CPF limpo:', cleanCpf);
 
     try {
       // ⚡ Suportar AMBOS: table_number (int) OU id (UUID)
@@ -637,26 +649,33 @@ const Menu = () => {
       
       console.log('✅ Mesa encontrada para login:', tableData);
 
-      // Verificar se mesa está ocupada por OUTRO cliente
-      if (tableData.is_occupied && tableData.occupied_by && tableData.occupied_by !== cpf) {
-        toast.error("Esta mesa já está ocupada por outro cliente!");
-        return;
+      // Verificar se mesa está ocupada por OUTRO cliente (comparando CPFs limpos)
+      if (tableData.is_occupied && tableData.occupied_by) {
+        const occupiedByCleaned = tableData.occupied_by.replace(/\D/g, '');
+        console.log('🔍 Verificando ocupação:', { occupiedByCleaned, cleanCpf, match: occupiedByCleaned === cleanCpf });
+        
+        if (occupiedByCleaned !== cleanCpf) {
+          console.error('❌ Mesa ocupada por outro cliente');
+          toast.error("Esta mesa já está ocupada por outro cliente!");
+          return;
+        }
+        console.log('✅ Mesmo cliente, permitindo relogin');
       }
 
-      // Ocupar a mesa com os dados do cliente
+      // Ocupar a mesa com os dados do cliente (usando CPF limpo)
       const { error: updateError } = await supabase
         .from("tables")
         .update({
           is_occupied: true,
           occupied_at: new Date().toISOString(),
-          occupied_by: cpf,
+          occupied_by: cleanCpf,
         })
         .eq("id", tableData.id);
 
       if (updateError) throw updateError;
+      console.log('✅ Mesa ocupada com sucesso');
 
       // SEMPRE criar nova comanda no login - fechar TODAS as comandas ativas da mesa
-      const cleanCpf = cpf.replace(/\D/g, '');
       
       // Fechar TODAS comandas ativas da mesa (independente do CPF)
       const { error: closeError } = await supabase

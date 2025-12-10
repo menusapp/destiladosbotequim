@@ -15,7 +15,7 @@ import { toast } from "sonner";
 interface CustomerInfoDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (name: string, cpf?: string) => void;
+  onSubmit: (name: string, cpf: string) => void;
   restaurantColor?: string;
 }
 
