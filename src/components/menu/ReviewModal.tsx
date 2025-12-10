@@ -39,11 +39,23 @@ export const ReviewModal = ({
     setSubmitting(true);
 
     try {
+      // Verificar se a bill ainda existe (pode ter sido deletada)
+      let validBillId = null;
+      if (billId) {
+        const { data: billExists } = await supabase
+          .from("bills")
+          .select("id")
+          .eq("id", billId)
+          .maybeSingle();
+        
+        validBillId = billExists?.id || null;
+      }
+
       const { error } = await supabase.from("restaurant_reviews").insert({
         restaurant_id: restaurantId,
         order_id: orderId || null,
         counter_order_id: counterOrderId || null,
-        bill_id: billId || null,
+        bill_id: validBillId,
         rating,
         comment: comment.trim() || null,
       });
