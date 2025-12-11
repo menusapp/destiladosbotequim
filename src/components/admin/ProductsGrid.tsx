@@ -263,7 +263,9 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
               return sum + (ing.quantity * (ing.stock_items?.price_per_unit || 0));
             }, 0) || 0;
             
-            const totalPrice = product.price + extra.price;
+            // Usar preço promocional se existir
+            const effectiveBasePrice = product.promotional_price || product.price;
+            const totalPrice = effectiveBasePrice + extra.price;
             const margin = totalPrice > 0 ? ((totalPrice - extraCost) / totalPrice) * 100 : 0;
             
             return {
@@ -276,7 +278,9 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
         // Se tem variações, usar range; senão, usar custo fixo
         let cost = fixedCost;
-        let margin = product.price > 0 ? ((product.price - cost) / product.price) * 100 : 0;
+        // Usar preço promocional se existir
+        const effectivePrice = product.promotional_price || product.price;
+        let margin = effectivePrice > 0 ? ((effectivePrice - cost) / effectivePrice) * 100 : 0;
 
         return {
           ...product,
@@ -924,20 +928,25 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
   // Cálculo de custos para variações
   const variationCosts = useMemo(() => {
-    const price = parseFloat(productPrice) || 0;
+    const basePrice = parseFloat(productPrice) || 0;
+    const promoPrice = parseFloat(productPromotionalPrice) || 0;
+    const effectiveBasePrice = promoPrice > 0 ? promoPrice : basePrice;
+    
     return variations.map(v => {
       const cost = v.ingredients.reduce((sum, ing) => {
         return sum + (ing.quantity * (ing.stock_item_price || 0));
       }, 0);
-      const totalPrice = price + v.price;
+      const totalPrice = effectiveBasePrice + v.price;
       const margin = totalPrice > 0 ? ((totalPrice - cost) / totalPrice) * 100 : 0;
       const cmv = totalPrice > 0 ? (cost / totalPrice) * 100 : 0;
       return { name: v.name, price: v.price, cost, margin, cmv, totalPrice };
     });
-  }, [variations, productPrice]);
+  }, [variations, productPrice, productPromotionalPrice]);
 
   const parsedProductPrice = parseFloat(productPrice) || 0;
-  const cmvPercentage = parsedProductPrice > 0 ? (fixedCost / parsedProductPrice) * 100 : 0;
+  const parsedPromoPrice = parseFloat(productPromotionalPrice) || 0;
+  const effectivePriceForCMV = parsedPromoPrice > 0 ? parsedPromoPrice : parsedProductPrice;
+  const cmvPercentage = effectivePriceForCMV > 0 ? (fixedCost / effectivePriceForCMV) * 100 : 0;
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
