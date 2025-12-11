@@ -63,6 +63,28 @@ interface ProductExtra {
   name: string;
   price: number;
   ingredients?: ProductIngredient[];
+  is_required?: boolean;
+  min_selection?: number;
+  max_selection?: number | null;
+}
+
+interface ComplementCategory {
+  id: string;
+  name: string;
+}
+
+interface LinkedComplementGroup {
+  id: string;
+  extra_category_id: string;
+  category_name: string;
+  is_required: boolean;
+  min_selection: number;
+  max_selection: number | null;
+  items: {
+    id: string;
+    name: string;
+    price: number;
+  }[];
 }
 
 interface ProductsGridProps {
@@ -98,11 +120,23 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const [selectedExtraStockItem, setSelectedExtraStockItem] = useState("");
   const [extraIngredientQuantity, setExtraIngredientQuantity] = useState("");
   const [productPrepTime, setProductPrepTime] = useState("");
+  
+  // Complementos avançados
+  const [complementCategories, setComplementCategories] = useState<ComplementCategory[]>([]);
+  const [linkedGroups, setLinkedGroups] = useState<LinkedComplementGroup[]>([]);
+  const [selectedComplementCategory, setSelectedComplementCategory] = useState("");
+  const [groupIsRequired, setGroupIsRequired] = useState(false);
+  const [groupMinSelection, setGroupMinSelection] = useState("0");
+  const [groupMaxSelection, setGroupMaxSelection] = useState("");
+  
+  // Individual complement settings
+  const [extraIsRequired, setExtraIsRequired] = useState(false);
 
   useEffect(() => {
     fetchCategories();
     fetchProducts();
     fetchStockItems();
+    fetchComplementCategories();
 
     // Realtime updates
     const channel = supabase
@@ -131,6 +165,15 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       .select("id, name, unit, price_per_unit")
       .eq("restaurant_id", restaurantId);
     setStockItems(data || []);
+  };
+
+  const fetchComplementCategories = async () => {
+    const { data } = await supabase
+      .from("extra_categories")
+      .select("id, name")
+      .eq("restaurant_id", restaurantId)
+      .order("name");
+    setComplementCategories(data || []);
   };
 
   const fetchCategories = async () => {
@@ -223,18 +266,13 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
   const handleAddExtra = () => {
     if (!extraName || !extraPrice) {
-      toast.error("Preencha nome e preço do adicional");
-      return;
-    }
-
-    if (extraIngredients.length === 0) {
-      toast.error("Adicione pelo menos 1 insumo ao adicional");
+      toast.error("Preencha nome e preço do complemento");
       return;
     }
 
     // Validação: verificar se já existe extra com mesmo nome
     if (extras.some(e => e.name.toLowerCase() === extraName.toLowerCase())) {
-      toast.error("Já existe um adicional com este nome");
+      toast.error("Já existe um complemento com este nome");
       return;
     }
 
@@ -242,12 +280,55 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       id: crypto.randomUUID(),
       name: extraName,
       price: parseFloat(extraPrice),
-      ingredients: [...extraIngredients]
+      ingredients: [...extraIngredients],
+      is_required: extraIsRequired,
     }]);
 
     setExtraName("");
     setExtraPrice("");
     setExtraIngredients([]);
+    setExtraIsRequired(false);
+  };
+
+  const handleLinkComplementCategory = async () => {
+    if (!selectedComplementCategory) {
+      toast.error("Selecione uma categoria de complementos");
+      return;
+    }
+
+    // Check if already linked
+    if (linkedGroups.some(g => g.extra_category_id === selectedComplementCategory)) {
+      toast.error("Esta categoria já está vinculada");
+      return;
+    }
+
+    // Fetch category items
+    const category = complementCategories.find(c => c.id === selectedComplementCategory);
+    if (!category) return;
+
+    const { data: itemsData } = await supabase
+      .from("extra_category_items")
+      .select("id, name, price")
+      .eq("category_id", selectedComplementCategory);
+
+    setLinkedGroups([...linkedGroups, {
+      id: crypto.randomUUID(),
+      extra_category_id: selectedComplementCategory,
+      category_name: category.name,
+      is_required: groupIsRequired,
+      min_selection: parseInt(groupMinSelection) || 0,
+      max_selection: groupMaxSelection ? parseInt(groupMaxSelection) : null,
+      items: itemsData || [],
+    }]);
+
+    setSelectedComplementCategory("");
+    setGroupIsRequired(false);
+    setGroupMinSelection("0");
+    setGroupMaxSelection("");
+  };
+
+  const handleRemoveLinkedGroup = (id: string) => {
+    setLinkedGroups(linkedGroups.filter(g => g.id !== id));
   };
 
   const handleRemoveExtra = (id: string) => {
@@ -288,10 +369,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       return;
     }
 
-    if (ingredients.length === 0) {
-      toast.error("Adicione pelo menos 1 insumo ao produto");
-      return;
-    }
+    // Insumos não são mais obrigatórios - permite produtos baseados apenas em complementos
 
     let imageUrl = productImageUrl;
 
@@ -555,6 +633,13 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setSelectedExtraStockItem("");
     setExtraIngredientQuantity("");
     setEditingProduct(null);
+    // Reset complement states
+    setLinkedGroups([]);
+    setSelectedComplementCategory("");
+    setGroupIsRequired(false);
+    setGroupMinSelection("0");
+    setGroupMaxSelection("");
+    setExtraIsRequired(false);
   };
 
   const calculateProductCost = () => {
@@ -603,6 +688,12 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
           setExtraName("");
           setExtraPrice("");
           setExtraIngredients([]);
+          setLinkedGroups([]);
+          setSelectedComplementCategory("");
+          setGroupIsRequired(false);
+          setGroupMinSelection("0");
+          setGroupMaxSelection("");
+          setExtraIsRequired(false);
           setDialogOpen(true);
         }}>
           <Plus className="h-4 w-4 mr-2" />
@@ -796,14 +887,110 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
               )}
             </div>
 
-            {/* Extras Section */}
-            <div className="space-y-3 p-4 border rounded-xl bg-secondary/20">
-              <h4 className="font-semibold">Adicionais (Opcional)</h4>
+            {/* Complementos Section */}
+            <div className="space-y-4 p-4 border rounded-xl bg-secondary/20">
+              <h4 className="font-semibold">Complementos</h4>
+              
+              {/* Link Complement Category */}
+              <div className="space-y-3 p-3 bg-background rounded-lg border">
+                <p className="text-sm font-medium">Vincular Categoria de Complementos</p>
+                <div className="flex gap-2">
+                  <Select value={selectedComplementCategory} onValueChange={setSelectedComplementCategory}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {complementCategories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedComplementCategory && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="group-required"
+                        checked={groupIsRequired}
+                        onChange={(e) => setGroupIsRequired(e.target.checked)}
+                        className="rounded border-input"
+                      />
+                      <Label htmlFor="group-required" className="text-xs">Obrigatório</Label>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Mín</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={groupMinSelection}
+                        onChange={(e) => setGroupMinSelection(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Máx</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={groupMaxSelection}
+                        onChange={(e) => setGroupMaxSelection(e.target.value)}
+                        placeholder="∞"
+                        className="h-8"
+                      />
+                    </div>
+                  </div>
+                )}
+                <Button type="button" variant="outline" onClick={handleLinkComplementCategory} className="w-full">
+                  Vincular Categoria
+                </Button>
+              </div>
 
-              <div className="space-y-3">
+              {/* Linked Groups */}
+              {linkedGroups.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Categorias Vinculadas:</p>
+                  {linkedGroups.map((group) => (
+                    <div key={group.id} className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <span className="font-medium">{group.category_name}</span>
+                          {group.is_required && (
+                            <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
+                              Obrigatório
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveLinkedGroup(group.id)}
+                        >
+                          Remover
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {group.items.length} itens • 
+                        Min: {group.min_selection} • 
+                        Max: {group.max_selection ?? "∞"}
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {group.items.map(i => i.name).join(", ")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Individual Complement */}
+              <div className="space-y-3 p-3 bg-background rounded-lg border">
+                <p className="text-sm font-medium">Criar Complemento Avulso</p>
                 <div className="grid grid-cols-2 gap-2">
                   <Input
-                    placeholder="Nome do adicional"
+                    placeholder="Nome do complemento"
                     value={extraName}
                     onChange={(e) => setExtraName(e.target.value)}
                   />
@@ -816,10 +1003,21 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                   />
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="extra-required"
+                    checked={extraIsRequired}
+                    onChange={(e) => setExtraIsRequired(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <Label htmlFor="extra-required" className="text-xs">Obrigatório</Label>
+                </div>
+
                 <div className="flex gap-2">
                   <Select value={selectedExtraStockItem} onValueChange={setSelectedExtraStockItem}>
                     <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Insumo do adicional" />
+                      <SelectValue placeholder="Insumo (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
                       {stockItems.map((item) => (
@@ -845,7 +1043,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                 {extraIngredients.length > 0 && (
                   <div className="space-y-1">
                     {extraIngredients.map((ing) => (
-                      <div key={ing.id} className="flex items-center justify-between p-2 bg-background rounded text-xs">
+                      <div key={ing.id} className="flex items-center justify-between p-2 bg-muted rounded text-xs">
                         <span>{ing.stock_item_name} - {ing.quantity} {ing.stock_item_unit}</span>
                         <Button
                           type="button"
@@ -861,16 +1059,25 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                 )}
 
                 <Button type="button" variant="secondary" onClick={handleAddExtra} className="w-full">
-                  Adicionar Extra
+                  Adicionar Complemento
                 </Button>
               </div>
 
+              {/* Individual Extras List */}
               {extras.length > 0 && (
-                <div className="space-y-2 pt-2">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Complementos Avulsos:</p>
                   {extras.map((extra) => (
                     <div key={extra.id} className="flex items-center justify-between p-3 bg-background rounded border">
                       <div>
-                        <p className="font-medium">{extra.name} - R$ {extra.price.toFixed(2)}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{extra.name} - R$ {extra.price.toFixed(2)}</p>
+                          {extra.is_required && (
+                            <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
+                              Obrigatório
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {extra.ingredients?.length || 0} insumo(s)
                         </p>
