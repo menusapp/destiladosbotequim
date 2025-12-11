@@ -12,6 +12,10 @@ export interface ProductExtra {
   id: string;
   name: string;
   price: number;
+  is_required?: boolean;
+  min_selection?: number;
+  max_selection?: number;
+  extra_category_id?: string;
 }
 
 export interface Category {
