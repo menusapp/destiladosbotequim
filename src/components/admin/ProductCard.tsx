@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pencil } from "lucide-react";
 
+interface VariableCostInfo {
+  name: string;
+  price: number;
+  cost: number;
+  margin: number;
+}
+
 interface ProductCardProps {
   product: {
     id: string;
@@ -16,12 +23,14 @@ interface ProductCardProps {
     margin?: number;
     prep_time?: number;
     sku?: string;
+    variableCosts?: VariableCostInfo[];
   };
   onEdit: (product: any) => void;
   onToggleAvailable: (id: string, available: boolean) => void;
 }
 
 const ProductCard = memo(({ product, onEdit, onToggleAvailable }: ProductCardProps) => {
+  const hasVariableCosts = product.variableCosts && product.variableCosts.length > 0;
   const margin = product.margin || 0;
   const marginColor = margin >= 70 ? "text-success" : margin >= 50 ? "text-warning" : "text-foreground";
 
@@ -56,20 +65,48 @@ const ProductCard = memo(({ product, onEdit, onToggleAvailable }: ProductCardPro
         </Badge>
       </div>
 
-      <div className="pt-4 border-t border-border space-y-2">
+      <div className="pt-4 border-t border-border space-y-3">
+        {/* Custos Variáveis */}
+        {hasVariableCosts ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Custos por Variação:</p>
+            <div className="space-y-1.5">
+              {product.variableCosts!.map((vc, idx) => {
+                const vcMarginColor = vc.margin >= 70 ? "text-success" : vc.margin >= 50 ? "text-warning" : "text-foreground";
+                return (
+                  <div key={idx} className="flex items-center justify-between text-sm bg-muted/50 p-2 rounded">
+                    <span className="font-medium">{vc.name}</span>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-muted-foreground">
+                        R$ {vc.cost.toFixed(2)}
+                      </span>
+                      <span className={`font-medium ${vcMarginColor}`}>
+                        {vc.margin.toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Custo:</span>
+              <span className="font-medium text-foreground">
+                R$ {(product.cost || 0).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Margem:</span>
+              <span className={`font-medium ${marginColor}`}>
+                {margin.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Custo:</span>
-            <span className="font-medium text-foreground">
-              R$ {(product.cost || 0).toFixed(2)}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Margem:</span>
-            <span className={`font-medium ${marginColor}`}>
-              {margin.toFixed(1)}%
-            </span>
-          </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Preparo:</span>
             <span className="font-medium text-foreground">
