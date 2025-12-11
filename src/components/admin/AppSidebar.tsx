@@ -56,6 +56,8 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "cardapio", label: "Cardápio", icon: Utensils },
       { id: "caixa", label: "Caixa", icon: CircleDollarSign },
       { id: "estoque", label: "Estoque", icon: Warehouse },
+      { id: "custos", label: "Custos", icon: CircleDollarSign },
+      { id: "margens", label: "Margens", icon: TrendingUp },
       { id: "relatorios", label: "Relatórios", icon: BarChart3 },
     ],
     development: [

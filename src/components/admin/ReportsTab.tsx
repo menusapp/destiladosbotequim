@@ -1,16 +1,443 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import DashboardTab from "./DashboardTab";
-import DRETab from "./DRETab";
-import CostosTab from "./CostosTab";
-import MargensTab from "./MargensTab";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Calendar as CalendarIcon, DollarSign, TrendingUp, Users, Clock, FileText } from "lucide-react";
+import { toast } from "sonner";
+import { format, startOfDay, endOfDay, subDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
 
 interface ReportsTabProps {
   restaurantId: string;
 }
 
+interface DashboardStats {
+  salesToday: number;
+  ordersCount: number;
+  averageTicket: number;
+  occupiedTables: number;
+  inPreparation: number;
+}
+
+interface FixedCost {
+  name: string;
+  amount: number;
+}
+
+interface VariableCost {
+  name: string;
+  type: string;
+  amount: number;
+  percentage: number;
+}
+
+interface LaborCost {
+  employee_name: string;
+  salary: number;
+}
+
 export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
+  const [dateFilter, setDateFilter] = useState<string>("today");
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
+  const [loading, setLoading] = useState(true);
+  
+  // Dashboard stats
+  const [stats, setStats] = useState<DashboardStats>({
+    salesToday: 0,
+    ordersCount: 0,
+    averageTicket: 0,
+    occupiedTables: 0,
+    inPreparation: 0,
+  });
+
+  // DRE states
+  const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
+  const [variableCosts, setVariableCosts] = useState<VariableCost[]>([]);
+  const [laborCosts, setLaborCosts] = useState<LaborCost[]>([]);
+  const [cmv, setCmv] = useState(0);
+  const [operationalExpenses, setOperationalExpenses] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+
+  useEffect(() => {
+    fetchData();
+  }, [dateFilter, customDateRange, restaurantId]);
+
+  const getDateRange = () => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = endOfDay(now);
+
+    switch (dateFilter) {
+      case "today":
+        startDate = startOfDay(now);
+        break;
+      case "yesterday":
+        startDate = startOfDay(subDays(now, 1));
+        endDate = endOfDay(subDays(now, 1));
+        break;
+      case "7days":
+        startDate = startOfDay(subDays(now, 6));
+        break;
+      case "30days":
+        startDate = startOfDay(subDays(now, 29));
+        break;
+      case "custom":
+        if (customDateRange?.from) {
+          startDate = startOfDay(customDateRange.from);
+          endDate = customDateRange.to ? endOfDay(customDateRange.to) : endOfDay(customDateRange.from);
+        } else {
+          startDate = startOfDay(now);
+        }
+        break;
+      default:
+        startDate = startOfDay(now);
+    }
+
+    return { startDate, endDate };
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const { startDate, endDate } = getDateRange();
+
+      // Fetch costs
+      const [fixedData, variableData, laborData] = await Promise.all([
+        supabase.from("fixed_costs").select("name, amount").eq("restaurant_id", restaurantId),
+        supabase.from("variable_costs").select("name, type, amount, percentage").eq("restaurant_id", restaurantId),
+        supabase.from("labor_costs").select("employee_name, salary").eq("restaurant_id", restaurantId),
+      ]);
+
+      setFixedCosts(fixedData.data || []);
+      setVariableCosts(variableData.data || []);
+      setLaborCosts(laborData.data || []);
+
+      // Buscar bills pagas no período (pedidos locais)
+      const { data: paidBills } = await supabase
+        .from("bills")
+        .select(`
+          id,
+          total_amount,
+          table_id,
+          tables!inner(restaurant_id)
+        `)
+        .eq("tables.restaurant_id", restaurantId)
+        .eq("status", "paid")
+        .gte("paid_at", startDate.toISOString())
+        .lte("paid_at", endDate.toISOString());
+
+      let billsTotal = 0;
+      let billsCount = 0;
+      let localOrderIds: string[] = [];
+      
+      if (paidBills && paidBills.length > 0) {
+        billsTotal = paidBills.reduce((sum, bill) => sum + Number(bill.total_amount), 0);
+        billsCount = paidBills.length;
+        
+        const tableIds = paidBills.map(b => b.table_id);
+        const { data: localOrders } = await supabase
+          .from("orders")
+          .select("id")
+          .in("table_id", tableIds)
+          .eq("order_type", "local");
+        
+        localOrderIds = (localOrders || []).map(o => o.id);
+      }
+
+      // Buscar pedidos delivery finalizados
+      const { data: deliveryOrders } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          order_items (
+            quantity,
+            price_at_order,
+            order_item_extras (price_at_order)
+          )
+        `)
+        .eq("restaurant_id", restaurantId)
+        .eq("order_type", "delivery")
+        .in("status", ["delivered", "picked_up"])
+        .gte("updated_at", startDate.toISOString())
+        .lte("updated_at", endDate.toISOString());
+
+      let deliveryTotal = 0;
+      const deliveryOrderIds = (deliveryOrders || []).map(o => o.id);
+      
+      deliveryOrders?.forEach((order: any) => {
+        let orderSubtotal = 0;
+        order.order_items?.forEach((item: any) => {
+          const itemTotal = item.price_at_order * item.quantity;
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
+            0
+          );
+          orderSubtotal += itemTotal + extrasTotal;
+        });
+        deliveryTotal += orderSubtotal;
+      });
+
+      // Buscar configuração de taxa de serviço
+      const { data: restaurant } = await supabase
+        .from("restaurants")
+        .select("service_fee_enabled, service_fee_percentage")
+        .eq("id", restaurantId)
+        .single();
+
+      if (restaurant?.service_fee_enabled) {
+        deliveryTotal += deliveryTotal * (Number(restaurant.service_fee_percentage) / 100);
+      }
+
+      // Buscar pedidos de balcão finalizados
+      const { data: counterOrders } = await supabase
+        .from("counter_orders")
+        .select("id, total_amount")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "paid")
+        .gte("finalized_at", startDate.toISOString())
+        .lte("finalized_at", endDate.toISOString());
+
+      const counterTotal = (counterOrders || []).reduce((sum, order) => sum + Number(order.total_amount), 0);
+      const counterOrderIds = (counterOrders || []).map(o => o.id);
+      
+      const salesTotal = billsTotal + deliveryTotal + counterTotal;
+      const ordersCount = billsCount + (deliveryOrders?.length || 0) + (counterOrders?.length || 0);
+      const avgTicket = ordersCount > 0 ? salesTotal / ordersCount : 0;
+
+      setTotalRevenue(salesTotal);
+
+      // Mesas ocupadas e em preparo (dados em tempo real)
+      const [occupiedTablesData, inPrepData] = await Promise.all([
+        supabase.from("tables").select("id").eq("restaurant_id", restaurantId).eq("is_occupied", true),
+        supabase.from("orders").select("id").eq("restaurant_id", restaurantId).in("status", ["pending", "accepted", "preparing"]),
+      ]);
+
+      setStats({
+        salesToday: salesTotal,
+        ordersCount,
+        averageTicket: avgTicket,
+        occupiedTables: occupiedTablesData.data?.length || 0,
+        inPreparation: inPrepData.data?.length || 0,
+      });
+
+      // Calcular CMV e despesas operacionais
+      await calculateCMV([...localOrderIds, ...deliveryOrderIds], counterOrderIds);
+      await calculateOperationalExpenses(startDate, endDate);
+
+    } catch (error: any) {
+      toast.error("Erro ao carregar dados: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateCMV = async (orderIds: string[], counterOrderIds: string[]) => {
+    if (orderIds.length === 0 && counterOrderIds.length === 0) {
+      setCmv(0);
+      return;
+    }
+
+    try {
+      let totalCmv = 0;
+
+      if (orderIds.length > 0) {
+        const { data: items } = await supabase
+          .from("order_items")
+          .select(`
+            id,
+            quantity,
+            products (
+              product_ingredients (
+                quantity,
+                stock_items (
+                  price_per_unit
+                )
+              )
+            ),
+            order_item_extras (
+              product_extra_id,
+              product_extras (
+                product_extra_ingredients (
+                  quantity,
+                  stock_items (
+                    price_per_unit
+                  )
+                )
+              )
+            )
+          `)
+          .in("order_id", orderIds);
+
+        items?.forEach((item: any) => {
+          const itemQty = item.quantity;
+          
+          const ingredients = item.products?.product_ingredients || [];
+          ingredients.forEach((ing: any) => {
+            totalCmv += (ing.quantity || 0) * (ing.stock_items?.price_per_unit || 0) * itemQty;
+          });
+          
+          const extras = item.order_item_extras || [];
+          extras.forEach((extra: any) => {
+            const extraIngredients = extra.product_extras?.product_extra_ingredients || [];
+            extraIngredients.forEach((ing: any) => {
+              totalCmv += (ing.quantity || 0) * (ing.stock_items?.price_per_unit || 0) * itemQty;
+            });
+          });
+        });
+      }
+
+      if (counterOrderIds.length > 0) {
+        const { data: counterItems } = await supabase
+          .from("counter_order_items")
+          .select(`
+            id,
+            quantity,
+            products (
+              product_ingredients (
+                quantity,
+                stock_items (
+                  price_per_unit
+                )
+              )
+            ),
+            counter_order_item_extras (
+              product_extra_id,
+              product_extras (
+                product_extra_ingredients (
+                  quantity,
+                  stock_items (
+                    price_per_unit
+                  )
+                )
+              )
+            )
+          `)
+          .in("counter_order_id", counterOrderIds);
+
+        counterItems?.forEach((item: any) => {
+          const itemQty = item.quantity;
+          
+          const ingredients = item.products?.product_ingredients || [];
+          ingredients.forEach((ing: any) => {
+            totalCmv += (ing.quantity || 0) * (ing.stock_items?.price_per_unit || 0) * itemQty;
+          });
+          
+          const extras = item.counter_order_item_extras || [];
+          extras.forEach((extra: any) => {
+            const extraIngredients = extra.product_extras?.product_extra_ingredients || [];
+            extraIngredients.forEach((ing: any) => {
+              totalCmv += (ing.quantity || 0) * (ing.stock_items?.price_per_unit || 0) * itemQty;
+            });
+          });
+        });
+      }
+
+      setCmv(totalCmv);
+    } catch (error) {
+      console.error("Erro ao calcular CMV:", error);
+      setCmv(0);
+    }
+  };
+
+  const calculateOperationalExpenses = async (startDate: Date, endDate: Date) => {
+    try {
+      const { data } = await supabase
+        .from("cash_movements")
+        .select("amount")
+        .eq("restaurant_id", restaurantId)
+        .eq("movement_type", "saida")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+
+      const total = data?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+      setOperationalExpenses(total);
+    } catch (error) {
+      console.error("Erro ao calcular despesas operacionais:", error);
+      setOperationalExpenses(0);
+    }
+  };
+
+  const calculateDREValues = () => {
+    const { startDate, endDate } = getDateRange();
+    
+    const calculateMonthlyProration = (monthlyCost: number): number => {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (start.getTime() === end.getTime()) {
+        const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+        return monthlyCost * (1 / daysInMonth);
+      }
+      
+      let totalProration = 0;
+      const currentMonth = new Date(start);
+      currentMonth.setDate(1);
+      
+      while (currentMonth <= end) {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        const firstDayOfMonth = new Date(year, month, 1);
+        const lastDayOfMonth = new Date(year, month, daysInMonth);
+        
+        const periodStart = start > firstDayOfMonth ? start : firstDayOfMonth;
+        const periodEnd = end < lastDayOfMonth ? end : lastDayOfMonth;
+        
+        const daysInPeriod = Math.floor((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        
+        totalProration += monthlyCost * (daysInPeriod / daysInMonth);
+        
+        currentMonth.setMonth(currentMonth.getMonth() + 1);
+      }
+      
+      return totalProration;
+    };
+    
+    const totalFixedCostsMonthly = fixedCosts.reduce((sum, cost) => sum + Number(cost.amount), 0);
+    const totalFixedCosts = calculateMonthlyProration(totalFixedCostsMonthly);
+    
+    const totalLaborCostsMonthly = laborCosts.reduce((sum, cost) => sum + Number(cost.salary), 0);
+    const totalLaborCosts = calculateMonthlyProration(totalLaborCostsMonthly);
+    
+    let totalVariableCosts = 0;
+    variableCosts.forEach(cost => {
+      if (cost.type === 'percentage') {
+        totalVariableCosts += totalRevenue * (Number(cost.percentage) / 100);
+      } else {
+        totalVariableCosts += calculateMonthlyProration(Number(cost.amount || 0));
+      }
+    });
+
+    const totalCosts = cmv + operationalExpenses + totalFixedCosts + totalVariableCosts + totalLaborCosts;
+    const operationalProfit = totalRevenue - totalCosts;
+
+    return {
+      grossRevenue: totalRevenue,
+      cmv,
+      grossProfit: totalRevenue - cmv,
+      operationalExpenses,
+      fixedCost: totalFixedCosts,
+      variableCost: totalVariableCosts,
+      laborCost: totalLaborCosts,
+      totalCosts,
+      operationalProfit
+    };
+  };
+
+  const dreValues = calculateDREValues();
+
+  if (loading) {
+    return <div className="p-6 text-muted-foreground">Carregando...</div>;
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h2 className="text-3xl font-bold text-foreground">Relatórios</h2>
         <p className="text-muted-foreground">
@@ -18,30 +445,166 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         </p>
       </div>
 
-      <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="dre">DRE</TabsTrigger>
-          <TabsTrigger value="custos">Custos</TabsTrigger>
-          <TabsTrigger value="margens">Margens</TabsTrigger>
-        </TabsList>
+      {/* Filtros de Data */}
+      <div className="flex flex-wrap gap-2">
+        <Button variant={dateFilter === "today" ? "default" : "outline"} onClick={() => setDateFilter("today")}>Hoje</Button>
+        <Button variant={dateFilter === "yesterday" ? "default" : "outline"} onClick={() => setDateFilter("yesterday")}>Ontem</Button>
+        <Button variant={dateFilter === "7days" ? "default" : "outline"} onClick={() => setDateFilter("7days")}>7 Dias</Button>
+        <Button variant={dateFilter === "30days" ? "default" : "outline"} onClick={() => setDateFilter("30days")}>30 Dias</Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant={dateFilter === "custom" ? "default" : "outline"} className={cn("justify-start text-left font-normal")}>
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateFilter === "custom" && customDateRange?.from
+                ? customDateRange.to
+                  ? `${format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })} - ${format(customDateRange.to, "dd/MM/yyyy", { locale: ptBR })}`
+                  : format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })
+                : "Personalizado"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarComponent
+              mode="range"
+              selected={customDateRange}
+              onSelect={(range) => {
+                setCustomDateRange(range);
+                if (range?.from) setDateFilter("custom");
+              }}
+              locale={ptBR}
+              numberOfMonths={2}
+              className="pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
 
-        <TabsContent value="dashboard" className="space-y-6">
-          <DashboardTab restaurantId={restaurantId} />
-        </TabsContent>
+      {/* Cards de Métricas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Vendas */}
+        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-300 shadow-card hover:shadow-hover transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-orange-700">Vendas</p>
+              <p className="text-3xl font-bold text-orange-900">
+                R$ {stats.salesToday.toFixed(2).replace(".", ",")}
+              </p>
+              <p className="text-xs text-orange-600">{stats.ordersCount} pedidos</p>
+            </div>
+            <div className="p-3 bg-orange-600 rounded-xl">
+              <DollarSign className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </Card>
 
-        <TabsContent value="dre" className="space-y-6">
-          <DRETab restaurantId={restaurantId} />
-        </TabsContent>
+        {/* Ticket Médio */}
+        <Card className="p-6 bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-300 shadow-card hover:shadow-hover transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-amber-700">Ticket Médio</p>
+              <p className="text-3xl font-bold text-amber-900">
+                R$ {stats.averageTicket.toFixed(2).replace(".", ",")}
+              </p>
+              <p className="text-xs text-amber-600">Por pedido pago</p>
+            </div>
+            <div className="p-3 bg-amber-500 rounded-xl">
+              <TrendingUp className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </Card>
 
-        <TabsContent value="custos" className="space-y-6">
-          <CostosTab restaurantId={restaurantId} />
-        </TabsContent>
+        {/* Mesas Ocupadas */}
+        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-orange-700">Mesas Ocupadas</p>
+              <p className="text-3xl font-bold text-orange-900">{stats.occupiedTables}</p>
+              <p className="text-xs text-orange-600">Agora</p>
+            </div>
+            <div className="p-3 bg-orange-500 rounded-xl">
+              <Users className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </Card>
 
-        <TabsContent value="margens" className="space-y-6">
-          <MargensTab restaurantId={restaurantId} />
-        </TabsContent>
-      </Tabs>
+        {/* Em Preparo */}
+        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-orange-700">Em Preparo</p>
+              <p className="text-3xl font-bold text-orange-900">{stats.inPreparation}</p>
+              <p className="text-xs text-orange-600">Pedidos ativos</p>
+            </div>
+            <div className="p-3 bg-orange-400 rounded-xl">
+              <Clock className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* DRE */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Demonstrativo de Resultados (DRE)
+          </CardTitle>
+          <CardDescription>Análise financeira completa do período selecionado</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center border-b pb-2">
+              <span className="font-semibold text-lg">Receita Bruta</span>
+              <span className="font-bold text-lg text-orange-600">R$ {dreValues.grossRevenue.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2 pl-4">
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">(-) CMV dos Produtos</span>
+              <span className="font-semibold text-orange-800">R$ {dreValues.cmv.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center border-b pb-2">
+              <span className="font-semibold">Lucro Bruto</span>
+              <span className="font-bold text-orange-600">R$ {dreValues.grossProfit.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2 pl-4">
+            <h3 className="font-semibold text-sm text-muted-foreground mb-2">Despesas Operacionais:</h3>
+            <div className="flex justify-between items-center pl-4">
+              <span className="text-sm">Despesas Registradas (Saídas do Caixa)</span>
+              <span className="text-sm text-orange-800">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center pl-4">
+              <span className="text-sm">Custo Fixo (proporcional)</span>
+              <span className="text-sm text-orange-800">R$ {dreValues.fixedCost.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center pl-4">
+              <span className="text-sm">Custo Variável</span>
+              <span className="text-sm text-orange-800">R$ {dreValues.variableCost.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center pl-4">
+              <span className="text-sm">CMO - Custo de Mão de Obra (proporcional)</span>
+              <span className="text-sm text-orange-800">R$ {dreValues.laborCost.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t-2 pt-4">
+            <div className="flex justify-between items-center bg-orange-50 p-4 rounded-lg">
+              <span className="font-bold text-lg">Lucro Operacional Final</span>
+              <span className={`font-bold text-2xl ${dreValues.operationalProfit >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                R$ {dreValues.operationalProfit.toFixed(2)}
+              </span>
+            </div>
+            {dreValues.grossRevenue > 0 && (
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span>Margem Operacional</span>
+                <span className="font-semibold">{((dreValues.operationalProfit / dreValues.grossRevenue) * 100).toFixed(2)}%</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
