@@ -589,6 +589,20 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
             toast.error("Feche o restaurante para adicionar produtos");
             return;
           }
+          // Resetar todos os estados do formulário para novo produto
+          setEditingProduct(null);
+          setProductName("");
+          setProductDescription("");
+          setProductPrice("");
+          setProductCategoryId("");
+          setProductImage(null);
+          setProductImageUrl(null);
+          setProductPrepTime("");
+          setIngredients([]);
+          setExtras([]);
+          setExtraName("");
+          setExtraPrice("");
+          setExtraIngredients([]);
           setDialogOpen(true);
         }}>
           <Plus className="h-4 w-4 mr-2" />
