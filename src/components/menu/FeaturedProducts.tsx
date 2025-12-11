@@ -26,7 +26,7 @@ export const FeaturedProducts = memo(({
           <div
             key={product.id}
             onClick={() => product.available && onProductClick(product)}
-            className="flex-none w-40 bg-card rounded-2xl shadow-sm cursor-pointer active:scale-95 transition-all hover:shadow-md p-3"
+            className="flex-none w-40 bg-card rounded-2xl border shadow-sm cursor-pointer active:scale-95 transition-all hover:shadow-md p-3"
           >
             <div className="relative aspect-square bg-muted rounded-xl overflow-hidden mb-3">
               {product.image_url ? (
