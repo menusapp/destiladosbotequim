@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Minus, Plus, ChevronDown } from "lucide-react";
 import { Product, ProductExtra } from "@/types/menu";
+import { toast } from "sonner";
 
 interface ProductDetailDrawerProps {
   product: Product | null;
@@ -36,17 +38,56 @@ export const ProductDetailDrawer = ({
   const [notes, setNotes] = useState("");
   const [quantity, setQuantity] = useState(1);
 
+  // Separar extras obrigatórios dos opcionais
+  const { requiredExtras, optionalExtras } = useMemo(() => {
+    const required = extras.filter(e => e.is_required);
+    const optional = extras.filter(e => !e.is_required);
+    return { requiredExtras: required, optionalExtras: optional };
+  }, [extras]);
+
+  // Verificar se há extras obrigatórios e se foram selecionados
+  const hasRequiredExtras = requiredExtras.length > 0;
+  const minRequiredSelection = hasRequiredExtras ? (requiredExtras[0]?.min_selection || 1) : 0;
+  const maxRequiredSelection = hasRequiredExtras ? (requiredExtras[0]?.max_selection || 1) : 0;
+  
+  const selectedRequiredCount = requiredExtras.filter(e => selectedExtras.includes(e.id)).length;
+  const isRequiredSatisfied = !hasRequiredExtras || selectedRequiredCount >= minRequiredSelection;
+  const canAddMore = !maxRequiredSelection || selectedRequiredCount < maxRequiredSelection;
+
   if (!product) return null;
 
-  const handleExtraToggle = (extraId: string) => {
-    setSelectedExtras((prev) =>
-      prev.includes(extraId)
-        ? prev.filter((id) => id !== extraId)
-        : [...prev, extraId]
-    );
+  const handleExtraToggle = (extraId: string, isRequired: boolean) => {
+    const extra = extras.find(e => e.id === extraId);
+    if (!extra) return;
+
+    // Se é obrigatório e max_selection é 1, funciona como radio (seleciona apenas um)
+    if (isRequired && maxRequiredSelection === 1) {
+      // Desmarcar outros obrigatórios e marcar este
+      const otherRequiredIds = requiredExtras.filter(e => e.id !== extraId).map(e => e.id);
+      setSelectedExtras(prev => {
+        const withoutOtherRequired = prev.filter(id => !otherRequiredIds.includes(id));
+        if (withoutOtherRequired.includes(extraId)) {
+          return withoutOtherRequired.filter(id => id !== extraId);
+        }
+        return [...withoutOtherRequired, extraId];
+      });
+    } else {
+      // Toggle normal
+      setSelectedExtras((prev) =>
+        prev.includes(extraId)
+          ? prev.filter((id) => id !== extraId)
+          : canAddMore || !isRequired ? [...prev, extraId] : prev
+      );
+    }
   };
 
   const handleAddToCart = () => {
+    // Validar se extras obrigatórios foram selecionados
+    if (!isRequiredSatisfied) {
+      toast.error(`Selecione pelo menos ${minRequiredSelection} opção obrigatória`);
+      return;
+    }
+
     const extrasToAdd = extras.filter((e) => selectedExtras.includes(e.id));
     // Add the item quantity times
     for (let i = 0; i < quantity; i++) {
@@ -129,14 +170,93 @@ export const ProductDetailDrawer = ({
             R$ {product.price.toFixed(2)}
           </div>
 
-          {/* Extras */}
-          {extras.length > 0 && (
+          {/* Extras Obrigatórios */}
+          {hasRequiredExtras && (
+            <div className="mb-6">
+              <h3 className="font-bold text-foreground mb-1 flex items-center gap-1">
+                Escolha uma opção
+                <span className="text-destructive">*</span>
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Obrigatório • Escolha {minRequiredSelection === maxRequiredSelection 
+                  ? `${minRequiredSelection} opção` 
+                  : `${minRequiredSelection} a ${maxRequiredSelection} opções`}
+              </p>
+              <div className="space-y-3">
+                {maxRequiredSelection === 1 ? (
+                  // Radio group para seleção única
+                  <RadioGroup
+                    value={selectedExtras.find(id => requiredExtras.some(e => e.id === id)) || ""}
+                    onValueChange={(value) => {
+                      const otherRequiredIds = requiredExtras.map(e => e.id);
+                      setSelectedExtras(prev => {
+                        const withoutRequired = prev.filter(id => !otherRequiredIds.includes(id));
+                        return [...withoutRequired, value];
+                      });
+                    }}
+                  >
+                    {requiredExtras.map((extra) => {
+                      const isSelected = selectedExtras.includes(extra.id);
+                      return (
+                        <label
+                          key={extra.id}
+                          className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                            isSelected
+                              ? "border-primary bg-accent/50"
+                              : "border-border hover:border-border/60"
+                          }`}
+                        >
+                          <RadioGroupItem value={extra.id} className="text-primary" />
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">{extra.name}</p>
+                          </div>
+                          <p className="font-bold text-sm" style={{ color: primaryColor }}>
+                            + R$ {extra.price.toFixed(2)}
+                          </p>
+                        </label>
+                      );
+                    })}
+                  </RadioGroup>
+                ) : (
+                  // Checkboxes para seleção múltipla
+                  requiredExtras.map((extra) => {
+                    const isSelected = selectedExtras.includes(extra.id);
+                    return (
+                      <label
+                        key={extra.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                          isSelected
+                            ? "border-primary bg-accent/50"
+                            : "border-border hover:border-border/60"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleExtraToggle(extra.id, true)}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium text-foreground">{extra.name}</p>
+                        </div>
+                        <p className="font-bold text-sm" style={{ color: primaryColor }}>
+                          + R$ {extra.price.toFixed(2)}
+                        </p>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Extras Opcionais */}
+          {optionalExtras.length > 0 && (
             <div className="mb-6">
               <h3 className="font-bold text-foreground mb-3">
                 Complementos
               </h3>
               <div className="space-y-3">
-                {extras.map((extra) => {
+                {optionalExtras.map((extra) => {
                   const isSelected = selectedExtras.includes(extra.id);
                   return (
                     <label
@@ -149,7 +269,7 @@ export const ProductDetailDrawer = ({
                     >
                       <Checkbox
                         checked={isSelected}
-                        onCheckedChange={() => handleExtraToggle(extra.id)}
+                        onCheckedChange={() => handleExtraToggle(extra.id, false)}
                         className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                       <div className="flex-1">
@@ -204,10 +324,11 @@ export const ProductDetailDrawer = ({
 
             <Button
               onClick={handleAddToCart}
-              className="flex-1 h-12 text-base font-bold rounded-xl"
-              style={{ backgroundColor: primaryColor, color: "white" }}
+              disabled={!isRequiredSatisfied}
+              className="flex-1 h-12 text-base font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ backgroundColor: isRequiredSatisfied ? primaryColor : undefined, color: isRequiredSatisfied ? "white" : undefined }}
             >
-              Adicionar • R$ {getTotalPrice().toFixed(2)}
+              {isRequiredSatisfied ? `Adicionar • R$ ${getTotalPrice().toFixed(2)}` : "Selecione uma opção"}
             </Button>
           </div>
         </div>

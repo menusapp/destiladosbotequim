@@ -199,10 +199,10 @@ export default function DeliveryMenu() {
   };
 
   const handleProductClick = async (product: Product) => {
-    // Buscar extras do produto
+    // Buscar extras do produto incluindo campos de obrigatoriedade
     const { data: extrasData } = await supabase
       .from("product_extras")
-      .select("*")
+      .select("id, name, price, is_required, min_selection, max_selection, extra_category_id")
       .eq("product_id", product.id);
 
     setProductExtras(extrasData || []);

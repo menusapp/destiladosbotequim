@@ -772,7 +772,8 @@ const Menu = () => {
       return;
     }
     const { data: extrasData } = await supabase.from("product_extras")
-      .select("id, name, price").eq("product_id", product.id);
+      .select("id, name, price, is_required, min_selection, max_selection, extra_category_id")
+      .eq("product_id", product.id);
     setSelectedProduct(product);
     setProductExtras(extrasData || []);
     setShowProductDialog(true);
