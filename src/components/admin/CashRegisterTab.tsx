@@ -585,101 +585,84 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                   />
                 </div>
                 
-                <div>
-                  <Label>Valor de abertura do caixa (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={openingBalance}
-                    onChange={(e) => setOpeningBalance(e.target.value)}
-                    placeholder="0.00"
-                    className="text-lg font-semibold"
-                  />
-                </div>
-
-                {/* Collapsible para contagem de cédulas/moedas */}
-                <Collapsible defaultOpen className="border rounded-lg overflow-hidden">
-                  <CollapsibleTrigger asChild>
-                    <button className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 hover:bg-orange-100 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <Banknote className="h-4 w-4 text-orange-600" />
-                        <span className="font-medium text-orange-900">Contagem de Cédulas e Moedas</span>
+                {/* Contagem de cédulas/moedas - sempre visível */}
+                <div className="border rounded-lg overflow-hidden border-orange-200">
+                  <div className="px-4 py-3 bg-orange-50 border-b border-orange-200">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-4 w-4 text-orange-600" />
+                      <span className="font-medium text-orange-900">Contagem de Cédulas e Moedas</span>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-4 bg-orange-50/30">
+                    {/* Cédulas */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Banknote className="h-4 w-4 text-orange-500" />
+                        <Label className="text-sm font-medium text-orange-800">Cédulas</Label>
                       </div>
-                      <ChevronDown className="h-4 w-4 text-orange-600 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="p-4 space-y-4 bg-orange-50/30">
-                      {/* Cédulas */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <Banknote className="h-4 w-4 text-orange-500" />
-                          <Label className="text-sm font-medium text-orange-800">Cédulas</Label>
-                        </div>
-                        <div className="grid grid-cols-7 gap-2">
-                          {billDenominations.map((bill) => (
-                            <div key={bill.key} className="text-center">
-                              <Label className="text-xs text-muted-foreground block mb-1">{bill.label}</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={billCounts[bill.key as keyof typeof billCounts] || ''}
-                                onChange={(e) => setBillCounts(prev => ({
-                                  ...prev,
-                                  [bill.key]: parseInt(e.target.value) || 0
-                                }))}
-                                placeholder="0"
-                                className="text-center h-9 text-sm"
-                              />
-                              <p className="text-xs text-orange-600 mt-1 font-medium">
-                                {((billCounts[bill.key as keyof typeof billCounts] || 0) * bill.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Moedas */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <Coins className="h-4 w-4 text-amber-500" />
-                          <Label className="text-sm font-medium text-amber-800">Moedas</Label>
-                        </div>
-                        <div className="grid grid-cols-5 gap-2">
-                          {coinDenominations.map((coin) => (
-                            <div key={coin.key} className="text-center">
-                              <Label className="text-xs text-muted-foreground block mb-1">{coin.label}</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={coinCounts[coin.key as keyof typeof coinCounts] || ''}
-                                onChange={(e) => setCoinCounts(prev => ({
-                                  ...prev,
-                                  [coin.key]: parseInt(e.target.value) || 0
-                                }))}
-                                placeholder="0"
-                                className="text-center h-9 text-sm"
-                              />
-                              <p className="text-xs text-amber-600 mt-1 font-medium">
-                                {((coinCounts[coin.key as keyof typeof coinCounts] || 0) * coin.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Total da contagem */}
-                      <div className="bg-orange-100 p-3 rounded-lg border border-orange-200">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium text-orange-800">Total da contagem:</span>
-                          <span className="text-xl font-bold text-orange-600">
-                            {calculateCashCountTotal().toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </span>
-                        </div>
+                      <div className="grid grid-cols-7 gap-2">
+                        {billDenominations.map((bill) => (
+                          <div key={bill.key} className="text-center">
+                            <Label className="text-xs text-muted-foreground block mb-1">{bill.label}</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={billCounts[bill.key as keyof typeof billCounts] || ''}
+                              onChange={(e) => setBillCounts(prev => ({
+                                ...prev,
+                                [bill.key]: parseInt(e.target.value) || 0
+                              }))}
+                              placeholder="0"
+                              className="text-center h-9 text-sm"
+                            />
+                            <p className="text-xs text-orange-600 mt-1 font-medium">
+                              {((billCounts[bill.key as keyof typeof billCounts] || 0) * bill.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </p>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
+
+                    {/* Moedas */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Coins className="h-4 w-4 text-amber-500" />
+                        <Label className="text-sm font-medium text-amber-800">Moedas</Label>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2">
+                        {coinDenominations.map((coin) => (
+                          <div key={coin.key} className="text-center">
+                            <Label className="text-xs text-muted-foreground block mb-1">{coin.label}</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={coinCounts[coin.key as keyof typeof coinCounts] || ''}
+                              onChange={(e) => setCoinCounts(prev => ({
+                                ...prev,
+                                [coin.key]: parseInt(e.target.value) || 0
+                              }))}
+                              placeholder="0"
+                              className="text-center h-9 text-sm"
+                            />
+                            <p className="text-xs text-amber-600 mt-1 font-medium">
+                              {((coinCounts[coin.key as keyof typeof coinCounts] || 0) * coin.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Total da contagem = Valor de abertura */}
+                    <div className="bg-orange-200 p-4 rounded-lg border border-orange-300">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-orange-800">Valor de Abertura:</span>
+                        <span className="text-2xl font-bold text-orange-700">
+                          {calculateCashCountTotal().toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <Button onClick={handleOpenCashRegister} className="w-full bg-orange-500 hover:bg-orange-600">
                   <Wallet className="h-4 w-4 mr-2" />
@@ -856,9 +839,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
             </Card>
           )}
           
-          {/* Registrar Movimentação - Collapsible */}
+          {/* Registrar Movimentação - Collapsible (inicia fechada) */}
           {currentSession && (
-            <Collapsible defaultOpen className="border rounded-lg overflow-hidden border-orange-200">
+            <Collapsible defaultOpen={false} className="border rounded-lg overflow-hidden border-orange-200">
               <CollapsibleTrigger asChild>
                 <button className="w-full flex items-center justify-between px-6 py-4 bg-orange-50 hover:bg-orange-100 transition-colors group">
                   <div className="flex items-center gap-3">
