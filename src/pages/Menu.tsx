@@ -664,6 +664,17 @@ const Menu = () => {
     console.log('🔢 CPF limpo:', cleanCpf);
 
     try {
+      // Check if customer exists in database - use saved name, ignore typed name
+      const { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("name")
+        .eq("restaurant_id", restaurant.id)
+        .eq("cpf", cleanCpf)
+        .maybeSingle();
+      
+      const finalName = existingCustomer ? existingCustomer.name : name;
+      console.log('👤 Nome final:', { existingCustomer: !!existingCustomer, finalName });
+
       // ⚡ Suportar AMBOS: table_number (int) OU id (UUID)
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableNumber);
       console.log('🔍 Buscando mesa para login:', { tableNumber, isUUID });
@@ -720,7 +731,7 @@ const Menu = () => {
         .update({
           is_occupied: true,
           occupied_at: new Date().toISOString(),
-          occupied_by: `${name} - ${formattedCPF}`,
+          occupied_by: `${finalName} - ${formattedCPF}`,
         })
         .eq("id", tableData.id);
 
@@ -748,7 +759,7 @@ const Menu = () => {
         .insert({
           restaurant_id: restaurant.id,
           table_id: tableData.id,
-          customer_name: name,
+          customer_name: finalName,
           customer_cpf: cleanCpf,
           status: "active"
         })
@@ -764,22 +775,22 @@ const Menu = () => {
       }
 
       // Salvar dados no sessionStorage
-      sessionStorage.setItem(`customer_name_${tableNumber}`, name);
-      sessionStorage.setItem(`customer_cpf_${tableNumber}`, cpf);
+      sessionStorage.setItem(`customer_name_${tableNumber}`, finalName);
+      sessionStorage.setItem(`customer_cpf_${tableNumber}`, cleanCpf);
       sessionStorage.setItem(`table_id_${tableNumber}`, tableData.id);
-      sessionStorage.setItem("customerInfo", JSON.stringify({ name, cpf }));
+      sessionStorage.setItem("customerInfo", JSON.stringify({ name: finalName, cpf: cleanCpf }));
       if (comandaId) {
         sessionStorage.setItem(`comanda_id_${tableNumber}`, comandaId);
       }
       
       // Atualizar estados
-      setCustomerName(name);
-      setCustomerCPF(cpf);
+      setCustomerName(finalName);
+      setCustomerCPF(cleanCpf);
       setTableId(tableData.id);
       setShowCustomerDialog(false);
       
       console.log('✅ Cliente logado com sucesso!', { tableId: tableData.id, comandaId });
-      toast.success(`Bem-vindo, ${name}!`);
+      toast.success(`Bem-vindo, ${finalName}!`);
       
       // Carregar dados
       fetchData();
@@ -997,6 +1008,7 @@ const Menu = () => {
         onClose={() => {}} 
         onSubmit={handleCustomerInfoSubmit}
         restaurantColor={primaryColor}
+        restaurantId={restaurant?.id}
       />
 
       <ProductDetailDrawer
