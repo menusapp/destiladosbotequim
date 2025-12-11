@@ -189,25 +189,22 @@ export const OrderDetailModal = ({
                   Iniciar Preparo
                 </Button>
               )}
-              {(order.status === "accepted" || order.status === "preparing") && (
-                <Button onClick={() => updateStatus("ready")} className="gap-2">
-                  <Play className="w-4 h-4" />
-                  Marcar como Pronto
-                </Button>
-              )}
-              {order.status === "ready" && order.order_type === "delivery" && order.delivery_type === "delivery" && (
+              {(order.status === "accepted" || order.status === "preparing") && 
+                order.order_type === "delivery" && order.delivery_type === "delivery" && (
                 <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2">
                   <Play className="w-4 h-4" />
                   Saiu para Entrega
                 </Button>
               )}
-              {order.status === "ready" && order.order_type === "delivery" && order.delivery_type === "pickup" && (
-                <Button onClick={() => updateStatus("picked_up")} className="gap-2">
+              {(order.status === "accepted" || order.status === "preparing") && 
+                order.order_type === "delivery" && order.delivery_type === "pickup" && (
+                <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2">
                   <Play className="w-4 h-4" />
-                  Marcar como Retirado
+                  Pronto para Retirada
                 </Button>
               )}
-              {order.status === "ready" && order.order_type === "local" && (
+              {(order.status === "accepted" || order.status === "preparing") && 
+                order.order_type === "local" && (
                 <Button onClick={() => updateStatus("delivered")} className="gap-2">
                   <Play className="w-4 h-4" />
                   Entregar na Mesa
