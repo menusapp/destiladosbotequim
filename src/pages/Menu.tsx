@@ -205,7 +205,8 @@ const Menu = () => {
       // Calcular total do carrinho SEMPRE (mesmo sem customer info)
       const cartTotal = currentCart.reduce((sum, item) => {
         const extrasSum = item.extras?.reduce((extraSum, extra) => extraSum + extra.price, 0) || 0;
-        return sum + (item.product.price + extrasSum) * item.quantity;
+        const effectivePrice = item.product.promotional_price ?? item.product.price;
+        return sum + (effectivePrice + extrasSum) * item.quantity;
       }, 0);
 
       // Obter informações do cliente da sessão atual
