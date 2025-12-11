@@ -511,6 +511,42 @@ const Menu = () => {
           }
         }
       })
+      // 🚪 Listener de mesa para detectar esvaziamento forçado (admin)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'tables'
+      }, (payload) => {
+        const table = payload.new as any;
+        const oldTable = payload.old as any;
+        
+        const currentTableId = tableIdRef.current;
+        const currentCustomer = customerInfoRef.current;
+        
+        // Se a mesa atual foi esvaziada (estava ocupada e agora está livre)
+        if (currentTableId && table.id === currentTableId && currentCustomer) {
+          if (oldTable?.is_occupied === true && table.is_occupied === false) {
+            console.log('🚪 Mesa esvaziada pelo admin! Fazendo logout...');
+            
+            toast.info("A mesa foi liberada. Até a próxima! 👋", { duration: 5000 });
+            
+            // Limpar sessão do cliente
+            sessionStorage.removeItem("customerInfo");
+            sessionStorage.removeItem("comanda_id");
+            sessionStorage.removeItem(`cart_${tableNumber}`);
+            
+            // Resetar estados
+            setCustomerName("");
+            setCustomerCPF("");
+            setCart([]);
+            setHasOpenComanda(false);
+            setComandaTotal(0);
+            
+            // Mostrar dialog de login novamente
+            setShowCustomerDialog(true);
+          }
+        }
+      })
       .subscribe((status) => {
         console.log('📡 Status da subscrição Menu:', status);
       });

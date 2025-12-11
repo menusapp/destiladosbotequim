@@ -165,16 +165,46 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     toast.success("QR Code baixado!");
   };
 
+  const checkCanEmptyTable = async (tableId: string): Promise<{ canEmpty: boolean; reason?: string }> => {
+    // Verificar comandas ativas
+    const { data: activeComandas } = await supabase
+      .from("comandas")
+      .select("id")
+      .eq("table_id", tableId)
+      .eq("status", "active");
+
+    if (activeComandas && activeComandas.length > 0) {
+      return { canEmpty: false, reason: "Existem comandas ativas nesta mesa. Feche-as primeiro." };
+    }
+
+    // Verificar pedidos pendentes/ativos
+    const { data: activeOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("table_id", tableId)
+      .in("status", ["pending", "accepted", "preparing", "ready"]);
+
+    if (activeOrders && activeOrders.length > 0) {
+      return { canEmpty: false, reason: "Existem pedidos ativos nesta mesa. Finalize-os primeiro." };
+    }
+
+    return { canEmpty: true };
+  };
+
+  const handleRequestEmptyTable = async (table: Table) => {
+    const { canEmpty, reason } = await checkCanEmptyTable(table.id);
+    
+    if (!canEmpty) {
+      toast.error(reason || "Não é possível esvaziar esta mesa");
+      return;
+    }
+
+    setTableToEmpty(table);
+  };
+
   const handleEmptyTable = async (tableId: string) => {
     try {
-      // 1. Fechar comandas ativas da mesa
-      await supabase
-        .from("comandas")
-        .update({ status: "closed", closed_at: new Date().toISOString() })
-        .eq("table_id", tableId)
-        .eq("status", "active");
-
-      // 2. Marcar mesa como livre
+      // Marcar mesa como livre (deslogando o cliente via Realtime)
       const { error } = await supabase
         .from("tables")
         .update({
@@ -186,7 +216,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (error) throw error;
 
-      toast.success("Mesa esvaziada com sucesso!");
+      toast.success("Mesa esvaziada! O cliente será deslogado automaticamente.");
       fetchTables();
     } catch (error) {
       console.error("Erro ao esvaziar mesa:", error);
@@ -385,7 +415,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                       className="text-orange-600"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setTableToEmpty(table);
+                        handleRequestEmptyTable(table);
                       }}
                     >
                       <XCircle className="w-4 h-4 mr-2" />
