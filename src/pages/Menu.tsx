@@ -113,6 +113,7 @@ const Menu = () => {
           id, name, slug, is_open, logo_url, banner_url, primary_color, 
           prep_time_minutes, service_fee_enabled, service_fee_percentage,
           featured_section_enabled, featured_section_title,
+          login_require_name, login_require_phone,
           categories (
             id, name, display_order,
             products (
