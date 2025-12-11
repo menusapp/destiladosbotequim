@@ -50,6 +50,7 @@ const RestaurantAdmin = () => {
     billId: string;
     tableNumber: number;
     total: number;
+    customerName: string;
   } | null>(null);
   const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
   const [notifiedBills, setNotifiedBills] = useState<Set<string>>(new Set());
@@ -225,12 +226,21 @@ const RestaurantAdmin = () => {
             .eq('id', bill.table_id)
             .single();
             
-          if (tableData?.restaurant_id === restaurantId && bill.status === 'pending') {
+          if (tableData?.restaurant_id === restaurantId && bill.status === 'requested') {
+            // Buscar nome do cliente da comanda ativa
+            const { data: comandaData } = await supabase
+              .from('comandas')
+              .select('customer_name')
+              .eq('table_id', bill.table_id)
+              .eq('status', 'active')
+              .maybeSingle();
+            
             // Mostrar notificação pop-up
             setBillNotification({
               billId: billId,
               tableNumber: tableData.table_number,
               total: bill.total_amount,
+              customerName: comandaData?.customer_name || 'Cliente',
             });
             
             // Marcar como notificado
@@ -258,8 +268,8 @@ const RestaurantAdmin = () => {
           const billId = bill.id;
           const status = bill.status;
           
-          // Se a conta foi atualizada (não mais pending), fechar notificação
-          if (billNotificationRef.current && billNotificationRef.current.billId === billId && status !== 'pending') {
+          // Se a conta foi atualizada (não mais requested), fechar notificação
+          if (billNotificationRef.current && billNotificationRef.current.billId === billId && status !== 'requested') {
             setBillNotification(null);
           }
         }
@@ -477,6 +487,7 @@ const RestaurantAdmin = () => {
             billId={billNotification.billId}
             tableNumber={billNotification.tableNumber}
             total={billNotification.total}
+            customerName={billNotification.customerName}
             onView={handleViewBill}
             onDismiss={() => setBillNotification(null)}
           />

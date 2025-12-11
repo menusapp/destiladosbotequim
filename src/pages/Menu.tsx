@@ -527,20 +527,53 @@ const Menu = () => {
     }
   }, [cart, tableNumber, customerName, customerCPF]);
 
-  // ⚡ Listener de beforeunload para limpar mesa (removido markTableOccupied duplicado)
+  // ⚡ Listener de beforeunload para limpar mesa
+  // IMPORTANTE: Só libera mesa se NÃO houver comandas ativas, pedidos ativos OU bills não pagas
   useEffect(() => {
+    const checkAndReleaseTa = async (currentTableId: string) => {
+      // Verificar se há bills não pagas (requested, on_the_way, pending)
+      const { data: hasUnpaidBills } = await supabase
+        .from("bills")
+        .select("id")
+        .eq("table_id", currentTableId)
+        .in("status", ["requested", "on_the_way", "pending"])
+        .limit(1);
 
-    const handleBeforeUnload = async () => {
+      // Verificar se há comandas ativas
+      const { data: hasActiveComandas } = await supabase
+        .from("comandas")
+        .select("id")
+        .eq("table_id", currentTableId)
+        .eq("status", "active")
+        .limit(1);
+
+      // Verificar se há pedidos ativos
+      const { data: hasActiveOrders } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("table_id", currentTableId)
+        .in("status", ["pending", "accepted", "preparing", "ready"])
+        .limit(1);
+
+      // Só liberar mesa se NÃO houver nenhuma condição ativa
+      const shouldKeepOccupied = 
+        (hasUnpaidBills && hasUnpaidBills.length > 0) ||
+        (hasActiveComandas && hasActiveComandas.length > 0) ||
+        (hasActiveOrders && hasActiveOrders.length > 0);
+
+      if (!shouldKeepOccupied) {
+        await supabase.from("tables").update({
+          is_occupied: false,
+          occupied_at: null,
+          occupied_by: null
+        }).eq("id", currentTableId);
+      }
+    };
+
+    const handleBeforeUnload = () => {
       if (tableId) {
-        const { data: hasUnpaidBills } = await supabase
-          .from("bills").select("id").eq("table_id", tableId).neq("status", "paid").limit(1);
-        if (!hasUnpaidBills || hasUnpaidBills.length === 0) {
-          await supabase.from("tables").update({
-            is_occupied: false,
-            occupied_at: null,
-            occupied_by: null
-          }).eq("id", tableId);
-        }
+        // Não podemos usar async/await aqui, então usamos navigator.sendBeacon ou ignoramos
+        // O cleanup no return vai cuidar disso
       }
     };
 
@@ -548,16 +581,7 @@ const Menu = () => {
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       if (tableId) {
-        supabase.from("bills").select("id").eq("table_id", tableId).neq("status", "paid").limit(1)
-          .then(({ data }) => {
-            if (!data || data.length === 0) {
-              supabase.from("tables").update({
-                is_occupied: false,
-                occupied_at: null,
-                occupied_by: null
-              }).eq("id", tableId);
-            }
-          });
+        checkAndReleaseTa(tableId);
       }
     };
   }, [tableId, customerName, customerCPF]);
