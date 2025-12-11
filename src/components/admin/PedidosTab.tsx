@@ -167,7 +167,6 @@ const PedidosTab = ({
   const groupedOrders = {
     pending: orders.filter((o) => o.status === "pending"),
     preparing: orders.filter((o) => ["accepted", "preparing"].includes(o.status)),
-    ready: orders.filter((o) => o.status === "ready"),
     out_for_delivery: orders.filter((o) => o.status === "out_for_delivery"),
     delivered: orders.filter((o) => ["delivered", "picked_up"].includes(o.status)),
     cancelled: orders.filter((o) => o.status === "cancelled"),
@@ -222,12 +221,11 @@ const PedidosTab = ({
       </div>
 
       {/* Kanban Board */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { key: "pending", title: "Aguardando confirmação", bg: "bg-red-50" },
           { key: "preparing", title: "Preparando", bg: "bg-orange-50" },
-          { key: "ready", title: "Pronto para entrega", bg: "bg-blue-50" },
-          { key: "out_for_delivery", title: "Saiu para entrega", bg: "bg-sky-50" },
+          { key: "out_for_delivery", title: "Saiu / Pronto Retirada", bg: "bg-sky-50" },
           { key: "delivered", title: "Entregue", bg: "bg-green-50" },
           { key: "cancelled", title: "Cancelado", bg: "bg-gray-50" },
         ].map(({ key, title, bg }) => {
