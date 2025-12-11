@@ -15,6 +15,8 @@ import CardapioTab from "@/components/admin/CardapioTab";
 import TablesTab from "@/components/admin/TablesTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
+import CostosTab from "@/components/admin/CostosTab";
+import MargensTab from "@/components/admin/MargensTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import PDVTab from "@/components/admin/PDVTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
@@ -419,6 +421,14 @@ const RestaurantAdmin = () => {
       // Estoque
       case "estoque":
         return <StockTab restaurantId={restaurant.id} />;
+      
+      // Custos
+      case "custos":
+        return <CostosTab restaurantId={restaurant.id} />;
+      
+      // Margens
+      case "margens":
+        return <MargensTab restaurantId={restaurant.id} />;
       
       // Relatórios
       case "relatorios":
