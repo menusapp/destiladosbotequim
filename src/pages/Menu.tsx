@@ -116,7 +116,7 @@ const Menu = () => {
           categories (
             id, name, display_order,
             products (
-              id, name, description, price, available, image_url, 
+              id, name, description, price, promotional_price, available, image_url, 
               is_featured, prep_time_minutes, featured_display_order,
               product_extras (id, name, price)
             )
@@ -170,11 +170,12 @@ const Menu = () => {
       setTableId(tableData.id);
 
       // ⚡ Processar categorias dos dados JÁ CARREGADOS (sem query adicional!)
+      // Filtrar produtos em destaque para não aparecerem duplicados nas categorias
       const sortedCategories = (restaurantData.categories || [])
         .map((cat: any) => ({ 
           ...cat, 
           products: (cat.products || [])
-            .filter((p: Product) => p.available)
+            .filter((p: Product) => p.available && !p.is_featured)
             .sort((a: Product, b: Product) => a.name.localeCompare(b.name)) 
         }))
         .filter((cat: Category) => cat.products.length > 0);

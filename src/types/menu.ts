@@ -7,6 +7,8 @@ export interface Product {
   available: boolean;
   image_url: string | null;
   prep_time_minutes?: number;
+  is_featured?: boolean;
+  featured_display_order?: number;
 }
 
 export interface ProductExtra {
