@@ -210,10 +210,16 @@ export const OrderDetailModal = ({
                   Entregar na Mesa
                 </Button>
               )}
-              {order.status === "out_for_delivery" && (
+              {order.status === "out_for_delivery" && order.delivery_type === "delivery" && (
                 <Button onClick={() => updateStatus("delivered")} className="gap-2">
                   <Play className="w-4 h-4" />
                   Confirmar Entrega
+                </Button>
+              )}
+              {order.status === "out_for_delivery" && order.delivery_type === "pickup" && (
+                <Button onClick={() => updateStatus("picked_up")} className="gap-2">
+                  <Play className="w-4 h-4" />
+                  Confirmar Retirada
                 </Button>
               )}
               
