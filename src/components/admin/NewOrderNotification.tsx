@@ -121,16 +121,16 @@ export const NewOrderNotification = ({
 
   return (
     <div className="fixed top-4 right-4 z-[100] w-96 animate-in slide-in-from-top-5">
-      <Card className="bg-green-50 border-green-200 shadow-2xl">
+      <Card className="bg-orange-50 border-orange-200 shadow-2xl">
         <div className="p-6 space-y-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center animate-bounce">
+              <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center animate-bounce">
                 <Bell className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-green-900">Novo Pedido!</h3>
-                <p className="text-sm text-green-700">
+                <h3 className="text-xl font-bold text-orange-900">Novo Pedido!</h3>
+                <p className="text-sm text-orange-700">
                   {orderType === 'local' 
                     ? `🍽️ Pedido local - Mesa ${tableNumber || '?'}` 
                     : deliveryType === 'pickup' 
@@ -144,18 +144,18 @@ export const NewOrderNotification = ({
               variant="ghost"
               size="icon"
               onClick={handleClose}
-              className="h-8 w-8 text-green-700 hover:text-green-900 hover:bg-green-100"
+              className="h-8 w-8 text-orange-700 hover:text-orange-900 hover:bg-orange-100"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
           
           <div className="space-y-1">
-            <p className="text-lg font-semibold text-green-800">
+            <p className="text-lg font-semibold text-orange-800">
               Pedido #{orderId.slice(0, 8)}
             </p>
-            <p className="text-green-700">{customerName}</p>
-            <p className="text-2xl font-bold text-green-900">
+            <p className="text-orange-700">{customerName}</p>
+            <p className="text-2xl font-bold text-orange-900">
               R$ {total.toFixed(2)}
             </p>
           </div>
@@ -163,14 +163,14 @@ export const NewOrderNotification = ({
           <div className="flex gap-2">
             <Button
               onClick={handleView}
-              className="flex-1 bg-green-600 hover:bg-green-700"
+              className="flex-1 bg-orange-600 hover:bg-orange-700"
             >
               VER PEDIDO
             </Button>
             <Button
               onClick={handleStopSound}
               variant="outline"
-              className="flex-1 border-green-300 text-green-700 hover:bg-green-100"
+              className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-100"
             >
               Parar Som
             </Button>

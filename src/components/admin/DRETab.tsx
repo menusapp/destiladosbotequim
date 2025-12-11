@@ -509,18 +509,18 @@ export default function DRETab({ restaurantId }: DRETabProps) {
           <div className="space-y-2">
             <div className="flex justify-between items-center border-b pb-2">
               <span className="font-semibold text-lg">Receita Bruta</span>
-              <span className="font-bold text-lg text-green-600">R$ {dreValues.grossRevenue.toFixed(2)}</span>
+              <span className="font-bold text-lg text-orange-600">R$ {dreValues.grossRevenue.toFixed(2)}</span>
             </div>
           </div>
 
           <div className="space-y-2 pl-4">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">(-) CMV dos Produtos</span>
-              <span className="font-semibold text-red-600">R$ {dreValues.cmv.toFixed(2)}</span>
+              <span className="font-semibold text-orange-800">R$ {dreValues.cmv.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center border-b pb-2">
               <span className="font-semibold">Lucro Bruto</span>
-              <span className="font-bold text-green-600">R$ {dreValues.grossProfit.toFixed(2)}</span>
+              <span className="font-bold text-orange-600">R$ {dreValues.grossProfit.toFixed(2)}</span>
             </div>
           </div>
 
@@ -528,26 +528,26 @@ export default function DRETab({ restaurantId }: DRETabProps) {
             <h3 className="font-semibold text-sm text-muted-foreground mb-2">Despesas Operacionais:</h3>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">Despesas Registradas (Saídas do Caixa)</span>
-              <span className="text-sm text-red-600">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
+              <span className="text-sm text-orange-800">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">Custo Fixo (proporcional)</span>
-              <span className="text-sm text-red-600">R$ {dreValues.fixedCost.toFixed(2)}</span>
+              <span className="text-sm text-orange-800">R$ {dreValues.fixedCost.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">Custo Variável</span>
-              <span className="text-sm text-red-600">R$ {dreValues.variableCost.toFixed(2)}</span>
+              <span className="text-sm text-orange-800">R$ {dreValues.variableCost.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">CMO - Custo de Mão de Obra (proporcional)</span>
-              <span className="text-sm text-red-600">R$ {dreValues.laborCost.toFixed(2)}</span>
+              <span className="text-sm text-orange-800">R$ {dreValues.laborCost.toFixed(2)}</span>
             </div>
           </div>
 
           <div className="space-y-2 border-t-2 pt-4">
-            <div className="flex justify-between items-center bg-primary/5 p-4 rounded-lg">
+            <div className="flex justify-between items-center bg-orange-50 p-4 rounded-lg">
               <span className="font-bold text-lg">Lucro Operacional Final</span>
-              <span className={`font-bold text-2xl ${dreValues.operationalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <span className={`font-bold text-2xl ${dreValues.operationalProfit >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
                 R$ {dreValues.operationalProfit.toFixed(2)}
               </span>
             </div>

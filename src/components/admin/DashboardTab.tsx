@@ -232,32 +232,32 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       {/* Cards de Métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Vendas Hoje */}
-        <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100/50 border-green-200 shadow-card hover:shadow-hover transition-shadow">
+        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-300 shadow-card hover:shadow-hover transition-shadow">
           <div className="flex items-start justify-between">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-green-700">Vendas Hoje</p>
-              <p className="text-3xl font-bold text-green-900">
+              <p className="text-sm font-medium text-orange-700">Vendas Hoje</p>
+              <p className="text-3xl font-bold text-orange-900">
                 R$ {stats.salesToday.toFixed(2).replace(".", ",")}
               </p>
-              <p className="text-xs text-green-600">{stats.ordersCount} pedidos</p>
+              <p className="text-xs text-orange-600">{stats.ordersCount} pedidos</p>
             </div>
-            <div className="p-3 bg-green-500 rounded-xl">
+            <div className="p-3 bg-orange-600 rounded-xl">
               <DollarSign className="h-6 w-6 text-white" />
             </div>
           </div>
         </Card>
 
         {/* Ticket Médio */}
-        <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200 shadow-card hover:shadow-hover transition-shadow">
+        <Card className="p-6 bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-300 shadow-card hover:shadow-hover transition-shadow">
           <div className="flex items-start justify-between">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-blue-700">Ticket Médio</p>
-              <p className="text-3xl font-bold text-blue-900">
+              <p className="text-sm font-medium text-amber-700">Ticket Médio</p>
+              <p className="text-3xl font-bold text-amber-900">
                 R$ {stats.averageTicket.toFixed(2).replace(".", ",")}
               </p>
-              <p className="text-xs text-blue-600">Por pedido pago</p>
+              <p className="text-xs text-amber-600">Por pedido pago</p>
             </div>
-            <div className="p-3 bg-blue-500 rounded-xl">
+            <div className="p-3 bg-amber-500 rounded-xl">
               <TrendingUp className="h-6 w-6 text-white" />
             </div>
           </div>
@@ -278,14 +278,14 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
         </Card>
 
         {/* Em Preparo */}
-        <Card className="p-6 bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200 shadow-card hover:shadow-hover transition-shadow">
+        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
           <div className="flex items-start justify-between">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-purple-700">Em Preparo</p>
-              <p className="text-3xl font-bold text-purple-900">{stats.inPreparation}</p>
-              <p className="text-xs text-purple-600">0 pendentes</p>
+              <p className="text-sm font-medium text-orange-700">Em Preparo</p>
+              <p className="text-3xl font-bold text-orange-900">{stats.inPreparation}</p>
+              <p className="text-xs text-orange-600">0 pendentes</p>
             </div>
-            <div className="p-3 bg-purple-500 rounded-xl">
+            <div className="p-3 bg-orange-400 rounded-xl">
               <Clock className="h-6 w-6 text-white" />
             </div>
           </div>
@@ -316,9 +316,9 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
                     </p>
                   </div>
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    order.status === "accepted" ? "bg-green-100 text-green-700" :
-                    order.status === "pending" ? "bg-yellow-100 text-yellow-700" :
-                    "bg-gray-100 text-gray-700"
+                    order.status === "accepted" ? "bg-orange-100 text-orange-700" :
+                    order.status === "pending" ? "bg-amber-100 text-amber-700" :
+                    "bg-orange-50 text-orange-600"
                   }`}>
                     {order.status === "pending" ? "Pendente" : 
                      order.status === "accepted" ? "Aceito" : 
