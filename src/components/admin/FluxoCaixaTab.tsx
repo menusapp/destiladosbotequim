@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle, ChevronDown, Receipt, Coins } from "lucide-react";
 import { format } from "date-fns";
 
 interface FluxoCaixaTabProps {
@@ -42,14 +43,23 @@ interface CashMovement {
   bill_id: string | null;
 }
 
+const BILL_DENOMINATIONS = [200, 100, 50, 20, 10, 5, 2];
+const COIN_DENOMINATIONS = [1, 0.5, 0.25, 0.1, 0.05];
+
 export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   const [currentSession, setCurrentSession] = useState<CashSession | null>(null);
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [lastClosedSession, setLastClosedSession] = useState<CashSession | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [openingBalance, setOpeningBalance] = useState("");
   const [openedBy, setOpenedBy] = useState("");
+  const [billCounts, setBillCounts] = useState<Record<number, number>>(() => 
+    Object.fromEntries(BILL_DENOMINATIONS.map(d => [d, 0]))
+  );
+  const [coinCounts, setCoinCounts] = useState<Record<number, number>>(() => 
+    Object.fromEntries(COIN_DENOMINATIONS.map(d => [d, 0]))
+  );
+  
   const [closingBalance, setClosingBalance] = useState("");
   const [closedBy, setClosedBy] = useState("");
   const [closeNotes, setCloseNotes] = useState("");
@@ -59,6 +69,13 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   const [movementCategory, setMovementCategory] = useState("");
   const [movementPaymentMethod, setMovementPaymentMethod] = useState("dinheiro");
   const [movementCreatedBy, setMovementCreatedBy] = useState("");
+  const [movementDrawerOpen, setMovementDrawerOpen] = useState(false);
+
+  const calculateOpeningBalance = () => {
+    const billTotal = BILL_DENOMINATIONS.reduce((sum, d) => sum + d * (billCounts[d] || 0), 0);
+    const coinTotal = COIN_DENOMINATIONS.reduce((sum, d) => sum + d * (coinCounts[d] || 0), 0);
+    return billTotal + coinTotal;
+  };
 
   useEffect(() => {
     fetchCurrentSession();
@@ -136,8 +153,10 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   };
 
   const handleOpenCashRegister = async () => {
-    if (!openedBy || !openingBalance) {
-      toast.error("Preencha todos os campos obrigatórios");
+    const openingBalance = calculateOpeningBalance();
+    
+    if (!openedBy) {
+      toast.error("Preencha o nome do responsável");
       return;
     }
 
@@ -145,7 +164,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       const { error } = await supabase.from("cash_register_sessions").insert({
         restaurant_id: restaurantId,
         opened_by: openedBy,
-        opening_balance: parseFloat(openingBalance),
+        opening_balance: openingBalance,
         status: "open"
       });
 
@@ -153,7 +172,8 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       
       toast.success("Caixa aberto com sucesso!");
       setOpenedBy("");
-      setOpeningBalance("");
+      setBillCounts(Object.fromEntries(BILL_DENOMINATIONS.map(d => [d, 0])));
+      setCoinCounts(Object.fromEntries(COIN_DENOMINATIONS.map(d => [d, 0])));
       fetchCurrentSession();
     } catch (error: any) {
       toast.error("Erro ao abrir caixa: " + error.message);
@@ -255,6 +275,10 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       .reduce((sum, m) => sum + m.amount, 0);
   };
 
+  const formatDenomination = (value: number) => {
+    return value >= 1 ? `R$${value}` : `R$${value.toFixed(2).replace('.', ',')}`;
+  };
+
   if (loading) {
     return <div className="p-4">Carregando...</div>;
   }
@@ -270,12 +294,12 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
         {!currentSession ? (
           <Dialog>
             <DialogTrigger asChild>
-              <Button size="lg" className="gap-2">
+              <Button size="lg" className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
                 <Wallet className="h-5 w-5" />
                 Abrir Caixa
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Abrir Caixa</DialogTitle>
               </DialogHeader>
@@ -288,17 +312,75 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                     placeholder="Nome do responsável"
                   />
                 </div>
-                <div>
-                  <Label>Saldo inicial (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={openingBalance}
-                    onChange={(e) => setOpeningBalance(e.target.value)}
-                    placeholder="0.00"
-                  />
+
+                {/* Cédulas */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-orange-600">
+                    <DollarSign className="h-4 w-4" />
+                    <Label className="text-base font-semibold">Cédulas</Label>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {BILL_DENOMINATIONS.map((denom) => (
+                      <div key={denom} className="text-center">
+                        <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          className="text-center h-10"
+                          value={billCounts[denom] || 0}
+                          onChange={(e) => setBillCounts(prev => ({
+                            ...prev,
+                            [denom]: parseInt(e.target.value) || 0
+                          }))}
+                        />
+                        <p className="text-xs text-orange-600 mt-1">
+                          R${(denom * (billCounts[denom] || 0)).toFixed(2)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <Button onClick={handleOpenCashRegister} className="w-full">
+
+                {/* Moedas */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-orange-600">
+                    <Coins className="h-4 w-4" />
+                    <Label className="text-base font-semibold">Moedas</Label>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {COIN_DENOMINATIONS.map((denom) => (
+                      <div key={denom} className="text-center">
+                        <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          className="text-center h-10"
+                          value={coinCounts[denom] || 0}
+                          onChange={(e) => setCoinCounts(prev => ({
+                            ...prev,
+                            [denom]: parseInt(e.target.value) || 0
+                          }))}
+                        />
+                        <p className="text-xs text-orange-600 mt-1">
+                          R${(denom * (coinCounts[denom] || 0)).toFixed(2)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className="bg-orange-100 p-4 rounded-lg border-2 border-orange-300">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-orange-800">Valor de Abertura:</span>
+                    <span className="text-2xl font-bold text-orange-600">
+                      R$ {calculateOpeningBalance().toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <Button onClick={handleOpenCashRegister} className="w-full bg-orange-500 hover:bg-orange-600 text-white">
+                  <Wallet className="h-4 w-4 mr-2" />
                   Abrir Caixa
                 </Button>
               </div>
@@ -317,14 +399,14 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                 <DialogTitle>Fechar Caixa</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-4">
-                <div className="bg-muted p-4 rounded-lg space-y-2">
+                <div className="bg-orange-50 p-4 rounded-lg space-y-2 border border-orange-200">
                   <div className="flex justify-between">
                     <span>Saldo inicial:</span>
                     <span className="font-bold">R$ {currentSession.opening_balance.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Saldo esperado:</span>
-                    <span className="font-bold">R$ {calculateExpectedBalance().toFixed(2)}</span>
+                    <span className="font-bold text-orange-600">R$ {calculateExpectedBalance().toFixed(2)}</span>
                   </div>
                 </div>
                 <div>
@@ -372,9 +454,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       </div>
 
       {currentSession && (
-        <Card>
+        <Card className="border-orange-200">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-orange-700">
               <DollarSign className="h-5 w-5" />
               Caixa Atual
             </CardTitle>
@@ -384,21 +466,21 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="bg-orange-100 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                <p className="text-2xl font-bold">R$ {currentSession.opening_balance.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-orange-700">R$ {currentSession.opening_balance.toFixed(2)}</p>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg">
+              <div className="bg-orange-50 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Entradas</p>
-                <p className="text-2xl font-bold text-green-600">R$ {calculateTotalSales().toFixed(2)}</p>
+                <p className="text-2xl font-bold text-orange-600">R$ {calculateTotalSales().toFixed(2)}</p>
               </div>
-              <div className="bg-red-50 p-4 rounded-lg">
+              <div className="bg-amber-50 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Saídas</p>
-                <p className="text-2xl font-bold text-red-600">R$ {calculateTotalExpenses().toFixed(2)}</p>
+                <p className="text-2xl font-bold text-orange-800">R$ {calculateTotalExpenses().toFixed(2)}</p>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="bg-orange-200 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                <p className="text-2xl font-bold text-purple-600">R$ {calculateExpectedBalance().toFixed(2)}</p>
+                <p className="text-2xl font-bold text-orange-700">R$ {calculateExpectedBalance().toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -406,9 +488,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       )}
 
       {!currentSession && lastClosedSession && (
-        <Card className="bg-secondary/20 border-2">
+        <Card className="bg-secondary/20 border-2 border-orange-200">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-orange-700">
               <FileText className="h-5 w-5" />
               Último Caixa Fechado - Histórico
             </CardTitle>
@@ -418,17 +500,17 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="bg-orange-100 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                <p className="text-2xl font-bold">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-orange-700">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="bg-orange-200 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                <p className="text-2xl font-bold">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
+                <p className="text-2xl font-bold text-orange-700">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg">
+              <div className="bg-orange-50 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Saldo Final</p>
-                <p className="text-2xl font-bold">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
+                <p className="text-2xl font-bold text-orange-600">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
               </div>
               <div className="bg-amber-50 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Diferença</p>
@@ -442,7 +524,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       )}
 
       {!currentSession && !lastClosedSession && (
-        <Card>
+        <Card className="border-orange-200">
           <CardContent className="py-12 text-center text-muted-foreground">
             Nenhum caixa aberto. Abra um caixa para registrar movimentações.
           </CardContent>
@@ -450,88 +532,103 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       )}
       
       {currentSession && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Registrar Movimentação</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Tipo de Movimentação</Label>
-                <Select value={movementType} onValueChange={setMovementType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="entrada">Entrada</SelectItem>
-                    <SelectItem value="saida">Saída</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Valor (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={movementAmount}
-                  onChange={(e) => setMovementAmount(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <Label>Descrição</Label>
-                <Input
-                  value={movementDescription}
-                  onChange={(e) => setMovementDescription(e.target.value)}
-                  placeholder="Descrição da movimentação"
-                />
-              </div>
-              <div>
-                <Label>Categoria (opcional)</Label>
-                <Input
-                  value={movementCategory}
-                  onChange={(e) => setMovementCategory(e.target.value)}
-                  placeholder="Ex: Alimentação, Limpeza..."
-                />
-              </div>
-              <div>
-                <Label>Forma de Pagamento</Label>
-                <Select value={movementPaymentMethod} onValueChange={setMovementPaymentMethod}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                    <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="credito">Crédito</SelectItem>
-                    <SelectItem value="debito">Débito</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Responsável</Label>
-                <Input
-                  value={movementCreatedBy}
-                  onChange={(e) => setMovementCreatedBy(e.target.value)}
-                  placeholder="Nome do responsável"
-                />
-              </div>
-            </div>
-            <Button onClick={handleAddMovement} className="w-full mt-4">
-              {movementType === "entrada" ? (
-                <PlusCircle className="h-4 w-4 mr-2" />
-              ) : (
-                <MinusCircle className="h-4 w-4 mr-2" />
-              )}
-              Registrar Movimentação
-            </Button>
-          </CardContent>
-        </Card>
+        <Collapsible open={movementDrawerOpen} onOpenChange={setMovementDrawerOpen}>
+          <Card className="border-orange-200">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-orange-50/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-orange-700">
+                    <Receipt className="h-5 w-5" />
+                    Registrar Movimentação
+                  </CardTitle>
+                  <ChevronDown className={`h-5 w-5 text-orange-600 transition-transform ${movementDrawerOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Tipo de Movimentação</Label>
+                    <Select value={movementType} onValueChange={setMovementType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="entrada">Entrada</SelectItem>
+                        <SelectItem value="saida">Saída</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Valor (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={movementAmount}
+                      onChange={(e) => setMovementAmount(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <Label>Descrição</Label>
+                    <Input
+                      value={movementDescription}
+                      onChange={(e) => setMovementDescription(e.target.value)}
+                      placeholder="Descrição da movimentação"
+                    />
+                  </div>
+                  <div>
+                    <Label>Categoria (opcional)</Label>
+                    <Input
+                      value={movementCategory}
+                      onChange={(e) => setMovementCategory(e.target.value)}
+                      placeholder="Ex: Alimentação, Limpeza..."
+                    />
+                  </div>
+                  <div>
+                    <Label>Forma de Pagamento</Label>
+                    <Select value={movementPaymentMethod} onValueChange={setMovementPaymentMethod}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="credito">Crédito</SelectItem>
+                        <SelectItem value="debito">Débito</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Responsável</Label>
+                    <Input
+                      value={movementCreatedBy}
+                      onChange={(e) => setMovementCreatedBy(e.target.value)}
+                      placeholder="Nome do responsável"
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleAddMovement} className="w-full mt-4 bg-orange-500 hover:bg-orange-600 text-white">
+                  {movementType === "entrada" ? (
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                  ) : (
+                    <MinusCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Registrar Movimentação
+                </Button>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
 
-      <Card>
+      <Card className="border-orange-200">
         <CardHeader>
-          <CardTitle>Histórico de Movimentações</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-orange-700">
+            <FileText className="h-5 w-5" />
+            Histórico de Movimentações
+          </CardTitle>
           <CardDescription>
             {currentSession 
               ? `${movements.length} movimentações registradas nesta sessão`
@@ -548,12 +645,12 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
               </p>
             ) : (
               movements.map((mov) => (
-                <div key={mov.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div key={mov.id} className="flex items-center justify-between p-4 border border-orange-100 rounded-lg hover:bg-orange-50/50 transition-colors">
                   <div className="flex items-center gap-4">
                     {mov.movement_type === "entrada" ? (
-                      <TrendingUp className="h-5 w-5 text-green-600" />
+                      <TrendingUp className="h-5 w-5 text-orange-600" />
                     ) : (
-                      <TrendingDown className="h-5 w-5 text-red-600" />
+                      <TrendingDown className="h-5 w-5 text-orange-800" />
                     )}
                     <div>
                       <p className="font-medium">{mov.description}</p>
@@ -567,8 +664,8 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                   </div>
                   <div className={`text-lg font-bold ${
                     mov.movement_type === "entrada"
-                      ? "text-green-600"
-                      : "text-red-600"
+                      ? "text-orange-600"
+                      : "text-orange-800"
                   }`}>
                     {mov.movement_type === "entrada" ? "+" : "-"}
                     R$ {mov.amount.toFixed(2)}
