@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StockItemsGrid from "./StockItemsGrid";
 import StockCategoriesTab from "./StockCategoriesTab";
+import StockMovementsTab from "./StockMovementsTab";
 
 interface StockTabProps {
   restaurantId: string;
@@ -15,7 +16,7 @@ export default function StockTab({ restaurantId }: StockTabProps) {
       {/* Header */}
       <div>
         <h1 className="text-[32px] font-bold text-foreground leading-tight">Estoque</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gerencie insumos e categorias</p>
+        <p className="text-sm text-muted-foreground mt-1">Gerencie insumos, categorias e movimentações</p>
       </div>
 
       {/* Tabs */}
@@ -33,6 +34,12 @@ export default function StockTab({ restaurantId }: StockTabProps) {
           >
             Categorias
           </TabsTrigger>
+          <TabsTrigger 
+            value="movimentacoes"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
+          >
+            Movimentações
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="insumos" className="mt-6">
@@ -41,6 +48,10 @@ export default function StockTab({ restaurantId }: StockTabProps) {
 
         <TabsContent value="categorias" className="mt-6">
           <StockCategoriesTab restaurantId={restaurantId} />
+        </TabsContent>
+
+        <TabsContent value="movimentacoes" className="mt-6">
+          <StockMovementsTab restaurantId={restaurantId} />
         </TabsContent>
       </Tabs>
     </div>
