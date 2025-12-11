@@ -162,10 +162,11 @@ export default function DeliveryMenu() {
         } else if (payload.eventType === 'UPDATE' && order?.status) {
           const statusMessages: Record<string, string> = {
             accepted: '✅ Pedido aceito! Está sendo preparado.',
-            ready: '🍔 Pedido pronto! Saindo para entrega.',
-            out_for_delivery: '🚚 Pedido saiu para entrega!',
+            out_for_delivery: order.delivery_type === 'pickup' 
+              ? '📦 Pedido pronto para retirada!'
+              : '🚚 Pedido saiu para entrega!',
             delivered: '🎉 Pedido entregue! Bom apetite!',
-            picked_up: '📦 Pedido retirado!',
+            picked_up: '📦 Pedido retirado! Bom apetite!',
           };
           
           if (statusMessages[order.status]) {

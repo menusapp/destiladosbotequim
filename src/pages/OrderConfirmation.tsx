@@ -55,29 +55,17 @@ const getStatusConfig = (status: string, deliveryType?: string) => {
       color: "bg-yellow-500",
     },
     accepted: {
-      icon: CheckCircle2,
-      label: "Pedido aceito",
-      description: "Seu pedido foi confirmado!",
+      icon: Package,
+      label: "Em Preparo",
+      description: "Seu pedido foi aceito e está sendo preparado!",
       color: "bg-blue-500",
     },
-    preparing: {
-      icon: Package,
-      label: "Em preparo",
-      description: "Estamos preparando seu pedido com carinho",
-      color: "bg-orange-500",
-    },
-    ready: {
-      icon: Package,
-      label: deliveryType === "pickup" ? "Pronto para retirada" : "Pronto para entrega",
+    out_for_delivery: {
+      icon: deliveryType === "pickup" ? Package : Truck,
+      label: deliveryType === "pickup" ? "Pronto para Retirada" : "Saiu para Entrega",
       description: deliveryType === "pickup" 
         ? "Seu pedido está pronto! Pode retirar." 
-        : "Seu pedido está pronto e aguardando o entregador.",
-      color: "bg-purple-500",
-    },
-    out_for_delivery: {
-      icon: Truck,
-      label: "Saiu para entrega",
-      description: "Seu pedido está a caminho!",
+        : "Seu pedido está a caminho!",
       color: "bg-indigo-500",
     },
     delivered: {
@@ -205,17 +193,13 @@ export default function OrderConfirmation() {
           const deliveryType = payload.new.delivery_type;
           
           if (newStatus === "accepted") {
-            toast.success("Seu pedido foi aceito! 🎉");
-          } else if (newStatus === "preparing") {
-            toast.info("Seu pedido está sendo preparado! 👨‍🍳");
-          } else if (newStatus === "ready") {
+            toast.success("Seu pedido foi aceito e está em preparo! 🎉");
+          } else if (newStatus === "out_for_delivery") {
             toast.success(
               deliveryType === "pickup" 
                 ? "Seu pedido está pronto para retirada! 📦" 
-                : "Seu pedido está pronto! Aguardando entregador. 📦"
+                : "Seu pedido saiu para entrega! 🚚"
             );
-          } else if (newStatus === "out_for_delivery") {
-            toast.success("Seu pedido saiu para entrega! 🚚");
           } else if (newStatus === "delivered") {
             toast.success("Pedido entregue! Bom apetite! 🎉");
             setTimeout(async () => {
@@ -367,14 +351,15 @@ export default function OrderConfirmation() {
                   time={format(new Date(order.created_at), "HH:mm")}
                 />
                 <StatusStep
-                  completed={["accepted", "preparing", "ready", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
+                  completed={["accepted", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
                   label="Em Preparo"
                 />
-                <StatusStep
-                  completed={["ready", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
-                  label={order.delivery_type === "pickup" ? "Pronto para Retirada" : "Pronto para Entrega"}
-                />
-                {order.delivery_type !== "pickup" && (
+                {order.delivery_type === "pickup" ? (
+                  <StatusStep
+                    completed={["out_for_delivery", "picked_up"].includes(order.status)}
+                    label="Pronto para Retirada"
+                  />
+                ) : (
                   <StatusStep
                     completed={["out_for_delivery", "delivered"].includes(order.status)}
                     label="Saiu para Entrega"
