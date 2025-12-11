@@ -159,9 +159,9 @@ const PedidosTab = ({
   };
 
   const getElapsedColor = (minutes: number) => {
-    if (minutes < 5) return "text-green-600 bg-green-50 border-green-200";
-    if (minutes < 15) return "text-yellow-600 bg-yellow-50 border-yellow-200";
-    return "text-red-600 bg-red-50 border-red-200";
+    if (minutes < 5) return "text-orange-600 bg-orange-50 border-orange-200";
+    if (minutes < 15) return "text-amber-600 bg-amber-50 border-amber-200";
+    return "text-orange-800 bg-orange-100 border-orange-300";
   };
 
   const groupedOrders = {
@@ -223,11 +223,11 @@ const PedidosTab = ({
       {/* Kanban Board */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { key: "pending", title: "Aguardando confirmação", headerBg: "bg-red-500", textColor: "text-white" },
+          { key: "pending", title: "Aguardando confirmação", headerBg: "bg-orange-600", textColor: "text-white" },
           { key: "preparing", title: "Preparando", headerBg: "bg-orange-500", textColor: "text-white" },
-          { key: "out_for_delivery", title: "Saiu / Pronto Retirada", headerBg: "bg-sky-500", textColor: "text-white" },
-          { key: "delivered", title: "Entregue", headerBg: "bg-green-500", textColor: "text-white" },
-          { key: "cancelled", title: "Cancelado", headerBg: "bg-gray-500", textColor: "text-white" },
+          { key: "out_for_delivery", title: "Saiu / Pronto Retirada", headerBg: "bg-amber-500", textColor: "text-white" },
+          { key: "delivered", title: "Entregue", headerBg: "bg-orange-400", textColor: "text-white" },
+          { key: "cancelled", title: "Cancelado", headerBg: "bg-orange-300", textColor: "text-orange-900" },
         ].map(({ key, title, headerBg, textColor }) => {
           const columnOrders = groupedOrders[key as keyof typeof groupedOrders];
           

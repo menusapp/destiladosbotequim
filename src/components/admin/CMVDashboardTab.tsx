@@ -169,35 +169,11 @@ export default function CMVDashboardTab({ restaurantId }: { restaurantId: string
         <div className="grid md:grid-cols-2 gap-6">
           <Card className="p-6">
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="h-5 w-5 text-green-500" />
+              <TrendingUp className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-semibold">Produtos Mais Rentáveis</h3>
             </div>
             <div className="space-y-3">
               {mostProfitable.map((product) => (
-                <div key={product.id} className="flex items-center justify-between p-3 bg-green-500/5 rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium">{product.name}</p>
-                    <div className="flex gap-4 text-sm text-muted-foreground mt-1">
-                      <span>Custo: R$ {product.cost.toFixed(2)}</span>
-                      <span>Venda: R$ {product.price.toFixed(2)}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-green-600">+R$ {product.margin.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">CMV: {product.cmv_percentage.toFixed(1)}%</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingDown className="h-5 w-5 text-orange-500" />
-              <h3 className="text-lg font-semibold">Produtos Menos Rentáveis</h3>
-            </div>
-            <div className="space-y-3">
-              {leastProfitable.map((product) => (
                 <div key={product.id} className="flex items-center justify-between p-3 bg-orange-500/5 rounded-lg">
                   <div className="flex-1">
                     <p className="font-medium">{product.name}</p>
@@ -208,6 +184,30 @@ export default function CMVDashboardTab({ restaurantId }: { restaurantId: string
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-orange-600">+R$ {product.margin.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">CMV: {product.cmv_percentage.toFixed(1)}%</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingDown className="h-5 w-5 text-orange-400" />
+              <h3 className="text-lg font-semibold">Produtos Menos Rentáveis</h3>
+            </div>
+            <div className="space-y-3">
+              {leastProfitable.map((product) => (
+                <div key={product.id} className="flex items-center justify-between p-3 bg-amber-500/5 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium">{product.name}</p>
+                    <div className="flex gap-4 text-sm text-muted-foreground mt-1">
+                      <span>Custo: R$ {product.cost.toFixed(2)}</span>
+                      <span>Venda: R$ {product.price.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-amber-600">+R$ {product.margin.toFixed(2)}</p>
                     <p className="text-xs text-muted-foreground">CMV: {product.cmv_percentage.toFixed(1)}%</p>
                   </div>
                 </div>
