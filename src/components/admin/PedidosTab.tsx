@@ -223,92 +223,102 @@ const PedidosTab = ({
       {/* Kanban Board */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { key: "pending", title: "Aguardando confirmação", bg: "bg-red-50" },
-          { key: "preparing", title: "Preparando", bg: "bg-orange-50" },
-          { key: "out_for_delivery", title: "Saiu / Pronto Retirada", bg: "bg-sky-50" },
-          { key: "delivered", title: "Entregue", bg: "bg-green-50" },
-          { key: "cancelled", title: "Cancelado", bg: "bg-gray-50" },
-        ].map(({ key, title, bg }) => {
+          { key: "pending", title: "Aguardando confirmação", headerBg: "bg-red-500", textColor: "text-white" },
+          { key: "preparing", title: "Preparando", headerBg: "bg-orange-500", textColor: "text-white" },
+          { key: "out_for_delivery", title: "Saiu / Pronto Retirada", headerBg: "bg-sky-500", textColor: "text-white" },
+          { key: "delivered", title: "Entregue", headerBg: "bg-green-500", textColor: "text-white" },
+          { key: "cancelled", title: "Cancelado", headerBg: "bg-gray-500", textColor: "text-white" },
+        ].map(({ key, title, headerBg, textColor }) => {
           const columnOrders = groupedOrders[key as keyof typeof groupedOrders];
           
           return (
-            <div key={key} className="space-y-3">
-              <div className="flex items-center justify-between">
+            <Card key={key} className="overflow-hidden border-2 border-border/50">
+              {/* Header colorido */}
+              <div className={`${headerBg} ${textColor} px-4 py-3 flex items-center justify-between`}>
                 <h3 className="font-semibold text-sm">{title}</h3>
-                <Badge variant="secondary">{columnOrders.length}</Badge>
+                <Badge variant="secondary" className="bg-white/20 text-white border-0 hover:bg-white/30">
+                  {columnOrders.length}
+                </Badge>
               </div>
 
-              <div className="space-y-2">
-                {columnOrders.map((order) => {
-                  const total = calculateTotal(order);
-                  const elapsed = getElapsedMinutes(order.created_at);
+              {/* Corpo com cards */}
+              <CardContent className="p-3 space-y-2 min-h-[200px] bg-muted/30">
+                {columnOrders.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">
+                    Nenhum pedido
+                  </p>
+                ) : (
+                  columnOrders.map((order) => {
+                    const total = calculateTotal(order);
+                    const elapsed = getElapsedMinutes(order.created_at);
 
-                  return (
-                    <Card
-                      key={order.id}
-                      className={`cursor-pointer hover:shadow-md transition-shadow ${bg}`}
-                      onClick={() => setSelectedOrder(order)}
-                    >
-                      <CardContent className="p-4 space-y-2">
-                        {/* Header with ID and Total */}
-                        <div className="flex items-start justify-between">
-                          <p className="font-bold text-sm">#{order.id.slice(0, 8)}</p>
-                          <p className="font-bold text-sm">R$ {total.toFixed(2)}</p>
-                        </div>
+                    return (
+                      <Card
+                        key={order.id}
+                        className="cursor-pointer bg-background hover:shadow-md transition-all border border-border/50 hover:border-border"
+                        onClick={() => setSelectedOrder(order)}
+                      >
+                        <CardContent className="p-4 space-y-2">
+                          {/* Header with ID and Total */}
+                          <div className="flex items-start justify-between">
+                            <p className="font-bold text-sm">#{order.id.slice(0, 8)}</p>
+                            <p className="font-bold text-sm">R$ {total.toFixed(2)}</p>
+                          </div>
 
-                        {/* Type badge */}
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          {getOrderTypeIcon(order)}
-                          <span>
-                            {order.delivery_type === "delivery" ? "Entrega" : "Retirada"}
-                          </span>
-                        </div>
+                          {/* Type badge */}
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            {getOrderTypeIcon(order)}
+                            <span>
+                              {order.delivery_type === "delivery" ? "Entrega" : "Retirada"}
+                            </span>
+                          </div>
 
-                        {/* Customer name */}
-                        <p className="text-sm font-medium flex items-center gap-1">
-                          👤 {order.customer_name}
-                        </p>
+                          {/* Customer name */}
+                          <p className="text-sm font-medium flex items-center gap-1">
+                            👤 {order.customer_name}
+                          </p>
 
-                        {/* Items */}
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <p className="font-medium">Itens:</p>
-                          {order.order_items.slice(0, 2).map((item) => (
-                            <p key={item.id}>
-                              {item.quantity}x {item.products?.name || "Produto"}
-                            </p>
-                          ))}
-                          {order.order_items.length > 2 && (
-                            <p>+{order.order_items.length - 2} itens</p>
-                          )}
-                        </div>
+                          {/* Items */}
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <p className="font-medium">Itens:</p>
+                            {order.order_items.slice(0, 2).map((item) => (
+                              <p key={item.id}>
+                                {item.quantity}x {item.products?.name || "Produto"}
+                              </p>
+                            ))}
+                            {order.order_items.length > 2 && (
+                              <p>+{order.order_items.length - 2} itens</p>
+                            )}
+                          </div>
 
-                        {/* Date and elapsed time */}
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">
-                            📅 {format(new Date(order.created_at), "dd/MM/yyyy HH:mm")}
-                          </span>
-                          <Badge className={getElapsedColor(elapsed)}>
-                            ⏱️ {elapsed} min
-                          </Badge>
-                        </div>
+                          {/* Date and elapsed time */}
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">
+                              📅 {format(new Date(order.created_at), "dd/MM/yyyy HH:mm")}
+                            </span>
+                            <Badge className={getElapsedColor(elapsed)}>
+                              ⏱️ {elapsed} min
+                            </Badge>
+                          </div>
 
-                        {/* Ver detalhes link */}
-                        <Button
-                          variant="link"
-                          className="w-full p-0 h-auto text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedOrder(order);
-                          }}
-                        >
-                          🔗 Ver detalhes
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
+                          {/* Ver detalhes link */}
+                          <Button
+                            variant="link"
+                            className="w-full p-0 h-auto text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedOrder(order);
+                            }}
+                          >
+                            🔗 Ver detalhes
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                )}
+              </CardContent>
+            </Card>
           );
         })}
       </div>
