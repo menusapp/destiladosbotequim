@@ -66,6 +66,7 @@ export default function MargensTab({ restaurantId }: MargensTabProps) {
           id,
           name,
           price,
+          promotional_price,
           categories!inner(restaurant_id)
         `)
         .eq('categories.restaurant_id', restaurantId);
@@ -130,7 +131,9 @@ export default function MargensTab({ restaurantId }: MargensTabProps) {
                   }
                 }
 
-                const variationPrice = product.price + (variation.price || 0);
+                // Usar preço promocional se existir
+                const effectiveBasePrice = product.promotional_price || product.price;
+                const variationPrice = effectiveBasePrice + (variation.price || 0);
                 const cmv = variationPrice > 0 ? (variationCost / variationPrice) * 100 : 0;
                 const margin = variationPrice - variationCost;
 
@@ -183,13 +186,15 @@ export default function MargensTab({ restaurantId }: MargensTabProps) {
               }
             }
 
-            const cmv = product.price > 0 ? (baseCost / product.price) * 100 : 0;
-            const margin = product.price - baseCost;
+            // Usar preço promocional se existir
+            const effectivePrice = product.promotional_price || product.price;
+            const cmv = effectivePrice > 0 ? (baseCost / effectivePrice) * 100 : 0;
+            const margin = effectivePrice - baseCost;
 
             return {
               id: product.id,
               name: product.name,
-              price: product.price,
+              price: effectivePrice,
               cost: baseCost,
               cmv_percentage: cmv,
               margin: margin,
