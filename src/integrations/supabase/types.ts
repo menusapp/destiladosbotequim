@@ -1367,6 +1367,7 @@ export type Database = {
           name: string
           prep_time_minutes: number | null
           price: number
+          promotional_price: number | null
           updated_at: string | null
         }
         Insert: {
@@ -1381,6 +1382,7 @@ export type Database = {
           name: string
           prep_time_minutes?: number | null
           price: number
+          promotional_price?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -1395,6 +1397,7 @@ export type Database = {
           name?: string
           prep_time_minutes?: number | null
           price?: number
+          promotional_price?: number | null
           updated_at?: string | null
         }
         Relationships: [

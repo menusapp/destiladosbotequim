@@ -3,7 +3,18 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil } from "lucide-react";
+import { Pencil, Copy, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface VariableCostInfo {
   name: string;
@@ -18,6 +29,7 @@ interface ProductCardProps {
     name: string;
     description: string | null;
     price: number;
+    promotional_price?: number | null;
     available: boolean;
     cost?: number;
     margin?: number;
@@ -27,12 +39,15 @@ interface ProductCardProps {
   };
   onEdit: (product: any) => void;
   onToggleAvailable: (id: string, available: boolean) => void;
+  onDuplicate?: (product: any) => void;
+  onDelete?: (productId: string) => void;
 }
 
-const ProductCard = memo(({ product, onEdit, onToggleAvailable }: ProductCardProps) => {
+const ProductCard = memo(({ product, onEdit, onToggleAvailable, onDuplicate, onDelete }: ProductCardProps) => {
   const hasVariableCosts = product.variableCosts && product.variableCosts.length > 0;
   const margin = product.margin || 0;
   const marginColor = margin >= 70 ? "text-success" : margin >= 50 ? "text-warning" : "text-foreground";
+  const hasPromoPrice = product.promotional_price !== null && product.promotional_price !== undefined;
 
   return (
     <Card className="p-4 hover:shadow-md transition-shadow">
@@ -54,8 +69,21 @@ const ProductCard = memo(({ product, onEdit, onToggleAvailable }: ProductCardPro
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <div className="text-[28px] font-bold text-primary leading-none">
-          R$ {product.price.toFixed(2)}
+        <div className="flex items-center gap-2">
+          {hasPromoPrice ? (
+            <>
+              <span className="text-lg text-muted-foreground line-through">
+                R$ {product.price.toFixed(2)}
+              </span>
+              <span className="text-[28px] font-bold text-primary leading-none">
+                R$ {product.promotional_price!.toFixed(2)}
+              </span>
+            </>
+          ) : (
+            <span className="text-[28px] font-bold text-primary leading-none">
+              R$ {product.price.toFixed(2)}
+            </span>
+          )}
         </div>
         <Badge 
           variant={product.available ? "default" : "secondary"}
@@ -121,15 +149,52 @@ const ProductCard = memo(({ product, onEdit, onToggleAvailable }: ProductCardPro
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full mt-3"
-          onClick={() => onEdit(product)}
-        >
-          <Pencil className="h-4 w-4 mr-2" />
-          Editar
-        </Button>
+        <div className="flex gap-2 mt-3">
+          {onDelete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="flex-1">
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Excluir
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir produto?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação não pode ser desfeita. O produto "{product.name}" será removido permanentemente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onDelete(product.id)}>
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          {onDuplicate && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => onDuplicate(product)}
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Duplicar
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={() => onEdit(product)}
+          >
+            <Pencil className="h-4 w-4 mr-1" />
+            Editar
+          </Button>
+        </div>
       </div>
     </Card>
   );
