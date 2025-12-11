@@ -57,6 +57,7 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerCpf, setCustomerCpf] = useState("");
+  const [isAutoFillingCpf, setIsAutoFillingCpf] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryNeighborhood, setDeliveryNeighborhood] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
@@ -194,6 +195,36 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
     setCustomerName("");
     setCustomerCpf("");
     setCustomerPhone("");
+  };
+
+  // Auto-fill customer when CPF is typed manually
+  const handleCpfChange = async (value: string) => {
+    setCustomerCpf(value);
+    
+    // Only check if CPF is complete (11 digits)
+    const cleanCpf = value.replace(/\D/g, "");
+    if (cleanCpf.length !== 11 || selectedCustomerId) return;
+    
+    setIsAutoFillingCpf(true);
+    try {
+      const { data: existing } = await supabase
+        .from("customers")
+        .select("id, name, phone")
+        .eq("restaurant_id", restaurantId)
+        .eq("cpf", cleanCpf)
+        .maybeSingle();
+
+      if (existing) {
+        setSelectedCustomerId(existing.id);
+        setCustomerName(existing.name);
+        setCustomerPhone(existing.phone || "");
+        toast.success(`Cliente ${existing.name} encontrado!`);
+      }
+    } catch (error) {
+      console.error("Error checking customer:", error);
+    } finally {
+      setIsAutoFillingCpf(false);
+    }
   };
 
   // Auto-create/update customer on order creation
@@ -656,9 +687,10 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
                   <Label className="text-xs">CPF (opcional)</Label>
                   <Input
                     value={customerCpf}
-                    onChange={(e) => setCustomerCpf(e.target.value)}
+                    onChange={(e) => handleCpfChange(e.target.value)}
                     placeholder="000.000.000-00"
                     className="h-9"
+                    disabled={isAutoFillingCpf}
                   />
                 </div>
 
@@ -775,9 +807,10 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
                     <Label className="text-xs">CPF (opcional)</Label>
                     <Input
                       value={customerCpf}
-                      onChange={(e) => setCustomerCpf(e.target.value)}
+                      onChange={(e) => handleCpfChange(e.target.value)}
                       placeholder="000.000.000-00"
                       className="h-9"
+                      disabled={isAutoFillingCpf}
                     />
                   </div>
                 </div>

@@ -187,11 +187,31 @@ export default function DeliveryMenu() {
     };
   }, [customerCPF, restaurant?.id]);
 
-  const handleCustomerInfoSubmit = (name: string, cpf?: string) => {
-    setCustomerName(name);
-    setCustomerCPF(cpf || "");
-    sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
-    sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, cpf || "");
+  const handleCustomerInfoSubmit = async (name: string, cpf?: string) => {
+    const sanitizedCPF = (cpf || "").replace(/\D/g, "");
+    
+    // Check if customer exists in database (use saved name, ignore typed name)
+    if (sanitizedCPF.length === 11 && restaurant?.id) {
+      const { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("name")
+        .eq("restaurant_id", restaurant.id)
+        .eq("cpf", sanitizedCPF)
+        .maybeSingle();
+      
+      const finalName = existingCustomer ? existingCustomer.name : name;
+      
+      setCustomerName(finalName);
+      setCustomerCPF(sanitizedCPF);
+      sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, finalName);
+      sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
+    } else {
+      setCustomerName(name);
+      setCustomerCPF(sanitizedCPF);
+      sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
+      sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
+    }
+    
     setShowCustomerDialog(false);
   };
 
@@ -446,6 +466,7 @@ export default function DeliveryMenu() {
             onClose={() => setShowCustomerDialog(false)}
             onSubmit={handleCustomerInfoSubmit}
             restaurantColor={primaryColor}
+            restaurantId={restaurant?.id}
           />
         </>
       )}
