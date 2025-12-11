@@ -160,8 +160,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
       }
 
       const statusMessages: Record<string, string> = {
-        accepted: "Pedido aceito e em produção",
-        ready: "Pedido marcado como pronto",
+        accepted: "Pedido aceito e em preparo",
         out_for_delivery: "Pedido saiu para entrega",
         delivered: "Entrega confirmada",
         picked_up: "Retirada confirmada",
@@ -309,7 +308,6 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
 
   const pendingOrders = filteredOrders.filter((o) => o.status === "pending");
   const acceptedOrders = filteredOrders.filter((o) => o.status === "accepted");
-  const readyOrders = filteredOrders.filter((o) => o.status === "ready");
   const outForDeliveryOrders = filteredOrders.filter((o) => o.status === "out_for_delivery");
   const finishedOrders = filteredOrders.filter((o) => o.status === "delivered" || o.status === "picked_up");
 
@@ -391,18 +389,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
               </Button>
             )}
 
-            {order.status === "accepted" && (
-              <Button
-                size="sm"
-                onClick={() => updateOrderStatus(order.id, "ready")}
-                className="flex-1"
-              >
-                Avançar Pedido
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            )}
-
-            {order.status === "ready" && order.delivery_type === "delivery" && (
+            {order.status === "accepted" && order.delivery_type === "delivery" && (
               <Button
                 size="sm"
                 onClick={() => updateOrderStatus(order.id, "out_for_delivery")}
@@ -413,7 +400,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
               </Button>
             )}
 
-            {order.status === "ready" && order.delivery_type === "pickup" && (
+            {order.status === "accepted" && order.delivery_type === "pickup" && (
               <Button
                 size="sm"
                 onClick={() => updateOrderStatus(order.id, "picked_up")}
@@ -644,36 +631,17 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
           </ScrollArea>
         </div>
 
-        {/* Column 3: Pronto */}
+        {/* Column 3: Saiu para Entrega / Pronto Retirada */}
         <div className="space-y-3">
           <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-            <h3 className="font-semibold text-lg">Pronto</h3>
-            <Badge variant="secondary">{readyOrders.length}</Badge>
-          </div>
-          <ScrollArea className="h-[calc(100vh-450px)]">
-            <div className="space-y-3 pr-2">
-              {readyOrders.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  Nenhum pedido pronto
-                </div>
-              ) : (
-                readyOrders.map((order) => <OrderCard key={order.id} order={order} />)
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-
-        {/* Column 4: Saiu para Entrega */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-            <h3 className="font-semibold text-lg">Saiu p/ Entrega</h3>
+            <h3 className="font-semibold text-lg">Saiu / Pronto</h3>
             <Badge variant="secondary">{outForDeliveryOrders.length}</Badge>
           </div>
           <ScrollArea className="h-[calc(100vh-450px)]">
             <div className="space-y-3 pr-2">
               {outForDeliveryOrders.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
-                  Nenhum pedido a caminho
+                  Nenhum pedido a caminho/pronto
                 </div>
               ) : (
                 outForDeliveryOrders.map((order) => <OrderCard key={order.id} order={order} />)
