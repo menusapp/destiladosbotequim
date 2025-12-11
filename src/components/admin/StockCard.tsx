@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface StockCardProps {
   item: {
@@ -16,9 +16,10 @@ interface StockCardProps {
     stock_categories?: { name: string } | null;
   };
   onEdit: (item: any) => void;
+  onDelete: (item: any) => void;
 }
 
-const StockCard = memo(({ item, onEdit }: StockCardProps) => {
+const StockCard = memo(({ item, onEdit, onDelete }: StockCardProps) => {
   const totalValue = item.current_quantity * item.price_per_unit;
   const isLowStock = item.current_quantity <= item.minimum_quantity;
 
@@ -75,15 +76,24 @@ const StockCard = memo(({ item, onEdit }: StockCardProps) => {
             </div>
           </div>
 
-          {/* Botão Movimentar */}
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => onEdit(item)}
-          >
-            <Pencil className="h-4 w-4 mr-2" />
-            Movimentar
-          </Button>
+          {/* Botões Atualizar e Excluir */}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => onEdit(item)}
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+              Atualizar
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onDelete(item)}
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

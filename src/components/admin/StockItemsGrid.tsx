@@ -6,10 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, AlertTriangle, Package } from "lucide-react";
 import StockCard from "./StockCard";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface StockCategory {
   id: string;
@@ -37,7 +37,8 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [movementTab, setMovementTab] = useState<"data" | "movement">("data");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<StockItem | null>(null);
   
   const [itemForm, setItemForm] = useState({
     name: "",
@@ -46,12 +47,6 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
     current_quantity: "",
     minimum_quantity: "",
     category_id: "",
-  });
-
-  const [movementForm, setMovementForm] = useState({
-    type: "entrada",
-    quantity: "",
-    reason: "",
   });
 
   const { toast } = useToast();
@@ -90,25 +85,31 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
   };
 
   const handleSaveItem = async () => {
-    if (!itemForm.name || !itemForm.price_per_unit || !itemForm.current_quantity) {
+    // Para criação, exige quantidade inicial
+    if (!editingItem && (!itemForm.name || !itemForm.price_per_unit || !itemForm.current_quantity)) {
+      toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
+      return;
+    }
+    
+    // Para edição, não exige quantidade
+    if (editingItem && (!itemForm.name || !itemForm.price_per_unit)) {
       toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
       return;
     }
 
-    const itemData = {
-      name: itemForm.name,
-      unit: itemForm.unit,
-      price_per_unit: parseFloat(itemForm.price_per_unit),
-      current_quantity: parseFloat(itemForm.current_quantity),
-      minimum_quantity: parseFloat(itemForm.minimum_quantity || "0"),
-      category_id: itemForm.category_id || null,
-      restaurant_id: restaurantId,
-    };
-
     if (editingItem) {
+      // Atualização: não altera current_quantity
+      const updateData = {
+        name: itemForm.name,
+        unit: itemForm.unit,
+        price_per_unit: parseFloat(itemForm.price_per_unit),
+        minimum_quantity: parseFloat(itemForm.minimum_quantity || "0"),
+        category_id: itemForm.category_id || null,
+      };
+
       const { error } = await supabase
         .from("stock_items")
-        .update(itemData)
+        .update(updateData)
         .eq("id", editingItem.id);
 
       if (error) {
@@ -117,6 +118,17 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
       }
       toast({ title: "Insumo atualizado com sucesso" });
     } else {
+      // Criação: inclui current_quantity
+      const itemData = {
+        name: itemForm.name,
+        unit: itemForm.unit,
+        price_per_unit: parseFloat(itemForm.price_per_unit),
+        current_quantity: parseFloat(itemForm.current_quantity),
+        minimum_quantity: parseFloat(itemForm.minimum_quantity || "0"),
+        category_id: itemForm.category_id || null,
+        restaurant_id: restaurantId,
+      };
+
       const { error } = await supabase
         .from("stock_items")
         .insert(itemData);
@@ -133,51 +145,29 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
     fetchStockItems();
   };
 
-  const handleSaveMovement = async () => {
-    if (!editingItem || !movementForm.quantity) {
-      toast({ title: "Preencha a quantidade", variant: "destructive" });
+  const handleDeleteItem = (item: StockItem) => {
+    setItemToDelete(item);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!itemToDelete) return;
+
+    const { error } = await supabase.rpc("admin_delete_stock_item", {
+      p_stock_item_id: itemToDelete.id,
+      p_restaurant_id: restaurantId,
+    });
+
+    if (error) {
+      toast({ title: "Erro ao excluir insumo", description: error.message, variant: "destructive" });
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
       return;
     }
 
-    const quantity = parseFloat(movementForm.quantity);
-    const newQuantity = movementForm.type === "entrada" 
-      ? editingItem.current_quantity + quantity
-      : editingItem.current_quantity - quantity;
-
-    if (newQuantity < 0) {
-      toast({ title: "Quantidade insuficiente em estoque", variant: "destructive" });
-      return;
-    }
-
-    // Atualizar estoque
-    const { error: updateError } = await supabase
-      .from("stock_items")
-      .update({ current_quantity: newQuantity })
-      .eq("id", editingItem.id);
-
-    if (updateError) {
-      toast({ title: "Erro ao atualizar estoque", variant: "destructive" });
-      return;
-    }
-
-    // Registrar movimentação
-    const { error: movementError } = await supabase
-      .from("stock_movements")
-      .insert({
-        stock_item_id: editingItem.id,
-        quantity: quantity,
-        movement_type: movementForm.type,
-        reason: movementForm.reason || "Movimentação manual",
-      });
-
-    if (movementError) {
-      toast({ title: "Erro ao registrar movimentação", variant: "destructive" });
-      return;
-    }
-
-    toast({ title: "Movimentação registrada com sucesso" });
-    resetForms();
-    setItemDialogOpen(false);
+    toast({ title: "Insumo excluído com sucesso" });
+    setDeleteDialogOpen(false);
+    setItemToDelete(null);
     fetchStockItems();
   };
 
@@ -191,7 +181,6 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
       minimum_quantity: item.minimum_quantity.toString(),
       category_id: item.category_id || "",
     });
-    setMovementTab("data");
     setItemDialogOpen(true);
   };
 
@@ -204,11 +193,6 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
       current_quantity: "",
       minimum_quantity: "",
       category_id: "",
-    });
-    setMovementForm({
-      type: "entrada",
-      quantity: "",
-      reason: "",
     });
   };
 
@@ -251,7 +235,6 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
         </div>
         <Button onClick={() => {
           resetForms();
-          setMovementTab("data");
           setItemDialogOpen(true);
         }}>
           <Plus className="h-4 w-4 mr-2" />
@@ -270,7 +253,12 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map((item) => (
-            <StockCard key={item.id} item={item} onEdit={openEditDialog} />
+            <StockCard 
+              key={item.id} 
+              item={item} 
+              onEdit={openEditDialog} 
+              onDelete={handleDeleteItem}
+            />
           ))}
         </div>
       )}
@@ -283,227 +271,115 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingItem ? "Movimentar Insumo" : "Novo Insumo"}
+              {editingItem ? "Atualizar Insumo" : "Novo Insumo"}
             </DialogTitle>
           </DialogHeader>
 
-          {editingItem ? (
-            <Tabs value={movementTab} onValueChange={(v: any) => setMovementTab(v)}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="data">Dados</TabsTrigger>
-                <TabsTrigger value="movement">Movimentação</TabsTrigger>
-              </TabsList>
+          <div className="space-y-4 pt-4">
+            <div>
+              <Label>Nome</Label>
+              <Input
+                value={itemForm.name}
+                onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                placeholder="Ex: Carne costela, Queijo cheddar..."
+              />
+            </div>
 
-              <TabsContent value="data" className="space-y-4 pt-4">
-                <div>
-                  <Label>Nome</Label>
-                  <Input
-                    value={itemForm.name}
-                    onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
-                    placeholder="Ex: Carne costela, Queijo cheddar..."
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Unidade</Label>
-                    <Select value={itemForm.unit} onValueChange={(v) => setItemForm({ ...itemForm, unit: v })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="kg">Kg</SelectItem>
-                        <SelectItem value="g">Gramas</SelectItem>
-                        <SelectItem value="l">Litros</SelectItem>
-                        <SelectItem value="ml">ML</SelectItem>
-                        <SelectItem value="un">Unidade</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>Preço por Unidade (R$)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={itemForm.price_per_unit}
-                      onChange={(e) => setItemForm({ ...itemForm, price_per_unit: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Quantidade Atual</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={itemForm.current_quantity}
-                      onChange={(e) => setItemForm({ ...itemForm, current_quantity: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Quantidade Mínima</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={itemForm.minimum_quantity}
-                      onChange={(e) => setItemForm({ ...itemForm, minimum_quantity: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Categoria</Label>
-                  <Select value={itemForm.category_id} onValueChange={(v) => setItemForm({ ...itemForm, category_id: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button onClick={handleSaveItem} className="w-full">
-                  Atualizar Insumo
-                </Button>
-              </TabsContent>
-
-              <TabsContent value="movement" className="space-y-4 pt-4">
-                <div>
-                  <Label>Tipo de Movimentação</Label>
-                  <Select value={movementForm.type} onValueChange={(v) => setMovementForm({ ...movementForm, type: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="entrada">Entrada</SelectItem>
-                      <SelectItem value="saida">Saída</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Quantidade</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={movementForm.quantity}
-                    onChange={(e) => setMovementForm({ ...movementForm, quantity: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div>
-                  <Label>Motivo (opcional)</Label>
-                  <Input
-                    value={movementForm.reason}
-                    onChange={(e) => setMovementForm({ ...movementForm, reason: e.target.value })}
-                    placeholder="Ex: Compra, Perda, Ajuste..."
-                  />
-                </div>
-
-                <Button onClick={handleSaveMovement} className="w-full">
-                  Registrar Movimentação
-                </Button>
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <div className="space-y-4 pt-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Nome</Label>
-                <Input
-                  value={itemForm.name}
-                  onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
-                  placeholder="Ex: Carne costela, Queijo cheddar..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Unidade</Label>
-                  <Select value={itemForm.unit} onValueChange={(v) => setItemForm({ ...itemForm, unit: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kg">Kg</SelectItem>
-                      <SelectItem value="g">Gramas</SelectItem>
-                      <SelectItem value="l">Litros</SelectItem>
-                      <SelectItem value="ml">ML</SelectItem>
-                      <SelectItem value="un">Unidade</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Preço por Unidade (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={itemForm.price_per_unit}
-                    onChange={(e) => setItemForm({ ...itemForm, price_per_unit: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Quantidade Inicial</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={itemForm.current_quantity}
-                    onChange={(e) => setItemForm({ ...itemForm, current_quantity: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <Label>Quantidade Mínima</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={itemForm.minimum_quantity}
-                    onChange={(e) => setItemForm({ ...itemForm, minimum_quantity: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label>Categoria</Label>
-                <Select value={itemForm.category_id} onValueChange={(v) => setItemForm({ ...itemForm, category_id: v })}>
+                <Label>Unidade</Label>
+                <Select value={itemForm.unit} onValueChange={(v) => setItemForm({ ...itemForm, unit: v })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="kg">Kg</SelectItem>
+                    <SelectItem value="g">Gramas</SelectItem>
+                    <SelectItem value="l">Litros</SelectItem>
+                    <SelectItem value="ml">ML</SelectItem>
+                    <SelectItem value="un">Unidade</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <Button onClick={handleSaveItem} className="w-full">
-                Criar Insumo
-              </Button>
+              <div>
+                <Label>Preço por Unidade (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={itemForm.price_per_unit}
+                  onChange={(e) => setItemForm({ ...itemForm, price_per_unit: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
             </div>
-          )}
+
+            {/* Quantidade inicial só aparece para novos insumos */}
+            {!editingItem && (
+              <div>
+                <Label>Quantidade Inicial</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={itemForm.current_quantity}
+                  onChange={(e) => setItemForm({ ...itemForm, current_quantity: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+            )}
+
+            <div>
+              <Label>Quantidade Mínima (para alertas)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={itemForm.minimum_quantity}
+                onChange={(e) => setItemForm({ ...itemForm, minimum_quantity: e.target.value })}
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <Label>Categoria</Label>
+              <Select value={itemForm.category_id} onValueChange={(v) => setItemForm({ ...itemForm, category_id: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button onClick={handleSaveItem} className="w-full">
+              {editingItem ? "Salvar Alterações" : "Criar Insumo"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de confirmação de exclusão */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Insumo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir "{itemToDelete?.name}"?
+              Esta ação não pode ser desfeita e removerá o insumo de todas as receitas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
