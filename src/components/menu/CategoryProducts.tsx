@@ -44,12 +44,26 @@ export const CategoryProducts = memo(({
                           {product.description}
                         </p>
                       )}
-                      <p
-                        className="text-lg font-bold"
-                        style={{ color: primaryColor }}
-                      >
-                        R$ {product.price.toFixed(2)}
-                      </p>
+                      {product.promotional_price ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground line-through">
+                            R$ {product.price.toFixed(2)}
+                          </span>
+                          <span
+                            className="text-lg font-bold"
+                            style={{ color: primaryColor }}
+                          >
+                            R$ {product.promotional_price.toFixed(2)}
+                          </span>
+                        </div>
+                      ) : (
+                        <p
+                          className="text-lg font-bold"
+                          style={{ color: primaryColor }}
+                        >
+                          R$ {product.price.toFixed(2)}
+                        </p>
+                      )}
                     </div>
                     {product.image_url && (
                       <div className="flex-shrink-0">

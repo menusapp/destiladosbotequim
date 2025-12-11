@@ -3,6 +3,7 @@ export interface Product {
   name: string;
   description: string | null;
   price: number;
+  promotional_price?: number | null;
   available: boolean;
   image_url: string | null;
   prep_time_minutes?: number;

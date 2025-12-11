@@ -55,9 +55,20 @@ export const FeaturedProducts = memo(({
               <h3 className="text-sm font-medium text-foreground line-clamp-2 mb-1">
                 {product.name}
               </h3>
-              <p className="text-lg font-bold" style={{ color: primaryColor }}>
-                R$ {product.price.toFixed(2)}
-              </p>
+              {product.promotional_price ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground line-through">
+                    R$ {product.price.toFixed(2)}
+                  </span>
+                  <span className="text-lg font-bold" style={{ color: primaryColor }}>
+                    R$ {product.promotional_price.toFixed(2)}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-lg font-bold" style={{ color: primaryColor }}>
+                  R$ {product.price.toFixed(2)}
+                </p>
+              )}
             </div>
           </div>
         ))}

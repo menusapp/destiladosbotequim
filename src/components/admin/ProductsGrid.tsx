@@ -29,6 +29,7 @@ interface Product {
   name: string;
   description: string | null;
   price: number;
+  promotional_price?: number | null;
   category_id: string;
   available: boolean;
   image_url: string | null;
@@ -124,6 +125,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const [productName, setProductName] = useState("");
   const [productDescription, setProductDescription] = useState("");
   const [productPrice, setProductPrice] = useState("");
+  const [productPromotionalPrice, setProductPromotionalPrice] = useState("");
   const [productCategoryId, setProductCategoryId] = useState("");
   const [productImage, setProductImage] = useState<File | null>(null);
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
@@ -278,6 +280,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
         return {
           ...product,
+          promotional_price: product.promotional_price,
           cost,
           margin,
           prep_time: product.prep_time_minutes || 30,
@@ -303,6 +306,136 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
     toast.success(`Produto ${available ? "disponibilizado" : "indisponibilizado"}`);
     fetchProducts();
+  };
+
+  // Duplicar produto
+  const handleDuplicateProduct = async (product: Product) => {
+    if (isRestaurantOpen) {
+      toast.error("Feche o restaurante para duplicar produtos");
+      return;
+    }
+
+    // Preencher formulário com dados do produto
+    setProductName(`${product.name} (cópia)`);
+    setProductDescription(product.description || "");
+    setProductPrice(product.price.toString());
+    setProductPromotionalPrice(product.promotional_price?.toString() || "");
+    setProductCategoryId(product.category_id);
+    setProductImageUrl(product.image_url);
+    setProductPrepTime(product.prep_time?.toString() || "");
+
+    // Buscar insumos do produto original
+    const { data: ingredientsData } = await supabase
+      .from("product_ingredients")
+      .select("*, stock_items(name, unit, price_per_unit)")
+      .eq("product_id", product.id);
+
+    const formattedIngredients = ingredientsData?.map((ing: any) => ({
+      id: crypto.randomUUID(),
+      stock_item_id: ing.stock_item_id,
+      quantity: ing.quantity,
+      stock_item_name: ing.stock_items?.name,
+      stock_item_unit: ing.stock_items?.unit,
+      stock_item_price: ing.stock_items?.price_per_unit
+    })) || [];
+
+    // Buscar extras do produto original
+    const { data: extrasData } = await supabase
+      .from("product_extras")
+      .select("*, product_extra_ingredients(*, stock_items(name, unit, price_per_unit))")
+      .eq("product_id", product.id);
+
+    const variationsFromDB: IngredientVariation[] = [];
+    const extrasFromDB: ProductExtra[] = [];
+
+    extrasData?.forEach((extra: any) => {
+      const ingredients = extra.product_extra_ingredients?.map((ing: any) => ({
+        id: crypto.randomUUID(),
+        stock_item_id: ing.stock_item_id,
+        quantity: ing.quantity,
+        stock_item_name: ing.stock_items?.name,
+        stock_item_unit: ing.stock_items?.unit,
+        stock_item_price: ing.stock_items?.price_per_unit
+      })) || [];
+
+      if (extra.is_required && ingredients.length > 0) {
+        variationsFromDB.push({
+          id: crypto.randomUUID(),
+          name: extra.name,
+          price: extra.price,
+          ingredients
+        });
+        if (variationsFromDB.length === 1) {
+          setVariationMinSelection(extra.min_selection?.toString() || "1");
+          setVariationMaxSelection(extra.max_selection?.toString() || "1");
+          setVariationIsRequired(true);
+        }
+      } else {
+        extrasFromDB.push({
+          id: crypto.randomUUID(),
+          name: extra.name,
+          price: extra.price,
+          ingredients,
+          is_required: extra.is_required
+        });
+      }
+    });
+
+    if (variationsFromDB.length > 0) {
+      setIngredientType("variable");
+      setVariations(variationsFromDB);
+      setIngredients([]);
+    } else {
+      setIngredientType("fixed");
+      setIngredients(formattedIngredients);
+      setVariations([]);
+    }
+
+    setExtras(extrasFromDB);
+
+    // Buscar grupos de complementos vinculados
+    const { data: groupsData } = await supabase
+      .from("product_complement_groups")
+      .select("*, extra_categories(id, name, extra_category_items(id, name, price))")
+      .eq("product_id", product.id);
+
+    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any) => ({
+      id: crypto.randomUUID(),
+      extra_category_id: g.extra_category_id,
+      category_name: g.extra_categories?.name || "",
+      is_required: g.is_required || false,
+      min_selection: g.min_selection || 0,
+      max_selection: g.max_selection,
+      items: g.extra_categories?.extra_category_items || []
+    }));
+
+    setLinkedGroups(formattedGroups);
+    setEditingProduct(null); // Garantir que é criação, não edição
+    setDialogOpen(true);
+    toast.info("Produto duplicado! Altere o que precisar e salve.");
+  };
+
+  // Excluir produto
+  const handleDeleteProduct = async (productId: string) => {
+    if (isRestaurantOpen) {
+      toast.error("Feche o restaurante para excluir produtos");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.rpc('admin_delete_product', {
+        p_product_id: productId,
+        p_restaurant_id: restaurantId
+      });
+
+      if (error) throw error;
+
+      toast.success("Produto excluído com sucesso!");
+      fetchProducts();
+    } catch (error) {
+      console.error("Erro ao excluir produto:", error);
+      toast.error("Erro ao excluir produto");
+    }
   };
 
   // Insumos fixos
@@ -505,6 +638,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       name: productName,
       description: productDescription,
       price: parseFloat(productPrice),
+      promotional_price: productPromotionalPrice ? parseFloat(productPromotionalPrice) : null,
       category_id: productCategoryId,
       image_url: imageUrl,
       prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : null,
@@ -646,6 +780,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductName(product.name);
     setProductDescription(product.description || "");
     setProductPrice(product.price.toString());
+    setProductPromotionalPrice(product.promotional_price?.toString() || "");
     setProductCategoryId(product.category_id);
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
@@ -749,6 +884,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductName("");
     setProductDescription("");
     setProductPrice("");
+    setProductPromotionalPrice("");
     setProductCategoryId("");
     setProductImage(null);
     setProductImageUrl(null);
@@ -848,6 +984,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
               product={product}
               onEdit={openEditDialog}
               onToggleAvailable={handleToggleAvailable}
+              onDuplicate={handleDuplicateProduct}
+              onDelete={handleDeleteProduct}
             />
           ))}
         </div>
@@ -918,17 +1056,31 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                   </Select>
                 </div>
               </div>
-              <div>
-                <Label htmlFor="product-prep-time">Tempo de Preparo (minutos)</Label>
-                <Input
-                  id="product-prep-time"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={productPrepTime}
-                  onChange={(e) => setProductPrepTime(e.target.value)}
-                  placeholder="Ex: 30"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="product-prep-time">Tempo de Preparo (min)</Label>
+                  <Input
+                    id="product-prep-time"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={productPrepTime}
+                    onChange={(e) => setProductPrepTime(e.target.value)}
+                    placeholder="Ex: 30"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="product-promotional-price">Preço Promocional (R$)</Label>
+                  <Input
+                    id="product-promotional-price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={productPromotionalPrice}
+                    onChange={(e) => setProductPromotionalPrice(e.target.value)}
+                    placeholder="Deixe vazio se não tiver promoção"
+                  />
+                </div>
               </div>
               <div>
                 <Label htmlFor="product-image">Foto do Produto</Label>
