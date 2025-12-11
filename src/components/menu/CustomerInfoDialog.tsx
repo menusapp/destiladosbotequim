@@ -17,9 +17,11 @@ import { Loader2, UserCheck } from "lucide-react";
 interface CustomerInfoDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (name: string, cpf: string) => void;
+  onSubmit: (name: string, cpf: string, phone?: string) => void;
   restaurantColor?: string;
   restaurantId?: string;
+  requireName?: boolean;
+  requirePhone?: boolean;
 }
 
 const CustomerInfoDialog = ({ 
@@ -27,10 +29,13 @@ const CustomerInfoDialog = ({
   onClose, 
   onSubmit, 
   restaurantColor = "#FF6B35",
-  restaurantId
+  restaurantId,
+  requireName = true,
+  requirePhone = false
 }: CustomerInfoDialogProps) => {
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
+  const [phone, setPhone] = useState("");
   const [cpfError, setCpfError] = useState("");
   const [isCheckingCpf, setIsCheckingCpf] = useState(false);
   const [existingCustomer, setExistingCustomer] = useState<{name: string; phone?: string} | null>(null);
@@ -40,6 +45,7 @@ const CustomerInfoDialog = ({
     if (open) {
       setName("");
       setCpf("");
+      setPhone("");
       setCpfError("");
       setExistingCustomer(null);
     }
@@ -67,6 +73,7 @@ const CustomerInfoDialog = ({
         if (!error && data) {
           setExistingCustomer(data);
           setName(data.name); // Auto-fill name
+          if (data.phone) setPhone(data.phone); // Auto-fill phone
         } else {
           setExistingCustomer(null);
         }
@@ -90,10 +97,23 @@ const CustomerInfoDialog = ({
     return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
   };
 
+  const formatPhoneInput = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 11);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  };
+
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCPFInput(e.target.value);
     setCpf(formatted);
     setCpfError("");
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneInput(e.target.value);
+    setPhone(formatted);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,29 +134,39 @@ const CustomerInfoDialog = ({
 
     // If existing customer, use their saved name (ignore whatever was typed)
     const finalName = existingCustomer ? existingCustomer.name : name.trim();
+    const finalPhone = existingCustomer?.phone || phone.replace(/\D/g, "") || undefined;
 
-    if (!finalName) {
+    if (requireName && !finalName) {
       toast.error("Por favor, informe seu nome");
+      return;
+    }
+
+    if (requirePhone && !finalPhone && !existingCustomer?.phone) {
+      toast.error("Por favor, informe seu telefone");
       return;
     }
 
     // If new customer, create record in database
     if (!existingCustomer && restaurantId) {
       try {
+        const insertData: { restaurant_id: string; cpf: string; name: string; phone?: string } = {
+          restaurant_id: restaurantId,
+          cpf: sanitizedCPF,
+          name: finalName || "Cliente",
+        };
+        if (finalPhone) {
+          insertData.phone = finalPhone;
+        }
         await supabase
           .from("customers")
-          .insert({
-            restaurant_id: restaurantId,
-            cpf: sanitizedCPF,
-            name: finalName,
-          });
+          .insert(insertData);
       } catch (err) {
         console.error("Error creating customer:", err);
         // Continue anyway - the customer will be created on order if this fails
       }
     }
 
-    onSubmit(finalName, sanitizedCPF);
+    onSubmit(finalName || "Cliente", sanitizedCPF, finalPhone);
   };
 
   return (
@@ -181,21 +211,43 @@ const CustomerInfoDialog = ({
               <UserCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
               <div>
                 <p className="font-medium text-green-800 dark:text-green-200">{existingCustomer.name}</p>
+                {existingCustomer.phone && (
+                  <p className="text-sm text-green-600 dark:text-green-400">📞 {formatPhoneInput(existingCustomer.phone)}</p>
+                )}
                 <p className="text-sm text-green-600 dark:text-green-400">Cliente cadastrado</p>
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="customer-name">Nome</Label>
-              <Input
-                id="customer-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Digite seu nome"
-                required={!existingCustomer}
-                disabled={isCheckingCpf}
-              />
-            </div>
+            <>
+              {requireName && (
+                <div className="space-y-2">
+                  <Label htmlFor="customer-name">Nome</Label>
+                  <Input
+                    id="customer-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Digite seu nome"
+                    required={requireName}
+                    disabled={isCheckingCpf}
+                  />
+                </div>
+              )}
+
+              {requirePhone && (
+                <div className="space-y-2">
+                  <Label htmlFor="customer-phone">Telefone</Label>
+                  <Input
+                    id="customer-phone"
+                    value={phone}
+                    onChange={handlePhoneChange}
+                    placeholder="(00) 00000-0000"
+                    required={requirePhone}
+                    disabled={isCheckingCpf}
+                    maxLength={15}
+                  />
+                </div>
+              )}
+            </>
           )}
 
           <Button 

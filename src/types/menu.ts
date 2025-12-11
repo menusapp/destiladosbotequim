@@ -38,6 +38,8 @@ export interface Restaurant {
   service_fee_percentage?: number;
   service_fee_enabled?: boolean;
   prep_time_minutes?: number;
+  login_require_name?: boolean;
+  login_require_phone?: boolean;
 }
 
 export interface CartItemExtra {

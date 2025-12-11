@@ -187,29 +187,41 @@ export default function DeliveryMenu() {
     };
   }, [customerCPF, restaurant?.id]);
 
-  const handleCustomerInfoSubmit = async (name: string, cpf?: string) => {
-    const sanitizedCPF = (cpf || "").replace(/\D/g, "");
+  const handleCustomerInfoSubmit = async (name: string, cpf: string, phone?: string) => {
+    const sanitizedCPF = cpf.replace(/\D/g, "");
     
     // Check if customer exists in database (use saved name, ignore typed name)
     if (sanitizedCPF.length === 11 && restaurant?.id) {
       const { data: existingCustomer } = await supabase
         .from("customers")
-        .select("name")
+        .select("name, phone")
         .eq("restaurant_id", restaurant.id)
         .eq("cpf", sanitizedCPF)
         .maybeSingle();
       
       const finalName = existingCustomer ? existingCustomer.name : name;
+      const finalPhone = existingCustomer?.phone || phone;
+      
+      // Update phone if new one provided and customer exists
+      if (existingCustomer && phone && !existingCustomer.phone) {
+        await supabase
+          .from("customers")
+          .update({ phone })
+          .eq("restaurant_id", restaurant.id)
+          .eq("cpf", sanitizedCPF);
+      }
       
       setCustomerName(finalName);
       setCustomerCPF(sanitizedCPF);
       sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, finalName);
       sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
+      if (finalPhone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, finalPhone);
     } else {
       setCustomerName(name);
       setCustomerCPF(sanitizedCPF);
       sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
       sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
+      if (phone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, phone);
     }
     
     setShowCustomerDialog(false);
@@ -467,6 +479,8 @@ export default function DeliveryMenu() {
             onSubmit={handleCustomerInfoSubmit}
             restaurantColor={primaryColor}
             restaurantId={restaurant?.id}
+            requireName={restaurant?.login_require_name ?? true}
+            requirePhone={restaurant?.login_require_phone ?? false}
           />
         </>
       )}

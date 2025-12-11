@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Palette } from "lucide-react";
+import { Palette, User, Phone, CreditCard } from "lucide-react";
 
 interface Settings {
   logo_url: string | null;
@@ -16,16 +16,20 @@ interface Settings {
   service_fee_enabled: boolean;
   service_fee_percentage: number;
   prep_time_minutes: number;
+  login_require_name: boolean;
+  login_require_phone: boolean;
 }
 
 const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
-  const [settings, setSettings] = useState<Settings>({
+const [settings, setSettings] = useState<Settings>({
     logo_url: null,
     banner_url: null,
     primary_color: "#FF6B35",
     service_fee_enabled: false,
     service_fee_percentage: 10,
     prep_time_minutes: 30,
+    login_require_name: true,
+    login_require_phone: false,
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -39,7 +43,7 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -53,6 +57,8 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
           prep_time_minutes: data.prep_time_minutes || 30,
+          login_require_name: data.login_require_name ?? true,
+          login_require_phone: data.login_require_phone ?? false,
         });
       } else {
         // Nenhuma configuração encontrada para este restaurante
@@ -180,6 +186,8 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: settings.service_fee_enabled,
           service_fee_percentage: settings.service_fee_percentage,
           prep_time_minutes: settings.prep_time_minutes,
+          login_require_name: settings.login_require_name,
+          login_require_phone: settings.login_require_phone,
         })
         .eq('id', restaurantId);
 
@@ -204,9 +212,10 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="menu-digital" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="menu-digital">Cardápio Digital</TabsTrigger>
           <TabsTrigger value="taxa-servico">Taxa de Serviço</TabsTrigger>
+          <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
         </TabsList>
 
         <TabsContent value="menu-digital" className="space-y-6 mt-6">
@@ -389,6 +398,75 @@ const SettingsTab = ({ restaurantId }: { restaurantId: string }) => {
                   />
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Button onClick={handleSaveSettings} className="w-full">
+            Salvar Configurações
+          </Button>
+        </TabsContent>
+
+        <TabsContent value="cadastro" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Campos de Cadastro
+              </CardTitle>
+              <CardDescription>
+                Configure quais informações solicitar ao cliente no login dos cardápios
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label className="font-medium">CPF</Label>
+                    <p className="text-sm text-muted-foreground">Identificação única do cliente</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Obrigatório</span>
+                  <Switch checked disabled />
+                </div>
+              </div>
+
+              <div className="border-t" />
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="require-name" className="font-medium">Nome do Cliente</Label>
+                    <p className="text-sm text-muted-foreground">Solicitar nome no cadastro</p>
+                  </div>
+                </div>
+                <Switch
+                  id="require-name"
+                  checked={settings.login_require_name}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, login_require_name: checked })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Phone className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="require-phone" className="font-medium">Telefone</Label>
+                    <p className="text-sm text-muted-foreground">Solicitar número de telefone no cadastro</p>
+                  </div>
+                </div>
+                <Switch
+                  id="require-phone"
+                  checked={settings.login_require_phone}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, login_require_phone: checked })
+                  }
+                />
+              </div>
             </CardContent>
           </Card>
 

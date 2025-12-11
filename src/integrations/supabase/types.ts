@@ -1589,6 +1589,8 @@ export type Database = {
           featured_section_title: string | null
           id: string
           is_open: boolean | null
+          login_require_name: boolean | null
+          login_require_phone: boolean | null
           logo_url: string | null
           loyalty_enabled: boolean | null
           loyalty_points_per_real: number | null
@@ -1613,6 +1615,8 @@ export type Database = {
           featured_section_title?: string | null
           id?: string
           is_open?: boolean | null
+          login_require_name?: boolean | null
+          login_require_phone?: boolean | null
           logo_url?: string | null
           loyalty_enabled?: boolean | null
           loyalty_points_per_real?: number | null
@@ -1637,6 +1641,8 @@ export type Database = {
           featured_section_title?: string | null
           id?: string
           is_open?: boolean | null
+          login_require_name?: boolean | null
+          login_require_phone?: boolean | null
           logo_url?: string | null
           loyalty_enabled?: boolean | null
           loyalty_points_per_real?: number | null
