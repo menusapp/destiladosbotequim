@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import ProductCard from "./ProductCard";
 
 interface Product {
@@ -35,6 +36,14 @@ interface Product {
   margin?: number;
   prep_time?: number;
   sku?: string;
+  variableCosts?: VariableCostInfo[];
+}
+
+interface VariableCostInfo {
+  name: string;
+  price: number;
+  cost: number;
+  margin: number;
 }
 
 interface Category {
@@ -87,6 +96,14 @@ interface LinkedComplementGroup {
   }[];
 }
 
+// Variação para insumos variáveis
+interface IngredientVariation {
+  id: string;
+  name: string;
+  price: number;
+  ingredients: ProductIngredient[];
+}
+
 interface ProductsGridProps {
   restaurantId: string;
   isRestaurantOpen: boolean;
@@ -110,27 +127,43 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const [productCategoryId, setProductCategoryId] = useState("");
   const [productImage, setProductImage] = useState<File | null>(null);
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
+  const [productPrepTime, setProductPrepTime] = useState("");
+  
+  // Tipo de insumos: "fixed" ou "variable"
+  const [ingredientType, setIngredientType] = useState<"fixed" | "variable">("fixed");
+  
+  // Insumos fixos
   const [ingredients, setIngredients] = useState<ProductIngredient[]>([]);
   const [selectedStockItem, setSelectedStockItem] = useState("");
   const [ingredientQuantity, setIngredientQuantity] = useState("");
+  
+  // Insumos variáveis (variações)
+  const [variations, setVariations] = useState<IngredientVariation[]>([]);
+  const [variationName, setVariationName] = useState("");
+  const [variationPrice, setVariationPrice] = useState("");
+  const [variationIngredients, setVariationIngredients] = useState<ProductIngredient[]>([]);
+  const [selectedVariationStockItem, setSelectedVariationStockItem] = useState("");
+  const [variationIngredientQuantity, setVariationIngredientQuantity] = useState("");
+  const [variationIsRequired, setVariationIsRequired] = useState(true);
+  const [variationMinSelection, setVariationMinSelection] = useState("1");
+  const [variationMaxSelection, setVariationMaxSelection] = useState("1");
+  
+  // Complementos avulsos
   const [extras, setExtras] = useState<ProductExtra[]>([]);
   const [extraName, setExtraName] = useState("");
   const [extraPrice, setExtraPrice] = useState("");
   const [extraIngredients, setExtraIngredients] = useState<ProductIngredient[]>([]);
   const [selectedExtraStockItem, setSelectedExtraStockItem] = useState("");
   const [extraIngredientQuantity, setExtraIngredientQuantity] = useState("");
-  const [productPrepTime, setProductPrepTime] = useState("");
+  const [extraIsRequired, setExtraIsRequired] = useState(false);
   
-  // Complementos avançados
+  // Complementos avançados (categorias vinculadas)
   const [complementCategories, setComplementCategories] = useState<ComplementCategory[]>([]);
   const [linkedGroups, setLinkedGroups] = useState<LinkedComplementGroup[]>([]);
   const [selectedComplementCategory, setSelectedComplementCategory] = useState("");
   const [groupIsRequired, setGroupIsRequired] = useState(false);
   const [groupMinSelection, setGroupMinSelection] = useState("0");
   const [groupMaxSelection, setGroupMaxSelection] = useState("");
-  
-  // Individual complement settings
-  const [extraIsRequired, setExtraIsRequired] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -204,23 +237,52 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     // Calculate cost and margin for each product
     const productsWithMetrics = await Promise.all(
       (data || []).map(async (product) => {
+        // Buscar insumos fixos
         const { data: ingredientsData } = await supabase
           .from("product_ingredients")
           .select("quantity, stock_items(price_per_unit)")
           .eq("product_id", product.id);
 
-        const cost = ingredientsData?.reduce((sum, ing: any) => {
+        const fixedCost = ingredientsData?.reduce((sum, ing: any) => {
           return sum + (ing.quantity * (ing.stock_items?.price_per_unit || 0));
         }, 0) || 0;
 
-        const margin = product.price > 0 ? ((product.price - cost) / product.price) * 100 : 0;
+        // Buscar extras (insumos variáveis) com ingredientes
+        const { data: extrasData } = await supabase
+          .from("product_extras")
+          .select("id, name, price, is_required, product_extra_ingredients(quantity, stock_items(price_per_unit))")
+          .eq("product_id", product.id);
+
+        // Calcular custo de cada variação
+        const variableCosts: VariableCostInfo[] = (extrasData || [])
+          .filter((e: any) => e.is_required) // Insumos variáveis são marcados como required
+          .map((extra: any) => {
+            const extraCost = extra.product_extra_ingredients?.reduce((sum: number, ing: any) => {
+              return sum + (ing.quantity * (ing.stock_items?.price_per_unit || 0));
+            }, 0) || 0;
+            
+            const totalPrice = product.price + extra.price;
+            const margin = totalPrice > 0 ? ((totalPrice - extraCost) / totalPrice) * 100 : 0;
+            
+            return {
+              name: extra.name,
+              price: extra.price,
+              cost: extraCost,
+              margin
+            };
+          });
+
+        // Se tem variações, usar range; senão, usar custo fixo
+        let cost = fixedCost;
+        let margin = product.price > 0 ? ((product.price - cost) / product.price) * 100 : 0;
 
         return {
           ...product,
           cost,
           margin,
           prep_time: product.prep_time_minutes || 30,
-          sku: product.name.substring(0, 3).toUpperCase() + String(product.id).substring(0, 4).toUpperCase()
+          sku: product.name.substring(0, 3).toUpperCase() + String(product.id).substring(0, 4).toUpperCase(),
+          variableCosts: variableCosts.length > 0 ? variableCosts : undefined
         };
       })
     );
@@ -243,6 +305,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     fetchProducts();
   };
 
+  // Insumos fixos
   const handleAddIngredient = () => {
     if (!selectedStockItem || !ingredientQuantity) return;
     const stockItem = stockItems.find(s => s.id === selectedStockItem);
@@ -264,13 +327,61 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setIngredients(ingredients.filter(i => i.id !== id));
   };
 
+  // Variações de insumos
+  const handleAddVariationIngredient = () => {
+    if (!selectedVariationStockItem || !variationIngredientQuantity) return;
+    const stockItem = stockItems.find(s => s.id === selectedVariationStockItem);
+    if (!stockItem) return;
+
+    setVariationIngredients([...variationIngredients, {
+      id: crypto.randomUUID(),
+      stock_item_id: selectedVariationStockItem,
+      quantity: parseFloat(variationIngredientQuantity),
+      stock_item_name: stockItem.name,
+      stock_item_unit: stockItem.unit,
+      stock_item_price: stockItem.price_per_unit
+    }]);
+    setSelectedVariationStockItem("");
+    setVariationIngredientQuantity("");
+  };
+
+  const handleRemoveVariationIngredient = (id: string) => {
+    setVariationIngredients(variationIngredients.filter(i => i.id !== id));
+  };
+
+  const handleAddVariation = () => {
+    if (!variationName) {
+      toast.error("Informe o nome da variação");
+      return;
+    }
+    if (variationIngredients.length === 0) {
+      toast.error("Adicione pelo menos um insumo à variação");
+      return;
+    }
+
+    setVariations([...variations, {
+      id: crypto.randomUUID(),
+      name: variationName,
+      price: parseFloat(variationPrice) || 0,
+      ingredients: [...variationIngredients]
+    }]);
+
+    setVariationName("");
+    setVariationPrice("");
+    setVariationIngredients([]);
+  };
+
+  const handleRemoveVariation = (id: string) => {
+    setVariations(variations.filter(v => v.id !== id));
+  };
+
+  // Complementos avulsos
   const handleAddExtra = () => {
     if (!extraName || !extraPrice) {
       toast.error("Preencha nome e preço do complemento");
       return;
     }
 
-    // Validação: verificar se já existe extra com mesmo nome
     if (extras.some(e => e.name.toLowerCase() === extraName.toLowerCase())) {
       toast.error("Já existe um complemento com este nome");
       return;
@@ -296,13 +407,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       return;
     }
 
-    // Check if already linked
     if (linkedGroups.some(g => g.extra_category_id === selectedComplementCategory)) {
       toast.error("Esta categoria já está vinculada");
       return;
     }
 
-    // Fetch category items
     const category = complementCategories.find(c => c.id === selectedComplementCategory);
     if (!category) return;
 
@@ -369,8 +478,6 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       return;
     }
 
-    // Insumos não são mais obrigatórios - permite produtos baseados apenas em complementos
-
     let imageUrl = productImageUrl;
 
     // Upload image if provided
@@ -403,6 +510,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : null,
     };
 
+    let productId: string;
+
     if (editingProduct) {
       const { error } = await supabase
         .from("products")
@@ -413,94 +522,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         toast.error("Erro ao atualizar produto");
         return;
       }
+      productId = editingProduct.id;
 
-      // Update ingredients
-      await supabase.from("product_ingredients").delete().eq("product_id", editingProduct.id);
-      const ingredientsData = ingredients.map(ing => ({
-        product_id: editingProduct.id,
-        stock_item_id: ing.stock_item_id,
-        quantity: ing.quantity
-      }));
-      await supabase.from("product_ingredients").insert(ingredientsData);
+      // Limpar ingredientes antigos
+      await supabase.from("product_ingredients").delete().eq("product_id", productId);
 
-      // Update extras - UPSERT inteligente para evitar duplicação
-      // 1. Buscar extras existentes
-      const { data: existingExtras } = await supabase
-        .from("product_extras")
-        .select("id, name, price")
-        .eq("product_id", editingProduct.id);
-
-      const existingExtrasMap = new Map(
-        (existingExtras || []).map(e => [e.name.toLowerCase(), e])
-      );
-      const processedExtraNames = new Set<string>();
-
-      // 2. Processar extras do formulário
-      for (const extra of extras) {
-        const extraNameLower = extra.name.toLowerCase();
-        processedExtraNames.add(extraNameLower);
-        
-        const existing = existingExtrasMap.get(extraNameLower);
-        
-        if (existing) {
-          // Atualizar preço se mudou
-          if (existing.price !== extra.price) {
-            await supabase
-              .from("product_extras")
-              .update({ price: extra.price })
-              .eq("id", existing.id);
-          }
-          
-          // Atualizar ingredientes do extra
-          await supabase.from("product_extra_ingredients").delete().eq("product_extra_id", existing.id);
-          if (extra.ingredients && extra.ingredients.length > 0) {
-            const extraIngredientsData = extra.ingredients.map(ing => ({
-              product_extra_id: existing.id,
-              stock_item_id: ing.stock_item_id,
-              quantity: ing.quantity
-            }));
-            await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
-          }
-        } else {
-          // Inserir novo extra
-          const { data: newExtra } = await supabase
-            .from("product_extras")
-            .insert({
-              product_id: editingProduct.id,
-              name: extra.name,
-              price: extra.price
-            })
-            .select()
-            .single();
-          
-          // Inserir ingredientes do novo extra
-          if (newExtra && extra.ingredients && extra.ingredients.length > 0) {
-            const extraIngredientsData = extra.ingredients.map(ing => ({
-              product_extra_id: newExtra.id,
-              stock_item_id: ing.stock_item_id,
-              quantity: ing.quantity
-            }));
-            await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
-          }
-        }
-      }
-
-      // 3. Deletar extras que foram removidos (ignorar erros de constraint)
-      for (const [name, existing] of existingExtrasMap.entries()) {
-        if (!processedExtraNames.has(name)) {
-          try {
-            await supabase
-              .from("product_extras")
-              .delete()
-              .eq("id", existing.id);
-            console.log(`Extra "${existing.name}" removido com sucesso`);
-          } catch (err) {
-            console.warn(`Não foi possível remover extra "${existing.name}" (pode estar em uso):`, err);
-          }
-        }
-      }
-
-      toast.success("Produto atualizado!");
     } else {
       const { data: newProduct, error } = await supabase
         .from("products")
@@ -512,45 +538,100 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         toast.error("Erro ao criar produto");
         return;
       }
-
-      // Insert ingredients
-      const ingredientsData = ingredients.map(ing => ({
-        product_id: newProduct.id,
-        stock_item_id: ing.stock_item_id,
-        quantity: ing.quantity
-      }));
-      await supabase.from("product_ingredients").insert(ingredientsData);
-
-      // Insert extras
-      if (extras.length > 0) {
-        const extrasData = extras.map(extra => ({
-          product_id: newProduct.id,
-          name: extra.name,
-          price: extra.price
-        }));
-        const { data: insertedExtras } = await supabase
-          .from("product_extras")
-          .insert(extrasData)
-          .select();
-
-        if (insertedExtras) {
-          for (let i = 0; i < insertedExtras.length; i++) {
-            const extra = extras[i];
-            if (extra.ingredients && extra.ingredients.length > 0) {
-              const extraIngredientsData = extra.ingredients.map(ing => ({
-                product_extra_id: insertedExtras[i].id,
-                stock_item_id: ing.stock_item_id,
-                quantity: ing.quantity
-              }));
-              await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
-            }
-          }
-        }
-      }
-
-      toast.success("Produto criado!");
+      productId = newProduct.id;
     }
 
+    // Salvar insumos baseado no tipo
+    if (ingredientType === "fixed") {
+      // Insumos fixos
+      if (ingredients.length > 0) {
+        const ingredientsData = ingredients.map(ing => ({
+          product_id: productId,
+          stock_item_id: ing.stock_item_id,
+          quantity: ing.quantity
+        }));
+        await supabase.from("product_ingredients").insert(ingredientsData);
+      }
+    }
+
+    // Deletar extras antigos (variações + complementos avulsos)
+    const { data: oldExtras } = await supabase
+      .from("product_extras")
+      .select("id")
+      .eq("product_id", productId);
+    
+    if (oldExtras && oldExtras.length > 0) {
+      for (const extra of oldExtras) {
+        await supabase.from("product_extra_ingredients").delete().eq("product_extra_id", extra.id);
+      }
+      await supabase.from("product_extras").delete().eq("product_id", productId);
+    }
+
+    // Salvar variações como extras com is_required = true
+    if (ingredientType === "variable" && variations.length > 0) {
+      for (const variation of variations) {
+        const { data: newExtra } = await supabase
+          .from("product_extras")
+          .insert({
+            product_id: productId,
+            name: variation.name,
+            price: variation.price,
+            is_required: true,
+            min_selection: parseInt(variationMinSelection) || 1,
+            max_selection: parseInt(variationMaxSelection) || 1
+          })
+          .select()
+          .single();
+
+        if (newExtra && variation.ingredients.length > 0) {
+          const extraIngredientsData = variation.ingredients.map(ing => ({
+            product_extra_id: newExtra.id,
+            stock_item_id: ing.stock_item_id,
+            quantity: ing.quantity
+          }));
+          await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
+        }
+      }
+    }
+
+    // Salvar complementos avulsos (não obrigatórios por padrão, ou conforme configurado)
+    for (const extra of extras) {
+      const { data: newExtra } = await supabase
+        .from("product_extras")
+        .insert({
+          product_id: productId,
+          name: extra.name,
+          price: extra.price,
+          is_required: extra.is_required || false
+        })
+        .select()
+        .single();
+
+      if (newExtra && extra.ingredients && extra.ingredients.length > 0) {
+        const extraIngredientsData = extra.ingredients.map(ing => ({
+          product_extra_id: newExtra.id,
+          stock_item_id: ing.stock_item_id,
+          quantity: ing.quantity
+        }));
+        await supabase.from("product_extra_ingredients").insert(extraIngredientsData);
+      }
+    }
+
+    // Salvar grupos de complementos vinculados
+    await supabase.from("product_complement_groups").delete().eq("product_id", productId);
+    
+    if (linkedGroups.length > 0) {
+      const groupsData = linkedGroups.map(group => ({
+        product_id: productId,
+        extra_category_id: group.extra_category_id,
+        is_required: group.is_required,
+        min_selection: group.min_selection,
+        max_selection: group.max_selection
+      }));
+      await supabase.from("product_complement_groups").insert(groupsData);
+    }
+
+    toast.success(editingProduct ? "Produto atualizado!" : "Produto criado!");
     resetForm();
     fetchProducts();
   };
@@ -569,7 +650,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
 
-    // Fetch ingredients
+    // Fetch ingredients (insumos fixos)
     const { data: ingredientsData } = await supabase
       .from("product_ingredients")
       .select("*, stock_items(name, unit, price_per_unit)")
@@ -584,15 +665,17 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       stock_item_price: ing.stock_items?.price_per_unit
     })) || [];
 
-    setIngredients(formattedIngredients);
-
     // Fetch extras
     const { data: extrasData } = await supabase
       .from("product_extras")
       .select("*, product_extra_ingredients(*, stock_items(name, unit, price_per_unit))")
       .eq("product_id", product.id);
 
-    const formattedExtras = extrasData?.map((extra: any) => {
+    // Separar variações (is_required=true) de complementos avulsos
+    const variationsFromDB: IngredientVariation[] = [];
+    const extrasFromDB: ProductExtra[] = [];
+
+    extrasData?.forEach((extra: any) => {
       const ingredients = extra.product_extra_ingredients?.map((ing: any) => ({
         id: ing.id,
         stock_item_id: ing.stock_item_id,
@@ -602,15 +685,62 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         stock_item_price: ing.stock_items?.price_per_unit
       })) || [];
 
-      return {
-        id: extra.id,
-        name: extra.name,
-        price: extra.price,
-        ingredients
-      };
-    }) || [];
+      if (extra.is_required && ingredients.length > 0) {
+        // É uma variação de insumo
+        variationsFromDB.push({
+          id: extra.id,
+          name: extra.name,
+          price: extra.price,
+          ingredients
+        });
+        // Pegar configurações de min/max do primeiro
+        if (variationsFromDB.length === 1) {
+          setVariationMinSelection(extra.min_selection?.toString() || "1");
+          setVariationMaxSelection(extra.max_selection?.toString() || "1");
+          setVariationIsRequired(true);
+        }
+      } else {
+        // É um complemento avulso
+        extrasFromDB.push({
+          id: extra.id,
+          name: extra.name,
+          price: extra.price,
+          ingredients,
+          is_required: extra.is_required
+        });
+      }
+    });
 
-    setExtras(formattedExtras);
+    // Determinar tipo de insumos
+    if (variationsFromDB.length > 0) {
+      setIngredientType("variable");
+      setVariations(variationsFromDB);
+      setIngredients([]);
+    } else {
+      setIngredientType("fixed");
+      setIngredients(formattedIngredients);
+      setVariations([]);
+    }
+
+    setExtras(extrasFromDB);
+
+    // Fetch linked complement groups
+    const { data: groupsData } = await supabase
+      .from("product_complement_groups")
+      .select("*, extra_categories(id, name, extra_category_items(id, name, price))")
+      .eq("product_id", product.id);
+
+    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any) => ({
+      id: g.id,
+      extra_category_id: g.extra_category_id,
+      category_name: g.extra_categories?.name || "",
+      is_required: g.is_required || false,
+      min_selection: g.min_selection || 0,
+      max_selection: g.max_selection,
+      items: g.extra_categories?.extra_category_items || []
+    }));
+
+    setLinkedGroups(formattedGroups);
     setDialogOpen(true);
   };
 
@@ -623,7 +753,15 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductImage(null);
     setProductImageUrl(null);
     setProductPrepTime("");
+    setIngredientType("fixed");
     setIngredients([]);
+    setVariations([]);
+    setVariationName("");
+    setVariationPrice("");
+    setVariationIngredients([]);
+    setVariationIsRequired(true);
+    setVariationMinSelection("1");
+    setVariationMaxSelection("1");
     setExtras([]);
     setExtraName("");
     setExtraPrice("");
@@ -633,7 +771,6 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setSelectedExtraStockItem("");
     setExtraIngredientQuantity("");
     setEditingProduct(null);
-    // Reset complement states
     setLinkedGroups([]);
     setSelectedComplementCategory("");
     setGroupIsRequired(false);
@@ -642,15 +779,29 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setExtraIsRequired(false);
   };
 
-  const calculateProductCost = () => {
+  // Cálculo de custo para insumos fixos
+  const fixedCost = useMemo(() => {
     return ingredients.reduce((sum, ing) => {
       return sum + (ing.quantity * (ing.stock_item_price || 0));
     }, 0);
-  };
+  }, [ingredients]);
 
-  const productCost = calculateProductCost();
+  // Cálculo de custos para variações
+  const variationCosts = useMemo(() => {
+    const price = parseFloat(productPrice) || 0;
+    return variations.map(v => {
+      const cost = v.ingredients.reduce((sum, ing) => {
+        return sum + (ing.quantity * (ing.stock_item_price || 0));
+      }, 0);
+      const totalPrice = price + v.price;
+      const margin = totalPrice > 0 ? ((totalPrice - cost) / totalPrice) * 100 : 0;
+      const cmv = totalPrice > 0 ? (cost / totalPrice) * 100 : 0;
+      return { name: v.name, price: v.price, cost, margin, cmv, totalPrice };
+    });
+  }, [variations, productPrice]);
+
   const parsedProductPrice = parseFloat(productPrice) || 0;
-  const cmvPercentage = parsedProductPrice > 0 ? (productCost / parsedProductPrice) * 100 : 0;
+  const cmvPercentage = parsedProductPrice > 0 ? (fixedCost / parsedProductPrice) * 100 : 0;
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -674,26 +825,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
             toast.error("Feche o restaurante para adicionar produtos");
             return;
           }
-          // Resetar todos os estados do formulário para novo produto
-          setEditingProduct(null);
-          setProductName("");
-          setProductDescription("");
-          setProductPrice("");
-          setProductCategoryId("");
-          setProductImage(null);
-          setProductImageUrl(null);
-          setProductPrepTime("");
-          setIngredients([]);
-          setExtras([]);
-          setExtraName("");
-          setExtraPrice("");
-          setExtraIngredients([]);
-          setLinkedGroups([]);
-          setSelectedComplementCategory("");
-          setGroupIsRequired(false);
-          setGroupMinSelection("0");
-          setGroupMaxSelection("");
-          setExtraIsRequired(false);
+          resetForm();
           setDialogOpen(true);
         }}>
           <Plus className="h-4 w-4 mr-2" />
@@ -759,7 +891,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="product-price">Preço (R$) *</Label>
+                  <Label htmlFor="product-price">Preço Base (R$) *</Label>
                   <Input
                     id="product-price"
                     type="number"
@@ -797,9 +929,6 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                   onChange={(e) => setProductPrepTime(e.target.value)}
                   placeholder="Ex: 30"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Tempo médio de preparo do produto
-                </p>
               </div>
               <div>
                 <Label htmlFor="product-image">Foto do Produto</Label>
@@ -816,80 +945,267 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
             </div>
 
             {/* Ingredients Section */}
-            <div className="space-y-3 p-4 border rounded-xl bg-primary/5">
+            <div className="space-y-4 p-4 border rounded-xl bg-primary/5">
               <div className="flex items-center justify-between">
-                <h4 className="font-semibold">Receita (Insumos) *</h4>
-                {productCost > 0 && (
-                  <div className="text-sm space-y-1">
-                    <p className="text-muted-foreground">
-                      Custo: <span className="font-semibold text-foreground">R$ {productCost.toFixed(2)}</span>
-                    </p>
-                    {parsedProductPrice > 0 && (
+                <h4 className="font-semibold">Insumos (Opcional)</h4>
+              </div>
+
+              {/* Tipo de Insumos */}
+              <RadioGroup 
+                value={ingredientType} 
+                onValueChange={(v) => setIngredientType(v as "fixed" | "variable")}
+                className="flex gap-6"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="fixed" id="fixed" />
+                  <Label htmlFor="fixed" className="cursor-pointer">
+                    Insumos Fixos
+                    <span className="text-xs text-muted-foreground block">Todos os pedidos usam os mesmos insumos</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="variable" id="variable" />
+                  <Label htmlFor="variable" className="cursor-pointer">
+                    Insumos Variáveis
+                    <span className="text-xs text-muted-foreground block">Cliente escolhe uma opção (tamanhos, etc.)</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+
+              {/* Insumos Fixos */}
+              {ingredientType === "fixed" && (
+                <div className="space-y-3">
+                  {fixedCost > 0 && (
+                    <div className="text-sm space-y-1 p-2 bg-background rounded border">
                       <p className="text-muted-foreground">
-                        CMV: <span className={`font-semibold ${cmvPercentage > 35 ? 'text-destructive' : 'text-success'}`}>
-                          {cmvPercentage.toFixed(1)}%
-                        </span>
+                        Custo: <span className="font-semibold text-foreground">R$ {fixedCost.toFixed(2)}</span>
                       </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <Select value={selectedStockItem} onValueChange={setSelectedStockItem}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Selecione um insumo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stockItems.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.unit}) - R$ {item.price_per_unit.toFixed(2)}/{item.unit}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  className="w-28"
-                  type="number"
-                  step="0.001"
-                  placeholder="Qtd"
-                  value={ingredientQuantity}
-                  onChange={(e) => setIngredientQuantity(e.target.value)}
-                />
-                <Button type="button" variant="outline" size="icon" onClick={handleAddIngredient}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {ingredients.length > 0 && (
-                <div className="space-y-2">
-                  {ingredients.map((ing) => (
-                    <div key={ing.id} className="flex items-center justify-between p-2 bg-background rounded border text-sm">
-                      <span>
-                        {ing.stock_item_name} - {ing.quantity} {ing.stock_item_unit}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">
-                          R$ {((ing.stock_item_price || 0) * ing.quantity).toFixed(2)}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveIngredient(ing.id)}
-                        >
-                          Remover
-                        </Button>
-                      </div>
+                      {parsedProductPrice > 0 && (
+                        <p className="text-muted-foreground">
+                          CMV: <span className={`font-semibold ${cmvPercentage > 35 ? 'text-destructive' : 'text-success'}`}>
+                            {cmvPercentage.toFixed(1)}%
+                          </span>
+                        </p>
+                      )}
                     </div>
-                  ))}
+                  )}
+
+                  <div className="flex gap-2">
+                    <Select value={selectedStockItem} onValueChange={setSelectedStockItem}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Selecione um insumo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stockItems.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name} ({item.unit}) - R$ {item.price_per_unit.toFixed(2)}/{item.unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      className="w-28"
+                      type="number"
+                      step="0.001"
+                      placeholder="Qtd"
+                      value={ingredientQuantity}
+                      onChange={(e) => setIngredientQuantity(e.target.value)}
+                    />
+                    <Button type="button" variant="outline" size="icon" onClick={handleAddIngredient}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {ingredients.length > 0 && (
+                    <div className="space-y-2">
+                      {ingredients.map((ing) => (
+                        <div key={ing.id} className="flex items-center justify-between p-2 bg-background rounded border text-sm">
+                          <span>
+                            {ing.stock_item_name} - {ing.quantity} {ing.stock_item_unit}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">
+                              R$ {((ing.stock_item_price || 0) * ing.quantity).toFixed(2)}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveIngredient(ing.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Insumos Variáveis */}
+              {ingredientType === "variable" && (
+                <div className="space-y-4">
+                  {/* Configuração do grupo */}
+                  <div className="grid grid-cols-3 gap-2 p-2 bg-background rounded border">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="variation-required"
+                        checked={variationIsRequired}
+                        onChange={(e) => setVariationIsRequired(e.target.checked)}
+                        className="rounded border-input"
+                      />
+                      <Label htmlFor="variation-required" className="text-xs">Obrigatório</Label>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Mín</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={variationMinSelection}
+                        onChange={(e) => setVariationMinSelection(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Máx</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={variationMaxSelection}
+                        onChange={(e) => setVariationMaxSelection(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Nova variação */}
+                  <div className="space-y-2 p-3 bg-background rounded-lg border">
+                    <p className="text-sm font-medium">Nova Variação</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Nome (ex: Batata P)"
+                        value={variationName}
+                        onChange={(e) => setVariationName(e.target.value)}
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Preço adicional"
+                        value={variationPrice}
+                        onChange={(e) => setVariationPrice(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Select value={selectedVariationStockItem} onValueChange={setSelectedVariationStockItem}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Insumo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stockItems.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.name} - R$ {item.price_per_unit.toFixed(2)}/{item.unit}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        className="w-24"
+                        type="number"
+                        step="0.001"
+                        placeholder="Qtd"
+                        value={variationIngredientQuantity}
+                        onChange={(e) => setVariationIngredientQuantity(e.target.value)}
+                      />
+                      <Button type="button" variant="outline" size="icon" onClick={handleAddVariationIngredient}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {variationIngredients.length > 0 && (
+                      <div className="space-y-1">
+                        {variationIngredients.map((ing) => (
+                          <div key={ing.id} className="flex items-center justify-between p-2 bg-muted rounded text-xs">
+                            <span>{ing.stock_item_name} - {ing.quantity} {ing.stock_item_unit}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveVariationIngredient(ing.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Button type="button" variant="secondary" onClick={handleAddVariation} className="w-full">
+                      Adicionar Variação
+                    </Button>
+                  </div>
+
+                  {/* Lista de variações */}
+                  {variations.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Variações Cadastradas:</p>
+                      {variations.map((v) => {
+                        const vc = variationCosts.find(c => c.name === v.name);
+                        return (
+                          <div key={v.id} className="p-3 bg-background rounded-lg border">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <span className="font-medium">{v.name}</span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  {v.price > 0 ? `+R$ ${v.price.toFixed(2)}` : "Incluído"}
+                                </span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveVariation(v.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {v.ingredients.map(i => i.stock_item_name).join(", ")}
+                            </div>
+                            {vc && (
+                              <div className="mt-2 pt-2 border-t text-sm grid grid-cols-3 gap-2">
+                                <div>
+                                  <span className="text-muted-foreground">Custo: </span>
+                                  <span className="font-medium">R$ {vc.cost.toFixed(2)}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">CMV: </span>
+                                  <span className={`font-medium ${vc.cmv > 35 ? 'text-destructive' : 'text-success'}`}>
+                                    {vc.cmv.toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Margem: </span>
+                                  <span className={`font-medium ${vc.margin < 50 ? 'text-destructive' : 'text-success'}`}>
+                                    {vc.margin.toFixed(1)}%
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Complementos Section */}
             <div className="space-y-4 p-4 border rounded-xl bg-secondary/20">
-              <h4 className="font-semibold">Complementos</h4>
+              <h4 className="font-semibold">Complementos (Opcional)</h4>
               
               {/* Link Complement Category */}
               <div className="space-y-3 p-3 bg-background rounded-lg border">
