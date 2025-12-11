@@ -10,8 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, Calendar as CalendarIcon, PlusCircle, MinusCircle } from "lucide-react";
+import { 
+  DollarSign, TrendingUp, TrendingDown, Wallet, FileText, 
+  Calendar as CalendarIcon, PlusCircle, MinusCircle, 
+  ChevronDown, Receipt, Banknote, Coins
+} from "lucide-react";
 import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -59,7 +64,6 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
   // Estados para abrir caixa
   const [openingBalance, setOpeningBalance] = useState("");
   const [openedBy, setOpenedBy] = useState("");
-  const [showCashCount, setShowCashCount] = useState(false);
   const [billCounts, setBillCounts] = useState({
     bill200: 0, bill100: 0, bill50: 0, bill20: 0, bill10: 0, bill5: 0, bill2: 0
   });
@@ -90,13 +94,11 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
   // Atualizar saldo inicial quando contagem mudar
   useEffect(() => {
-    if (showCashCount) {
-      const total = calculateCashCountTotal();
-      if (total > 0) {
-        setOpeningBalance(total.toFixed(2));
-      }
+    const total = calculateCashCountTotal();
+    if (total > 0) {
+      setOpeningBalance(total.toFixed(2));
     }
-  }, [billCounts, coinCounts, showCashCount]);
+  }, [billCounts, coinCounts]);
 
   // Estados para fechar caixa
   const [closingBalance, setClosingBalance] = useState("");
@@ -141,7 +143,6 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       if (error) throw error;
       setCurrentSession(data);
 
-      // Se não houver caixa aberto, buscar última sessão fechada
       if (!data) {
         const { data: lastClosed, error: lastError } = await supabase
           .from("cash_register_sessions")
@@ -155,7 +156,6 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         if (lastError) throw lastError;
         setLastClosedSession(lastClosed);
 
-        // Buscar movimentações da última sessão fechada
         if (lastClosed) {
           const { data: lastMovements, error: movError } = await supabase
             .from("cash_movements")
@@ -205,7 +205,6 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       if (error) throw error;
       setClosedSessions(data || []);
       
-      // Buscar movimentações das sessões fechadas
       if (data && data.length > 0) {
         const sessionIds = data.map(s => s.id);
         const { data: movementsData, error: movError } = await supabase
@@ -243,7 +242,6 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       toast.success("Caixa aberto com sucesso!");
       setOpenedBy("");
       setOpeningBalance("");
-      setShowCashCount(false);
       setBillCounts({ bill200: 0, bill100: 0, bill50: 0, bill20: 0, bill10: 0, bill5: 0, bill2: 0 });
       setCoinCounts({ coin100: 0, coin50: 0, coin25: 0, coin10: 0, coin05: 0 });
       fetchCurrentSession();
@@ -395,7 +393,6 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
   const generateDRE = async () => {
     const { startDate, endDate } = getDateRange();
 
-    // Sessões no período: fechadas + (aberta, se dentro do período)
     const sessionsInRange: CashSession[] = [
       ...closedSessions.filter(filterSessionsByDate),
       ...(currentSession && filterSessionsByDate(currentSession) ? [currentSession] : []),
@@ -403,7 +400,6 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
     const sessionIds = sessionsInRange.map((s) => s.id);
 
-    // Movimentações no período dessas sessões (fechadas + aberta)
     const movementsInRange: CashMovement[] = [
       ...allMovements.filter((m) => sessionIds.includes(m.cash_session_id)),
       ...(currentSession && sessionIds.includes(currentSession.id) ? movements : []),
@@ -417,14 +413,12 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
       .filter((m) => m.movement_type === "saida")
       .reduce((sum, m) => sum + m.amount, 0);
 
-    // CMV com base APENAS nos pedidos que efetivamente entraram no caixa
     let cmv = 0;
     try {
       const cashMovementsOrders = movementsInRange.filter(
         (m) => m.movement_type === "entrada" && m.category === "Pedido"
       );
 
-      // Extrair IDs de pedidos do texto "Pedido #<uuid>"
       const orderIds: string[] = [];
       cashMovementsOrders.forEach((movement) => {
         const match = movement.description.match(/Pedido #([a-f0-9-]+)/);
@@ -461,9 +455,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         });
       }
 
-      // fallback via movimentações de estoque quando itens não estão mais disponíveis
       if (cmv === 0) {
-        // Buscar movimentações de estoque por vendas no período e calcular custo por insumo
         const { data: stockMoves } = await supabase
           .from("stock_movements")
           .select("stock_item_id, quantity, movement_type, created_at, reason")
@@ -539,8 +531,27 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
     return <div className="p-4">Carregando...</div>;
   }
 
+  const billDenominations = [
+    { key: 'bill200', label: 'R$ 200', value: 200 },
+    { key: 'bill100', label: 'R$ 100', value: 100 },
+    { key: 'bill50', label: 'R$ 50', value: 50 },
+    { key: 'bill20', label: 'R$ 20', value: 20 },
+    { key: 'bill10', label: 'R$ 10', value: 10 },
+    { key: 'bill5', label: 'R$ 5', value: 5 },
+    { key: 'bill2', label: 'R$ 2', value: 2 },
+  ];
+
+  const coinDenominations = [
+    { key: 'coin100', label: 'R$ 1,00', value: 1 },
+    { key: 'coin50', label: 'R$ 0,50', value: 0.5 },
+    { key: 'coin25', label: 'R$ 0,25', value: 0.25 },
+    { key: 'coin10', label: 'R$ 0,10', value: 0.1 },
+    { key: 'coin05', label: 'R$ 0,05', value: 0.05 },
+  ];
+
   return (
     <div className="space-y-6 p-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold">Gestão de Caixa</h2>
@@ -550,14 +561,19 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         {!currentSession ? (
           <Dialog>
             <DialogTrigger asChild>
-              <Button size="lg" className="gap-2">
+              <Button size="lg" className="gap-2 bg-orange-500 hover:bg-orange-600">
                 <Wallet className="h-5 w-5" />
                 Abrir Caixa
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Abrir Caixa</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-orange-100">
+                    <Wallet className="h-5 w-5 text-orange-600" />
+                  </div>
+                  Abrir Caixa
+                </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div>
@@ -570,107 +586,103 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                 </div>
                 
                 <div>
-                  <Label>Saldo inicial (R$)</Label>
+                  <Label>Valor de abertura do caixa (R$)</Label>
                   <Input
                     type="number"
                     step="0.01"
                     value={openingBalance}
                     onChange={(e) => setOpeningBalance(e.target.value)}
                     placeholder="0.00"
+                    className="text-lg font-semibold"
                   />
                 </div>
 
-                {/* Botão para expandir contagem de cédulas/moedas */}
-                <Button 
-                  variant="outline" 
-                  type="button"
-                  className="w-full"
-                  onClick={() => setShowCashCount(!showCashCount)}
-                >
-                  {showCashCount ? "Ocultar contagem de cédulas/moedas" : "Mostrar contagem de cédulas/moedas"}
-                </Button>
+                {/* Collapsible para contagem de cédulas/moedas */}
+                <Collapsible defaultOpen className="border rounded-lg overflow-hidden">
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 hover:bg-orange-100 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="h-4 w-4 text-orange-600" />
+                        <span className="font-medium text-orange-900">Contagem de Cédulas e Moedas</span>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-orange-600 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="p-4 space-y-4 bg-orange-50/30">
+                      {/* Cédulas */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Banknote className="h-4 w-4 text-orange-500" />
+                          <Label className="text-sm font-medium text-orange-800">Cédulas</Label>
+                        </div>
+                        <div className="grid grid-cols-7 gap-2">
+                          {billDenominations.map((bill) => (
+                            <div key={bill.key} className="text-center">
+                              <Label className="text-xs text-muted-foreground block mb-1">{bill.label}</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={billCounts[bill.key as keyof typeof billCounts] || ''}
+                                onChange={(e) => setBillCounts(prev => ({
+                                  ...prev,
+                                  [bill.key]: parseInt(e.target.value) || 0
+                                }))}
+                                placeholder="0"
+                                className="text-center h-9 text-sm"
+                              />
+                              <p className="text-xs text-orange-600 mt-1 font-medium">
+                                {((billCounts[bill.key as keyof typeof billCounts] || 0) * bill.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
 
-                {showCashCount && (
-                  <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                    {/* Cédulas */}
-                    <div>
-                      <Label className="text-base font-semibold mb-3 block">Cédulas</Label>
-                      <div className="grid grid-cols-4 gap-3">
-                        {[
-                          { key: 'bill200', label: 'R$ 200', value: 200 },
-                          { key: 'bill100', label: 'R$ 100', value: 100 },
-                          { key: 'bill50', label: 'R$ 50', value: 50 },
-                          { key: 'bill20', label: 'R$ 20', value: 20 },
-                          { key: 'bill10', label: 'R$ 10', value: 10 },
-                          { key: 'bill5', label: 'R$ 5', value: 5 },
-                          { key: 'bill2', label: 'R$ 2', value: 2 },
-                        ].map((bill) => (
-                          <div key={bill.key} className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">{bill.label}</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={billCounts[bill.key as keyof typeof billCounts] || ''}
-                              onChange={(e) => setBillCounts(prev => ({
-                                ...prev,
-                                [bill.key]: parseInt(e.target.value) || 0
-                              }))}
-                              placeholder="0"
-                              className="text-center"
-                            />
-                            <p className="text-xs text-center text-muted-foreground">
-                              = R$ {((billCounts[bill.key as keyof typeof billCounts] || 0) * bill.value).toFixed(2)}
-                            </p>
-                          </div>
-                        ))}
+                      {/* Moedas */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Coins className="h-4 w-4 text-amber-500" />
+                          <Label className="text-sm font-medium text-amber-800">Moedas</Label>
+                        </div>
+                        <div className="grid grid-cols-5 gap-2">
+                          {coinDenominations.map((coin) => (
+                            <div key={coin.key} className="text-center">
+                              <Label className="text-xs text-muted-foreground block mb-1">{coin.label}</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={coinCounts[coin.key as keyof typeof coinCounts] || ''}
+                                onChange={(e) => setCoinCounts(prev => ({
+                                  ...prev,
+                                  [coin.key]: parseInt(e.target.value) || 0
+                                }))}
+                                placeholder="0"
+                                className="text-center h-9 text-sm"
+                              />
+                              <p className="text-xs text-amber-600 mt-1 font-medium">
+                                {((coinCounts[coin.key as keyof typeof coinCounts] || 0) * coin.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Total da contagem */}
+                      <div className="bg-orange-100 p-3 rounded-lg border border-orange-200">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-orange-800">Total da contagem:</span>
+                          <span className="text-xl font-bold text-orange-600">
+                            {calculateCashCountTotal().toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  </CollapsibleContent>
+                </Collapsible>
 
-                    {/* Moedas */}
-                    <div>
-                      <Label className="text-base font-semibold mb-3 block">Moedas</Label>
-                      <div className="grid grid-cols-5 gap-3">
-                        {[
-                          { key: 'coin100', label: 'R$ 1,00', value: 1 },
-                          { key: 'coin50', label: 'R$ 0,50', value: 0.5 },
-                          { key: 'coin25', label: 'R$ 0,25', value: 0.25 },
-                          { key: 'coin10', label: 'R$ 0,10', value: 0.1 },
-                          { key: 'coin05', label: 'R$ 0,05', value: 0.05 },
-                        ].map((coin) => (
-                          <div key={coin.key} className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">{coin.label}</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={coinCounts[coin.key as keyof typeof coinCounts] || ''}
-                              onChange={(e) => setCoinCounts(prev => ({
-                                ...prev,
-                                [coin.key]: parseInt(e.target.value) || 0
-                              }))}
-                              placeholder="0"
-                              className="text-center"
-                            />
-                            <p className="text-xs text-center text-muted-foreground">
-                              = R$ {((coinCounts[coin.key as keyof typeof coinCounts] || 0) * coin.value).toFixed(2)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Total da contagem */}
-                    <div className="bg-primary/10 p-3 rounded-lg">
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold">Total da contagem:</span>
-                        <span className="text-xl font-bold text-primary">
-                          R$ {calculateCashCountTotal().toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <Button onClick={handleOpenCashRegister} className="w-full">
+                <Button onClick={handleOpenCashRegister} className="w-full bg-orange-500 hover:bg-orange-600">
+                  <Wallet className="h-4 w-4 mr-2" />
                   Abrir Caixa
                 </Button>
               </div>
@@ -679,24 +691,29 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         ) : (
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="destructive" size="lg" className="gap-2">
+              <Button variant="destructive" size="lg" className="gap-2 bg-orange-600 hover:bg-orange-700">
                 <Wallet className="h-5 w-5" />
                 Fechar Caixa
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Fechar Caixa</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-orange-100">
+                    <Wallet className="h-5 w-5 text-orange-600" />
+                  </div>
+                  Fechar Caixa
+                </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-4">
-                <div className="bg-muted p-4 rounded-lg space-y-2">
+                <div className="bg-orange-50 p-4 rounded-lg space-y-2 border border-orange-200">
                   <div className="flex justify-between">
-                    <span>Saldo inicial:</span>
-                    <span className="font-bold">R$ {currentSession.opening_balance.toFixed(2)}</span>
+                    <span className="text-orange-800">Saldo inicial:</span>
+                    <span className="font-bold text-orange-900">R$ {currentSession.opening_balance.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Saldo esperado:</span>
-                    <span className="font-bold">R$ {calculateExpectedBalance().toFixed(2)}</span>
+                    <span className="text-orange-800">Saldo esperado:</span>
+                    <span className="font-bold text-orange-900">R$ {calculateExpectedBalance().toFixed(2)}</span>
                   </div>
                 </div>
                 <div>
@@ -720,8 +737,8 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                 {closingBalance && (
                   <div className={`p-3 rounded-lg ${
                     parseFloat(closingBalance) - calculateExpectedBalance() >= 0 
-                      ? "bg-green-100 text-green-800" 
-                      : "bg-red-100 text-red-800"
+                      ? "bg-orange-100 text-orange-800 border border-orange-200" 
+                      : "bg-red-100 text-red-800 border border-red-200"
                   }`}>
                     Diferença: R$ {(parseFloat(closingBalance) - calculateExpectedBalance()).toFixed(2)}
                   </div>
@@ -734,7 +751,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     placeholder="Observações sobre o fechamento..."
                   />
                 </div>
-                <Button onClick={handleCloseCashRegister} className="w-full">
+                <Button onClick={handleCloseCashRegister} className="w-full bg-orange-500 hover:bg-orange-600">
                   Confirmar Fechamento
                 </Button>
               </div>
@@ -743,11 +760,12 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         )}
       </div>
 
+      {/* Cards de resumo do caixa atual */}
       {currentSession && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
+        <Card className="border-orange-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-orange-800">
+              <DollarSign className="h-5 w-5 text-orange-500" />
               Caixa Atual
             </CardTitle>
             <CardDescription>
@@ -755,56 +773,57 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                <p className="text-2xl font-bold">R$ {currentSession.opening_balance.toFixed(2)}</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-orange-100 p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-orange-700">Saldo Inicial</p>
+                <p className="text-2xl font-bold text-orange-800">R$ {currentSession.opening_balance.toFixed(2)}</p>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Entradas</p>
-                <p className="text-2xl font-bold text-green-600">R$ {calculateTotalSales().toFixed(2)}</p>
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-orange-600">Entradas</p>
+                <p className="text-2xl font-bold text-orange-600">R$ {calculateTotalSales().toFixed(2)}</p>
               </div>
-              <div className="bg-red-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saídas</p>
-                <p className="text-2xl font-bold text-red-600">R$ {calculateTotalExpenses().toFixed(2)}</p>
+              <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                <p className="text-sm text-amber-700">Saídas</p>
+                <p className="text-2xl font-bold text-orange-800">R$ {calculateTotalExpenses().toFixed(2)}</p>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                <p className="text-2xl font-bold text-purple-600">R$ {calculateExpectedBalance().toFixed(2)}</p>
+              <div className="bg-orange-200 p-4 rounded-lg border border-orange-300">
+                <p className="text-sm text-orange-700">Saldo Esperado</p>
+                <p className="text-2xl font-bold text-orange-800">R$ {calculateExpectedBalance().toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
+      {/* Último caixa fechado */}
       {!currentSession && lastClosedSession && (
-        <Card className="bg-secondary/20 border-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Último Caixa Fechado - Histórico
+        <Card className="border-orange-200 bg-orange-50/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-orange-800">
+              <FileText className="h-5 w-5 text-orange-500" />
+              Último Caixa Fechado
             </CardTitle>
             <CardDescription>
               Fechado em {format(new Date(lastClosedSession.closed_at!), "dd/MM/yyyy 'às' HH:mm")}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                <p className="text-2xl font-bold">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-orange-100 p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-orange-700">Saldo Inicial</p>
+                <p className="text-2xl font-bold text-orange-800">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                <p className="text-2xl font-bold">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-orange-600">Saldo Esperado</p>
+                <p className="text-2xl font-bold text-orange-700">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Final</p>
-                <p className="text-2xl font-bold">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
+              <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                <p className="text-sm text-amber-700">Saldo Final</p>
+                <p className="text-2xl font-bold text-orange-700">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
               </div>
-              <div className="bg-amber-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Diferença</p>
-                <p className={`text-2xl font-bold ${(lastClosedSession.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className="bg-orange-100 p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-orange-700">Diferença</p>
+                <p className={`text-2xl font-bold ${(lastClosedSession.difference || 0) >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
                   R$ {(lastClosedSession.difference || 0).toFixed(2)}
                 </p>
               </div>
@@ -813,199 +832,229 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
         </Card>
       )}
 
+      {/* Tabs */}
       <Tabs defaultValue="movements" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="movements">Movimentações</TabsTrigger>
-          <TabsTrigger value="reports">Relatórios</TabsTrigger>
-          <TabsTrigger value="dre">DRE</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 bg-orange-100">
+          <TabsTrigger value="movements" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+            Movimentações
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+            Relatórios
+          </TabsTrigger>
+          <TabsTrigger value="dre" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+            DRE
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="movements" className="space-y-4">
+        <TabsContent value="movements" className="space-y-4 mt-4">
           {!currentSession && !lastClosedSession && (
-            <Card>
+            <Card className="border-orange-200">
               <CardContent className="py-12 text-center text-muted-foreground">
+                <Wallet className="h-12 w-12 mx-auto mb-4 text-orange-300" />
                 Nenhum caixa aberto. Abra um caixa para registrar movimentações.
               </CardContent>
             </Card>
           )}
           
+          {/* Registrar Movimentação - Collapsible */}
           {currentSession && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Registrar Movimentação</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Tipo de Movimentação</Label>
-                    <Select value={movementType} onValueChange={setMovementType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="entrada">Entrada</SelectItem>
-                        <SelectItem value="saida">Saída</SelectItem>
-                      </SelectContent>
-                    </Select>
+            <Collapsible defaultOpen className="border rounded-lg overflow-hidden border-orange-200">
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between px-6 py-4 bg-orange-50 hover:bg-orange-100 transition-colors group">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-orange-100 group-hover:bg-orange-200 transition-colors">
+                      <Receipt className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold text-orange-900">Registrar Movimentação</h3>
+                      <p className="text-sm text-orange-600">Adicionar entrada ou saída</p>
+                    </div>
                   </div>
-                  <div>
-                    <Label>Valor (R$)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={movementAmount}
-                      onChange={(e) => setMovementAmount(e.target.value)}
-                      placeholder="0.00"
-                    />
+                  <ChevronDown className="h-5 w-5 text-orange-500 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="px-6 pb-6 pt-4 border-t border-orange-200 bg-white">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-orange-800">Tipo</Label>
+                      <Select value={movementType} onValueChange={setMovementType}>
+                        <SelectTrigger className="border-orange-200 focus:ring-orange-500">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="entrada">
+                            <span className="flex items-center gap-2">
+                              <TrendingUp className="h-4 w-4 text-orange-500" />
+                              Entrada
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="saida">
+                            <span className="flex items-center gap-2">
+                              <TrendingDown className="h-4 w-4 text-orange-700" />
+                              Saída
+                            </span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-orange-800">Valor (R$)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={movementAmount}
+                        onChange={(e) => setMovementAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="border-orange-200 focus:ring-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-orange-800">Forma de Pagamento</Label>
+                      <Select value={movementPaymentMethod} onValueChange={setMovementPaymentMethod}>
+                        <SelectTrigger className="border-orange-200 focus:ring-orange-500">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                          <SelectItem value="pix">PIX</SelectItem>
+                          <SelectItem value="credito">Crédito</SelectItem>
+                          <SelectItem value="debito">Débito</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-orange-800">Descrição</Label>
+                      <Input
+                        value={movementDescription}
+                        onChange={(e) => setMovementDescription(e.target.value)}
+                        placeholder="Descrição da movimentação"
+                        className="border-orange-200 focus:ring-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-orange-800">Categoria (opcional)</Label>
+                      <Input
+                        value={movementCategory}
+                        onChange={(e) => setMovementCategory(e.target.value)}
+                        placeholder="Ex: Alimentação, Limpeza..."
+                        className="border-orange-200 focus:ring-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-orange-800">Responsável</Label>
+                      <Input
+                        value={movementCreatedBy}
+                        onChange={(e) => setMovementCreatedBy(e.target.value)}
+                        placeholder="Nome do responsável"
+                        className="border-orange-200 focus:ring-orange-500"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label>Descrição</Label>
-                    <Input
-                      value={movementDescription}
-                      onChange={(e) => setMovementDescription(e.target.value)}
-                      placeholder="Descrição da movimentação"
-                    />
-                  </div>
-                  <div>
-                    <Label>Categoria (opcional)</Label>
-                    <Input
-                      value={movementCategory}
-                      onChange={(e) => setMovementCategory(e.target.value)}
-                      placeholder="Ex: Alimentação, Limpeza..."
-                    />
-                  </div>
-                  <div>
-                    <Label>Forma de Pagamento</Label>
-                    <Select value={movementPaymentMethod} onValueChange={setMovementPaymentMethod}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                        <SelectItem value="pix">PIX</SelectItem>
-                        <SelectItem value="credito">Crédito</SelectItem>
-                        <SelectItem value="debito">Débito</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Responsável</Label>
-                    <Input
-                      value={movementCreatedBy}
-                      onChange={(e) => setMovementCreatedBy(e.target.value)}
-                      placeholder="Nome do responsável"
-                    />
-                  </div>
+                  <Button onClick={handleAddMovement} className="w-full mt-4 bg-orange-500 hover:bg-orange-600">
+                    {movementType === "entrada" ? (
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                    ) : (
+                      <MinusCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Registrar Movimentação
+                  </Button>
                 </div>
-                <Button onClick={handleAddMovement} className="w-full mt-4">
-                  {movementType === "entrada" ? (
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                  ) : (
-                    <MinusCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Registrar Movimentação
-                </Button>
-              </CardContent>
-            </Card>
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Histórico de Movimentações</CardTitle>
+          {/* Histórico de Movimentações */}
+          <Card className="border-orange-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-orange-800">Histórico de Movimentações</CardTitle>
               <CardDescription>
                 {currentSession 
                   ? `${movements.length} movimentações registradas nesta sessão`
-                  : lastClosedSession
-                    ? `${movements.length} movimentações do último caixa fechado`
-                    : "Abra o caixa para ver as movimentações"}
+                  : lastClosedSession 
+                    ? `${movements.length} movimentações do último caixa`
+                    : "Nenhuma movimentação"
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {movements.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    Nenhuma movimentação registrada
-                  </p>
-                ) : (
-                  movements.map((mov) => (
-                    <div key={mov.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
+              {movements.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  Nenhuma movimentação registrada
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {movements.map((mov) => (
+                    <div
+                      key={mov.id}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-lg border",
+                        mov.movement_type === "entrada" 
+                          ? "bg-orange-50 border-orange-200" 
+                          : "bg-amber-50 border-amber-200"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
                         {mov.movement_type === "entrada" ? (
-                          <TrendingUp className="h-5 w-5 text-green-600" />
+                          <TrendingUp className="h-5 w-5 text-orange-500" />
                         ) : (
-                          <TrendingDown className="h-5 w-5 text-red-600" />
+                          <TrendingDown className="h-5 w-5 text-orange-700" />
                         )}
                         <div>
-                          <p className="font-medium">{mov.description}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {mov.movement_type} • {mov.payment_method} • {mov.created_by}
-                          </p>
+                          <p className="font-medium text-sm">{mov.description}</p>
                           <p className="text-xs text-muted-foreground">
-                            {format(new Date(mov.created_at), "dd/MM/yyyy 'às' HH:mm")}
+                            {mov.category && `${mov.category} • `}
+                            {mov.payment_method} • {mov.created_by} • {format(new Date(mov.created_at), "HH:mm")}
                           </p>
                         </div>
                       </div>
-                      <div className={`text-lg font-bold ${
-                        mov.movement_type === "entrada"
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}>
-                        {mov.movement_type === "entrada" ? "+" : "-"}
-                        R$ {mov.amount.toFixed(2)}
-                      </div>
+                      <span className={cn(
+                        "font-bold",
+                        mov.movement_type === "entrada" ? "text-orange-600" : "text-orange-800"
+                      )}>
+                        {mov.movement_type === "entrada" ? "+" : "-"}R$ {mov.amount.toFixed(2)}
+                      </span>
                     </div>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
+        <TabsContent value="reports" className="space-y-4 mt-4">
+          {/* Filtro de data */}
+          <Card className="border-orange-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-orange-800">
+                <CalendarIcon className="h-5 w-5 text-orange-500" />
                 Período de Análise
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={dateFilter === "today" ? "default" : "outline"}
-                  onClick={() => setDateFilter("today")}
-                >
-                  Hoje
-                </Button>
-                <Button
-                  variant={dateFilter === "yesterday" ? "default" : "outline"}
-                  onClick={() => setDateFilter("yesterday")}
-                >
-                  Ontem
-                </Button>
-                <Button
-                  variant={dateFilter === "7days" ? "default" : "outline"}
-                  onClick={() => setDateFilter("7days")}
-                >
-                  Últimos 7 Dias
-                </Button>
-                <Button
-                  variant={dateFilter === "thisMonth" ? "default" : "outline"}
-                  onClick={() => setDateFilter("thisMonth")}
-                >
-                  Este Mês
-                </Button>
-                <Button
-                  variant={dateFilter === "lastMonth" ? "default" : "outline"}
-                  onClick={() => setDateFilter("lastMonth")}
-                >
-                  Mês Passado
-                </Button>
+                {["today", "yesterday", "7days", "thisMonth", "lastMonth"].map((filter) => (
+                  <Button
+                    key={filter}
+                    variant={dateFilter === filter ? "default" : "outline"}
+                    onClick={() => setDateFilter(filter)}
+                    className={dateFilter === filter ? "bg-orange-500 hover:bg-orange-600" : "border-orange-200 text-orange-700 hover:bg-orange-50"}
+                  >
+                    {filter === "today" && "Hoje"}
+                    {filter === "yesterday" && "Ontem"}
+                    {filter === "7days" && "Últimos 7 Dias"}
+                    {filter === "thisMonth" && "Este Mês"}
+                    {filter === "lastMonth" && "Mês Passado"}
+                  </Button>
+                ))}
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant={dateFilter === "custom" ? "default" : "outline"}
-                      className={cn("justify-start text-left font-normal")}
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        dateFilter === "custom" ? "bg-orange-500 hover:bg-orange-600" : "border-orange-200 text-orange-700 hover:bg-orange-50"
+                      )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {dateFilter === "custom" && customDateRange?.from
@@ -1035,19 +1084,20 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
             </CardContent>
           </Card>
 
+          {/* Cards de Receitas e Despesas */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
+            <Card className="border-orange-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-orange-700">
+                  <TrendingUp className="h-5 w-5 text-orange-500" />
                   Receitas
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
-                    <span className="font-medium">Total de Receitas</span>
-                    <span className="text-2xl font-bold text-green-600">
+                  <div className="flex justify-between items-center p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <span className="font-medium text-orange-800">Total de Receitas</span>
+                    <span className="text-2xl font-bold text-orange-600">
                       R$ {closedSessions
                         .filter(filterSessionsByDate)
                         .reduce((total, session) => {
@@ -1060,7 +1110,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     </span>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Por tipo de entrada:</p>
+                    <p className="text-sm font-medium text-orange-700">Por tipo de entrada:</p>
                     {Array.from(new Set(
                       allMovements
                         .filter(m => m.movement_type === "entrada")
@@ -1080,9 +1130,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       if (total === 0) return null;
                       
                       return (
-                        <div key={category} className="flex justify-between p-2 border-l-2 border-green-500 pl-4">
-                          <span>{category}</span>
-                          <span className="font-medium">R$ {total.toFixed(2)}</span>
+                        <div key={category} className="flex justify-between p-2 border-l-2 border-orange-400 pl-4 bg-orange-50/50">
+                          <span className="text-orange-800">{category}</span>
+                          <span className="font-medium text-orange-600">R$ {total.toFixed(2)}</span>
                         </div>
                       );
                     })}
@@ -1091,18 +1141,18 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingDown className="h-5 w-5 text-red-600" />
+            <Card className="border-amber-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-amber-700">
+                  <TrendingDown className="h-5 w-5 text-amber-600" />
                   Despesas
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center p-4 bg-red-50 rounded-lg">
-                    <span className="font-medium">Total de Despesas</span>
-                    <span className="text-2xl font-bold text-red-600">
+                  <div className="flex justify-between items-center p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <span className="font-medium text-amber-800">Total de Despesas</span>
+                    <span className="text-2xl font-bold text-orange-700">
                       R$ {closedSessions
                         .filter(filterSessionsByDate)
                         .reduce((total, session) => {
@@ -1115,7 +1165,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                     </span>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Por tipo de despesa:</p>
+                    <p className="text-sm font-medium text-amber-700">Por tipo de despesa:</p>
                     {Array.from(new Set(
                       allMovements
                         .filter(m => m.movement_type === "saida")
@@ -1135,9 +1185,9 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       if (total === 0) return null;
                       
                       return (
-                        <div key={category} className="flex justify-between p-2 border-l-2 border-red-500 pl-4">
-                          <span>{category}</span>
-                          <span className="font-medium">R$ {total.toFixed(2)}</span>
+                        <div key={category} className="flex justify-between p-2 border-l-2 border-amber-500 pl-4 bg-amber-50/50">
+                          <span className="text-amber-800">{category}</span>
+                          <span className="font-medium text-orange-700">R$ {total.toFixed(2)}</span>
                         </div>
                       );
                     })}
@@ -1148,51 +1198,39 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
           </div>
         </TabsContent>
 
-        <TabsContent value="dre" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
+        <TabsContent value="dre" className="space-y-4 mt-4">
+          {/* Filtro de data DRE */}
+          <Card className="border-orange-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-orange-800">
+                <CalendarIcon className="h-5 w-5 text-orange-500" />
                 Período de Análise
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={dateFilter === "today" ? "default" : "outline"}
-                  onClick={() => setDateFilter("today")}
-                >
-                  Hoje
-                </Button>
-                <Button
-                  variant={dateFilter === "yesterday" ? "default" : "outline"}
-                  onClick={() => setDateFilter("yesterday")}
-                >
-                  Ontem
-                </Button>
-                <Button
-                  variant={dateFilter === "7days" ? "default" : "outline"}
-                  onClick={() => setDateFilter("7days")}
-                >
-                  Últimos 7 Dias
-                </Button>
-                <Button
-                  variant={dateFilter === "thisMonth" ? "default" : "outline"}
-                  onClick={() => setDateFilter("thisMonth")}
-                >
-                  Este Mês
-                </Button>
-                <Button
-                  variant={dateFilter === "lastMonth" ? "default" : "outline"}
-                  onClick={() => setDateFilter("lastMonth")}
-                >
-                  Mês Passado
-                </Button>
+                {["today", "yesterday", "7days", "thisMonth", "lastMonth"].map((filter) => (
+                  <Button
+                    key={filter}
+                    variant={dateFilter === filter ? "default" : "outline"}
+                    onClick={() => setDateFilter(filter)}
+                    className={dateFilter === filter ? "bg-orange-500 hover:bg-orange-600" : "border-orange-200 text-orange-700 hover:bg-orange-50"}
+                  >
+                    {filter === "today" && "Hoje"}
+                    {filter === "yesterday" && "Ontem"}
+                    {filter === "7days" && "Últimos 7 Dias"}
+                    {filter === "thisMonth" && "Este Mês"}
+                    {filter === "lastMonth" && "Mês Passado"}
+                  </Button>
+                ))}
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant={dateFilter === "custom" ? "default" : "outline"}
-                      className={cn("justify-start text-left font-normal")}
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        dateFilter === "custom" ? "bg-orange-500 hover:bg-orange-600" : "border-orange-200 text-orange-700 hover:bg-orange-50"
+                      )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {dateFilter === "custom" && customDateRange?.from
@@ -1222,10 +1260,11 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
+          {/* DRE */}
+          <Card className="border-orange-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-orange-800">
+                <FileText className="h-5 w-5 text-orange-500" />
                 Demonstração do Resultado do Exercício (DRE)
               </CardTitle>
               <CardDescription>
@@ -1236,87 +1275,101 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Receitas */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border-l-4 border-green-500">
-                    <div>
-                      <p className="text-sm text-muted-foreground font-medium">RECEITA BRUTA</p>
-                      <p className="text-xs text-muted-foreground">Todas as entradas do período</p>
-                    </div>
-                    <span className="font-bold text-2xl text-green-600">R$ {dreData.salesTotal.toFixed(2)}</span>
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-l-4 border-orange-500">
+                  <div>
+                    <p className="text-sm text-orange-700 font-medium">RECEITA BRUTA</p>
+                    <p className="text-xs text-orange-600">Todas as entradas do período</p>
                   </div>
+                  <span className="font-bold text-2xl text-orange-600">R$ {dreData.salesTotal.toFixed(2)}</span>
                 </div>
 
                 {/* CMV */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-l-4 border-orange-500">
-                    <div>
-                      <p className="text-sm text-muted-foreground font-medium">(-) CMV - CUSTO DE MERCADORIAS VENDIDAS</p>
-                      <p className="text-xs text-muted-foreground">Custo dos insumos utilizados nos produtos vendidos</p>
-                    </div>
-                    <span className="font-bold text-xl text-orange-600">R$ {dreData.cmv.toFixed(2)}</span>
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-amber-100 rounded-lg border-l-4 border-amber-500">
+                  <div>
+                    <p className="text-sm text-amber-700 font-medium">(-) CMV - CUSTO DE MERCADORIAS VENDIDAS</p>
+                    <p className="text-xs text-amber-600">Custo dos insumos utilizados</p>
                   </div>
+                  <span className="font-bold text-xl text-orange-700">R$ {dreData.cmv.toFixed(2)}</span>
                 </div>
 
                 {/* Lucro Bruto */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
-                    <div>
-                      <p className="text-sm text-muted-foreground font-medium">(=) LUCRO BRUTO</p>
-                      <p className="text-xs text-muted-foreground">Receita - CMV | Margem: {dreData.grossMargin.toFixed(1)}%</p>
-                    </div>
-                    <span className="font-bold text-2xl text-blue-600">R$ {dreData.grossProfit.toFixed(2)}</span>
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-orange-100 to-orange-200 rounded-lg border-l-4 border-orange-400">
+                  <div>
+                    <p className="text-sm text-orange-800 font-medium">(=) LUCRO BRUTO</p>
+                    <p className="text-xs text-orange-600">Receita - CMV | Margem: {dreData.grossMargin.toFixed(1)}%</p>
                   </div>
+                  <span className="font-bold text-2xl text-orange-700">R$ {dreData.grossProfit.toFixed(2)}</span>
                 </div>
 
                 {/* Despesas Operacionais */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border-l-4 border-red-500">
-                    <div>
-                      <p className="text-sm text-muted-foreground font-medium">(-) DESPESAS OPERACIONAIS</p>
-                      <p className="text-xs text-muted-foreground">Todas as saídas registradas no caixa</p>
-                    </div>
-                    <span className="font-bold text-xl text-red-600">R$ {dreData.operationalExpenses.toFixed(2)}</span>
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-100 to-amber-200 rounded-lg border-l-4 border-amber-600">
+                  <div>
+                    <p className="text-sm text-amber-800 font-medium">(-) DESPESAS OPERACIONAIS</p>
+                    <p className="text-xs text-amber-600">Todas as saídas registradas</p>
                   </div>
+                  <span className="font-bold text-xl text-orange-800">R$ {dreData.operationalExpenses.toFixed(2)}</span>
                 </div>
 
                 {/* Separador */}
-                <div className="border-t-2 border-dashed"></div>
+                <div className="border-t-2 border-dashed border-orange-300"></div>
 
                 {/* Despesas Totais */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">TOTAL DE DESPESAS</p>
-                      <p className="text-xs text-muted-foreground">CMV + Despesas Operacionais</p>
-                    </div>
-                    <span className="font-bold text-lg">R$ {dreData.totalExpenses.toFixed(2)}</span>
+                <div className="flex justify-between items-center p-3 bg-orange-100 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">TOTAL DE DESPESAS</p>
+                    <p className="text-xs text-orange-600">CMV + Despesas Operacionais</p>
                   </div>
+                  <span className="font-bold text-lg text-orange-700">R$ {dreData.totalExpenses.toFixed(2)}</span>
                 </div>
 
                 {/* Separador Final */}
-                <div className="border-t-4 border-primary"></div>
+                <div className="border-t-4 border-orange-500"></div>
 
                 {/* Lucro Líquido */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-5 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border-l-4 border-purple-500 shadow-md">
-                    <div>
-                      <p className="text-base font-bold text-purple-900">(=) LUCRO LÍQUIDO</p>
-                      <p className="text-xs text-muted-foreground">Receita Bruta - Total de Despesas</p>
-                    </div>
-                    <span className="font-bold text-3xl text-purple-600">R$ {dreData.netProfit.toFixed(2)}</span>
+                <div className={cn(
+                  "flex justify-between items-center p-5 rounded-lg border-l-4 shadow-md",
+                  dreData.netProfit >= 0 
+                    ? "bg-gradient-to-r from-orange-100 to-orange-200 border-orange-500" 
+                    : "bg-gradient-to-r from-red-50 to-red-100 border-red-500"
+                )}>
+                  <div>
+                    <p className={cn(
+                      "text-base font-bold",
+                      dreData.netProfit >= 0 ? "text-orange-900" : "text-red-900"
+                    )}>(=) LUCRO LÍQUIDO</p>
+                    <p className={cn(
+                      "text-xs",
+                      dreData.netProfit >= 0 ? "text-orange-600" : "text-red-600"
+                    )}>Receita Bruta - Total de Despesas</p>
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <span className="text-xs text-muted-foreground">Margem Bruta</span>
-                      <span className="font-bold text-xl text-blue-600">{dreData.grossMargin.toFixed(1)}%</span>
-                    </div>
-                    <div className="flex flex-col p-3 bg-purple-50 rounded-lg border border-purple-200">
-                      <span className="text-xs text-muted-foreground">Margem Líquida</span>
-                      <span className="font-bold text-xl text-purple-600">{dreData.netMargin.toFixed(1)}%</span>
-                    </div>
+                  <span className={cn(
+                    "font-bold text-3xl",
+                    dreData.netProfit >= 0 ? "text-orange-600" : "text-red-600"
+                  )}>R$ {dreData.netProfit.toFixed(2)}</span>
+                </div>
+                
+                {/* Margens */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col p-3 bg-orange-50 rounded-lg border border-orange-200">
+                    <span className="text-xs text-orange-600">Margem Bruta</span>
+                    <span className="font-bold text-xl text-orange-700">{dreData.grossMargin.toFixed(1)}%</span>
+                  </div>
+                  <div className={cn(
+                    "flex flex-col p-3 rounded-lg border",
+                    dreData.netMargin >= 0 
+                      ? "bg-orange-100 border-orange-200" 
+                      : "bg-red-50 border-red-200"
+                  )}>
+                    <span className={cn(
+                      "text-xs",
+                      dreData.netMargin >= 0 ? "text-orange-600" : "text-red-600"
+                    )}>Margem Líquida</span>
+                    <span className={cn(
+                      "font-bold text-xl",
+                      dreData.netMargin >= 0 ? "text-orange-700" : "text-red-600"
+                    )}>{dreData.netMargin.toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
