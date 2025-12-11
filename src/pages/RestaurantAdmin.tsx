@@ -90,7 +90,7 @@ const RestaurantAdmin = () => {
     }
 
     fetchRestaurant(restaurantId);
-    setupNotifications(restaurantId);
+    return setupNotifications(restaurantId);
   }, [navigate]);
 
   const setupNotifications = (restaurantId: string) => {

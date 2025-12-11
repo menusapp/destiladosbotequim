@@ -58,6 +58,7 @@ interface CartItem {
     id: string;
     name: string;
     price: number;
+    promotional_price?: number | null;
   };
   quantity: number;
   extras: CartItemExtra[];
@@ -419,7 +420,8 @@ const Comanda = () => {
 
     const cartSubtotal = cart.reduce((sum, item) => {
       const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-      return sum + (item.product.price + extrasTotal) * item.quantity;
+      const effectivePrice = item.product.promotional_price ?? item.product.price;
+      return sum + (effectivePrice + extrasTotal) * item.quantity;
     }, 0);
 
     const subtotal = ordersSubtotal + cartSubtotal;
@@ -534,7 +536,7 @@ const Comanda = () => {
             order_id: order.id,
             product_id: item.product.id,
             quantity: item.quantity,
-            price_at_order: item.product.price,
+            price_at_order: item.product.promotional_price ?? item.product.price,
             notes: item.notes || null,
           })
           .select()
@@ -751,7 +753,8 @@ const Comanda = () => {
               <div className="space-y-2">
                 {cart.map((item) => {
                   const extrasTotal = item.extras.reduce((sum, e) => sum + e.price, 0);
-                  const itemTotal = (item.product.price + extrasTotal) * item.quantity;
+                  const effectivePrice = item.product.promotional_price ?? item.product.price;
+                  const itemTotal = (effectivePrice + extrasTotal) * item.quantity;
                   
                   return (
                     <div

@@ -34,7 +34,8 @@ export const CartStep = ({
 }: CartStepProps) => {
   const subtotal = cart.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-    return sum + (item.product.price + extrasTotal) * item.quantity;
+    const effectivePrice = item.product.promotional_price ?? item.product.price;
+    return sum + (effectivePrice + extrasTotal) * item.quantity;
   }, 0);
 
   const couponDiscount = coupon
@@ -55,8 +56,9 @@ export const CartStep = ({
         <h4 className="font-bold text-foreground mb-3">Itens adicionados</h4>
         <div className="space-y-3">
           {cart.map((item) => {
+            const effectivePrice = item.product.promotional_price ?? item.product.price;
             const itemTotal =
-              (item.product.price + item.extras.reduce((s, e) => s + e.price, 0)) *
+              (effectivePrice + item.extras.reduce((s, e) => s + e.price, 0)) *
               item.quantity;
 
             return (

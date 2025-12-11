@@ -107,7 +107,8 @@ export const ProductDetailDrawer = ({
     const extrasTotal = extras
       .filter((e) => selectedExtras.includes(e.id))
       .reduce((sum, e) => sum + e.price, 0);
-    return (product.price + extrasTotal) * quantity;
+    const effectivePrice = product.promotional_price ?? product.price;
+    return (effectivePrice + extrasTotal) * quantity;
   };
 
   return (
@@ -163,12 +164,26 @@ export const ProductDetailDrawer = ({
             <p className="text-sm text-muted-foreground mb-4">{product.description}</p>
           )}
 
-          <div
-            className="inline-block px-4 py-2 rounded-lg font-bold text-2xl mb-6"
-            style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
-          >
-            R$ {product.price.toFixed(2)}
-          </div>
+          {product.promotional_price ? (
+            <div className="flex flex-col gap-1 mb-6">
+              <span className="text-sm text-muted-foreground line-through">
+                R$ {product.price.toFixed(2)}
+              </span>
+              <span
+                className="inline-block px-4 py-2 rounded-lg font-bold text-2xl"
+                style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
+              >
+                R$ {product.promotional_price.toFixed(2)}
+              </span>
+            </div>
+          ) : (
+            <div
+              className="inline-block px-4 py-2 rounded-lg font-bold text-2xl mb-6"
+              style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
+            >
+              R$ {product.price.toFixed(2)}
+            </div>
+          )}
 
           {/* Extras Obrigatórios */}
           {hasRequiredExtras && (

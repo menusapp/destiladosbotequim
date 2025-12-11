@@ -258,7 +258,8 @@ export default function DeliveryMenu() {
   const calculateTotal = () => {
     return cart.reduce((sum, item) => {
       const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-      return sum + (item.product.price + extrasTotal) * item.quantity;
+      const effectivePrice = item.product.promotional_price ?? item.product.price;
+      return sum + (effectivePrice + extrasTotal) * item.quantity;
     }, 0);
   };
 

@@ -33,7 +33,8 @@ export const SummaryStep = ({
 }: SummaryStepProps) => {
   const subtotal = cart.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-    return sum + (item.product.price + extrasTotal) * item.quantity;
+    const effectivePrice = item.product.promotional_price ?? item.product.price;
+    return sum + (effectivePrice + extrasTotal) * item.quantity;
   }, 0);
 
   const couponDiscount = coupon
@@ -83,8 +84,9 @@ export const SummaryStep = ({
         </CardHeader>
         <CardContent className="space-y-2">
           {cart.map((item) => {
+            const effectivePrice = item.product.promotional_price ?? item.product.price;
             const itemTotal =
-              (item.product.price + item.extras.reduce((s, e) => s + e.price, 0)) *
+              (effectivePrice + item.extras.reduce((s, e) => s + e.price, 0)) *
               item.quantity;
 
             return (

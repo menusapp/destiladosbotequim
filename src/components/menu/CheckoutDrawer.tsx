@@ -65,7 +65,8 @@ export const CheckoutDrawer = ({
       // 1. Calcular valores
       const subtotal = cart.reduce((sum, item) => {
         const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-        return sum + (item.product.price + extrasTotal) * item.quantity;
+        const effectivePrice = item.product.promotional_price ?? item.product.price;
+        return sum + (effectivePrice + extrasTotal) * item.quantity;
       }, 0);
 
       const couponDiscount = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
@@ -116,7 +117,7 @@ export const CheckoutDrawer = ({
             order_id: order.id,
             product_id: item.product.id,
             quantity: item.quantity,
-            price_at_order: item.product.price,
+            price_at_order: item.product.promotional_price ?? item.product.price,
             notes: item.notes,
           })
           .select()
