@@ -19,6 +19,7 @@ import CostosTab from "@/components/admin/CostosTab";
 import MargensTab from "@/components/admin/MargensTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import PDVTab from "@/components/admin/PDVTab";
+import ClientesTab from "@/components/admin/ClientesTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
@@ -440,7 +441,7 @@ const RestaurantAdmin = () => {
       case "marketing":
         return <DevelopmentPlaceholder title="Marketing" />;
       case "clientes":
-        return <DevelopmentPlaceholder title="Clientes" />;
+        return <ClientesTab restaurantId={restaurant.id} />;
       case "configuracoes":
         return <SettingsTab restaurantId={restaurant.id} />;
       case "modulos":

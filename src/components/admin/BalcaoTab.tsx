@@ -15,9 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Trash2, ShoppingCart, Package, MapPin, Users } from "lucide-react";
+import { Search, Trash2, ShoppingCart, Package, MapPin, Users, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
+import { CustomerSelectDialog } from "./CustomerSelectDialog";
 
 interface BalcaoTabProps {
   restaurantId: string;
@@ -63,6 +64,10 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
   
   // Local order fields
   const [selectedTableId, setSelectedTableId] = useState("");
+  
+  // Customer selection
+  const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
   // Fetch categories
   const { data: categories } = useQuery({
@@ -171,6 +176,62 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
     setDeliveryCity("");
     setPaymentType("");
     setSelectedTableId("");
+    setSelectedCustomerId(null);
+  };
+
+  // Handle customer selection from dialog
+  const handleCustomerSelect = (customer: { id: string; cpf: string; name: string; phone: string | null }) => {
+    setSelectedCustomerId(customer.id);
+    setCustomerName(customer.name);
+    setCustomerCpf(customer.cpf);
+    setCustomerPhone(customer.phone || "");
+    toast.success(`Cliente ${customer.name} selecionado`);
+  };
+
+  // Clear selected customer
+  const clearSelectedCustomer = () => {
+    setSelectedCustomerId(null);
+    setCustomerName("");
+    setCustomerCpf("");
+    setCustomerPhone("");
+  };
+
+  // Auto-create/update customer on order creation
+  const upsertCustomer = async (cpf: string, name: string, phone: string | null) => {
+    if (!cpf || cpf === "000.000.000-00") return;
+    
+    const cleanCpf = cpf.replace(/\D/g, "");
+    if (cleanCpf.length !== 11) return;
+
+    try {
+      // Check if customer exists
+      const { data: existing } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("restaurant_id", restaurantId)
+        .eq("cpf", cleanCpf)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing customer
+        await supabase
+          .from("customers")
+          .update({ name, phone: phone || null })
+          .eq("id", existing.id);
+      } else {
+        // Create new customer
+        await supabase
+          .from("customers")
+          .insert({
+            restaurant_id: restaurantId,
+            cpf: cleanCpf,
+            name,
+            phone: phone || null,
+          });
+      }
+    } catch (error) {
+      console.error("Error upserting customer:", error);
+    }
   };
 
   // Open product drawer
@@ -240,10 +301,14 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
         }
       }
 
+      // Auto-create customer if CPF provided
+      await upsertCustomer(customerCpf, customerName, customerPhone);
+
       return order;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
       toast.success("Pedido online enviado para 'Aguardando Confirmação'!");
       clearCart();
     },
@@ -374,11 +439,15 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
         }
       }
 
+      // Auto-create customer if CPF provided
+      await upsertCustomer(customerCpf, customerName || "Cliente PDV", null);
+
       return { order, tableNumber: table.table_number };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["tables"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
       toast.success(`Pedido lançado para Mesa ${data.tableNumber}!`);
       clearCart();
     },
@@ -538,6 +607,30 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
                   </RadioGroup>
                 </div>
 
+                {/* Customer select button */}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsCustomerSelectOpen(true)}
+                    className="flex-1"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    {selectedCustomerId ? "Trocar Cliente" : "Selecionar Cliente"}
+                  </Button>
+                  {selectedCustomerId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearSelectedCustomer}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-xs">Nome *</Label>
@@ -642,6 +735,30 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Customer select button for local orders */}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsCustomerSelectOpen(true)}
+                    className="flex-1"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    {selectedCustomerId ? "Trocar Cliente" : "Selecionar Cliente"}
+                  </Button>
+                  {selectedCustomerId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearSelectedCustomer}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -764,6 +881,14 @@ const BalcaoTab = ({ restaurantId }: BalcaoTabProps) => {
           setSelectedProduct(null);
         }}
         onAddToCart={handleAddToCart}
+      />
+
+      {/* Customer select dialog */}
+      <CustomerSelectDialog
+        restaurantId={restaurantId}
+        open={isCustomerSelectOpen}
+        onOpenChange={setIsCustomerSelectOpen}
+        onSelect={handleCustomerSelect}
       />
     </div>
   );
