@@ -52,11 +52,17 @@ export default function DeliveryMenu() {
         .order("display_order");
 
       if (categoriesError) throw categoriesError;
-      setCategories(categoriesData || []);
+      
+      // Filtrar produtos em destaque para não aparecerem duplicados nas categorias
+      const filteredCategories = (categoriesData || []).map((cat: any) => ({
+        ...cat,
+        products: (cat.products || []).filter((p: any) => p.available && !p.is_featured)
+      })).filter((cat: any) => cat.products.length > 0);
+      setCategories(filteredCategories);
 
       const { data: featuredData } = await supabase
         .from("products")
-        .select("id, name, description, price, available, image_url, prep_time_minutes, is_featured, featured_display_order, categories!inner(restaurant_id)")
+        .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, categories!inner(restaurant_id)")
         .eq("categories.restaurant_id", restaurantData.id)
         .eq("is_featured", true)
         .eq("available", true)
