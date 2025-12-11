@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProductsGrid from "./ProductsGrid";
 import CategoriesTab from "./CategoriesTab";
 import DestaquesTab from "./DestaquesTab";
+import ComplementosTab from "./ComplementosTab";
 
 interface CardapioTabProps {
   restaurantId: string;
@@ -17,7 +18,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
       {/* Header */}
       <div>
         <h1 className="text-[32px] font-bold text-foreground leading-tight">Cardápio</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gerencie produtos, categorias e destaques</p>
+        <p className="text-sm text-muted-foreground mt-1">Gerencie produtos, categorias, complementos e destaques</p>
       </div>
 
       {/* Tabs */}
@@ -36,6 +37,12 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
             Categorias
           </TabsTrigger>
           <TabsTrigger 
+            value="complementos"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
+          >
+            Complementos
+          </TabsTrigger>
+          <TabsTrigger 
             value="destaques"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
           >
@@ -49,6 +56,10 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
 
         <TabsContent value="categorias" className="mt-6">
           <CategoriesTab restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
+        </TabsContent>
+
+        <TabsContent value="complementos" className="mt-6">
+          <ComplementosTab restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
         </TabsContent>
 
         <TabsContent value="destaques" className="mt-6">

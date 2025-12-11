@@ -1171,6 +1171,57 @@ export type Database = {
           },
         ]
       }
+      product_complement_groups: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          extra_category_id: string
+          id: string
+          is_required: boolean | null
+          max_selection: number | null
+          min_selection: number | null
+          product_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          extra_category_id: string
+          id?: string
+          is_required?: boolean | null
+          max_selection?: number | null
+          min_selection?: number | null
+          product_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          extra_category_id?: string
+          id?: string
+          is_required?: boolean | null
+          max_selection?: number | null
+          min_selection?: number | null
+          product_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_complement_groups_extra_category_id_fkey"
+            columns: ["extra_category_id"]
+            isOneToOne: false
+            referencedRelation: "extra_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_complement_groups_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_extra_ingredients: {
         Row: {
           created_at: string | null
@@ -1213,7 +1264,11 @@ export type Database = {
       product_extras: {
         Row: {
           created_at: string | null
+          extra_category_id: string | null
           id: string
+          is_required: boolean | null
+          max_selection: number | null
+          min_selection: number | null
           name: string
           price: number
           product_id: string
@@ -1221,7 +1276,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          extra_category_id?: string | null
           id?: string
+          is_required?: boolean | null
+          max_selection?: number | null
+          min_selection?: number | null
           name: string
           price?: number
           product_id: string
@@ -1229,13 +1288,24 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          extra_category_id?: string | null
           id?: string
+          is_required?: boolean | null
+          max_selection?: number | null
+          min_selection?: number | null
           name?: string
           price?: number
           product_id?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "product_extras_extra_category_id_fkey"
+            columns: ["extra_category_id"]
+            isOneToOne: false
+            referencedRelation: "extra_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_extras_product_id_fkey"
             columns: ["product_id"]
