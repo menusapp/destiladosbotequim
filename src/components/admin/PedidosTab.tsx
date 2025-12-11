@@ -220,8 +220,8 @@ const PedidosTab = ({
         </Popover>
       </div>
 
-      {/* Kanban Board */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* Kanban Board - Layout horizontal com scroll */}
+      <div className="flex gap-4 overflow-x-auto pb-4">
         {[
           { key: "pending", title: "Aguardando confirmação", headerBg: "bg-orange-600", textColor: "text-white" },
           { key: "preparing", title: "Preparando", headerBg: "bg-orange-500", textColor: "text-white" },
@@ -232,7 +232,7 @@ const PedidosTab = ({
           const columnOrders = groupedOrders[key as keyof typeof groupedOrders];
           
           return (
-            <Card key={key} className="overflow-hidden border-2 border-border/50">
+            <Card key={key} className="overflow-hidden border-2 border-border/50 min-w-[280px] flex-shrink-0">
               {/* Header colorido */}
               <div className={`${headerBg} ${textColor} px-4 py-3 flex items-center justify-between`}>
                 <h3 className="font-semibold text-sm">{title}</h3>
@@ -241,8 +241,8 @@ const PedidosTab = ({
                 </Badge>
               </div>
 
-              {/* Corpo com cards */}
-              <CardContent className="p-3 space-y-2 min-h-[200px] bg-muted/30">
+              {/* Corpo com cards - scroll interno */}
+              <CardContent className="p-3 space-y-2 min-h-[200px] max-h-[500px] overflow-y-auto bg-muted/30">
                 {columnOrders.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-8">
                     Nenhum pedido
