@@ -643,8 +643,8 @@ const Menu = () => {
     toast.info("Obrigado pela visita! 🙏");
   }, [tableNumber]);
 
-  const handleCustomerInfoSubmit = async (name: string, cpf: string) => {
-    console.log('👤 LOGIN INICIADO:', { name, cpf, tableNumber, hasRestaurant: !!restaurant });
+  const handleCustomerInfoSubmit = async (name: string, cpf: string, phone?: string) => {
+    console.log('👤 LOGIN INICIADO:', { name, cpf, phone, tableNumber, hasRestaurant: !!restaurant });
     
     // Validação de CPF
     if (!cpf || cpf.trim() === '') {
@@ -667,12 +667,23 @@ const Menu = () => {
       // Check if customer exists in database - use saved name, ignore typed name
       const { data: existingCustomer } = await supabase
         .from("customers")
-        .select("name")
+        .select("name, phone")
         .eq("restaurant_id", restaurant.id)
         .eq("cpf", cleanCpf)
         .maybeSingle();
       
       const finalName = existingCustomer ? existingCustomer.name : name;
+      const finalPhone = existingCustomer?.phone || phone;
+      
+      // Update phone if new one provided and customer exists but has no phone
+      if (existingCustomer && phone && !existingCustomer.phone) {
+        await supabase
+          .from("customers")
+          .update({ phone })
+          .eq("restaurant_id", restaurant.id)
+          .eq("cpf", cleanCpf);
+      }
+      
       console.log('👤 Nome final:', { existingCustomer: !!existingCustomer, finalName });
 
       // ⚡ Suportar AMBOS: table_number (int) OU id (UUID)
@@ -1009,6 +1020,8 @@ const Menu = () => {
         onSubmit={handleCustomerInfoSubmit}
         restaurantColor={primaryColor}
         restaurantId={restaurant?.id}
+        requireName={restaurant?.login_require_name ?? true}
+        requirePhone={restaurant?.login_require_phone ?? false}
       />
 
       <ProductDetailDrawer
