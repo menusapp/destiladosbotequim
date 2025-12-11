@@ -13,6 +13,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -29,7 +39,8 @@ import {
   MoreVertical,
   QrCode,
   Edit,
-  Trash2
+  Trash2,
+  XCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
@@ -55,6 +66,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const [restaurantSlug, setRestaurantSlug] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [tableToEmpty, setTableToEmpty] = useState<Table | null>(null);
 
   useEffect(() => {
     fetchRestaurantSlug();
@@ -151,6 +163,37 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     downloadLink.download = `mesa-${table.table_number}-qr.png`;
     downloadLink.click();
     toast.success("QR Code baixado!");
+  };
+
+  const handleEmptyTable = async (tableId: string) => {
+    try {
+      // 1. Fechar comandas ativas da mesa
+      await supabase
+        .from("comandas")
+        .update({ status: "closed", closed_at: new Date().toISOString() })
+        .eq("table_id", tableId)
+        .eq("status", "active");
+
+      // 2. Marcar mesa como livre
+      const { error } = await supabase
+        .from("tables")
+        .update({
+          is_occupied: false,
+          occupied_by: null,
+          occupied_at: null,
+        })
+        .eq("id", tableId);
+
+      if (error) throw error;
+
+      toast.success("Mesa esvaziada com sucesso!");
+      fetchTables();
+    } catch (error) {
+      console.error("Erro ao esvaziar mesa:", error);
+      toast.error("Erro ao esvaziar mesa");
+    } finally {
+      setTableToEmpty(null);
+    }
   };
 
   const filteredTables = tables.filter((table) => {
@@ -339,6 +382,16 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                       Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem
+                      className="text-orange-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTableToEmpty(table);
+                      }}
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Esvaziar Mesa
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
                       className="text-destructive"
                       disabled={table.is_occupied}
                       onClick={(e) => {
@@ -375,6 +428,27 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
           </Card>
         ))}
       </div>
+
+      {/* AlertDialog para confirmar esvaziamento */}
+      <AlertDialog open={!!tableToEmpty} onOpenChange={() => setTableToEmpty(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Esvaziar Mesa {tableToEmpty?.table_number}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja esvaziar esta mesa? Todas as comandas ativas serão fechadas automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-orange-600 hover:bg-orange-700"
+              onClick={() => tableToEmpty && handleEmptyTable(tableToEmpty.id)}
+            >
+              Esvaziar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
