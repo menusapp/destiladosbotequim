@@ -7,6 +7,7 @@ interface NewBillNotificationProps {
   billId: string;
   tableNumber: number;
   total: number;
+  customerName?: string;
   onView: () => void;
   onDismiss: () => void;
 }
@@ -15,6 +16,7 @@ export const NewBillNotification = ({
   billId,
   tableNumber,
   total,
+  customerName,
   onView,
   onDismiss,
 }: NewBillNotificationProps) => {
@@ -101,7 +103,7 @@ export const NewBillNotification = ({
               <div>
                 <h3 className="text-xl font-bold text-amber-900 dark:text-amber-100">Conta Solicitada!</h3>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  🍽️ Mesa {tableNumber}
+                  🍽️ Mesa {tableNumber} {customerName && `• ${customerName}`}
                 </p>
               </div>
             </div>
