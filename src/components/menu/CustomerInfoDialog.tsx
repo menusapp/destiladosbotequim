@@ -37,7 +37,9 @@ const CustomerInfoDialog = ({
   const [cpf, setCpf] = useState("");
   const [phone, setPhone] = useState("");
   const [cpfError, setCpfError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [isCheckingCpf, setIsCheckingCpf] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingCustomer, setExistingCustomer] = useState<{name: string; phone?: string} | null>(null);
 
   // Reset state when dialog opens
@@ -47,6 +49,7 @@ const CustomerInfoDialog = ({
       setCpf("");
       setPhone("");
       setCpfError("");
+      setPhoneError("");
       setExistingCustomer(null);
     }
   }, [open]);
@@ -114,6 +117,7 @@ const CustomerInfoDialog = ({
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneInput(e.target.value);
     setPhone(formatted);
+    setPhoneError(""); // Limpar erro ao digitar
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -148,7 +152,26 @@ const CustomerInfoDialog = ({
 
     // If new customer, create record in database
     if (!existingCustomer && restaurantId) {
+      setIsSubmitting(true);
       try {
+        // Verificar se telefone já existe em outro cliente
+        if (finalPhone) {
+          const { data: phoneExists } = await supabase
+            .from("customers")
+            .select("cpf, name")
+            .eq("restaurant_id", restaurantId)
+            .eq("phone", finalPhone)
+            .neq("cpf", sanitizedCPF)
+            .maybeSingle();
+
+          if (phoneExists) {
+            setPhoneError("Este telefone já está cadastrado para outro cliente");
+            toast.error("Este telefone já está cadastrado para outro cliente");
+            setIsSubmitting(false);
+            return;
+          }
+        }
+
         const insertData: { restaurant_id: string; cpf: string; name: string; phone?: string } = {
           restaurant_id: restaurantId,
           cpf: sanitizedCPF,
@@ -163,6 +186,8 @@ const CustomerInfoDialog = ({
       } catch (err) {
         console.error("Error creating customer:", err);
         // Continue anyway - the customer will be created on order if this fails
+      } finally {
+        setIsSubmitting(false);
       }
     }
 
@@ -244,7 +269,11 @@ const CustomerInfoDialog = ({
                     required={requirePhone}
                     disabled={isCheckingCpf}
                     maxLength={15}
+                    className={phoneError ? "border-destructive" : ""}
                   />
+                  {phoneError && (
+                    <p className="text-sm text-destructive">{phoneError}</p>
+                  )}
                 </div>
               )}
             </>
@@ -254,9 +283,9 @@ const CustomerInfoDialog = ({
             type="submit" 
             className="w-full text-white"
             style={{ backgroundColor: restaurantColor }}
-            disabled={isCheckingCpf}
+            disabled={isCheckingCpf || isSubmitting}
           >
-            {existingCustomer ? "Continuar" : "Começar Pedido"}
+            {isSubmitting ? "Verificando..." : existingCustomer ? "Continuar" : "Começar Pedido"}
           </Button>
         </form>
       </DialogContent>
