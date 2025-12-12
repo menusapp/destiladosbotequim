@@ -59,11 +59,11 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "custos", label: "Custos", icon: CircleDollarSign },
       { id: "margens", label: "Margens", icon: TrendingUp },
       { id: "relatorios", label: "Relatórios", icon: BarChart3 },
+      { id: "clientes", label: "Clientes", icon: Users },
     ],
     development: [
       { id: "entregadores", label: "Entregadores", icon: Truck },
       { id: "marketing", label: "Marketing", icon: TrendingUp },
-      { id: "clientes", label: "Clientes", icon: Users },
       { id: "configuracoes", label: "Configurações", icon: Settings },
       { id: "modulos", label: "Módulos", icon: Construction },
     ],
