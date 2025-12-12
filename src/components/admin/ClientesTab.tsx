@@ -20,9 +20,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Users, UserPlus, TrendingUp, Calendar, Phone, Mail, FileText } from "lucide-react";
+import { Search, Users, UserPlus, TrendingUp, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { CustomerDetailDrawer } from "./CustomerDetailDrawer";
 
@@ -42,8 +49,11 @@ interface Customer {
   total_spent?: number;
 }
 
+type SortOption = 'most_spent' | 'least_spent' | 'recent' | 'oldest' | 'alphabetical';
+
 export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isNewCustomerOpen, setIsNewCustomerOpen] = useState(false);
@@ -117,18 +127,43 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
     };
   }, [customers]);
 
-  // Filter customers
+  // Filter and sort customers
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
-    if (!searchTerm) return customers;
     
-    const term = searchTerm.toLowerCase();
-    return customers.filter(c => 
-      c.name.toLowerCase().includes(term) || 
-      c.cpf.includes(term) ||
-      c.phone?.includes(term)
-    );
-  }, [customers, searchTerm]);
+    let result = [...customers];
+    
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(c => 
+        c.name.toLowerCase().includes(term) || 
+        c.cpf.includes(term) ||
+        c.phone?.includes(term)
+      );
+    }
+    
+    // Apply sorting
+    switch (sortBy) {
+      case 'most_spent':
+        result.sort((a, b) => (b.total_spent || 0) - (a.total_spent || 0));
+        break;
+      case 'least_spent':
+        result.sort((a, b) => (a.total_spent || 0) - (b.total_spent || 0));
+        break;
+      case 'recent':
+        result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        break;
+      case 'oldest':
+        result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        break;
+      case 'alphabetical':
+        result.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+    }
+    
+    return result;
+  }, [customers, searchTerm, sortBy]);
 
   const formatCpf = (cpf: string) => {
     const digits = cpf.replace(/\D/g, "");
@@ -236,15 +271,30 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
         </Card>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nome, CPF ou telefone..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search and Sort */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome, CPF ou telefone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+          <SelectTrigger className="w-[200px]">
+            <ArrowUpDown className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Ordenar por..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="most_spent">💰 Mais gasto</SelectItem>
+            <SelectItem value="least_spent">📉 Menos gasto</SelectItem>
+            <SelectItem value="recent">🆕 Recentes</SelectItem>
+            <SelectItem value="oldest">📅 Mais antigos</SelectItem>
+            <SelectItem value="alphabetical">🔤 A-Z</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Customers table */}
