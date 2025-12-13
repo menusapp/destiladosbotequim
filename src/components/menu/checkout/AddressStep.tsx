@@ -41,45 +41,16 @@ const getDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number): 
   return R * c;
 };
 
-// Cache de coordenadas por cidade (persiste durante a sessão)
-const cityCoordinatesCache: Map<string, { lat: number; lng: number }> = new Map();
-
-// Geocodificar cidade usando Nominatim com cache e timeout
-const getCityCoordinates = async (city: string, state: string): Promise<{ lat: number; lng: number } | null> => {
-  if (!city || !state) return null;
+// Verificar se cidade do cliente corresponde à zona de raio (comparação por nome)
+const cityMatchesRadiusZone = (customerCity: string, zoneName: string): boolean => {
+  if (!customerCity || !zoneName) return false;
   
-  const cacheKey = `${city.toLowerCase()}-${state.toUpperCase()}`;
+  const normalizedCity = customerCity.toLowerCase().trim();
+  const normalizedZone = zoneName.toLowerCase().trim();
   
-  // Verificar cache primeiro (instantâneo)
-  if (cityCoordinatesCache.has(cacheKey)) {
-    return cityCoordinatesCache.get(cacheKey)!;
-  }
-  
-  try {
-    // Timeout de 3 segundos usando AbortController
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-    
-    const query = encodeURIComponent(`${city}, ${state}, Brazil`);
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
-      { signal: controller.signal }
-    );
-    
-    clearTimeout(timeoutId);
-    const data = await response.json();
-    
-    if (data && data.length > 0) {
-      const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-      cityCoordinatesCache.set(cacheKey, coords);
-      return coords;
-    }
-  } catch (error) {
-    // Timeout ou erro de rede - continuar sem coordenadas
-    console.log("Geocoding timeout/error:", error);
-  }
-  
-  return null;
+  // Verificar se o nome da cidade está contido no nome da zona ou vice-versa
+  // Ex: "Duartina" matches "Duartina Cidade" ou "Zona Duartina"
+  return normalizedZone.includes(normalizedCity) || normalizedCity.includes(normalizedZone.split(' ')[0]);
 };
 
 export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }: AddressStepProps) => {
@@ -191,28 +162,13 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
         return true;
       }
       
-      // Verificar zonas do tipo raio usando geocodificação por cidade
+      // Verificar zonas do tipo raio usando comparação de cidade (instantâneo)
       const radiusZones = deliveryZones.filter(z => z.zone_type === "radius");
       
-      if (radiusZones.length > 0 && city && state) {
-        const coords = await getCityCoordinates(city, state);
-        
-        if (coords) {
-          for (const zone of radiusZones) {
-            if (zone.center_lat && zone.center_lng && zone.radius_km) {
-              const distance = getDistanceKm(coords.lat, coords.lng, zone.center_lat, zone.center_lng);
-              if (distance <= zone.radius_km) {
-                setMatchedZone(zone);
-                setZoneError(null);
-                return true;
-              }
-            }
-          }
-        } else {
-          // Fallback: se não conseguiu geocodificar mas tem zonas de raio, permitir (melhor UX)
-          // O restaurante pode validar manualmente depois
-          if (radiusZones.length > 0) {
-            setMatchedZone(radiusZones[0]);
+      if (radiusZones.length > 0 && city) {
+        for (const zone of radiusZones) {
+          if (cityMatchesRadiusZone(city, zone.zone_name)) {
+            setMatchedZone(zone);
             setZoneError(null);
             return true;
           }
