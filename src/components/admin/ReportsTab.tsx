@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, DollarSign, TrendingUp, Users, Clock, FileText } from "lucide-react";
+import { Calendar as CalendarIcon, DollarSign, TrendingUp, Users, CreditCard, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -15,12 +15,18 @@ interface ReportsTabProps {
   restaurantId: string;
 }
 
+interface PaymentMethodSummary {
+  method_name: string;
+  method_type: string;
+  total: number;
+}
+
 interface DashboardStats {
   salesToday: number;
   ordersCount: number;
   averageTicket: number;
-  occupiedTables: number;
-  inPreparation: number;
+  mesasAtendidas: number;
+  paymentsByMethod: PaymentMethodSummary[];
 }
 
 interface FixedCost {
@@ -50,8 +56,8 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
     salesToday: 0,
     ordersCount: 0,
     averageTicket: 0,
-    occupiedTables: 0,
-    inPreparation: 0,
+    mesasAtendidas: 0,
+    paymentsByMethod: [],
   });
 
   // DRE states
@@ -210,18 +216,90 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
 
       setTotalRevenue(salesTotal);
 
-      // Mesas ocupadas e em preparo (dados em tempo real)
-      const [occupiedTablesData, inPrepData] = await Promise.all([
-        supabase.from("tables").select("id").eq("restaurant_id", restaurantId).eq("is_occupied", true),
-        supabase.from("orders").select("id").eq("restaurant_id", restaurantId).in("status", ["pending", "accepted", "preparing"]),
-      ]);
+      // Contar comandas criadas no período (Mesas Atendidas)
+      const { data: comandasData } = await supabase
+        .from("comandas")
+        .select("id")
+        .eq("restaurant_id", restaurantId)
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+
+      const mesasAtendidas = comandasData?.length || 0;
+
+      // Buscar formas de pagamento ativas e calcular receita por método
+      const { data: paymentMethods } = await supabase
+        .from("payment_methods")
+        .select("name, method_type")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true);
+
+      // Agregar valores por forma de pagamento
+      const paymentTotals: Record<string, { method_type: string; total: number }> = {};
+
+      // Inicializar todas as formas de pagamento ativas com 0
+      paymentMethods?.forEach(pm => {
+        paymentTotals[pm.name] = { method_type: pm.method_type, total: 0 };
+      });
+
+      // Somar bills por payment_method
+      paidBills?.forEach((bill: any) => {
+        const method = bill.payment_method;
+        if (method && paymentTotals[method]) {
+          paymentTotals[method].total += Number(bill.total_amount);
+        }
+      });
+
+      // Somar counter_orders por payment_method
+      counterOrders?.forEach((order: any) => {
+        const method = order.payment_method;
+        if (method && paymentTotals[method]) {
+          paymentTotals[method].total += Number(order.total_amount);
+        }
+      });
+
+      // Somar delivery orders por payment_type
+      if (deliveryOrders && deliveryOrders.length > 0) {
+        const { data: deliveryOrdersWithPayment } = await supabase
+          .from("orders")
+          .select("id, payment_type, order_items(quantity, price_at_order, order_item_extras(price_at_order))")
+          .eq("restaurant_id", restaurantId)
+          .eq("order_type", "delivery")
+          .in("status", ["delivered", "picked_up"])
+          .gte("updated_at", startDate.toISOString())
+          .lte("updated_at", endDate.toISOString());
+
+        deliveryOrdersWithPayment?.forEach((order: any) => {
+          const method = order.payment_type;
+          if (method && paymentTotals[method]) {
+            let orderTotal = 0;
+            order.order_items?.forEach((item: any) => {
+              const itemTotal = item.price_at_order * item.quantity;
+              const extrasTotal = (item.order_item_extras || []).reduce(
+                (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
+                0
+              );
+              orderTotal += itemTotal + extrasTotal;
+            });
+            if (restaurant?.service_fee_enabled) {
+              orderTotal += orderTotal * (Number(restaurant.service_fee_percentage) / 100);
+            }
+            paymentTotals[method].total += orderTotal;
+          }
+        });
+      }
+
+      const paymentsByMethod: PaymentMethodSummary[] = Object.entries(paymentTotals).map(([name, data]) => ({
+        method_name: name,
+        method_type: data.method_type,
+        total: data.total,
+      }));
 
       setStats({
         salesToday: salesTotal,
         ordersCount,
         averageTicket: avgTicket,
-        occupiedTables: occupiedTablesData.data?.length || 0,
-        inPreparation: inPrepData.data?.length || 0,
+        mesasAtendidas,
+        paymentsByMethod,
       });
 
       // Calcular CMV e despesas operacionais
@@ -512,13 +590,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           </div>
         </Card>
 
-        {/* Mesas Ocupadas */}
+        {/* Mesas Atendidas */}
         <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
           <div className="flex items-start justify-between">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-orange-700">Mesas Ocupadas</p>
-              <p className="text-3xl font-bold text-orange-900">{stats.occupiedTables}</p>
-              <p className="text-xs text-orange-600">Agora</p>
+              <p className="text-sm font-medium text-orange-700">Mesas Atendidas</p>
+              <p className="text-3xl font-bold text-orange-900">{stats.mesasAtendidas}</p>
+              <p className="text-xs text-orange-600">Comandas no período</p>
             </div>
             <div className="p-3 bg-orange-500 rounded-xl">
               <Users className="h-6 w-6 text-white" />
@@ -526,18 +604,26 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           </div>
         </Card>
 
-        {/* Em Preparo */}
+        {/* Formas de Pagamento */}
         <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-orange-700">Em Preparo</p>
-              <p className="text-3xl font-bold text-orange-900">{stats.inPreparation}</p>
-              <p className="text-xs text-orange-600">Pedidos ativos</p>
-            </div>
-            <div className="p-3 bg-orange-400 rounded-xl">
-              <Clock className="h-6 w-6 text-white" />
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-sm font-medium text-orange-700">Formas de Pagamento</p>
+            <div className="p-2 bg-orange-400 rounded-xl">
+              <CreditCard className="h-5 w-5 text-white" />
             </div>
           </div>
+          {stats.paymentsByMethod.length === 0 ? (
+            <p className="text-xs text-orange-600">Nenhuma forma cadastrada</p>
+          ) : (
+            <div className="space-y-1">
+              {stats.paymentsByMethod.map(pm => (
+                <div key={pm.method_name} className="flex justify-between items-center text-sm">
+                  <span className="text-orange-800 truncate">{pm.method_name}</span>
+                  <span className="font-semibold text-orange-900">R$ {pm.total.toFixed(2).replace(".", ",")}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
 
