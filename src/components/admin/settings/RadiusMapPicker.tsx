@@ -1,19 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, Circle, Marker, useMapEvents, useMap } from "react-leaflet";
-import L from "leaflet";
+import { useEffect, useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Search, MapPin } from "lucide-react";
-
-// Fix Leaflet default marker icon issue
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-});
+import { Search, MapPin, Loader2 } from "lucide-react";
 
 interface RadiusMapPickerProps {
   centerLat: number | null;
@@ -21,25 +11,6 @@ interface RadiusMapPickerProps {
   radiusKm: number;
   onCenterChange: (lat: number, lng: number) => void;
   onRadiusChange: (km: number) => void;
-}
-
-function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click: (e) => {
-      onClick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
-
-function MapCenterUpdater({ lat, lng }: { lat: number; lng: number }) {
-  const map = useMap();
-  useEffect(() => {
-    if (lat && lng) {
-      map.setView([lat, lng], map.getZoom());
-    }
-  }, [lat, lng, map]);
-  return null;
 }
 
 const RadiusMapPicker = ({
@@ -51,17 +22,106 @@ const RadiusMapPicker = ({
 }: RadiusMapPickerProps) => {
   const [searchAddress, setSearchAddress] = useState("");
   const [searching, setSearching] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapRef, setMapRef] = useState<any>(null);
 
   // Default center: São Paulo, Brazil
   const defaultLat = centerLat || -23.5505;
   const defaultLng = centerLng || -46.6333;
+
+  // Initialize map after component mounts
+  useEffect(() => {
+    let map: any = null;
+    let marker: any = null;
+    let circle: any = null;
+
+    const initMap = async () => {
+      try {
+        const L = (await import("leaflet")).default;
+        
+        // Fix Leaflet default marker icon issue
+        delete (L.Icon.Default.prototype as any)._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+          iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+        });
+
+        const container = document.getElementById("radius-map-container");
+        if (!container) return;
+
+        // Create map
+        map = L.map(container).setView([defaultLat, defaultLng], 13);
+        
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        }).addTo(map);
+
+        // Add click handler
+        map.on("click", (e: any) => {
+          const { lat, lng } = e.latlng;
+          onCenterChange(lat, lng);
+        });
+
+        // If we have a center, add marker and circle
+        if (centerLat && centerLng) {
+          marker = L.marker([centerLat, centerLng]).addTo(map);
+          circle = L.circle([centerLat, centerLng], {
+            radius: radiusKm * 1000,
+            color: "hsl(24, 90%, 50%)",
+            fillColor: "hsl(24, 90%, 50%)",
+            fillOpacity: 0.2,
+          }).addTo(map);
+        }
+
+        setMapRef({ map, marker, circle, L });
+        setMapLoaded(true);
+      } catch (error) {
+        console.error("Error loading map:", error);
+      }
+    };
+
+    initMap();
+
+    return () => {
+      if (map) {
+        map.remove();
+      }
+    };
+  }, []);
+
+  // Update marker and circle when center or radius changes
+  useEffect(() => {
+    if (!mapRef || !mapRef.map) return;
+
+    const { map, L } = mapRef;
+
+    // Remove existing marker and circle
+    map.eachLayer((layer: any) => {
+      if (layer instanceof L.Marker || layer instanceof L.Circle) {
+        map.removeLayer(layer);
+      }
+    });
+
+    // Add new marker and circle if we have coordinates
+    if (centerLat && centerLng) {
+      L.marker([centerLat, centerLng]).addTo(map);
+      L.circle([centerLat, centerLng], {
+        radius: radiusKm * 1000,
+        color: "hsl(24, 90%, 50%)",
+        fillColor: "hsl(24, 90%, 50%)",
+        fillOpacity: 0.2,
+      }).addTo(map);
+
+      map.setView([centerLat, centerLng], map.getZoom());
+    }
+  }, [centerLat, centerLng, radiusKm, mapRef]);
 
   const handleSearch = async () => {
     if (!searchAddress.trim()) return;
 
     setSearching(true);
     try {
-      // Use Nominatim (OpenStreetMap) for geocoding - free, no API key required
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
           searchAddress + ", Brasil"
@@ -87,10 +147,6 @@ const RadiusMapPicker = ({
     }
   };
 
-  const handleMapClick = (lat: number, lng: number) => {
-    onCenterChange(lat, lng);
-  };
-
   return (
     <div className="space-y-4">
       {/* Search bar */}
@@ -109,38 +165,18 @@ const RadiusMapPicker = ({
           onClick={handleSearch}
           disabled={searching}
         >
-          <Search className="h-4 w-4" />
+          {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
         </Button>
       </div>
 
       {/* Map */}
-      <div className="h-[300px] rounded-lg overflow-hidden border">
-        <MapContainer
-          center={[defaultLat, defaultLng]}
-          zoom={13}
-          style={{ height: "100%", width: "100%" }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapClickHandler onClick={handleMapClick} />
-          {centerLat && centerLng && (
-            <>
-              <MapCenterUpdater lat={centerLat} lng={centerLng} />
-              <Marker position={[centerLat, centerLng]} />
-              <Circle
-                center={[centerLat, centerLng]}
-                radius={radiusKm * 1000} // Convert km to meters
-                pathOptions={{
-                  color: "hsl(var(--primary))",
-                  fillColor: "hsl(var(--primary))",
-                  fillOpacity: 0.2,
-                }}
-              />
-            </>
-          )}
-        </MapContainer>
+      <div className="h-[300px] rounded-lg overflow-hidden border relative">
+        {!mapLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        <div id="radius-map-container" className="h-full w-full" />
       </div>
 
       {/* Instructions */}
