@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ShoppingBag,
   CreditCard,
@@ -12,6 +13,13 @@ import {
   CircleDollarSign,
   MessageCircle,
   Construction,
+  ChevronDown,
+  ChevronRight,
+  Building2,
+  Clock,
+  MapPin,
+  Printer,
+  MessageSquare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -24,6 +32,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface AppSidebarProps {
   activeSection: string;
@@ -36,6 +45,7 @@ interface AppSidebarProps {
 export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
 
   const menuStructure = {
     main: [
@@ -64,10 +74,19 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
     development: [
       { id: "entregadores", label: "Entregadores", icon: Truck },
       { id: "marketing", label: "Marketing", icon: TrendingUp },
-      { id: "configuracoes", label: "Configurações", icon: Settings },
       { id: "modulos", label: "Módulos", icon: Construction },
     ],
+    configSubItems: [
+      { id: "config-dados", label: "Dados da Empresa", icon: Building2 },
+      { id: "config-horario", label: "Horário de Funcionamento", icon: Clock },
+      { id: "config-regioes", label: "Regiões de Entrega", icon: MapPin },
+      { id: "config-pagamentos", label: "Formas de Pagamento", icon: CreditCard },
+      { id: "config-impressoras", label: "Impressoras", icon: Printer },
+      { id: "config-whatsapp", label: "Automação WhatsApp", icon: MessageSquare },
+    ],
   };
+
+  const isConfigActive = activeSection.startsWith("config-");
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background w-60">
@@ -124,6 +143,45 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {/* Configurações - Menu Expansível */}
+              <SidebarMenuItem>
+                <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      tooltip="Configurações"
+                      className={`w-full ${isConfigActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "opacity-60"}`}
+                    >
+                      <Settings className="h-4 w-4" />
+                      {!collapsed && (
+                        <>
+                          <span className="flex-1 text-left">Configurações</span>
+                          {configOpen ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </>
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  {!collapsed && (
+                    <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                      {menuStructure.configSubItems.map((subItem) => (
+                        <SidebarMenuButton
+                          key={subItem.id}
+                          onClick={() => onSectionChange(subItem.id)}
+                          isActive={activeSection === subItem.id}
+                          className="w-full text-sm"
+                        >
+                          <subItem.icon className="h-4 w-4" />
+                          <span>{subItem.label}</span>
+                        </SidebarMenuButton>
+                      ))}
+                    </CollapsibleContent>
+                  )}
+                </Collapsible>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

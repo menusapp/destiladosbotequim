@@ -13,7 +13,6 @@ import PedidosTab from "@/components/admin/PedidosTab";
 import LocalOrdersTab from "@/components/admin/LocalOrdersTab";
 import CardapioTab from "@/components/admin/CardapioTab";
 import TablesTab from "@/components/admin/TablesTab";
-import SettingsTab from "@/components/admin/SettingsTab";
 import StockTab from "@/components/admin/StockTab";
 import CostosTab from "@/components/admin/CostosTab";
 import MargensTab from "@/components/admin/MargensTab";
@@ -23,6 +22,13 @@ import ClientesTab from "@/components/admin/ClientesTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
+// Settings sub-tabs
+import CompanyDataSettings from "@/components/admin/settings/CompanyDataSettings";
+import BusinessHoursSettings from "@/components/admin/settings/BusinessHoursSettings";
+import DeliveryZonesSettings from "@/components/admin/settings/DeliveryZonesSettings";
+import PaymentMethodsSettings from "@/components/admin/settings/PaymentMethodsSettings";
+import PrintersSettings from "@/components/admin/settings/PrintersSettings";
+import WhatsAppSettings from "@/components/admin/settings/WhatsAppSettings";
 
 interface Restaurant {
   id: string;
@@ -442,10 +448,22 @@ const RestaurantAdmin = () => {
         return <DevelopmentPlaceholder title="Marketing" />;
       case "clientes":
         return <ClientesTab restaurantId={restaurant.id} />;
-      case "configuracoes":
-        return <SettingsTab restaurantId={restaurant.id} />;
       case "modulos":
         return <DevelopmentPlaceholder title="Módulos e Assinaturas" />;
+      
+      // Configurações - Subabas
+      case "config-dados":
+        return <CompanyDataSettings restaurantId={restaurant.id} />;
+      case "config-horario":
+        return <BusinessHoursSettings restaurantId={restaurant.id} />;
+      case "config-regioes":
+        return <DeliveryZonesSettings restaurantId={restaurant.id} />;
+      case "config-pagamentos":
+        return <PaymentMethodsSettings restaurantId={restaurant.id} />;
+      case "config-impressoras":
+        return <PrintersSettings restaurantId={restaurant.id} />;
+      case "config-whatsapp":
+        return <WhatsAppSettings restaurantId={restaurant.id} />;
       
       default:
         return <PedidosTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
