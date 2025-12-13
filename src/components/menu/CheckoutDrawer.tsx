@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CartStep } from "./checkout/CartStep";
 import { AddressStep } from "./checkout/AddressStep";
@@ -13,6 +12,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type CheckoutStep = "cart" | "delivery-type" | "address" | "payment" | "summary";
+
+interface DeliveryZone {
+  id: string;
+  zone_name: string;
+  delivery_fee: number;
+  min_order_value: number;
+  estimated_time_minutes: number;
+}
 
 interface CheckoutDrawerProps {
   open: boolean;
@@ -45,6 +52,7 @@ export const CheckoutDrawer = ({
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -57,26 +65,39 @@ export const CheckoutDrawer = ({
     return steps[step];
   };
 
+  // Calcular subtotal
+  const subtotal = cart.reduce((sum, item) => {
+    const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+    const effectivePrice = item.product.promotional_price ?? item.product.price;
+    return sum + (effectivePrice + extrasTotal) * item.quantity;
+  }, 0);
+
+  // Usar taxa de entrega da zona encontrada ou do restaurante como fallback
+  const getDeliveryFee = () => {
+    if (deliveryType === "pickup") return 0;
+    if (deliveryZone) return deliveryZone.delivery_fee || 0;
+    return restaurant.delivery_fee || 0;
+  };
+
+  // Verificar pedido mínimo
+  const getMinOrderValue = () => {
+    if (deliveryType === "pickup") return 0;
+    if (deliveryZone) return deliveryZone.min_order_value || 0;
+    return restaurant.min_order_value || 0;
+  };
+
   const handleFinishOrder = async () => {
     if (submitting) return;
     
     setSubmitting(true);
     try {
-      // 1. Calcular valores
-      const subtotal = cart.reduce((sum, item) => {
-        const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-        const effectivePrice = item.product.promotional_price ?? item.product.price;
-        return sum + (effectivePrice + extrasTotal) * item.quantity;
-      }, 0);
-
       const couponDiscount = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
       const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
-      const deliveryFee = restaurant.delivery_fee || 0;
+      const deliveryFee = getDeliveryFee();
       const serviceFee = restaurant.service_fee_enabled 
         ? (subtotal * restaurant.service_fee_percentage / 100) 
         : 0;
 
-      // 2. Criar pedido (delivery sem table_id)
       const orderData: any = {
         table_id: null,
         restaurant_id: restaurant.id,
@@ -91,7 +112,7 @@ export const CheckoutDrawer = ({
         payment_type: paymentData.method,
         coupon_code: coupon?.code,
         coupon_discount: couponDiscount,
-        delivery_fee: deliveryType === "delivery" ? deliveryFee : 0,
+        delivery_fee: deliveryFee,
         loyalty_points_used: loyaltyPointsUsed,
         loyalty_points_earned: Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1)),
         status: "pending",
@@ -109,7 +130,6 @@ export const CheckoutDrawer = ({
         throw orderError;
       }
 
-      // 4. Criar itens do pedido
       for (const item of cart) {
         const { data: orderItem, error: itemError } = await supabase
           .from("order_items")
@@ -125,7 +145,6 @@ export const CheckoutDrawer = ({
 
         if (itemError) throw itemError;
 
-        // 5. Criar extras dos itens
         for (const extra of item.extras) {
           await supabase.from("order_item_extras").insert({
             order_item_id: orderItem.id,
@@ -135,7 +154,6 @@ export const CheckoutDrawer = ({
         }
       }
 
-      // 6. Atualizar cupom
       if (coupon) {
         await supabase
           .from("coupons")
@@ -143,7 +161,6 @@ export const CheckoutDrawer = ({
           .eq("id", coupon.id);
       }
 
-      // 7. Gerenciar pontos de fidelidade
       if (restaurant.loyalty_enabled && customerData.cpf) {
         if (loyaltyPointsUsed > 0) {
           await updateLoyaltyPoints(
@@ -167,7 +184,6 @@ export const CheckoutDrawer = ({
         }
       }
 
-      // 8. Salvar endereço se solicitado (apenas para delivery)
       if (deliveryType === "delivery" && addressData?.saveForLater) {
         await supabase.from("customer_addresses").insert({
           customer_cpf: customerData.cpf,
@@ -178,22 +194,16 @@ export const CheckoutDrawer = ({
         });
       }
 
-      // 9. Limpar carrinho
       localStorage.removeItem(`delivery-cart-${restaurantSlug}`);
       onClearCart();
 
-      // 10. Redirecionar
       navigate(`/delivery/${restaurantSlug}/pedido/${order.id}`);
       toast.success("Pedido realizado com sucesso! 🎉");
     } catch (error: any) {
       console.error("Erro ao finalizar pedido:", error);
-      console.error("Detalhes do erro:", error?.message || error);
-      
-      // Mensagem de erro mais específica
       const errorMessage = error?.message 
         ? `Erro: ${error.message}` 
         : "Erro ao finalizar pedido. Tente novamente.";
-      
       toast.error(errorMessage);
     } finally {
       setSubmitting(false);
@@ -207,7 +217,6 @@ export const CheckoutDrawer = ({
     orderId: string,
     type: "earn" | "redeem"
   ) => {
-    // Buscar ou criar registro de pontos
     const { data: existing } = await supabase
       .from("loyalty_points")
       .select("*")
@@ -239,7 +248,6 @@ export const CheckoutDrawer = ({
       });
     }
 
-    // Criar transação
     await supabase.from("loyalty_transactions").insert({
       customer_cpf: cpf,
       restaurant_id: restaurantId,
@@ -276,6 +284,8 @@ export const CheckoutDrawer = ({
             loyaltyPointsUsed={loyaltyPointsUsed}
             onRedeemPoints={setLoyaltyPointsUsed}
             onContinue={() => setStep("delivery-type")}
+            minOrderValue={getMinOrderValue()}
+            deliveryType={deliveryType}
           />
         );
       case "delivery-type":
@@ -292,6 +302,7 @@ export const CheckoutDrawer = ({
               }
             }}
             storeAddress={restaurant.store_address}
+            restaurantId={restaurant.id}
           />
         );
       case "address":
@@ -301,26 +312,26 @@ export const CheckoutDrawer = ({
             onContinue={(data) => {
               setCustomerData({ name: data.customerName, cpf: data.customerCPF, phone: data.customerPhone });
               setAddressData(data);
+              
+              // Salvar zona de entrega encontrada
+              if (data.deliveryZone) {
+                setDeliveryZone(data.deliveryZone);
+              }
+              
               setStep("payment");
               
-              // Buscar pontos de fidelidade se habilitado
               if (restaurant.loyalty_enabled && data.customerCPF) {
                 fetchLoyaltyPoints(data.customerCPF);
               }
             }}
             restaurantSlug={restaurantSlug}
+            restaurantId={restaurant.id}
           />
         );
       case "payment":
-        // Calcular total do pedido
-        const subtotal = cart.reduce((sum, item) => {
-          const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-          return sum + (item.product.price + extrasTotal) * item.quantity;
-        }, 0);
-
         const couponDiscount = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
         const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
-        const deliveryFee = deliveryType === "delivery" ? (restaurant.delivery_fee || 0) : 0;
+        const deliveryFee = getDeliveryFee();
         const serviceFee = restaurant.service_fee_enabled 
           ? (subtotal * restaurant.service_fee_percentage / 100) 
           : 0;
@@ -332,17 +343,16 @@ export const CheckoutDrawer = ({
             onBack={() => deliveryType === "delivery" ? setStep("address") : setStep("delivery-type")}
             requireCustomerInfo={deliveryType === "pickup"}
             orderTotal={orderTotal}
+            restaurantId={restaurant.id}
             onContinue={(data) => {
               setPaymentData(data);
               
-              // Se for retirada, pegar dados do cliente aqui
               if (deliveryType === "pickup") {
                 const cpf = sessionStorage.getItem("customer_cpf") || "";
                 const name = sessionStorage.getItem("customer_name") || "";
                 const phone = sessionStorage.getItem("customer_phone") || "";
                 setCustomerData({ name, cpf, phone });
                 
-                // Buscar pontos de fidelidade se habilitado
                 if (restaurant.loyalty_enabled && cpf) {
                   fetchLoyaltyPoints(cpf);
                 }
@@ -366,6 +376,7 @@ export const CheckoutDrawer = ({
             onBack={() => setStep("payment")}
             onConfirm={handleFinishOrder}
             submitting={submitting}
+            deliveryZone={deliveryZone}
           />
         );
     }
@@ -383,8 +394,7 @@ export const CheckoutDrawer = ({
   };
 
   if (mode === "local") {
-    // Renderizar o antigo CartDrawer para modo local
-    return null; // Implementar depois se necessário
+    return null;
   }
 
   return (

@@ -4,6 +4,14 @@ import { Separator } from "@/components/ui/separator";
 import { CartItem } from "@/types/menu";
 import { MapPin, CreditCard, Clock, Gift } from "lucide-react";
 
+interface DeliveryZone {
+  id: string;
+  zone_name: string;
+  delivery_fee: number;
+  min_order_value: number;
+  estimated_time_minutes: number;
+}
+
 interface SummaryStepProps {
   cart: CartItem[];
   restaurant: any;
@@ -16,6 +24,7 @@ interface SummaryStepProps {
   onBack: () => void;
   onConfirm: () => void;
   submitting: boolean;
+  deliveryZone?: DeliveryZone | null;
 }
 
 export const SummaryStep = ({
@@ -30,6 +39,7 @@ export const SummaryStep = ({
   onBack,
   onConfirm,
   submitting,
+  deliveryZone,
 }: SummaryStepProps) => {
   const subtotal = cart.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
@@ -47,7 +57,12 @@ export const SummaryStep = ({
     : 0;
 
   const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
-  const deliveryFee = deliveryType === "delivery" ? (restaurant.delivery_fee || 0) : 0;
+  
+  // Usar taxa da zona de entrega se disponível
+  const deliveryFee = deliveryType === "delivery" 
+    ? (deliveryZone?.delivery_fee ?? restaurant.delivery_fee ?? 0) 
+    : 0;
+  
   const serviceFee = restaurant.service_fee_enabled
     ? (subtotal * restaurant.service_fee_percentage) / 100
     : 0;
@@ -55,12 +70,16 @@ export const SummaryStep = ({
 
   const pointsToEarn = Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1));
 
+  // Tempo estimado: usar da zona se disponível
+  const estimatedTime = deliveryZone?.estimated_time_minutes ?? restaurant.prep_time_minutes ?? 30;
+
   const getPaymentLabel = () => {
     const labels = {
       cash: "Dinheiro",
       debit: "Cartão de Débito",
       credit: "Cartão de Crédito",
       pix: "PIX",
+      voucher: "Vale Refeição",
     };
     return labels[paymentData.method as keyof typeof labels] || paymentData.method;
   };
@@ -125,6 +144,11 @@ export const SummaryStep = ({
               <p className="text-sm text-muted-foreground">
                 Telefone: {customerData.phone}
               </p>
+              {deliveryZone && (
+                <p className="text-sm text-muted-foreground">
+                  Região: {deliveryZone.zone_name}
+                </p>
+              )}
             </>
           ) : (
             <p className="text-sm text-muted-foreground mt-1">
@@ -211,7 +235,7 @@ export const SummaryStep = ({
       {/* Estimated Time */}
       <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
         <Clock className="w-4 h-4" />
-        <span>Tempo estimado: {restaurant.prep_time_minutes || 30}-45 minutos</span>
+        <span>Tempo estimado: {estimatedTime}-{estimatedTime + 15} minutos</span>
       </div>
 
       {/* Actions */}

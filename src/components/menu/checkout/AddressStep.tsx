@@ -6,15 +6,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MapPin, Trash2 } from "lucide-react";
+import { MapPin, Trash2, AlertCircle } from "lucide-react";
+
+interface DeliveryZone {
+  id: string;
+  zone_name: string;
+  zip_codes: string[];
+  neighborhoods: string[];
+  delivery_fee: number;
+  min_order_value: number;
+  estimated_time_minutes: number;
+  is_active: boolean;
+}
 
 interface AddressStepProps {
   onBack: () => void;
   onContinue: (data: any) => void;
   restaurantSlug?: string;
+  restaurantId?: string;
 }
 
-export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepProps) => {
+export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }: AddressStepProps) => {
   const [customerName, setCustomerName] = useState("");
   const [customerCPF, setCustomerCPF] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -22,6 +34,9 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [saveForLater, setSaveForLater] = useState(false);
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
+  const [matchedZone, setMatchedZone] = useState<DeliveryZone | null>(null);
+  const [zoneError, setZoneError] = useState<string | null>(null);
   const [newAddress, setNewAddress] = useState({
     zip_code: "",
     street: "",
@@ -31,6 +46,25 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
     city: "",
     state: "",
   });
+
+  // Carregar zonas de entrega ativas
+  useEffect(() => {
+    const fetchDeliveryZones = async () => {
+      if (!restaurantId) return;
+      
+      const { data } = await supabase
+        .from("delivery_zones")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true);
+      
+      if (data) {
+        setDeliveryZones(data);
+      }
+    };
+    
+    fetchDeliveryZones();
+  }, [restaurantId]);
 
   // Carregar dados do usuário logado ou sessionStorage
   useEffect(() => {
@@ -84,9 +118,46 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
       setCustomerPhone(data[0].customer_phone);
       setSelectedAddress(data[0]);
       setShowNewForm(false);
+      
+      // Validar CEP do endereço selecionado
+      validateZipCode(data[0].zip_code);
     } else {
       setSavedAddresses([]);
       setShowNewForm(true);
+    }
+  };
+
+  // Validar CEP contra zonas de entrega
+  const validateZipCode = (zipCode: string) => {
+    const cleanZip = zipCode.replace(/\D/g, "");
+    
+    // Se não há zonas configuradas, permitir qualquer CEP
+    if (deliveryZones.length === 0) {
+      setMatchedZone(null);
+      setZoneError(null);
+      return true;
+    }
+    
+    // Buscar zona que corresponde ao CEP
+    const zone = deliveryZones.find(z => 
+      z.zip_codes?.some(prefix => {
+        const cleanPrefix = prefix.replace(/\D/g, "");
+        return cleanZip.startsWith(cleanPrefix);
+      }) ||
+      z.neighborhoods?.some(n => 
+        newAddress.neighborhood?.toLowerCase().includes(n.toLowerCase()) ||
+        n.toLowerCase().includes(newAddress.neighborhood?.toLowerCase() || "")
+      )
+    );
+    
+    if (zone) {
+      setMatchedZone(zone);
+      setZoneError(null);
+      return true;
+    } else {
+      setMatchedZone(null);
+      setZoneError("Não entregamos nessa região. Por favor, escolha retirada no estabelecimento.");
+      return false;
     }
   };
 
@@ -106,6 +177,10 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
             city: data.localidade || prev.city,
             state: data.uf || prev.state,
           }));
+          
+          // Validar CEP contra zonas de entrega
+          validateZipCode(newAddress.zip_code);
+          
           toast.success("CEP encontrado!");
         } else {
           toast.error("CEP não encontrado");
@@ -115,6 +190,20 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
       }
     }
   };
+
+  // Revalidar quando neighborhood é preenchido (para validação por bairro)
+  useEffect(() => {
+    if (newAddress.neighborhood && deliveryZones.length > 0) {
+      validateZipCode(newAddress.zip_code);
+    }
+  }, [newAddress.neighborhood, deliveryZones]);
+
+  // Validar quando seleciona endereço salvo
+  useEffect(() => {
+    if (selectedAddress && deliveryZones.length > 0) {
+      validateZipCode(selectedAddress.zip_code);
+    }
+  }, [selectedAddress, deliveryZones]);
 
   const handleDeleteAddress = async (id: string) => {
     const { error } = await supabase
@@ -127,6 +216,8 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
       if (selectedAddress?.id === id) {
         setSelectedAddress(null);
         setShowNewForm(true);
+        setMatchedZone(null);
+        setZoneError(null);
       }
       toast.success("Endereço removido");
     }
@@ -151,6 +242,12 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
       return;
     }
 
+    // Validar zona de entrega antes de continuar
+    if (deliveryZones.length > 0 && !matchedZone) {
+      toast.error("Não entregamos nessa região. Por favor, volte e escolha retirada.");
+      return;
+    }
+
     onContinue({
       customerName,
       customerCPF,
@@ -158,11 +255,45 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
       address: addressToUse,
       saveForLater: showNewForm && saveForLater,
       isFirstAddress: savedAddresses.length === 0,
+      deliveryZone: matchedZone, // Passar zona encontrada para usar taxa correta
     });
   };
 
   return (
     <div className="p-4 space-y-6">
+      {/* Zone Error Alert */}
+      {zoneError && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+              <p className="text-sm text-destructive font-medium">{zoneError}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Matched Zone Info */}
+      {matchedZone && (
+        <Card className="border-green-500 bg-green-500/10">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <MapPin className="w-5 h-5 text-green-600" />
+              <div>
+                <p className="text-sm font-medium text-green-700">
+                  Entregamos na sua região! ({matchedZone.zone_name})
+                </p>
+                <p className="text-xs text-green-600">
+                  Taxa: R$ {matchedZone.delivery_fee.toFixed(2)} • 
+                  Tempo estimado: {matchedZone.estimated_time_minutes} min
+                  {matchedZone.min_order_value > 0 && ` • Pedido mínimo: R$ ${matchedZone.min_order_value.toFixed(2)}`}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Customer Data */}
       <div className="space-y-4">
         <div>
@@ -209,7 +340,10 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
                   ? "border-primary bg-primary/5"
                   : "hover:border-primary/50"
               }`}
-              onClick={() => setSelectedAddress(addr)}
+              onClick={() => {
+                setSelectedAddress(addr);
+                validateZipCode(addr.zip_code);
+              }}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
@@ -251,6 +385,8 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
             onClick={() => {
               setShowNewForm(true);
               setSelectedAddress(null);
+              setMatchedZone(null);
+              setZoneError(null);
             }}
           >
             + Usar outro endereço
@@ -366,7 +502,11 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug }: AddressStepP
         <Button variant="outline" onClick={onBack} className="flex-1">
           Voltar
         </Button>
-        <Button onClick={handleContinue} className="flex-1">
+        <Button 
+          onClick={handleContinue} 
+          className="flex-1"
+          disabled={deliveryZones.length > 0 && !matchedZone}
+        >
           Continuar
         </Button>
       </div>

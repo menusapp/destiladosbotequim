@@ -4,28 +4,89 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Banknote, CreditCard, Smartphone } from "lucide-react";
+import { Banknote, CreditCard, Smartphone, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+
+interface PaymentMethod {
+  id: string;
+  method_type: string;
+  name: string;
+  is_active: boolean;
+}
 
 interface PaymentStepProps {
   onBack: () => void;
   onContinue: (data: any) => void;
   requireCustomerInfo?: boolean;
   orderTotal?: number;
+  restaurantId?: string;
 }
 
-export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTotal = 0 }: PaymentStepProps) => {
+const METHOD_ICONS: Record<string, any> = {
+  cash: Banknote,
+  debit: CreditCard,
+  credit: CreditCard,
+  pix: Smartphone,
+  voucher: Utensils,
+};
+
+const DEFAULT_METHODS = [
+  { value: "cash", label: "Dinheiro", icon: Banknote },
+  { value: "debit", label: "Cartão de Débito", icon: CreditCard },
+  { value: "credit", label: "Cartão de Crédito", icon: CreditCard },
+  { value: "pix", label: "PIX", icon: Smartphone },
+];
+
+export const PaymentStep = ({ 
+  onBack, 
+  onContinue, 
+  requireCustomerInfo, 
+  orderTotal = 0,
+  restaurantId 
+}: PaymentStepProps) => {
   const [paymentType, setPaymentType] = useState<"delivery" | "online">("delivery");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [changeFor, setChangeFor] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerCPF, setCustomerCPF] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [availableMethods, setAvailableMethods] = useState<{ value: string; label: string; icon: any }[]>(DEFAULT_METHODS);
+  const [loading, setLoading] = useState(true);
+
+  // Carregar métodos de pagamento ativos do restaurante
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      if (!restaurantId) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("payment_methods")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true);
+
+      if (!error && data && data.length > 0) {
+        // Usar métodos configurados pelo admin
+        const methods = data.map((m: PaymentMethod) => ({
+          value: m.method_type,
+          label: m.name,
+          icon: METHOD_ICONS[m.method_type] || CreditCard,
+        }));
+        setAvailableMethods(methods);
+      }
+      // Se não há métodos configurados, usa os padrões
+      
+      setLoading(false);
+    };
+
+    fetchPaymentMethods();
+  }, [restaurantId]);
 
   useEffect(() => {
     const loadUserData = async () => {
-      // Tentar buscar dados do perfil do usuário autenticado
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
@@ -36,7 +97,6 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTota
           .single();
         
         if (profile) {
-          // Preencher automaticamente os campos
           if (profile.full_name) {
             setCustomerName(profile.full_name);
             sessionStorage.setItem("customer_name", profile.full_name);
@@ -49,11 +109,10 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTota
             setCustomerPhone(profile.phone);
             sessionStorage.setItem("customer_phone", profile.phone);
           }
-          return; // Se encontrou perfil, não busca do sessionStorage
+          return;
         }
       }
       
-      // Fallback: buscar do sessionStorage se não estiver autenticado
       if (requireCustomerInfo) {
         setCustomerName(sessionStorage.getItem("customer_name") || "");
         setCustomerCPF(sessionStorage.getItem("customer_cpf") || "");
@@ -64,20 +123,12 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTota
     loadUserData();
   }, [requireCustomerInfo]);
 
-  const paymentMethods = [
-    { value: "cash", label: "Dinheiro", icon: Banknote },
-    { value: "debit", label: "Cartão de Débito", icon: CreditCard },
-    { value: "credit", label: "Cartão de Crédito", icon: CreditCard },
-    { value: "pix", label: "PIX", icon: Smartphone },
-  ];
-
   const handleContinue = () => {
     if (!paymentMethod) {
       toast.error("Selecione uma forma de pagamento");
       return;
     }
 
-    // Validação obrigatória de troco para pagamento em dinheiro
     if (paymentMethod === "cash") {
       if (!changeFor || changeFor.trim() === "") {
         toast.error("Informe o valor para troco");
@@ -112,6 +163,14 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTota
       changeFor: paymentMethod === "cash" ? changeFor : null,
     });
   };
+
+  if (loading) {
+    return (
+      <div className="p-4 flex items-center justify-center min-h-[200px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-6">
@@ -191,30 +250,38 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTota
       {/* Payment Methods for Delivery */}
       {paymentType === "delivery" && (
         <div className="space-y-3">
-          {paymentMethods.map((method) => (
-            <Card
-              key={method.value}
-              className={`cursor-pointer transition-colors ${
-                paymentMethod === method.value
-                  ? "border-primary bg-primary/5"
-                  : "hover:border-primary/50"
-              }`}
-              onClick={() => setPaymentMethod(method.value)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <method.icon className="w-5 h-5" />
-                  <span className="font-medium">{method.label}</span>
-                </div>
-              </CardContent>
+          {availableMethods.length === 0 ? (
+            <Card className="p-4 border-amber-500 bg-amber-500/10">
+              <p className="text-sm text-amber-700">
+                Nenhuma forma de pagamento configurada
+              </p>
             </Card>
-          ))}
+          ) : (
+            availableMethods.map((method) => (
+              <Card
+                key={method.value}
+                className={`cursor-pointer transition-colors ${
+                  paymentMethod === method.value
+                    ? "border-primary bg-primary/5"
+                    : "hover:border-primary/50"
+                }`}
+                onClick={() => setPaymentMethod(method.value)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <method.icon className="w-5 h-5" />
+                    <span className="font-medium">{method.label}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
 
           {paymentMethod === "cash" && (
             <div className="mt-4">
-                  <Label htmlFor="changeFor">
-                    Troco para quanto? <span className="text-red-500">*</span>
-                  </Label>
+              <Label htmlFor="changeFor">
+                Troco para quanto? <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="changeFor"
                 type="number"
@@ -244,7 +311,7 @@ export const PaymentStep = ({ onBack, onContinue, requireCustomerInfo, orderTota
         </Button>
         <Button
           onClick={handleContinue}
-          disabled={!paymentMethod}
+          disabled={!paymentMethod || availableMethods.length === 0}
           className="flex-1"
         >
           Continuar

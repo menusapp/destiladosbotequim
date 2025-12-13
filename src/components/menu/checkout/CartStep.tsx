@@ -1,11 +1,11 @@
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Minus, Plus, Trash2, AlertCircle } from "lucide-react";
 import { CartItem } from "@/types/menu";
 import { ProductSuggestions } from "./ProductSuggestions";
 import { CouponInput } from "./CouponInput";
 import { LoyaltyPointsDisplay } from "./LoyaltyPointsDisplay";
+import { toast } from "sonner";
 
 interface CartStepProps {
   cart: CartItem[];
@@ -18,6 +18,8 @@ interface CartStepProps {
   loyaltyPointsUsed: number;
   onRedeemPoints: (points: number) => void;
   onContinue: () => void;
+  minOrderValue?: number;
+  deliveryType?: "delivery" | "pickup";
 }
 
 export const CartStep = ({
@@ -31,6 +33,8 @@ export const CartStep = ({
   loyaltyPointsUsed,
   onRedeemPoints,
   onContinue,
+  minOrderValue = 0,
+  deliveryType = "delivery",
 }: CartStepProps) => {
   const subtotal = cart.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
@@ -49,8 +53,40 @@ export const CartStep = ({
 
   const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
 
+  // Verificar pedido mínimo apenas para delivery
+  const effectiveMinOrder = deliveryType === "delivery" ? minOrderValue : 0;
+  const meetsMinOrder = subtotal >= effectiveMinOrder;
+  const amountNeeded = effectiveMinOrder - subtotal;
+
+  const handleContinue = () => {
+    if (!meetsMinOrder && deliveryType === "delivery") {
+      toast.error(`Pedido mínimo para entrega: R$ ${effectiveMinOrder.toFixed(2).replace('.', ',')}`);
+      return;
+    }
+    onContinue();
+  };
+
   return (
     <div className="p-4 space-y-6">
+      {/* Min Order Warning */}
+      {!meetsMinOrder && effectiveMinOrder > 0 && deliveryType === "delivery" && (
+        <Card className="border-amber-500 bg-amber-500/10">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-amber-700">
+                  Pedido mínimo: R$ {effectiveMinOrder.toFixed(2).replace('.', ',')}
+                </p>
+                <p className="text-xs text-amber-600">
+                  Adicione mais R$ {amountNeeded.toFixed(2).replace('.', ',')} para continuar
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Items */}
       <div>
         <h4 className="font-bold text-foreground mb-3">Itens adicionados</h4>
@@ -179,11 +215,15 @@ export const CartStep = ({
           Taxa de entrega será calculada no próximo passo
         </p>
         <Button
-          onClick={onContinue}
+          onClick={handleContinue}
           className="w-full h-12 text-base font-bold"
           style={{ backgroundColor: restaurant.primary_color, color: "white" }}
+          disabled={!meetsMinOrder && deliveryType === "delivery" && effectiveMinOrder > 0}
         >
-          Continuar
+          {!meetsMinOrder && effectiveMinOrder > 0 && deliveryType === "delivery"
+            ? `Faltam R$ ${amountNeeded.toFixed(2).replace('.', ',')}`
+            : "Continuar"
+          }
         </Button>
       </div>
     </div>
