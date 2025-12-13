@@ -94,6 +94,47 @@ export type Database = {
           },
         ]
       }
+      business_hours: {
+        Row: {
+          close_time: string | null
+          created_at: string | null
+          day_of_week: number
+          id: string
+          is_open: boolean | null
+          open_time: string | null
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          close_time?: string | null
+          created_at?: string | null
+          day_of_week: number
+          id?: string
+          is_open?: boolean | null
+          open_time?: string | null
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          close_time?: string | null
+          created_at?: string | null
+          day_of_week?: number
+          id?: string
+          is_open?: boolean | null
+          open_time?: string | null
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_hours_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_fees: {
         Row: {
           card_brand: string
@@ -730,6 +771,56 @@ export type Database = {
           },
         ]
       }
+      delivery_zones: {
+        Row: {
+          created_at: string | null
+          delivery_fee: number | null
+          estimated_time_minutes: number | null
+          id: string
+          is_active: boolean | null
+          min_order_value: number | null
+          neighborhoods: string[] | null
+          restaurant_id: string
+          updated_at: string | null
+          zip_codes: string[] | null
+          zone_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_fee?: number | null
+          estimated_time_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          min_order_value?: number | null
+          neighborhoods?: string[] | null
+          restaurant_id: string
+          updated_at?: string | null
+          zip_codes?: string[] | null
+          zone_name: string
+        }
+        Update: {
+          created_at?: string | null
+          delivery_fee?: number | null
+          estimated_time_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          min_order_value?: number | null
+          neighborhoods?: string[] | null
+          restaurant_id?: string
+          updated_at?: string | null
+          zip_codes?: string[] | null
+          zone_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_zones_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extra_categories: {
         Row: {
           created_at: string | null
@@ -1215,6 +1306,44 @@ export type Database = {
           },
         ]
       }
+      payment_methods: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          method_type: string
+          name: string
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          method_type: string
+          name: string
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          method_type?: string
+          name?: string
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_complement_groups: {
         Row: {
           created_at: string | null
@@ -1583,6 +1712,7 @@ export type Database = {
       }
       restaurants: {
         Row: {
+          auto_open_close: boolean | null
           banner_url: string | null
           created_at: string | null
           featured_section_enabled: boolean | null
@@ -1609,6 +1739,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          auto_open_close?: boolean | null
           banner_url?: string | null
           created_at?: string | null
           featured_section_enabled?: boolean | null
@@ -1635,6 +1766,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          auto_open_close?: boolean | null
           banner_url?: string | null
           created_at?: string | null
           featured_section_enabled?: boolean | null
