@@ -773,6 +773,8 @@ export type Database = {
       }
       delivery_zones: {
         Row: {
+          center_lat: number | null
+          center_lng: number | null
           created_at: string | null
           delivery_fee: number | null
           estimated_time_minutes: number | null
@@ -780,12 +782,16 @@ export type Database = {
           is_active: boolean | null
           min_order_value: number | null
           neighborhoods: string[] | null
+          radius_km: number | null
           restaurant_id: string
           updated_at: string | null
           zip_codes: string[] | null
           zone_name: string
+          zone_type: string | null
         }
         Insert: {
+          center_lat?: number | null
+          center_lng?: number | null
           created_at?: string | null
           delivery_fee?: number | null
           estimated_time_minutes?: number | null
@@ -793,12 +799,16 @@ export type Database = {
           is_active?: boolean | null
           min_order_value?: number | null
           neighborhoods?: string[] | null
+          radius_km?: number | null
           restaurant_id: string
           updated_at?: string | null
           zip_codes?: string[] | null
           zone_name: string
+          zone_type?: string | null
         }
         Update: {
+          center_lat?: number | null
+          center_lng?: number | null
           created_at?: string | null
           delivery_fee?: number | null
           estimated_time_minutes?: number | null
@@ -806,10 +816,12 @@ export type Database = {
           is_active?: boolean | null
           min_order_value?: number | null
           neighborhoods?: string[] | null
+          radius_km?: number | null
           restaurant_id?: string
           updated_at?: string | null
           zip_codes?: string[] | null
           zone_name?: string
+          zone_type?: string | null
         }
         Relationships: [
           {

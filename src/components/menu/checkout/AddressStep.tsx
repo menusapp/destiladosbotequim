@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,10 @@ interface DeliveryZone {
   min_order_value: number;
   estimated_time_minutes: number;
   is_active: boolean;
+  zone_type: string;
+  center_lat: number | null;
+  center_lng: number | null;
+  radius_km: number | null;
 }
 
 interface AddressStepProps {
@@ -25,6 +29,38 @@ interface AddressStepProps {
   restaurantSlug?: string;
   restaurantId?: string;
 }
+
+// Haversine formula to calculate distance between two coordinates
+const getDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+// Get coordinates from CEP using Nominatim (free OpenStreetMap geocoding)
+const getCoordinatesFromCep = async (zipCode: string, city: string, state: string): Promise<{ lat: number; lng: number } | null> => {
+  try {
+    const query = `${zipCode}, ${city}, ${state}, Brasil`;
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+      { headers: { "Accept-Language": "pt-BR" } }
+    );
+    const data = await response.json();
+    
+    if (data && data.length > 0) {
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    }
+    return null;
+  } catch (error) {
+    console.error("Erro ao geocodificar:", error);
+    return null;
+  }
+};
 
 export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }: AddressStepProps) => {
   const [customerName, setCustomerName] = useState("");
@@ -37,6 +73,7 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [matchedZone, setMatchedZone] = useState<DeliveryZone | null>(null);
   const [zoneError, setZoneError] = useState<string | null>(null);
+  const [validatingZone, setValidatingZone] = useState(false);
   const [newAddress, setNewAddress] = useState({
     zip_code: "",
     street: "",
@@ -99,11 +136,68 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
     loadUserData();
   }, [restaurantSlug]);
 
-  useEffect(() => {
-    if (customerCPF.length === 11) {
-      fetchSavedAddresses();
+  // Validar CEP contra zonas de entrega (suporta CEP/bairro e raio)
+  const validateAddress = useCallback(async (zipCode: string, neighborhood?: string, city?: string, state?: string) => {
+    const cleanZip = zipCode.replace(/\D/g, "");
+    
+    // Se não há zonas configuradas, permitir qualquer CEP
+    if (deliveryZones.length === 0) {
+      setMatchedZone(null);
+      setZoneError(null);
+      return true;
     }
-  }, [customerCPF]);
+    
+    setValidatingZone(true);
+    
+    try {
+      // Primeiro, verificar zonas do tipo CEP/bairro
+      const zipZone = deliveryZones.find(z => 
+        z.zone_type !== "radius" && (
+          z.zip_codes?.some(prefix => {
+            const cleanPrefix = prefix.replace(/\D/g, "");
+            return cleanZip.startsWith(cleanPrefix);
+          }) ||
+          z.neighborhoods?.some(n => {
+            const targetNeighborhood = neighborhood || "";
+            return targetNeighborhood.toLowerCase().includes(n.toLowerCase()) ||
+                   n.toLowerCase().includes(targetNeighborhood.toLowerCase());
+          })
+        )
+      );
+      
+      if (zipZone) {
+        setMatchedZone(zipZone);
+        setZoneError(null);
+        return true;
+      }
+      
+      // Verificar zonas do tipo raio
+      const radiusZones = deliveryZones.filter(z => z.zone_type === "radius");
+      
+      if (radiusZones.length > 0 && cleanZip && city && state) {
+        const coords = await getCoordinatesFromCep(cleanZip, city, state);
+        
+        if (coords) {
+          for (const zone of radiusZones) {
+            if (zone.center_lat && zone.center_lng && zone.radius_km) {
+              const distance = getDistanceKm(coords.lat, coords.lng, zone.center_lat, zone.center_lng);
+              if (distance <= zone.radius_km) {
+                setMatchedZone(zone);
+                setZoneError(null);
+                return true;
+              }
+            }
+          }
+        }
+      }
+      
+      setMatchedZone(null);
+      setZoneError("Não entregamos nessa região. Por favor, escolha retirada no estabelecimento.");
+      return false;
+    } finally {
+      setValidatingZone(false);
+    }
+  }, [deliveryZones]);
 
   const fetchSavedAddresses = async () => {
     const { data } = await supabase
@@ -120,46 +214,18 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
       setShowNewForm(false);
       
       // Validar CEP do endereço selecionado
-      validateZipCode(data[0].zip_code);
+      validateAddress(data[0].zip_code, data[0].neighborhood, data[0].city, data[0].state);
     } else {
       setSavedAddresses([]);
       setShowNewForm(true);
     }
   };
 
-  // Validar CEP contra zonas de entrega
-  const validateZipCode = (zipCode: string) => {
-    const cleanZip = zipCode.replace(/\D/g, "");
-    
-    // Se não há zonas configuradas, permitir qualquer CEP
-    if (deliveryZones.length === 0) {
-      setMatchedZone(null);
-      setZoneError(null);
-      return true;
+  useEffect(() => {
+    if (customerCPF.length === 11) {
+      fetchSavedAddresses();
     }
-    
-    // Buscar zona que corresponde ao CEP
-    const zone = deliveryZones.find(z => 
-      z.zip_codes?.some(prefix => {
-        const cleanPrefix = prefix.replace(/\D/g, "");
-        return cleanZip.startsWith(cleanPrefix);
-      }) ||
-      z.neighborhoods?.some(n => 
-        newAddress.neighborhood?.toLowerCase().includes(n.toLowerCase()) ||
-        n.toLowerCase().includes(newAddress.neighborhood?.toLowerCase() || "")
-      )
-    );
-    
-    if (zone) {
-      setMatchedZone(zone);
-      setZoneError(null);
-      return true;
-    } else {
-      setMatchedZone(null);
-      setZoneError("Não entregamos nessa região. Por favor, escolha retirada no estabelecimento.");
-      return false;
-    }
-  };
+  }, [customerCPF]);
 
   const handleZipCodeBlur = async () => {
     if (newAddress.zip_code.length === 8) {
@@ -170,16 +236,23 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
         const data = await response.json();
 
         if (!data.erro) {
-          setNewAddress((prev) => ({
-            ...prev,
-            street: data.logradouro || prev.street,
-            neighborhood: data.bairro || prev.neighborhood,
-            city: data.localidade || prev.city,
-            state: data.uf || prev.state,
-          }));
+          const updatedAddress = {
+            ...newAddress,
+            street: data.logradouro || newAddress.street,
+            neighborhood: data.bairro || newAddress.neighborhood,
+            city: data.localidade || newAddress.city,
+            state: data.uf || newAddress.state,
+          };
+          
+          setNewAddress(updatedAddress);
           
           // Validar CEP contra zonas de entrega
-          validateZipCode(newAddress.zip_code);
+          validateAddress(
+            newAddress.zip_code, 
+            updatedAddress.neighborhood, 
+            updatedAddress.city, 
+            updatedAddress.state
+          );
           
           toast.success("CEP encontrado!");
         } else {
@@ -193,17 +266,17 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
 
   // Revalidar quando neighborhood é preenchido (para validação por bairro)
   useEffect(() => {
-    if (newAddress.neighborhood && deliveryZones.length > 0) {
-      validateZipCode(newAddress.zip_code);
+    if (newAddress.neighborhood && newAddress.city && deliveryZones.length > 0) {
+      validateAddress(newAddress.zip_code, newAddress.neighborhood, newAddress.city, newAddress.state);
     }
-  }, [newAddress.neighborhood, deliveryZones]);
+  }, [newAddress.neighborhood, newAddress.city, deliveryZones, validateAddress]);
 
   // Validar quando seleciona endereço salvo
   useEffect(() => {
     if (selectedAddress && deliveryZones.length > 0) {
-      validateZipCode(selectedAddress.zip_code);
+      validateAddress(selectedAddress.zip_code, selectedAddress.neighborhood, selectedAddress.city, selectedAddress.state);
     }
-  }, [selectedAddress, deliveryZones]);
+  }, [selectedAddress, deliveryZones, validateAddress]);
 
   const handleDeleteAddress = async (id: string) => {
     const { error } = await supabase
@@ -273,8 +346,17 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
         </Card>
       )}
 
+      {/* Validating Zone */}
+      {validatingZone && (
+        <Card className="border-muted">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Verificando região de entrega...</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Matched Zone Info */}
-      {matchedZone && (
+      {matchedZone && !validatingZone && (
         <Card className="border-green-500 bg-green-500/10">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -342,7 +424,6 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
               }`}
               onClick={() => {
                 setSelectedAddress(addr);
-                validateZipCode(addr.zip_code);
               }}
             >
               <CardContent className="p-4">
@@ -498,18 +579,20 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
       )}
 
       {/* Actions */}
-      <div className="flex gap-2 pt-4">
+      <div className="flex gap-3 pt-4">
         <Button variant="outline" onClick={onBack} className="flex-1">
           Voltar
         </Button>
         <Button 
           onClick={handleContinue} 
           className="flex-1"
-          disabled={deliveryZones.length > 0 && !matchedZone}
+          disabled={(deliveryZones.length > 0 && !matchedZone) || validatingZone}
         >
-          Continuar
+          {validatingZone ? "Verificando..." : "Continuar"}
         </Button>
       </div>
     </div>
   );
 };
+
+export default AddressStep;

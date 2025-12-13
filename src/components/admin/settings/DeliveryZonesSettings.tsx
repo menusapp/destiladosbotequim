@@ -3,12 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Plus, Trash2, Edit } from "lucide-react";
+import { MapPin, Plus, Trash2, Edit, CircleDot } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import RadiusMapPicker from "./RadiusMapPicker";
 
 interface DeliveryZone {
   id: string;
@@ -19,6 +21,10 @@ interface DeliveryZone {
   min_order_value: number;
   estimated_time_minutes: number;
   is_active: boolean;
+  zone_type: "zip_codes" | "radius";
+  center_lat: number | null;
+  center_lng: number | null;
+  radius_km: number | null;
 }
 
 const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
@@ -29,11 +35,17 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
   
   // Form state
   const [zoneName, setZoneName] = useState("");
+  const [zoneType, setZoneType] = useState<"zip_codes" | "radius">("zip_codes");
   const [zipCodesInput, setZipCodesInput] = useState("");
   const [neighborhoodsInput, setNeighborhoodsInput] = useState("");
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [minOrderValue, setMinOrderValue] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState(30);
+  
+  // Radius zone state
+  const [centerLat, setCenterLat] = useState<number | null>(null);
+  const [centerLng, setCenterLng] = useState<number | null>(null);
+  const [radiusKm, setRadiusKm] = useState(5);
 
   useEffect(() => {
     fetchZones();
@@ -48,7 +60,10 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
         .order("zone_name");
 
       if (error) throw error;
-      setZones(data || []);
+      setZones((data || []).map(z => ({
+        ...z,
+        zone_type: (z.zone_type === "radius" ? "radius" : "zip_codes") as "zip_codes" | "radius",
+      })));
     } catch (error) {
       toast.error("Erro ao carregar regiões");
       console.error(error);
@@ -59,22 +74,30 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
 
   const resetForm = () => {
     setZoneName("");
+    setZoneType("zip_codes");
     setZipCodesInput("");
     setNeighborhoodsInput("");
     setDeliveryFee(0);
     setMinOrderValue(0);
     setEstimatedTime(30);
+    setCenterLat(null);
+    setCenterLng(null);
+    setRadiusKm(5);
     setEditingZone(null);
   };
 
   const openEditDialog = (zone: DeliveryZone) => {
     setEditingZone(zone);
     setZoneName(zone.zone_name);
-    setZipCodesInput(zone.zip_codes.join(", "));
-    setNeighborhoodsInput(zone.neighborhoods.join(", "));
+    setZoneType(zone.zone_type || "zip_codes");
+    setZipCodesInput(zone.zip_codes?.join(", ") || "");
+    setNeighborhoodsInput(zone.neighborhoods?.join(", ") || "");
     setDeliveryFee(zone.delivery_fee);
     setMinOrderValue(zone.min_order_value);
     setEstimatedTime(zone.estimated_time_minutes);
+    setCenterLat(zone.center_lat);
+    setCenterLng(zone.center_lng);
+    setRadiusKm(zone.radius_km || 5);
     setDialogOpen(true);
   };
 
@@ -84,26 +107,42 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
       return;
     }
 
+    if (zoneType === "zip_codes") {
+      const zipCodes = zipCodesInput.split(",").map(z => z.trim()).filter(Boolean);
+      const neighborhoods = neighborhoodsInput.split(",").map(n => n.trim()).filter(Boolean);
+
+      if (zipCodes.length === 0 && neighborhoods.length === 0) {
+        toast.error("Adicione pelo menos um CEP ou bairro");
+        return;
+      }
+    } else {
+      if (!centerLat || !centerLng) {
+        toast.error("Clique no mapa para definir o ponto central");
+        return;
+      }
+    }
+
     const zipCodes = zipCodesInput.split(",").map(z => z.trim()).filter(Boolean);
     const neighborhoods = neighborhoodsInput.split(",").map(n => n.trim()).filter(Boolean);
 
-    if (zipCodes.length === 0 && neighborhoods.length === 0) {
-      toast.error("Adicione pelo menos um CEP ou bairro");
-      return;
-    }
-
     try {
+      const zoneData = {
+        zone_name: zoneName,
+        zone_type: zoneType,
+        zip_codes: zoneType === "zip_codes" ? zipCodes : [],
+        neighborhoods: zoneType === "zip_codes" ? neighborhoods : [],
+        delivery_fee: deliveryFee,
+        min_order_value: minOrderValue,
+        estimated_time_minutes: estimatedTime,
+        center_lat: zoneType === "radius" ? centerLat : null,
+        center_lng: zoneType === "radius" ? centerLng : null,
+        radius_km: zoneType === "radius" ? radiusKm : null,
+      };
+
       if (editingZone) {
         const { error } = await supabase
           .from("delivery_zones")
-          .update({
-            zone_name: zoneName,
-            zip_codes: zipCodes,
-            neighborhoods: neighborhoods,
-            delivery_fee: deliveryFee,
-            min_order_value: minOrderValue,
-            estimated_time_minutes: estimatedTime,
-          })
+          .update(zoneData)
           .eq("id", editingZone.id);
 
         if (error) throw error;
@@ -113,12 +152,7 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
           .from("delivery_zones")
           .insert({
             restaurant_id: restaurantId,
-            zone_name: zoneName,
-            zip_codes: zipCodes,
-            neighborhoods: neighborhoods,
-            delivery_fee: deliveryFee,
-            min_order_value: minOrderValue,
-            estimated_time_minutes: estimatedTime,
+            ...zoneData,
           });
 
         if (error) throw error;
@@ -189,11 +223,11 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
               Nova Região
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingZone ? "Editar Região" : "Nova Região de Entrega"}</DialogTitle>
               <DialogDescription>
-                Configure os CEPs ou bairros atendidos nesta região
+                Configure a área de cobertura e taxas desta região
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -207,28 +241,86 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="zip-codes">CEPs (separados por vírgula)</Label>
-                <Input
-                  id="zip-codes"
-                  placeholder="01310-100, 01311-000, 01312-000"
-                  value={zipCodesInput}
-                  onChange={(e) => setZipCodesInput(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Você pode usar prefixos como "01310" para aceitar todos CEPs que começam com esse número
-                </p>
+              {/* Zone Type Selector */}
+              <div className="space-y-3">
+                <Label>Tipo de Zona</Label>
+                <RadioGroup
+                  value={zoneType}
+                  onValueChange={(v) => setZoneType(v as "zip_codes" | "radius")}
+                  className="grid grid-cols-2 gap-4"
+                >
+                  <div>
+                    <RadioGroupItem
+                      value="zip_codes"
+                      id="zone-type-zip"
+                      className="peer sr-only"
+                    />
+                    <Label
+                      htmlFor="zone-type-zip"
+                      className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                    >
+                      <MapPin className="mb-2 h-6 w-6" />
+                      <span className="text-sm font-medium">CEP/Bairro</span>
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem
+                      value="radius"
+                      id="zone-type-radius"
+                      className="peer sr-only"
+                    />
+                    <Label
+                      htmlFor="zone-type-radius"
+                      className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                    >
+                      <CircleDot className="mb-2 h-6 w-6" />
+                      <span className="text-sm font-medium">Raio no Mapa</span>
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
 
-              <div>
-                <Label htmlFor="neighborhoods">Bairros (separados por vírgula)</Label>
-                <Input
-                  id="neighborhoods"
-                  placeholder="Centro, Consolação, Bela Vista"
-                  value={neighborhoodsInput}
-                  onChange={(e) => setNeighborhoodsInput(e.target.value)}
+              {/* CEP/Neighborhood fields */}
+              {zoneType === "zip_codes" && (
+                <>
+                  <div>
+                    <Label htmlFor="zip-codes">CEPs (separados por vírgula)</Label>
+                    <Input
+                      id="zip-codes"
+                      placeholder="01310-100, 01311-000, 01312-000"
+                      value={zipCodesInput}
+                      onChange={(e) => setZipCodesInput(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Use prefixos como "17470" para aceitar todos CEPs que começam com esse número
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="neighborhoods">Bairros (separados por vírgula)</Label>
+                    <Input
+                      id="neighborhoods"
+                      placeholder="Centro, Consolação, Bela Vista"
+                      value={neighborhoodsInput}
+                      onChange={(e) => setNeighborhoodsInput(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Radius map picker */}
+              {zoneType === "radius" && (
+                <RadiusMapPicker
+                  centerLat={centerLat}
+                  centerLng={centerLng}
+                  radiusKm={radiusKm}
+                  onCenterChange={(lat, lng) => {
+                    setCenterLat(lat);
+                    setCenterLng(lng);
+                  }}
+                  onRadiusChange={setRadiusKm}
                 />
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -293,23 +385,39 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <h3 className="font-semibold">{zone.zone_name}</h3>
+                      <Badge variant="outline" className="text-xs">
+                        {zone.zone_type === "radius" ? (
+                          <><CircleDot className="h-3 w-3 mr-1" /> Raio</>
+                        ) : (
+                          <><MapPin className="h-3 w-3 mr-1" /> CEP</>
+                        )}
+                      </Badge>
                       {!zone.is_active && (
                         <Badge variant="secondary">Inativo</Badge>
                       )}
                     </div>
                     
                     <div className="space-y-1 text-sm text-muted-foreground">
-                      {zone.neighborhoods.length > 0 && (
+                      {zone.zone_type === "radius" ? (
                         <p>
-                          <span className="font-medium">Bairros:</span>{" "}
-                          {zone.neighborhoods.join(", ")}
+                          <span className="font-medium">Raio:</span>{" "}
+                          {zone.radius_km} km
                         </p>
-                      )}
-                      {zone.zip_codes.length > 0 && (
-                        <p>
-                          <span className="font-medium">CEPs:</span>{" "}
-                          {zone.zip_codes.join(", ")}
-                        </p>
+                      ) : (
+                        <>
+                          {zone.neighborhoods?.length > 0 && (
+                            <p>
+                              <span className="font-medium">Bairros:</span>{" "}
+                              {zone.neighborhoods.join(", ")}
+                            </p>
+                          )}
+                          {zone.zip_codes?.length > 0 && (
+                            <p>
+                              <span className="font-medium">CEPs:</span>{" "}
+                              {zone.zip_codes.join(", ")}
+                            </p>
+                          )}
+                        </>
                       )}
                     </div>
 
