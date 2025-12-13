@@ -26,6 +26,7 @@ interface AdminHeaderProps {
   prepTime: number;
   pickupTime: number;
   isOpen: boolean;
+  autoOpenClose?: boolean;
   onPrepTimeUpdate: (time: number) => void;
   onPickupTimeUpdate: (time: number) => void;
   onIsOpenUpdate: (isOpen: boolean) => void;
@@ -37,6 +38,7 @@ export const AdminHeader = ({
   prepTime,
   pickupTime,
   isOpen,
+  autoOpenClose = false,
   onPrepTimeUpdate,
   onPickupTimeUpdate,
   onIsOpenUpdate,
@@ -214,10 +216,13 @@ export const AdminHeader = ({
         <span className={`text-sm font-medium ${isOpen ? 'text-green-500' : 'text-destructive'}`}>
           {isOpen ? 'Aberto' : 'Fechado'}
         </span>
+        {autoOpenClose && (
+          <span className="text-xs text-muted-foreground">(Auto)</span>
+        )}
         <Switch
           checked={isOpen}
           onCheckedChange={handleToggleOpen}
-          disabled={updatingOpen}
+          disabled={updatingOpen || autoOpenClose}
           className="data-[state=checked]:bg-green-500"
         />
       </div>

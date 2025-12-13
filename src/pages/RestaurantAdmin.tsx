@@ -37,6 +37,7 @@ interface Restaurant {
   is_open: boolean;
   prep_time_minutes: number;
   pickup_time_minutes: number;
+  auto_open_close?: boolean;
 }
 
 const RestaurantAdmin = () => {
@@ -312,6 +313,11 @@ const RestaurantAdmin = () => {
 
       if (error) throw error;
       setRestaurant(data);
+      
+      // Verificar horário automaticamente após carregar restaurante
+      if (data?.auto_open_close) {
+        checkAndUpdateOpenStatus(data);
+      }
     } catch (error) {
       toast.error("Erro ao carregar dados do restaurante");
       navigate("/");
@@ -319,6 +325,61 @@ const RestaurantAdmin = () => {
       setLoading(false);
     }
   };
+
+  // Função para verificar e atualizar status de abertura baseado no horário
+  const checkAndUpdateOpenStatus = async (restaurantData: Restaurant) => {
+    if (!restaurantData.auto_open_close) return;
+
+    try {
+      // Buscar horários de funcionamento
+      const { data: hours, error } = await supabase
+        .from('business_hours')
+        .select('*')
+        .eq('restaurant_id', restaurantData.id);
+
+      if (error) throw error;
+
+      const now = new Date();
+      const currentDay = now.getDay(); // 0 = Domingo, 6 = Sábado
+      const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+
+      // Encontrar configuração do dia atual
+      const todayConfig = hours?.find(h => h.day_of_week === currentDay);
+
+      let shouldBeOpen = false;
+
+      if (todayConfig && todayConfig.is_open && todayConfig.open_time && todayConfig.close_time) {
+        // Verificar se está dentro do horário de funcionamento
+        shouldBeOpen = currentTime >= todayConfig.open_time && currentTime < todayConfig.close_time;
+      }
+
+      // Só atualizar se o status atual for diferente do esperado
+      if (restaurantData.is_open !== shouldBeOpen) {
+        const { error: updateError } = await supabase
+          .from('restaurants')
+          .update({ is_open: shouldBeOpen })
+          .eq('id', restaurantData.id);
+
+        if (!updateError) {
+          setRestaurant(prev => prev ? { ...prev, is_open: shouldBeOpen } : null);
+          console.log(`🕐 Status automático: ${shouldBeOpen ? 'Aberto' : 'Fechado'}`);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao verificar horário:', error);
+    }
+  };
+
+  // Verificar horário a cada minuto quando automação está ativa
+  useEffect(() => {
+    if (!restaurant?.auto_open_close) return;
+
+    const interval = setInterval(() => {
+      checkAndUpdateOpenStatus(restaurant);
+    }, 60000); // A cada 1 minuto
+
+    return () => clearInterval(interval);
+  }, [restaurant?.id, restaurant?.auto_open_close]);
 
   const handleLogout = () => {
     localStorage.removeItem('restaurant_id');
@@ -487,6 +548,7 @@ const RestaurantAdmin = () => {
             prepTime={restaurant.prep_time_minutes}
             pickupTime={restaurant.pickup_time_minutes}
             isOpen={restaurant.is_open}
+            autoOpenClose={restaurant.auto_open_close}
             onPrepTimeUpdate={(time) => setRestaurant({ ...restaurant, prep_time_minutes: time })}
             onPickupTimeUpdate={(time) => setRestaurant({ ...restaurant, pickup_time_minutes: time })}
             onIsOpenUpdate={(isOpen) => setRestaurant({ ...restaurant, is_open: isOpen })}

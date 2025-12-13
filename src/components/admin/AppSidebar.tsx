@@ -88,6 +88,47 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
 
   const isConfigActive = activeSection.startsWith("config-");
 
+  // Configurações agora fica no menu principal
+  const renderConfigMenu = () => (
+    <SidebarMenuItem>
+      <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            tooltip="Configurações"
+            className={`w-full ${isConfigActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}`}
+          >
+            <Settings className="h-4 w-4" />
+            {!collapsed && (
+              <>
+                <span className="flex-1 text-left">Configurações</span>
+                {configOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </>
+            )}
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        {!collapsed && (
+          <CollapsibleContent className="pl-4 space-y-1 mt-1">
+            {menuStructure.configSubItems.map((subItem) => (
+              <SidebarMenuButton
+                key={subItem.id}
+                onClick={() => onSectionChange(subItem.id)}
+                isActive={activeSection === subItem.id}
+                className="w-full text-sm"
+              >
+                <subItem.icon className="h-4 w-4" />
+                <span>{subItem.label}</span>
+              </SidebarMenuButton>
+            ))}
+          </CollapsibleContent>
+        )}
+      </Collapsible>
+    </SidebarMenuItem>
+  );
+
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background w-60">
       <SidebarContent className="bg-sidebar-background">
@@ -114,6 +155,9 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              
+              {/* Configurações - Menu Expansível (no menu principal, após Clientes) */}
+              {renderConfigMenu()}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -143,45 +187,6 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-
-              {/* Configurações - Menu Expansível */}
-              <SidebarMenuItem>
-                <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton
-                      tooltip="Configurações"
-                      className={`w-full ${isConfigActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "opacity-60"}`}
-                    >
-                      <Settings className="h-4 w-4" />
-                      {!collapsed && (
-                        <>
-                          <span className="flex-1 text-left">Configurações</span>
-                          {configOpen ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </>
-                      )}
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  {!collapsed && (
-                    <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                      {menuStructure.configSubItems.map((subItem) => (
-                        <SidebarMenuButton
-                          key={subItem.id}
-                          onClick={() => onSectionChange(subItem.id)}
-                          isActive={activeSection === subItem.id}
-                          className="w-full text-sm"
-                        >
-                          <subItem.icon className="h-4 w-4" />
-                          <span>{subItem.label}</span>
-                        </SidebarMenuButton>
-                      ))}
-                    </CollapsibleContent>
-                  )}
-                </Collapsible>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
