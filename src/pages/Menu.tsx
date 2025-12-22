@@ -220,26 +220,47 @@ const Menu = () => {
       }
 
       const currentCustomer = JSON.parse(savedCustomerInfo);
+      
+      // 🔑 CRÍTICO: Obter comanda_id da sessão (isolamento por CPF)
+      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
 
-      // Verificar se a conta já foi paga (sessão finalizada)
-      const { data: paidBills } = await supabase
-        .from("bills")
-        .select("id, status")
-        .eq("table_id", currentTableId)
-        .eq("status", "paid")
-        .limit(1);
-
-      // Se existe conta paga, zerar comanda (sessão finalizada)
-      if (paidBills && paidBills.length > 0) {
-        console.log('Conta já foi paga, resetando comanda');
-        setHasOpenComanda(false);
-        setComandaTotal(cartTotal); // Só mostrar carrinho
-        setComandaStatus("");
-        return;
+      // Verificar se a COMANDA ESPECÍFICA DO CLIENTE foi fechada (não da mesa toda!)
+      // Isso evita que pagar uma comanda afete outras comandas na mesma mesa
+      if (comandaId) {
+        // Verificar se a comanda do cliente está fechada
+        const { data: clientComanda } = await supabase
+          .from("comandas")
+          .select("status")
+          .eq("id", comandaId)
+          .maybeSingle();
+        
+        if (clientComanda?.status === "closed") {
+          console.log('🔒 Comanda do cliente está fechada, resetando sessão');
+          setHasOpenComanda(false);
+          setComandaTotal(cartTotal);
+          setComandaStatus("");
+          return;
+        }
+        
+        // Verificar se existe bill paga DESTA COMANDA específica
+        const { data: clientPaidBill } = await supabase
+          .from("bills")
+          .select("id")
+          .eq("comanda_id", comandaId)
+          .eq("status", "paid")
+          .limit(1);
+        
+        if (clientPaidBill && clientPaidBill.length > 0) {
+          console.log('💰 Conta desta comanda já foi paga, resetando sessão');
+          setHasOpenComanda(false);
+          setComandaTotal(cartTotal);
+          setComandaStatus("");
+          return;
+        }
       }
 
-      // Buscar apenas pedidos do cliente atual (sessão atual)
-      const { data: orders, error } = await supabase
+      // Buscar apenas pedidos do cliente atual (sessão atual) usando comanda_id se disponível
+      let ordersQuery = supabase
         .from("orders")
         .select(`
           id,
@@ -255,9 +276,18 @@ const Menu = () => {
           )
         `)
         .eq("table_id", currentTableId)
-        .eq("customer_name", currentCustomer.name)
-        .eq("customer_cpf", currentCustomer.cpf)
         .in("status", ["pending", "accepted", "preparing", "ready"]);
+      
+      // Filtrar por comanda_id se disponível (mais preciso), senão por CPF
+      if (comandaId) {
+        ordersQuery = ordersQuery.eq("comanda_id", comandaId);
+      } else {
+        ordersQuery = ordersQuery
+          .eq("customer_name", currentCustomer.name)
+          .eq("customer_cpf", currentCustomer.cpf);
+      }
+      
+      const { data: orders, error } = await ordersQuery;
 
       if (error) throw error;
 
@@ -287,7 +317,7 @@ const Menu = () => {
     } catch (error) {
       console.error("Erro ao verificar comanda:", error);
     }
-  }, []);
+  }, [tableNumber]);
 
   // Detectar direção do scroll para esconder/mostrar barra
   useEffect(() => {

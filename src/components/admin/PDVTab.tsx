@@ -361,57 +361,64 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
 
       const paymentMethodString = splitPayments.length === 1 ? splitPayments[0].method : "mixed";
 
-      // Criar bill para cada comanda selecionada ou uma única bill
-      const { data: existingBill } = await supabase
-        .from("bills")
-        .select("id")
-        .eq("table_id", selectedTable.id)
-        .in("comanda_id", selectedComandas)
-        .in("status", ["pending", "on_the_way", "requested"])
-        .maybeSingle();
-
-      if (existingBill) {
-        const { error: updateBillError } = await supabase
+      // 🔑 CRÍTICO: Processar CADA comanda selecionada individualmente
+      // Isso garante que cada cliente receba o evento de pagamento da SUA comanda
+      for (const comandaId of selectedComandas) {
+        const comandaTotal = calculateComandaTotal(comandaId);
+        
+        // Buscar bill existente para ESTA comanda específica
+        const { data: existingBill } = await supabase
           .from("bills")
-          .update({
-            status: "paid",
-            paid_at: new Date().toISOString(),
-            payment_method: paymentMethodString,
-            change_amount: getChangeAmount() > 0 ? getChangeAmount() : null,
-          })
-          .eq("id", existingBill.id);
+          .select("id")
+          .eq("table_id", selectedTable.id)
+          .eq("comanda_id", comandaId)
+          .in("status", ["pending", "on_the_way", "requested"])
+          .maybeSingle();
 
-        if (updateBillError) throw updateBillError;
-      } else {
-        // Criar nova bill
-        const { error: billError } = await supabase
-          .from("bills")
-          .insert({
-            table_id: selectedTable.id,
-            comanda_id: selectedComandas[0], // Primary comanda
-            subtotal: total,
-            service_fee: 0,
-            total_amount: total,
-            payment_method: paymentMethodString,
-            status: "paid",
-            paid_at: new Date().toISOString(),
-            change_amount: getChangeAmount() > 0 ? getChangeAmount() : null,
-          });
+        if (existingBill) {
+          // Atualizar bill existente desta comanda para paid
+          const { error: updateBillError } = await supabase
+            .from("bills")
+            .update({
+              status: "paid",
+              paid_at: new Date().toISOString(),
+              payment_method: paymentMethodString,
+              change_amount: getChangeAmount() > 0 ? getChangeAmount() : null,
+            })
+            .eq("id", existingBill.id);
 
-        if (billError) throw billError;
+          if (updateBillError) throw updateBillError;
+        } else {
+          // Criar nova bill para ESTA comanda específica
+          const { error: billError } = await supabase
+            .from("bills")
+            .insert({
+              table_id: selectedTable.id,
+              comanda_id: comandaId,
+              subtotal: comandaTotal,
+              service_fee: 0,
+              total_amount: comandaTotal,
+              payment_method: paymentMethodString,
+              status: "paid",
+              paid_at: new Date().toISOString(),
+              change_amount: getChangeAmount() > 0 ? getChangeAmount() : null,
+            });
+
+          if (billError) throw billError;
+        }
+        
+        // Atualizar pedidos DESTA comanda específica
+        const comandaOrders = tableOrders.filter(o => o.comanda_id === comandaId);
+        for (const order of comandaOrders) {
+          await supabase.from("orders").update({ status: "delivered" }).eq("id", order.id);
+        }
+        
+        // Fechar ESTA comanda específica
+        await supabase
+          .from("comandas")
+          .update({ status: "closed", closed_at: new Date().toISOString() })
+          .eq("id", comandaId);
       }
-
-      // Atualizar APENAS pedidos das comandas selecionadas
-      const selectedOrders = tableOrders.filter(o => selectedComandas.includes(o.comanda_id));
-      for (const order of selectedOrders) {
-        await supabase.from("orders").update({ status: "delivered" }).eq("id", order.id);
-      }
-
-      // Fechar APENAS as comandas selecionadas
-      await supabase
-        .from("comandas")
-        .update({ status: "closed", closed_at: new Date().toISOString() })
-        .in("id", selectedComandas);
 
       // Verificar se ainda há comandas ativas restantes
       const { count: remainingComandas } = await supabase

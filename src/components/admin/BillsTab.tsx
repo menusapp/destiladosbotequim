@@ -509,11 +509,17 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
   const getPaymentIcon = (method: string) => {
     switch (method) {
       case "card":
+      case "credit":
+      case "debit":
         return <CreditCard className="h-4 w-4" />;
       case "pix":
         return <Smartphone className="h-4 w-4" />;
       case "cash":
         return <Banknote className="h-4 w-4" />;
+      case "meal_voucher":
+        return <CreditCard className="h-4 w-4" />;
+      case "mixed":
+        return <CreditCard className="h-4 w-4" />;
       default:
         return null;
     }
@@ -523,10 +529,18 @@ const BillsTab = ({ restaurantId }: { restaurantId: string }) => {
     switch (method) {
       case "card":
         return "Cartão";
+      case "credit":
+        return "Crédito";
+      case "debit":
+        return "Débito";
       case "pix":
         return "PIX";
       case "cash":
         return "Dinheiro";
+      case "meal_voucher":
+        return "Vale Refeição";
+      case "mixed":
+        return "Misto";
       default:
         return method;
     }

@@ -166,8 +166,37 @@ const Comanda = () => {
       
       if (!tableData) return;
       
-      // Buscar comanda_id do cliente atual
-      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      // 🔑 CRÍTICO: Buscar comanda_id do cliente atual
+      // Se não existir no sessionStorage, tentar encontrar comanda ativa pelo CPF
+      let comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      
+      if (!comandaId) {
+        const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+        if (customerCPF) {
+          // Buscar comanda ativa deste cliente nesta mesa
+          const { data: activeComanda } = await supabase
+            .from("comandas")
+            .select("id")
+            .eq("table_id", tableData.id)
+            .eq("customer_cpf", customerCPF.replace(/\D/g, ''))
+            .eq("status", "active")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (activeComanda) {
+            comandaId = activeComanda.id;
+            sessionStorage.setItem(`comanda_id_${tableNumber}`, comandaId);
+            console.log("🔑 Comanda encontrada e salva no sessionStorage:", comandaId);
+          }
+        }
+      }
+      
+      // 🚨 Se não encontrou comanda_id, NÃO configurar realtime (evita fallback por table_id)
+      if (!comandaId) {
+        console.log("⚠️ Sem comanda_id - realtime não configurado (cliente precisa fazer login)");
+        return;
+      }
       
       console.log("🔔 Configurando realtime para Comanda - table_id:", tableData.id, "comanda_id:", comandaId);
       
@@ -203,13 +232,12 @@ const Comanda = () => {
         }, 2000);
       };
 
-      // Configurar realtime para atualizar status da conta - filtrar por comanda_id se disponível
-      const billFilter = comandaId 
-        ? `comanda_id=eq.${comandaId}` 
-        : `table_id=eq.${tableData.id}`;
+      // Configurar realtime para atualizar status da conta - SEMPRE por comanda_id
+      // (comandaId é garantido existir neste ponto do código)
+      const billFilter = `comanda_id=eq.${comandaId}`;
       
       billChannel = supabase
-        .channel(`bill-status-${comandaId || tableData.id}`)
+        .channel(`bill-status-${comandaId}`)
         .on(
           'postgres_changes',
           {
@@ -305,14 +333,12 @@ const Comanda = () => {
           console.log('📡 Status da subscrição Comanda (Bills):', status);
         });
       
-      // Configurar realtime para pedidos aceitos - filtrar por comanda_id se disponível
-      // Isso evita que eventos de outras comandas afetem esta
-      const ordersFilter = comandaId 
-        ? `comanda_id=eq.${comandaId}` 
-        : `table_id=eq.${tableData.id}`;
+      // Configurar realtime para pedidos aceitos - SEMPRE por comanda_id
+      // (comandaId é garantido existir neste ponto do código)
+      const ordersFilter = `comanda_id=eq.${comandaId}`;
       
       ordersChannel = supabase
-        .channel(`order-status-${comandaId || tableData.id}`)
+        .channel(`order-status-${comandaId}`)
         .on(
           'postgres_changes',
           {
