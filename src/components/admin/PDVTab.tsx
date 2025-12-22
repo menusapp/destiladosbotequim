@@ -270,13 +270,9 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
       toast.error("Valor total já atingido");
       return;
     }
-    // Normalizar method_type para valores aceitos pela constraint: cash, pix, card
-    let normalizedMethod = "card";
-    if (paymentMethod.method_type === "cash") normalizedMethod = "cash";
-    else if (paymentMethod.method_type === "pix") normalizedMethod = "pix";
-    
+    // Usar method_type diretamente (cash, credit, debit, pix, meal_voucher)
     setSplitPayments(prev => [...prev, { 
-      method: normalizedMethod, 
+      method: paymentMethod.method_type, 
       methodName: paymentMethod.name,
       amount: remaining 
     }]);
