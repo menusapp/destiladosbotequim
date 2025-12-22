@@ -1333,7 +1333,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                               </Button>
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {v.ingredients.map(i => i.stock_item_name).join(", ")}
+                              {v.ingredients.map(i => `${i.stock_item_name} - ${i.quantity}${i.stock_item_unit}`).join(", ")}
                             </div>
                             {vc && (
                               <div className="mt-2 pt-2 border-t text-sm grid grid-cols-3 gap-2">
