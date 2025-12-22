@@ -148,7 +148,7 @@ const Comanda = () => {
     let ordersChannel: any = null;
     
     const setupRealtimeChannels = async () => {
-      // Buscar table_id primeiro
+      // Buscar table_id e comanda_id primeiro
       const { data: restData } = await supabase
         .from("restaurants")
         .select("id")
@@ -166,7 +166,10 @@ const Comanda = () => {
       
       if (!tableData) return;
       
-      console.log("🔔 Configurando realtime para Comanda - table_id:", tableData.id);
+      // Buscar comanda_id do cliente atual
+      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      
+      console.log("🔔 Configurando realtime para Comanda - table_id:", tableData.id, "comanda_id:", comandaId);
       
       // Função para processar pagamento (seja UPDATE ou INSERT de bill paga)
       const handleBillPaid = (bill: any) => {
@@ -174,7 +177,6 @@ const Comanda = () => {
         toast.success("Conta paga! Obrigado pela preferência!");
         
         // Fechar comanda ativa
-        const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
         if (comandaId) {
           supabase.from("comandas").update({
             status: "closed",
@@ -201,16 +203,20 @@ const Comanda = () => {
         }, 2000);
       };
 
-      // Configurar realtime para atualizar status da conta
+      // Configurar realtime para atualizar status da conta - filtrar por comanda_id se disponível
+      const billFilter = comandaId 
+        ? `comanda_id=eq.${comandaId}` 
+        : `table_id=eq.${tableData.id}`;
+      
       billChannel = supabase
-        .channel(`bill-status-${tableData.id}`)
+        .channel(`bill-status-${comandaId || tableData.id}`)
         .on(
           'postgres_changes',
           {
             event: 'UPDATE',
             schema: 'public',
             table: 'bills',
-            filter: `table_id=eq.${tableData.id}`,
+            filter: billFilter,
           },
           (payload) => {
             console.log("🔔 Conta ATUALIZADA em tempo real na Comanda:", payload);
@@ -237,7 +243,7 @@ const Comanda = () => {
             event: 'INSERT',
             schema: 'public',
             table: 'bills',
-            filter: `table_id=eq.${tableData.id}`,
+            filter: billFilter,
           },
           (payload) => {
             console.log("🔔 Nova conta CRIADA em tempo real na Comanda:", payload);
@@ -262,18 +268,14 @@ const Comanda = () => {
             event: 'DELETE',
             schema: 'public',
             table: 'bills',
-            filter: `table_id=eq.${tableData.id}`,
+            filter: billFilter,
           },
           (payload) => {
             // Conta removida (paga e encerrada) -> agradecer e sair
             const deletedBill = payload.old as any;
             toast.success("Conta paga! Obrigado pela preferência!");
             
-            // ⚠️ NÃO liberar mesa aqui - é responsabilidade do banco de dados
-            // Isso acontece quando admin deleta a conta manualmente
-            
             // Fechar comanda ativa
-            const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
             if (comandaId) {
               supabase.from("comandas").update({
                 status: "closed",
@@ -441,17 +443,29 @@ const Comanda = () => {
         ordersQuery = ordersQuery.gt("created_at", lastPaidBill.paid_at);
       }
 
-      // Buscar pedidos e conta ativa em paralelo
+      // Buscar comanda_id do cliente atual para filtrar bills
+      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      
+      // Buscar pedidos e conta ativa em paralelo - bills filtrado por comanda_id
+      const billQuery = comandaId
+        ? supabase
+            .from("bills")
+            .select("id, status")
+            .eq("comanda_id", comandaId)
+            .in("status", ["requested", "on_the_way"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+        : supabase
+            .from("bills")
+            .select("id, status")
+            .eq("table_id", tableData.id)
+            .in("status", ["requested", "on_the_way"])
+            .order("created_at", { ascending: false })
+            .limit(1);
+      
       const [ordersResult, billResult] = await Promise.all([
         ordersQuery.order("created_at", { ascending: false }),
-        
-      supabase
-          .from("bills")
-          .select("id, status")
-          .eq("table_id", tableData.id)
-          .in("status", ["requested", "on_the_way"])
-          .order("created_at", { ascending: false })
-          .limit(1)
+        billQuery
       ]);
 
       if (ordersResult.data) {
@@ -671,16 +685,24 @@ const Comanda = () => {
   const handleRequestBill = async () => {
     if (!tableId) return;
 
-    // Verificar se já existe bill ativa (não criar duplicada)
+    // Buscar comanda_id do cliente atual
+    const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+    
+    if (!comandaId) {
+      toast.error("Comanda não encontrada. Por favor, faça login novamente.");
+      return;
+    }
+
+    // Verificar se já existe bill ativa para ESTA COMANDA (não para a mesa toda)
     const { data: existingBill } = await supabase
       .from("bills")
       .select("id, status")
-      .eq("table_id", tableId)
+      .eq("comanda_id", comandaId)
       .in("status", ["requested", "on_the_way"])
       .limit(1);
 
     if (existingBill && existingBill.length > 0) {
-      // Já existe bill - apenas atualizar estado local
+      // Já existe bill para esta comanda - apenas atualizar estado local
       setBillRequested(true);
       if (existingBill[0].status === "on_the_way") {
         setBillOnTheWay(true);
@@ -708,6 +730,7 @@ const Comanda = () => {
         .from("bills")
         .insert({
           table_id: tableId,
+          comanda_id: comandaId, // ← INCLUIR comanda_id
           subtotal: totals.subtotal,
           service_fee: totals.serviceFee,
           total_amount: totals.total,

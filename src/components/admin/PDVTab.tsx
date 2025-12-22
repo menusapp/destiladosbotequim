@@ -310,8 +310,9 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
         throw new Error(`Valor pago (R$ ${totalPaid.toFixed(2)}) é menor que o total (R$ ${total.toFixed(2)})`);
       }
       
+      // Validar dinheiro apenas se receivedAmount foi preenchido mas é insuficiente
       const cashPayment = splitPayments.find(p => p.method === "cash");
-      if (cashPayment && (!cashPayment.receivedAmount || cashPayment.receivedAmount < cashPayment.amount)) {
+      if (cashPayment && cashPayment.receivedAmount !== undefined && cashPayment.receivedAmount < cashPayment.amount) {
         throw new Error("Valor recebido em dinheiro deve ser maior ou igual ao valor pago");
       }
 

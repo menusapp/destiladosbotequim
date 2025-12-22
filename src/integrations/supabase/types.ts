@@ -50,6 +50,7 @@ export type Database = {
       bills: {
         Row: {
           change_amount: number | null
+          comanda_id: string | null
           created_at: string | null
           id: string
           paid_at: string | null
@@ -62,6 +63,7 @@ export type Database = {
         }
         Insert: {
           change_amount?: number | null
+          comanda_id?: string | null
           created_at?: string | null
           id?: string
           paid_at?: string | null
@@ -74,6 +76,7 @@ export type Database = {
         }
         Update: {
           change_amount?: number | null
+          comanda_id?: string | null
           created_at?: string | null
           id?: string
           paid_at?: string | null
@@ -85,6 +88,13 @@ export type Database = {
           total_amount?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "bills_comanda_id_fkey"
+            columns: ["comanda_id"]
+            isOneToOne: false
+            referencedRelation: "comandas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bills_table_id_fkey"
             columns: ["table_id"]
