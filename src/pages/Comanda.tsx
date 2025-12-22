@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Receipt, Clock, CreditCard, Banknote, Smartphone, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Receipt, Clock, CreditCard, Banknote, Smartphone, ShoppingCart, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -18,6 +18,48 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+
+// Ícones por tipo de método
+const METHOD_ICONS: Record<string, any> = {
+  cash: Banknote,
+  debit: CreditCard,
+  credit: CreditCard,
+  pix: Smartphone,
+  meal_voucher: Utensils,
+};
+
+// Bandeiras de cartão
+const CARD_BRANDS = [
+  { code: "visa", name: "Visa", logo: "https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" },
+  { code: "mastercard", name: "Mastercard", logo: "https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" },
+  { code: "elo", name: "Elo", logo: "https://upload.wikimedia.org/wikipedia/commons/d/d0/Bandeira_elo_cartance.png" },
+  { code: "amex", name: "American Express", logo: "https://upload.wikimedia.org/wikipedia/commons/f/fa/American_Express_logo_%282018%29.svg" },
+  { code: "hipercard", name: "Hipercard", logo: "https://upload.wikimedia.org/wikipedia/commons/8/89/Hipercard_logo.svg" },
+];
+
+// Bandeiras de vale refeição
+const MEAL_VOUCHER_BRANDS = [
+  { code: "alelo", name: "Alelo", logo: "https://www.alelo.com.br/assets/img/logo-alelo.svg" },
+  { code: "sodexo", name: "Sodexo", logo: "https://upload.wikimedia.org/wikipedia/commons/3/37/Sodexo_2008_%28Green%29.svg" },
+  { code: "vr", name: "VR", logo: "https://www.vr.com.br/assets/img/logo-vr.svg" },
+  { code: "ticket", name: "Ticket", logo: "https://www.ticket.com.br/portal-parceiros/assets/images/logo-ticket-red.svg" },
+  { code: "ben", name: "Ben Visa Vale", logo: "https://www.ben.com.br/assets/images/logo-ben.svg" },
+  { code: "flash", name: "Flash", logo: "https://flash.com.br/images/logo.svg" },
+];
+
+// Função para obter informação de uma bandeira
+const getBrandInfo = (brandCode: string) => {
+  return CARD_BRANDS.find(b => b.code === brandCode) || 
+         MEAL_VOUCHER_BRANDS.find(b => b.code === brandCode);
+};
+
+interface PaymentMethod {
+  id: string;
+  name: string;
+  method_type: string;
+  is_active: boolean;
+  accepted_brands: string[] | null;
+}
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -77,7 +119,7 @@ const Comanda = () => {
   const [billOnTheWay, setBillOnTheWay] = useState(false);
   const [prepTimerSeconds, setPrepTimerSeconds] = useState(0);
   const [hasAcceptedOrder, setHasAcceptedOrder] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<string>("pix");
+  const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [changeAmount, setChangeAmount] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
@@ -85,6 +127,8 @@ const Comanda = () => {
   const [prepTimeMinutes, setPrepTimeMinutes] = useState(30);
   const [restaurantColor, setRestaurantColor] = useState("#FF6B35");
   const [orderNotes, setOrderNotes] = useState("");
+  const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -319,6 +363,7 @@ const Comanda = () => {
       setServiceFeePercentage(restData.service_fee_percentage || 10);
       setPrepTimeMinutes(restData.prep_time_minutes || 30);
       setRestaurantColor(restData.primary_color || "#FF6B35");
+      setRestaurantId(restData.id);
 
       // Buscar mesa DO RESTAURANTE ESPECÍFICO
       const tableResult = await supabase
@@ -407,6 +452,27 @@ const Comanda = () => {
       setLoading(false);
     }
   }, [restaurantSlug, tableNumber, prepTimeMinutes]);
+
+  // Buscar formas de pagamento quando restaurantId estiver disponível
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      if (!restaurantId) return;
+      
+      const { data, error } = await supabase
+        .from("payment_methods")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true);
+      
+      if (!error && data && data.length > 0) {
+        setPaymentMethods(data);
+        // Setar primeiro método como default
+        setPaymentMethod(data[0].name);
+      }
+    };
+    
+    fetchPaymentMethods();
+  }, [restaurantId]);
 
   // Memoizar cálculo do total
   const totals = useMemo(() => {
@@ -919,32 +985,75 @@ const Comanda = () => {
                   Selecione como deseja pagar a conta
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
                 <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="pix" id="pix" />
-                    <Label htmlFor="pix" className="flex items-center gap-2 cursor-pointer">
-                      <Smartphone className="h-4 w-4" />
-                      PIX
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="card" id="card" />
-                    <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer">
-                      <CreditCard className="h-4 w-4" />
-                      Cartão
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="cash" id="cash" />
-                    <Label htmlFor="cash" className="flex items-center gap-2 cursor-pointer">
-                      <Banknote className="h-4 w-4" />
-                      Dinheiro
-                    </Label>
-                  </div>
+                  {paymentMethods.length > 0 ? (
+                    paymentMethods.map((method) => {
+                      const Icon = METHOD_ICONS[method.method_type] || CreditCard;
+                      const brands = method.accepted_brands || [];
+                      
+                      return (
+                        <div key={method.id} className="flex flex-col gap-2 p-3 border rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value={method.name} id={method.id} />
+                            <Label htmlFor={method.id} className="flex items-center gap-2 cursor-pointer flex-1">
+                              <Icon className="h-4 w-4" />
+                              {method.name}
+                            </Label>
+                          </div>
+                          
+                          {/* Bandeiras aceitas - responsivas */}
+                          {brands.length > 0 && (
+                            <div className="flex flex-wrap gap-1 ml-6">
+                              {brands.map((brandCode: string) => {
+                                const brand = getBrandInfo(brandCode);
+                                if (!brand) return null;
+                                return (
+                                  <img 
+                                    key={brandCode}
+                                    src={brand.logo} 
+                                    alt={brand.name}
+                                    className="h-3 sm:h-4 w-auto object-contain"
+                                    title={brand.name}
+                                  />
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    // Fallback para caso não haja métodos cadastrados
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="PIX" id="pix" />
+                        <Label htmlFor="pix" className="flex items-center gap-2 cursor-pointer">
+                          <Smartphone className="h-4 w-4" />
+                          PIX
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Cartão" id="card" />
+                        <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer">
+                          <CreditCard className="h-4 w-4" />
+                          Cartão
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Dinheiro" id="cash" />
+                        <Label htmlFor="cash" className="flex items-center gap-2 cursor-pointer">
+                          <Banknote className="h-4 w-4" />
+                          Dinheiro
+                        </Label>
+                      </div>
+                    </>
+                  )}
                 </RadioGroup>
 
-                {paymentMethod === "cash" && (
+                {/* Mostrar campo de troco apenas para métodos do tipo cash */}
+                {(paymentMethods.find(m => m.name === paymentMethod)?.method_type === "cash" || 
+                  (paymentMethods.length === 0 && paymentMethod === "Dinheiro")) && (
                   <div className="space-y-2">
                     <Label htmlFor="change">Troco para quanto? (Opcional)</Label>
                     <Input
