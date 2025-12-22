@@ -51,20 +51,26 @@ const CustomerInfoDialog = ({
       setCpfError("");
       setPhoneError("");
       setExistingCustomer(null);
+      setIsCheckingCpf(false);
+      setIsSubmitting(false);
     }
   }, [open]);
 
   // Check for existing customer when CPF is valid
   useEffect(() => {
-    const checkExistingCustomer = async () => {
-      const sanitizedCPF = cpf.replace(/\D/g, "");
-      
-      if (sanitizedCPF.length !== 11 || !validateCPF(sanitizedCPF) || !restaurantId) {
-        setExistingCustomer(null);
-        return;
-      }
+    const sanitizedCPF = cpf.replace(/\D/g, "");
+    
+    // Se CPF não está completo ou inválido, garantir que não está "checking"
+    if (sanitizedCPF.length !== 11 || !validateCPF(sanitizedCPF) || !restaurantId) {
+      setExistingCustomer(null);
+      setIsCheckingCpf(false);
+      return;
+    }
 
-      setIsCheckingCpf(true);
+    // Setar como checking ANTES do debounce
+    setIsCheckingCpf(true);
+
+    const checkExistingCustomer = async () => {
       try {
         const { data, error } = await supabase
           .from("customers")
@@ -75,8 +81,8 @@ const CustomerInfoDialog = ({
 
         if (!error && data) {
           setExistingCustomer(data);
-          setName(data.name); // Auto-fill name
-          if (data.phone) setPhone(data.phone); // Auto-fill phone
+          setName(data.name);
+          if (data.phone) setPhone(data.phone);
         } else {
           setExistingCustomer(null);
         }
