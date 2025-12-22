@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Banknote, CreditCard, Smartphone, Utensils } from "lucide-react";
+import { Banknote, CreditCard, Smartphone, Utensils, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -13,6 +13,7 @@ interface PaymentMethod {
   method_type: string;
   name: string;
   is_active: boolean;
+  accepted_brands: string[];
 }
 
 interface PaymentStepProps {
@@ -29,13 +30,34 @@ const METHOD_ICONS: Record<string, any> = {
   credit: CreditCard,
   pix: Smartphone,
   voucher: Utensils,
+  meal_voucher: Utensils,
 };
 
+// Bandeiras de cartão de crédito/débito
+const CARD_BRANDS = [
+  { code: "visa", name: "Visa", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png" },
+  { code: "mastercard", name: "Mastercard", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/200px-Mastercard-logo.svg.png" },
+  { code: "elo", name: "Elo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/ELO_logo.svg/200px-ELO_logo.svg.png" },
+  { code: "amex", name: "American Express", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/American_Express_logo_%282018%29.svg/200px-American_Express_logo_%282018%29.svg.png" },
+  { code: "hipercard", name: "Hipercard", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Hipercard_logo.svg/200px-Hipercard_logo.svg.png" },
+  { code: "diners", name: "Diners Club", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Diners_Club_Logo3.svg/200px-Diners_Club_Logo3.svg.png" },
+];
+
+// Bandeiras de vale-refeição
+const MEAL_VOUCHER_BRANDS = [
+  { code: "alelo", name: "Alelo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Alelo_logo.svg/200px-Alelo_logo.svg.png" },
+  { code: "sodexo", name: "Sodexo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sodexo_logo.svg/200px-Sodexo_logo.svg.png" },
+  { code: "ticket", name: "Ticket", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Edenred_logo.svg/200px-Edenred_logo.svg.png" },
+  { code: "vr", name: "VR", logo: "https://www.vr.com.br/assets/img/logo.svg" },
+  { code: "pluxee", name: "Pluxee", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sodexo_logo.svg/200px-Sodexo_logo.svg.png" },
+  { code: "ifood", name: "iFood Benefícios", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/IFood_logo.svg/200px-IFood_logo.svg.png" },
+];
+
 const DEFAULT_METHODS = [
-  { value: "cash", label: "Dinheiro", icon: Banknote },
-  { value: "debit", label: "Cartão de Débito", icon: CreditCard },
-  { value: "credit", label: "Cartão de Crédito", icon: CreditCard },
-  { value: "pix", label: "PIX", icon: Smartphone },
+  { value: "cash", label: "Dinheiro", icon: Banknote, brands: [] },
+  { value: "debit", label: "Cartão de Débito", icon: CreditCard, brands: [] },
+  { value: "credit", label: "Cartão de Crédito", icon: CreditCard, brands: [] },
+  { value: "pix", label: "PIX", icon: Smartphone, brands: [] },
 ];
 
 export const PaymentStep = ({ 
@@ -51,8 +73,13 @@ export const PaymentStep = ({
   const [customerName, setCustomerName] = useState("");
   const [customerCPF, setCustomerCPF] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [availableMethods, setAvailableMethods] = useState<{ value: string; label: string; icon: any }[]>(DEFAULT_METHODS);
+  const [availableMethods, setAvailableMethods] = useState<{ value: string; label: string; icon: any; brands: string[] }[]>(DEFAULT_METHODS);
   const [loading, setLoading] = useState(true);
+
+  const getBrandInfo = (brandCode: string) => {
+    const allBrands = [...CARD_BRANDS, ...MEAL_VOUCHER_BRANDS];
+    return allBrands.find(b => b.code === brandCode);
+  };
 
   // Carregar métodos de pagamento ativos do restaurante
   useEffect(() => {
@@ -71,9 +98,11 @@ export const PaymentStep = ({
       if (!error && data && data.length > 0) {
         // Usar métodos configurados pelo admin
         const methods = data.map((m: PaymentMethod) => ({
-          value: m.method_type,
+          value: m.id,
+          methodType: m.method_type,
           label: m.name,
           icon: METHOD_ICONS[m.method_type] || CreditCard,
+          brands: m.accepted_brands || [],
         }));
         setAvailableMethods(methods);
       }
@@ -129,7 +158,10 @@ export const PaymentStep = ({
       return;
     }
 
-    if (paymentMethod === "cash") {
+    const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
+    const methodType = (selectedMethod as any)?.methodType || selectedMethod?.value;
+
+    if (methodType === "cash") {
       if (!changeFor || changeFor.trim() === "") {
         toast.error("Informe o valor para troco");
         return;
@@ -160,7 +192,7 @@ export const PaymentStep = ({
     onContinue({
       type: paymentType,
       method: paymentMethod,
-      changeFor: paymentMethod === "cash" ? changeFor : null,
+      changeFor: methodType === "cash" ? changeFor : null,
     });
   };
 
@@ -257,27 +289,77 @@ export const PaymentStep = ({
               </p>
             </Card>
           ) : (
-            availableMethods.map((method) => (
-              <Card
-                key={method.value}
-                className={`cursor-pointer transition-colors ${
-                  paymentMethod === method.value
-                    ? "border-primary bg-primary/5"
-                    : "hover:border-primary/50"
-                }`}
-                onClick={() => setPaymentMethod(method.value)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <method.icon className="w-5 h-5" />
-                    <span className="font-medium">{method.label}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+            availableMethods.map((method) => {
+              const isSelected = paymentMethod === method.value;
+              const methodType = (method as any).methodType || method.value;
+              const hasBrands = method.brands && method.brands.length > 0;
+              const Icon = method.icon;
+              
+              return (
+                <Card
+                  key={method.value}
+                  className={`cursor-pointer transition-colors ${
+                    isSelected
+                      ? "border-primary bg-primary/5"
+                      : "hover:border-primary/50"
+                  }`}
+                  onClick={() => setPaymentMethod(method.value)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Icon className="w-5 h-5" />
+                        <span className="font-medium">{method.label}</span>
+                      </div>
+                      {hasBrands && (
+                        isSelected ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )
+                      )}
+                    </div>
+                    
+                    {/* Gavetinha de bandeiras */}
+                    {isSelected && hasBrands && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {method.brands.map((brandCode) => {
+                            const brand = getBrandInfo(brandCode);
+                            if (!brand) return null;
+                            return (
+                              <div 
+                                key={brandCode} 
+                                className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
+                              >
+                                <img 
+                                  src={brand.logo} 
+                                  alt={brand.name} 
+                                  className="h-4 w-auto object-contain"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                                <span className="text-xs font-medium">{brand.name}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
 
-          {paymentMethod === "cash" && (
+          {/* Troco para dinheiro */}
+          {paymentMethod && (() => {
+            const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
+            const methodType = (selectedMethod as any)?.methodType || selectedMethod?.value;
+            return methodType === "cash";
+          })() && (
             <div className="mt-4">
               <Label htmlFor="changeFor">
                 Troco para quanto? <span className="text-red-500">*</span>

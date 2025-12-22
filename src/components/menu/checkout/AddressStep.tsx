@@ -42,6 +42,17 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
   const [matchedZone, setMatchedZone] = useState<DeliveryZone | null>(null);
   const [zoneError, setZoneError] = useState<string | null>(null);
   const [validatingZone, setValidatingZone] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: boolean;
+    cpf?: boolean;
+    phone?: boolean;
+    street?: boolean;
+    number?: boolean;
+    neighborhood?: boolean;
+    city?: boolean;
+    state?: boolean;
+    zipCode?: boolean;
+  }>({});
   const [newAddress, setNewAddress] = useState({
     zip_code: "",
     street: "",
@@ -243,19 +254,25 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
   };
 
   const handleContinue = () => {
-    if (!customerName || !customerCPF || !customerPhone) {
-      return;
-    }
+    const errors: typeof fieldErrors = {};
+    
+    if (!customerName) errors.name = true;
+    if (!customerCPF || customerCPF.length !== 11) errors.cpf = true;
+    if (!customerPhone) errors.phone = true;
 
     const addressToUse = showNewForm ? newAddress : selectedAddress;
-
-    if (
-      !addressToUse.street ||
-      !addressToUse.number ||
-      !addressToUse.neighborhood ||
-      !addressToUse.city ||
-      !addressToUse.state
-    ) {
+    
+    if (showNewForm || !selectedAddress) {
+      if (!newAddress.zip_code) errors.zipCode = true;
+      if (!newAddress.street) errors.street = true;
+      if (!newAddress.number) errors.number = true;
+      if (!newAddress.neighborhood) errors.neighborhood = true;
+      if (!newAddress.city) errors.city = true;
+      if (!newAddress.state) errors.state = true;
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
@@ -271,7 +288,7 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
       address: addressToUse,
       saveForLater: showNewForm && saveForLater,
       isFirstAddress: savedAddresses.length === 0,
-      deliveryZone: matchedZone, // Passar zona encontrada para usar taxa correta
+      deliveryZone: matchedZone,
     });
   };
 
@@ -322,34 +339,61 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
       {/* Customer Data */}
       <div className="space-y-4">
         <div>
-          <Label htmlFor="name">Nome completo</Label>
+          <Label htmlFor="name" className={fieldErrors.name ? "text-red-500" : ""}>
+            Nome completo
+          </Label>
           <Input
             id="name"
             value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
+            onChange={(e) => {
+              setCustomerName(e.target.value);
+              if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: false }));
+            }}
             placeholder="Seu nome"
+            className={fieldErrors.name ? "border-red-300 bg-red-50/50" : ""}
           />
+          {fieldErrors.name && (
+            <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+          )}
         </div>
 
         <div>
-          <Label htmlFor="cpf">CPF</Label>
+          <Label htmlFor="cpf" className={fieldErrors.cpf ? "text-red-500" : ""}>
+            CPF
+          </Label>
           <Input
             id="cpf"
             value={customerCPF}
-            onChange={(e) => setCustomerCPF(e.target.value.replace(/\D/g, ""))}
+            onChange={(e) => {
+              setCustomerCPF(e.target.value.replace(/\D/g, ""));
+              if (fieldErrors.cpf) setFieldErrors(prev => ({ ...prev, cpf: false }));
+            }}
             placeholder="00000000000"
             maxLength={11}
+            className={fieldErrors.cpf ? "border-red-300 bg-red-50/50" : ""}
           />
+          {fieldErrors.cpf && (
+            <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+          )}
         </div>
 
         <div>
-          <Label htmlFor="phone">Telefone</Label>
+          <Label htmlFor="phone" className={fieldErrors.phone ? "text-red-500" : ""}>
+            Telefone
+          </Label>
           <Input
             id="phone"
             value={customerPhone}
-            onChange={(e) => setCustomerPhone(e.target.value)}
+            onChange={(e) => {
+              setCustomerPhone(e.target.value);
+              if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: false }));
+            }}
             placeholder="(00) 00000-0000"
+            className={fieldErrors.phone ? "border-red-300 bg-red-50/50" : ""}
           />
+          {fieldErrors.phone && (
+            <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+          )}
         </div>
       </div>
 
@@ -424,43 +468,64 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
           <h3 className="font-bold text-foreground">Endereço de entrega</h3>
 
           <div>
-            <Label htmlFor="zipCode">CEP</Label>
+            <Label htmlFor="zipCode" className={fieldErrors.zipCode ? "text-red-500" : ""}>
+              CEP
+            </Label>
             <Input
               id="zipCode"
               value={newAddress.zip_code}
-              onChange={(e) =>
+              onChange={(e) => {
                 setNewAddress({
                   ...newAddress,
                   zip_code: e.target.value.replace(/\D/g, ""),
-                })
-              }
+                });
+                if (fieldErrors.zipCode) setFieldErrors(prev => ({ ...prev, zipCode: false }));
+              }}
               onBlur={handleZipCodeBlur}
               placeholder="00000000"
               maxLength={8}
+              className={fieldErrors.zipCode ? "border-red-300 bg-red-50/50" : ""}
             />
+            {fieldErrors.zipCode && (
+              <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+            )}
           </div>
 
           <div>
-            <Label htmlFor="street">Rua</Label>
+            <Label htmlFor="street" className={fieldErrors.street ? "text-red-500" : ""}>
+              Rua
+            </Label>
             <Input
               id="street"
               value={newAddress.street}
-              onChange={(e) =>
-                setNewAddress({ ...newAddress, street: e.target.value })
-              }
+              onChange={(e) => {
+                setNewAddress({ ...newAddress, street: e.target.value });
+                if (fieldErrors.street) setFieldErrors(prev => ({ ...prev, street: false }));
+              }}
+              className={fieldErrors.street ? "border-red-300 bg-red-50/50" : ""}
             />
+            {fieldErrors.street && (
+              <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="number">Número</Label>
+              <Label htmlFor="number" className={fieldErrors.number ? "text-red-500" : ""}>
+                Número
+              </Label>
               <Input
                 id="number"
                 value={newAddress.number}
-                onChange={(e) =>
-                  setNewAddress({ ...newAddress, number: e.target.value })
-                }
+                onChange={(e) => {
+                  setNewAddress({ ...newAddress, number: e.target.value });
+                  if (fieldErrors.number) setFieldErrors(prev => ({ ...prev, number: false }));
+                }}
+                className={fieldErrors.number ? "border-red-300 bg-red-50/50" : ""}
               />
+              {fieldErrors.number && (
+                <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+              )}
             </div>
             <div>
               <Label htmlFor="complement">Complemento</Label>
@@ -476,41 +541,62 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
           </div>
 
           <div>
-            <Label htmlFor="neighborhood">Bairro</Label>
+            <Label htmlFor="neighborhood" className={fieldErrors.neighborhood ? "text-red-500" : ""}>
+              Bairro
+            </Label>
             <Input
               id="neighborhood"
               value={newAddress.neighborhood}
-              onChange={(e) =>
-                setNewAddress({ ...newAddress, neighborhood: e.target.value })
-              }
+              onChange={(e) => {
+                setNewAddress({ ...newAddress, neighborhood: e.target.value });
+                if (fieldErrors.neighborhood) setFieldErrors(prev => ({ ...prev, neighborhood: false }));
+              }}
+              className={fieldErrors.neighborhood ? "border-red-300 bg-red-50/50" : ""}
             />
+            {fieldErrors.neighborhood && (
+              <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="city">Cidade</Label>
+              <Label htmlFor="city" className={fieldErrors.city ? "text-red-500" : ""}>
+                Cidade
+              </Label>
               <Input
                 id="city"
                 value={newAddress.city}
-                onChange={(e) =>
-                  setNewAddress({ ...newAddress, city: e.target.value })
-                }
+                onChange={(e) => {
+                  setNewAddress({ ...newAddress, city: e.target.value });
+                  if (fieldErrors.city) setFieldErrors(prev => ({ ...prev, city: false }));
+                }}
+                className={fieldErrors.city ? "border-red-300 bg-red-50/50" : ""}
               />
+              {fieldErrors.city && (
+                <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+              )}
             </div>
             <div>
-              <Label htmlFor="state">Estado</Label>
+              <Label htmlFor="state" className={fieldErrors.state ? "text-red-500" : ""}>
+                Estado
+              </Label>
               <Input
                 id="state"
                 value={newAddress.state}
-                onChange={(e) =>
+                onChange={(e) => {
                   setNewAddress({
                     ...newAddress,
                     state: e.target.value.toUpperCase(),
-                  })
-                }
+                  });
+                  if (fieldErrors.state) setFieldErrors(prev => ({ ...prev, state: false }));
+                }}
                 maxLength={2}
                 placeholder="UF"
+                className={fieldErrors.state ? "border-red-300 bg-red-50/50" : ""}
               />
+              {fieldErrors.state && (
+                <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+              )}
             </div>
           </div>
 
