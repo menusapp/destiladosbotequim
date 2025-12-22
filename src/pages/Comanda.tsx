@@ -120,6 +120,7 @@ const Comanda = () => {
   const [prepTimerSeconds, setPrepTimerSeconds] = useState(0);
   const [hasAcceptedOrder, setHasAcceptedOrder] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("");
+  const [selectedPaymentMethodType, setSelectedPaymentMethodType] = useState<string>("");
   const [changeAmount, setChangeAmount] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
@@ -167,19 +168,52 @@ const Comanda = () => {
       
       console.log("🔔 Configurando realtime para Comanda - table_id:", tableData.id);
       
+      // Função para processar pagamento (seja UPDATE ou INSERT de bill paga)
+      const handleBillPaid = (bill: any) => {
+        console.log("✅ Conta foi paga! Redirecionando...");
+        toast.success("Conta paga! Obrigado pela preferência!");
+        
+        // Fechar comanda ativa
+        const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+        if (comandaId) {
+          supabase.from("comandas").update({
+            status: "closed",
+            closed_at: new Date().toISOString()
+          }).eq("id", comandaId);
+          console.log("📋 Comanda fechada:", comandaId);
+        }
+        
+        // Salvar informações para abrir modal de avaliação
+        sessionStorage.setItem('shouldShowReview', 'true');
+        if (bill?.id) {
+          sessionStorage.setItem('reviewBillId', bill.id);
+        }
+        
+        // Limpar TODOS os dados do cliente da sessão
+        sessionStorage.removeItem(`customer_name_${tableNumber}`);
+        sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+        sessionStorage.removeItem(`cart_${tableNumber}`);
+        sessionStorage.removeItem(`comanda_id_${tableNumber}`);
+        sessionStorage.removeItem("customerInfo");
+        
+        setTimeout(() => {
+          navigate(`/menu/${restaurantSlug}/${tableNumber}`);
+        }, 2000);
+      };
+
       // Configurar realtime para atualizar status da conta
       billChannel = supabase
         .channel(`bill-status-${tableData.id}`)
         .on(
           'postgres_changes',
           {
-            event: '*',
+            event: 'UPDATE',
             schema: 'public',
             table: 'bills',
             filter: `table_id=eq.${tableData.id}`,
           },
           (payload) => {
-            console.log("🔔 Conta atualizada em tempo real na Comanda:", payload);
+            console.log("🔔 Conta ATUALIZADA em tempo real na Comanda:", payload);
             const bill = payload.new as any;
             
             if (bill?.status === "on_the_way") {
@@ -189,43 +223,37 @@ const Comanda = () => {
             }
             
             if (bill?.status === "paid") {
-              console.log("✅ Conta foi paga! Redirecionando...");
-              toast.success("Conta paga! Obrigado pela preferência!");
-              
-              // Fechar comanda ativa
-              const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
-              if (comandaId) {
-                supabase.from("comandas").update({
-                  status: "closed",
-                  closed_at: new Date().toISOString()
-                }).eq("id", comandaId);
-                console.log("📋 Comanda fechada:", comandaId);
-              }
-              
-              // ⚠️ NÃO liberar mesa aqui - admin_mark_bill_paid já faz isso!
-              // A mesa é liberada pela função do banco de dados quando a conta é paga
-              
-              // Salvar informações para abrir modal de avaliação
-              sessionStorage.setItem('shouldShowReview', 'true');
-              if (bill?.id) {
-                sessionStorage.setItem('reviewBillId', bill.id);
-              }
-              
-              // Limpar TODOS os dados do cliente da sessão
-              sessionStorage.removeItem(`customer_name_${tableNumber}`);
-              sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
-              sessionStorage.removeItem(`cart_${tableNumber}`);
-              sessionStorage.removeItem(`comanda_id_${tableNumber}`);
-              sessionStorage.removeItem("customerInfo");
-              
-              setTimeout(() => {
-                navigate(`/menu/${restaurantSlug}/${tableNumber}`);
-              }, 2000);
+              handleBillPaid(bill);
             }
             
             // Recarregar dados de qualquer forma
             console.log("🔄 Recarregando dados da comanda...");
             fetchData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'bills',
+            filter: `table_id=eq.${tableData.id}`,
+          },
+          (payload) => {
+            console.log("🔔 Nova conta CRIADA em tempo real na Comanda:", payload);
+            const bill = payload.new as any;
+            
+            // Bill criada já como paga (pelo PDV sem cliente ter solicitado)
+            if (bill?.status === "paid") {
+              handleBillPaid(bill);
+            } else {
+              // Bill criada com outro status - atualizar estado
+              setBillRequested(true);
+              if (bill?.status === "on_the_way") {
+                setBillOnTheWay(true);
+              }
+              fetchData();
+            }
           }
         )
         .on(
@@ -468,6 +496,7 @@ const Comanda = () => {
         setPaymentMethods(data);
         // Setar primeiro método como default
         setPaymentMethod(data[0].name);
+        setSelectedPaymentMethodType(data[0].method_type);
       }
     };
     
@@ -661,8 +690,9 @@ const Comanda = () => {
       return;
     }
 
-    // Validar troco em dinheiro
-    if (paymentMethod === "cash" && changeAmount) {
+    // Validar troco em dinheiro - usar method_type para comparar
+    const isCash = selectedPaymentMethodType === "cash";
+    if (isCash && changeAmount) {
       const changeValue = parseFloat(changeAmount);
       if (changeValue < totals.total) {
         toast.error(`O valor para troco deve ser maior ou igual ao total da conta (R$ ${totals.total.toFixed(2)})`);
@@ -678,9 +708,9 @@ const Comanda = () => {
           subtotal: totals.subtotal,
           service_fee: totals.serviceFee,
           total_amount: totals.total,
-          status: "requested",
+          status: "pending",
           payment_method: paymentMethod,
-          change_amount: paymentMethod === "cash" ? parseFloat(changeAmount || "0") : null,
+          change_amount: isCash ? parseFloat(changeAmount || "0") : null,
         })
         .select()
         .single();
@@ -986,7 +1016,11 @@ const Comanda = () => {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
+                <RadioGroup value={paymentMethod} onValueChange={(value) => {
+                  setPaymentMethod(value);
+                  const selected = paymentMethods.find(m => m.name === value);
+                  if (selected) setSelectedPaymentMethodType(selected.method_type);
+                }}>
                   {paymentMethods.length > 0 ? (
                     paymentMethods.map((method) => {
                       const Icon = METHOD_ICONS[method.method_type] || CreditCard;
@@ -1000,7 +1034,10 @@ const Comanda = () => {
                           className={`p-3 border rounded-lg cursor-pointer transition-all ${
                             isSelected ? "border-primary bg-primary/5" : "hover:border-primary/50"
                           }`}
-                          onClick={() => setPaymentMethod(method.name)}
+                          onClick={() => {
+                            setPaymentMethod(method.name);
+                            setSelectedPaymentMethodType(method.method_type);
+                          }}
                         >
                           <div className="flex items-center justify-between">
                             {/* Lado esquerdo: Radio + Icon + Nome */}
@@ -1075,34 +1112,48 @@ const Comanda = () => {
                   ) : (
                     // Fallback para caso não haja métodos cadastrados
                     <>
-                      <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                        <RadioGroupItem value="PIX" id="pix" />
-                        <Label htmlFor="pix" className="flex items-center gap-2 cursor-pointer">
-                          <Smartphone className="h-4 w-4" />
-                          PIX
-                        </Label>
+                      <div 
+                        className={`p-3 border rounded-lg cursor-pointer transition-all ${paymentMethod === "PIX" ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
+                        onClick={() => { setPaymentMethod("PIX"); setSelectedPaymentMethodType("pix"); }}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="PIX" id="pix" />
+                          <Label htmlFor="pix" className="flex items-center gap-2 cursor-pointer">
+                            <Smartphone className="h-4 w-4" />
+                            PIX
+                          </Label>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                        <RadioGroupItem value="Cartão" id="card" />
-                        <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer">
-                          <CreditCard className="h-4 w-4" />
-                          Cartão
-                        </Label>
+                      <div 
+                        className={`p-3 border rounded-lg cursor-pointer transition-all ${paymentMethod === "Cartão" ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
+                        onClick={() => { setPaymentMethod("Cartão"); setSelectedPaymentMethodType("credit"); }}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Cartão" id="card" />
+                          <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer">
+                            <CreditCard className="h-4 w-4" />
+                            Cartão
+                          </Label>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                        <RadioGroupItem value="Dinheiro" id="cash" />
-                        <Label htmlFor="cash" className="flex items-center gap-2 cursor-pointer">
-                          <Banknote className="h-4 w-4" />
-                          Dinheiro
-                        </Label>
+                      <div 
+                        className={`p-3 border rounded-lg cursor-pointer transition-all ${paymentMethod === "Dinheiro" ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
+                        onClick={() => { setPaymentMethod("Dinheiro"); setSelectedPaymentMethodType("cash"); }}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Dinheiro" id="cash" />
+                          <Label htmlFor="cash" className="flex items-center gap-2 cursor-pointer">
+                            <Banknote className="h-4 w-4" />
+                            Dinheiro
+                          </Label>
+                        </div>
                       </div>
                     </>
                   )}
                 </RadioGroup>
 
                 {/* Mostrar campo de troco apenas para métodos do tipo cash */}
-                {(paymentMethods.find(m => m.name === paymentMethod)?.method_type === "cash" || 
-                  (paymentMethods.length === 0 && paymentMethod === "Dinheiro")) && (
+                {selectedPaymentMethodType === "cash" && (
                   <div className="space-y-2">
                     <Label htmlFor="change">Troco para quanto? (Opcional)</Label>
                     <Input
