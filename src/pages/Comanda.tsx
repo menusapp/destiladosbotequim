@@ -701,13 +701,8 @@ const Comanda = () => {
     }
 
     try {
-      // Normalizar payment_method para valores aceitos pela constraint: cash, pix, card
-      let normalizedPaymentMethod = "card";
-      if (selectedPaymentMethodType === "cash") {
-        normalizedPaymentMethod = "cash";
-      } else if (selectedPaymentMethodType === "pix") {
-        normalizedPaymentMethod = "pix";
-      }
+      // Usar method_type diretamente (cash, credit, debit, pix, meal_voucher)
+      const normalizedPaymentMethod = selectedPaymentMethodType || "cash";
 
       const { data: billData, error } = await supabase
         .from("bills")

@@ -237,44 +237,58 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
 
       const mesasAtendidas = comandasData?.length || 0;
 
-      // Buscar formas de pagamento ativas e calcular receita por método
+      // Labels fixos para cada method_type
+      const METHOD_TYPE_LABELS: Record<string, string> = {
+        cash: "Dinheiro",
+        credit: "Cartão de Crédito",
+        debit: "Cartão de Débito",
+        pix: "PIX",
+        meal_voucher: "Vale Refeição",
+      };
+
+      // Buscar formas de pagamento cadastradas para resolver UUIDs e nomes
       const { data: paymentMethods } = await supabase
         .from("payment_methods")
         .select("id, name, method_type")
-        .eq("restaurant_id", restaurantId)
-        .eq("is_active", true);
+        .eq("restaurant_id", restaurantId);
 
-      // Agregar valores por forma de pagamento
-      const paymentTotals: Record<string, { method_type: string; total: number }> = {};
+      // Agregar valores diretamente por method_type
+      const paymentTotals: Record<string, number> = {
+        cash: 0,
+        credit: 0,
+        debit: 0,
+        pix: 0,
+        meal_voucher: 0,
+      };
 
-      // Criar mapeamento de method_type/id/nome para o nome de exibição
-      const methodToName: Record<string, string> = {};
-      
-      // Inicializar todas as formas de pagamento ativas com 0
-      paymentMethods?.forEach(pm => {
-        paymentTotals[pm.name] = { method_type: pm.method_type, total: 0 };
-        // Mapear por nome, method_type e id
-        methodToName[pm.name] = pm.name;
-        methodToName[pm.method_type] = pm.name;
-        methodToName[pm.id] = pm.name;
-      });
-      
-      // Fallbacks para valores legados do banco
-      if (!methodToName["cash"]) methodToName["cash"] = "Dinheiro";
-      if (!methodToName["pix"]) methodToName["pix"] = "PIX";
-      if (!methodToName["card"]) methodToName["card"] = "Cartão";
-      if (!methodToName["credit"]) methodToName["credit"] = "Crédito";
-      if (!methodToName["debit"]) methodToName["debit"] = "Débito";
+      // Função para normalizar qualquer valor salvo → method_type
+      const normalizeMethod = (method: string | null | undefined): string | null => {
+        if (!method) return null;
+        
+        // Já é um method_type válido
+        if (paymentTotals.hasOwnProperty(method)) return method;
+        
+        // Mapear valores legados
+        if (method === "card") return "credit"; // card genérico vai para crédito
+        
+        // Verificar se é UUID de uma forma de pagamento cadastrada
+        const pmById = paymentMethods?.find(p => p.id === method);
+        if (pmById) return pmById.method_type;
+        
+        // Verificar se é nome de uma forma de pagamento
+        const pmByName = paymentMethods?.find(p => 
+          p.name.toLowerCase() === method.toLowerCase()
+        );
+        if (pmByName) return pmByName.method_type;
+        
+        return null;
+      };
 
-      // Função para resolver nome e somar valor
+      // Função para somar ao total do method_type
       const addToPaymentTotal = (method: string | null | undefined, amount: number) => {
-        if (!method) return;
-        const resolvedName = methodToName[method] || method;
-        if (paymentTotals[resolvedName]) {
-          paymentTotals[resolvedName].total += amount;
-        } else {
-          // Criar entrada para métodos não mapeados
-          paymentTotals[resolvedName] = { method_type: "other", total: amount };
+        const normalized = normalizeMethod(method);
+        if (normalized && paymentTotals.hasOwnProperty(normalized)) {
+          paymentTotals[normalized] += amount;
         }
       };
 
@@ -306,11 +320,14 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         addToPaymentTotal(order.payment_type, orderTotal);
       });
 
-      const paymentsByMethod: PaymentMethodSummary[] = Object.entries(paymentTotals).map(([name, data]) => ({
-        method_name: name,
-        method_type: data.method_type,
-        total: data.total,
-      }));
+      // Converter para array de exibição (apenas os que têm valor > 0)
+      const paymentsByMethod: PaymentMethodSummary[] = Object.entries(paymentTotals)
+        .filter(([_, total]) => total > 0)
+        .map(([type, total]) => ({
+          method_name: METHOD_TYPE_LABELS[type] || type,
+          method_type: type,
+          total,
+        }));
 
       setStats({
         salesToday: salesTotal,

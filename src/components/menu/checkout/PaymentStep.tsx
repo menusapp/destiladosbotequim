@@ -192,12 +192,10 @@ export const PaymentStep = ({
       sessionStorage.setItem("customer_phone", customerPhone);
     }
 
-    // Passar o NOME do método de pagamento para salvar corretamente no banco
-    const methodName = (selectedMethod as any)?.methodName || selectedMethod?.label || paymentMethod;
-    
+    // Passar o method_type para salvar no banco (cash, credit, debit, pix, meal_voucher)
     onContinue({
       type: paymentType,
-      method: methodName,
+      method: methodType, // Salvar method_type, não o nome
       changeFor: methodType === "cash" ? changeFor : null,
     });
   };
