@@ -701,6 +701,14 @@ const Comanda = () => {
     }
 
     try {
+      // Normalizar payment_method para valores aceitos pela constraint: cash, pix, card
+      let normalizedPaymentMethod = "card";
+      if (selectedPaymentMethodType === "cash") {
+        normalizedPaymentMethod = "cash";
+      } else if (selectedPaymentMethodType === "pix") {
+        normalizedPaymentMethod = "pix";
+      }
+
       const { data: billData, error } = await supabase
         .from("bills")
         .insert({
@@ -708,8 +716,8 @@ const Comanda = () => {
           subtotal: totals.subtotal,
           service_fee: totals.serviceFee,
           total_amount: totals.total,
-          status: "pending",
-          payment_method: paymentMethod,
+          status: "requested",
+          payment_method: normalizedPaymentMethod,
           change_amount: isCash ? parseFloat(changeAmount || "0") : null,
         })
         .select()
@@ -721,7 +729,7 @@ const Comanda = () => {
       setDialogOpen(false);
       toast.success("Conta solicitada! O garçom chegará em breve");
     } catch (error: any) {
-      toast.error("Erro ao solicitar conta");
+      toast.error(`Erro ao solicitar conta: ${error.message || "tente novamente"}`);
       console.error(error);
     }
   };
