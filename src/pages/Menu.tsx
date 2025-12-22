@@ -758,69 +758,67 @@ const Menu = () => {
       
       console.log('✅ Mesa encontrada para login:', tableData);
 
-      // Verificar se mesa está ocupada por OUTRO cliente (extrair últimos 11 dígitos = CPF)
-      if (tableData.is_occupied && tableData.occupied_by) {
-        const occupiedDigits = tableData.occupied_by.replace(/\D/g, '');
-        const occupiedCpf = occupiedDigits.slice(-11); // Últimos 11 dígitos = CPF
-        console.log('🔍 Verificando ocupação:', { occupiedCpf, cleanCpf, match: occupiedCpf === cleanCpf });
-        
-        if (occupiedCpf !== cleanCpf) {
-          console.error('❌ Mesa ocupada por outro cliente');
-          toast.error("Esta mesa já está ocupada por outro cliente!");
-          return;
+      // Verificar se este cliente já tem comanda ativa nesta mesa
+      const { data: existingComanda } = await supabase
+        .from("comandas")
+        .select("id")
+        .eq("table_id", tableData.id)
+        .eq("customer_cpf", cleanCpf)
+        .eq("status", "active")
+        .maybeSingle();
+
+      let comandaId: string | undefined;
+
+      if (existingComanda) {
+        // Cliente já tem comanda ativa - usar a existente
+        comandaId = existingComanda.id;
+        console.log('📋 Comanda existente encontrada:', comandaId);
+      } else {
+        // Criar nova comanda para este cliente (NÃO fechar as outras)
+        const { data: newComanda, error: comandaError } = await supabase
+          .from("comandas")
+          .insert({
+            restaurant_id: restaurant.id,
+            table_id: tableData.id,
+            customer_name: finalName,
+            customer_cpf: cleanCpf,
+            status: "active"
+          })
+          .select("id")
+          .single();
+
+        if (comandaError) {
+          console.error("Erro ao criar comanda:", comandaError);
+        } else {
+          comandaId = newComanda.id;
+          console.log('📋 Nova comanda criada:', comandaId);
         }
-        console.log('✅ Mesmo cliente, permitindo relogin');
       }
 
-      // Ocupar a mesa com os dados do cliente (formato: "Nome - CPF formatado" para exibição no admin)
-      const formattedCPF = cleanCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+      // Contar comandas ativas na mesa para atualizar occupied_by
+      const { count: activeCount } = await supabase
+        .from("comandas")
+        .select("*", { count: "exact", head: true })
+        .eq("table_id", tableData.id)
+        .eq("status", "active");
+
+      const clientCount = activeCount || 1;
+      const occupiedByText = clientCount === 1 
+        ? `${finalName}` 
+        : `${clientCount} clientes`;
+
+      // Atualizar mesa como ocupada
       const { error: updateError } = await supabase
         .from("tables")
         .update({
           is_occupied: true,
-          occupied_at: new Date().toISOString(),
-          occupied_by: `${finalName} - ${formattedCPF}`,
+          occupied_at: tableData.is_occupied ? tableData.occupied_at : new Date().toISOString(),
+          occupied_by: occupiedByText,
         })
         .eq("id", tableData.id);
 
       if (updateError) throw updateError;
-      console.log('✅ Mesa ocupada com sucesso');
-
-      // SEMPRE criar nova comanda no login - fechar TODAS as comandas ativas da mesa
-      
-      // Fechar TODAS comandas ativas da mesa (independente do CPF)
-      const { error: closeError } = await supabase
-        .from("comandas")
-        .update({ status: "closed", closed_at: new Date().toISOString() })
-        .eq("table_id", tableData.id)
-        .eq("status", "active");
-
-      if (closeError) {
-        console.error("Erro ao fechar comandas anteriores:", closeError);
-      } else {
-        console.log('📋 Comandas anteriores fechadas');
-      }
-
-      // SEMPRE criar nova comanda
-      const { data: newComanda, error: comandaError } = await supabase
-        .from("comandas")
-        .insert({
-          restaurant_id: restaurant.id,
-          table_id: tableData.id,
-          customer_name: finalName,
-          customer_cpf: cleanCpf,
-          status: "active"
-        })
-        .select("id")
-        .single();
-
-      let comandaId: string | undefined;
-      if (comandaError) {
-        console.error("Erro ao criar comanda:", comandaError);
-      } else {
-        comandaId = newComanda.id;
-        console.log('📋 Nova comanda criada:', comandaId);
-      }
+      console.log('✅ Mesa ocupada com sucesso:', { clientCount, occupiedByText });
 
       // Salvar dados no sessionStorage
       sessionStorage.setItem(`customer_name_${tableNumber}`, finalName);

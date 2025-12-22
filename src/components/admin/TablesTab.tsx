@@ -47,6 +47,12 @@ import QRCode from "qrcode";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+interface Comanda {
+  id: string;
+  customer_name: string;
+  customer_cpf: string;
+}
+
 interface Table {
   id: string;
   table_number: number;
@@ -54,6 +60,7 @@ interface Table {
   is_occupied: boolean;
   occupied_by: string | null;
   occupied_at: string | null;
+  comandas?: Comanda[];
 }
 
 type FilterType = "all" | "occupied" | "available";
@@ -72,8 +79,8 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     fetchRestaurantSlug();
     fetchTables();
 
-    // Realtime subscription
-    const channel = supabase
+    // Realtime subscription for tables
+    const tablesChannel = supabase
       .channel("tables-changes")
       .on(
         "postgres_changes",
@@ -88,8 +95,25 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       )
       .subscribe();
 
+    // Realtime subscription for comandas
+    const comandasChannel = supabase
+      .channel("comandas-tables-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "comandas",
+        },
+        () => {
+          fetchTables();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(tablesChannel);
+      supabase.removeChannel(comandasChannel);
     };
   }, [restaurantId]);
 
@@ -106,7 +130,8 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const fetchTables = async () => {
-    const { data, error } = await supabase
+    // Buscar mesas
+    const { data: tablesData, error } = await supabase
       .from("tables")
       .select("*")
       .eq("restaurant_id", restaurantId)
@@ -116,8 +141,28 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     if (error) {
       toast.error("Erro ao buscar mesas");
       console.error(error);
+      return;
+    }
+
+    // Buscar comandas ativas para todas as mesas
+    const tableIds = (tablesData || []).map(t => t.id);
+    
+    if (tableIds.length > 0) {
+      const { data: comandasData } = await supabase
+        .from("comandas")
+        .select("id, table_id, customer_name, customer_cpf")
+        .in("table_id", tableIds)
+        .eq("status", "active");
+
+      // Mapear comandas para cada mesa
+      const tablesWithComandas = (tablesData || []).map(table => ({
+        ...table,
+        comandas: (comandasData || []).filter(c => c.table_id === table.id)
+      }));
+
+      setTables(tablesWithComandas);
     } else {
-      setTables(data || []);
+      setTables(tablesData || []);
     }
   };
 
@@ -184,17 +229,6 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const checkCanEmptyTable = async (tableId: string): Promise<{ canEmpty: boolean; reason?: string }> => {
-    // Verificar comandas ativas
-    const { data: activeComandas } = await supabase
-      .from("comandas")
-      .select("id")
-      .eq("table_id", tableId)
-      .eq("status", "active");
-
-    if (activeComandas && activeComandas.length > 0) {
-      return { canEmpty: false, reason: "Existem comandas ativas nesta mesa. Feche-as primeiro." };
-    }
-
     // Verificar pedidos pendentes/ativos
     const { data: activeOrders } = await supabase
       .from("orders")
@@ -222,7 +256,14 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
   const handleEmptyTable = async (tableId: string) => {
     try {
-      // Marcar mesa como livre (deslogando o cliente via Realtime)
+      // Fechar todas as comandas ativas da mesa
+      await supabase
+        .from("comandas")
+        .update({ status: "closed", closed_at: new Date().toISOString() })
+        .eq("table_id", tableId)
+        .eq("status", "active");
+
+      // Marcar mesa como livre
       const { error } = await supabase
         .from("tables")
         .update({
@@ -234,7 +275,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
       if (error) throw error;
 
-      toast.success("Mesa esvaziada! O cliente será deslogado automaticamente.");
+      toast.success("Mesa esvaziada! Todas as comandas foram fechadas.");
       fetchTables();
     } catch (error) {
       console.error("Erro ao esvaziar mesa:", error);
@@ -242,6 +283,13 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     } finally {
       setTableToEmpty(null);
     }
+  };
+
+  const maskCPF = (cpf: string) => {
+    if (cpf.length === 11) {
+      return `***.***${cpf.slice(6, 9)}-${cpf.slice(9)}`;
+    }
+    return cpf;
   };
 
   const filteredTables = tables.filter((table) => {
@@ -385,93 +433,125 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
       {/* Grid de Mesas */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {filteredTables.map((table) => (
-          <Card
-            key={table.id}
-            className={`cursor-pointer transition-all hover:shadow-lg ${
-              table.is_occupied ? "border-red-500" : "border-green-500"
-            }`}
-            onClick={() => navigate(`/admin/table/${table.id}`)}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div
-                  className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                    table.is_occupied
-                      ? "bg-red-100 dark:bg-red-950"
-                      : "bg-green-100 dark:bg-green-950"
-                  }`}
-                >
-                  <Users
-                    className={`w-6 h-6 ${
-                      table.is_occupied ? "text-red-600" : "text-green-600"
+        {filteredTables.map((table) => {
+          const clientCount = table.comandas?.length || 0;
+          
+          return (
+            <Card
+              key={table.id}
+              className={`cursor-pointer transition-all hover:shadow-lg ${
+                table.is_occupied ? "border-red-500" : "border-green-500"
+              }`}
+              onClick={() => navigate(`/admin/table/${table.id}`)}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                      table.is_occupied
+                        ? "bg-red-100 dark:bg-red-950"
+                        : "bg-green-100 dark:bg-green-950"
                     }`}
-                  />
+                  >
+                    <Users
+                      className={`w-6 h-6 ${
+                        table.is_occupied ? "text-red-600" : "text-green-600"
+                      }`}
+                    />
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation();
+                        downloadQRCode(table);
+                      }}>
+                        <QrCode className="w-4 h-4 mr-2" />
+                        Baixar QR Code
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => copyTableLink(table, e)}>
+                        <LinkIcon className="w-4 h-4 mr-2" />
+                        Copiar Link
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-orange-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRequestEmptyTable(table);
+                        }}
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Esvaziar Mesa
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        disabled={table.is_occupied}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(table.id);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation();
-                      downloadQRCode(table);
-                    }}>
-                      <QrCode className="w-4 h-4 mr-2" />
-                      Baixar QR Code
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => copyTableLink(table, e)}>
-                      <LinkIcon className="w-4 h-4 mr-2" />
-                      Copiar Link
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-orange-600"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRequestEmptyTable(table);
-                      }}
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Esvaziar Mesa
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      disabled={table.is_occupied}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(table.id);
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
 
-              <h3 className="font-semibold text-lg mb-1">Mesa {table.table_number}</h3>
-              {table.is_occupied && table.occupied_by ? (
-                <div className="text-sm text-muted-foreground">
-                  <p className="truncate">{table.occupied_by}</p>
-                  {table.occupied_at && (
-                    <p className="text-xs">
-                      {formatDistanceToNow(new Date(table.occupied_at), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <Badge variant="outline" className="text-green-600 border-green-600">
-                  Disponível
-                </Badge>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                <h3 className="font-semibold text-lg mb-1">Mesa {table.table_number}</h3>
+                
+                {table.is_occupied && clientCount > 0 ? (
+                  <div className="space-y-2">
+                    <Badge variant="secondary" className="gap-1">
+                      <Users className="w-3 h-3" />
+                      {clientCount} cliente{clientCount > 1 ? 's' : ''}
+                    </Badge>
+                    <div className="space-y-1">
+                      {table.comandas?.slice(0, 2).map((comanda) => (
+                        <p key={comanda.id} className="text-xs text-muted-foreground truncate">
+                          {comanda.customer_name} - {maskCPF(comanda.customer_cpf)}
+                        </p>
+                      ))}
+                      {clientCount > 2 && (
+                        <p className="text-xs text-muted-foreground">
+                          +{clientCount - 2} mais...
+                        </p>
+                      )}
+                    </div>
+                    {table.occupied_at && (
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(table.occupied_at), {
+                          addSuffix: true,
+                          locale: ptBR,
+                        })}
+                      </p>
+                    )}
+                  </div>
+                ) : table.is_occupied ? (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="truncate">{table.occupied_by}</p>
+                    {table.occupied_at && (
+                      <p className="text-xs">
+                        {formatDistanceToNow(new Date(table.occupied_at), {
+                          addSuffix: true,
+                          locale: ptBR,
+                        })}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <Badge variant="outline" className="text-green-600 border-green-600">
+                    Disponível
+                  </Badge>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* AlertDialog para confirmar esvaziamento */}
@@ -480,7 +560,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
           <AlertDialogHeader>
             <AlertDialogTitle>Esvaziar Mesa {tableToEmpty?.table_number}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja esvaziar esta mesa? Todas as comandas ativas serão fechadas automaticamente.
+              Tem certeza que deseja esvaziar esta mesa? Todas as comandas ativas serão fechadas e os clientes serão deslogados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
