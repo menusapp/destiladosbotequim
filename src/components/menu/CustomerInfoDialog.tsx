@@ -144,22 +144,52 @@ const CustomerInfoDialog = ({
 
     // If existing customer, use their saved name (ignore whatever was typed)
     const finalName = existingCustomer ? existingCustomer.name : name.trim();
-    const finalPhone = existingCustomer?.phone || phone.replace(/\D/g, "") || undefined;
+    // Se cliente existente não tem telefone, usar o que foi digitado no form
+    const typedPhone = phone.replace(/\D/g, "");
+    const finalPhone = existingCustomer?.phone || typedPhone || undefined;
 
     if (requireName && !finalName) {
       toast.error("Por favor, informe seu nome");
       return;
     }
 
-    if (requirePhone && !finalPhone && !existingCustomer?.phone) {
+    // Validar telefone: se requirePhone e não tem telefone (nem salvo nem digitado)
+    if (requirePhone && !finalPhone) {
       toast.error("Por favor, informe seu telefone");
       return;
     }
 
-    // If new customer, create record in database
-    if (!existingCustomer && restaurantId) {
-      setIsSubmitting(true);
-      try {
+    setIsSubmitting(true);
+    
+    try {
+      // Se cliente existente mas sem telefone e foi digitado um telefone, atualizar
+      if (existingCustomer && !existingCustomer.phone && typedPhone && restaurantId) {
+        // Verificar se telefone já existe em outro cliente
+        const { data: phoneExists } = await supabase
+          .from("customers")
+          .select("cpf, name")
+          .eq("restaurant_id", restaurantId)
+          .eq("phone", typedPhone)
+          .neq("cpf", sanitizedCPF)
+          .maybeSingle();
+
+        if (phoneExists) {
+          setPhoneError("Este telefone já está cadastrado para outro cliente");
+          toast.error("Este telefone já está cadastrado para outro cliente");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Atualizar telefone do cliente existente
+        await supabase
+          .from("customers")
+          .update({ phone: typedPhone })
+          .eq("restaurant_id", restaurantId)
+          .eq("cpf", sanitizedCPF);
+      }
+
+      // If new customer, create record in database
+      if (!existingCustomer && restaurantId) {
         // Verificar se telefone já existe em outro cliente
         if (finalPhone) {
           const { data: phoneExists } = await supabase
@@ -189,12 +219,12 @@ const CustomerInfoDialog = ({
         await supabase
           .from("customers")
           .insert(insertData);
-      } catch (err) {
-        console.error("Error creating customer:", err);
-        // Continue anyway - the customer will be created on order if this fails
-      } finally {
-        setIsSubmitting(false);
       }
+    } catch (err) {
+      console.error("Error saving customer:", err);
+      // Continue anyway - the customer will be created on order if this fails
+    } finally {
+      setIsSubmitting(false);
     }
 
     onSubmit(finalName || "Cliente", sanitizedCPF, finalPhone);
@@ -237,7 +267,7 @@ const CustomerInfoDialog = ({
             )}
           </div>
 
-          {existingCustomer ? (
+          {existingCustomer && (
             <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
               <UserCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
               <div>
@@ -248,41 +278,46 @@ const CustomerInfoDialog = ({
                 <p className="text-sm text-green-600 dark:text-green-400">Cliente cadastrado</p>
               </div>
             </div>
-          ) : (
-            <>
-              {requireName && (
-                <div className="space-y-2">
-                  <Label htmlFor="customer-name">Nome</Label>
-                  <Input
-                    id="customer-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Digite seu nome"
-                    required={requireName}
-                    disabled={isCheckingCpf}
-                  />
-                </div>
-              )}
+          )}
 
-              {requirePhone && (
-                <div className="space-y-2">
-                  <Label htmlFor="customer-phone">Telefone</Label>
-                  <Input
-                    id="customer-phone"
-                    value={phone}
-                    onChange={handlePhoneChange}
-                    placeholder="(00) 00000-0000"
-                    required={requirePhone}
-                    disabled={isCheckingCpf}
-                    maxLength={15}
-                    className={phoneError ? "border-destructive" : ""}
-                  />
-                  {phoneError && (
-                    <p className="text-sm text-destructive">{phoneError}</p>
-                  )}
-                </div>
+          {/* Campo de nome - só para novos clientes */}
+          {!existingCustomer && requireName && (
+            <div className="space-y-2">
+              <Label htmlFor="customer-name">Nome</Label>
+              <Input
+                id="customer-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Digite seu nome"
+                required={requireName}
+                disabled={isCheckingCpf}
+              />
+            </div>
+          )}
+
+          {/* Campo de telefone - para novos clientes OU clientes existentes sem telefone */}
+          {((!existingCustomer && requirePhone) || (existingCustomer && !existingCustomer.phone && requirePhone)) && (
+            <div className="space-y-2">
+              <Label htmlFor="customer-phone">Telefone</Label>
+              <Input
+                id="customer-phone"
+                value={phone}
+                onChange={handlePhoneChange}
+                placeholder="(00) 00000-0000"
+                required={requirePhone}
+                disabled={isCheckingCpf}
+                maxLength={15}
+                className={phoneError ? "border-destructive" : ""}
+              />
+              {phoneError && (
+                <p className="text-sm text-destructive">{phoneError}</p>
               )}
-            </>
+              {existingCustomer && (
+                <p className="text-xs text-muted-foreground">
+                  Complete seu cadastro informando seu telefone
+                </p>
+              )}
+            </div>
           )}
 
           <Button 
