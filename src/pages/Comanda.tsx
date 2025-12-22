@@ -305,16 +305,21 @@ const Comanda = () => {
           console.log('📡 Status da subscrição Comanda (Bills):', status);
         });
       
-      // Configurar realtime para pedidos aceitos
+      // Configurar realtime para pedidos aceitos - filtrar por comanda_id se disponível
+      // Isso evita que eventos de outras comandas afetem esta
+      const ordersFilter = comandaId 
+        ? `comanda_id=eq.${comandaId}` 
+        : `table_id=eq.${tableData.id}`;
+      
       ordersChannel = supabase
-        .channel(`order-status-${tableData.id}`)
+        .channel(`order-status-${comandaId || tableData.id}`)
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
             table: 'orders',
-            filter: `table_id=eq.${tableData.id}`,
+            filter: ordersFilter,
           },
           (payload) => {
             console.log("Order atualizada em tempo real:", payload);
@@ -414,15 +419,28 @@ const Comanda = () => {
       
       setTableId(tableData.id);
 
-      // Buscar última conta paga para essa mesa e CPF
-      const { data: lastPaidBill } = await supabase
-        .from("bills")
-        .select("paid_at")
-        .eq("table_id", tableData.id)
-        .eq("status", "paid")
-        .order("paid_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Buscar comanda_id do cliente atual
+      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      
+      // Buscar última conta paga DESTA COMANDA específica (não da mesa toda)
+      // Isso evita que pagar uma comanda afete a visualização de outras comandas na mesma mesa
+      const lastPaidBillQuery = comandaId
+        ? supabase
+            .from("bills")
+            .select("paid_at")
+            .eq("comanda_id", comandaId)
+            .eq("status", "paid")
+            .order("paid_at", { ascending: false })
+            .limit(1)
+        : supabase
+            .from("bills")
+            .select("paid_at")
+            .eq("table_id", tableData.id)
+            .eq("status", "paid")
+            .order("paid_at", { ascending: false })
+            .limit(1);
+
+      const { data: lastPaidBill } = await lastPaidBillQuery.maybeSingle();
 
       // Construir query de pedidos
       let ordersQuery = supabase
@@ -438,13 +456,12 @@ const Comanda = () => {
         .eq("table_id", tableData.id)
         .eq("customer_cpf", customerCPF);
 
-      // Se existe conta paga, buscar apenas pedidos criados após ela
+      // Se existe conta paga para esta comanda, buscar apenas pedidos criados após ela
       if (lastPaidBill?.paid_at) {
         ordersQuery = ordersQuery.gt("created_at", lastPaidBill.paid_at);
       }
 
-      // Buscar comanda_id do cliente atual para filtrar bills
-      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      // Buscar pedidos e conta ativa em paralelo - bills filtrado por comanda_id (já declarado acima)
       
       // Buscar pedidos e conta ativa em paralelo - bills filtrado por comanda_id
       const billQuery = comandaId
