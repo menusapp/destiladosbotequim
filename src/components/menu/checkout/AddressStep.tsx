@@ -103,18 +103,44 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
         }
       }
       
-      // Fallback: sessionStorage
+      // Fallback: sessionStorage (incluindo telefone)
       if (restaurantSlug) {
         const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
         const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
+        const storedPhone = sessionStorage.getItem(`delivery-phone-${restaurantSlug}`);
         
         if (storedName) setCustomerName(storedName);
         if (storedCPF) setCustomerCPF(storedCPF);
+        if (storedPhone) setCustomerPhone(storedPhone);
       }
     };
     
     loadUserData();
   }, [restaurantSlug]);
+
+  // Quando CPF é preenchido, buscar dados do cliente na tabela customers
+  useEffect(() => {
+    const fetchCustomerData = async () => {
+      if (customerCPF.length !== 11 || !restaurantId) return;
+      
+      // Só buscar se telefone ainda não estiver preenchido
+      if (customerPhone) return;
+      
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("name, phone")
+        .eq("restaurant_id", restaurantId)
+        .eq("cpf", customerCPF)
+        .maybeSingle();
+      
+      if (customer) {
+        if (customer.name && !customerName) setCustomerName(customer.name);
+        if (customer.phone && !customerPhone) setCustomerPhone(customer.phone);
+      }
+    };
+    
+    fetchCustomerData();
+  }, [customerCPF, restaurantId]);
 
   // Validar CEP contra zonas de entrega (suporta CEP/bairro e raio)
   const validateAddress = useCallback(async (zipCode: string, neighborhood?: string, city?: string, state?: string) => {
@@ -280,6 +306,13 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
     // Validar zona de entrega antes de continuar
     if (deliveryZones.length > 0 && !matchedZone) {
       return;
+    }
+
+    // Salvar dados no sessionStorage para próximos pedidos
+    if (restaurantSlug) {
+      sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, customerName);
+      sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, customerCPF);
+      sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, customerPhone);
     }
 
     onContinue({
