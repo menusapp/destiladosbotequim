@@ -27,9 +27,50 @@ import {
   Banknote,
   QrCode,
   CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  UtensilsCrossed,
 } from "lucide-react";
 import { toast } from "sonner";
 import BalcaoTab from "./BalcaoTab";
+
+// Constantes de bandeiras - mesmo padrão do Comanda.tsx
+const CARD_BRANDS = [
+  { code: "visa", name: "Visa", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png" },
+  { code: "mastercard", name: "Mastercard", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/200px-Mastercard-logo.svg.png" },
+  { code: "elo", name: "Elo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Elo_logo.svg/200px-Elo_logo.svg.png" },
+  { code: "amex", name: "American Express", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/American_Express_logo_%282018%29.svg/200px-American_Express_logo_%282018%29.svg.png" },
+  { code: "hipercard", name: "Hipercard", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Hipercard_logo.svg/200px-Hipercard_logo.svg.png" },
+];
+
+const MEAL_VOUCHER_BRANDS = [
+  { code: "alelo", name: "Alelo", logo: "https://www.alelo.com.br/assets/img/brand/alelo.svg" },
+  { code: "sodexo", name: "Sodexo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Sodexo_logo.svg/200px-Sodexo_logo.svg.png" },
+  { code: "vr", name: "VR", logo: "https://www.vr.com.br/assets/img/logo-vr.svg" },
+  { code: "ticket", name: "Ticket", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Ticket_Restaurant_logo.svg/200px-Ticket_Restaurant_logo.svg.png" },
+  { code: "ben", name: "Ben Visa Vale", logo: "https://www.ben.com.br/assets/img/logo-ben.svg" },
+];
+
+const METHOD_ICONS: Record<string, any> = {
+  cash: Banknote,
+  pix: QrCode,
+  credit: CreditCard,
+  debit: CreditCard,
+  meal_voucher: UtensilsCrossed,
+};
+
+const getBrandInfo = (brandCode: string) => {
+  return CARD_BRANDS.find(b => b.code === brandCode) || 
+         MEAL_VOUCHER_BRANDS.find(b => b.code === brandCode);
+};
+
+interface PaymentMethod {
+  id: string;
+  name: string;
+  method_type: string;
+  is_active: boolean;
+  accepted_brands?: string[];
+}
 
 interface PDVTabProps {
   restaurantId: string;
@@ -66,7 +107,8 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
   // Split payment state
-  const [splitPayments, setSplitPayments] = useState<{method: string; amount: number; receivedAmount?: number}[]>([]);
+  const [splitPayments, setSplitPayments] = useState<{method: string; methodName: string; amount: number; receivedAmount?: number}[]>([]);
+  const [selectedPaymentType, setSelectedPaymentType] = useState<string>("");
   
   // Criar comanda manual state
   const [newComandaName, setNewComandaName] = useState("");
@@ -122,6 +164,21 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
         .order("table_number");
       if (error) throw error;
       return data as Table[];
+    },
+  });
+
+  // Fetch payment methods
+  const { data: paymentMethodsData } = useQuery({
+    queryKey: ["pdv-payment-methods", restaurantId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payment_methods")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data as PaymentMethod[];
     },
   });
 
@@ -207,13 +264,23 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
     return cashPayment?.receivedAmount ? cashPayment.receivedAmount - cashPayment.amount : 0;
   };
 
-  const addSplitPayment = (method: string) => {
+  const addSplitPayment = (paymentMethod: PaymentMethod) => {
     const remaining = getRemainingAmount();
     if (remaining <= 0) {
       toast.error("Valor total já atingido");
       return;
     }
-    setSplitPayments(prev => [...prev, { method, amount: remaining }]);
+    // Normalizar method_type para valores aceitos pela constraint: cash, pix, card
+    let normalizedMethod = "card";
+    if (paymentMethod.method_type === "cash") normalizedMethod = "cash";
+    else if (paymentMethod.method_type === "pix") normalizedMethod = "pix";
+    
+    setSplitPayments(prev => [...prev, { 
+      method: normalizedMethod, 
+      methodName: paymentMethod.name,
+      amount: remaining 
+    }]);
+    setSelectedPaymentType(paymentMethod.id);
   };
 
   const updateSplitPaymentAmount = (index: number, amount: number) => {
@@ -230,6 +297,7 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
 
   const openPayBillDialog = () => {
     setSplitPayments([]);
+    setSelectedPaymentType("");
     setShowPayBillDialog(true);
   };
 
@@ -835,19 +903,112 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
           <div className="space-y-4">
             <div>
               <p className="text-sm font-medium mb-2">Adicionar forma de pagamento:</p>
-              <div className="grid grid-cols-3 gap-2">
-                <Button variant="outline" size="sm" className="flex-col gap-1 h-16" onClick={() => addSplitPayment("cash")} disabled={getRemainingAmount() <= 0}>
-                  <Banknote className="w-5 h-5" />
-                  <span className="text-xs">Dinheiro</span>
-                </Button>
-                <Button variant="outline" size="sm" className="flex-col gap-1 h-16" onClick={() => addSplitPayment("card")} disabled={getRemainingAmount() <= 0}>
-                  <CreditCard className="w-5 h-5" />
-                  <span className="text-xs">Cartão</span>
-                </Button>
-                <Button variant="outline" size="sm" className="flex-col gap-1 h-16" onClick={() => addSplitPayment("pix")} disabled={getRemainingAmount() <= 0}>
-                  <QrCode className="w-5 h-5" />
-                  <span className="text-xs">PIX</span>
-                </Button>
+              <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                {paymentMethodsData && paymentMethodsData.length > 0 ? (
+                  paymentMethodsData.map((method) => {
+                    const Icon = METHOD_ICONS[method.method_type] || CreditCard;
+                    const brands = method.accepted_brands || [];
+                    const isSelected = selectedPaymentType === method.id;
+                    const maxPreviewBrands = 3;
+                    
+                    return (
+                      <div 
+                        key={method.id} 
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          isSelected ? "border-primary bg-primary/5 ring-2 ring-primary" : "hover:border-primary/50"
+                        } ${getRemainingAmount() <= 0 ? "opacity-50 pointer-events-none" : ""}`}
+                        onClick={() => addSplitPayment(method)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-4 w-4" />
+                            <span className="font-medium text-sm">{method.name}</span>
+                          </div>
+                          
+                          {/* Preview das bandeiras (P&B) quando NÃO selecionado */}
+                          {!isSelected && brands.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              {brands.slice(0, maxPreviewBrands).map((brandCode: string) => {
+                                const brand = getBrandInfo(brandCode);
+                                if (!brand) return null;
+                                return (
+                                  <img 
+                                    key={brandCode}
+                                    src={brand.logo} 
+                                    alt={brand.name}
+                                    className="h-3 w-auto grayscale opacity-50"
+                                  />
+                                );
+                              })}
+                              {brands.length > maxPreviewBrands && (
+                                <span className="text-xs text-muted-foreground">
+                                  +{brands.length - maxPreviewBrands}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          
+                          {brands.length > 0 && (
+                            isSelected ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                          )}
+                        </div>
+                        
+                        {/* Bandeiras coloridas quando SELECIONADO */}
+                        {isSelected && brands.length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {brands.map((brandCode: string) => {
+                                const brand = getBrandInfo(brandCode);
+                                if (!brand) return null;
+                                return (
+                                  <div key={brandCode} className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md">
+                                    <img src={brand.logo} alt={brand.name} className="h-4 w-auto" />
+                                    <span className="text-xs font-medium">{brand.name}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  /* Fallback se não houver métodos cadastrados */
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-col gap-1 h-16" 
+                      onClick={() => addSplitPayment({ id: 'cash', name: 'Dinheiro', method_type: 'cash', is_active: true })} 
+                      disabled={getRemainingAmount() <= 0}
+                    >
+                      <Banknote className="w-5 h-5" />
+                      <span className="text-xs">Dinheiro</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-col gap-1 h-16" 
+                      onClick={() => addSplitPayment({ id: 'card', name: 'Cartão', method_type: 'credit', is_active: true })} 
+                      disabled={getRemainingAmount() <= 0}
+                    >
+                      <CreditCard className="w-5 h-5" />
+                      <span className="text-xs">Cartão</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-col gap-1 h-16" 
+                      onClick={() => addSplitPayment({ id: 'pix', name: 'PIX', method_type: 'pix', is_active: true })} 
+                      disabled={getRemainingAmount() <= 0}
+                    >
+                      <QrCode className="w-5 h-5" />
+                      <span className="text-xs">PIX</span>
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -862,7 +1023,7 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
                         {payment.method === "card" && <CreditCard className="w-4 h-4" />}
                         {payment.method === "pix" && <QrCode className="w-4 h-4" />}
                         <span className="font-medium text-sm">
-                          {payment.method === "cash" ? "Dinheiro" : payment.method === "card" ? "Cartão" : "PIX"}
+                          {payment.methodName}
                         </span>
                       </div>
                       <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeSplitPayment(index)}>
