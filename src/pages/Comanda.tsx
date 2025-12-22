@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Receipt, Clock, CreditCard, Banknote, Smartphone, ShoppingCart, Utensils } from "lucide-react";
+import { ArrowLeft, Receipt, Clock, CreditCard, Banknote, Smartphone, ShoppingCart, Utensils, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -991,33 +991,82 @@ const Comanda = () => {
                     paymentMethods.map((method) => {
                       const Icon = METHOD_ICONS[method.method_type] || CreditCard;
                       const brands = method.accepted_brands || [];
+                      const isSelected = paymentMethod === method.name;
+                      const maxPreviewBrands = 3;
                       
                       return (
-                        <div key={method.id} className="flex flex-col gap-2 p-3 border rounded-lg">
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value={method.name} id={method.id} />
-                            <Label htmlFor={method.id} className="flex items-center gap-2 cursor-pointer flex-1">
-                              <Icon className="h-4 w-4" />
-                              {method.name}
-                            </Label>
+                        <div 
+                          key={method.id} 
+                          className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                            isSelected ? "border-primary bg-primary/5" : "hover:border-primary/50"
+                          }`}
+                          onClick={() => setPaymentMethod(method.name)}
+                        >
+                          <div className="flex items-center justify-between">
+                            {/* Lado esquerdo: Radio + Icon + Nome */}
+                            <div className="flex items-center space-x-2 min-w-0">
+                              <RadioGroupItem value={method.name} id={method.id} />
+                              <Label htmlFor={method.id} className="flex items-center gap-2 cursor-pointer">
+                                <Icon className="h-4 w-4 shrink-0" />
+                                <span className="truncate">{method.name}</span>
+                              </Label>
+                            </div>
+                            
+                            {/* Lado direito: Preview das bandeiras (P&B) quando NÃO selecionado */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {!isSelected && brands.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  {brands.slice(0, maxPreviewBrands).map((brandCode: string) => {
+                                    const brand = getBrandInfo(brandCode);
+                                    if (!brand) return null;
+                                    return (
+                                      <img 
+                                        key={brandCode}
+                                        src={brand.logo} 
+                                        alt={brand.name}
+                                        className="h-3 w-auto object-contain grayscale opacity-50"
+                                        title={brand.name}
+                                      />
+                                    );
+                                  })}
+                                  {brands.length > maxPreviewBrands && (
+                                    <span className="text-[10px] text-muted-foreground">+{brands.length - maxPreviewBrands}</span>
+                                  )}
+                                </div>
+                              )}
+                              {brands.length > 0 && (
+                                isSelected ? (
+                                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                )
+                              )}
+                            </div>
                           </div>
                           
-                          {/* Bandeiras aceitas - responsivas */}
-                          {brands.length > 0 && (
-                            <div className="flex flex-wrap gap-1 ml-6">
-                              {brands.map((brandCode: string) => {
-                                const brand = getBrandInfo(brandCode);
-                                if (!brand) return null;
-                                return (
-                                  <img 
-                                    key={brandCode}
-                                    src={brand.logo} 
-                                    alt={brand.name}
-                                    className="h-3 sm:h-4 w-auto object-contain"
-                                    title={brand.name}
-                                  />
-                                );
-                              })}
+                          {/* Gavetinha expandida: Bandeiras coloridas quando SELECIONADO */}
+                          {isSelected && brands.length > 0 && (
+                            <div className="mt-3 pt-3 border-t animate-in fade-in slide-in-from-top-1 duration-200">
+                              <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {brands.map((brandCode: string) => {
+                                  const brand = getBrandInfo(brandCode);
+                                  if (!brand) return null;
+                                  return (
+                                    <div 
+                                      key={brandCode} 
+                                      className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
+                                    >
+                                      <img 
+                                        src={brand.logo} 
+                                        alt={brand.name}
+                                        className="h-4 w-auto object-contain"
+                                      />
+                                      <span className="text-xs font-medium">{brand.name}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1026,21 +1075,21 @@ const Comanda = () => {
                   ) : (
                     // Fallback para caso não haja métodos cadastrados
                     <>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg">
                         <RadioGroupItem value="PIX" id="pix" />
                         <Label htmlFor="pix" className="flex items-center gap-2 cursor-pointer">
                           <Smartphone className="h-4 w-4" />
                           PIX
                         </Label>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg">
                         <RadioGroupItem value="Cartão" id="card" />
                         <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer">
                           <CreditCard className="h-4 w-4" />
                           Cartão
                         </Label>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 p-3 border rounded-lg">
                         <RadioGroupItem value="Dinheiro" id="cash" />
                         <Label htmlFor="cash" className="flex items-center gap-2 cursor-pointer">
                           <Banknote className="h-4 w-4" />
