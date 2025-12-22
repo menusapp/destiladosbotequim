@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -105,6 +106,9 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
   const [showPayBillDialog, setShowPayBillDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  // Seleção de comandas para pagamento
+  const [selectedComandas, setSelectedComandas] = useState<string[]>([]);
   
   // Split payment state
   const [splitPayments, setSplitPayments] = useState<{method: string; methodName: string; amount: number; receivedAmount?: number}[]>([]);
@@ -256,9 +260,43 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
     }, 0);
   };
 
+  // Calculate total for selected comandas only
+  const calculateSelectedTotal = () => {
+    if (selectedComandas.length === 0) return 0;
+    const selectedOrders = tableOrders.filter(o => selectedComandas.includes(o.comanda_id));
+    return selectedOrders.reduce((sum, order) => {
+      const orderSum = order.order_items.reduce((itemSum: number, item: any) => {
+        const extrasSum = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
+        return itemSum + (item.price_at_order + extrasSum) * item.quantity;
+      }, 0);
+      return sum + orderSum;
+    }, 0);
+  };
+
+  // Calculate total for a specific comanda
+  const calculateComandaTotal = (comandaId: string) => {
+    const comandaOrders = tableOrders.filter(o => o.comanda_id === comandaId);
+    return comandaOrders.reduce((sum, order) => {
+      const orderSum = order.order_items.reduce((itemSum: number, item: any) => {
+        const extrasSum = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
+        return itemSum + (item.price_at_order + extrasSum) * item.quantity;
+      }, 0);
+      return sum + orderSum;
+    }, 0);
+  };
+
+  // Toggle comanda selection
+  const toggleComandaSelection = (comandaId: string) => {
+    setSelectedComandas(prev => 
+      prev.includes(comandaId) 
+        ? prev.filter(id => id !== comandaId)
+        : [...prev, comandaId]
+    );
+  };
+
   // Split payment helpers
   const getTotalSplitPayments = () => splitPayments.reduce((sum, p) => sum + p.amount, 0);
-  const getRemainingAmount = () => calculateTableTotal() - getTotalSplitPayments();
+  const getRemainingAmount = () => calculateSelectedTotal() - getTotalSplitPayments();
   const getChangeAmount = () => {
     const cashPayment = splitPayments.find(p => p.method === "cash");
     return cashPayment?.receivedAmount ? cashPayment.receivedAmount - cashPayment.amount : 0;
@@ -292,18 +330,23 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
   };
 
   const openPayBillDialog = () => {
+    if (selectedComandas.length === 0) {
+      toast.error("Selecione pelo menos uma comanda para pagar");
+      return;
+    }
     setSplitPayments([]);
     setSelectedPaymentType("");
     setShowPayBillDialog(true);
   };
 
-  // Pay table bill mutation
+  // Pay selected comandas mutation
   const payBillMutation = useMutation({
     mutationFn: async () => {
       if (!selectedTable) throw new Error("Mesa não selecionada");
+      if (selectedComandas.length === 0) throw new Error("Selecione pelo menos uma comanda");
       if (splitPayments.length === 0) throw new Error("Adicione pelo menos uma forma de pagamento");
       
-      const total = calculateTableTotal();
+      const total = calculateSelectedTotal();
       const totalPaid = getTotalSplitPayments();
       
       if (totalPaid < total) {
@@ -316,13 +359,15 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
         throw new Error("Valor recebido em dinheiro deve ser maior ou igual ao valor pago");
       }
 
-      const paymentMethodString = splitPayments.length === 1 ? splitPayments[0].method : "cash";
+      const paymentMethodString = splitPayments.length === 1 ? splitPayments[0].method : "mixed";
 
+      // Criar bill para cada comanda selecionada ou uma única bill
       const { data: existingBill } = await supabase
         .from("bills")
         .select("id")
         .eq("table_id", selectedTable.id)
-        .in("status", ["pending", "on_the_way"])
+        .in("comanda_id", selectedComandas)
+        .in("status", ["pending", "on_the_way", "requested"])
         .maybeSingle();
 
       if (existingBill) {
@@ -338,10 +383,12 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
 
         if (updateBillError) throw updateBillError;
       } else {
+        // Criar nova bill
         const { error: billError } = await supabase
           .from("bills")
           .insert({
             table_id: selectedTable.id,
+            comanda_id: selectedComandas[0], // Primary comanda
             subtotal: total,
             service_fee: 0,
             total_amount: total,
@@ -354,31 +401,57 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
         if (billError) throw billError;
       }
 
-      for (const order of tableOrders) {
+      // Atualizar APENAS pedidos das comandas selecionadas
+      const selectedOrders = tableOrders.filter(o => selectedComandas.includes(o.comanda_id));
+      for (const order of selectedOrders) {
         await supabase.from("orders").update({ status: "delivered" }).eq("id", order.id);
       }
 
+      // Fechar APENAS as comandas selecionadas
       await supabase
         .from("comandas")
         .update({ status: "closed", closed_at: new Date().toISOString() })
+        .in("id", selectedComandas);
+
+      // Verificar se ainda há comandas ativas restantes
+      const { count: remainingComandas } = await supabase
+        .from("comandas")
+        .select("*", { count: "exact", head: true })
         .eq("table_id", selectedTable.id)
         .eq("status", "active");
 
-      await supabase
-        .from("tables")
-        .update({ is_occupied: false, occupied_at: null, occupied_by: null })
-        .eq("id", selectedTable.id);
+      // Só libera mesa se NÃO há mais comandas ativas
+      if (remainingComandas === 0) {
+        await supabase
+          .from("tables")
+          .update({ is_occupied: false, occupied_at: null, occupied_by: null })
+          .eq("id", selectedTable.id);
+      }
 
       return true;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["pdv-tables"] });
       queryClient.invalidateQueries({ queryKey: ["local-orders"] });
-      toast.success("Conta paga! Mesa liberada.");
-      setShowPayBillDialog(false);
-      setShowTableDetail(false);
-      setSelectedTable(null);
-      setSplitPayments([]);
+      
+      const remainingCount = tableComandas.length - selectedComandas.length;
+      if (remainingCount > 0) {
+        toast.success(`Comanda(s) paga(s)! Ainda há ${remainingCount} comanda(s) ativa(s) na mesa.`);
+        // Refresh table details to show remaining comandas
+        if (selectedTable) {
+          await fetchTableDetails(selectedTable);
+        }
+        setShowPayBillDialog(false);
+        setSelectedComandas([]);
+        setSplitPayments([]);
+      } else {
+        toast.success("Conta paga! Mesa liberada.");
+        setShowPayBillDialog(false);
+        setShowTableDetail(false);
+        setSelectedTable(null);
+        setSelectedComandas([]);
+        setSplitPayments([]);
+      }
     },
     onError: (error: any) => {
       toast.error(error.message || "Erro ao pagar conta");
@@ -653,7 +726,12 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
       </Tabs>
 
       {/* Dialog Detalhes da Mesa */}
-      <Dialog open={showTableDetail} onOpenChange={setShowTableDetail}>
+      <Dialog open={showTableDetail} onOpenChange={(open) => {
+        setShowTableDetail(open);
+        if (!open) {
+          setSelectedComandas([]);
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -668,17 +746,63 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
           {selectedTable?.is_occupied ? (
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold mb-2">Comandas Ativas</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold">Comandas Ativas</h3>
+                  {tableComandas.length > 1 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        if (selectedComandas.length === tableComandas.length) {
+                          setSelectedComandas([]);
+                        } else {
+                          setSelectedComandas(tableComandas.map(c => c.id));
+                        }
+                      }}
+                    >
+                      {selectedComandas.length === tableComandas.length ? "Desmarcar Todas" : "Selecionar Todas"}
+                    </Button>
+                  )}
+                </div>
                 {tableComandas.length === 0 ? (
                   <p className="text-muted-foreground text-sm">Nenhuma comanda ativa</p>
                 ) : (
                   <div className="space-y-2">
-                    {tableComandas.map((comanda) => (
-                      <div key={comanda.id} className="p-3 bg-muted rounded-lg">
-                        <p className="font-medium">{comanda.customer_name}</p>
-                        <p className="text-sm text-muted-foreground">CPF: {comanda.customer_cpf}</p>
-                      </div>
-                    ))}
+                    {tableComandas.map((comanda) => {
+                      const comandaTotal = calculateComandaTotal(comanda.id);
+                      const isSelected = selectedComandas.includes(comanda.id);
+                      const comandaOrders = tableOrders.filter(o => o.comanda_id === comanda.id);
+                      
+                      return (
+                        <div 
+                          key={comanda.id} 
+                          className={`p-3 rounded-lg cursor-pointer border-2 transition-all ${
+                            isSelected 
+                              ? "border-primary bg-primary/10" 
+                              : "border-muted bg-muted hover:border-muted-foreground/50"
+                          }`}
+                          onClick={() => toggleComandaSelection(comanda.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Checkbox 
+                              checked={isSelected} 
+                              onCheckedChange={() => toggleComandaSelection(comanda.id)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div className="flex-1">
+                              <p className="font-medium">{comanda.customer_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                CPF: ***.***.{comanda.customer_cpf.slice(-6,-2)}-{comanda.customer_cpf.slice(-2)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground">{comandaOrders.length} pedido(s)</p>
+                              <p className="font-bold text-primary">R$ {comandaTotal.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -689,32 +813,44 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
                   <p className="text-muted-foreground text-sm">Nenhum pedido</p>
                 ) : (
                   <div className="space-y-2">
-                    {tableOrders.map((order) => (
-                      <Card key={order.id}>
-                        <CardContent className="p-3">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-medium text-sm">#{order.id.slice(0, 8)}</span>
-                            <Badge variant="secondary">{order.status}</Badge>
-                          </div>
-                          <div className="text-sm space-y-1">
-                            {order.order_items.map((item: any) => (
-                              <p key={item.id}>
-                                {item.quantity}x {item.products?.name} - R$ {(item.price_at_order * item.quantity).toFixed(2)}
-                              </p>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                    {tableOrders.map((order) => {
+                      const comanda = tableComandas.find(c => c.id === order.comanda_id);
+                      return (
+                        <Card key={order.id} className={selectedComandas.includes(order.comanda_id) ? "ring-2 ring-primary" : ""}>
+                          <CardContent className="p-3">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <span className="font-medium text-sm">#{order.id.slice(0, 8)}</span>
+                                {comanda && <span className="text-xs text-muted-foreground ml-2">({comanda.customer_name})</span>}
+                              </div>
+                              <Badge variant="secondary">{order.status}</Badge>
+                            </div>
+                            <div className="text-sm space-y-1">
+                              {order.order_items.map((item: any) => (
+                                <p key={item.id}>
+                                  {item.quantity}x {item.products?.name} - R$ {(item.price_at_order * item.quantity).toFixed(2)}
+                                </p>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
               </div>
 
               <div className="border-t pt-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-lg">Total da Mesa</span>
-                  <span className="text-2xl font-bold text-primary">R$ {calculateTableTotal().toFixed(2)}</span>
+                <div className="flex justify-between items-center text-muted-foreground">
+                  <span>Total da Mesa</span>
+                  <span>R$ {calculateTableTotal().toFixed(2)}</span>
                 </div>
+                {selectedComandas.length > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-lg">Total Selecionado ({selectedComandas.length})</span>
+                    <span className="text-2xl font-bold text-primary">R$ {calculateSelectedTotal().toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
@@ -727,9 +863,12 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
                     <Plus className="w-4 h-4 mr-2" />
                     Adicionar Produtos
                   </Button>
-                  <Button disabled={tableOrders.length === 0} onClick={openPayBillDialog}>
+                  <Button 
+                    disabled={selectedComandas.length === 0} 
+                    onClick={openPayBillDialog}
+                  >
                     <DollarSign className="w-4 h-4 mr-2" />
-                    Pagar Conta
+                    Pagar Selecionadas
                   </Button>
                 </div>
               </div>
@@ -894,7 +1033,12 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Pagar Conta - Mesa {selectedTable?.table_number}</DialogTitle>
-            <DialogDescription>Total: R$ {calculateTableTotal().toFixed(2)}</DialogDescription>
+            <DialogDescription>
+              {selectedComandas.length === 1 
+                ? `Pagando 1 comanda - Total: R$ ${calculateSelectedTotal().toFixed(2)}`
+                : `Pagando ${selectedComandas.length} comandas - Total: R$ ${calculateSelectedTotal().toFixed(2)}`
+              }
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -1067,8 +1211,8 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
 
             <div className="border-t pt-3 space-y-1">
               <div className="flex justify-between text-sm">
-                <span>Total da conta:</span>
-                <span className="font-medium">R$ {calculateTableTotal().toFixed(2)}</span>
+                <span>Total selecionado:</span>
+                <span className="font-medium">R$ {calculateSelectedTotal().toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>Total pago:</span>
@@ -1091,9 +1235,9 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
             <div className="bg-amber-500/10 p-3 rounded-lg text-sm text-amber-800 dark:text-amber-200">
               <p className="font-medium">Ao confirmar:</p>
               <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
-                <li>Pedidos marcados como entregues</li>
-                <li>Comandas fechadas</li>
-                <li>Mesa liberada</li>
+                <li>Pedidos das comandas selecionadas marcados como entregues</li>
+                <li>{selectedComandas.length} comanda(s) fechada(s)</li>
+                <li>{selectedComandas.length === tableComandas.length ? "Mesa liberada" : "Mesa continua ocupada (há comandas restantes)"}</li>
               </ul>
             </div>
 
