@@ -119,16 +119,19 @@ export default function DRETab({ restaurantId }: DRETabProps) {
         .gte("paid_at", startDate.toISOString())
         .lte("paid_at", endDate.toISOString());
 
-      // Buscar IDs dos pedidos das bills pagas
+      // Buscar IDs dos pedidos das bills pagas - filtrar por data
       let localOrderIds: string[] = [];
       if (paidBills && paidBills.length > 0) {
         const tableIds = paidBills.map(b => b.table_id);
         
+        // Buscar apenas pedidos locais do período selecionado
         const { data: localOrders } = await supabase
           .from("orders")
           .select("id")
           .in("table_id", tableIds)
-          .eq("order_type", "local");
+          .eq("order_type", "local")
+          .gte("created_at", startDate.toISOString())
+          .lte("created_at", endDate.toISOString());
         
         localOrderIds = (localOrders || []).map(o => o.id);
       }
