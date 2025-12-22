@@ -41,16 +41,56 @@ const getDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number): 
   return R * c;
 };
 
-// Verificar se cidade do cliente corresponde à zona de raio (comparação por nome)
-const cityMatchesRadiusZone = (customerCity: string, zoneName: string): boolean => {
-  if (!customerCity || !zoneName) return false;
+// Cache de coordenadas por CEP (persiste durante a sessão)
+const cepCoordinatesCache: Map<string, { lat: number; lng: number } | null> = new Map();
+
+// Geocodificar CEP usando BrasilAPI (retorna coordenadas diretamente)
+const getCoordinatesFromBrasilAPI = async (cep: string): Promise<{ lat: number; lng: number } | null> => {
+  const cleanCep = cep.replace(/\D/g, "");
   
-  const normalizedCity = customerCity.toLowerCase().trim();
-  const normalizedZone = zoneName.toLowerCase().trim();
+  if (cleanCep.length !== 8) return null;
   
-  // Verificar se o nome da cidade está contido no nome da zona ou vice-versa
-  // Ex: "Duartina" matches "Duartina Cidade" ou "Zona Duartina"
-  return normalizedZone.includes(normalizedCity) || normalizedCity.includes(normalizedZone.split(' ')[0]);
+  // Verificar cache primeiro
+  if (cepCoordinatesCache.has(cleanCep)) {
+    return cepCoordinatesCache.get(cleanCep) || null;
+  }
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
+    
+    const response = await fetch(
+      `https://brasilapi.com.br/api/cep/v2/${cleanCep}`,
+      { signal: controller.signal }
+    );
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      cepCoordinatesCache.set(cleanCep, null);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    // BrasilAPI v2 retorna coordenadas em location.coordinates
+    if (data.location?.coordinates?.latitude && data.location?.coordinates?.longitude) {
+      const coords = {
+        lat: parseFloat(data.location.coordinates.latitude),
+        lng: parseFloat(data.location.coordinates.longitude)
+      };
+      cepCoordinatesCache.set(cleanCep, coords);
+      console.log(`BrasilAPI: CEP ${cleanCep} -> coords:`, coords);
+      return coords;
+    }
+    
+    cepCoordinatesCache.set(cleanCep, null);
+    console.log(`BrasilAPI: CEP ${cleanCep} sem coordenadas`);
+    return null;
+  } catch (error) {
+    console.log("BrasilAPI timeout/error:", error);
+    return null;
+  }
 };
 
 export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }: AddressStepProps) => {
@@ -162,16 +202,37 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
         return true;
       }
       
-      // Verificar zonas do tipo raio usando comparação de cidade (instantâneo)
+      // Verificar zonas do tipo raio usando BrasilAPI + cálculo de distância real
       const radiusZones = deliveryZones.filter(z => z.zone_type === "radius");
       
-      if (radiusZones.length > 0 && city) {
-        for (const zone of radiusZones) {
-          if (cityMatchesRadiusZone(city, zone.zone_name)) {
-            setMatchedZone(zone);
-            setZoneError(null);
-            return true;
+      if (radiusZones.length > 0) {
+        // Buscar coordenadas do CEP do cliente via BrasilAPI
+        const customerCoords = await getCoordinatesFromBrasilAPI(cleanZip);
+        
+        if (customerCoords) {
+          for (const zone of radiusZones) {
+            if (zone.center_lat && zone.center_lng && zone.radius_km) {
+              const distance = getDistanceKm(
+                customerCoords.lat,
+                customerCoords.lng,
+                zone.center_lat,
+                zone.center_lng
+              );
+              
+              console.log(`Zona "${zone.zone_name}": distância = ${distance.toFixed(2)}km, raio = ${zone.radius_km}km`);
+              
+              if (distance <= zone.radius_km) {
+                setMatchedZone(zone);
+                setZoneError(null);
+                return true;
+              }
+            }
           }
+          
+          // Coordenadas encontradas mas fora de todas as zonas de raio
+          console.log("CEP fora de todas as zonas de raio configuradas");
+        } else {
+          console.log("BrasilAPI não retornou coordenadas para este CEP");
         }
       }
       
