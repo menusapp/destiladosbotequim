@@ -103,6 +103,7 @@ export const PaymentStep = ({
           value: m.id,
           methodType: m.method_type,
           label: m.name,
+          methodName: m.name, // Guardar o nome para salvar no banco
           icon: METHOD_ICONS[m.method_type] || CreditCard,
           brands: m.accepted_brands || [],
         }));
@@ -191,9 +192,12 @@ export const PaymentStep = ({
       sessionStorage.setItem("customer_phone", customerPhone);
     }
 
+    // Passar o NOME do método de pagamento para salvar corretamente no banco
+    const methodName = (selectedMethod as any)?.methodName || selectedMethod?.label || paymentMethod;
+    
     onContinue({
       type: paymentType,
-      method: paymentMethod,
+      method: methodName,
       changeFor: methodType === "cash" ? changeFor : null,
     });
   };

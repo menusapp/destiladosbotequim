@@ -38,7 +38,7 @@ import {
   TrendingUp,
   MoreVertical,
   QrCode,
-  Edit,
+  Link as LinkIcon,
   Trash2,
   XCircle
 } from "lucide-react";
@@ -153,6 +153,24 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
     toast.success("Mesa excluída!");
     fetchTables();
+  };
+
+  const copyTableLink = async (table: Table, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const link = `${window.location.origin}/menu/${restaurantSlug}/${table.table_number}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success(`Link da Mesa ${table.table_number} copiado!`);
+    } catch {
+      // Fallback para navegadores que não suportam clipboard API
+      const textArea = document.createElement("textarea");
+      textArea.value = link;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      toast.success(`Link da Mesa ${table.table_number} copiado!`);
+    }
   };
 
   const downloadQRCode = async (table: Table) => {
@@ -404,12 +422,9 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                       <QrCode className="w-4 h-4 mr-2" />
                       Baixar QR Code
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation();
-                      // TODO: Editar número da mesa
-                    }}>
-                      <Edit className="w-4 h-4 mr-2" />
-                      Editar
+                    <DropdownMenuItem onClick={(e) => copyTableLink(table, e)}>
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                      Copiar Link
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-orange-600"
