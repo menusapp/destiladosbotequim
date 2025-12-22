@@ -32,6 +32,8 @@ interface CheckoutDrawerProps {
   restaurantSlug?: string;
 }
 
+const primaryColorFromRestaurant = (restaurant: any) => restaurant?.primary_color || "#fe9516";
+
 export const CheckoutDrawer = ({
   open,
   onClose,
@@ -326,6 +328,7 @@ export const CheckoutDrawer = ({
             }}
             restaurantSlug={restaurantSlug}
             restaurantId={restaurant.id}
+            primaryColor={primaryColorFromRestaurant(restaurant)}
           />
         );
       case "payment":
@@ -344,6 +347,7 @@ export const CheckoutDrawer = ({
             requireCustomerInfo={deliveryType === "pickup"}
             orderTotal={orderTotal}
             restaurantId={restaurant.id}
+            primaryColor={primaryColorFromRestaurant(restaurant)}
             onContinue={(data) => {
               setPaymentData(data);
               

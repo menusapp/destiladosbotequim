@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Printer, ShoppingCart, Percent } from "lucide-react";
+import { Printer, ShoppingCart, Percent, Banknote, CreditCard, Smartphone, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -23,12 +23,56 @@ interface Order {
   order_items: OrderItem[];
 }
 
+interface PaymentMethod {
+  id: string;
+  method_type: string;
+  name: string;
+  is_active: boolean;
+  accepted_brands: string[] | null;
+}
+
 interface PaymentConfirmationModalProps {
   order: Order;
   restaurantId: string;
   onClose: () => void;
   onConfirm: () => void;
 }
+
+const METHOD_ICONS: Record<string, any> = {
+  cash: Banknote,
+  debit: CreditCard,
+  credit: CreditCard,
+  pix: Smartphone,
+  voucher: Utensils,
+  meal_voucher: Utensils,
+};
+
+// Bandeiras de cartão de crédito/débito
+const CARD_BRANDS = [
+  { code: "visa", name: "Visa", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png" },
+  { code: "mastercard", name: "Mastercard", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/200px-Mastercard-logo.svg.png" },
+  { code: "elo", name: "Elo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/ELO_logo.svg/200px-ELO_logo.svg.png" },
+  { code: "amex", name: "American Express", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/American_Express_logo_%282018%29.svg/200px-American_Express_logo_%282018%29.svg.png" },
+  { code: "hipercard", name: "Hipercard", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Hipercard_logo.svg/200px-Hipercard_logo.svg.png" },
+  { code: "diners", name: "Diners Club", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Diners_Club_Logo3.svg/200px-Diners_Club_Logo3.svg.png" },
+];
+
+// Bandeiras de vale-refeição
+const MEAL_VOUCHER_BRANDS = [
+  { code: "alelo", name: "Alelo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Alelo_logo.svg/200px-Alelo_logo.svg.png" },
+  { code: "sodexo", name: "Sodexo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sodexo_logo.svg/200px-Sodexo_logo.svg.png" },
+  { code: "ticket", name: "Ticket", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Edenred_logo.svg/200px-Edenred_logo.svg.png" },
+  { code: "vr", name: "VR", logo: "https://www.vr.com.br/assets/img/logo.svg" },
+  { code: "pluxee", name: "Pluxee", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sodexo_logo.svg/200px-Sodexo_logo.svg.png" },
+  { code: "ifood", name: "iFood Benefícios", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/IFood_logo.svg/200px-IFood_logo.svg.png" },
+];
+
+const DEFAULT_METHODS: PaymentMethod[] = [
+  { id: "cash", method_type: "cash", name: "Dinheiro", is_active: true, accepted_brands: null },
+  { id: "pix", method_type: "pix", name: "PIX", is_active: true, accepted_brands: null },
+  { id: "credit", method_type: "credit", name: "Cartão de Crédito", is_active: true, accepted_brands: null },
+  { id: "debit", method_type: "debit", name: "Cartão de Débito", is_active: true, accepted_brands: null },
+];
 
 export const PaymentConfirmationModal = ({
   order,
@@ -39,6 +83,30 @@ export const PaymentConfirmationModal = ({
   const [serviceFee, setServiceFee] = useState(10);
   const [selectedPayments, setSelectedPayments] = useState<Array<{ method: string; amount: number }>>([]);
   const [currentAmount, setCurrentAmount] = useState("");
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(DEFAULT_METHODS);
+  const [loading, setLoading] = useState(true);
+
+  const getBrandInfo = (brandCode: string) => {
+    const allBrands = [...CARD_BRANDS, ...MEAL_VOUCHER_BRANDS];
+    return allBrands.find(b => b.code === brandCode);
+  };
+
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      const { data, error } = await supabase
+        .from("payment_methods")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true);
+
+      if (!error && data && data.length > 0) {
+        setPaymentMethods(data);
+      }
+      setLoading(false);
+    };
+
+    fetchPaymentMethods();
+  }, [restaurantId]);
 
   const calculateSubtotal = () => {
     return order.order_items.reduce((total, item) => {
@@ -57,7 +125,7 @@ export const PaymentConfirmationModal = ({
   const paidAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = total - paidAmount;
 
-  const addPayment = (method: string) => {
+  const addPayment = (methodName: string) => {
     const amount = parseFloat(currentAmount);
     if (isNaN(amount) || amount <= 0) {
       toast.error("Digite um valor válido");
@@ -68,7 +136,7 @@ export const PaymentConfirmationModal = ({
       return;
     }
 
-    setSelectedPayments([...selectedPayments, { method, amount }]);
+    setSelectedPayments([...selectedPayments, { method: methodName, amount }]);
     setCurrentAmount("");
   };
 
@@ -80,7 +148,7 @@ export const PaymentConfirmationModal = ({
 
     try {
       // Update order with payment info
-      const primaryPayment = selectedPayments[0]?.method || "cash";
+      const primaryPayment = selectedPayments[0]?.method || "Dinheiro";
       const { error } = await supabase
         .from("orders")
         .update({ payment_type: primaryPayment })
@@ -98,7 +166,7 @@ export const PaymentConfirmationModal = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">Finalizar atendimento</DialogTitle>
         </DialogHeader>
@@ -167,40 +235,57 @@ export const PaymentConfirmationModal = ({
               />
             </div>
 
-            <div className="grid grid-cols-4 gap-2">
-              <Button
-                variant="outline"
-                onClick={() => addPayment("cash")}
-                className="h-20 flex-col"
-              >
-                💵
-                <span className="text-xs mt-1">Dinheiro</span>
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => addPayment("pix")}
-                className="h-20 flex-col"
-              >
-                📱
-                <span className="text-xs mt-1">PIX</span>
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => addPayment("credit_card")}
-                className="h-20 flex-col"
-              >
-                💳
-                <span className="text-xs mt-1">Crédito</span>
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => addPayment("debit_card")}
-                className="h-20 flex-col"
-              >
-                💳
-                <span className="text-xs mt-1">Débito</span>
-              </Button>
-            </div>
+            {loading ? (
+              <div className="text-center py-4 text-muted-foreground">Carregando...</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {paymentMethods.map((method) => {
+                  const Icon = METHOD_ICONS[method.method_type] || CreditCard;
+                  const hasBrands = method.accepted_brands && method.accepted_brands.length > 0;
+                  
+                  return (
+                    <Button
+                      key={method.id}
+                      variant="outline"
+                      onClick={() => addPayment(method.name)}
+                      className="h-auto p-3 flex-col items-start text-left"
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        <span className="text-xs font-medium truncate">{method.name}</span>
+                      </div>
+                      
+                      {/* Bandeiras aceitas - responsivas */}
+                      {hasBrands && (
+                        <div className="flex flex-wrap gap-1 mt-2 w-full">
+                          {method.accepted_brands!.slice(0, 4).map((brandCode) => {
+                            const brand = getBrandInfo(brandCode);
+                            if (!brand) return null;
+                            return (
+                              <img 
+                                key={brandCode}
+                                src={brand.logo} 
+                                alt={brand.name}
+                                className="h-3 sm:h-4 w-auto object-contain"
+                                title={brand.name}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            );
+                          })}
+                          {method.accepted_brands!.length > 4 && (
+                            <span className="text-[10px] text-muted-foreground">
+                              +{method.accepted_brands!.length - 4}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
 
             {selectedPayments.length > 0 && (
               <div className="border-t pt-3 space-y-2">

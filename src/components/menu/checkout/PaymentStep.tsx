@@ -22,6 +22,7 @@ interface PaymentStepProps {
   requireCustomerInfo?: boolean;
   orderTotal?: number;
   restaurantId?: string;
+  primaryColor?: string;
 }
 
 const METHOD_ICONS: Record<string, any> = {
@@ -65,7 +66,8 @@ export const PaymentStep = ({
   onContinue, 
   requireCustomerInfo, 
   orderTotal = 0,
-  restaurantId 
+  restaurantId,
+  primaryColor
 }: PaymentStepProps) => {
   const [paymentType, setPaymentType] = useState<"delivery" | "online">("delivery");
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -395,6 +397,7 @@ export const PaymentStep = ({
           onClick={handleContinue}
           disabled={!paymentMethod || availableMethods.length === 0}
           className="flex-1"
+          style={primaryColor ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
         >
           Continuar
         </Button>

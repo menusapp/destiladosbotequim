@@ -27,10 +27,11 @@ interface AddressStepProps {
   onContinue: (data: any) => void;
   restaurantSlug?: string;
   restaurantId?: string;
+  primaryColor?: string;
 }
 
 
-export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }: AddressStepProps) => {
+export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, primaryColor }: AddressStepProps) => {
   const [customerName, setCustomerName] = useState("");
   const [customerCPF, setCustomerCPF] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -616,6 +617,7 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
           onClick={handleContinue} 
           className="flex-1"
           disabled={(deliveryZones.length > 0 && !matchedZone) || validatingZone}
+          style={primaryColor ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
         >
           {validatingZone ? "Verificando..." : "Continuar"}
         </Button>

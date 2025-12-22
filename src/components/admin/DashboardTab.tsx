@@ -81,6 +81,9 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       .from("orders")
       .select(`
         id,
+        delivery_fee,
+        coupon_discount,
+        loyalty_points_used,
         order_items (
           quantity,
           price_at_order,
@@ -93,7 +96,7 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
       .gte("updated_at", startDate.toISOString())
       .lte("updated_at", endDate.toISOString());
 
-      // Calcular total dos pedidos delivery
+      // Calcular total dos pedidos delivery incluindo taxas
       let deliveryTotal = 0;
       deliveryOrders?.forEach((order: any) => {
         let orderSubtotal = 0;
@@ -105,20 +108,14 @@ export default function DashboardTab({ restaurantId }: DashboardTabProps) {
           );
           orderSubtotal += itemTotal + extrasTotal;
         });
-        deliveryTotal += orderSubtotal;
+        // Adicionar taxa de entrega e descontar cupom/fidelidade
+        const deliveryFee = Number(order.delivery_fee || 0);
+        const couponDiscount = Number(order.coupon_discount || 0);
+        const loyaltyDiscount = Number(order.loyalty_points_used || 0) * 0.01;
+        deliveryTotal += orderSubtotal + deliveryFee - couponDiscount - loyaltyDiscount;
       });
 
-      // Buscar configuração de taxa de serviço para pedidos delivery
-      const { data: restaurant } = await supabase
-        .from("restaurants")
-        .select("service_fee_enabled, service_fee_percentage")
-        .eq("id", restaurantId)
-        .single();
-
-      // Aplicar taxa de serviço nos pedidos delivery
-      if (restaurant?.service_fee_enabled) {
-        deliveryTotal += deliveryTotal * (Number(restaurant.service_fee_percentage) / 100);
-      }
+      // Não aplicar taxa de serviço novamente, já está incluída no checkout
 
       // Buscar pedidos de balcão finalizados do dia
       const { data: counterOrders } = await supabase
