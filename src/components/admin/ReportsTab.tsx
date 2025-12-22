@@ -146,11 +146,14 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         billsCount = paidBills.length;
         
         const tableIds = paidBills.map(b => b.table_id);
+        // Buscar apenas pedidos locais do período selecionado
         const { data: localOrders } = await supabase
           .from("orders")
           .select("id")
           .in("table_id", tableIds)
-          .eq("order_type", "local");
+          .eq("order_type", "local")
+          .gte("created_at", startDate.toISOString())
+          .lte("created_at", endDate.toISOString());
         
         localOrderIds = (localOrders || []).map(o => o.id);
       }
@@ -237,53 +240,70 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       // Buscar formas de pagamento ativas e calcular receita por método
       const { data: paymentMethods } = await supabase
         .from("payment_methods")
-        .select("name, method_type")
+        .select("id, name, method_type")
         .eq("restaurant_id", restaurantId)
         .eq("is_active", true);
 
       // Agregar valores por forma de pagamento
       const paymentTotals: Record<string, { method_type: string; total: number }> = {};
 
+      // Criar mapeamento de method_type/id/nome para o nome de exibição
+      const methodToName: Record<string, string> = {};
+      
       // Inicializar todas as formas de pagamento ativas com 0
       paymentMethods?.forEach(pm => {
         paymentTotals[pm.name] = { method_type: pm.method_type, total: 0 };
+        // Mapear por nome, method_type e id
+        methodToName[pm.name] = pm.name;
+        methodToName[pm.method_type] = pm.name;
+        methodToName[pm.id] = pm.name;
       });
+      
+      // Fallbacks para valores legados do banco
+      if (!methodToName["cash"]) methodToName["cash"] = "Dinheiro";
+      if (!methodToName["pix"]) methodToName["pix"] = "PIX";
+      if (!methodToName["card"]) methodToName["card"] = "Cartão";
+      if (!methodToName["credit"]) methodToName["credit"] = "Crédito";
+      if (!methodToName["debit"]) methodToName["debit"] = "Débito";
+
+      // Função para resolver nome e somar valor
+      const addToPaymentTotal = (method: string | null | undefined, amount: number) => {
+        if (!method) return;
+        const resolvedName = methodToName[method] || method;
+        if (paymentTotals[resolvedName]) {
+          paymentTotals[resolvedName].total += amount;
+        } else {
+          // Criar entrada para métodos não mapeados
+          paymentTotals[resolvedName] = { method_type: "other", total: amount };
+        }
+      };
 
       // Somar bills por payment_method
       paidBills?.forEach((bill: any) => {
-        const method = bill.payment_method;
-        if (method && paymentTotals[method]) {
-          paymentTotals[method].total += Number(bill.total_amount);
-        }
+        addToPaymentTotal(bill.payment_method, Number(bill.total_amount));
       });
 
       // Somar counter_orders por payment_method
       counterOrders?.forEach((order: any) => {
-        const method = order.payment_method;
-        if (method && paymentTotals[method]) {
-          paymentTotals[method].total += Number(order.total_amount);
-        }
+        addToPaymentTotal(order.payment_method, Number(order.total_amount));
       });
 
-      // Somar delivery orders por payment_type (já temos os dados na query principal)
+      // Somar delivery orders por payment_type
       deliveryOrders?.forEach((order: any) => {
-        const method = order.payment_type;
-        if (method && paymentTotals[method]) {
-          let orderTotal = 0;
-          order.order_items?.forEach((item: any) => {
-            const itemTotal = item.price_at_order * item.quantity;
-            const extrasTotal = (item.order_item_extras || []).reduce(
-              (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
-              0
-            );
-            orderTotal += itemTotal + extrasTotal;
-          });
-          // Adicionar taxa de entrega e descontar cupom
-          orderTotal += Number(order.delivery_fee || 0);
-          orderTotal -= Number(order.coupon_discount || 0);
-          orderTotal -= Number(order.loyalty_points_used || 0) * 0.01;
-          paymentTotals[method].total += orderTotal;
-        }
+        let orderTotal = 0;
+        order.order_items?.forEach((item: any) => {
+          const itemTotal = item.price_at_order * item.quantity;
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
+            0
+          );
+          orderTotal += itemTotal + extrasTotal;
+        });
+        // Adicionar taxa de entrega e descontar cupom
+        orderTotal += Number(order.delivery_fee || 0);
+        orderTotal -= Number(order.coupon_discount || 0);
+        orderTotal -= Number(order.loyalty_points_used || 0) * 0.01;
+        addToPaymentTotal(order.payment_type, orderTotal);
       });
 
       const paymentsByMethod: PaymentMethodSummary[] = Object.entries(paymentTotals).map(([name, data]) => ({
