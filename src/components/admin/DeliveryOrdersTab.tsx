@@ -37,6 +37,9 @@ interface Order {
   notes: string | null;
   created_at: string | null;
   order_type: string | null;
+  delivery_fee?: number | null;
+  coupon_discount?: number | null;
+  loyalty_points_used?: number | null;
   order_items: Array<{
     id: string;
     quantity: number;
@@ -95,6 +98,9 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
         .select(
           `
           *,
+          delivery_fee,
+          coupon_discount,
+          loyalty_points_used,
           order_items(
             id,
             quantity,
@@ -286,7 +292,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
 
   const isDeliveryOrder = (order: Order) => order.delivery_type === "delivery";
 
-  const calculateTotal = (order: Order) => {
+  const calculateSubtotal = (order: Order) => {
     return order.order_items.reduce((sum, item) => {
       const itemTotal = item.price_at_order * item.quantity;
       const extrasTotal = item.order_item_extras.reduce(
@@ -295,6 +301,14 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
       );
       return sum + itemTotal + extrasTotal * item.quantity;
     }, 0);
+  };
+
+  const calculateTotal = (order: Order) => {
+    const subtotal = calculateSubtotal(order);
+    const deliveryFee = Number(order.delivery_fee || 0);
+    const couponDiscount = Number(order.coupon_discount || 0);
+    const loyaltyDiscount = Number(order.loyalty_points_used || 0) * 0.01;
+    return subtotal + deliveryFee - couponDiscount - loyaltyDiscount;
   };
 
   const filteredOrders = orders.filter((order) => {
@@ -313,8 +327,13 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
 
   const OrderCard = ({ order }: { order: Order }) => {
     const isDelivery = order.delivery_type === "delivery";
+    const subtotal = calculateSubtotal(order);
     const total = calculateTotal(order);
     const itemCount = order.order_items.reduce((sum, item) => sum + item.quantity, 0);
+    const deliveryFee = Number(order.delivery_fee || 0);
+    const couponDiscount = Number(order.coupon_discount || 0);
+    const loyaltyDiscount = Number(order.loyalty_points_used || 0) * 0.01;
+    const hasDiscounts = couponDiscount > 0 || loyaltyDiscount > 0;
 
     return (
       <Card className="p-4 mb-3 hover:shadow-md transition-shadow">
@@ -362,6 +381,17 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
           <div className="flex items-center gap-2 text-sm">
             <Package className="w-4 h-4 text-muted-foreground" />
             <span>{itemCount} {itemCount === 1 ? "item" : "itens"}</span>
+          </div>
+
+          {/* Breakdown de taxas */}
+          <div className="space-y-1 text-sm">
+            <div className="text-muted-foreground">Subtotal: R$ {subtotal.toFixed(2)}</div>
+            {deliveryFee > 0 && (
+              <div className="text-muted-foreground">+ Entrega: R$ {deliveryFee.toFixed(2)}</div>
+            )}
+            {hasDiscounts && (
+              <div className="text-green-600">- Desconto: R$ {(couponDiscount + loyaltyDiscount).toFixed(2)}</div>
+            )}
           </div>
 
           {/* Total */}

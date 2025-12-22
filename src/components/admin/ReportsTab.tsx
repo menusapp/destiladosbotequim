@@ -122,13 +122,14 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       setVariableCosts(variableData.data || []);
       setLaborCosts(laborData.data || []);
 
-      // Buscar bills pagas no período (pedidos locais)
+      // Buscar bills pagas no período (pedidos locais) - incluir payment_method
       const { data: paidBills } = await supabase
         .from("bills")
         .select(`
           id,
           total_amount,
           table_id,
+          payment_method,
           tables!inner(restaurant_id)
         `)
         .eq("tables.restaurant_id", restaurantId)
@@ -154,11 +155,15 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         localOrderIds = (localOrders || []).map(o => o.id);
       }
 
-      // Buscar pedidos delivery finalizados
+      // Buscar pedidos delivery finalizados - incluir taxas
       const { data: deliveryOrders } = await supabase
         .from("orders")
         .select(`
           id,
+          delivery_fee,
+          coupon_discount,
+          loyalty_points_used,
+          payment_type,
           order_items (
             quantity,
             price_at_order,
@@ -184,7 +189,11 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           );
           orderSubtotal += itemTotal + extrasTotal;
         });
-        deliveryTotal += orderSubtotal;
+        // Adicionar taxa de entrega e descontar cupom/fidelidade
+        const deliveryFee = Number(order.delivery_fee || 0);
+        const couponDiscount = Number(order.coupon_discount || 0);
+        const loyaltyDiscount = Number(order.loyalty_points_used || 0) * 0.01;
+        deliveryTotal += orderSubtotal + deliveryFee - couponDiscount - loyaltyDiscount;
       });
 
       // Buscar configuração de taxa de serviço
@@ -194,14 +203,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         .eq("id", restaurantId)
         .single();
 
-      if (restaurant?.service_fee_enabled) {
-        deliveryTotal += deliveryTotal * (Number(restaurant.service_fee_percentage) / 100);
-      }
+      // Remover aplicação duplicada de taxa de serviço nos delivery (já está no subtotal do pedido)
+      // A taxa de serviço é calculada no checkout e incluída no valor dos itens
 
-      // Buscar pedidos de balcão finalizados
+      // Buscar pedidos de balcão finalizados - incluir payment_method
       const { data: counterOrders } = await supabase
         .from("counter_orders")
-        .select("id, total_amount")
+        .select("id, total_amount, payment_method")
         .eq("restaurant_id", restaurantId)
         .eq("status", "paid")
         .gte("finalized_at", startDate.toISOString())
@@ -257,36 +265,26 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         }
       });
 
-      // Somar delivery orders por payment_type
-      if (deliveryOrders && deliveryOrders.length > 0) {
-        const { data: deliveryOrdersWithPayment } = await supabase
-          .from("orders")
-          .select("id, payment_type, order_items(quantity, price_at_order, order_item_extras(price_at_order))")
-          .eq("restaurant_id", restaurantId)
-          .eq("order_type", "delivery")
-          .in("status", ["delivered", "picked_up"])
-          .gte("updated_at", startDate.toISOString())
-          .lte("updated_at", endDate.toISOString());
-
-        deliveryOrdersWithPayment?.forEach((order: any) => {
-          const method = order.payment_type;
-          if (method && paymentTotals[method]) {
-            let orderTotal = 0;
-            order.order_items?.forEach((item: any) => {
-              const itemTotal = item.price_at_order * item.quantity;
-              const extrasTotal = (item.order_item_extras || []).reduce(
-                (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
-                0
-              );
-              orderTotal += itemTotal + extrasTotal;
-            });
-            if (restaurant?.service_fee_enabled) {
-              orderTotal += orderTotal * (Number(restaurant.service_fee_percentage) / 100);
-            }
-            paymentTotals[method].total += orderTotal;
-          }
-        });
-      }
+      // Somar delivery orders por payment_type (já temos os dados na query principal)
+      deliveryOrders?.forEach((order: any) => {
+        const method = order.payment_type;
+        if (method && paymentTotals[method]) {
+          let orderTotal = 0;
+          order.order_items?.forEach((item: any) => {
+            const itemTotal = item.price_at_order * item.quantity;
+            const extrasTotal = (item.order_item_extras || []).reduce(
+              (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
+              0
+            );
+            orderTotal += itemTotal + extrasTotal;
+          });
+          // Adicionar taxa de entrega e descontar cupom
+          orderTotal += Number(order.delivery_fee || 0);
+          orderTotal -= Number(order.coupon_discount || 0);
+          orderTotal -= Number(order.loyalty_points_used || 0) * 0.01;
+          paymentTotals[method].total += orderTotal;
+        }
+      });
 
       const paymentsByMethod: PaymentMethodSummary[] = Object.entries(paymentTotals).map(([name, data]) => ({
         method_name: name,
