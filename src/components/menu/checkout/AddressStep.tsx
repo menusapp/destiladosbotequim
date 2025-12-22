@@ -29,69 +29,6 @@ interface AddressStepProps {
   restaurantId?: string;
 }
 
-// Haversine formula to calculate distance between two coordinates
-const getDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-
-// Cache de coordenadas por CEP (persiste durante a sessão)
-const cepCoordinatesCache: Map<string, { lat: number; lng: number } | null> = new Map();
-
-// Geocodificar CEP usando BrasilAPI (retorna coordenadas diretamente)
-const getCoordinatesFromBrasilAPI = async (cep: string): Promise<{ lat: number; lng: number } | null> => {
-  const cleanCep = cep.replace(/\D/g, "");
-  
-  if (cleanCep.length !== 8) return null;
-  
-  // Verificar cache primeiro
-  if (cepCoordinatesCache.has(cleanCep)) {
-    return cepCoordinatesCache.get(cleanCep) || null;
-  }
-  
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
-    
-    const response = await fetch(
-      `https://brasilapi.com.br/api/cep/v2/${cleanCep}`,
-      { signal: controller.signal }
-    );
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      cepCoordinatesCache.set(cleanCep, null);
-      return null;
-    }
-    
-    const data = await response.json();
-    
-    // BrasilAPI v2 retorna coordenadas em location.coordinates
-    if (data.location?.coordinates?.latitude && data.location?.coordinates?.longitude) {
-      const coords = {
-        lat: parseFloat(data.location.coordinates.latitude),
-        lng: parseFloat(data.location.coordinates.longitude)
-      };
-      cepCoordinatesCache.set(cleanCep, coords);
-      console.log(`BrasilAPI: CEP ${cleanCep} -> coords:`, coords);
-      return coords;
-    }
-    
-    cepCoordinatesCache.set(cleanCep, null);
-    console.log(`BrasilAPI: CEP ${cleanCep} sem coordenadas`);
-    return null;
-  } catch (error) {
-    console.log("BrasilAPI timeout/error:", error);
-    return null;
-  }
-};
 
 export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }: AddressStepProps) => {
   const [customerName, setCustomerName] = useState("");
@@ -202,39 +139,7 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId }
         return true;
       }
       
-      // Verificar zonas do tipo raio usando BrasilAPI + cálculo de distância real
-      const radiusZones = deliveryZones.filter(z => z.zone_type === "radius");
-      
-      if (radiusZones.length > 0) {
-        // Buscar coordenadas do CEP do cliente via BrasilAPI
-        const customerCoords = await getCoordinatesFromBrasilAPI(cleanZip);
-        
-        if (customerCoords) {
-          for (const zone of radiusZones) {
-            if (zone.center_lat && zone.center_lng && zone.radius_km) {
-              const distance = getDistanceKm(
-                customerCoords.lat,
-                customerCoords.lng,
-                zone.center_lat,
-                zone.center_lng
-              );
-              
-              console.log(`Zona "${zone.zone_name}": distância = ${distance.toFixed(2)}km, raio = ${zone.radius_km}km`);
-              
-              if (distance <= zone.radius_km) {
-                setMatchedZone(zone);
-                setZoneError(null);
-                return true;
-              }
-            }
-          }
-          
-          // Coordenadas encontradas mas fora de todas as zonas de raio
-          console.log("CEP fora de todas as zonas de raio configuradas");
-        } else {
-          console.log("BrasilAPI não retornou coordenadas para este CEP");
-        }
-      }
+      // Zonas de raio desabilitadas temporariamente - ignorar
       
       setMatchedZone(null);
       setZoneError("Não entregamos nessa região. Por favor, escolha retirada no estabelecimento.");
