@@ -9,6 +9,32 @@ const corsHeaders = {
 const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL');
 const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY');
 
+// Helper to extract QR string from various response formats
+function extractQrData(data: any): { qrString: string | null; pairingCode: string | null } {
+  let qrString = null;
+  let pairingCode = null;
+
+  // Try to find QR string in various fields
+  if (typeof data.code === 'string' && data.code.length > 20) {
+    qrString = data.code;
+  } else if (typeof data.qrcode === 'string' && data.qrcode.length > 20) {
+    qrString = data.qrcode;
+  } else if (typeof data.qr === 'string' && data.qr.length > 20) {
+    qrString = data.qr;
+  } else if (data.qrcode?.code) {
+    qrString = data.qrcode.code;
+  } else if (data.base64 && data.base64.length > 100) {
+    // Already a base64 image
+    qrString = data.base64;
+  } else if (data.qrcode?.base64 && data.qrcode.base64.length > 100) {
+    qrString = data.qrcode.base64;
+  }
+
+  pairingCode = data.pairingCode || data.pairing_code || data.qrcode?.pairingCode || null;
+
+  return { qrString, pairingCode };
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -32,24 +58,20 @@ serve(async (req) => {
 
     const instanceName = `rest-${restaurantId.slice(0, 8)}`;
 
-    // GET - Fetch instance status and QR code
+    // GET - Fetch instance status
     if (req.method === 'GET') {
       console.log(`[GET] Fetching status for instance: ${instanceName}`);
 
-      // First check local DB status
       const { data: config } = await supabase
         .from('whatsapp_config')
         .select('*')
         .eq('restaurant_id', restaurantId)
         .maybeSingle();
 
-      // Try to get connection state from Evolution API
       try {
         const stateResponse = await fetch(
           `${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`,
-          {
-            headers: { 'apikey': EVOLUTION_API_KEY! }
-          }
+          { headers: { 'apikey': EVOLUTION_API_KEY! } }
         );
 
         if (stateResponse.ok) {
@@ -58,7 +80,6 @@ serve(async (req) => {
 
           const isConnected = stateData.state === 'open';
 
-          // Update DB with current status
           await supabase
             .from('whatsapp_config')
             .upsert({
@@ -83,7 +104,6 @@ serve(async (req) => {
         console.log(`[GET] Instance might not exist yet:`, error);
       }
 
-      // Instance doesn't exist or error
       return new Response(
         JSON.stringify({
           instance_name: instanceName,
@@ -120,12 +140,10 @@ serve(async (req) => {
         console.log(`[POST] Create response:`, JSON.stringify(createData));
 
         if (!createResponse.ok) {
-          // Instance might already exist, try to get QR code
-          if (createData.message?.includes('already') || createData.error?.includes('already')) {
-            console.log(`[POST] Instance exists, fetching QR code...`);
-          } else {
+          if (!(createData.message?.includes('already') || createData.error?.includes('already'))) {
             throw new Error(createData.message || createData.error || 'Failed to create instance');
           }
+          console.log(`[POST] Instance exists, will fetch QR code...`);
         }
 
         // Save to database
@@ -139,52 +157,54 @@ serve(async (req) => {
           }, { onConflict: 'restaurant_id' });
 
         // Wait for instance to initialize
-        console.log(`[POST] Waiting 2s for instance to initialize...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log(`[POST] Waiting 3s for instance to initialize...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // Get QR code with retry
-        let qrcode = null;
+        // Get QR code with extended retry (up to 45s)
+        let qrString = null;
         let pairingCode = null;
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 15;
+        const retryDelay = 3000;
 
-        while (!qrcode && attempts < maxAttempts) {
+        while (!qrString && attempts < maxAttempts) {
           attempts++;
           console.log(`[POST] Fetching QR code, attempt ${attempts}/${maxAttempts}...`);
 
-          const qrResponse = await fetch(
-            `${EVOLUTION_API_URL}/instance/connect/${instanceName}`,
-            {
-              headers: { 'apikey': EVOLUTION_API_KEY! }
+          try {
+            const qrResponse = await fetch(
+              `${EVOLUTION_API_URL}/instance/connect/${instanceName}`,
+              { headers: { 'apikey': EVOLUTION_API_KEY! } }
+            );
+
+            const qrData = await qrResponse.json();
+            console.log(`[POST] QR response (attempt ${attempts}):`, JSON.stringify(qrData));
+
+            const extracted = extractQrData(qrData);
+            qrString = extracted.qrString;
+            pairingCode = extracted.pairingCode;
+
+            if (qrString) {
+              console.log(`[POST] QR obtained! Length: ${qrString.length}, isBase64: ${qrString.startsWith('data:') || qrString.length > 500}`);
             }
-          );
+          } catch (err) {
+            console.error(`[POST] Error fetching QR:`, err);
+          }
 
-          const qrData = await qrResponse.json();
-          console.log(`[POST] QR response (attempt ${attempts}):`, JSON.stringify(qrData));
-
-          // Try multiple possible paths for QR code
-          qrcode = qrData.base64 
-            || qrData.qrcode?.base64 
-            || qrData.qrcode 
-            || qrData.code 
-            || qrData.qr
-            || null;
-          
-          pairingCode = qrData.pairingCode || qrData.pairing_code || null;
-
-          if (!qrcode && attempts < maxAttempts) {
-            console.log(`[POST] QR code not available yet, waiting 2s...`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
+          if (!qrString && attempts < maxAttempts) {
+            console.log(`[POST] QR not available yet, waiting ${retryDelay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
           }
         }
 
-        if (!qrcode) {
+        if (!qrString) {
           console.log(`[POST] Failed to get QR code after ${maxAttempts} attempts`);
           return new Response(
             JSON.stringify({
               success: false,
-              error: 'QR code não disponível ainda. Tente novamente em alguns segundos.',
-              instance_name: instanceName
+              status: 'pending_qr',
+              instance_name: instanceName,
+              message: 'QR code ainda não disponível. Use action:qrcode para tentar novamente.'
             }),
             { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
@@ -195,7 +215,7 @@ serve(async (req) => {
           JSON.stringify({
             success: true,
             instance_name: instanceName,
-            qrcode: qrcode,
+            qrString: qrString,
             pairingCode: pairingCode
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -207,27 +227,19 @@ serve(async (req) => {
 
         const qrResponse = await fetch(
           `${EVOLUTION_API_URL}/instance/connect/${instanceName}`,
-          {
-            headers: { 'apikey': EVOLUTION_API_KEY! }
-          }
+          { headers: { 'apikey': EVOLUTION_API_KEY! } }
         );
 
         const qrData = await qrResponse.json();
         console.log(`[POST] QR code response:`, JSON.stringify(qrData));
 
-        // Try multiple possible paths for QR code
-        const qrcode = qrData.base64 
-          || qrData.qrcode?.base64 
-          || qrData.qrcode 
-          || qrData.code 
-          || qrData.qr
-          || null;
+        const extracted = extractQrData(qrData);
 
         return new Response(
           JSON.stringify({
-            success: true,
-            qrcode: qrcode,
-            pairingCode: qrData.pairingCode || qrData.pairing_code
+            success: !!extracted.qrString,
+            qrString: extracted.qrString,
+            pairingCode: extracted.pairingCode
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -238,7 +250,6 @@ serve(async (req) => {
     if (req.method === 'DELETE') {
       console.log(`[DELETE] Disconnecting instance: ${instanceName}`);
 
-      // Logout from Evolution API
       const logoutResponse = await fetch(
         `${EVOLUTION_API_URL}/instance/logout/${instanceName}`,
         {
@@ -249,7 +260,6 @@ serve(async (req) => {
 
       console.log(`[DELETE] Logout status:`, logoutResponse.status);
 
-      // Update database
       await supabase
         .from('whatsapp_config')
         .update({

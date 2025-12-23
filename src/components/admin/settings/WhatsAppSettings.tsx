@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import QRCode from "qrcode";
 import { 
   MessageSquare, 
   Wifi, 
@@ -17,7 +17,6 @@ import {
   RefreshCw, 
   Loader2,
   CheckCircle2,
-  XCircle,
   Smartphone,
   Send
 } from "lucide-react";
@@ -41,12 +40,14 @@ const DEFAULT_MESSAGES = {
   delivered: "🎉 Pedido #{pedido} entregue com sucesso! Obrigado pela preferência, {nome}!"
 };
 
+const SUPABASE_URL = "https://nrddbsudiphrvgfneqle.supabase.co";
+
 const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [config, setConfig] = useState<WhatsAppConfig | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [messages, setMessages] = useState({
@@ -54,6 +55,33 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     out_for_delivery: DEFAULT_MESSAGES.out_for_delivery,
     delivered: DEFAULT_MESSAGES.delivered
   });
+  
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const qrPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Generate QR code image from string
+  const generateQrImage = async (qrString: string): Promise<string | null> => {
+    try {
+      // If it's already a data URL or base64 image, use it directly
+      if (qrString.startsWith('data:image')) {
+        return qrString;
+      }
+      // If it looks like base64 PNG (long string), add prefix
+      if (qrString.length > 500 && !qrString.includes(' ')) {
+        return `data:image/png;base64,${qrString}`;
+      }
+      // Otherwise, generate QR code from the string
+      const dataUrl = await QRCode.toDataURL(qrString, {
+        width: 256,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' }
+      });
+      return dataUrl;
+    } catch (error) {
+      console.error('Error generating QR image:', error);
+      return null;
+    }
+  };
 
   // Fetch config on mount
   const fetchConfig = useCallback(async () => {
@@ -84,19 +112,26 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
   useEffect(() => {
     fetchConfig();
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (qrPollIntervalRef.current) clearInterval(qrPollIntervalRef.current);
+    };
   }, [fetchConfig]);
 
   // Check instance status
-  const checkStatus = async () => {
+  const checkStatus = async (): Promise<{ status: string } | null> => {
     try {
       const response = await fetch(
-        `https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`
+        `${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`
       );
       const data = await response.json();
       
       if (data.status === 'connected') {
         setConfig(prev => prev ? { ...prev, instance_status: 'connected' } : null);
-        setQrCode(null);
+        setQrCodeDataUrl(null);
+        // Stop all polling
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        if (qrPollIntervalRef.current) clearInterval(qrPollIntervalRef.current);
       } else if (data.status === 'disconnected' || data.status === 'not_created') {
         setConfig(prev => prev ? { ...prev, instance_status: data.status } : null);
       }
@@ -108,12 +143,48 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
+  // Poll for QR code if not received initially
+  const pollForQrCode = async () => {
+    try {
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'qrcode' })
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data.qrString) {
+        const imageUrl = await generateQrImage(data.qrString);
+        if (imageUrl) {
+          setQrCodeDataUrl(imageUrl);
+          // Stop QR polling once we have QR
+          if (qrPollIntervalRef.current) {
+            clearInterval(qrPollIntervalRef.current);
+            qrPollIntervalRef.current = null;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error polling for QR:', error);
+    }
+  };
+
   // Create instance and get QR code
   const handleConnect = async () => {
     setConnecting(true);
+    setQrCodeDataUrl(null);
+    
+    // Clear any existing polls
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    if (qrPollIntervalRef.current) clearInterval(qrPollIntervalRef.current);
+    
     try {
       const response = await fetch(
-        `https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`,
+        `${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -122,9 +193,28 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       );
       
       const data = await response.json();
+      console.log('Connect response:', data);
       
-      if (data.qrcode) {
-        setQrCode(data.qrcode);
+      if (data.qrString) {
+        // Generate QR image locally
+        const imageUrl = await generateQrImage(data.qrString);
+        if (imageUrl) {
+          setQrCodeDataUrl(imageUrl);
+          setConfig(prev => prev ? { 
+            ...prev, 
+            instance_name: data.instance_name,
+            instance_status: 'pending' 
+          } : null);
+          
+          toast({
+            title: "QR Code gerado",
+            description: "Escaneie o código com seu WhatsApp para conectar"
+          });
+        } else {
+          throw new Error('Falha ao gerar imagem do QR code');
+        }
+      } else if (data.status === 'pending_qr') {
+        // Start polling for QR code
         setConfig(prev => prev ? { 
           ...prev, 
           instance_name: data.instance_name,
@@ -132,33 +222,49 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
         } : null);
         
         toast({
-          title: "QR Code gerado",
-          description: "Escaneie o código com seu WhatsApp para conectar"
+          title: "Aguardando QR Code",
+          description: "O QR code está sendo gerado..."
         });
-
-        // Start polling for connection status
-        const pollInterval = setInterval(async () => {
-          const status = await checkStatus();
-          if (status?.status === 'connected') {
-            clearInterval(pollInterval);
-            setQrCode(null);
-            toast({
-              title: "Conectado!",
-              description: "WhatsApp conectado com sucesso"
-            });
+        
+        // Poll for QR code every 3 seconds
+        qrPollIntervalRef.current = setInterval(pollForQrCode, 3000);
+        // Stop QR polling after 60 seconds
+        setTimeout(() => {
+          if (qrPollIntervalRef.current) {
+            clearInterval(qrPollIntervalRef.current);
+            qrPollIntervalRef.current = null;
           }
-        }, 3000);
-
-        // Stop polling after 2 minutes
-        setTimeout(() => clearInterval(pollInterval), 120000);
+        }, 60000);
+      } else if (data.error) {
+        throw new Error(data.error);
       } else {
-        throw new Error(data.error || 'Falha ao gerar QR code');
+        throw new Error('Resposta inesperada do servidor');
       }
+
+      // Start polling for connection status
+      pollIntervalRef.current = setInterval(async () => {
+        const status = await checkStatus();
+        if (status?.status === 'connected') {
+          toast({
+            title: "Conectado!",
+            description: "WhatsApp conectado com sucesso"
+          });
+        }
+      }, 3000);
+
+      // Stop status polling after 2 minutes
+      setTimeout(() => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+      }, 120000);
+      
     } catch (error) {
       console.error('Error connecting:', error);
       toast({
         title: "Erro",
-        description: "Falha ao conectar WhatsApp",
+        description: error instanceof Error ? error.message : "Falha ao conectar WhatsApp",
         variant: "destructive"
       });
     } finally {
@@ -170,7 +276,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const handleDisconnect = async () => {
     try {
       const response = await fetch(
-        `https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`,
+        `${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`,
         { method: 'DELETE' }
       );
       
@@ -183,7 +289,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
           connected_phone: null,
           connected_at: null
         } : null);
-        setQrCode(null);
+        setQrCodeDataUrl(null);
         
         toast({
           title: "Desconectado",
@@ -242,7 +348,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
     try {
       const response = await fetch(
-        'https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-send',
+        `${SUPABASE_URL}/functions/v1/whatsapp-send`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -352,20 +458,31 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
           </div>
 
           {/* QR Code Display */}
-          {qrCode && (
+          {(qrCodeDataUrl || (isPending && !isConnected)) && (
             <div className="flex flex-col items-center gap-4 py-6 border rounded-lg bg-white">
-              <p className="text-sm text-muted-foreground">
-                Escaneie o QR Code com seu WhatsApp
-              </p>
-              <img 
-                src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`} 
-                alt="QR Code WhatsApp" 
-                className="w-64 h-64"
-              />
-              <Button variant="ghost" size="sm" onClick={handleConnect}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Gerar novo QR Code
-              </Button>
+              {qrCodeDataUrl ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Escaneie o QR Code com seu WhatsApp
+                  </p>
+                  <img 
+                    src={qrCodeDataUrl} 
+                    alt="QR Code WhatsApp" 
+                    className="w-64 h-64"
+                  />
+                  <Button variant="ghost" size="sm" onClick={handleConnect} disabled={connecting}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${connecting ? 'animate-spin' : ''}`} />
+                    Gerar novo QR Code
+                  </Button>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Aguardando QR Code...
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
