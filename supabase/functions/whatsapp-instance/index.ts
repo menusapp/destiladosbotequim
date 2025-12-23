@@ -14,7 +14,7 @@ function extractQrData(data: any): { qrString: string | null; pairingCode: strin
   let qrString = null;
   let pairingCode = null;
 
-  // Try to find QR string in various fields
+  // Try to find QR string in various fields (priority order)
   if (typeof data.code === 'string' && data.code.length > 20) {
     qrString = data.code;
   } else if (typeof data.qrcode === 'string' && data.qrcode.length > 20) {
@@ -24,7 +24,6 @@ function extractQrData(data: any): { qrString: string | null; pairingCode: strin
   } else if (data.qrcode?.code) {
     qrString = data.qrcode.code;
   } else if (data.base64 && data.base64.length > 100) {
-    // Already a base64 image
     qrString = data.base64;
   } else if (data.qrcode?.base64 && data.qrcode.base64.length > 100) {
     qrString = data.qrcode.base64;
@@ -35,8 +34,82 @@ function extractQrData(data: any): { qrString: string | null; pairingCode: strin
   return { qrString, pairingCode };
 }
 
+// Try multiple endpoints to get QR code
+async function tryGetQrCode(instanceName: string): Promise<{ qrString: string | null; pairingCode: string | null; rawResponse: any }> {
+  const endpoints = [
+    { method: 'GET', path: `/instance/connect/${instanceName}` },
+    { method: 'POST', path: `/instance/connect/${instanceName}` },
+    { method: 'GET', path: `/instance/qrcode/${instanceName}` },
+    { method: 'GET', path: `/instance/qr/${instanceName}` },
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      console.log(`[QR] Trying ${endpoint.method} ${endpoint.path}`);
+      
+      const response = await fetch(`${EVOLUTION_API_URL}${endpoint.path}`, {
+        method: endpoint.method,
+        headers: { 
+          'apikey': EVOLUTION_API_KEY!,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const rawText = await response.text();
+      console.log(`[QR] ${endpoint.method} ${endpoint.path} - Status: ${response.status}, Body: ${rawText.substring(0, 500)}`);
+
+      if (!response.ok) continue;
+
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        continue;
+      }
+
+      // Skip if count:0 or empty
+      if (data.count === 0 || (typeof data === 'object' && Object.keys(data).length === 0)) {
+        continue;
+      }
+
+      const extracted = extractQrData(data);
+      if (extracted.qrString) {
+        console.log(`[QR] Success with ${endpoint.method} ${endpoint.path}, QR length: ${extracted.qrString.length}`);
+        return { ...extracted, rawResponse: data };
+      }
+    } catch (error) {
+      console.log(`[QR] Error on ${endpoint.method} ${endpoint.path}:`, error);
+    }
+  }
+
+  return { qrString: null, pairingCode: null, rawResponse: null };
+}
+
+// Restart instance to force new QR generation
+async function restartInstance(instanceName: string): Promise<boolean> {
+  try {
+    console.log(`[RESTART] Restarting instance: ${instanceName}`);
+    
+    // First try restart
+    const restartResponse = await fetch(`${EVOLUTION_API_URL}/instance/restart/${instanceName}`, {
+      method: 'PUT',
+      headers: { 'apikey': EVOLUTION_API_KEY! }
+    });
+    console.log(`[RESTART] Restart status: ${restartResponse.status}`);
+    
+    if (restartResponse.ok) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.log(`[RESTART] Error:`, error);
+    return false;
+  }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -79,6 +152,7 @@ serve(async (req) => {
           console.log(`[GET] Connection state:`, stateData);
 
           const isConnected = stateData.state === 'open';
+          const instanceState = stateData.instance?.state || stateData.state || 'unknown';
 
           await supabase
             .from('whatsapp_config')
@@ -94,7 +168,7 @@ serve(async (req) => {
             JSON.stringify({
               instance_name: instanceName,
               status: isConnected ? 'connected' : 'disconnected',
-              state: stateData.state,
+              state: instanceState,
               config
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -136,14 +210,26 @@ serve(async (req) => {
           })
         });
 
-        const createData = await createResponse.json();
-        console.log(`[POST] Create response:`, JSON.stringify(createData));
+        const createText = await createResponse.text();
+        console.log(`[POST] Create response status: ${createResponse.status}, body: ${createText}`);
 
-        if (!createResponse.ok) {
-          if (!(createData.message?.includes('already') || createData.error?.includes('already'))) {
-            throw new Error(createData.message || createData.error || 'Failed to create instance');
-          }
-          console.log(`[POST] Instance exists, will fetch QR code...`);
+        let createData;
+        try {
+          createData = JSON.parse(createText);
+        } catch {
+          createData = { raw: createText };
+        }
+
+        const instanceExists = !createResponse.ok && 
+          (createData.message?.includes('already') || createData.error?.includes('already') || createResponse.status === 403);
+
+        if (!createResponse.ok && !instanceExists) {
+          throw new Error(createData.message || createData.error || 'Failed to create instance');
+        }
+
+        if (instanceExists) {
+          console.log(`[POST] Instance exists, trying to restart and get QR...`);
+          await restartInstance(instanceName);
         }
 
         // Save to database
@@ -160,45 +246,29 @@ serve(async (req) => {
         console.log(`[POST] Waiting 3s for instance to initialize...`);
         await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // Get QR code with extended retry (up to 45s)
+        // Get QR code with extended retry
         let qrString = null;
         let pairingCode = null;
         let attempts = 0;
-        const maxAttempts = 15;
+        const maxAttempts = 10;
         const retryDelay = 3000;
 
         while (!qrString && attempts < maxAttempts) {
           attempts++;
-          console.log(`[POST] Fetching QR code, attempt ${attempts}/${maxAttempts}...`);
+          console.log(`[POST] QR attempt ${attempts}/${maxAttempts}...`);
 
-          try {
-            const qrResponse = await fetch(
-              `${EVOLUTION_API_URL}/instance/connect/${instanceName}`,
-              { headers: { 'apikey': EVOLUTION_API_KEY! } }
-            );
-
-            const qrData = await qrResponse.json();
-            console.log(`[POST] QR response (attempt ${attempts}):`, JSON.stringify(qrData));
-
-            const extracted = extractQrData(qrData);
-            qrString = extracted.qrString;
-            pairingCode = extracted.pairingCode;
-
-            if (qrString) {
-              console.log(`[POST] QR obtained! Length: ${qrString.length}, isBase64: ${qrString.startsWith('data:') || qrString.length > 500}`);
-            }
-          } catch (err) {
-            console.error(`[POST] Error fetching QR:`, err);
-          }
+          const result = await tryGetQrCode(instanceName);
+          qrString = result.qrString;
+          pairingCode = result.pairingCode;
 
           if (!qrString && attempts < maxAttempts) {
-            console.log(`[POST] QR not available yet, waiting ${retryDelay}ms...`);
+            console.log(`[POST] QR not available, waiting ${retryDelay}ms...`);
             await new Promise(resolve => setTimeout(resolve, retryDelay));
           }
         }
 
         if (!qrString) {
-          console.log(`[POST] Failed to get QR code after ${maxAttempts} attempts`);
+          console.log(`[POST] Failed to get QR after ${maxAttempts} attempts`);
           return new Response(
             JSON.stringify({
               success: false,
@@ -210,10 +280,11 @@ serve(async (req) => {
           );
         }
 
-        console.log(`[POST] QR code obtained successfully`);
+        console.log(`[POST] QR code obtained successfully, length: ${qrString.length}`);
         return new Response(
           JSON.stringify({
             success: true,
+            status: 'qr_ready',
             instance_name: instanceName,
             qrString: qrString,
             pairingCode: pairingCode
@@ -225,23 +296,43 @@ serve(async (req) => {
       if (action === 'qrcode') {
         console.log(`[POST] Getting QR code for: ${instanceName}`);
 
-        const qrResponse = await fetch(
-          `${EVOLUTION_API_URL}/instance/connect/${instanceName}`,
-          { headers: { 'apikey': EVOLUTION_API_KEY! } }
-        );
-
-        const qrData = await qrResponse.json();
-        console.log(`[POST] QR code response:`, JSON.stringify(qrData));
-
-        const extracted = extractQrData(qrData);
+        const result = await tryGetQrCode(instanceName);
 
         return new Response(
           JSON.stringify({
-            success: !!extracted.qrString,
-            qrString: extracted.qrString,
-            pairingCode: extracted.pairingCode
+            success: !!result.qrString,
+            status: result.qrString ? 'qr_ready' : 'pending_qr',
+            qrString: result.qrString,
+            pairingCode: result.pairingCode
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (action === 'restart') {
+        console.log(`[POST] Restart requested for: ${instanceName}`);
+        
+        const success = await restartInstance(instanceName);
+        
+        if (success) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const result = await tryGetQrCode(instanceName);
+          
+          return new Response(
+            JSON.stringify({
+              success: !!result.qrString,
+              status: result.qrString ? 'qr_ready' : 'pending_qr',
+              qrString: result.qrString,
+              pairingCode: result.pairingCode,
+              message: 'Instance restarted'
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        return new Response(
+          JSON.stringify({ success: false, message: 'Failed to restart instance' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
