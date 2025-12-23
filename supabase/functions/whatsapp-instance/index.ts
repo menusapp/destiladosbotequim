@@ -117,14 +117,14 @@ serve(async (req) => {
         });
 
         const createData = await createResponse.json();
-        console.log(`[POST] Create response:`, createData);
+        console.log(`[POST] Create response:`, JSON.stringify(createData));
 
         if (!createResponse.ok) {
           // Instance might already exist, try to get QR code
-          if (createData.message?.includes('already')) {
+          if (createData.message?.includes('already') || createData.error?.includes('already')) {
             console.log(`[POST] Instance exists, fetching QR code...`);
           } else {
-            throw new Error(createData.message || 'Failed to create instance');
+            throw new Error(createData.message || createData.error || 'Failed to create instance');
           }
         }
 
@@ -138,23 +138,65 @@ serve(async (req) => {
             updated_at: new Date().toISOString()
           }, { onConflict: 'restaurant_id' });
 
-        // Get QR code
-        const qrResponse = await fetch(
-          `${EVOLUTION_API_URL}/instance/connect/${instanceName}`,
-          {
-            headers: { 'apikey': EVOLUTION_API_KEY! }
+        // Wait for instance to initialize
+        console.log(`[POST] Waiting 2s for instance to initialize...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Get QR code with retry
+        let qrcode = null;
+        let pairingCode = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (!qrcode && attempts < maxAttempts) {
+          attempts++;
+          console.log(`[POST] Fetching QR code, attempt ${attempts}/${maxAttempts}...`);
+
+          const qrResponse = await fetch(
+            `${EVOLUTION_API_URL}/instance/connect/${instanceName}`,
+            {
+              headers: { 'apikey': EVOLUTION_API_KEY! }
+            }
+          );
+
+          const qrData = await qrResponse.json();
+          console.log(`[POST] QR response (attempt ${attempts}):`, JSON.stringify(qrData));
+
+          // Try multiple possible paths for QR code
+          qrcode = qrData.base64 
+            || qrData.qrcode?.base64 
+            || qrData.qrcode 
+            || qrData.code 
+            || qrData.qr
+            || null;
+          
+          pairingCode = qrData.pairingCode || qrData.pairing_code || null;
+
+          if (!qrcode && attempts < maxAttempts) {
+            console.log(`[POST] QR code not available yet, waiting 2s...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
-        );
+        }
 
-        const qrData = await qrResponse.json();
-        console.log(`[POST] QR response received`);
+        if (!qrcode) {
+          console.log(`[POST] Failed to get QR code after ${maxAttempts} attempts`);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'QR code não disponível ainda. Tente novamente em alguns segundos.',
+              instance_name: instanceName
+            }),
+            { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
+        console.log(`[POST] QR code obtained successfully`);
         return new Response(
           JSON.stringify({
             success: true,
             instance_name: instanceName,
-            qrcode: qrData.base64 || qrData.qrcode?.base64,
-            pairingCode: qrData.pairingCode
+            qrcode: qrcode,
+            pairingCode: pairingCode
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -171,12 +213,21 @@ serve(async (req) => {
         );
 
         const qrData = await qrResponse.json();
+        console.log(`[POST] QR code response:`, JSON.stringify(qrData));
+
+        // Try multiple possible paths for QR code
+        const qrcode = qrData.base64 
+          || qrData.qrcode?.base64 
+          || qrData.qrcode 
+          || qrData.code 
+          || qrData.qr
+          || null;
 
         return new Response(
           JSON.stringify({
             success: true,
-            qrcode: qrData.base64 || qrData.qrcode?.base64,
-            pairingCode: qrData.pairingCode
+            qrcode: qrcode,
+            pairingCode: qrData.pairingCode || qrData.pairing_code
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
