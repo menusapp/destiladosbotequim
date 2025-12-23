@@ -47,6 +47,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [connectFlowActive, setConnectFlowActive] = useState(false); // Controls QR area visibility
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [config, setConfig] = useState<WhatsAppConfig | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -58,19 +59,17 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const qrPollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Generate QR code image from string
   const generateQrImage = async (qrString: string): Promise<string | null> => {
     try {
-      // If it's already a data URL or base64 image, use it directly
       if (qrString.startsWith('data:image')) {
         return qrString;
       }
-      // If it looks like base64 PNG (long string), add prefix
       if (qrString.length > 500 && !qrString.includes(' ')) {
         return `data:image/png;base64,${qrString}`;
       }
-      // Otherwise, generate QR code from the string
       const dataUrl = await QRCode.toDataURL(qrString, {
         width: 256,
         margin: 2,
@@ -82,6 +81,22 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       return null;
     }
   };
+
+  // Stop all polling
+  const stopAllPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    if (qrPollIntervalRef.current) {
+      clearInterval(qrPollIntervalRef.current);
+      qrPollIntervalRef.current = null;
+    }
+    if (qrPollTimeoutRef.current) {
+      clearTimeout(qrPollTimeoutRef.current);
+      qrPollTimeoutRef.current = null;
+    }
+  }, []);
 
   // Fetch config on mount
   const fetchConfig = useCallback(async () => {
@@ -113,10 +128,9 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   useEffect(() => {
     fetchConfig();
     return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-      if (qrPollIntervalRef.current) clearInterval(qrPollIntervalRef.current);
+      stopAllPolling();
     };
-  }, [fetchConfig]);
+  }, [fetchConfig, stopAllPolling]);
 
   // Check instance status
   const checkStatus = async (): Promise<{ status: string } | null> => {
@@ -129,9 +143,8 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       if (data.status === 'connected') {
         setConfig(prev => prev ? { ...prev, instance_status: 'connected' } : null);
         setQrCodeDataUrl(null);
-        // Stop all polling
-        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        if (qrPollIntervalRef.current) clearInterval(qrPollIntervalRef.current);
+        setConnectFlowActive(false);
+        stopAllPolling();
       } else if (data.status === 'disconnected' || data.status === 'not_created') {
         setConfig(prev => prev ? { ...prev, instance_status: data.status } : null);
       }
@@ -144,7 +157,9 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   // Poll for QR code if not received initially
-  const pollForQrCode = async () => {
+  const pollForQrCode = useCallback(async () => {
+    if (!connectFlowActive) return;
+    
     try {
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`,
@@ -161,7 +176,6 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
         const imageUrl = await generateQrImage(data.qrString);
         if (imageUrl) {
           setQrCodeDataUrl(imageUrl);
-          // Stop QR polling once we have QR
           if (qrPollIntervalRef.current) {
             clearInterval(qrPollIntervalRef.current);
             qrPollIntervalRef.current = null;
@@ -171,16 +185,14 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     } catch (error) {
       console.error('Error polling for QR:', error);
     }
-  };
+  }, [restaurantId, connectFlowActive]);
 
   // Create instance and get QR code
   const handleConnect = async () => {
     setConnecting(true);
+    setConnectFlowActive(true);
     setQrCodeDataUrl(null);
-    
-    // Clear any existing polls
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    if (qrPollIntervalRef.current) clearInterval(qrPollIntervalRef.current);
+    stopAllPolling();
     
     try {
       const response = await fetch(
@@ -196,7 +208,6 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       console.log('Connect response:', data);
       
       if (data.qrString) {
-        // Generate QR image locally
         const imageUrl = await generateQrImage(data.qrString);
         if (imageUrl) {
           setQrCodeDataUrl(imageUrl);
@@ -214,7 +225,6 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
           throw new Error('Falha ao gerar imagem do QR code');
         }
       } else if (data.status === 'pending_qr') {
-        // Start polling for QR code
         setConfig(prev => prev ? { 
           ...prev, 
           instance_name: data.instance_name,
@@ -228,11 +238,19 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
         
         // Poll for QR code every 3 seconds
         qrPollIntervalRef.current = setInterval(pollForQrCode, 3000);
-        // Stop QR polling after 60 seconds
-        setTimeout(() => {
+        
+        // Stop QR polling after 60 seconds with feedback
+        qrPollTimeoutRef.current = setTimeout(() => {
           if (qrPollIntervalRef.current) {
             clearInterval(qrPollIntervalRef.current);
             qrPollIntervalRef.current = null;
+          }
+          if (!qrCodeDataUrl) {
+            toast({
+              title: "Tempo esgotado",
+              description: "Não foi possível obter o QR Code. Clique em 'Tentar novamente'.",
+              variant: "destructive"
+            });
           }
         }, 60000);
       } else if (data.error) {
@@ -262,6 +280,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       
     } catch (error) {
       console.error('Error connecting:', error);
+      setConnectFlowActive(false);
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : "Falha ao conectar WhatsApp",
@@ -270,6 +289,13 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     } finally {
       setConnecting(false);
     }
+  };
+
+  // Cancel connection flow
+  const handleCancelConnect = () => {
+    stopAllPolling();
+    setConnectFlowActive(false);
+    setQrCodeDataUrl(null);
   };
 
   // Disconnect instance
@@ -290,6 +316,8 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
           connected_at: null
         } : null);
         setQrCodeDataUrl(null);
+        setConnectFlowActive(false);
+        stopAllPolling();
         
         toast({
           title: "Desconectado",
@@ -457,8 +485,8 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
             </div>
           </div>
 
-          {/* QR Code Display */}
-          {(qrCodeDataUrl || (isPending && !isConnected)) && (
+          {/* QR Code Display - Only show when user explicitly clicked Connect */}
+          {connectFlowActive && !isConnected && (
             <div className="flex flex-col items-center gap-4 py-6 border rounded-lg bg-white">
               {qrCodeDataUrl ? (
                 <>
@@ -470,17 +498,25 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
                     alt="QR Code WhatsApp" 
                     className="w-64 h-64"
                   />
-                  <Button variant="ghost" size="sm" onClick={handleConnect} disabled={connecting}>
-                    <RefreshCw className={`h-4 w-4 mr-2 ${connecting ? 'animate-spin' : ''}`} />
-                    Gerar novo QR Code
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={handleConnect} disabled={connecting}>
+                      <RefreshCw className={`h-4 w-4 mr-2 ${connecting ? 'animate-spin' : ''}`} />
+                      Gerar novo QR Code
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleCancelConnect}>
+                      Cancelar
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <div className="flex flex-col items-center gap-2 py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
-                    Aguardando QR Code...
+                    Gerando QR Code...
                   </p>
+                  <Button variant="outline" size="sm" onClick={handleCancelConnect} className="mt-2">
+                    Cancelar
+                  </Button>
                 </div>
               )}
             </div>
