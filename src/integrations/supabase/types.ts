@@ -2070,9 +2070,13 @@ export type Database = {
       whatsapp_config: {
         Row: {
           api_token: string | null
+          connected_at: string | null
+          connected_phone: string | null
           created_at: string | null
           enabled: boolean | null
           id: string
+          instance_name: string | null
+          instance_status: string | null
           message_accepted: string | null
           message_delivered: string | null
           message_out_for_delivery: string | null
@@ -2082,9 +2086,13 @@ export type Database = {
         }
         Insert: {
           api_token?: string | null
+          connected_at?: string | null
+          connected_phone?: string | null
           created_at?: string | null
           enabled?: boolean | null
           id?: string
+          instance_name?: string | null
+          instance_status?: string | null
           message_accepted?: string | null
           message_delivered?: string | null
           message_out_for_delivery?: string | null
@@ -2094,9 +2102,13 @@ export type Database = {
         }
         Update: {
           api_token?: string | null
+          connected_at?: string | null
+          connected_phone?: string | null
           created_at?: string | null
           enabled?: boolean | null
           id?: string
+          instance_name?: string | null
+          instance_status?: string | null
           message_accepted?: string | null
           message_delivered?: string | null
           message_out_for_delivery?: string | null
