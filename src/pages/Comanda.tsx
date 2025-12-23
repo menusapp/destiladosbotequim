@@ -65,7 +65,7 @@ interface OrderItemExtra {
   price_at_order: number;
   product_extras: {
     name: string;
-  };
+  } | null;
 }
 
 interface OrderItem {
@@ -75,7 +75,7 @@ interface OrderItem {
   notes?: string;
   products: {
     name: string;
-  };
+  } | null;
   order_item_extras: OrderItemExtra[];
 }
 
@@ -468,23 +468,44 @@ const Comanda = () => {
 
       const { data: lastPaidBill } = await lastPaidBillQuery.maybeSingle();
 
-      // Construir query de pedidos
-      let ordersQuery = supabase
-        .from("orders")
-        .select(`
-          id, status, created_at, customer_name, notes,
-          order_items(
-            id, quantity, price_at_order, notes,
-            products(name),
-            order_item_extras(price_at_order, product_extras(name))
-          )
-        `)
-        .eq("table_id", tableData.id)
-        .eq("customer_cpf", customerCPF);
-
-      // Se existe conta paga para esta comanda, buscar apenas pedidos criados após ela
-      if (lastPaidBill?.paid_at) {
-        ordersQuery = ordersQuery.gt("created_at", lastPaidBill.paid_at);
+      // 🔑 CRÍTICO: Construir query de pedidos SEMPRE por comanda_id (não por CPF!)
+      // Isso evita mostrar pedidos de comandas antigas/fechadas
+      let ordersQuery;
+      
+      if (comandaId) {
+        // ✅ Busca APENAS pedidos desta comanda específica
+        ordersQuery = supabase
+          .from("orders")
+          .select(`
+            id, status, created_at, customer_name, notes,
+            order_items(
+              id, quantity, price_at_order, notes,
+              products(name),
+              order_item_extras(price_at_order, product_extras(name))
+            )
+          `)
+          .eq("comanda_id", comandaId);
+      } else {
+        // Fallback: sem comanda_id, buscar por mesa+CPF mas apenas pedidos NÃO entregues
+        // (isso evita mostrar histórico de comandas fechadas)
+        ordersQuery = supabase
+          .from("orders")
+          .select(`
+            id, status, created_at, customer_name, notes,
+            order_items(
+              id, quantity, price_at_order, notes,
+              products(name),
+              order_item_extras(price_at_order, product_extras(name))
+            )
+          `)
+          .eq("table_id", tableData.id)
+          .eq("customer_cpf", customerCPF)
+          .in("status", ["pending", "accepted", "preparing", "ready"]);
+        
+        // Se existe conta paga recente, buscar apenas pedidos criados após ela
+        if (lastPaidBill?.paid_at) {
+          ordersQuery = ordersQuery.gt("created_at", lastPaidBill.paid_at);
+        }
       }
 
       // Buscar pedidos e conta ativa em paralelo - bills filtrado por comanda_id (já declarado acima)
@@ -1010,13 +1031,16 @@ const Comanda = () => {
                         className="flex justify-between items-start py-2 border-b last:border-0"
                       >
                         <div className="flex-1">
-                          <p className="font-medium">{item.products.name}</p>
+                          <p className="font-medium">{item.products?.name || "Produto removido"}</p>
                           <p className="text-sm text-muted-foreground">
                             Qtd: {item.quantity}
                           </p>
                           {item.order_item_extras && item.order_item_extras.length > 0 && (
                             <div className="text-xs text-muted-foreground mt-1">
-                              + {item.order_item_extras.map(e => e.product_extras.name).join(', ')}
+                              + {item.order_item_extras
+                                  .filter(e => e.product_extras?.name)
+                                  .map(e => e.product_extras.name)
+                                  .join(', ')}
                             </div>
                           )}
                           {item.notes && (
