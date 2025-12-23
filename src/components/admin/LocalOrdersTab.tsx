@@ -201,24 +201,38 @@ const LocalOrdersTab = ({
 
     const billsWithOrders = await Promise.all(
       (billsData || []).map(async (bill: any) => {
-        const { data: lastPaidBill } = await supabase
-          .from("bills")
-          .select("created_at")
-          .eq("table_id", bill.table_id)
-          .eq("status", "paid")
-          .lt("created_at", bill.created_at)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        let ordersData;
+        
+        // 🔑 CRÍTICO: Se a bill tem comanda_id, buscar APENAS orders dessa comanda
+        if (bill.comanda_id) {
+          const { data } = await supabase
+            .from("orders")
+            .select(`customer_name, customer_cpf, notes, order_items(quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
+            .eq("comanda_id", bill.comanda_id)
+            .order("created_at", { ascending: false });
+          ordersData = data;
+        } else {
+          // Fallback para bills antigas sem comanda_id: buscar por table_id e período
+          const { data: lastPaidBill } = await supabase
+            .from("bills")
+            .select("created_at")
+            .eq("table_id", bill.table_id)
+            .eq("status", "paid")
+            .lt("created_at", bill.created_at)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-        const startDateFilter = lastPaidBill ? lastPaidBill.created_at : new Date(0).toISOString();
-        const { data: ordersData } = await supabase
-          .from("orders")
-          .select(`customer_name, customer_cpf, notes, order_items(quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
-          .eq("table_id", bill.table_id)
-          .gte("created_at", startDateFilter)
-          .lte("created_at", bill.created_at)
-          .order("created_at", { ascending: false });
+          const startDateFilter = lastPaidBill ? lastPaidBill.created_at : new Date(0).toISOString();
+          const { data } = await supabase
+            .from("orders")
+            .select(`customer_name, customer_cpf, notes, order_items(quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
+            .eq("table_id", bill.table_id)
+            .gte("created_at", startDateFilter)
+            .lte("created_at", bill.created_at)
+            .order("created_at", { ascending: false });
+          ordersData = data;
+        }
 
         return { ...bill, orders: ordersData || [] };
       })
@@ -450,7 +464,7 @@ const LocalOrdersTab = ({
             bill.payment_method
               ? `
           <div style="margin-top: 16px; padding: 8px; background: #f0f9ff; border-radius: 4px;">
-            <p style="margin: 0; font-size: 12px;"><strong>Forma de pagamento:</strong> ${bill.payment_method === "cash" ? "Dinheiro" : bill.payment_method === "debit" ? "Cartão de Débito" : bill.payment_method === "credit" ? "Cartão de Crédito" : "Pix"}</p>
+            <p style="margin: 0; font-size: 12px;"><strong>Forma de pagamento:</strong> ${bill.payment_method === "cash" ? "Dinheiro" : bill.payment_method === "debit" ? "Cartão de Débito" : bill.payment_method === "credit" ? "Cartão de Crédito" : bill.payment_method === "meal_voucher" ? "Vale Refeição" : bill.payment_method === "mixed" ? "Misto" : "Pix"}</p>
             ${bill.change_amount ? `<p style="margin: 4px 0; font-size: 12px;"><strong>Troco para:</strong> R$ ${bill.change_amount.toFixed(2)}</p>` : ""}
           </div>
           `
@@ -709,6 +723,10 @@ const LocalOrdersTab = ({
                                 ? "Cartão de Débito"
                                 : bill.payment_method === "credit"
                                 ? "Cartão de Crédito"
+                                : bill.payment_method === "meal_voucher"
+                                ? "Vale Refeição"
+                                : bill.payment_method === "mixed"
+                                ? "Misto"
                                 : "Pix"}
                             </div>
                           )}
