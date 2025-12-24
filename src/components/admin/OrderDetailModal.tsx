@@ -95,6 +95,101 @@ export const OrderDetailModal = ({
     }, 0);
   };
 
+  // Função para enviar notificação WhatsApp automática
+  const sendWhatsAppNotification = async (newStatus: string) => {
+    try {
+      // Só envia se tiver telefone do cliente
+      if (!order.delivery_phone) {
+        console.log('[WhatsApp][AUTO] Sem telefone para pedido', order.id);
+        return;
+      }
+
+      // Buscar config do WhatsApp
+      const { data: config, error: configError } = await supabase
+        .from('whatsapp_config')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+
+      if (configError) {
+        console.error('[WhatsApp][AUTO] Erro ao buscar config:', configError);
+        return;
+      }
+
+      if (!config?.enabled) {
+        console.log('[WhatsApp][AUTO] WhatsApp não habilitado para restaurante');
+        return;
+      }
+
+      if (config?.instance_status !== 'connected') {
+        console.log('[WhatsApp][AUTO] Instância não conectada:', config?.instance_status);
+        return;
+      }
+
+      // Mapear status para template de mensagem
+      // accepted/preparing -> message_accepted
+      // out_for_delivery -> message_out_for_delivery
+      // delivered/picked_up -> message_delivered
+      let template: string | null = null;
+      let messageType = '';
+
+      if (newStatus === 'accepted' || newStatus === 'preparing') {
+        template = config.message_accepted;
+        messageType = 'accepted';
+      } else if (newStatus === 'out_for_delivery') {
+        template = config.message_out_for_delivery;
+        messageType = 'out_for_delivery';
+      } else if (newStatus === 'delivered' || newStatus === 'picked_up') {
+        template = config.message_delivered;
+        messageType = 'delivered';
+      }
+
+      if (!template) {
+        console.log('[WhatsApp][AUTO] Sem template para status:', newStatus);
+        return;
+      }
+
+      // Buscar tempo estimado do restaurante
+      const { data: restaurant } = await supabase
+        .from('restaurants')
+        .select('prep_time_minutes')
+        .eq('id', restaurantId)
+        .single();
+
+      const tempoEstimado = restaurant?.prep_time_minutes?.toString() || '30';
+
+      // Substituir variáveis do template
+      const message = template
+        .replace(/{nome}/g, order.customer_name || 'Cliente')
+        .replace(/{pedido}/g, order.id.slice(0, 8))
+        .replace(/{tempo}/g, tempoEstimado);
+
+      console.log('[WhatsApp][AUTO] Enviando mensagem para pedido', order.id, 'status:', newStatus);
+      console.log('[WhatsApp][AUTO] Telefone:', order.delivery_phone);
+      console.log('[WhatsApp][AUTO] Mensagem:', message);
+
+      // Chamar edge function
+      const { data, error: sendError } = await supabase.functions.invoke('whatsapp-send', {
+        body: {
+          restaurantId,
+          phone: order.delivery_phone,
+          message,
+          orderId: order.id,
+          messageType
+        }
+      });
+
+      if (sendError) {
+        console.error('[WhatsApp][AUTO] Erro ao enviar:', sendError);
+      } else {
+        console.log('[WhatsApp][AUTO] Mensagem enviada com sucesso!', data);
+      }
+    } catch (error) {
+      console.error('[WhatsApp][AUTO] Erro geral:', error);
+      // Não bloquear o fluxo se falhar o WhatsApp
+    }
+  };
+
   const updateStatus = async (newStatus: string) => {
     try {
       const { error } = await supabase.rpc("admin_update_order_status", {
@@ -104,6 +199,10 @@ export const OrderDetailModal = ({
       });
 
       if (error) throw error;
+      
+      // Enviar notificação WhatsApp após sucesso (não bloqueia o fluxo)
+      sendWhatsAppNotification(newStatus);
+      
       toast.success("Status atualizado!");
       onStatusUpdate();
       onClose();
