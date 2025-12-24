@@ -32,12 +32,18 @@ interface WhatsAppConfig {
   message_accepted: string | null;
   message_out_for_delivery: string | null;
   message_delivered: string | null;
+  message_ready_for_pickup: string | null;
+  message_picked_up: string | null;
+  message_cancelled: string | null;
 }
 
 const DEFAULT_MESSAGES = {
   accepted: "✅ Olá {nome}! Seu pedido #{pedido} foi aceito e está sendo preparado. Tempo estimado: {tempo} minutos.",
   out_for_delivery: "🚗 Seu pedido #{pedido} saiu para entrega! Em breve chegará no seu endereço.",
-  delivered: "🎉 Pedido #{pedido} entregue com sucesso! Obrigado pela preferência, {nome}!"
+  delivered: "🎉 Pedido #{pedido} entregue com sucesso! Obrigado pela preferência, {nome}!",
+  ready_for_pickup: "📍 Seu pedido #{pedido} está pronto para retirada! Aguardamos você!",
+  picked_up: "✅ Pedido #{pedido} retirado com sucesso! Obrigado pela preferência, {nome}! 🙏",
+  cancelled: "❌ Olá {nome}, infelizmente seu pedido #{pedido} foi cancelado. Entre em contato conosco para mais informações."
 };
 
 const SUPABASE_URL = "https://nrddbsudiphrvgfneqle.supabase.co";
@@ -54,7 +60,10 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [messages, setMessages] = useState({
     accepted: DEFAULT_MESSAGES.accepted,
     out_for_delivery: DEFAULT_MESSAGES.out_for_delivery,
-    delivered: DEFAULT_MESSAGES.delivered
+    delivered: DEFAULT_MESSAGES.delivered,
+    ready_for_pickup: DEFAULT_MESSAGES.ready_for_pickup,
+    picked_up: DEFAULT_MESSAGES.picked_up,
+    cancelled: DEFAULT_MESSAGES.cancelled
   });
   
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -115,7 +124,10 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
         setMessages({
           accepted: data.message_accepted || DEFAULT_MESSAGES.accepted,
           out_for_delivery: data.message_out_for_delivery || DEFAULT_MESSAGES.out_for_delivery,
-          delivered: data.message_delivered || DEFAULT_MESSAGES.delivered
+          delivered: data.message_delivered || DEFAULT_MESSAGES.delivered,
+          ready_for_pickup: data.message_ready_for_pickup || DEFAULT_MESSAGES.ready_for_pickup,
+          picked_up: data.message_picked_up || DEFAULT_MESSAGES.picked_up,
+          cancelled: data.message_cancelled || DEFAULT_MESSAGES.cancelled
         });
       }
     } catch (error) {
@@ -346,6 +358,9 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
           message_accepted: messages.accepted,
           message_out_for_delivery: messages.out_for_delivery,
           message_delivered: messages.delivered,
+          message_ready_for_pickup: messages.ready_for_pickup,
+          message_picked_up: messages.picked_up,
+          message_cancelled: messages.cancelled,
           updated_at: new Date().toISOString()
         }, { onConflict: 'restaurant_id' });
 
@@ -564,7 +579,10 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
             <code className="bg-muted px-1 rounded ml-1">{'{endereco}'}</code>
           </p>
 
+          {/* Delivery Section */}
           <div className="space-y-4">
+            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">📦 Entrega</h4>
+            
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -577,8 +595,6 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
                 placeholder="Mensagem quando o pedido for aceito..."
               />
             </div>
-
-            <Separator />
 
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
@@ -593,8 +609,6 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
               />
             </div>
 
-            <Separator />
-
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-purple-600" />
@@ -605,6 +619,59 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
                 onChange={(e) => setMessages(prev => ({ ...prev, delivered: e.target.value }))}
                 rows={3}
                 placeholder="Mensagem quando o pedido for entregue..."
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Pickup Section */}
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">🏪 Retirada</h4>
+            
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-orange-600" />
+                Pronto para Retirada
+              </Label>
+              <Textarea
+                value={messages.ready_for_pickup}
+                onChange={(e) => setMessages(prev => ({ ...prev, ready_for_pickup: e.target.value }))}
+                rows={3}
+                placeholder="Mensagem quando o pedido estiver pronto para retirada..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Pedido Retirado
+              </Label>
+              <Textarea
+                value={messages.picked_up}
+                onChange={(e) => setMessages(prev => ({ ...prev, picked_up: e.target.value }))}
+                rows={3}
+                placeholder="Mensagem quando o cliente retirar o pedido..."
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Cancellation Section */}
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">❌ Cancelamento</h4>
+            
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-red-600" />
+                Pedido Cancelado
+              </Label>
+              <Textarea
+                value={messages.cancelled}
+                onChange={(e) => setMessages(prev => ({ ...prev, cancelled: e.target.value }))}
+                rows={3}
+                placeholder="Mensagem quando o pedido for cancelado..."
               />
             </div>
           </div>

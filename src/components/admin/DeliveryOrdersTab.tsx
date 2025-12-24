@@ -173,13 +173,27 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
       }
 
       // Mapear status para template de mensagem
-      const messageTemplates: Record<string, string | null | undefined> = {
-        accepted: config.message_accepted,
-        out_for_delivery: config.message_out_for_delivery,
-        delivered: config.message_delivered,
+      const getTemplate = () => {
+        if (newStatus === 'accepted') {
+          return { template: config.message_accepted, type: 'accepted' };
+        } else if (newStatus === 'out_for_delivery') {
+          // Se for pedido de retirada, usa o template de "pronto para retirada"
+          if (order.delivery_type === 'pickup') {
+            return { template: config.message_ready_for_pickup, type: 'ready_for_pickup' };
+          }
+          return { template: config.message_out_for_delivery, type: 'out_for_delivery' };
+        } else if (newStatus === 'delivered') {
+          return { template: config.message_delivered, type: 'delivered' };
+        } else if (newStatus === 'picked_up') {
+          return { template: config.message_picked_up, type: 'picked_up' };
+        } else if (newStatus === 'cancelled') {
+          return { template: config.message_cancelled, type: 'cancelled' };
+        }
+        return { template: null, type: '' };
       };
 
-      const template = messageTemplates[newStatus];
+      const { template, type: messageType } = getTemplate();
+
       if (!template) {
         console.log('[WhatsApp] No template for status:', newStatus);
         return;
@@ -200,7 +214,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
           phone: order.delivery_phone,
           message,
           orderId: order.id,
-          messageType: newStatus
+          messageType
         }
       });
 
