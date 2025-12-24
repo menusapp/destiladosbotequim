@@ -151,7 +151,7 @@ serve(async (req) => {
           const stateData = await stateResponse.json();
           console.log(`[GET] Connection state:`, stateData);
 
-          const isConnected = stateData.state === 'open';
+          const isConnected = stateData.instance?.state === 'open' || stateData.state === 'open';
           const instanceState = stateData.instance?.state || stateData.state || 'unknown';
 
           await supabase
