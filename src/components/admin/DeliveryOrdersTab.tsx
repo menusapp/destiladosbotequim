@@ -141,9 +141,86 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
     }
   };
 
+  // Função para enviar notificação WhatsApp automática
+  const sendWhatsAppNotification = async (order: Order, newStatus: string) => {
+    try {
+      // Só envia se tiver telefone do cliente
+      if (!order.delivery_phone) {
+        console.log('[WhatsApp] No phone number for order', order.id);
+        return;
+      }
+
+      // Buscar config do WhatsApp
+      const { data: config, error: configError } = await supabase
+        .from('whatsapp_config')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+
+      if (configError) {
+        console.error('[WhatsApp] Config fetch error:', configError);
+        return;
+      }
+
+      if (!config?.enabled) {
+        console.log('[WhatsApp] Not enabled for restaurant');
+        return;
+      }
+
+      if (config?.instance_status !== 'connected') {
+        console.log('[WhatsApp] Instance not connected:', config?.instance_status);
+        return;
+      }
+
+      // Mapear status para template de mensagem
+      const messageTemplates: Record<string, string | null | undefined> = {
+        accepted: config.message_accepted,
+        out_for_delivery: config.message_out_for_delivery,
+        delivered: config.message_delivered,
+      };
+
+      const template = messageTemplates[newStatus];
+      if (!template) {
+        console.log('[WhatsApp] No template for status:', newStatus);
+        return;
+      }
+
+      // Substituir variáveis do template
+      const message = template
+        .replace(/{nome}/g, order.customer_name || 'Cliente')
+        .replace(/{pedido}/g, order.id.slice(0, 8))
+        .replace(/{tempo}/g, '30'); // tempo estimado padrão
+
+      console.log('[WhatsApp] Sending message for order', order.id, 'status:', newStatus);
+
+      // Chamar edge function
+      const { error: sendError } = await supabase.functions.invoke('whatsapp-send', {
+        body: {
+          restaurantId,
+          phone: order.delivery_phone,
+          message,
+          orderId: order.id,
+          messageType: newStatus
+        }
+      });
+
+      if (sendError) {
+        console.error('[WhatsApp] Send error:', sendError);
+      } else {
+        console.log('[WhatsApp] Message sent successfully for order', order.id);
+      }
+    } catch (error) {
+      console.error('[WhatsApp] Error sending notification:', error);
+      // Não bloquear o fluxo se falhar o WhatsApp
+    }
+  };
+
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     setIsUpdating(true);
     try {
+      // Buscar o pedido antes de atualizar para ter os dados completos
+      const orderToUpdate = orders.find(o => o.id === orderId);
+
       // Update otimista: atualizar UI ANTES da chamada RPC
       setOrders(prevOrders => 
         prevOrders.map(order => 
@@ -163,6 +240,11 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
         // Se der erro, reverter o update otimista
         fetchOrders();
         throw error;
+      }
+
+      // Enviar notificação WhatsApp após sucesso (não bloqueia o fluxo)
+      if (orderToUpdate) {
+        sendWhatsAppNotification(orderToUpdate, newStatus);
       }
 
       const statusMessages: Record<string, string> = {
