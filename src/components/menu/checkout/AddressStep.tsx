@@ -118,13 +118,14 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
     loadUserData();
   }, [restaurantSlug]);
 
+  // Estado para controlar se telefone veio do cadastro (readonly)
+  const [phoneFromCustomer, setPhoneFromCustomer] = useState(false);
+
   // Quando CPF é preenchido, buscar dados do cliente na tabela customers
+  // SEMPRE priorizar telefone do cadastro customers (fonte da verdade para WhatsApp)
   useEffect(() => {
     const fetchCustomerData = async () => {
       if (customerCPF.length !== 11 || !restaurantId) return;
-      
-      // Só buscar se telefone ainda não estiver preenchido
-      if (customerPhone) return;
       
       const { data: customer } = await supabase
         .from("customers")
@@ -135,7 +136,15 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
       
       if (customer) {
         if (customer.name && !customerName) setCustomerName(customer.name);
-        if (customer.phone && !customerPhone) setCustomerPhone(customer.phone);
+        // SEMPRE usar telefone do cadastro se existir (prioridade máxima)
+        if (customer.phone) {
+          setCustomerPhone(customer.phone);
+          setPhoneFromCustomer(true);
+        } else {
+          setPhoneFromCustomer(false);
+        }
+      } else {
+        setPhoneFromCustomer(false);
       }
     };
     
@@ -196,8 +205,10 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
 
     if (data && data.length > 0) {
       setSavedAddresses(data);
-      setCustomerName(data[0].customer_name);
-      setCustomerPhone(data[0].customer_phone);
+      // Só usar nome do endereço se não tiver nome preenchido
+      if (!customerName) setCustomerName(data[0].customer_name);
+      // NÃO sobrescrever telefone do cadastro customers - só usar do endereço se não tiver telefone
+      if (!customerPhone && !phoneFromCustomer) setCustomerPhone(data[0].customer_phone);
       setSelectedAddress(data[0]);
       setShowNewForm(false);
       
@@ -413,19 +424,27 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
 
         <div>
           <Label htmlFor="phone" className={fieldErrors.phone ? "text-red-500" : ""}>
-            Telefone
+            Telefone {phoneFromCustomer && <span className="text-xs text-muted-foreground">(do cadastro)</span>}
           </Label>
           <Input
             id="phone"
             value={customerPhone}
             onChange={(e) => {
-              setCustomerPhone(e.target.value);
-              if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: false }));
+              if (!phoneFromCustomer) {
+                setCustomerPhone(e.target.value);
+                if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: false }));
+              }
             }}
             placeholder="(00) 00000-0000"
-            className={fieldErrors.phone ? "border-red-300 bg-red-50/50" : ""}
+            className={`${fieldErrors.phone ? "border-red-300 bg-red-50/50" : ""} ${phoneFromCustomer ? "bg-muted/50" : ""}`}
+            readOnly={phoneFromCustomer}
           />
-          {fieldErrors.phone && (
+          {phoneFromCustomer && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Telefone do seu cadastro. Para alterar, acesse seu perfil.
+            </p>
+          )}
+          {fieldErrors.phone && !phoneFromCustomer && (
             <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
           )}
         </div>
