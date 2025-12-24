@@ -101,7 +101,35 @@ serve(async (req) => {
     console.log(`[SEND] Response:`, sendData);
 
     if (!sendResponse.ok) {
-      throw new Error(sendData.message || 'Failed to send message');
+      // Check if it's a "number doesn't exist on WhatsApp" error
+      const numberNotOnWhatsApp = sendData?.response?.message?.some?.(
+        (m: { exists?: boolean }) => m.exists === false
+      );
+
+      if (numberNotOnWhatsApp) {
+        console.log(`[SEND] Number ${formattedPhone} is not on WhatsApp`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'number_not_on_whatsapp',
+            message: 'Este número não está cadastrado no WhatsApp',
+            to: formattedPhone
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // For other errors, log and return error response
+      console.error(`[SEND] Evolution API error:`, sendData);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'send_failed',
+          message: sendData.message || 'Falha ao enviar mensagem',
+          details: sendData
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response(
