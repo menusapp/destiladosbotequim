@@ -128,8 +128,11 @@ export const OrderDetailModal = ({
 
       // Mapear status para template de mensagem
       // accepted/preparing -> message_accepted
-      // out_for_delivery -> message_out_for_delivery
-      // delivered/picked_up -> message_delivered
+      // out_for_delivery (delivery) -> message_out_for_delivery
+      // out_for_delivery (pickup) / ready -> message_ready_for_pickup
+      // delivered -> message_delivered
+      // picked_up -> message_picked_up
+      // cancelled -> message_cancelled
       let template: string | null = null;
       let messageType = '';
 
@@ -137,11 +140,26 @@ export const OrderDetailModal = ({
         template = config.message_accepted;
         messageType = 'accepted';
       } else if (newStatus === 'out_for_delivery') {
-        template = config.message_out_for_delivery;
-        messageType = 'out_for_delivery';
-      } else if (newStatus === 'delivered' || newStatus === 'picked_up') {
+        // Se for pedido de retirada, usa o template de "pronto para retirada"
+        if (order.delivery_type === 'pickup') {
+          template = config.message_ready_for_pickup;
+          messageType = 'ready_for_pickup';
+        } else {
+          template = config.message_out_for_delivery;
+          messageType = 'out_for_delivery';
+        }
+      } else if (newStatus === 'ready') {
+        template = config.message_ready_for_pickup;
+        messageType = 'ready_for_pickup';
+      } else if (newStatus === 'delivered') {
         template = config.message_delivered;
         messageType = 'delivered';
+      } else if (newStatus === 'picked_up') {
+        template = config.message_picked_up;
+        messageType = 'picked_up';
+      } else if (newStatus === 'cancelled') {
+        template = config.message_cancelled;
+        messageType = 'cancelled';
       }
 
       if (!template) {

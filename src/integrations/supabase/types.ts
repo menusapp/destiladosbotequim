@@ -2078,8 +2078,11 @@ export type Database = {
           instance_name: string | null
           instance_status: string | null
           message_accepted: string | null
+          message_cancelled: string | null
           message_delivered: string | null
           message_out_for_delivery: string | null
+          message_picked_up: string | null
+          message_ready_for_pickup: string | null
           phone_number: string | null
           restaurant_id: string
           updated_at: string | null
@@ -2094,8 +2097,11 @@ export type Database = {
           instance_name?: string | null
           instance_status?: string | null
           message_accepted?: string | null
+          message_cancelled?: string | null
           message_delivered?: string | null
           message_out_for_delivery?: string | null
+          message_picked_up?: string | null
+          message_ready_for_pickup?: string | null
           phone_number?: string | null
           restaurant_id: string
           updated_at?: string | null
@@ -2110,8 +2116,11 @@ export type Database = {
           instance_name?: string | null
           instance_status?: string | null
           message_accepted?: string | null
+          message_cancelled?: string | null
           message_delivered?: string | null
           message_out_for_delivery?: string | null
+          message_picked_up?: string | null
+          message_ready_for_pickup?: string | null
           phone_number?: string | null
           restaurant_id?: string
           updated_at?: string | null
