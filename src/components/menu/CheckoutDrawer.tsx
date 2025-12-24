@@ -100,6 +100,22 @@ export const CheckoutDrawer = ({
         ? (subtotal * restaurant.service_fee_percentage / 100) 
         : 0;
 
+      // PRIORIDADE: Buscar telefone do cadastro do cliente (fonte da verdade para WhatsApp)
+      let phoneToUse = customerData.phone;
+      const { data: customerRecord } = await supabase
+        .from("customers")
+        .select("phone")
+        .eq("cpf", customerData.cpf)
+        .eq("restaurant_id", restaurant.id)
+        .maybeSingle();
+      
+      if (customerRecord?.phone) {
+        phoneToUse = customerRecord.phone;
+        console.log("[WhatsApp] Usando telefone do cadastro:", phoneToUse);
+      } else {
+        console.log("[WhatsApp] Usando telefone informado no pedido:", phoneToUse);
+      }
+
       const orderData: any = {
         table_id: null,
         restaurant_id: restaurant.id,
@@ -108,7 +124,7 @@ export const CheckoutDrawer = ({
         order_type: "delivery",
         delivery_type: deliveryType,
         delivery_address: deliveryType === "delivery" ? formatAddress(addressData?.address) : null,
-        delivery_phone: customerData.phone,
+        delivery_phone: phoneToUse,
         delivery_neighborhood: deliveryType === "delivery" ? addressData?.address?.neighborhood : null,
         delivery_city: deliveryType === "delivery" ? addressData?.address?.city : null,
         payment_type: paymentData.method,
