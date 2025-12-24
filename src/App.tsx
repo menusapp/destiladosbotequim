@@ -29,17 +29,17 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/ceo" element={
-              <ProtectedRoute requiredRole="ceo">
+              <ProtectedRoute>
                 <CEODashboard />
               </ProtectedRoute>
             } />
             <Route path="/admin" element={
-              <ProtectedRoute requiredRole="restaurant_admin">
+              <ProtectedRoute>
                 <RestaurantAdmin />
               </ProtectedRoute>
             } />
             <Route path="/admin/table/:tableId" element={
-              <ProtectedRoute requiredRole="restaurant_admin">
+              <ProtectedRoute>
                 <TableDetailView />
               </ProtectedRoute>
             } />
