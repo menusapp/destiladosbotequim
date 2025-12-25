@@ -261,6 +261,22 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
         sendWhatsAppNotification(orderToUpdate, newStatus);
       }
 
+      // Disparar gatilho de marketing para campanhas automáticas
+      if (newStatus === 'delivered' || newStatus === 'picked_up') {
+        supabase.functions.invoke('marketing-trigger', {
+          body: {
+            orderId: orderId,
+            restaurantId: restaurantId
+          }
+        }).then(({ error: marketingError }) => {
+          if (marketingError) {
+            console.error('[Marketing] Trigger error:', marketingError);
+          } else {
+            console.log('[Marketing] Trigger invoked for order', orderId);
+          }
+        });
+      }
+
       const statusMessages: Record<string, string> = {
         accepted: "Pedido aceito e em preparo",
         out_for_delivery: "Pedido saiu para entrega",
