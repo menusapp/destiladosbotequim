@@ -69,7 +69,8 @@ export function CampaignForm({
   const [triggerProductId, setTriggerProductId] = useState<string>("");
   const [triggerCategoryId, setTriggerCategoryId] = useState<string>("");
   const [delayValue, setDelayValue] = useState(3);
-  const [delayUnit, setDelayUnit] = useState<"minutes" | "hours" | "days">("days");
+  const [delayUnit, setDelayUnit] = useState<"seconds" | "minutes" | "hours" | "days">("days");
+  const [orderTypeFilter, setOrderTypeFilter] = useState<"all" | "online" | "local">("all");
   const [messageTemplate, setMessageTemplate] = useState(
     "Olá {nome}! 🎉\n\nSentimos sua falta! Use o cupom {cupom} e ganhe {desconto} na sua próxima compra!\n\nVálido por {validade} dias. Te esperamos!"
   );
@@ -140,6 +141,7 @@ export function CampaignForm({
       setDiscountTargetProductId(rule.discount_target_product_id || "");
       setDiscountTargetCategoryId(rule.discount_target_category_id || "");
       setDiscountValidityDays(rule.discount_validity_days || 7);
+      setOrderTypeFilter((rule.order_type_filter as any) || "all");
     }
   };
 
@@ -160,6 +162,7 @@ export function CampaignForm({
     setDiscountTargetProductId("");
     setDiscountTargetCategoryId("");
     setDiscountValidityDays(7);
+    setOrderTypeFilter("all");
   };
 
   const handleSubmit = async () => {
@@ -211,6 +214,7 @@ export function CampaignForm({
             discount_target_product_id: includeDiscount && discountTargetType === "product" ? discountTargetProductId : null,
             discount_target_category_id: includeDiscount && discountTargetType === "category" ? discountTargetCategoryId : null,
             discount_validity_days: discountValidityDays,
+            order_type_filter: orderTypeFilter,
           })
           .eq("campaign_id", editingCampaign.id);
 
@@ -248,6 +252,7 @@ export function CampaignForm({
             discount_target_product_id: includeDiscount && discountTargetType === "product" ? discountTargetProductId : null,
             discount_target_category_id: includeDiscount && discountTargetType === "category" ? discountTargetCategoryId : null,
             discount_validity_days: discountValidityDays,
+            order_type_filter: orderTypeFilter,
           });
 
         if (ruleError) throw ruleError;
@@ -368,12 +373,45 @@ export function CampaignForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="seconds">Segundos</SelectItem>
                   <SelectItem value="minutes">Minutos</SelectItem>
                   <SelectItem value="hours">Horas</SelectItem>
                   <SelectItem value="days">Dias</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Tipo de Pedido */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold">Tipo de Pedido</Label>
+            <p className="text-sm text-muted-foreground">
+              Para quais tipos de pedido esta campanha será acionada?
+            </p>
+
+            <RadioGroup
+              value={orderTypeFilter}
+              onValueChange={(v) => setOrderTypeFilter(v as any)}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="all" id="order-all" />
+                <Label htmlFor="order-all">Ambos (Online + Local)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="online" id="order-online" />
+                <Label htmlFor="order-online" className="text-sm">
+                  Apenas Online (Delivery/Retirada do cardápio digital ou PDV)
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="local" id="order-local" />
+                <Label htmlFor="order-local" className="text-sm">
+                  Apenas Local (Pedidos de mesas/comandas)
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
 
           <Separator />

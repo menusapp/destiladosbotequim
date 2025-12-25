@@ -1117,6 +1117,7 @@ export type Database = {
           discount_value: number | null
           id: string
           message_template: string
+          order_type_filter: string | null
           trigger_category_id: string | null
           trigger_product_id: string | null
           trigger_type: string
@@ -1134,6 +1135,7 @@ export type Database = {
           discount_value?: number | null
           id?: string
           message_template: string
+          order_type_filter?: string | null
           trigger_category_id?: string | null
           trigger_product_id?: string | null
           trigger_type: string
@@ -1151,6 +1153,7 @@ export type Database = {
           discount_value?: number | null
           id?: string
           message_template?: string
+          order_type_filter?: string | null
           trigger_category_id?: string | null
           trigger_product_id?: string | null
           trigger_type?: string

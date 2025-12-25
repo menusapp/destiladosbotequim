@@ -221,6 +221,22 @@ export const OrderDetailModal = ({
       // Enviar notificação WhatsApp após sucesso (não bloqueia o fluxo)
       sendWhatsAppNotification(newStatus);
       
+      // Disparar gatilho de marketing para campanhas automáticas
+      if (newStatus === 'delivered' || newStatus === 'picked_up') {
+        supabase.functions.invoke('marketing-trigger', {
+          body: {
+            orderId: order.id,
+            restaurantId: restaurantId
+          }
+        }).then(({ error: triggerError }) => {
+          if (triggerError) {
+            console.error('[Marketing] Trigger error:', triggerError);
+          } else {
+            console.log('[Marketing] Trigger invoked for order', order.id);
+          }
+        });
+      }
+      
       toast.success("Status atualizado!");
       onStatusUpdate();
       onClose();

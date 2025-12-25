@@ -28,6 +28,7 @@ serve(async (req) => {
         customer_name,
         customer_cpf,
         delivery_phone,
+        order_type,
         order_items(
           product_id,
           products(
@@ -76,7 +77,7 @@ serve(async (req) => {
       .select(`
         id,
         name,
-        marketing_campaign_rules(*)
+        marketing_campaign_rules(*, order_type_filter)
       `)
       .eq("restaurant_id", restaurantId)
       .eq("is_active", true);
@@ -174,11 +175,28 @@ serve(async (req) => {
         }
 
         if (matches) {
+          // Check order type filter
+          const orderType = order.order_type || 'local';
+          const isOnlineOrder = orderType === 'delivery';
+          const filterType = rule.order_type_filter || 'all';
+
+          if (filterType === 'online' && !isOnlineOrder) {
+            console.log(`[marketing-trigger] Campaign ${campaign.name} skipped: filter is 'online' but order is 'local'`);
+            continue;
+          }
+          if (filterType === 'local' && isOnlineOrder) {
+            console.log(`[marketing-trigger] Campaign ${campaign.name} skipped: filter is 'local' but order is 'online'`);
+            continue;
+          }
+
           console.log(`[marketing-trigger] Campaign ${campaign.name} matches!`);
 
           // Calculate scheduled time
           let scheduledFor = new Date();
           switch (rule.delay_unit) {
+            case "seconds":
+              scheduledFor.setSeconds(scheduledFor.getSeconds() + rule.delay_value);
+              break;
             case "minutes":
               scheduledFor.setMinutes(scheduledFor.getMinutes() + rule.delay_value);
               break;
