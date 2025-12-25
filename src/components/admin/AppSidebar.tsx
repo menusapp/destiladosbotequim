@@ -20,6 +20,7 @@ import {
   MapPin,
   Printer,
   MessageSquare,
+  Megaphone,
 } from "lucide-react";
 import {
   Sidebar,
@@ -70,10 +71,10 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "margens", label: "Margens", icon: TrendingUp },
       { id: "relatorios", label: "Relatórios", icon: BarChart3 },
       { id: "clientes", label: "Clientes", icon: Users },
+      { id: "marketing", label: "Marketing", icon: Megaphone },
     ],
     development: [
       { id: "entregadores", label: "Entregadores", icon: Truck },
-      { id: "marketing", label: "Marketing", icon: TrendingUp },
       { id: "modulos", label: "Módulos", icon: Construction },
     ],
     configSubItems: [
