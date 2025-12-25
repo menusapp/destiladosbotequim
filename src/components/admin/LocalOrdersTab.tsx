@@ -253,6 +253,22 @@ const LocalOrdersTab = ({
       return;
     }
 
+    // Disparar gatilho de marketing para campanhas automáticas
+    if (newStatus === 'delivered' || newStatus === 'picked_up') {
+      supabase.functions.invoke('marketing-trigger', {
+        body: {
+          orderId: orderId,
+          restaurantId: restaurantId
+        }
+      }).then(({ error: marketingError }) => {
+        if (marketingError) {
+          console.error('[Marketing] Trigger error:', marketingError);
+        } else {
+          console.log('[Marketing] Trigger invoked for order', orderId);
+        }
+      });
+    }
+
     toast.success("Status atualizado!");
     fetchOrders();
   };
