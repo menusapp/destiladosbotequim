@@ -32,7 +32,7 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
 
       if (data) {
         setWhatsappEnabled(data.enabled || false);
-        setWhatsappConnected(data.instance_status === "open");
+        setWhatsappConnected(data.instance_status === "connected");
       } else {
         setWhatsappEnabled(false);
         setWhatsappConnected(false);

@@ -57,7 +57,7 @@ serve(async (req) => {
           .eq("restaurant_id", message.restaurant_id)
           .single();
 
-        if (!whatsappConfig?.enabled || whatsappConfig?.instance_status !== "open") {
+        if (!whatsappConfig?.enabled || whatsappConfig?.instance_status !== "connected") {
           console.log(`[marketing-scheduler] WhatsApp not enabled/connected for restaurant ${message.restaurant_id}`);
           
           // Mark as failed
