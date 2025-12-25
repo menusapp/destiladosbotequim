@@ -1103,6 +1103,214 @@ export type Database = {
           },
         ]
       }
+      marketing_campaign_rules: {
+        Row: {
+          campaign_id: string
+          created_at: string | null
+          delay_unit: string
+          delay_value: number
+          discount_target_category_id: string | null
+          discount_target_product_id: string | null
+          discount_target_type: string | null
+          discount_type: string | null
+          discount_validity_days: number | null
+          discount_value: number | null
+          id: string
+          message_template: string
+          trigger_category_id: string | null
+          trigger_product_id: string | null
+          trigger_type: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string | null
+          delay_unit?: string
+          delay_value?: number
+          discount_target_category_id?: string | null
+          discount_target_product_id?: string | null
+          discount_target_type?: string | null
+          discount_type?: string | null
+          discount_validity_days?: number | null
+          discount_value?: number | null
+          id?: string
+          message_template: string
+          trigger_category_id?: string | null
+          trigger_product_id?: string | null
+          trigger_type: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string | null
+          delay_unit?: string
+          delay_value?: number
+          discount_target_category_id?: string | null
+          discount_target_product_id?: string | null
+          discount_target_type?: string | null
+          discount_type?: string | null
+          discount_validity_days?: number | null
+          discount_value?: number | null
+          id?: string
+          message_template?: string
+          trigger_category_id?: string | null
+          trigger_product_id?: string | null
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaign_rules_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_campaign_rules_discount_target_category_id_fkey"
+            columns: ["discount_target_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_campaign_rules_discount_target_product_id_fkey"
+            columns: ["discount_target_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_campaign_rules_trigger_category_id_fkey"
+            columns: ["trigger_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_campaign_rules_trigger_product_id_fkey"
+            columns: ["trigger_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_campaigns: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaigns_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_scheduled_messages: {
+        Row: {
+          campaign_id: string | null
+          coupon_code: string | null
+          created_at: string | null
+          customer_cpf: string
+          customer_name: string
+          customer_phone: string
+          error_message: string | null
+          id: string
+          message_text: string
+          order_id: string | null
+          restaurant_id: string
+          rule_id: string | null
+          scheduled_for: string
+          sent_at: string | null
+          status: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          coupon_code?: string | null
+          created_at?: string | null
+          customer_cpf: string
+          customer_name: string
+          customer_phone: string
+          error_message?: string | null
+          id?: string
+          message_text: string
+          order_id?: string | null
+          restaurant_id: string
+          rule_id?: string | null
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          coupon_code?: string | null
+          created_at?: string | null
+          customer_cpf?: string
+          customer_name?: string
+          customer_phone?: string
+          error_message?: string | null
+          id?: string
+          message_text?: string
+          order_id?: string | null
+          restaurant_id?: string
+          rule_id?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_scheduled_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_scheduled_messages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_scheduled_messages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_scheduled_messages_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaign_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operational_costs: {
         Row: {
           created_at: string | null
