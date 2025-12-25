@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DevelopmentPlaceholder } from "@/components/admin/DevelopmentPlaceholder";
+import MarketingTab from "@/components/admin/MarketingTab";
 import { ReportsTab } from "@/components/admin/ReportsTab";
 import PedidosTab from "@/components/admin/PedidosTab";
 import LocalOrdersTab from "@/components/admin/LocalOrdersTab";
@@ -502,13 +503,17 @@ const RestaurantAdmin = () => {
       case "relatorios":
         return <ReportsTab restaurantId={restaurant.id} />;
       
+      // Clientes
+      case "clientes":
+        return <ClientesTab restaurantId={restaurant.id} />;
+      
+      // Marketing
+      case "marketing":
+        return <MarketingTab restaurantId={restaurant.id} onNavigateToWhatsApp={() => setActiveSection("config-whatsapp")} />;
+      
       // Em Desenvolvimento
       case "entregadores":
         return <DevelopmentPlaceholder title="Entregadores" />;
-      case "marketing":
-        return <DevelopmentPlaceholder title="Marketing" />;
-      case "clientes":
-        return <ClientesTab restaurantId={restaurant.id} />;
       case "modulos":
         return <DevelopmentPlaceholder title="Módulos e Assinaturas" />;
       
