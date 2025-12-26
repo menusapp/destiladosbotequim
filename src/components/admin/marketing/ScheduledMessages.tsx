@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, X, MessageSquare, User, Phone } from "lucide-react";
+import { Clock, X, MessageSquare, User, Phone, Play, Loader2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -28,6 +28,35 @@ interface ScheduledMessagesProps {
 export function ScheduledMessages({ restaurantId }: ScheduledMessagesProps) {
   const [messages, setMessages] = useState<ScheduledMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+
+  const isDelayed = (scheduledFor: string) => {
+    return new Date(scheduledFor) < new Date();
+  };
+
+  const processNow = async () => {
+    setProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("marketing-scheduler");
+      
+      if (error) throw error;
+      
+      const result = data as { processed?: number; success?: number; failed?: number };
+      
+      if (result.processed === 0) {
+        toast.info("Nenhuma mensagem pendente para processar");
+      } else {
+        toast.success(`Processadas: ${result.success || 0} enviadas, ${result.failed || 0} falhas`);
+      }
+      
+      fetchMessages();
+    } catch (error) {
+      console.error("Error processing messages:", error);
+      toast.error("Erro ao processar mensagens");
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   useEffect(() => {
     fetchMessages();
@@ -111,7 +140,22 @@ export function ScheduledMessages({ restaurantId }: ScheduledMessagesProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Mensagens Agendadas</h2>
-        <Badge variant="secondary">{messages.length} pendentes</Badge>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={processNow}
+            disabled={processing || messages.length === 0}
+          >
+            {processing ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            Processar agora
+          </Button>
+          <Badge variant="secondary">{messages.length} pendentes</Badge>
+        </div>
       </div>
 
       {messages.length === 0 ? (
@@ -159,6 +203,12 @@ export function ScheduledMessages({ restaurantId }: ScheduledMessagesProps) {
                           })}
                         </strong>
                       </span>
+                      {isDelayed(message.scheduled_for) && (
+                        <Badge variant="destructive" className="ml-2">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Atrasada
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="text-sm bg-muted p-2 rounded-md mt-2">
