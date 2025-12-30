@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Ticket, Plus, Pencil, Trash2, Gift, Truck } from "lucide-react";
+import { Ticket, Plus, Pencil, Trash2, Gift, Truck, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 
 interface Coupon {
@@ -55,6 +56,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [productVariations, setProductVariations] = useState<ProductVariation[]>([]);
   const [variationSystem, setVariationSystem] = useState<'new' | 'legacy' | null>(null);
+  const [variationDrawerOpen, setVariationDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -612,25 +614,64 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
                 {productVariations.length > 0 && (
                   <div>
                     <Label>Variação/Tamanho do Produto</Label>
-                    <Select
-                      value={formData.target_extra_id}
-                      onValueChange={(v) => setFormData({ ...formData, target_extra_id: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a variação (opcional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Qualquer variação</SelectItem>
-                        {productVariations.map((variation) => (
-                          <SelectItem key={variation.id} value={variation.id}>
-                            {variation.name} - R$ {variation.price.toFixed(2)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Escolha qual variação específica será dada de graça
-                    </p>
+
+                    <Drawer open={variationDrawerOpen} onOpenChange={setVariationDrawerOpen}>
+                      <DrawerTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-between"
+                        >
+                          <span className="truncate">
+                            {formData.target_extra_id
+                              ? productVariations.find(v => v.id === formData.target_extra_id)?.name || "Variação selecionada"
+                              : "Qualquer variação"}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </DrawerTrigger>
+
+                      <DrawerContent className="max-h-[80vh] bg-background z-50">
+                        <DrawerHeader>
+                          <DrawerTitle>Escolher variação</DrawerTitle>
+                        </DrawerHeader>
+
+                        <div className="px-4 pb-4 space-y-2 overflow-y-auto">
+                          <Button
+                            type="button"
+                            variant={formData.target_extra_id === "" ? "default" : "outline"}
+                            className="w-full justify-between"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, target_extra_id: "" }));
+                              setVariationDrawerOpen(false);
+                            }}
+                          >
+                            <span>Qualquer variação</span>
+                          </Button>
+
+                          {productVariations.map((variation) => (
+                            <Button
+                              key={variation.id}
+                              type="button"
+                              variant={formData.target_extra_id === variation.id ? "default" : "outline"}
+                              className="w-full justify-between"
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, target_extra_id: variation.id }));
+                                setVariationDrawerOpen(false);
+                              }}
+                            >
+                              <span className="truncate">
+                                {variation.name} - R$ {variation.price.toFixed(2)}
+                              </span>
+                            </Button>
+                          ))}
+
+                          <p className="text-xs text-muted-foreground">
+                            Escolha qual variação específica será dada de graça
+                          </p>
+                        </div>
+                      </DrawerContent>
+                    </Drawer>
                   </div>
                 )}
               </>
