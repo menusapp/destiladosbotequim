@@ -187,13 +187,19 @@ export default function ProgramsTab({ restaurantId }: ProgramsTabProps) {
       if (activate) {
         await supabase
           .from("loyalty_programs")
-          .update({ is_active: false })
+          .update({ is_active: false, activated_at: null })
           .eq("restaurant_id", restaurantId);
       }
 
+      // When activating, set activated_at to now; when deactivating, clear it
+      const updateData = {
+        is_active: activate,
+        activated_at: activate ? new Date().toISOString() : null,
+      };
+
       const { error } = await supabase
         .from("loyalty_programs")
-        .update({ is_active: activate })
+        .update(updateData)
         .eq("id", programId);
 
       if (error) throw error;

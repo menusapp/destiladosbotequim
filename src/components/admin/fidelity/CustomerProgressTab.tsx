@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -7,19 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Users, Gift, AlertCircle } from "lucide-react";
 
-interface CustomerProgress {
-  id: string;
-  customer_cpf: string;
-  purchase_count: number;
-  total_spent: number;
-  last_reward_trigger: number;
-  customer_name?: string;
-}
-
 interface LoyaltyProgram {
   id: string;
   name: string;
   type: string;
+  activated_at: string | null;
   rewards: {
     trigger_value: number;
     reward_type: string;
@@ -28,13 +20,21 @@ interface LoyaltyProgram {
   }[];
 }
 
+interface CustomerWithProgress {
+  cpf: string;
+  name: string;
+  phone: string | null;
+  purchase_count: number;
+  total_spent: number;
+}
+
 interface CustomerProgressTabProps {
   restaurantId: string;
 }
 
 export default function CustomerProgressTab({ restaurantId }: CustomerProgressTabProps) {
   const [activeProgram, setActiveProgram] = useState<LoyaltyProgram | null>(null);
-  const [customers, setCustomers] = useState<CustomerProgress[]>([]);
+  const [customers, setCustomers] = useState<CustomerWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -57,11 +57,15 @@ export default function CustomerProgressTab({ restaurantId }: CustomerProgressTa
       if (error) throw error;
 
       if (program) {
-        setActiveProgram({
-          ...program,
+        const programData: LoyaltyProgram = {
+          id: program.id,
+          name: program.name,
+          type: program.type,
+          activated_at: program.activated_at,
           rewards: program.loyalty_program_rewards || [],
-        });
-        await fetchCustomerProgress(program.id);
+        };
+        setActiveProgram(programData);
+        await fetchCustomersWithProgress(programData);
       } else {
         setActiveProgram(null);
       }
@@ -72,41 +76,91 @@ export default function CustomerProgressTab({ restaurantId }: CustomerProgressTa
     }
   };
 
-  const fetchCustomerProgress = async (programId: string) => {
+  const fetchCustomersWithProgress = async (program: LoyaltyProgram) => {
     try {
-      const { data: progress, error } = await supabase
-        .from("customer_loyalty_progress")
-        .select("*")
-        .eq("program_id", programId)
-        .order("purchase_count", { ascending: false });
-
-      if (error) throw error;
-
-      // Fetch customer names from orders
-      const cpfs = progress?.map(p => p.customer_cpf) || [];
-      const { data: orders } = await supabase
-        .from("orders")
-        .select("customer_cpf, customer_name")
-        .in("customer_cpf", cpfs)
+      // Fetch all customers from CRM
+      const { data: crmCustomers, error: crmError } = await supabase
+        .from("customers")
+        .select("cpf, name, phone")
         .eq("restaurant_id", restaurantId);
 
-      const cpfToName: Record<string, string> = {};
-      orders?.forEach(o => {
-        if (!cpfToName[o.customer_cpf]) {
-          cpfToName[o.customer_cpf] = o.customer_name;
+      if (crmError) throw crmError;
+
+      if (!crmCustomers || crmCustomers.length === 0) {
+        setCustomers([]);
+        return;
+      }
+
+      // Fetch orders made AFTER the program was activated
+      const cpfList = crmCustomers.map(c => c.cpf);
+      
+      let ordersQuery = supabase
+        .from("orders")
+        .select(`
+          id, customer_cpf, created_at,
+          order_items(price_at_order, quantity, order_item_extras(price_at_order))
+        `)
+        .eq("restaurant_id", restaurantId)
+        .in("customer_cpf", cpfList)
+        .in("status", ["delivered", "picked_up", "completed"]);
+
+      // Only count orders AFTER activation date
+      if (program.activated_at) {
+        ordersQuery = ordersQuery.gte("created_at", program.activated_at);
+      }
+
+      const { data: ordersData, error: ordersError } = await ordersQuery;
+      if (ordersError) throw ordersError;
+
+      // Calculate progress per customer
+      const progressByCustomer: Record<string, { purchase_count: number; total_spent: number }> = {};
+      
+      ordersData?.forEach(order => {
+        if (!progressByCustomer[order.customer_cpf]) {
+          progressByCustomer[order.customer_cpf] = { purchase_count: 0, total_spent: 0 };
         }
+        
+        progressByCustomer[order.customer_cpf].purchase_count += 1;
+        
+        // Calculate order total
+        let orderTotal = 0;
+        order.order_items?.forEach((item: any) => {
+          orderTotal += item.price_at_order * item.quantity;
+          item.order_item_extras?.forEach((extra: any) => {
+            orderTotal += extra.price_at_order;
+          });
+        });
+        progressByCustomer[order.customer_cpf].total_spent += orderTotal;
       });
 
-      setCustomers(progress?.map(p => ({
-        ...p,
-        customer_name: cpfToName[p.customer_cpf] || "Cliente",
-      })) || []);
+      // Merge CRM data with progress
+      const customersWithProgress: CustomerWithProgress[] = crmCustomers.map(customer => ({
+        cpf: customer.cpf,
+        name: customer.name,
+        phone: customer.phone,
+        purchase_count: progressByCustomer[customer.cpf]?.purchase_count || 0,
+        total_spent: progressByCustomer[customer.cpf]?.total_spent || 0,
+      }));
+
+      // Sort by proximity to next reward (higher progress first)
+      const sortedRewards = [...program.rewards].sort((a, b) => a.trigger_value - b.trigger_value);
+      const firstTrigger = sortedRewards[0]?.trigger_value || 1;
+
+      customersWithProgress.sort((a, b) => {
+        const valueA = program.type === "purchases" ? a.purchase_count : a.total_spent;
+        const valueB = program.type === "purchases" ? b.purchase_count : b.total_spent;
+        const progressA = (valueA / firstTrigger) * 100;
+        const progressB = (valueB / firstTrigger) * 100;
+        return progressB - progressA; // Higher progress first
+      });
+
+      setCustomers(customersWithProgress);
     } catch (error) {
-      console.error("Error fetching customer progress:", error);
+      console.error("Error fetching customers with progress:", error);
     }
   };
 
-  const getNextReward = (customer: CustomerProgress) => {
+  const getNextReward = (customer: CustomerWithProgress) => {
     if (!activeProgram) return null;
     
     const currentValue = activeProgram.type === "purchases" 
@@ -115,9 +169,9 @@ export default function CustomerProgressTab({ restaurantId }: CustomerProgressTa
 
     const sortedRewards = [...activeProgram.rewards].sort((a, b) => a.trigger_value - b.trigger_value);
     
-    // Find next reward that hasn't been claimed
+    // Find next reward that hasn't been reached
     for (const reward of sortedRewards) {
-      if (reward.trigger_value > customer.last_reward_trigger) {
+      if (currentValue < reward.trigger_value) {
         return {
           reward,
           progress: Math.min((currentValue / reward.trigger_value) * 100, 100),
@@ -125,11 +179,25 @@ export default function CustomerProgressTab({ restaurantId }: CustomerProgressTa
         };
       }
     }
+    
+    // All rewards achieved
+    const lastReward = sortedRewards[sortedRewards.length - 1];
+    if (lastReward && currentValue >= lastReward.trigger_value) {
+      return {
+        reward: lastReward,
+        progress: 100,
+        remaining: 0,
+        completed: true,
+      };
+    }
+    
     return null;
   };
 
   const formatCPF = (cpf: string) => {
-    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+    const cleaned = cpf.replace(/\D/g, "");
+    if (cleaned.length !== 11) return cpf;
+    return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
   };
 
   const getRewardDescription = (reward: any) => {
@@ -148,8 +216,8 @@ export default function CustomerProgressTab({ restaurantId }: CustomerProgressTa
   };
 
   const filteredCustomers = customers.filter(c => 
-    c.customer_cpf.includes(searchTerm.replace(/\D/g, "")) ||
-    c.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.cpf.includes(searchTerm.replace(/\D/g, "")) ||
+    c.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -198,9 +266,9 @@ export default function CustomerProgressTab({ restaurantId }: CustomerProgressTa
         <Card>
           <CardContent className="p-12 text-center">
             <Gift className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-medium mb-2">Nenhum cliente ainda</h3>
+            <h3 className="text-lg font-medium mb-2">Nenhum cliente cadastrado</h3>
             <p className="text-muted-foreground">
-              Quando clientes fizerem pedidos, o progresso deles aparecerá aqui
+              Cadastre clientes no CRM para ver o progresso deles aqui
             </p>
           </CardContent>
         </Card>
@@ -223,10 +291,10 @@ export default function CustomerProgressTab({ restaurantId }: CustomerProgressTa
                 {filteredCustomers.map((customer) => {
                   const nextReward = getNextReward(customer);
                   return (
-                    <TableRow key={customer.id}>
-                      <TableCell className="font-medium">{customer.customer_name}</TableCell>
+                    <TableRow key={customer.cpf}>
+                      <TableCell className="font-medium">{customer.name}</TableCell>
                       <TableCell className="text-muted-foreground">
-                        {formatCPF(customer.customer_cpf)}
+                        {formatCPF(customer.cpf)}
                       </TableCell>
                       <TableCell className="text-center">
                         {activeProgram.type === "purchases" ? (
@@ -237,30 +305,40 @@ export default function CustomerProgressTab({ restaurantId }: CustomerProgressTa
                       </TableCell>
                       <TableCell>
                         {nextReward ? (
-                          <div className="text-sm">
-                            <div className="font-medium">{getRewardDescription(nextReward.reward)}</div>
-                            <div className="text-muted-foreground">
-                              {activeProgram.type === "purchases" 
-                                ? `Faltam ${Math.ceil(nextReward.remaining)} compras`
-                                : `Faltam R$ ${nextReward.remaining.toFixed(2)}`}
+                          nextReward.completed ? (
+                            <span className="text-muted-foreground">
+                              Meta atingida! ✓
+                            </span>
+                          ) : (
+                            <div className="text-sm">
+                              <div className="font-medium">{getRewardDescription(nextReward.reward)}</div>
+                              <div className="text-muted-foreground">
+                                {activeProgram.type === "purchases" 
+                                  ? `Faltam ${Math.ceil(nextReward.remaining)} compras`
+                                  : `Faltam R$ ${nextReward.remaining.toFixed(2)}`}
+                              </div>
                             </div>
-                          </div>
+                          )
                         ) : (
                           <span className="text-muted-foreground">
-                            Todas as recompensas obtidas ✓
+                            Sem recompensas configuradas
                           </span>
                         )}
                       </TableCell>
                       <TableCell>
                         {nextReward ? (
-                          <div className="space-y-1">
-                            <Progress value={nextReward.progress} className="h-2" />
-                            <span className="text-xs text-muted-foreground">
-                              {nextReward.progress.toFixed(0)}%
-                            </span>
-                          </div>
+                          nextReward.completed ? (
+                            <Badge variant="default">Completo</Badge>
+                          ) : (
+                            <div className="space-y-1">
+                              <Progress value={nextReward.progress} className="h-2" />
+                              <span className="text-xs text-muted-foreground">
+                                {nextReward.progress.toFixed(0)}%
+                              </span>
+                            </div>
+                          )
                         ) : (
-                          <Badge variant="default">Completo</Badge>
+                          <span className="text-xs text-muted-foreground">-</span>
                         )}
                       </TableCell>
                     </TableRow>

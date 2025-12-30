@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Plus, Trash2, User, Gift } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { MapPin, Plus, Trash2, User, Gift, Check, Circle } from "lucide-react";
 import { toast } from "sonner";
 
 interface ProfileViewProps {
@@ -15,6 +15,24 @@ interface ProfileViewProps {
   customerCPF: string;
   restaurantId: string;
   onNameUpdate: (name: string) => void;
+}
+
+interface LoyaltyProgram {
+  id: string;
+  name: string;
+  type: string;
+  activated_at: string | null;
+  rewards: {
+    trigger_value: number;
+    reward_type: string;
+    reward_value: number | null;
+    description: string | null;
+  }[];
+}
+
+interface CustomerProgress {
+  purchase_count: number;
+  total_spent: number;
 }
 
 export const ProfileView = ({
@@ -27,8 +45,9 @@ export const ProfileView = ({
   const [phone, setPhone] = useState("");
   const [addresses, setAddresses] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
-  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [showAddAddress, setShowAddAddress] = useState(false);
+  const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null);
+  const [customerProgress, setCustomerProgress] = useState<CustomerProgress>({ purchase_count: 0, total_spent: 0 });
   const [newAddress, setNewAddress] = useState({
     street: "",
     number: "",
@@ -42,7 +61,7 @@ export const ProfileView = ({
   useEffect(() => {
     fetchAddresses();
     fetchCoupons();
-    fetchLoyaltyPoints();
+    fetchLoyaltyProgram();
   }, [customerCPF, restaurantId]);
 
   const fetchAddresses = async () => {
@@ -69,15 +88,71 @@ export const ProfileView = ({
     setCoupons(data || []);
   };
 
-  const fetchLoyaltyPoints = async () => {
-    const { data } = await supabase
-      .from("loyalty_points")
-      .select("points_balance")
-      .eq("customer_cpf", customerCPF)
-      .eq("restaurant_id", restaurantId)
-      .single();
-    
-    setLoyaltyPoints(data?.points_balance || 0);
+  const fetchLoyaltyProgram = async () => {
+    try {
+      // Fetch active program
+      const { data: program, error: programError } = await supabase
+        .from("loyalty_programs")
+        .select(`
+          *,
+          loyalty_program_rewards(*)
+        `)
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (programError) throw programError;
+
+      if (!program) {
+        setLoyaltyProgram(null);
+        return;
+      }
+
+      const programData: LoyaltyProgram = {
+        id: program.id,
+        name: program.name,
+        type: program.type,
+        activated_at: program.activated_at,
+        rewards: program.loyalty_program_rewards || [],
+      };
+      setLoyaltyProgram(programData);
+
+      // Fetch customer's orders AFTER program activation
+      let ordersQuery = supabase
+        .from("orders")
+        .select(`
+          id, created_at,
+          order_items(price_at_order, quantity, order_item_extras(price_at_order))
+        `)
+        .eq("restaurant_id", restaurantId)
+        .eq("customer_cpf", customerCPF)
+        .in("status", ["delivered", "picked_up", "completed"]);
+
+      if (program.activated_at) {
+        ordersQuery = ordersQuery.gte("created_at", program.activated_at);
+      }
+
+      const { data: ordersData, error: ordersError } = await ordersQuery;
+      if (ordersError) throw ordersError;
+
+      // Calculate progress
+      let purchase_count = 0;
+      let total_spent = 0;
+
+      ordersData?.forEach(order => {
+        purchase_count += 1;
+        order.order_items?.forEach((item: any) => {
+          total_spent += item.price_at_order * item.quantity;
+          item.order_item_extras?.forEach((extra: any) => {
+            total_spent += extra.price_at_order;
+          });
+        });
+      });
+
+      setCustomerProgress({ purchase_count, total_spent });
+    } catch (error) {
+      console.error("Error fetching loyalty program:", error);
+    }
   };
 
   const handleSaveName = () => {
@@ -122,6 +197,183 @@ export const ProfileView = ({
     }
   };
 
+  const getRewardDescription = (reward: any) => {
+    switch (reward.reward_type) {
+      case "discount_percentage":
+        return `${reward.reward_value}% de desconto`;
+      case "discount_fixed":
+        return `R$ ${reward.reward_value} de desconto`;
+      case "free_item":
+        return "Item grátis";
+      case "free_delivery":
+        return "Entrega grátis";
+      default:
+        return reward.description || "Recompensa";
+    }
+  };
+
+  const renderLoyaltyProgram = () => {
+    if (!loyaltyProgram) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gift className="w-5 h-5" />
+              Programa de Fidelidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-4 text-muted-foreground">
+              <Gift className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p>Nenhum programa de fidelidade ativo no momento.</p>
+              <p className="text-sm mt-1">Continue fazendo pedidos!</p>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const currentValue = loyaltyProgram.type === "purchases" 
+      ? customerProgress.purchase_count 
+      : customerProgress.total_spent;
+
+    const sortedRewards = [...loyaltyProgram.rewards].sort((a, b) => a.trigger_value - b.trigger_value);
+
+    if (loyaltyProgram.type === "spending") {
+      // Spending type - show progress bar
+      const nextReward = sortedRewards.find(r => r.trigger_value > currentValue);
+      const targetValue = nextReward?.trigger_value || sortedRewards[sortedRewards.length - 1]?.trigger_value || 100;
+      const progress = Math.min((currentValue / targetValue) * 100, 100);
+      const reachedGoal = currentValue >= targetValue;
+
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gift className="w-5 h-5" />
+              Programa de Fidelidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="font-medium text-center">{loyaltyProgram.name}</p>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Seu progresso:</span>
+                <span className="font-medium">
+                  R$ {currentValue.toFixed(2)} de R$ {targetValue.toFixed(2)}
+                </span>
+              </div>
+              <Progress value={progress} className="h-3" />
+              <p className="text-center text-sm text-muted-foreground">
+                {progress.toFixed(0)}%
+              </p>
+            </div>
+
+            {reachedGoal ? (
+              <div className="bg-primary/10 rounded-lg p-4 text-center">
+                <Check className="w-8 h-8 mx-auto mb-2 text-primary" />
+                <p className="font-medium text-primary">Você já atingiu a meta!</p>
+                {nextReward && (
+                  <p className="text-sm mt-1">
+                    Na sua próxima compra você ganha: <strong>{getRewardDescription(nextReward)}</strong>
+                  </p>
+                )}
+              </div>
+            ) : nextReward && (
+              <div className="bg-muted rounded-lg p-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Faltam <strong>R$ {(targetValue - currentValue).toFixed(2)}</strong> para ganhar:
+                </p>
+                <p className="font-medium mt-1">{getRewardDescription(nextReward)}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      );
+    } else {
+      // Purchases type - show steps
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gift className="w-5 h-5" />
+              Programa de Fidelidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="font-medium text-center">{loyaltyProgram.name}</p>
+            
+            <div className="text-center py-2">
+              <p className="text-sm text-muted-foreground">Você fez:</p>
+              <p className="text-3xl font-bold text-primary">{customerProgress.purchase_count}</p>
+              <p className="text-sm text-muted-foreground">compras</p>
+            </div>
+
+            {/* Steps visualization */}
+            <div className="space-y-3">
+              {sortedRewards.map((reward, index) => {
+                const isCompleted = customerProgress.purchase_count >= reward.trigger_value;
+                const isNext = !isCompleted && (index === 0 || customerProgress.purchase_count >= sortedRewards[index - 1].trigger_value);
+                
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                      isCompleted 
+                        ? "bg-primary/10 border border-primary/20" 
+                        : isNext 
+                          ? "bg-accent border border-accent-foreground/20" 
+                          : "bg-muted"
+                    }`}
+                  >
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                      isCompleted 
+                        ? "bg-primary text-primary-foreground" 
+                        : isNext 
+                          ? "bg-accent-foreground/20 text-accent-foreground" 
+                          : "bg-muted-foreground/20 text-muted-foreground"
+                    }`}>
+                      {isCompleted ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Circle className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${isCompleted ? "text-primary" : ""}`}>
+                        {reward.trigger_value}ª compra
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {getRewardDescription(reward)}
+                      </p>
+                    </div>
+                    {isNext && (
+                      <Badge variant="secondary" className="text-xs">
+                        Próxima
+                      </Badge>
+                    )}
+                    {isCompleted && (
+                      <Badge variant="default" className="text-xs">
+                        ✓
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {customerProgress.purchase_count === 0 && (
+              <p className="text-center text-sm text-muted-foreground">
+                Faça sua primeira compra e comece a ganhar recompensas!
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      );
+    }
+  };
+
   return (
     <ScrollArea className="h-[calc(100vh-120px)]">
       <div className="space-y-4 p-4 pb-20">
@@ -155,23 +407,8 @@ export const ProfileView = ({
           </CardContent>
         </Card>
 
-        {/* Pontos de Fidelidade */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Gift className="w-5 h-5" />
-              Pontos de Fidelidade
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-4">
-              <div className="text-4xl font-bold text-primary mb-2">
-                {loyaltyPoints}
-              </div>
-              <p className="text-sm text-muted-foreground">pontos disponíveis</p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Programa de Fidelidade */}
+        {renderLoyaltyProgram()}
 
         {/* Endereços Salvos */}
         <Card>
