@@ -28,6 +28,7 @@ interface Coupon {
   valid_until: string | null;
   target_product_id: string | null;
   target_extra_id: string | null;
+  target_product_extra_id: string | null;
   target_product_name?: string;
   target_extra_name?: string;
 }
@@ -42,6 +43,7 @@ interface ProductVariation {
   name: string;
   price: number;
   category_name: string;
+  system: 'new' | 'legacy'; // Track which system the variation comes from
 }
 
 interface CouponsTabProps {
@@ -52,6 +54,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productVariations, setProductVariations] = useState<ProductVariation[]>([]);
+  const [variationSystem, setVariationSystem] = useState<'new' | 'legacy' | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -81,6 +84,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
       fetchProductVariations(formData.target_product_id);
     } else {
       setProductVariations([]);
+      setVariationSystem(null);
       setFormData(prev => ({ ...prev, target_extra_id: "" }));
     }
   }, [formData.target_product_id, formData.coupon_type]);
@@ -97,7 +101,8 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
 
       // Fetch product and extra names for free_product coupons
       const productIds = data?.filter(c => c.target_product_id).map(c => c.target_product_id) || [];
-      const extraIds = data?.filter(c => c.target_extra_id).map(c => c.target_extra_id) || [];
+      const newSystemExtraIds = data?.filter(c => c.target_extra_id).map(c => c.target_extra_id) || [];
+      const legacyExtraIds = data?.filter(c => c.target_product_extra_id).map(c => c.target_product_extra_id) || [];
       
       let productMap: Record<string, string> = {};
       let extraMap: Record<string, string> = {};
@@ -110,11 +115,21 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
         prods?.forEach(p => { productMap[p.id] = p.name; });
       }
 
-      if (extraIds.length > 0) {
+      // Fetch from new system (extra_category_items)
+      if (newSystemExtraIds.length > 0) {
         const { data: extras } = await supabase
           .from("extra_category_items")
           .select("id, name")
-          .in("id", extraIds);
+          .in("id", newSystemExtraIds);
+        extras?.forEach(e => { extraMap[e.id] = e.name; });
+      }
+
+      // Fetch from legacy system (product_extras)
+      if (legacyExtraIds.length > 0) {
+        const { data: extras } = await supabase
+          .from("product_extras")
+          .select("id, name")
+          .in("id", legacyExtraIds);
         extras?.forEach(e => { extraMap[e.id] = e.name; });
       }
 
@@ -122,7 +137,11 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
         ...c,
         coupon_type: c.coupon_type || "discount",
         target_product_name: c.target_product_id ? productMap[c.target_product_id] : undefined,
-        target_extra_name: c.target_extra_id ? extraMap[c.target_extra_id] : undefined,
+        target_extra_name: c.target_extra_id 
+          ? extraMap[c.target_extra_id] 
+          : c.target_product_extra_id 
+            ? extraMap[c.target_product_extra_id] 
+            : undefined,
       })) || []);
     } catch (error) {
       console.error("Error fetching coupons:", error);
@@ -143,7 +162,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
 
   const fetchProductVariations = async (productId: string) => {
     try {
-      // Buscar grupos de complementos obrigatórios do produto
+      // First, try the new system (product_complement_groups)
       const { data: groups } = await supabase
         .from("product_complement_groups")
         .select(`
@@ -174,39 +193,50 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
                 name: item.name,
                 price: item.price,
                 category_name: category.name,
+                system: 'new', // Mark as new system
               });
             });
           }
         });
-        setProductVariations(variations);
-      } else {
-        // Fallback: buscar extras do produto diretamente (produtos mais antigos)
-        const { data: extras } = await supabase
-          .from("product_extras")
-          .select("id, name, price, is_required")
-          .eq("product_id", productId)
-          .eq("is_required", true);
-
-        if (extras && extras.length > 0) {
-          setProductVariations(extras.map(e => ({
-            id: e.id,
-            name: e.name,
-            price: e.price,
-            category_name: "Variação",
-          })));
-        } else {
-          setProductVariations([]);
+        if (variations.length > 0) {
+          setProductVariations(variations);
+          setVariationSystem('new');
+          return;
         }
+      }
+      
+      // Fallback: try legacy system (product_extras)
+      const { data: extras } = await supabase
+        .from("product_extras")
+        .select("id, name, price, is_required")
+        .eq("product_id", productId)
+        .eq("is_required", true);
+
+      if (extras && extras.length > 0) {
+        setProductVariations(extras.map(e => ({
+          id: e.id,
+          name: e.name,
+          price: e.price,
+          category_name: "Variação",
+          system: 'legacy', // Mark as legacy system
+        })));
+        setVariationSystem('legacy');
+      } else {
+        setProductVariations([]);
+        setVariationSystem(null);
       }
     } catch (error) {
       console.error("Error fetching product variations:", error);
       setProductVariations([]);
+      setVariationSystem(null);
     }
   };
 
   const handleOpenDialog = (coupon?: Coupon) => {
     if (coupon) {
       setEditingCoupon(coupon);
+      // Use whichever extra ID is set (new or legacy system)
+      const extraId = coupon.target_extra_id || coupon.target_product_extra_id || "";
       setFormData({
         code: coupon.code,
         coupon_type: coupon.coupon_type || "discount",
@@ -219,7 +249,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
         valid_from: coupon.valid_from ? format(new Date(coupon.valid_from), "yyyy-MM-dd") : "",
         valid_until: coupon.valid_until ? format(new Date(coupon.valid_until), "yyyy-MM-dd") : "",
         target_product_id: coupon.target_product_id || "",
-        target_extra_id: coupon.target_extra_id || "",
+        target_extra_id: extraId,
       });
     } else {
       setEditingCoupon(null);
@@ -261,6 +291,10 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
     }
 
     try {
+      // Determine which column to use for variation based on the system
+      const isNewSystem = variationSystem === 'new';
+      const hasVariation = formData.coupon_type === "free_product" && formData.target_extra_id;
+      
       const payload: any = {
         restaurant_id: restaurantId,
         code: formData.code.toUpperCase(),
@@ -275,7 +309,9 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
         valid_from: formData.valid_from ? new Date(formData.valid_from).toISOString() : null,
         valid_until: formData.valid_until ? new Date(formData.valid_until).toISOString() : null,
         target_product_id: formData.coupon_type === "free_product" ? formData.target_product_id : null,
-        target_extra_id: formData.coupon_type === "free_product" && formData.target_extra_id ? formData.target_extra_id : null,
+        // Save to correct column based on variation system
+        target_extra_id: hasVariation && isNewSystem ? formData.target_extra_id : null,
+        target_product_extra_id: hasVariation && !isNewSystem ? formData.target_extra_id : null,
       };
 
       if (editingCoupon) {

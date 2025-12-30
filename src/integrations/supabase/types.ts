@@ -599,6 +599,7 @@ export type Database = {
           min_order_value: number | null
           restaurant_id: string
           target_extra_id: string | null
+          target_product_extra_id: string | null
           target_product_id: string | null
           updated_at: string | null
           usage_limit: number | null
@@ -619,6 +620,7 @@ export type Database = {
           min_order_value?: number | null
           restaurant_id: string
           target_extra_id?: string | null
+          target_product_extra_id?: string | null
           target_product_id?: string | null
           updated_at?: string | null
           usage_limit?: number | null
@@ -639,6 +641,7 @@ export type Database = {
           min_order_value?: number | null
           restaurant_id?: string
           target_extra_id?: string | null
+          target_product_extra_id?: string | null
           target_product_id?: string | null
           updated_at?: string | null
           usage_limit?: number | null
@@ -660,6 +663,13 @@ export type Database = {
             columns: ["target_extra_id"]
             isOneToOne: false
             referencedRelation: "extra_category_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupons_target_product_extra_id_fkey"
+            columns: ["target_product_extra_id"]
+            isOneToOne: false
+            referencedRelation: "product_extras"
             referencedColumns: ["id"]
           },
           {
