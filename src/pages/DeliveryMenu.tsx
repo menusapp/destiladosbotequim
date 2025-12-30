@@ -471,6 +471,7 @@ export default function DeliveryMenu() {
             onClearCart={handleClearCart}
             mode="delivery"
             restaurantSlug={restaurantSlug}
+            onAddRewardItem={(item) => setCart(prev => [...prev, item])}
           />
 
           <CustomerInfoDialog

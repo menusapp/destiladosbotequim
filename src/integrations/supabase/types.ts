@@ -1234,6 +1234,71 @@ export type Database = {
           },
         ]
       }
+      loyalty_reward_redemptions: {
+        Row: {
+          created_at: string | null
+          customer_cpf: string
+          id: string
+          order_id: string | null
+          program_id: string
+          redeemed_at: string | null
+          restaurant_id: string
+          reward_id: string
+          trigger_value: number
+        }
+        Insert: {
+          created_at?: string | null
+          customer_cpf: string
+          id?: string
+          order_id?: string | null
+          program_id: string
+          redeemed_at?: string | null
+          restaurant_id: string
+          reward_id: string
+          trigger_value: number
+        }
+        Update: {
+          created_at?: string | null
+          customer_cpf?: string
+          id?: string
+          order_id?: string | null
+          program_id?: string
+          redeemed_at?: string | null
+          restaurant_id?: string
+          reward_id?: string
+          trigger_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_reward_redemptions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_reward_redemptions_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_reward_redemptions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_reward_redemptions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_program_rewards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loyalty_transactions: {
         Row: {
           created_at: string | null
@@ -1282,6 +1347,7 @@ export type Database = {
       marketing_campaign_rules: {
         Row: {
           campaign_id: string
+          coupon_id: string | null
           created_at: string | null
           delay_unit: string
           delay_value: number
@@ -1300,6 +1366,7 @@ export type Database = {
         }
         Insert: {
           campaign_id: string
+          coupon_id?: string | null
           created_at?: string | null
           delay_unit?: string
           delay_value?: number
@@ -1318,6 +1385,7 @@ export type Database = {
         }
         Update: {
           campaign_id?: string
+          coupon_id?: string | null
           created_at?: string | null
           delay_unit?: string
           delay_value?: number
@@ -1340,6 +1408,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_campaign_rules_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
             referencedColumns: ["id"]
           },
           {
