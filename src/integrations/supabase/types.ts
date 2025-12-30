@@ -589,6 +589,7 @@ export type Database = {
       coupons: {
         Row: {
           code: string
+          coupon_type: string | null
           created_at: string | null
           discount_type: string
           discount_value: number
@@ -597,14 +598,17 @@ export type Database = {
           max_discount: number | null
           min_order_value: number | null
           restaurant_id: string
+          target_product_id: string | null
           updated_at: string | null
           usage_limit: number | null
+          usage_limit_per_user: number | null
           used_count: number | null
           valid_from: string | null
           valid_until: string | null
         }
         Insert: {
           code: string
+          coupon_type?: string | null
           created_at?: string | null
           discount_type: string
           discount_value: number
@@ -613,14 +617,17 @@ export type Database = {
           max_discount?: number | null
           min_order_value?: number | null
           restaurant_id: string
+          target_product_id?: string | null
           updated_at?: string | null
           usage_limit?: number | null
+          usage_limit_per_user?: number | null
           used_count?: number | null
           valid_from?: string | null
           valid_until?: string | null
         }
         Update: {
           code?: string
+          coupon_type?: string | null
           created_at?: string | null
           discount_type?: string
           discount_value?: number
@@ -629,8 +636,10 @@ export type Database = {
           max_discount?: number | null
           min_order_value?: number | null
           restaurant_id?: string
+          target_product_id?: string | null
           updated_at?: string | null
           usage_limit?: number | null
+          usage_limit_per_user?: number | null
           used_count?: number | null
           valid_from?: string | null
           valid_until?: string | null
@@ -641,6 +650,13 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupons_target_product_id_fkey"
+            columns: ["target_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -695,6 +711,57 @@ export type Database = {
           zip_code?: string
         }
         Relationships: []
+      }
+      customer_loyalty_progress: {
+        Row: {
+          created_at: string | null
+          customer_cpf: string
+          id: string
+          last_reward_trigger: number | null
+          program_id: string
+          purchase_count: number | null
+          restaurant_id: string
+          total_spent: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_cpf: string
+          id?: string
+          last_reward_trigger?: number | null
+          program_id: string
+          purchase_count?: number | null
+          restaurant_id: string
+          total_spent?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_cpf?: string
+          id?: string
+          last_reward_trigger?: number | null
+          program_id?: string
+          purchase_count?: number | null
+          restaurant_id?: string
+          total_spent?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_loyalty_progress_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_loyalty_progress_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customers: {
         Row: {
@@ -1051,6 +1118,92 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "loyalty_points_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loyalty_program_rewards: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          program_id: string
+          reward_product_id: string | null
+          reward_type: string
+          reward_value: number | null
+          trigger_value: number
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          program_id: string
+          reward_product_id?: string | null
+          reward_type: string
+          reward_value?: number | null
+          trigger_value: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          program_id?: string
+          reward_product_id?: string | null
+          reward_type?: string
+          reward_value?: number | null
+          trigger_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_program_rewards_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_program_rewards_reward_product_id_fkey"
+            columns: ["reward_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loyalty_programs: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          restaurant_id: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          restaurant_id: string
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          restaurant_id?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_programs_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
