@@ -275,6 +275,20 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
             console.log('[Marketing] Trigger invoked for order', orderId);
           }
         });
+
+        // Processar programa de fidelidade
+        supabase.functions.invoke('loyalty-processor', {
+          body: {
+            orderId: orderId,
+            restaurantId: restaurantId
+          }
+        }).then(({ data, error: loyaltyError }) => {
+          if (loyaltyError) {
+            console.error('[Loyalty] Processor error:', loyaltyError);
+          } else {
+            console.log('[Loyalty] Processor result:', data);
+          }
+        });
       }
 
       const statusMessages: Record<string, string> = {

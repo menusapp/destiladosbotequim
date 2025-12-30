@@ -89,10 +89,8 @@ export const ProductDetailDrawer = ({
     }
 
     const extrasToAdd = extras.filter((e) => selectedExtras.includes(e.id));
-    // Add the item quantity times
-    for (let i = 0; i < quantity; i++) {
-      onAddToCart(product, extrasToAdd, notes || undefined);
-    }
+    // Passa a quantidade diretamente ao invés de usar loop
+    onAddToCart(product, extrasToAdd, notes || undefined, quantity);
     resetAndClose();
   };
 

@@ -892,7 +892,7 @@ const Menu = () => {
     setShowProductDialog(true);
   }, [customerName, customerCPF, showCustomerDialog]);
 
-  const addToCart = useCallback((product: Product, extras: ProductExtra[], notes?: string) => {
+  const addToCart = useCallback((product: Product, extras: ProductExtra[], notes?: string, quantity: number = 1) => {
     setCart((prev) => {
       const existing = prev.find((item) => 
         item.product.id === product.id && 
@@ -900,11 +900,11 @@ const Menu = () => {
         item.notes === notes
       );
       if (existing) {
-        return prev.map((item) => item.id === existing.id ? { ...item, quantity: item.quantity + 1 } : item);
+        return prev.map((item) => item.id === existing.id ? { ...item, quantity: item.quantity + quantity } : item);
       }
-      return [...prev, { id: crypto.randomUUID(), product, quantity: 1, extras, notes }];
+      return [...prev, { id: crypto.randomUUID(), product, quantity, extras, notes }];
     });
-    toast.success(`${product.name} adicionado`);
+    toast.success(`${product.name} adicionado${quantity > 1 ? ` (${quantity}x)` : ''}`);
   }, []);
 
   const updateQuantity = (itemId: string, delta: number) => {

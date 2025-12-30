@@ -27,12 +27,21 @@ interface Coupon {
   valid_from: string | null;
   valid_until: string | null;
   target_product_id: string | null;
+  target_extra_id: string | null;
   target_product_name?: string;
+  target_extra_name?: string;
 }
 
 interface Product {
   id: string;
   name: string;
+}
+
+interface ProductVariation {
+  id: string;
+  name: string;
+  price: number;
+  category_name: string;
 }
 
 interface CouponsTabProps {
@@ -42,6 +51,7 @@ interface CouponsTabProps {
 export default function CouponsTab({ restaurantId }: CouponsTabProps) {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [productVariations, setProductVariations] = useState<ProductVariation[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -57,12 +67,23 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
     valid_from: "",
     valid_until: "",
     target_product_id: "",
+    target_extra_id: "",
   });
 
   useEffect(() => {
     fetchCoupons();
     fetchProducts();
   }, [restaurantId]);
+
+  // Buscar variações quando produto é selecionado
+  useEffect(() => {
+    if (formData.target_product_id && formData.coupon_type === "free_product") {
+      fetchProductVariations(formData.target_product_id);
+    } else {
+      setProductVariations([]);
+      setFormData(prev => ({ ...prev, target_extra_id: "" }));
+    }
+  }, [formData.target_product_id, formData.coupon_type]);
 
   const fetchCoupons = async () => {
     try {
@@ -74,9 +95,13 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
 
       if (error) throw error;
 
-      // Fetch product names for free_product coupons
+      // Fetch product and extra names for free_product coupons
       const productIds = data?.filter(c => c.target_product_id).map(c => c.target_product_id) || [];
+      const extraIds = data?.filter(c => c.target_extra_id).map(c => c.target_extra_id) || [];
+      
       let productMap: Record<string, string> = {};
+      let extraMap: Record<string, string> = {};
+      
       if (productIds.length > 0) {
         const { data: prods } = await supabase
           .from("products")
@@ -85,10 +110,19 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
         prods?.forEach(p => { productMap[p.id] = p.name; });
       }
 
+      if (extraIds.length > 0) {
+        const { data: extras } = await supabase
+          .from("extra_category_items")
+          .select("id, name")
+          .in("id", extraIds);
+        extras?.forEach(e => { extraMap[e.id] = e.name; });
+      }
+
       setCoupons(data?.map(c => ({
         ...c,
         coupon_type: c.coupon_type || "discount",
         target_product_name: c.target_product_id ? productMap[c.target_product_id] : undefined,
+        target_extra_name: c.target_extra_id ? extraMap[c.target_extra_id] : undefined,
       })) || []);
     } catch (error) {
       console.error("Error fetching coupons:", error);
@@ -107,6 +141,69 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
     setProducts(data || []);
   };
 
+  const fetchProductVariations = async (productId: string) => {
+    try {
+      // Buscar grupos de complementos obrigatórios do produto
+      const { data: groups } = await supabase
+        .from("product_complement_groups")
+        .select(`
+          id,
+          is_required,
+          extra_category_id,
+          extra_categories (
+            id,
+            name,
+            extra_category_items (
+              id,
+              name,
+              price
+            )
+          )
+        `)
+        .eq("product_id", productId)
+        .eq("is_required", true);
+
+      if (groups && groups.length > 0) {
+        const variations: ProductVariation[] = [];
+        groups.forEach((group: any) => {
+          const category = group.extra_categories;
+          if (category && category.extra_category_items) {
+            category.extra_category_items.forEach((item: any) => {
+              variations.push({
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                category_name: category.name,
+              });
+            });
+          }
+        });
+        setProductVariations(variations);
+      } else {
+        // Fallback: buscar extras do produto diretamente (produtos mais antigos)
+        const { data: extras } = await supabase
+          .from("product_extras")
+          .select("id, name, price, is_required")
+          .eq("product_id", productId)
+          .eq("is_required", true);
+
+        if (extras && extras.length > 0) {
+          setProductVariations(extras.map(e => ({
+            id: e.id,
+            name: e.name,
+            price: e.price,
+            category_name: "Variação",
+          })));
+        } else {
+          setProductVariations([]);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching product variations:", error);
+      setProductVariations([]);
+    }
+  };
+
   const handleOpenDialog = (coupon?: Coupon) => {
     if (coupon) {
       setEditingCoupon(coupon);
@@ -122,6 +219,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
         valid_from: coupon.valid_from ? format(new Date(coupon.valid_from), "yyyy-MM-dd") : "",
         valid_until: coupon.valid_until ? format(new Date(coupon.valid_until), "yyyy-MM-dd") : "",
         target_product_id: coupon.target_product_id || "",
+        target_extra_id: coupon.target_extra_id || "",
       });
     } else {
       setEditingCoupon(null);
@@ -137,6 +235,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
         valid_from: "",
         valid_until: "",
         target_product_id: "",
+        target_extra_id: "",
       });
     }
     setDialogOpen(true);
@@ -150,6 +249,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
       return;
     }
 
+    // Validar desconto apenas para tipo discount
     if (formData.coupon_type === "discount" && !formData.discount_value) {
       toast.error("Informe o valor do desconto");
       return;
@@ -165,6 +265,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
         restaurant_id: restaurantId,
         code: formData.code.toUpperCase(),
         coupon_type: formData.coupon_type,
+        // Para free_product e free_delivery, discount_value é 0
         discount_type: formData.coupon_type === "discount" ? formData.discount_type : "fixed",
         discount_value: formData.coupon_type === "discount" ? parseFloat(formData.discount_value) : 0,
         min_order_value: formData.min_order_value ? parseFloat(formData.min_order_value) : 0,
@@ -174,6 +275,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
         valid_from: formData.valid_from ? new Date(formData.valid_from).toISOString() : null,
         valid_until: formData.valid_until ? new Date(formData.valid_until).toISOString() : null,
         target_product_id: formData.coupon_type === "free_product" ? formData.target_product_id : null,
+        target_extra_id: formData.coupon_type === "free_product" && formData.target_extra_id ? formData.target_extra_id : null,
       };
 
       if (editingCoupon) {
@@ -237,7 +339,11 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
   const getCouponDescription = (coupon: Coupon) => {
     switch (coupon.coupon_type) {
       case "free_product":
-        return `Produto grátis: ${coupon.target_product_name || "N/A"}`;
+        let desc = `Produto grátis: ${coupon.target_product_name || "N/A"}`;
+        if (coupon.target_extra_name) {
+          desc += ` (${coupon.target_extra_name})`;
+        }
+        return desc;
       case "free_delivery":
         return "Entrega grátis";
       default:
@@ -388,7 +494,7 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
               <Label>Tipo de Cupom *</Label>
               <Select
                 value={formData.coupon_type}
-                onValueChange={(v) => setFormData({ ...formData, coupon_type: v as any })}
+                onValueChange={(v) => setFormData({ ...formData, coupon_type: v, target_product_id: "", target_extra_id: "" })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -447,23 +553,59 @@ export default function CouponsTab({ restaurantId }: CouponsTabProps) {
             )}
 
             {formData.coupon_type === "free_product" && (
-              <div>
-                <Label>Produto Grátis *</Label>
-                <Select
-                  value={formData.target_product_id}
-                  onValueChange={(v) => setFormData({ ...formData, target_product_id: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o produto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <>
+                <div>
+                  <Label>Produto Grátis *</Label>
+                  <Select
+                    value={formData.target_product_id}
+                    onValueChange={(v) => setFormData({ ...formData, target_product_id: v, target_extra_id: "" })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o produto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {productVariations.length > 0 && (
+                  <div>
+                    <Label>Variação/Tamanho do Produto</Label>
+                    <Select
+                      value={formData.target_extra_id}
+                      onValueChange={(v) => setFormData({ ...formData, target_extra_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a variação (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Qualquer variação</SelectItem>
+                        {productVariations.map((variation) => (
+                          <SelectItem key={variation.id} value={variation.id}>
+                            {variation.name} - R$ {variation.price.toFixed(2)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Escolha qual variação específica será dada de graça
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {formData.coupon_type === "free_delivery" && (
+              <div className="p-4 bg-accent rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <Truck className="w-4 h-4 inline mr-2" />
+                  Este cupom vai zerar a taxa de entrega do pedido
+                </p>
               </div>
             )}
 
