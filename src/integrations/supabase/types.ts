@@ -1195,6 +1195,7 @@ export type Database = {
       }
       loyalty_programs: {
         Row: {
+          activated_at: string | null
           created_at: string | null
           id: string
           is_active: boolean | null
@@ -1204,6 +1205,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          activated_at?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
@@ -1213,6 +1215,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          activated_at?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
