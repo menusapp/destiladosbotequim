@@ -149,11 +149,16 @@ export function CampaignForm({
       setDelayValue(rule.delay_value);
       setDelayUnit(rule.delay_unit as any);
       setMessageTemplate(rule.message_template);
-      // Check if there's a discount configured (has discount_type means there was a coupon selection)
-      setIncludeDiscount(!!rule.discount_type);
-      // We'll try to find matching coupon if discount was configured
-      setSelectedCouponId("");
       setOrderTypeFilter((rule.order_type_filter as any) || "all");
+      
+      // Load coupon_id directly from the rule
+      if (rule.coupon_id) {
+        setIncludeDiscount(true);
+        setSelectedCouponId(rule.coupon_id);
+      } else {
+        setIncludeDiscount(false);
+        setSelectedCouponId("");
+      }
     }
   };
 
@@ -244,6 +249,7 @@ export function CampaignForm({
             discount_target_category_id: null,
             discount_validity_days: 7,
             order_type_filter: orderTypeFilter,
+            coupon_id: includeDiscount ? selectedCouponId : null,
           })
           .eq("campaign_id", editingCampaign.id);
 
@@ -282,6 +288,7 @@ export function CampaignForm({
             discount_target_category_id: null,
             discount_validity_days: 7,
             order_type_filter: orderTypeFilter,
+            coupon_id: includeDiscount ? selectedCouponId : null,
           });
 
         if (ruleError) throw ruleError;

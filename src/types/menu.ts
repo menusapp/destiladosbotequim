@@ -54,4 +54,6 @@ export interface CartItem {
   quantity: number;
   extras: CartItemExtra[];
   notes?: string;
+  isRewardItem?: boolean;
+  rewardId?: string;
 }

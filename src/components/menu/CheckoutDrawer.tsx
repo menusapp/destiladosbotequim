@@ -21,6 +21,21 @@ interface DeliveryZone {
   estimated_time_minutes: number;
 }
 
+interface Reward {
+  id: string;
+  trigger_value: number;
+  reward_type: string;
+  reward_value: number | null;
+  reward_product_id: string | null;
+  description: string | null;
+  product?: {
+    id: string;
+    name: string;
+    image_url: string | null;
+    price: number;
+  };
+}
+
 interface CheckoutDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -30,6 +45,7 @@ interface CheckoutDrawerProps {
   onClearCart: () => void;
   mode: "delivery" | "local";
   restaurantSlug?: string;
+  onAddRewardItem?: (item: CartItem) => void;
 }
 
 const primaryColorFromRestaurant = (restaurant: any) => restaurant?.primary_color || "#fe9516";
@@ -43,6 +59,7 @@ export const CheckoutDrawer = ({
   onClearCart,
   mode,
   restaurantSlug,
+  onAddRewardItem,
 }: CheckoutDrawerProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>("cart");
@@ -287,6 +304,36 @@ export const CheckoutDrawer = ({
     return `${address.street}, ${address.number}${address.complement ? `, ${address.complement}` : ""} - ${address.neighborhood}, ${address.city}/${address.state} - CEP: ${address.zip_code}`;
   };
 
+  const handleAddRewardItem = async (reward: Reward) => {
+    if (!reward.product || !onAddRewardItem) return;
+
+    const rewardCartItem: CartItem = {
+      id: `reward-${reward.id}-${Date.now()}`,
+      product: {
+        id: reward.product.id,
+        name: reward.product.name,
+        description: null,
+        price: reward.product.price,
+        promotional_price: null,
+        available: true,
+        image_url: reward.product.image_url,
+      },
+      quantity: 1,
+      extras: [],
+      notes: "Recompensa do programa de fidelidade",
+      isRewardItem: true,
+      rewardId: reward.id,
+    };
+
+    onAddRewardItem(rewardCartItem);
+    toast.success(`${reward.product.name} adicionado como recompensa!`);
+  };
+
+  // Get customer CPF from sessionStorage for cart step
+  const getCustomerCPF = () => {
+    return sessionStorage.getItem("customer_cpf") || "";
+  };
+
   const renderStep = () => {
     switch (step) {
       case "cart":
@@ -304,6 +351,8 @@ export const CheckoutDrawer = ({
             onContinue={() => setStep("delivery-type")}
             minOrderValue={getMinOrderValue()}
             deliveryType={deliveryType}
+            customerCPF={getCustomerCPF()}
+            onAddRewardItem={onAddRewardItem ? handleAddRewardItem : undefined}
           />
         );
       case "delivery-type":

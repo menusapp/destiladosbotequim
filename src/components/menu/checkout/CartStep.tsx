@@ -1,11 +1,27 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Trash2, AlertCircle } from "lucide-react";
+import { Minus, Plus, Trash2, AlertCircle, Gift } from "lucide-react";
 import { CartItem } from "@/types/menu";
 import { ProductSuggestions } from "./ProductSuggestions";
 import { CouponInput } from "./CouponInput";
 import { LoyaltyPointsDisplay } from "./LoyaltyPointsDisplay";
+import { LoyaltyRewardNotification } from "./LoyaltyRewardNotification";
 import { toast } from "sonner";
+
+interface Reward {
+  id: string;
+  trigger_value: number;
+  reward_type: string;
+  reward_value: number | null;
+  reward_product_id: string | null;
+  description: string | null;
+  product?: {
+    id: string;
+    name: string;
+    image_url: string | null;
+    price: number;
+  };
+}
 
 interface CartStepProps {
   cart: CartItem[];
@@ -20,6 +36,8 @@ interface CartStepProps {
   onContinue: () => void;
   minOrderValue?: number;
   deliveryType?: "delivery" | "pickup";
+  customerCPF?: string;
+  onAddRewardItem?: (reward: Reward) => void;
 }
 
 export const CartStep = ({
@@ -35,8 +53,12 @@ export const CartStep = ({
   onContinue,
   minOrderValue = 0,
   deliveryType = "delivery",
+  customerCPF,
+  onAddRewardItem,
 }: CartStepProps) => {
   const subtotal = cart.reduce((sum, item) => {
+    // Reward items don't count towards subtotal (they're free)
+    if (item.isRewardItem) return sum;
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
     const effectivePrice = item.product.promotional_price ?? item.product.price;
     return sum + (effectivePrice + extrasTotal) * item.quantity;
@@ -110,9 +132,17 @@ export const CartStep = ({
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <h5 className="font-bold text-sm text-foreground">
-                          {item.product.name}
-                        </h5>
+                        <div>
+                          <h5 className="font-bold text-sm text-foreground">
+                            {item.product.name}
+                          </h5>
+                          {item.isRewardItem && (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                              <Gift className="w-3 h-3" />
+                              Recompensa Fidelidade
+                            </span>
+                          )}
+                        </div>
                         <button
                           onClick={() => onUpdateQuantity(item.id, -item.quantity)}
                           className="text-destructive flex-shrink-0"
@@ -133,27 +163,29 @@ export const CartStep = ({
                       <div className="flex items-center justify-between mt-2">
                         <p
                           className="font-bold text-sm"
-                          style={{ color: restaurant.primary_color }}
+                          style={{ color: item.isRewardItem ? '#22c55e' : restaurant.primary_color }}
                         >
-                          R$ {itemTotal.toFixed(2)}
+                          {item.isRewardItem ? "GRÁTIS" : `R$ ${itemTotal.toFixed(2)}`}
                         </p>
-                        <div className="flex items-center gap-3 bg-accent/50 rounded-full px-3 py-1">
-                          <button
-                            onClick={() => onUpdateQuantity(item.id, -1)}
-                            className="text-foreground"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                          <span className="font-bold text-foreground min-w-[20px] text-center">
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() => onUpdateQuantity(item.id, 1)}
-                            style={{ color: restaurant.primary_color }}
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {!item.isRewardItem && (
+                          <div className="flex items-center gap-3 bg-accent/50 rounded-full px-3 py-1">
+                            <button
+                              onClick={() => onUpdateQuantity(item.id, -1)}
+                              className="text-foreground"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <span className="font-bold text-foreground min-w-[20px] text-center">
+                              {item.quantity}
+                            </span>
+                            <button
+                              onClick={() => onUpdateQuantity(item.id, 1)}
+                              style={{ color: restaurant.primary_color }}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -179,6 +211,16 @@ export const CartStep = ({
         onApplyCoupon={onApplyCoupon}
         primaryColor={restaurant.primary_color}
       />
+
+      {/* Loyalty Reward Notification */}
+      {customerCPF && onAddRewardItem && (
+        <LoyaltyRewardNotification
+          restaurantId={restaurant.id}
+          customerCPF={customerCPF}
+          primaryColor={restaurant.primary_color}
+          onRedeemReward={onAddRewardItem}
+        />
+      )}
 
       {/* Loyalty Points */}
       {restaurant.loyalty_enabled && (
