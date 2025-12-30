@@ -20,6 +20,7 @@ import MargensTab from "@/components/admin/MargensTab";
 import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import PDVTab from "@/components/admin/PDVTab";
 import ClientesTab from "@/components/admin/ClientesTab";
+import FidelityTab from "@/components/admin/FidelityTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
@@ -507,13 +508,15 @@ const RestaurantAdmin = () => {
       case "clientes":
         return <ClientesTab restaurantId={restaurant.id} />;
       
+      // Fidelidade
+      case "fidelidade":
+        return <FidelityTab restaurantId={restaurant.id} />;
+      
       // Marketing
       case "marketing":
         return <MarketingTab restaurantId={restaurant.id} onNavigateToWhatsApp={() => setActiveSection("config-whatsapp")} />;
       
       // Em Desenvolvimento
-      case "entregadores":
-        return <DevelopmentPlaceholder title="Entregadores" />;
       case "modulos":
         return <DevelopmentPlaceholder title="Módulos e Assinaturas" />;
       

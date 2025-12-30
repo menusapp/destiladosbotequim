@@ -42,6 +42,15 @@ interface Product {
   category_id: string;
 }
 
+interface Coupon {
+  id: string;
+  code: string;
+  discount_type: string;
+  discount_value: number;
+  coupon_type: string | null;
+  is_active: boolean;
+}
+
 const MESSAGE_VARIABLES = [
   { key: "{nome}", desc: "Nome do cliente" },
   { key: "{cupom}", desc: "Código do cupom" },
@@ -62,6 +71,7 @@ export function CampaignForm({
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
 
   // Form state
   const [name, setName] = useState("");
@@ -74,13 +84,8 @@ export function CampaignForm({
   const [messageTemplate, setMessageTemplate] = useState(
     "Olá {nome}! 🎉\n\nSentimos sua falta! Use o cupom {cupom} e ganhe {desconto} na sua próxima compra!\n\nVálido por {validade} dias. Te esperamos!"
   );
-  const [includeDiscount, setIncludeDiscount] = useState(true);
-  const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
-  const [discountValue, setDiscountValue] = useState(10);
-  const [discountTargetType, setDiscountTargetType] = useState<"any" | "same_category" | "category" | "product">("any");
-  const [discountTargetProductId, setDiscountTargetProductId] = useState<string>("");
-  const [discountTargetCategoryId, setDiscountTargetCategoryId] = useState<string>("");
-  const [discountValidityDays, setDiscountValidityDays] = useState(7);
+  const [includeDiscount, setIncludeDiscount] = useState(false);
+  const [selectedCouponId, setSelectedCouponId] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -112,8 +117,18 @@ export function CampaignForm({
         .order("name");
 
       setProducts(productsData || []);
+
+      // Fetch active coupons
+      const { data: couponsData } = await supabase
+        .from("coupons")
+        .select("id, code, discount_type, discount_value, coupon_type, is_active")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true)
+        .order("code");
+
+      setCoupons(couponsData || []);
     } catch (error) {
-      console.error("Error fetching categories/products:", error);
+      console.error("Error fetching categories/products/coupons:", error);
     }
   };
 
@@ -134,13 +149,10 @@ export function CampaignForm({
       setDelayValue(rule.delay_value);
       setDelayUnit(rule.delay_unit as any);
       setMessageTemplate(rule.message_template);
+      // Check if there's a discount configured (has discount_type means there was a coupon selection)
       setIncludeDiscount(!!rule.discount_type);
-      setDiscountType((rule.discount_type as any) || "percentage");
-      setDiscountValue(rule.discount_value || 10);
-      setDiscountTargetType((rule.discount_target_type as any) || "any");
-      setDiscountTargetProductId(rule.discount_target_product_id || "");
-      setDiscountTargetCategoryId(rule.discount_target_category_id || "");
-      setDiscountValidityDays(rule.discount_validity_days || 7);
+      // We'll try to find matching coupon if discount was configured
+      setSelectedCouponId("");
       setOrderTypeFilter((rule.order_type_filter as any) || "all");
     }
   };
@@ -155,14 +167,24 @@ export function CampaignForm({
     setMessageTemplate(
       "Olá {nome}! 🎉\n\nSentimos sua falta! Use o cupom {cupom} e ganhe {desconto} na sua próxima compra!\n\nVálido por {validade} dias. Te esperamos!"
     );
-    setIncludeDiscount(true);
-    setDiscountType("percentage");
-    setDiscountValue(10);
-    setDiscountTargetType("any");
-    setDiscountTargetProductId("");
-    setDiscountTargetCategoryId("");
-    setDiscountValidityDays(7);
+    setIncludeDiscount(false);
+    setSelectedCouponId("");
     setOrderTypeFilter("all");
+  };
+
+  const getSelectedCoupon = () => coupons.find(c => c.id === selectedCouponId);
+
+  const formatCouponDisplay = (coupon: Coupon) => {
+    if (coupon.coupon_type === "free_delivery") {
+      return `${coupon.code} - Entrega Grátis`;
+    }
+    if (coupon.coupon_type === "free_product") {
+      return `${coupon.code} - Produto Grátis`;
+    }
+    if (coupon.discount_type === "percentage") {
+      return `${coupon.code} - ${coupon.discount_value}% de desconto`;
+    }
+    return `${coupon.code} - R$ ${coupon.discount_value.toFixed(2)} de desconto`;
   };
 
   const handleSubmit = async () => {
@@ -186,6 +208,13 @@ export function CampaignForm({
       return;
     }
 
+    if (includeDiscount && !selectedCouponId) {
+      toast.error("Selecione um cupom existente");
+      return;
+    }
+
+    const selectedCoupon = getSelectedCoupon();
+
     setLoading(true);
 
     try {
@@ -208,12 +237,12 @@ export function CampaignForm({
             delay_value: delayValue,
             delay_unit: delayUnit,
             message_template: messageTemplate,
-            discount_type: includeDiscount ? discountType : null,
-            discount_value: includeDiscount ? discountValue : 0,
-            discount_target_type: includeDiscount ? discountTargetType : "any",
-            discount_target_product_id: includeDiscount && discountTargetType === "product" ? discountTargetProductId : null,
-            discount_target_category_id: includeDiscount && discountTargetType === "category" ? discountTargetCategoryId : null,
-            discount_validity_days: discountValidityDays,
+            discount_type: includeDiscount && selectedCoupon ? selectedCoupon.discount_type : null,
+            discount_value: includeDiscount && selectedCoupon ? selectedCoupon.discount_value : 0,
+            discount_target_type: "any",
+            discount_target_product_id: null,
+            discount_target_category_id: null,
+            discount_validity_days: 7,
             order_type_filter: orderTypeFilter,
           })
           .eq("campaign_id", editingCampaign.id);
@@ -246,12 +275,12 @@ export function CampaignForm({
             delay_value: delayValue,
             delay_unit: delayUnit,
             message_template: messageTemplate,
-            discount_type: includeDiscount ? discountType : null,
-            discount_value: includeDiscount ? discountValue : 0,
-            discount_target_type: includeDiscount ? discountTargetType : "any",
-            discount_target_product_id: includeDiscount && discountTargetType === "product" ? discountTargetProductId : null,
-            discount_target_category_id: includeDiscount && discountTargetType === "category" ? discountTargetCategoryId : null,
-            discount_validity_days: discountValidityDays,
+            discount_type: includeDiscount && selectedCoupon ? selectedCoupon.discount_type : null,
+            discount_value: includeDiscount && selectedCoupon ? selectedCoupon.discount_value : 0,
+            discount_target_type: "any",
+            discount_target_product_id: null,
+            discount_target_category_id: null,
+            discount_validity_days: 7,
             order_type_filter: orderTypeFilter,
           });
 
@@ -444,7 +473,7 @@ export function CampaignForm({
 
           <Separator />
 
-          {/* Desconto */}
+          {/* Cupom de Desconto */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-base font-semibold">Incluir Cupom de Desconto</Label>
@@ -455,102 +484,32 @@ export function CampaignForm({
             </div>
 
             {includeDiscount && (
-              <>
-                <div className="space-y-2">
-                  <Label>Tipo de desconto</Label>
-                  <RadioGroup
-                    value={discountType}
-                    onValueChange={(v) => setDiscountType(v as any)}
-                    className="flex gap-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="percentage" id="pct" />
-                      <Label htmlFor="pct">Porcentagem (%)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="fixed" id="fixed" />
-                      <Label htmlFor="fixed">Valor Fixo (R$)</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Valor</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
-                    className="w-32"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Válido para</Label>
-                  <RadioGroup
-                    value={discountTargetType}
-                    onValueChange={(v) => setDiscountTargetType(v as any)}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="any" id="target-any" />
-                      <Label htmlFor="target-any">Qualquer item</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="same_category" id="target-same" />
-                      <Label htmlFor="target-same">Mesma categoria que ativou</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="category" id="target-cat" />
-                      <Label htmlFor="target-cat">Categoria específica</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="product" id="target-prod" />
-                      <Label htmlFor="target-prod">Produto específico</Label>
-                    </div>
-                  </RadioGroup>
-
-                  {discountTargetType === "category" && (
-                    <Select value={discountTargetCategoryId} onValueChange={setDiscountTargetCategoryId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-
-                  {discountTargetType === "product" && (
-                    <Select value={discountTargetProductId} onValueChange={setDiscountTargetProductId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Validade do cupom (dias)</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={discountValidityDays}
-                    onChange={(e) => setDiscountValidityDays(parseInt(e.target.value) || 7)}
-                    className="w-32"
-                  />
-                </div>
-              </>
+              <div className="space-y-2">
+                <Label>Selecionar Cupom Existente</Label>
+                {coupons.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum cupom ativo encontrado. Crie cupons na aba Fidelidade → Cupons.
+                  </p>
+                ) : (
+                  <Select value={selectedCouponId} onValueChange={setSelectedCouponId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um cupom" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {coupons.map((coupon) => (
+                        <SelectItem key={coupon.id} value={coupon.id}>
+                          {formatCouponDisplay(coupon)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {selectedCouponId && getSelectedCoupon() && (
+                  <p className="text-xs text-muted-foreground">
+                    O código do cupom será incluído automaticamente na mensagem usando a variável {"{cupom}"}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 

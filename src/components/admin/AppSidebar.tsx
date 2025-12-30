@@ -6,7 +6,6 @@ import {
   Utensils,
   Warehouse,
   BarChart3,
-  Truck,
   TrendingUp,
   Users,
   Settings,
@@ -21,6 +20,7 @@ import {
   Printer,
   MessageSquare,
   Megaphone,
+  Gift,
 } from "lucide-react";
 import {
   Sidebar,
@@ -71,10 +71,10 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "margens", label: "Margens", icon: TrendingUp },
       { id: "relatorios", label: "Relatórios", icon: BarChart3 },
       { id: "clientes", label: "Clientes", icon: Users },
+      { id: "fidelidade", label: "Fidelidade", icon: Gift },
       { id: "marketing", label: "Marketing", icon: Megaphone },
     ],
     development: [
-      { id: "entregadores", label: "Entregadores", icon: Truck },
       { id: "modulos", label: "Módulos", icon: Construction },
     ],
     configSubItems: [
