@@ -35,8 +35,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!session) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+  // Check for restaurant session in localStorage (restaurant login)
+  const restaurantId = localStorage.getItem('restaurant_id');
+  
+  if (!session && !restaurantId) {
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
