@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef, useImperativeHandle } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,18 +14,23 @@ interface CouponInputProps {
   primaryColor: string;
 }
 
-export const CouponInput = ({
+export interface CouponInputRef {
+  applyCouponCode: (code: string) => void;
+}
+
+export const CouponInput = forwardRef<CouponInputRef, CouponInputProps>(({
   restaurantId,
   subtotal,
   appliedCoupon,
   onApplyCoupon,
   primaryColor,
-}: CouponInputProps) => {
+}, ref) => {
   const [code, setCode] = useState("");
   const [validating, setValidating] = useState(false);
 
-  const validateCoupon = async () => {
-    if (!code) return;
+  const validateCoupon = async (couponCode?: string) => {
+    const codeToValidate = couponCode || code;
+    if (!codeToValidate) return;
 
     setValidating(true);
 
@@ -33,7 +38,7 @@ export const CouponInput = ({
       const { data, error } = await supabase
         .from("coupons")
         .select("*")
-        .eq("code", code.toUpperCase())
+        .eq("code", codeToValidate.toUpperCase())
         .eq("restaurant_id", restaurantId)
         .eq("is_active", true)
         .single();
@@ -74,6 +79,14 @@ export const CouponInput = ({
       setValidating(false);
     }
   };
+
+  // Expose method to apply coupon from outside
+  useImperativeHandle(ref, () => ({
+    applyCouponCode: (couponCode: string) => {
+      setCode(couponCode);
+      validateCoupon(couponCode);
+    }
+  }));
 
   if (appliedCoupon) {
     return (
@@ -122,7 +135,7 @@ export const CouponInput = ({
             onKeyDown={(e) => e.key === "Enter" && validateCoupon()}
           />
           <Button
-            onClick={validateCoupon}
+            onClick={() => validateCoupon()}
             disabled={validating || !code}
             style={{ backgroundColor: primaryColor, color: "white" }}
           >
@@ -132,4 +145,6 @@ export const CouponInput = ({
       </CardContent>
     </Card>
   );
-};
+});
+
+CouponInput.displayName = "CouponInput";
