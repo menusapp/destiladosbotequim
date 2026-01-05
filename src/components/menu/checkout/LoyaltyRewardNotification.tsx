@@ -136,7 +136,8 @@ export const LoyaltyRewardNotification = ({
         });
       });
 
-      const currentVal = program.type === "purchases" ? purchase_count : total_spent;
+      // Para programas de compras, a compra atual também conta (+1)
+      const currentVal = program.type === "purchases" ? purchase_count + 1 : total_spent;
       setCurrentValue(currentVal);
 
       // Fetch redemptions AFTER the baseline (current cycle only)
