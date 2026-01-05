@@ -21,12 +21,19 @@ interface DeliveryZone {
   estimated_time_minutes: number;
 }
 
+interface ProductExtra {
+  id: string;
+  name: string;
+  price: number;
+}
+
 interface Reward {
   id: string;
   trigger_value: number;
   reward_type: string;
   reward_value: number | null;
   reward_product_id: string | null;
+  reward_extra_id: string | null;
   description: string | null;
   product?: {
     id: string;
@@ -34,6 +41,7 @@ interface Reward {
     image_url: string | null;
     price: number;
   };
+  extra?: ProductExtra;
 }
 
 interface CheckoutDrawerProps {
@@ -86,8 +94,9 @@ export const CheckoutDrawer = ({
     return steps[step];
   };
 
-  // Calcular subtotal
+  // Calcular subtotal (reward items don't count - they're free)
   const subtotal = cart.reduce((sum, item) => {
+    if (item.isRewardItem) return sum;
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
     const effectivePrice = item.product.promotional_price ?? item.product.price;
     return sum + (effectivePrice + extrasTotal) * item.quantity;
@@ -167,14 +176,20 @@ export const CheckoutDrawer = ({
         throw orderError;
       }
 
+      // Insert order items
       for (const item of cart) {
+        // For reward items, price_at_order should be 0
+        const priceAtOrder = item.isRewardItem 
+          ? 0 
+          : (item.product.promotional_price ?? item.product.price);
+
         const { data: orderItem, error: itemError } = await supabase
           .from("order_items")
           .insert({
             order_id: order.id,
             product_id: item.product.id,
             quantity: item.quantity,
-            price_at_order: item.product.promotional_price ?? item.product.price,
+            price_at_order: priceAtOrder,
             notes: item.notes,
           })
           .select()
@@ -182,12 +197,46 @@ export const CheckoutDrawer = ({
 
         if (itemError) throw itemError;
 
+        // For reward items with extras, price should also be 0
         for (const extra of item.extras) {
           await supabase.from("order_item_extras").insert({
             order_item_id: orderItem.id,
             product_extra_id: extra.id,
-            price_at_order: extra.price,
+            price_at_order: item.isRewardItem ? 0 : extra.price,
           });
+        }
+      }
+
+      // Record loyalty reward redemptions for reward items
+      const rewardItems = cart.filter(item => item.isRewardItem && item.rewardId);
+      if (rewardItems.length > 0) {
+        // Get active program
+        const { data: activeProgram } = await supabase
+          .from("loyalty_programs")
+          .select("id")
+          .eq("restaurant_id", restaurant.id)
+          .eq("is_active", true)
+          .single();
+
+        if (activeProgram) {
+          for (const rewardItem of rewardItems) {
+            // Get the reward's trigger_value
+            const { data: reward } = await supabase
+              .from("loyalty_program_rewards")
+              .select("trigger_value")
+              .eq("id", rewardItem.rewardId)
+              .single();
+
+            await supabase.from("loyalty_reward_redemptions").insert({
+              restaurant_id: restaurant.id,
+              customer_cpf: customerData.cpf,
+              program_id: activeProgram.id,
+              reward_id: rewardItem.rewardId,
+              order_id: order.id,
+              trigger_value: reward?.trigger_value || 0,
+              redeemed_at: new Date().toISOString(),
+            });
+          }
         }
       }
 
@@ -309,19 +358,36 @@ export const CheckoutDrawer = ({
   const handleAddRewardItem = async (reward: Reward) => {
     if (!reward.product || !onAddRewardItem) return;
 
+    // Check if this reward is already in the cart
+    const existingRewardItem = cart.find(item => item.rewardId === reward.id);
+    if (existingRewardItem) {
+      toast.error("Esta recompensa já está na sacola");
+      return;
+    }
+
+    // Build extras array if there's a specific extra for this reward
+    const extras: Array<{ id: string; name: string; price: number }> = [];
+    if (reward.extra) {
+      extras.push({
+        id: reward.extra.id,
+        name: reward.extra.name,
+        price: 0, // Free because it's part of the reward
+      });
+    }
+
     const rewardCartItem: CartItem = {
       id: `reward-${reward.id}-${Date.now()}`,
       product: {
         id: reward.product.id,
         name: reward.product.name,
         description: null,
-        price: reward.product.price,
+        price: 0, // FREE
         promotional_price: null,
         available: true,
         image_url: reward.product.image_url,
       },
       quantity: 1,
-      extras: [],
+      extras,
       notes: "Recompensa do programa de fidelidade",
       isRewardItem: true,
       rewardId: reward.id,
