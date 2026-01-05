@@ -96,9 +96,9 @@ export const CheckoutDrawer = ({
     return steps[step];
   };
 
-  // Calcular subtotal (reward items don't count - they're free)
+  // Calcular subtotal (reward items and coupon free items don't count - they're free)
   const subtotal = cart.reduce((sum, item) => {
-    if (item.isRewardItem) return sum;
+    if (item.isRewardItem || item.isCouponFreeItem) return sum;
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
     const effectivePrice = item.product.promotional_price ?? item.product.price;
     return sum + (effectivePrice + extrasTotal) * item.quantity;
@@ -201,8 +201,8 @@ export const CheckoutDrawer = ({
 
       // Insert order items
       for (const item of cart) {
-        // For reward items, price_at_order should be 0
-        const priceAtOrder = item.isRewardItem 
+        // For reward items or coupon free items, price_at_order should be 0
+        const priceAtOrder = (item.isRewardItem || item.isCouponFreeItem) 
           ? 0 
           : (item.product.promotional_price ?? item.product.price);
 
@@ -220,12 +220,12 @@ export const CheckoutDrawer = ({
 
         if (itemError) throw itemError;
 
-        // For reward items with extras, price should also be 0
+        // For reward/coupon items with extras, price should also be 0
         for (const extra of item.extras) {
           await supabase.from("order_item_extras").insert({
             order_item_id: orderItem.id,
             product_extra_id: extra.id,
-            price_at_order: item.isRewardItem ? 0 : extra.price,
+            price_at_order: (item.isRewardItem || item.isCouponFreeItem) ? 0 : extra.price,
           });
         }
       }
@@ -380,6 +380,13 @@ export const CheckoutDrawer = ({
   };
 
   const calculateCouponDiscount = (subtotal: number, coupon: any) => {
+    // Free product coupons don't apply a monetary discount
+    if (coupon.coupon_type === "free_product") {
+      return 0;
+    }
+    if (coupon.coupon_type === "free_delivery") {
+      return 0; // Handled in getDeliveryFee
+    }
     if (coupon.discount_type === "percentage") {
       const discount = subtotal * (coupon.discount_value / 100);
       return coupon.max_discount ? Math.min(discount, coupon.max_discount) : discount;
@@ -442,6 +449,54 @@ export const CheckoutDrawer = ({
     setActiveRewardDiscount(null);
   };
 
+  // Handle coupon application with free product logic
+  const handleApplyCoupon = (couponData: any) => {
+    // If removing coupon, also remove free item from cart
+    if (!couponData && coupon?.coupon_type === "free_product" && onAddRewardItem) {
+      // Note: We can't remove items directly, the free item stays but that's ok
+      // since it's already marked as free
+    }
+    
+    // If applying a free product coupon, add the item to cart
+    if (couponData?.coupon_type === "free_product" && couponData.freeProduct && onAddRewardItem) {
+      // Check if this coupon's free item is already in the cart
+      const existingFreeItem = cart.find(item => item.couponId === couponData.id);
+      if (!existingFreeItem) {
+        // Build extras array if there's a specific extra for this coupon
+        const extras: Array<{ id: string; name: string; price: number }> = [];
+        if (couponData.freeProductExtra) {
+          extras.push({
+            id: couponData.freeProductExtra.id,
+            name: couponData.freeProductExtra.name,
+            price: 0, // Free because it's part of the coupon
+          });
+        }
+
+        const freeCartItem: CartItem = {
+          id: `coupon-free-${couponData.id}-${Date.now()}`,
+          product: {
+            id: couponData.freeProduct.id,
+            name: couponData.freeProduct.name,
+            description: null,
+            price: 0, // FREE
+            promotional_price: null,
+            available: true,
+            image_url: couponData.freeProduct.image_url,
+          },
+          quantity: 1,
+          extras,
+          notes: `Cupom ${couponData.code}`,
+          isCouponFreeItem: true,
+          couponId: couponData.id,
+        };
+
+        onAddRewardItem(freeCartItem);
+      }
+    }
+    
+    setCoupon(couponData);
+  };
+
   // Get customer CPF from prop or sessionStorage
   const getCustomerCPF = () => {
     return customerCPFProp || sessionStorage.getItem("customer_cpf") || "";
@@ -457,7 +512,7 @@ export const CheckoutDrawer = ({
             onUpdateQuantity={onUpdateQuantity}
             onClearCart={onClearCart}
             coupon={coupon}
-            onApplyCoupon={setCoupon}
+            onApplyCoupon={handleApplyCoupon}
             loyaltyPoints={loyaltyPoints}
             loyaltyPointsUsed={loyaltyPointsUsed}
             onRedeemPoints={setLoyaltyPointsUsed}

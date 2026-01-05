@@ -56,4 +56,6 @@ export interface CartItem {
   notes?: string;
   isRewardItem?: boolean;
   rewardId?: string;
+  isCouponFreeItem?: boolean;
+  couponId?: string;
 }
