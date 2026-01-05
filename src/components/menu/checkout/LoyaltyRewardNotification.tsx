@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
 
 interface Reward {
   id: string;
@@ -52,12 +53,12 @@ export const LoyaltyRewardNotification = ({
   const checkAvailableRewards = async () => {
     setLoading(true);
     try {
-      // Fetch active program
+      // Fetch active program with rewards
       const { data: program } = await supabase
         .from("loyalty_programs")
         .select(`
           *,
-          loyalty_program_rewards(*, reward_product:products(id, name, image_url, price))
+          loyalty_program_rewards(*)
         `)
         .eq("restaurant_id", restaurantId)
         .eq("is_active", true)
@@ -68,8 +69,24 @@ export const LoyaltyRewardNotification = ({
         return;
       }
 
-      // Fetch customer orders after activation
-      let ordersQuery = supabase
+      // Find the last redemption to get the baseline
+      const { data: lastRedemption } = await supabase
+        .from("loyalty_reward_redemptions")
+        .select("redeemed_at")
+        .eq("restaurant_id", restaurantId)
+        .eq("customer_cpf", customerCPF)
+        .eq("program_id", program.id)
+        .order("redeemed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Baseline: the later of program activation or last redemption
+      const programActivatedAt = program.activated_at ? new Date(program.activated_at) : new Date(0);
+      const lastRedeemedAt = lastRedemption?.redeemed_at ? new Date(lastRedemption.redeemed_at) : new Date(0);
+      const baselineAt = programActivatedAt > lastRedeemedAt ? programActivatedAt : lastRedeemedAt;
+
+      // Fetch customer orders AFTER the baseline
+      const { data: ordersData } = await supabase
         .from("orders")
         .select(`
           id, created_at,
@@ -77,15 +94,10 @@ export const LoyaltyRewardNotification = ({
         `)
         .eq("restaurant_id", restaurantId)
         .eq("customer_cpf", customerCPF)
-        .in("status", ["delivered", "picked_up", "completed"]);
+        .in("status", ["delivered", "picked_up", "completed"])
+        .gte("created_at", baselineAt.toISOString());
 
-      if (program.activated_at) {
-        ordersQuery = ordersQuery.gte("created_at", program.activated_at);
-      }
-
-      const { data: ordersData } = await ordersQuery;
-
-      // Calculate progress
+      // Calculate progress from baseline
       let purchase_count = 0;
       let total_spent = 0;
 
@@ -101,30 +113,52 @@ export const LoyaltyRewardNotification = ({
 
       const currentValue = program.type === "purchases" ? purchase_count : total_spent;
 
-      // Fetch already redeemed rewards
-      const { data: redemptions } = await supabase
+      // Fetch redemptions AFTER the baseline (current cycle only)
+      const { data: cycleRedemptions } = await supabase
         .from("loyalty_reward_redemptions")
-        .select("trigger_value")
+        .select("reward_id")
         .eq("restaurant_id", restaurantId)
         .eq("customer_cpf", customerCPF)
-        .eq("program_id", program.id);
+        .eq("program_id", program.id)
+        .gte("redeemed_at", baselineAt.toISOString());
 
-      const redeemedTriggers = new Set(redemptions?.map(r => r.trigger_value) || []);
+      const redeemedRewardIds = new Set(cycleRedemptions?.map(r => r.reward_id) || []);
 
-      // Find rewards that are earned but not redeemed
-      const rewards = (program.loyalty_program_rewards || [])
-        .filter((r: any) => 
-          r.trigger_value <= currentValue && !redeemedTriggers.has(r.trigger_value)
-        )
-        .map((r: any) => ({
-          id: r.id,
-          trigger_value: r.trigger_value,
-          reward_type: r.reward_type,
-          reward_value: r.reward_value,
-          reward_product_id: r.reward_product_id,
-          description: r.description,
-          product: r.reward_product,
-        }));
+      // Find rewards that are earned and not yet redeemed in this cycle
+      const allRewards = program.loyalty_program_rewards || [];
+      const earnedRewards = allRewards
+        .filter((r: any) => r.trigger_value <= currentValue && !redeemedRewardIds.has(r.id))
+        .sort((a: any, b: any) => b.trigger_value - a.trigger_value); // Highest first
+
+      // Only show the highest earned reward (1 redemption per cycle)
+      const rewardToShow = earnedRewards.length > 0 ? [earnedRewards[0]] : [];
+
+      // Fetch products for free_item rewards
+      const freeItemRewards = rewardToShow.filter((r: any) => r.reward_type === "free_item" && r.reward_product_id);
+      const productIds = freeItemRewards.map((r: any) => r.reward_product_id);
+
+      let productsMap: Record<string, any> = {};
+      if (productIds.length > 0) {
+        const { data: products } = await supabase
+          .from("products")
+          .select("id, name, image_url, price")
+          .in("id", productIds);
+        
+        products?.forEach(p => {
+          productsMap[p.id] = p;
+        });
+      }
+
+      // Build final rewards with product info
+      const rewards: Reward[] = rewardToShow.map((r: any) => ({
+        id: r.id,
+        trigger_value: r.trigger_value,
+        reward_type: r.reward_type,
+        reward_value: r.reward_value,
+        reward_product_id: r.reward_product_id,
+        description: r.description,
+        product: r.reward_product_id ? productsMap[r.reward_product_id] : undefined,
+      }));
 
       setAvailableRewards(rewards);
     } catch (error) {
@@ -135,9 +169,15 @@ export const LoyaltyRewardNotification = ({
   };
 
   const handleRedeem = async (reward: Reward) => {
+    // For free_item, ensure product exists
+    if (reward.reward_type === "free_item" && !reward.product) {
+      toast.error("Produto da recompensa não encontrado");
+      return;
+    }
+
     setRedeeming(reward.id);
     try {
-      // Record redemption
+      // Get active program
       const { data: program } = await supabase
         .from("loyalty_programs")
         .select("id")
@@ -146,12 +186,14 @@ export const LoyaltyRewardNotification = ({
         .single();
 
       if (program) {
+        // Record redemption
         await supabase.from("loyalty_reward_redemptions").insert({
           restaurant_id: restaurantId,
           customer_cpf: customerCPF,
           program_id: program.id,
           reward_id: reward.id,
           trigger_value: reward.trigger_value,
+          redeemed_at: new Date().toISOString(),
         });
       }
 
@@ -162,6 +204,7 @@ export const LoyaltyRewardNotification = ({
       setAvailableRewards(prev => prev.filter(r => r.id !== reward.id));
     } catch (error) {
       console.error("Error redeeming reward:", error);
+      toast.error("Erro ao resgatar recompensa");
     } finally {
       setRedeeming(null);
     }

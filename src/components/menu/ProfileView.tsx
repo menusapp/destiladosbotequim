@@ -23,10 +23,13 @@ interface LoyaltyProgram {
   type: string;
   activated_at: string | null;
   rewards: {
+    id: string;
     trigger_value: number;
     reward_type: string;
     reward_value: number | null;
+    reward_product_id: string | null;
     description: string | null;
+    productName?: string;
   }[];
 }
 
@@ -108,17 +111,58 @@ export const ProfileView = ({
         return;
       }
 
+      // Find the last redemption to get the baseline
+      const { data: lastRedemption } = await supabase
+        .from("loyalty_reward_redemptions")
+        .select("redeemed_at")
+        .eq("restaurant_id", restaurantId)
+        .eq("customer_cpf", customerCPF)
+        .eq("program_id", program.id)
+        .order("redeemed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Baseline: the later of program activation or last redemption
+      const programActivatedAt = program.activated_at ? new Date(program.activated_at) : new Date(0);
+      const lastRedeemedAt = lastRedemption?.redeemed_at ? new Date(lastRedemption.redeemed_at) : new Date(0);
+      const baselineAt = programActivatedAt > lastRedeemedAt ? programActivatedAt : lastRedeemedAt;
+
+      // Fetch products for free_item rewards
+      const rewards = program.loyalty_program_rewards || [];
+      const freeItemRewards = rewards.filter((r: any) => r.reward_type === "free_item" && r.reward_product_id);
+      const productIds = freeItemRewards.map((r: any) => r.reward_product_id);
+
+      let productsMap: Record<string, string> = {};
+      if (productIds.length > 0) {
+        const { data: products } = await supabase
+          .from("products")
+          .select("id, name")
+          .in("id", productIds);
+        
+        products?.forEach(p => {
+          productsMap[p.id] = p.name;
+        });
+      }
+
       const programData: LoyaltyProgram = {
         id: program.id,
         name: program.name,
         type: program.type,
         activated_at: program.activated_at,
-        rewards: program.loyalty_program_rewards || [],
+        rewards: rewards.map((r: any) => ({
+          id: r.id,
+          trigger_value: r.trigger_value,
+          reward_type: r.reward_type,
+          reward_value: r.reward_value,
+          reward_product_id: r.reward_product_id,
+          description: r.description,
+          productName: r.reward_product_id ? productsMap[r.reward_product_id] : undefined,
+        })),
       };
       setLoyaltyProgram(programData);
 
-      // Fetch customer's orders AFTER program activation
-      let ordersQuery = supabase
+      // Fetch customer's orders AFTER baseline (reset logic)
+      const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(`
           id, created_at,
@@ -126,16 +170,12 @@ export const ProfileView = ({
         `)
         .eq("restaurant_id", restaurantId)
         .eq("customer_cpf", customerCPF)
-        .in("status", ["delivered", "picked_up", "completed"]);
+        .in("status", ["delivered", "picked_up", "completed"])
+        .gte("created_at", baselineAt.toISOString());
 
-      if (program.activated_at) {
-        ordersQuery = ordersQuery.gte("created_at", program.activated_at);
-      }
-
-      const { data: ordersData, error: ordersError } = await ordersQuery;
       if (ordersError) throw ordersError;
 
-      // Calculate progress
+      // Calculate progress from baseline
       let purchase_count = 0;
       let total_spent = 0;
 
@@ -204,7 +244,7 @@ export const ProfileView = ({
       case "discount_fixed":
         return `R$ ${reward.reward_value} de desconto`;
       case "free_item":
-        return "Item grátis";
+        return reward.productName ? `${reward.productName} grátis` : "Item grátis";
       case "free_delivery":
         return "Entrega grátis";
       default:
@@ -238,6 +278,10 @@ export const ProfileView = ({
       : customerProgress.total_spent;
 
     const sortedRewards = [...loyaltyProgram.rewards].sort((a, b) => a.trigger_value - b.trigger_value);
+    
+    // Find the highest reward achieved in current cycle
+    const earnedReward = sortedRewards.filter(r => r.trigger_value <= currentValue).pop();
+    const hasRewardToRedeem = !!earnedReward;
 
     if (loyaltyProgram.type === "spending") {
       // Spending type - show progress bar
@@ -270,7 +314,18 @@ export const ProfileView = ({
               </p>
             </div>
 
-            {reachedGoal ? (
+            {hasRewardToRedeem ? (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
+                <Gift className="w-8 h-8 mx-auto mb-2 text-green-600" />
+                <p className="font-medium text-green-700">Você tem uma recompensa disponível!</p>
+                <p className="text-sm mt-1 text-green-600">
+                  <strong>{getRewardDescription(earnedReward)}</strong>
+                </p>
+                <p className="text-xs text-green-600 mt-2">
+                  Resgate na sacola ao fazer seu pedido
+                </p>
+              </div>
+            ) : reachedGoal ? (
               <div className="bg-primary/10 rounded-lg p-4 text-center">
                 <Check className="w-8 h-8 mx-auto mb-2 text-primary" />
                 <p className="font-medium text-primary">Você já atingiu a meta!</p>
@@ -363,7 +418,18 @@ export const ProfileView = ({
               })}
             </div>
 
-            {customerProgress.purchase_count === 0 && (
+            {hasRewardToRedeem ? (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
+                <Gift className="w-8 h-8 mx-auto mb-2 text-green-600" />
+                <p className="font-medium text-green-700">Você tem uma recompensa disponível!</p>
+                <p className="text-sm mt-1 text-green-600">
+                  <strong>{getRewardDescription(earnedReward)}</strong>
+                </p>
+                <p className="text-xs text-green-600 mt-2">
+                  Resgate na sacola ao fazer seu pedido
+                </p>
+              </div>
+            ) : customerProgress.purchase_count === 0 && (
               <p className="text-center text-sm text-muted-foreground">
                 Faça sua primeira compra e comece a ganhar recompensas!
               </p>

@@ -472,6 +472,7 @@ export default function DeliveryMenu() {
             mode="delivery"
             restaurantSlug={restaurantSlug}
             onAddRewardItem={(item) => setCart(prev => [...prev, item])}
+            customerCPF={customerCPF}
           />
 
           <CustomerInfoDialog
