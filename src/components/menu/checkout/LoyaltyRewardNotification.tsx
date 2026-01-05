@@ -11,12 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 
+interface ProductExtra {
+  id: string;
+  name: string;
+  price: number;
+}
+
 interface Reward {
   id: string;
   trigger_value: number;
   reward_type: string;
   reward_value: number | null;
   reward_product_id: string | null;
+  reward_extra_id: string | null;
   description: string | null;
   product?: {
     id: string;
@@ -24,6 +31,7 @@ interface Reward {
     image_url: string | null;
     price: number;
   };
+  extra?: ProductExtra;
 }
 
 interface LoyaltyRewardNotificationProps {
@@ -149,15 +157,34 @@ export const LoyaltyRewardNotification = ({
         });
       }
 
-      // Build final rewards with product info
+      // Fetch extras for rewards that have reward_extra_id
+      const extraIds = rewardToShow
+        .filter((r: any) => r.reward_extra_id)
+        .map((r: any) => r.reward_extra_id);
+
+      let extrasMap: Record<string, ProductExtra> = {};
+      if (extraIds.length > 0) {
+        const { data: extras } = await supabase
+          .from("product_extras")
+          .select("id, name, price")
+          .in("id", extraIds);
+        
+        extras?.forEach(e => {
+          extrasMap[e.id] = e;
+        });
+      }
+
+      // Build final rewards with product and extra info
       const rewards: Reward[] = rewardToShow.map((r: any) => ({
         id: r.id,
         trigger_value: r.trigger_value,
         reward_type: r.reward_type,
         reward_value: r.reward_value,
         reward_product_id: r.reward_product_id,
+        reward_extra_id: r.reward_extra_id,
         description: r.description,
         product: r.reward_product_id ? productsMap[r.reward_product_id] : undefined,
+        extra: r.reward_extra_id ? extrasMap[r.reward_extra_id] : undefined,
       }));
 
       setAvailableRewards(rewards);
@@ -177,31 +204,15 @@ export const LoyaltyRewardNotification = ({
 
     setRedeeming(reward.id);
     try {
-      // Get active program
-      const { data: program } = await supabase
-        .from("loyalty_programs")
-        .select("id")
-        .eq("restaurant_id", restaurantId)
-        .eq("is_active", true)
-        .single();
-
-      if (program) {
-        // Record redemption
-        await supabase.from("loyalty_reward_redemptions").insert({
-          restaurant_id: restaurantId,
-          customer_cpf: customerCPF,
-          program_id: program.id,
-          reward_id: reward.id,
-          trigger_value: reward.trigger_value,
-          redeemed_at: new Date().toISOString(),
-        });
-      }
-
+      // DO NOT record redemption here - it will be recorded when the order is finalized
+      // Just add the item to the cart
       onRedeemReward(reward);
       setDrawerOpen(false);
       
       // Remove from list
       setAvailableRewards(prev => prev.filter(r => r.id !== reward.id));
+      
+      toast.success("Recompensa adicionada à sacola!");
     } catch (error) {
       console.error("Error redeeming reward:", error);
       toast.error("Erro ao resgatar recompensa");
@@ -217,7 +228,11 @@ export const LoyaltyRewardNotification = ({
       case "discount_fixed":
         return `R$ ${reward.reward_value?.toFixed(2)} de desconto`;
       case "free_item":
-        return reward.product ? `${reward.product.name} grátis` : "Item grátis";
+        let desc = reward.product ? reward.product.name : "Item";
+        if (reward.extra) {
+          desc += ` (${reward.extra.name})`;
+        }
+        return `${desc} grátis`;
       case "free_delivery":
         return "Entrega grátis";
       default:

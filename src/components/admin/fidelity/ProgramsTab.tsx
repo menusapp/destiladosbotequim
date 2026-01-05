@@ -27,12 +27,19 @@ interface LoyaltyReward {
   reward_type: string;
   reward_value: number | null;
   reward_product_id: string | null;
+  reward_extra_id: string | null;
   description: string | null;
 }
 
 interface Product {
   id: string;
   name: string;
+}
+
+interface ProductExtra {
+  id: string;
+  name: string;
+  product_id: string;
 }
 
 interface ProgramsTabProps {
@@ -42,6 +49,7 @@ interface ProgramsTabProps {
 export default function ProgramsTab({ restaurantId }: ProgramsTabProps) {
   const [programs, setPrograms] = useState<LoyaltyProgram[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [productExtras, setProductExtras] = useState<Record<string, ProductExtra[]>>({});
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProgram, setEditingProgram] = useState<LoyaltyProgram | null>(null);
@@ -86,6 +94,20 @@ export default function ProgramsTab({ restaurantId }: ProgramsTabProps) {
     setProducts(data || []);
   };
 
+  const fetchProductExtras = async (productId: string) => {
+    if (productExtras[productId]) return; // Already fetched
+
+    const { data } = await supabase
+      .from("product_extras")
+      .select("id, name, product_id")
+      .eq("product_id", productId)
+      .order("name");
+
+    if (data && data.length > 0) {
+      setProductExtras(prev => ({ ...prev, [productId]: data }));
+    }
+  };
+
   const handleOpenDialog = (program?: LoyaltyProgram) => {
     if (program) {
       setEditingProgram(program);
@@ -96,13 +118,21 @@ export default function ProgramsTab({ restaurantId }: ProgramsTabProps) {
         reward_type: r.reward_type,
         reward_value: r.reward_value,
         reward_product_id: r.reward_product_id,
+        reward_extra_id: r.reward_extra_id,
         description: r.description,
       })) || []);
+      
+      // Fetch extras for any products that are selected
+      program.rewards?.forEach(r => {
+        if (r.reward_product_id) {
+          fetchProductExtras(r.reward_product_id);
+        }
+      });
     } else {
       setEditingProgram(null);
       setFormName("");
       setFormType("purchases");
-      setRewards([{ trigger_value: 1, reward_type: "discount_percentage", reward_value: 10, reward_product_id: null, description: "Primeira compra" }]);
+      setRewards([{ trigger_value: 1, reward_type: "discount_percentage", reward_value: 10, reward_product_id: null, reward_extra_id: null, description: "Primeira compra" }]);
     }
     setDialogOpen(true);
   };
@@ -114,6 +144,7 @@ export default function ProgramsTab({ restaurantId }: ProgramsTabProps) {
       reward_type: "discount_percentage",
       reward_value: 10,
       reward_product_id: null,
+      reward_extra_id: null,
       description: "",
     }]);
   };
@@ -125,6 +156,15 @@ export default function ProgramsTab({ restaurantId }: ProgramsTabProps) {
   const updateReward = (index: number, field: string, value: any) => {
     const updated = [...rewards];
     (updated[index] as any)[field] = value;
+    
+    // If product changed, clear the extra and fetch new extras
+    if (field === "reward_product_id") {
+      updated[index].reward_extra_id = null;
+      if (value) {
+        fetchProductExtras(value);
+      }
+    }
+    
     setRewards(updated);
   };
 
@@ -237,6 +277,18 @@ export default function ProgramsTab({ restaurantId }: ProgramsTabProps) {
     }
   };
 
+  const getProductName = (productId: string | null) => {
+    if (!productId) return null;
+    return products.find(p => p.id === productId)?.name;
+  };
+
+  const getExtraName = (productId: string | null, extraId: string | null) => {
+    if (!productId || !extraId) return null;
+    const extras = productExtras[productId];
+    if (!extras) return null;
+    return extras.find(e => e.id === extraId)?.name;
+  };
+
   if (loading) {
     return <div className="p-4">Carregando...</div>;
   }
@@ -330,25 +382,35 @@ export default function ProgramsTab({ restaurantId }: ProgramsTabProps) {
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium">Recompensas:</h4>
                   <div className="grid gap-2">
-                    {program.rewards?.sort((a, b) => a.trigger_value - b.trigger_value).map((reward, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-sm bg-muted p-2 rounded">
-                        <Badge variant="outline">
-                          {program.type === "purchases" 
-                            ? `${reward.trigger_value}ª compra`
-                            : `R$ ${reward.trigger_value}`}
-                        </Badge>
-                        <span className="text-muted-foreground">→</span>
-                        <span>
-                          {reward.reward_type === "discount_percentage" && `${reward.reward_value}% de desconto`}
-                          {reward.reward_type === "discount_fixed" && `R$ ${reward.reward_value} de desconto`}
-                          {reward.reward_type === "free_item" && "Item grátis"}
-                          {reward.reward_type === "free_delivery" && "Entrega grátis"}
-                        </span>
-                        {reward.description && (
-                          <span className="text-muted-foreground">- {reward.description}</span>
-                        )}
-                      </div>
-                    ))}
+                    {program.rewards?.sort((a, b) => a.trigger_value - b.trigger_value).map((reward, idx) => {
+                      const productName = getProductName(reward.reward_product_id);
+                      const extraName = getExtraName(reward.reward_product_id, reward.reward_extra_id);
+                      
+                      return (
+                        <div key={idx} className="flex items-center gap-2 text-sm bg-muted p-2 rounded">
+                          <Badge variant="outline">
+                            {program.type === "purchases" 
+                              ? `${reward.trigger_value}ª compra`
+                              : `R$ ${reward.trigger_value}`}
+                          </Badge>
+                          <span className="text-muted-foreground">→</span>
+                          <span>
+                            {reward.reward_type === "discount_percentage" && `${reward.reward_value}% de desconto`}
+                            {reward.reward_type === "discount_fixed" && `R$ ${reward.reward_value} de desconto`}
+                            {reward.reward_type === "free_item" && (
+                              <>
+                                {productName ? `${productName} grátis` : "Item grátis"}
+                                {extraName && <span className="text-muted-foreground ml-1">({extraName})</span>}
+                              </>
+                            )}
+                            {reward.reward_type === "free_delivery" && "Entrega grátis"}
+                          </span>
+                          {reward.description && (
+                            <span className="text-muted-foreground">- {reward.description}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>
@@ -459,24 +521,52 @@ export default function ProgramsTab({ restaurantId }: ProgramsTabProps) {
                     )}
 
                     {reward.reward_type === "free_item" && (
-                      <div className="space-y-2">
-                        <Label>Produto Grátis</Label>
-                        <Select 
-                          value={reward.reward_product_id || ""} 
-                          onValueChange={(v) => updateReward(index, "reward_product_id", v)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o produto" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <>
+                        <div className="space-y-2">
+                          <Label>Produto Grátis</Label>
+                          <Select 
+                            value={reward.reward_product_id || ""} 
+                            onValueChange={(v) => updateReward(index, "reward_product_id", v)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o produto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Show variation selector if product has extras */}
+                        {reward.reward_product_id && productExtras[reward.reward_product_id]?.length > 0 && (
+                          <div className="space-y-2">
+                            <Label>Variação (opcional)</Label>
+                            <Select 
+                              value={reward.reward_extra_id || "base"} 
+                              onValueChange={(v) => updateReward(index, "reward_extra_id", v === "base" ? null : v)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Produto base (sem variação)" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="base">Produto base (sem variação)</SelectItem>
+                                {productExtras[reward.reward_product_id].map((extra) => (
+                                  <SelectItem key={extra.id} value={extra.id}>
+                                    {extra.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              Escolha uma variação específica para dar de graça, ou deixe "Produto base"
+                            </p>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     <div className="space-y-2">

@@ -208,46 +208,81 @@ serve(async (req) => {
               break;
           }
 
-          // Generate coupon code if discount is enabled
+          // Generate coupon code or use existing coupon
           let couponCode: string | null = null;
           let discountText = "";
+          let validityText = "";
 
           if (rule.discount_type) {
-            // Generate unique coupon code
-            couponCode = `MKT${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-            
-            discountText = rule.discount_type === "percentage"
-              ? `${rule.discount_value}%`
-              : `R$ ${Number(rule.discount_value).toFixed(2)}`;
+            // Check if rule has an existing coupon_id to use
+            if (rule.coupon_id) {
+              // Use existing coupon
+              const { data: existingCoupon } = await supabase
+                .from("coupons")
+                .select("code, valid_until, discount_type, discount_value")
+                .eq("id", rule.coupon_id)
+                .single();
 
-            // Determine category restriction
-            let discountCategoryId: string | null = null;
-            if (rule.discount_target_type === "same_category" && matchedCategoryId) {
-              discountCategoryId = matchedCategoryId;
-            } else if (rule.discount_target_type === "category" && rule.discount_target_category_id) {
-              discountCategoryId = rule.discount_target_category_id;
+              if (existingCoupon) {
+                couponCode = existingCoupon.code;
+                discountText = existingCoupon.discount_type === "percentage"
+                  ? `${existingCoupon.discount_value}%`
+                  : `R$ ${Number(existingCoupon.discount_value).toFixed(2)}`;
+                
+                // Format validity as date DD/MM/YYYY
+                if (existingCoupon.valid_until) {
+                  const validDate = new Date(existingCoupon.valid_until);
+                  validityText = validDate.toLocaleDateString('pt-BR');
+                } else {
+                  validityText = `${rule.discount_validity_days || 7} dias`;
+                }
+                
+                console.log(`[marketing-trigger] Using existing coupon: ${couponCode}`);
+              }
             }
+            
+            // If no existing coupon or coupon not found, generate new one
+            if (!couponCode) {
+              couponCode = `MKT${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+              
+              discountText = rule.discount_type === "percentage"
+                ? `${rule.discount_value}%`
+                : `R$ ${Number(rule.discount_value).toFixed(2)}`;
 
-            // Create coupon in the coupons table
-            const couponValidUntil = new Date();
-            couponValidUntil.setDate(couponValidUntil.getDate() + (rule.discount_validity_days || 7));
+              // Determine category restriction
+              let discountCategoryId: string | null = null;
+              if (rule.discount_target_type === "same_category" && matchedCategoryId) {
+                discountCategoryId = matchedCategoryId;
+              } else if (rule.discount_target_type === "category" && rule.discount_target_category_id) {
+                discountCategoryId = rule.discount_target_category_id;
+              }
 
-            const { error: couponError } = await supabase
-              .from("coupons")
-              .insert({
-                restaurant_id: restaurantId,
-                code: couponCode,
-                discount_type: rule.discount_type,
-                discount_value: rule.discount_value,
-                min_order_value: 0,
-                is_active: true,
-                usage_limit: 1,
-                valid_from: new Date().toISOString(),
-                valid_until: couponValidUntil.toISOString(),
-              });
+              // Create coupon in the coupons table
+              const couponValidUntil = new Date();
+              couponValidUntil.setDate(couponValidUntil.getDate() + (rule.discount_validity_days || 7));
 
-            if (couponError) {
-              console.error("[marketing-trigger] Error creating coupon:", couponError);
+              const { error: couponError } = await supabase
+                .from("coupons")
+                .insert({
+                  restaurant_id: restaurantId,
+                  code: couponCode,
+                  discount_type: rule.discount_type,
+                  discount_value: rule.discount_value,
+                  min_order_value: 0,
+                  is_active: true,
+                  usage_limit: 1,
+                  valid_from: new Date().toISOString(),
+                  valid_until: couponValidUntil.toISOString(),
+                });
+
+              if (couponError) {
+                console.error("[marketing-trigger] Error creating coupon:", couponError);
+              }
+
+              // Format validity as date DD/MM/YYYY
+              validityText = couponValidUntil.toLocaleDateString('pt-BR');
+              
+              console.log(`[marketing-trigger] Created new coupon: ${couponCode}`);
             }
           }
 
@@ -258,7 +293,7 @@ serve(async (req) => {
             .replace(/{desconto}/g, discountText)
             .replace(/{produto}/g, matchedProductName)
             .replace(/{categoria}/g, matchedCategoryName)
-            .replace(/{validade}/g, String(rule.discount_validity_days || 7))
+            .replace(/{validade}/g, validityText)
             .replace(/{restaurante}/g, restaurantName);
 
           scheduledMessages.push({

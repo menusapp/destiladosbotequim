@@ -1151,6 +1151,7 @@ export type Database = {
           description: string | null
           id: string
           program_id: string
+          reward_extra_id: string | null
           reward_product_id: string | null
           reward_type: string
           reward_value: number | null
@@ -1161,6 +1162,7 @@ export type Database = {
           description?: string | null
           id?: string
           program_id: string
+          reward_extra_id?: string | null
           reward_product_id?: string | null
           reward_type: string
           reward_value?: number | null
@@ -1171,6 +1173,7 @@ export type Database = {
           description?: string | null
           id?: string
           program_id?: string
+          reward_extra_id?: string | null
           reward_product_id?: string | null
           reward_type?: string
           reward_value?: number | null
@@ -1182,6 +1185,13 @@ export type Database = {
             columns: ["program_id"]
             isOneToOne: false
             referencedRelation: "loyalty_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_program_rewards_reward_extra_id_fkey"
+            columns: ["reward_extra_id"]
+            isOneToOne: false
+            referencedRelation: "product_extras"
             referencedColumns: ["id"]
           },
           {
