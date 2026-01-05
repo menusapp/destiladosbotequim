@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CartItem } from "@/types/menu";
 import { MapPin, CreditCard, Clock, Gift } from "lucide-react";
+import { DiscountReward } from "./LoyaltyRewardNotification";
 
 interface DeliveryZone {
   id: string;
@@ -25,6 +26,7 @@ interface SummaryStepProps {
   onConfirm: () => void;
   submitting: boolean;
   deliveryZone?: DeliveryZone | null;
+  activeRewardDiscount?: DiscountReward | null;
 }
 
 export const SummaryStep = ({
@@ -40,6 +42,7 @@ export const SummaryStep = ({
   onConfirm,
   submitting,
   deliveryZone,
+  activeRewardDiscount,
 }: SummaryStepProps) => {
   const subtotal = cart.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
@@ -58,15 +61,48 @@ export const SummaryStep = ({
 
   const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
   
-  // Usar taxa da zona de entrega se disponível
+  // Calculate reward discount
+  const getRewardDiscountValue = (): number => {
+    if (!activeRewardDiscount) return 0;
+    switch (activeRewardDiscount.type) {
+      case "discount_percentage":
+        return subtotal * (activeRewardDiscount.value / 100);
+      case "discount_fixed":
+        return Math.min(activeRewardDiscount.value, subtotal);
+      case "free_delivery":
+        return 0; // Handled in deliveryFee
+      default:
+        return 0;
+    }
+  };
+
+  const rewardDiscount = getRewardDiscountValue();
+
+  const getRewardDiscountLabel = (): string => {
+    if (!activeRewardDiscount) return "";
+    switch (activeRewardDiscount.type) {
+      case "discount_percentage":
+        return `Desconto recompensa (${activeRewardDiscount.value}%)`;
+      case "discount_fixed":
+        return "Desconto recompensa";
+      case "free_delivery":
+        return "Entrega grátis (recompensa)";
+      default:
+        return "Desconto recompensa";
+    }
+  };
+  
+  // Usar taxa da zona de entrega se disponível, or 0 if free delivery
   const deliveryFee = deliveryType === "delivery" 
-    ? (deliveryZone?.delivery_fee ?? restaurant.delivery_fee ?? 0) 
+    ? (activeRewardDiscount?.type === "free_delivery" 
+        ? 0 
+        : (deliveryZone?.delivery_fee ?? restaurant.delivery_fee ?? 0))
     : 0;
   
   const serviceFee = restaurant.service_fee_enabled
     ? (subtotal * restaurant.service_fee_percentage) / 100
     : 0;
-  const total = subtotal - couponDiscount - loyaltyDiscount + deliveryFee + serviceFee;
+  const total = subtotal - couponDiscount - loyaltyDiscount - rewardDiscount + deliveryFee + serviceFee;
 
   const pointsToEarn = Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1));
 
@@ -118,8 +154,13 @@ export const SummaryStep = ({
                       + {item.extras.map((e) => e.name).join(", ")}
                     </span>
                   )}
+                  {item.isRewardItem && (
+                    <span className="text-green-600 ml-1">(Recompensa)</span>
+                  )}
                 </span>
-                <span className="font-medium">R$ {itemTotal.toFixed(2)}</span>
+                <span className={`font-medium ${item.isRewardItem ? 'text-green-600' : ''}`}>
+                  {item.isRewardItem ? "GRÁTIS" : `R$ ${itemTotal.toFixed(2)}`}
+                </span>
               </div>
             );
           })}
@@ -189,7 +230,11 @@ export const SummaryStep = ({
           {deliveryType === "delivery" && (
             <div className="flex justify-between text-sm">
               <span>Taxa de entrega</span>
-              <span>R$ {deliveryFee.toFixed(2)}</span>
+              <span className={activeRewardDiscount?.type === "free_delivery" ? "text-green-600" : ""}>
+                {activeRewardDiscount?.type === "free_delivery" 
+                  ? "GRÁTIS" 
+                  : `R$ ${deliveryFee.toFixed(2)}`}
+              </span>
             </div>
           )}
           {serviceFee > 0 && (
@@ -204,9 +249,15 @@ export const SummaryStep = ({
               <span>-R$ {couponDiscount.toFixed(2)}</span>
             </div>
           )}
+          {rewardDiscount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>{getRewardDiscountLabel()}</span>
+              <span>-R$ {rewardDiscount.toFixed(2)}</span>
+            </div>
+          )}
           {loyaltyDiscount > 0 && (
             <div className="flex justify-between text-sm text-green-600">
-              <span>Desconto fidelidade ({loyaltyPointsUsed} pontos)</span>
+              <span>Desconto pontos ({loyaltyPointsUsed} pontos)</span>
               <span>-R$ {loyaltyDiscount.toFixed(2)}</span>
             </div>
           )}

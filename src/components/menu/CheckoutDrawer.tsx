@@ -10,6 +10,7 @@ import { DeliveryTypeStep } from "./checkout/DeliveryTypeStep";
 import { CartItem } from "@/types/menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { DiscountReward } from "./checkout/LoyaltyRewardNotification";
 
 type CheckoutStep = "cart" | "delivery-type" | "address" | "payment" | "summary";
 
@@ -82,6 +83,7 @@ export const CheckoutDrawer = ({
   const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
+  const [activeRewardDiscount, setActiveRewardDiscount] = useState<DiscountReward | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -105,6 +107,8 @@ export const CheckoutDrawer = ({
   // Usar taxa de entrega da zona encontrada ou do restaurante como fallback
   const getDeliveryFee = () => {
     if (deliveryType === "pickup") return 0;
+    // If free delivery reward is active, return 0
+    if (activeRewardDiscount?.type === "free_delivery") return 0;
     if (deliveryZone) return deliveryZone.delivery_fee || 0;
     return restaurant.delivery_fee || 0;
   };
@@ -116,6 +120,22 @@ export const CheckoutDrawer = ({
     return restaurant.min_order_value || 0;
   };
 
+  // Calculate reward discount
+  const calculateRewardDiscount = (subtotal: number): number => {
+    if (!activeRewardDiscount) return 0;
+    
+    switch (activeRewardDiscount.type) {
+      case "discount_percentage":
+        return subtotal * (activeRewardDiscount.value / 100);
+      case "discount_fixed":
+        return Math.min(activeRewardDiscount.value, subtotal);
+      case "free_delivery":
+        return 0; // Handled in getDeliveryFee
+      default:
+        return 0;
+    }
+  };
+
   const handleFinishOrder = async () => {
     if (submitting) return;
     
@@ -123,6 +143,7 @@ export const CheckoutDrawer = ({
     try {
       const couponDiscount = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
       const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
+      const rewardDiscount = calculateRewardDiscount(subtotal);
       const deliveryFee = getDeliveryFee();
       const serviceFee = restaurant.service_fee_enabled 
         ? (subtotal * restaurant.service_fee_percentage / 100) 
@@ -163,6 +184,8 @@ export const CheckoutDrawer = ({
         loyalty_points_earned: Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1)),
         status: "pending",
         notes: paymentData.changeFor ? `Troco para: R$ ${paymentData.changeFor}` : null,
+        reward_discount: rewardDiscount,
+        reward_id: activeRewardDiscount?.id || null,
       };
 
       const { data: order, error: orderError } = await supabase
@@ -207,7 +230,7 @@ export const CheckoutDrawer = ({
         }
       }
 
-      // Record loyalty reward redemptions for reward items
+      // Record loyalty reward redemptions for reward items (free_item type)
       const rewardItems = cart.filter(item => item.isRewardItem && item.rewardId);
       if (rewardItems.length > 0) {
         // Get active program
@@ -238,6 +261,19 @@ export const CheckoutDrawer = ({
             });
           }
         }
+      }
+
+      // Record redemption for discount rewards
+      if (activeRewardDiscount) {
+        await supabase.from("loyalty_reward_redemptions").insert({
+          restaurant_id: restaurant.id,
+          customer_cpf: customerData.cpf,
+          program_id: activeRewardDiscount.programId,
+          reward_id: activeRewardDiscount.id,
+          order_id: order.id,
+          trigger_value: activeRewardDiscount.triggerValue,
+          redeemed_at: new Date().toISOString(),
+        });
       }
 
       if (coupon) {
@@ -397,6 +433,15 @@ export const CheckoutDrawer = ({
     toast.success(`${reward.product.name} adicionado como recompensa!`);
   };
 
+  const handleRedeemDiscount = (discount: DiscountReward) => {
+    setActiveRewardDiscount(discount);
+    toast.success("Desconto de fidelidade aplicado!");
+  };
+
+  const handleClearRewardDiscount = () => {
+    setActiveRewardDiscount(null);
+  };
+
   // Get customer CPF from prop or sessionStorage
   const getCustomerCPF = () => {
     return customerCPFProp || sessionStorage.getItem("customer_cpf") || "";
@@ -421,6 +466,9 @@ export const CheckoutDrawer = ({
             deliveryType={deliveryType}
             customerCPF={getCustomerCPF()}
             onAddRewardItem={onAddRewardItem ? handleAddRewardItem : undefined}
+            onRedeemDiscount={handleRedeemDiscount}
+            activeRewardDiscount={activeRewardDiscount}
+            onClearRewardDiscount={handleClearRewardDiscount}
           />
         );
       case "delivery-type":
@@ -467,12 +515,13 @@ export const CheckoutDrawer = ({
       case "payment":
         const couponDiscount = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
         const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
+        const rewardDiscount = calculateRewardDiscount(subtotal);
         const deliveryFee = getDeliveryFee();
         const serviceFee = restaurant.service_fee_enabled 
           ? (subtotal * restaurant.service_fee_percentage / 100) 
           : 0;
         
-        const orderTotal = subtotal + serviceFee + deliveryFee - couponDiscount - loyaltyDiscount;
+        const orderTotal = subtotal + serviceFee + deliveryFee - couponDiscount - loyaltyDiscount - rewardDiscount;
 
         return (
           <PaymentStep
@@ -514,6 +563,7 @@ export const CheckoutDrawer = ({
             onConfirm={handleFinishOrder}
             submitting={submitting}
             deliveryZone={deliveryZone}
+            activeRewardDiscount={activeRewardDiscount}
           />
         );
     }

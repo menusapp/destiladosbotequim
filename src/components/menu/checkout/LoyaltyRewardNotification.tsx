@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Gift, ChevronRight, X, Loader2 } from "lucide-react";
+import { Gift, ChevronRight, X, Loader2, Lock, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Drawer,
@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 
 interface ProductExtra {
@@ -34,11 +35,20 @@ interface Reward {
   extra?: ProductExtra;
 }
 
+export interface DiscountReward {
+  id: string;
+  type: 'discount_percentage' | 'discount_fixed' | 'free_delivery';
+  value: number;
+  programId: string;
+  triggerValue: number;
+}
+
 interface LoyaltyRewardNotificationProps {
   restaurantId: string;
   customerCPF: string;
   primaryColor: string;
   onRedeemReward: (reward: Reward) => void;
+  onRedeemDiscount?: (discount: DiscountReward) => void;
 }
 
 export const LoyaltyRewardNotification = ({
@@ -46,11 +56,15 @@ export const LoyaltyRewardNotification = ({
   customerCPF,
   primaryColor,
   onRedeemReward,
+  onRedeemDiscount,
 }: LoyaltyRewardNotificationProps) => {
-  const [availableRewards, setAvailableRewards] = useState<Reward[]>([]);
+  const [earnedRewards, setEarnedRewards] = useState<Reward[]>([]);
+  const [lockedRewards, setLockedRewards] = useState<{ reward: Reward; missing: number; unit: string }[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [redeeming, setRedeeming] = useState<string | null>(null);
+  const [currentValue, setCurrentValue] = useState(0);
+  const [programType, setProgramType] = useState<"purchases" | "spending">("purchases");
 
   useEffect(() => {
     if (customerCPF && restaurantId) {
@@ -73,9 +87,12 @@ export const LoyaltyRewardNotification = ({
         .maybeSingle();
 
       if (!program) {
-        setAvailableRewards([]);
+        setEarnedRewards([]);
+        setLockedRewards([]);
         return;
       }
+
+      setProgramType(program.type as "purchases" | "spending");
 
       // Find the last redemption to get the baseline
       const { data: lastRedemption } = await supabase
@@ -119,7 +136,8 @@ export const LoyaltyRewardNotification = ({
         });
       });
 
-      const currentValue = program.type === "purchases" ? purchase_count : total_spent;
+      const currentVal = program.type === "purchases" ? purchase_count : total_spent;
+      setCurrentValue(currentVal);
 
       // Fetch redemptions AFTER the baseline (current cycle only)
       const { data: cycleRedemptions } = await supabase
@@ -132,17 +150,26 @@ export const LoyaltyRewardNotification = ({
 
       const redeemedRewardIds = new Set(cycleRedemptions?.map(r => r.reward_id) || []);
 
-      // Find rewards that are earned and not yet redeemed in this cycle
-      const allRewards = program.loyalty_program_rewards || [];
-      const earnedRewards = allRewards
-        .filter((r: any) => r.trigger_value <= currentValue && !redeemedRewardIds.has(r.id))
-        .sort((a: any, b: any) => b.trigger_value - a.trigger_value); // Highest first
+      // All rewards for the program
+      const allRewards = (program.loyalty_program_rewards || []) as any[];
 
-      // Only show the highest earned reward (1 redemption per cycle)
-      const rewardToShow = earnedRewards.length > 0 ? [earnedRewards[0]] : [];
+      // Separate earned and locked rewards
+      const earned = allRewards
+        .filter((r: any) => r.trigger_value <= currentVal && !redeemedRewardIds.has(r.id))
+        .sort((a: any, b: any) => b.trigger_value - a.trigger_value);
+
+      const locked = allRewards
+        .filter((r: any) => r.trigger_value > currentVal)
+        .map((r: any) => ({
+          reward: r,
+          missing: r.trigger_value - currentVal,
+          unit: program.type === "purchases" ? "compra(s)" : "R$",
+        }))
+        .sort((a: any, b: any) => a.missing - b.missing);
 
       // Fetch products for free_item rewards
-      const freeItemRewards = rewardToShow.filter((r: any) => r.reward_type === "free_item" && r.reward_product_id);
+      const allRewardsToEnrich = [...earned, ...locked.map(l => l.reward)];
+      const freeItemRewards = allRewardsToEnrich.filter((r: any) => r.reward_type === "free_item" && r.reward_product_id);
       const productIds = freeItemRewards.map((r: any) => r.reward_product_id);
 
       let productsMap: Record<string, any> = {};
@@ -158,7 +185,7 @@ export const LoyaltyRewardNotification = ({
       }
 
       // Fetch extras for rewards that have reward_extra_id
-      const extraIds = rewardToShow
+      const extraIds = allRewardsToEnrich
         .filter((r: any) => r.reward_extra_id)
         .map((r: any) => r.reward_extra_id);
 
@@ -174,8 +201,8 @@ export const LoyaltyRewardNotification = ({
         });
       }
 
-      // Build final rewards with product and extra info
-      const rewards: Reward[] = rewardToShow.map((r: any) => ({
+      // Build final earned rewards
+      const earnedRewardsList: Reward[] = earned.map((r: any) => ({
         id: r.id,
         trigger_value: r.trigger_value,
         reward_type: r.reward_type,
@@ -187,7 +214,25 @@ export const LoyaltyRewardNotification = ({
         extra: r.reward_extra_id ? extrasMap[r.reward_extra_id] : undefined,
       }));
 
-      setAvailableRewards(rewards);
+      // Build final locked rewards
+      const lockedRewardsList = locked.map((l: any) => ({
+        reward: {
+          id: l.reward.id,
+          trigger_value: l.reward.trigger_value,
+          reward_type: l.reward.reward_type,
+          reward_value: l.reward.reward_value,
+          reward_product_id: l.reward.reward_product_id,
+          reward_extra_id: l.reward.reward_extra_id,
+          description: l.reward.description,
+          product: l.reward.reward_product_id ? productsMap[l.reward.reward_product_id] : undefined,
+          extra: l.reward.reward_extra_id ? extrasMap[l.reward.reward_extra_id] : undefined,
+        },
+        missing: l.missing,
+        unit: l.unit,
+      }));
+
+      setEarnedRewards(earnedRewardsList);
+      setLockedRewards(lockedRewardsList);
     } catch (error) {
       console.error("Error checking rewards:", error);
     } finally {
@@ -195,24 +240,35 @@ export const LoyaltyRewardNotification = ({
     }
   };
 
-  const handleRedeem = async (reward: Reward) => {
-    // For free_item, ensure product exists
-    if (reward.reward_type === "free_item" && !reward.product) {
-      toast.error("Produto da recompensa não encontrado");
-      return;
-    }
-
+  const handleRedeem = async (reward: Reward, programId: string) => {
     setRedeeming(reward.id);
     try {
-      // DO NOT record redemption here - it will be recorded when the order is finalized
-      // Just add the item to the cart
-      onRedeemReward(reward);
+      if (reward.reward_type === "free_item") {
+        // For free_item, ensure product exists
+        if (!reward.product) {
+          toast.error("Produto da recompensa não encontrado");
+          return;
+        }
+        onRedeemReward(reward);
+      } else if (reward.reward_type === "discount_percentage" || reward.reward_type === "discount_fixed" || reward.reward_type === "free_delivery") {
+        // For discount rewards
+        if (onRedeemDiscount) {
+          onRedeemDiscount({
+            id: reward.id,
+            type: reward.reward_type as 'discount_percentage' | 'discount_fixed' | 'free_delivery',
+            value: reward.reward_type === "free_delivery" ? 100 : (reward.reward_value || 0),
+            programId,
+            triggerValue: reward.trigger_value,
+          });
+        }
+      }
+
       setDrawerOpen(false);
       
-      // Remove from list
-      setAvailableRewards(prev => prev.filter(r => r.id !== reward.id));
+      // Remove from earned list
+      setEarnedRewards(prev => prev.filter(r => r.id !== reward.id));
       
-      toast.success("Recompensa adicionada à sacola!");
+      toast.success("Recompensa aplicada!");
     } catch (error) {
       console.error("Error redeeming reward:", error);
       toast.error("Erro ao resgatar recompensa");
@@ -240,7 +296,37 @@ export const LoyaltyRewardNotification = ({
     }
   };
 
-  if (loading || availableRewards.length === 0) {
+  const getRewardIcon = (type: string) => {
+    switch (type) {
+      case "discount_percentage":
+      case "discount_fixed":
+        return "%";
+      case "free_delivery":
+        return "🚚";
+      default:
+        return null;
+    }
+  };
+
+  // Get program ID for redemption
+  const [programId, setProgramId] = useState<string>("");
+
+  useEffect(() => {
+    const fetchProgramId = async () => {
+      const { data } = await supabase
+        .from("loyalty_programs")
+        .select("id")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (data) setProgramId(data.id);
+    };
+    if (restaurantId) fetchProgramId();
+  }, [restaurantId]);
+
+  const hasRewards = earnedRewards.length > 0 || lockedRewards.length > 0;
+
+  if (loading || !hasRewards) {
     return null;
   }
 
@@ -260,16 +346,20 @@ export const LoyaltyRewardNotification = ({
           style={{ backgroundColor: primaryColor }}
         >
           <Gift className="w-5 h-5 text-white" />
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-            {availableRewards.length}
-          </span>
+          {earnedRewards.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+              {earnedRewards.length}
+            </span>
+          )}
         </div>
         <div className="flex-1 text-left">
           <p className="font-medium text-sm" style={{ color: primaryColor }}>
-            Você tem recompensas!
+            {earnedRewards.length > 0 ? "Você tem recompensas!" : "Programa de Fidelidade"}
           </p>
           <p className="text-xs text-muted-foreground">
-            Clique para resgatar
+            {earnedRewards.length > 0 
+              ? "Clique para resgatar" 
+              : `${lockedRewards.length} recompensa(s) disponível(is)`}
           </p>
         </div>
         <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -290,54 +380,117 @@ export const LoyaltyRewardNotification = ({
             </div>
           </DrawerHeader>
 
-          <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
-            {availableRewards.map((reward) => (
-              <Card key={reward.id} className="overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-3 p-3">
-                    {reward.product?.image_url ? (
-                      <img
-                        src={reward.product.image_url}
-                        alt={reward.product.name}
-                        className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
-                      />
-                    ) : (
-                      <div 
-                        className="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${primaryColor}20` }}
-                      >
-                        <Gift className="w-8 h-8" style={{ color: primaryColor }} />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm">
-                        {getRewardDescription(reward)}
-                      </p>
-                      {reward.product && (
-                        <p className="text-xs text-muted-foreground line-through">
-                          R$ {reward.product.price.toFixed(2)}
-                        </p>
-                      )}
-                      <p className="text-xs font-medium mt-1" style={{ color: primaryColor }}>
-                        GRÁTIS
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleRedeem(reward)}
-                      disabled={redeeming === reward.id}
-                      style={{ backgroundColor: primaryColor }}
-                    >
-                      {redeeming === reward.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        "Resgatar"
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Current Progress */}
+            <div className="text-center text-sm text-muted-foreground">
+              <p>
+                {programType === "purchases" 
+                  ? `Você tem ${currentValue} compra(s) no ciclo atual` 
+                  : `Você gastou R$ ${currentValue.toFixed(2)} no ciclo atual`}
+              </p>
+            </div>
+
+            {/* Earned Rewards Section */}
+            {earnedRewards.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2 mb-3" style={{ color: primaryColor }}>
+                  <Check className="w-4 h-4" />
+                  Liberadas
+                </h3>
+                <div className="space-y-2">
+                  {earnedRewards.map((reward) => (
+                    <Card key={reward.id} className="overflow-hidden border-2" style={{ borderColor: `${primaryColor}40` }}>
+                      <CardContent className="p-0">
+                        <div className="flex items-center gap-3 p-3">
+                          {reward.product?.image_url ? (
+                            <img
+                              src={reward.product.image_url}
+                              alt={reward.product.name}
+                              className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+                            />
+                          ) : (
+                            <div 
+                              className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 text-white font-bold text-lg"
+                              style={{ backgroundColor: primaryColor }}
+                            >
+                              {getRewardIcon(reward.reward_type) || <Gift className="w-6 h-6" />}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm">
+                              {getRewardDescription(reward)}
+                            </p>
+                            <p className="text-xs font-medium mt-1" style={{ color: primaryColor }}>
+                              ✓ LIBERADO
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleRedeem(reward, programId)}
+                            disabled={redeeming === reward.id}
+                            style={{ backgroundColor: primaryColor }}
+                          >
+                            {redeeming === reward.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              "Resgatar"
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Locked Rewards Section */}
+            {lockedRewards.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-muted-foreground">
+                  <Lock className="w-4 h-4" />
+                  Faltam liberar
+                </h3>
+                <div className="space-y-2">
+                  {lockedRewards.map(({ reward, missing, unit }) => {
+                    const progress = (currentValue / reward.trigger_value) * 100;
+                    
+                    return (
+                      <Card key={reward.id} className="overflow-hidden opacity-70">
+                        <CardContent className="p-0">
+                          <div className="flex items-center gap-3 p-3">
+                            {reward.product?.image_url ? (
+                              <img
+                                src={reward.product.image_url}
+                                alt={reward.product.name}
+                                className="w-14 h-14 object-cover rounded-lg flex-shrink-0 grayscale"
+                              />
+                            ) : (
+                              <div 
+                                className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground font-bold text-lg"
+                              >
+                                {getRewardIcon(reward.reward_type) || <Gift className="w-6 h-6" />}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-muted-foreground">
+                                {getRewardDescription(reward)}
+                              </p>
+                              <div className="mt-2">
+                                <Progress value={progress} className="h-1.5" />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  🔒 Falta {unit === "R$" ? `R$ ${missing.toFixed(2)}` : `${missing} ${unit}`}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </DrawerContent>
       </Drawer>

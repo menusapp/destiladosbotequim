@@ -1724,6 +1724,8 @@ export type Database = {
           order_type: string | null
           payment_type: string | null
           restaurant_id: string
+          reward_discount: number | null
+          reward_id: string | null
           status: string | null
           table_id: string | null
           updated_at: string | null
@@ -1748,6 +1750,8 @@ export type Database = {
           order_type?: string | null
           payment_type?: string | null
           restaurant_id: string
+          reward_discount?: number | null
+          reward_id?: string | null
           status?: string | null
           table_id?: string | null
           updated_at?: string | null
@@ -1772,6 +1776,8 @@ export type Database = {
           order_type?: string | null
           payment_type?: string | null
           restaurant_id?: string
+          reward_discount?: number | null
+          reward_id?: string | null
           status?: string | null
           table_id?: string | null
           updated_at?: string | null
@@ -1789,6 +1795,13 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_program_rewards"
             referencedColumns: ["id"]
           },
           {
