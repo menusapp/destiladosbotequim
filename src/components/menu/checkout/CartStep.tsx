@@ -1,9 +1,10 @@
+import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, AlertCircle, Gift, X } from "lucide-react";
 import { CartItem } from "@/types/menu";
 import { ProductSuggestions } from "./ProductSuggestions";
-import { CouponInput } from "./CouponInput";
+import { CouponInput, CouponInputRef } from "./CouponInput";
 import { LoyaltyPointsDisplay } from "./LoyaltyPointsDisplay";
 import { LoyaltyRewardNotification, DiscountReward } from "./LoyaltyRewardNotification";
 import { toast } from "sonner";
@@ -62,6 +63,14 @@ export const CartStep = ({
   activeRewardDiscount,
   onClearRewardDiscount,
 }: CartStepProps) => {
+  const couponInputRef = useRef<CouponInputRef>(null);
+
+  const handleUseCoupon = (couponCode: string) => {
+    if (couponInputRef.current) {
+      couponInputRef.current.applyCouponCode(couponCode);
+    }
+  };
+
   const subtotal = cart.reduce((sum, item) => {
     // Reward items don't count towards subtotal (they're free)
     if (item.isRewardItem) return sum;
@@ -242,6 +251,7 @@ export const CartStep = ({
 
       {/* Coupon */}
       <CouponInput
+        ref={couponInputRef}
         restaurantId={restaurant.id}
         subtotal={subtotal}
         appliedCoupon={coupon}
@@ -257,6 +267,7 @@ export const CartStep = ({
           primaryColor={restaurant.primary_color}
           onRedeemReward={onAddRewardItem}
           onRedeemDiscount={onRedeemDiscount}
+          onUseCoupon={handleUseCoupon}
         />
       )}
 

@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Gift, ChevronRight, X, Loader2, Lock, Check } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Gift, ChevronRight, X, Loader2, Lock, Check, Ticket } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Drawer,
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import useEmblaCarousel from "embla-carousel-react";
 
 interface ProductExtra {
   id: string;
@@ -43,12 +44,22 @@ export interface DiscountReward {
   triggerValue: number;
 }
 
+interface CustomerCoupon {
+  id: string;
+  code: string;
+  discount_type: string;
+  discount_value: number;
+  valid_until: string | null;
+  min_order_value: number | null;
+}
+
 interface LoyaltyRewardNotificationProps {
   restaurantId: string;
   customerCPF: string;
   primaryColor: string;
   onRedeemReward: (reward: Reward) => void;
   onRedeemDiscount?: (discount: DiscountReward) => void;
+  onUseCoupon?: (couponCode: string) => void;
 }
 
 export const LoyaltyRewardNotification = ({
@@ -57,6 +68,7 @@ export const LoyaltyRewardNotification = ({
   primaryColor,
   onRedeemReward,
   onRedeemDiscount,
+  onUseCoupon,
 }: LoyaltyRewardNotificationProps) => {
   const [earnedRewards, setEarnedRewards] = useState<Reward[]>([]);
   const [lockedRewards, setLockedRewards] = useState<{ reward: Reward; missing: number; unit: string }[]>([]);
@@ -65,12 +77,78 @@ export const LoyaltyRewardNotification = ({
   const [redeeming, setRedeeming] = useState<string | null>(null);
   const [currentValue, setCurrentValue] = useState(0);
   const [programType, setProgramType] = useState<"purchases" | "spending">("purchases");
+  
+  // Coupons state
+  const [customerCoupons, setCustomerCoupons] = useState<CustomerCoupon[]>([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
+  
+  // Carousel for tabs
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Sync carousel with tab selection
+  useEffect(() => {
+    if (emblaApi) {
+      emblaApi.on('select', () => {
+        setActiveTab(emblaApi.selectedScrollSnap());
+      });
+    }
+  }, [emblaApi]);
+
+  const scrollToTab = (index: number) => {
+    if (emblaApi) {
+      emblaApi.scrollTo(index);
+      setActiveTab(index);
+    }
+  };
 
   useEffect(() => {
     if (customerCPF && restaurantId) {
       checkAvailableRewards();
+      fetchCustomerCoupons();
     }
   }, [customerCPF, restaurantId]);
+
+  const fetchCustomerCoupons = async () => {
+    setLoadingCoupons(true);
+    try {
+      // Fetch coupon codes from marketing messages sent to this customer
+      const { data: messages } = await supabase
+        .from("marketing_scheduled_messages")
+        .select("coupon_code")
+        .eq("restaurant_id", restaurantId)
+        .eq("customer_cpf", customerCPF)
+        .eq("status", "sent")
+        .not("coupon_code", "is", null);
+
+      const couponCodes = [...new Set(messages?.map(m => m.coupon_code).filter(Boolean) || [])];
+
+      if (couponCodes.length === 0) {
+        setCustomerCoupons([]);
+        return;
+      }
+
+      // Fetch valid coupons
+      const { data: coupons } = await supabase
+        .from("coupons")
+        .select("id, code, discount_type, discount_value, valid_until, min_order_value")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true)
+        .in("code", couponCodes);
+
+      // Filter out expired coupons
+      const validCoupons = (coupons || []).filter(c => {
+        if (!c.valid_until) return true;
+        return new Date(c.valid_until) > new Date();
+      });
+
+      setCustomerCoupons(validCoupons);
+    } catch (error) {
+      console.error("Error fetching customer coupons:", error);
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
 
   const checkAvailableRewards = async () => {
     setLoading(true);
@@ -278,6 +356,14 @@ export const LoyaltyRewardNotification = ({
     }
   };
 
+  const handleUseCoupon = (couponCode: string) => {
+    if (onUseCoupon) {
+      onUseCoupon(couponCode);
+      setDrawerOpen(false);
+      toast.success(`Cupom ${couponCode} selecionado!`);
+    }
+  };
+
   const getRewardDescription = (reward: Reward) => {
     switch (reward.reward_type) {
       case "discount_percentage":
@@ -309,6 +395,13 @@ export const LoyaltyRewardNotification = ({
     }
   };
 
+  const formatCouponDiscount = (coupon: CustomerCoupon) => {
+    if (coupon.discount_type === "percentage") {
+      return `${coupon.discount_value}% OFF`;
+    }
+    return `R$ ${coupon.discount_value.toFixed(2)} OFF`;
+  };
+
   // Get program ID for redemption
   const [programId, setProgramId] = useState<string>("");
 
@@ -326,10 +419,14 @@ export const LoyaltyRewardNotification = ({
   }, [restaurantId]);
 
   const hasRewards = earnedRewards.length > 0 || lockedRewards.length > 0;
+  const hasCoupons = customerCoupons.length > 0;
+  const hasContent = hasRewards || hasCoupons;
 
-  if (loading || !hasRewards) {
+  if (loading || !hasContent) {
     return null;
   }
+
+  const totalNotifications = earnedRewards.length + customerCoupons.length;
 
   return (
     <>
@@ -347,30 +444,30 @@ export const LoyaltyRewardNotification = ({
           style={{ backgroundColor: primaryColor }}
         >
           <Gift className="w-5 h-5 text-white" />
-          {earnedRewards.length > 0 && (
+          {totalNotifications > 0 && (
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-              {earnedRewards.length}
+              {totalNotifications}
             </span>
           )}
         </div>
         <div className="flex-1 text-left">
           <p className="font-medium text-sm" style={{ color: primaryColor }}>
-            {earnedRewards.length > 0 ? "Você tem recompensas!" : "Programa de Fidelidade"}
+            {totalNotifications > 0 ? "Você tem recompensas!" : "Programa de Fidelidade"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {earnedRewards.length > 0 
-              ? "Clique para resgatar" 
+            {totalNotifications > 0 
+              ? "Clique para ver e resgatar" 
               : `${lockedRewards.length} recompensa(s) disponível(is)`}
           </p>
         </div>
         <ChevronRight className="w-5 h-5 text-muted-foreground" />
       </button>
 
-      {/* Drawer with rewards */}
+      {/* Drawer with rewards and coupons */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerContent>
-          <DrawerHeader className="border-b">
-            <div className="flex items-center justify-between">
+          <DrawerHeader className="border-b pb-0">
+            <div className="flex items-center justify-between mb-3">
               <DrawerTitle className="flex items-center gap-2">
                 <Gift className="w-5 h-5" style={{ color: primaryColor }} />
                 Suas Recompensas
@@ -379,119 +476,256 @@ export const LoyaltyRewardNotification = ({
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
+            
+            {/* Tab Headers */}
+            <div className="flex gap-1 bg-muted rounded-lg p-1">
+              <button
+                onClick={() => scrollToTab(0)}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 0 
+                    ? 'bg-background shadow-sm' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                style={activeTab === 0 ? { color: primaryColor } : {}}
+              >
+                <Gift className="w-4 h-4 inline mr-1" />
+                Fidelidade
+                {earnedRewards.length > 0 && (
+                  <span 
+                    className="ml-1 px-1.5 py-0.5 text-xs rounded-full text-white"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {earnedRewards.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => scrollToTab(1)}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 1 
+                    ? 'bg-background shadow-sm' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                style={activeTab === 1 ? { color: primaryColor } : {}}
+              >
+                <Ticket className="w-4 h-4 inline mr-1" />
+                Cupons
+                {customerCoupons.length > 0 && (
+                  <span 
+                    className="ml-1 px-1.5 py-0.5 text-xs rounded-full text-white"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {customerCoupons.length}
+                  </span>
+                )}
+              </button>
+            </div>
           </DrawerHeader>
 
-          <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
-            {/* Current Progress */}
-            <div className="text-center text-sm text-muted-foreground">
-              <p>
-                {programType === "purchases" 
-                  ? `Você tem ${currentValue} compra(s) no ciclo atual` 
-                  : `Você gastou R$ ${currentValue.toFixed(2)} no ciclo atual`}
-              </p>
+          {/* Swipeable Content */}
+          <div className="overflow-hidden" ref={emblaRef}>
+            <div className="flex">
+              {/* Tab 1: Fidelidade */}
+              <div className="flex-[0_0_100%] min-w-0">
+                <div className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
+                  {/* Current Progress */}
+                  {hasRewards && (
+                    <div className="text-center text-sm text-muted-foreground">
+                      <p>
+                        {programType === "purchases" 
+                          ? `Você tem ${currentValue} compra(s) no ciclo atual` 
+                          : `Você gastou R$ ${currentValue.toFixed(2)} no ciclo atual`}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Earned Rewards Section */}
+                  {earnedRewards.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold flex items-center gap-2 mb-3" style={{ color: primaryColor }}>
+                        <Check className="w-4 h-4" />
+                        Liberadas
+                      </h3>
+                      <div className="space-y-2">
+                        {earnedRewards.map((reward) => (
+                          <Card key={reward.id} className="overflow-hidden border-2" style={{ borderColor: `${primaryColor}40` }}>
+                            <CardContent className="p-0">
+                              <div className="flex items-center gap-3 p-3">
+                                {reward.product?.image_url ? (
+                                  <img
+                                    src={reward.product.image_url}
+                                    alt={reward.product.name}
+                                    className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div 
+                                    className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 text-white font-bold text-lg"
+                                    style={{ backgroundColor: primaryColor }}
+                                  >
+                                    {getRewardIcon(reward.reward_type) || <Gift className="w-6 h-6" />}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-sm">
+                                    {getRewardDescription(reward)}
+                                  </p>
+                                  <p className="text-xs font-medium mt-1" style={{ color: primaryColor }}>
+                                    ✓ LIBERADO
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleRedeem(reward, programId)}
+                                  disabled={redeeming === reward.id}
+                                  style={{ backgroundColor: primaryColor }}
+                                >
+                                  {redeeming === reward.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    "Resgatar"
+                                  )}
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Locked Rewards Section */}
+                  {lockedRewards.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-muted-foreground">
+                        <Lock className="w-4 h-4" />
+                        Faltam liberar
+                      </h3>
+                      <div className="space-y-2">
+                        {lockedRewards.map(({ reward, missing, unit }) => {
+                          const progress = (currentValue / reward.trigger_value) * 100;
+                          
+                          return (
+                            <Card key={reward.id} className="overflow-hidden opacity-70">
+                              <CardContent className="p-0">
+                                <div className="flex items-center gap-3 p-3">
+                                  {reward.product?.image_url ? (
+                                    <img
+                                      src={reward.product.image_url}
+                                      alt={reward.product.name}
+                                      className="w-14 h-14 object-cover rounded-lg flex-shrink-0 grayscale"
+                                    />
+                                  ) : (
+                                    <div 
+                                      className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground font-bold text-lg"
+                                    >
+                                      {getRewardIcon(reward.reward_type) || <Gift className="w-6 h-6" />}
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-sm text-muted-foreground">
+                                      {getRewardDescription(reward)}
+                                    </p>
+                                    <div className="mt-2">
+                                      <Progress value={progress} className="h-1.5" />
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        🔒 Falta {unit === "R$" ? `R$ ${missing.toFixed(2)}` : `${missing} ${unit}`}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No rewards message */}
+                  {!hasRewards && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Gift className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-sm">Nenhum programa de fidelidade ativo</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Tab 2: Cupons */}
+              <div className="flex-[0_0_100%] min-w-0">
+                <div className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
+                  {loadingCoupons ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : customerCoupons.length > 0 ? (
+                    <div>
+                      <h3 className="text-sm font-semibold flex items-center gap-2 mb-3" style={{ color: primaryColor }}>
+                        <Ticket className="w-4 h-4" />
+                        Cupons Disponíveis
+                      </h3>
+                      <div className="space-y-2">
+                        {customerCoupons.map((coupon) => (
+                          <Card key={coupon.id} className="overflow-hidden border-2" style={{ borderColor: `${primaryColor}40` }}>
+                            <CardContent className="p-0">
+                              <div className="flex items-center gap-3 p-3">
+                                <div 
+                                  className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 text-white"
+                                  style={{ backgroundColor: primaryColor }}
+                                >
+                                  <Ticket className="w-6 h-6" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-sm">{coupon.code}</p>
+                                  <p className="text-xs font-medium" style={{ color: primaryColor }}>
+                                    {formatCouponDiscount(coupon)}
+                                  </p>
+                                  {coupon.valid_until && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Válido até {new Date(coupon.valid_until).toLocaleDateString('pt-BR')}
+                                    </p>
+                                  )}
+                                  {coupon.min_order_value && coupon.min_order_value > 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Pedido mínimo: R$ {coupon.min_order_value.toFixed(2)}
+                                    </p>
+                                  )}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleUseCoupon(coupon.code)}
+                                  style={{ backgroundColor: primaryColor }}
+                                >
+                                  Usar
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Ticket className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-sm">Nenhum cupom disponível</p>
+                      <p className="text-xs mt-1">Cupons de campanhas aparecerão aqui</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+          </div>
 
-            {/* Earned Rewards Section */}
-            {earnedRewards.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2 mb-3" style={{ color: primaryColor }}>
-                  <Check className="w-4 h-4" />
-                  Liberadas
-                </h3>
-                <div className="space-y-2">
-                  {earnedRewards.map((reward) => (
-                    <Card key={reward.id} className="overflow-hidden border-2" style={{ borderColor: `${primaryColor}40` }}>
-                      <CardContent className="p-0">
-                        <div className="flex items-center gap-3 p-3">
-                          {reward.product?.image_url ? (
-                            <img
-                              src={reward.product.image_url}
-                              alt={reward.product.name}
-                              className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
-                            />
-                          ) : (
-                            <div 
-                              className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 text-white font-bold text-lg"
-                              style={{ backgroundColor: primaryColor }}
-                            >
-                              {getRewardIcon(reward.reward_type) || <Gift className="w-6 h-6" />}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm">
-                              {getRewardDescription(reward)}
-                            </p>
-                            <p className="text-xs font-medium mt-1" style={{ color: primaryColor }}>
-                              ✓ LIBERADO
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleRedeem(reward, programId)}
-                            disabled={redeeming === reward.id}
-                            style={{ backgroundColor: primaryColor }}
-                          >
-                            {redeeming === reward.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              "Resgatar"
-                            )}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Locked Rewards Section */}
-            {lockedRewards.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-muted-foreground">
-                  <Lock className="w-4 h-4" />
-                  Faltam liberar
-                </h3>
-                <div className="space-y-2">
-                  {lockedRewards.map(({ reward, missing, unit }) => {
-                    const progress = (currentValue / reward.trigger_value) * 100;
-                    
-                    return (
-                      <Card key={reward.id} className="overflow-hidden opacity-70">
-                        <CardContent className="p-0">
-                          <div className="flex items-center gap-3 p-3">
-                            {reward.product?.image_url ? (
-                              <img
-                                src={reward.product.image_url}
-                                alt={reward.product.name}
-                                className="w-14 h-14 object-cover rounded-lg flex-shrink-0 grayscale"
-                              />
-                            ) : (
-                              <div 
-                                className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground font-bold text-lg"
-                              >
-                                {getRewardIcon(reward.reward_type) || <Gift className="w-6 h-6" />}
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-sm text-muted-foreground">
-                                {getRewardDescription(reward)}
-                              </p>
-                              <div className="mt-2">
-                                <Progress value={progress} className="h-1.5" />
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  🔒 Falta {unit === "R$" ? `R$ ${missing.toFixed(2)}` : `${missing} ${unit}`}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          {/* Swipe indicator */}
+          <div className="flex justify-center gap-1.5 pb-4">
+            <div 
+              className={`w-2 h-2 rounded-full transition-colors ${activeTab === 0 ? '' : 'bg-muted'}`}
+              style={activeTab === 0 ? { backgroundColor: primaryColor } : {}}
+            />
+            <div 
+              className={`w-2 h-2 rounded-full transition-colors ${activeTab === 1 ? '' : 'bg-muted'}`}
+              style={activeTab === 1 ? { backgroundColor: primaryColor } : {}}
+            />
           </div>
         </DrawerContent>
       </Drawer>
