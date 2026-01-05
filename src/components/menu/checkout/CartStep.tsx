@@ -1,11 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Trash2, AlertCircle, Gift } from "lucide-react";
+import { Minus, Plus, Trash2, AlertCircle, Gift, X } from "lucide-react";
 import { CartItem } from "@/types/menu";
 import { ProductSuggestions } from "./ProductSuggestions";
 import { CouponInput } from "./CouponInput";
 import { LoyaltyPointsDisplay } from "./LoyaltyPointsDisplay";
-import { LoyaltyRewardNotification } from "./LoyaltyRewardNotification";
+import { LoyaltyRewardNotification, DiscountReward } from "./LoyaltyRewardNotification";
 import { toast } from "sonner";
 
 interface Reward {
@@ -38,6 +38,9 @@ interface CartStepProps {
   deliveryType?: "delivery" | "pickup";
   customerCPF?: string;
   onAddRewardItem?: (reward: Reward) => void;
+  onRedeemDiscount?: (discount: DiscountReward) => void;
+  activeRewardDiscount?: DiscountReward | null;
+  onClearRewardDiscount?: () => void;
 }
 
 export const CartStep = ({
@@ -55,6 +58,9 @@ export const CartStep = ({
   deliveryType = "delivery",
   customerCPF,
   onAddRewardItem,
+  onRedeemDiscount,
+  activeRewardDiscount,
+  onClearRewardDiscount,
 }: CartStepProps) => {
   const subtotal = cart.reduce((sum, item) => {
     // Reward items don't count towards subtotal (they're free)
@@ -74,6 +80,37 @@ export const CartStep = ({
     : 0;
 
   const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
+
+  // Calculate reward discount
+  const getRewardDiscountValue = (): number => {
+    if (!activeRewardDiscount) return 0;
+    switch (activeRewardDiscount.type) {
+      case "discount_percentage":
+        return subtotal * (activeRewardDiscount.value / 100);
+      case "discount_fixed":
+        return Math.min(activeRewardDiscount.value, subtotal);
+      case "free_delivery":
+        return 0; // This is handled separately
+      default:
+        return 0;
+    }
+  };
+
+  const rewardDiscount = getRewardDiscountValue();
+
+  const getRewardDiscountLabel = (): string => {
+    if (!activeRewardDiscount) return "";
+    switch (activeRewardDiscount.type) {
+      case "discount_percentage":
+        return `${activeRewardDiscount.value}% de desconto`;
+      case "discount_fixed":
+        return `R$ ${activeRewardDiscount.value.toFixed(2)} de desconto`;
+      case "free_delivery":
+        return "Entrega grátis";
+      default:
+        return "Desconto fidelidade";
+    }
+  };
 
   // Verificar pedido mínimo apenas para delivery
   const effectiveMinOrder = deliveryType === "delivery" ? minOrderValue : 0;
@@ -219,7 +256,37 @@ export const CartStep = ({
           customerCPF={customerCPF}
           primaryColor={restaurant.primary_color}
           onRedeemReward={onAddRewardItem}
+          onRedeemDiscount={onRedeemDiscount}
         />
+      )}
+
+      {/* Active Reward Discount Display */}
+      {activeRewardDiscount && (
+        <Card className="border-green-500 bg-green-500/10">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium text-green-700">
+                    {getRewardDiscountLabel()}
+                  </p>
+                  <p className="text-xs text-green-600">
+                    Recompensa de fidelidade aplicada
+                  </p>
+                </div>
+              </div>
+              {onClearRewardDiscount && (
+                <button
+                  onClick={onClearRewardDiscount}
+                  className="text-green-600 hover:text-green-800"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Loyalty Points */}
@@ -246,9 +313,21 @@ export const CartStep = ({
               <span>-R$ {couponDiscount.toFixed(2)}</span>
             </div>
           )}
+          {rewardDiscount > 0 && (
+            <div className="flex justify-between text-green-600">
+              <span>Desconto (recompensa)</span>
+              <span>-R$ {rewardDiscount.toFixed(2)}</span>
+            </div>
+          )}
+          {activeRewardDiscount?.type === "free_delivery" && (
+            <div className="flex justify-between text-green-600">
+              <span>Entrega grátis (recompensa)</span>
+              <span>✓</span>
+            </div>
+          )}
           {loyaltyDiscount > 0 && (
             <div className="flex justify-between text-green-600">
-              <span>Desconto (fidelidade)</span>
+              <span>Desconto (pontos)</span>
               <span>-R$ {loyaltyDiscount.toFixed(2)}</span>
             </div>
           )}
