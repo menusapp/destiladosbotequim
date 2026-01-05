@@ -46,6 +46,7 @@ interface CheckoutDrawerProps {
   mode: "delivery" | "local";
   restaurantSlug?: string;
   onAddRewardItem?: (item: CartItem) => void;
+  customerCPF?: string;
 }
 
 const primaryColorFromRestaurant = (restaurant: any) => restaurant?.primary_color || "#fe9516";
@@ -60,6 +61,7 @@ export const CheckoutDrawer = ({
   mode,
   restaurantSlug,
   onAddRewardItem,
+  customerCPF: customerCPFProp,
 }: CheckoutDrawerProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>("cart");
@@ -329,9 +331,9 @@ export const CheckoutDrawer = ({
     toast.success(`${reward.product.name} adicionado como recompensa!`);
   };
 
-  // Get customer CPF from sessionStorage for cart step
+  // Get customer CPF from prop or sessionStorage
   const getCustomerCPF = () => {
-    return sessionStorage.getItem("customer_cpf") || "";
+    return customerCPFProp || sessionStorage.getItem("customer_cpf") || "";
   };
 
   const renderStep = () => {
