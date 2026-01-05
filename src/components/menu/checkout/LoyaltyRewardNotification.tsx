@@ -128,7 +128,7 @@ export const LoyaltyRewardNotification = ({
         .eq("restaurant_id", restaurantId)
         .eq("customer_cpf", customerCPF)
         .eq("program_id", program.id)
-        .gte("redeemed_at", baselineAt.toISOString());
+        .gt("redeemed_at", baselineAt.toISOString());
 
       const redeemedRewardIds = new Set(cycleRedemptions?.map(r => r.reward_id) || []);
 
