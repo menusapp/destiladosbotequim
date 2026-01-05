@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Trash2, AlertCircle, Gift, X } from "lucide-react";
+import { Minus, Plus, Trash2, AlertCircle, Gift, X, Ticket } from "lucide-react";
 import { CartItem } from "@/types/menu";
 import { ProductSuggestions } from "./ProductSuggestions";
 import { CouponInput, CouponInputRef } from "./CouponInput";
@@ -72,8 +72,8 @@ export const CartStep = ({
   };
 
   const subtotal = cart.reduce((sum, item) => {
-    // Reward items don't count towards subtotal (they're free)
-    if (item.isRewardItem) return sum;
+    // Reward items and coupon free items don't count towards subtotal (they're free)
+    if (item.isRewardItem || item.isCouponFreeItem) return sum;
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
     const effectivePrice = item.product.promotional_price ?? item.product.price;
     return sum + (effectivePrice + extrasTotal) * item.quantity;
@@ -188,6 +188,12 @@ export const CartStep = ({
                               Recompensa Fidelidade
                             </span>
                           )}
+                          {item.isCouponFreeItem && (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                              <Ticket className="w-3 h-3" />
+                              Cupom Grátis
+                            </span>
+                          )}
                         </div>
                         <button
                           onClick={() => onUpdateQuantity(item.id, -item.quantity)}
@@ -209,11 +215,11 @@ export const CartStep = ({
                       <div className="flex items-center justify-between mt-2">
                         <p
                           className="font-bold text-sm"
-                          style={{ color: item.isRewardItem ? '#22c55e' : restaurant.primary_color }}
+                          style={{ color: (item.isRewardItem || item.isCouponFreeItem) ? '#22c55e' : restaurant.primary_color }}
                         >
-                          {item.isRewardItem ? "GRÁTIS" : `R$ ${itemTotal.toFixed(2)}`}
+                          {(item.isRewardItem || item.isCouponFreeItem) ? "GRÁTIS" : `R$ ${itemTotal.toFixed(2)}`}
                         </p>
-                        {!item.isRewardItem && (
+                        {!item.isRewardItem && !item.isCouponFreeItem && (
                           <div className="flex items-center gap-3 bg-accent/50 rounded-full px-3 py-1">
                             <button
                               onClick={() => onUpdateQuantity(item.id, -1)}
