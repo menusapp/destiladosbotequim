@@ -81,14 +81,39 @@ export const ProfileView = ({
   };
 
   const fetchCoupons = async () => {
-    const { data } = await supabase
+    // Buscar mensagens de marketing enviadas para este CPF que têm cupom
+    const { data: messages } = await supabase
+      .from("marketing_scheduled_messages")
+      .select("coupon_code")
+      .eq("restaurant_id", restaurantId)
+      .eq("customer_cpf", customerCPF)
+      .eq("status", "sent")
+      .not("coupon_code", "is", null);
+
+    if (!messages || messages.length === 0) {
+      setCoupons([]);
+      return;
+    }
+
+    // Pegar os códigos únicos dos cupons
+    const couponCodes = [...new Set(messages.map(m => m.coupon_code).filter(Boolean))];
+
+    if (couponCodes.length === 0) {
+      setCoupons([]);
+      return;
+    }
+
+    // Buscar detalhes dos cupons válidos
+    const now = new Date().toISOString();
+    const { data: validCoupons } = await supabase
       .from("coupons")
       .select("*")
       .eq("restaurant_id", restaurantId)
       .eq("is_active", true)
-      .gte("valid_until", new Date().toISOString());
-    
-    setCoupons(data || []);
+      .in("code", couponCodes)
+      .or(`valid_until.is.null,valid_until.gte.${now}`);
+
+    setCoupons(validCoupons || []);
   };
 
   const fetchLoyaltyProgram = async () => {
@@ -454,17 +479,12 @@ export const ProfileView = ({
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Seu nome"
-                />
-                <Button onClick={handleSaveName} size="sm">
-                  Salvar
-                </Button>
-              </div>
+              <Input
+                id="name"
+                value={name}
+                disabled
+                className="bg-muted"
+              />
             </div>
             <div className="space-y-2">
               <Label>CPF</Label>
@@ -619,7 +639,7 @@ export const ProfileView = ({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Gift className="w-5 h-5" />
-              Seus Descontos
+              Seus Cupons
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -637,10 +657,15 @@ export const ProfileView = ({
                         <p className="text-sm text-muted-foreground">
                           {coupon.discount_type === "percentage"
                             ? `${coupon.discount_value}% de desconto`
-                            : `R$ ${coupon.discount_value.toFixed(2)} de desconto`}
+                            : `R$ ${Number(coupon.discount_value).toFixed(2)} de desconto`}
                         </p>
+                        {coupon.valid_until && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Válido até {new Date(coupon.valid_until).toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
                       </div>
-                      <Badge variant="secondary">Válido</Badge>
+                      <Badge variant="secondary">Disponível</Badge>
                     </div>
                   </CardContent>
                 </Card>
