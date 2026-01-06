@@ -8,9 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle, ChevronDown, Receipt, Coins } from "lucide-react";
-import { format } from "date-fns";
+import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle, ChevronDown, Receipt, Coins, Search, Calendar as CalendarIcon } from "lucide-react";
+import { format, isToday, isYesterday, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface FluxoCaixaTabProps {
   restaurantId: string;
@@ -52,6 +55,13 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   const [lastClosedSession, setLastClosedSession] = useState<CashSession | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Estados para histórico de caixa
+  const [closedSessions, setClosedSessions] = useState<CashSession[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [selectedSession, setSelectedSession] = useState<CashSession | null>(null);
+  const [selectedSessionMovements, setSelectedSessionMovements] = useState<CashMovement[]>([]);
+
   const [openedBy, setOpenedBy] = useState("");
   const [billCounts, setBillCounts] = useState<Record<number, number>>(() => 
     Object.fromEntries(BILL_DENOMINATIONS.map(d => [d, 0]))
@@ -79,6 +89,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
 
   useEffect(() => {
     fetchCurrentSession();
+    fetchClosedSessions();
   }, [restaurantId]);
 
   useEffect(() => {
@@ -135,6 +146,22 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
     }
   };
 
+  const fetchClosedSessions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("cash_register_sessions")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "closed")
+        .order("closed_at", { ascending: false });
+
+      if (error) throw error;
+      setClosedSessions(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao buscar histórico de caixas: " + error.message);
+    }
+  };
+
   const fetchMovements = async () => {
     if (!currentSession) return;
     
@@ -150,6 +177,26 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
     } catch (error: any) {
       toast.error("Erro ao buscar movimentações: " + error.message);
     }
+  };
+
+  const fetchSessionMovements = async (sessionId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("cash_movements")
+        .select("*")
+        .eq("cash_session_id", sessionId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setSelectedSessionMovements(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao buscar movimentações: " + error.message);
+    }
+  };
+
+  const handleSelectSession = (session: CashSession) => {
+    setSelectedSession(session);
+    fetchSessionMovements(session.id);
   };
 
   const handleOpenCashRegister = async () => {
@@ -211,6 +258,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       setCloseNotes("");
       setCurrentSession(null);
       fetchCurrentSession();
+      fetchClosedSessions();
     } catch (error: any) {
       toast.error("Erro ao fechar caixa: " + error.message);
     }
@@ -279,403 +327,620 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
     return value >= 1 ? `R$${value}` : `R$${value.toFixed(2).replace('.', ',')}`;
   };
 
+  const filterByDateRange = (session: CashSession) => {
+    if (!session.closed_at) return false;
+    
+    const closedDate = new Date(session.closed_at);
+    const now = new Date();
+    
+    switch (dateFilter) {
+      case "today":
+        return isToday(closedDate);
+      case "yesterday":
+        return isYesterday(closedDate);
+      case "7days":
+        return closedDate >= subDays(now, 7);
+      case "thisMonth":
+        return closedDate >= startOfMonth(now) && closedDate <= endOfMonth(now);
+      case "lastMonth":
+        const lastMonth = subMonths(now, 1);
+        return closedDate >= startOfMonth(lastMonth) && closedDate <= endOfMonth(lastMonth);
+      default:
+        return true;
+    }
+  };
+
+  const filteredSessions = closedSessions.filter(session => {
+    const matchesSearch = 
+      session.opened_by.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (session.closed_by || "").toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesDate = filterByDateRange(session);
+    
+    return matchesSearch && matchesDate;
+  });
+
   if (loading) {
     return <div className="p-4">Carregando...</div>;
   }
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Fluxo de Caixa</h2>
-          <p className="text-muted-foreground">Controle completo do fluxo de caixa</p>
-        </div>
-        
-        {!currentSession ? (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button size="lg" className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
-                <Wallet className="h-5 w-5" />
-                Abrir Caixa
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Abrir Caixa</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div>
-                  <Label>Responsável pela abertura</Label>
-                  <Input
-                    value={openedBy}
-                    onChange={(e) => setOpenedBy(e.target.value)}
-                    placeholder="Nome do responsável"
-                  />
-                </div>
+      <Tabs defaultValue="fluxo" className="w-full">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-3xl font-bold">Caixa</h2>
+            <p className="text-muted-foreground">Controle completo do fluxo de caixa</p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <TabsList className="grid grid-cols-2">
+              <TabsTrigger value="fluxo">Fluxo de Caixa</TabsTrigger>
+              <TabsTrigger value="historico">Histórico de Caixa</TabsTrigger>
+            </TabsList>
+            
+            {!currentSession ? (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button size="lg" className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
+                    <Wallet className="h-5 w-5" />
+                    Abrir Caixa
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Abrir Caixa</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div>
+                      <Label>Responsável pela abertura</Label>
+                      <Input
+                        value={openedBy}
+                        onChange={(e) => setOpenedBy(e.target.value)}
+                        placeholder="Nome do responsável"
+                      />
+                    </div>
 
-                {/* Cédulas */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-orange-600">
-                    <DollarSign className="h-4 w-4" />
-                    <Label className="text-base font-semibold">Cédulas</Label>
-                  </div>
-                  <div className="grid grid-cols-7 gap-2">
-                    {BILL_DENOMINATIONS.map((denom) => (
-                      <div key={denom} className="text-center">
-                        <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          className="text-center h-10"
-                          value={billCounts[denom] || 0}
-                          onChange={(e) => setBillCounts(prev => ({
-                            ...prev,
-                            [denom]: parseInt(e.target.value) || 0
-                          }))}
-                        />
-                        <p className="text-xs text-orange-600 mt-1">
-                          R${(denom * (billCounts[denom] || 0)).toFixed(2)}
-                        </p>
+                    {/* Cédulas */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-orange-600">
+                        <DollarSign className="h-4 w-4" />
+                        <Label className="text-base font-semibold">Cédulas</Label>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Moedas */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-orange-600">
-                    <Coins className="h-4 w-4" />
-                    <Label className="text-base font-semibold">Moedas</Label>
-                  </div>
-                  <div className="grid grid-cols-5 gap-2">
-                    {COIN_DENOMINATIONS.map((denom) => (
-                      <div key={denom} className="text-center">
-                        <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          className="text-center h-10"
-                          value={coinCounts[denom] || 0}
-                          onChange={(e) => setCoinCounts(prev => ({
-                            ...prev,
-                            [denom]: parseInt(e.target.value) || 0
-                          }))}
-                        />
-                        <p className="text-xs text-orange-600 mt-1">
-                          R${(denom * (coinCounts[denom] || 0)).toFixed(2)}
-                        </p>
+                      <div className="grid grid-cols-7 gap-2">
+                        {BILL_DENOMINATIONS.map((denom) => (
+                          <div key={denom} className="text-center">
+                            <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              className="text-center h-10"
+                              value={billCounts[denom] || 0}
+                              onChange={(e) => setBillCounts(prev => ({
+                                ...prev,
+                                [denom]: parseInt(e.target.value) || 0
+                              }))}
+                            />
+                            <p className="text-xs text-orange-600 mt-1">
+                              R${(denom * (billCounts[denom] || 0)).toFixed(2)}
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                {/* Total */}
-                <div className="bg-orange-100 p-4 rounded-lg border-2 border-orange-300">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-orange-800">Valor de Abertura:</span>
-                    <span className="text-2xl font-bold text-orange-600">
-                      R$ {calculateOpeningBalance().toFixed(2)}
-                    </span>
-                  </div>
-                </div>
+                    {/* Moedas */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-orange-600">
+                        <Coins className="h-4 w-4" />
+                        <Label className="text-base font-semibold">Moedas</Label>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2">
+                        {COIN_DENOMINATIONS.map((denom) => (
+                          <div key={denom} className="text-center">
+                            <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              className="text-center h-10"
+                              value={coinCounts[denom] || 0}
+                              onChange={(e) => setCoinCounts(prev => ({
+                                ...prev,
+                                [denom]: parseInt(e.target.value) || 0
+                              }))}
+                            />
+                            <p className="text-xs text-orange-600 mt-1">
+                              R${(denom * (coinCounts[denom] || 0)).toFixed(2)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                <Button onClick={handleOpenCashRegister} className="w-full bg-orange-500 hover:bg-orange-600 text-white">
-                  <Wallet className="h-4 w-4 mr-2" />
-                  Abrir Caixa
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        ) : (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="destructive" size="lg" className="gap-2">
-                <Wallet className="h-5 w-5" />
-                Fechar Caixa
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Fechar Caixa</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="bg-orange-50 p-4 rounded-lg space-y-2 border border-orange-200">
-                  <div className="flex justify-between">
-                    <span>Saldo inicial:</span>
-                    <span className="font-bold">R$ {currentSession.opening_balance.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Saldo esperado:</span>
-                    <span className="font-bold text-orange-600">R$ {calculateExpectedBalance().toFixed(2)}</span>
-                  </div>
-                </div>
-                <div>
-                  <Label>Responsável pelo fechamento</Label>
-                  <Input
-                    value={closedBy}
-                    onChange={(e) => setClosedBy(e.target.value)}
-                    placeholder="Nome do responsável"
-                  />
-                </div>
-                <div>
-                  <Label>Saldo real no caixa (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={closingBalance}
-                    onChange={(e) => setClosingBalance(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                {closingBalance && (
-                  <div className={`p-3 rounded-lg ${
-                    parseFloat(closingBalance) - calculateExpectedBalance() >= 0 
-                      ? "bg-green-100 text-green-800" 
-                      : "bg-red-100 text-red-800"
-                  }`}>
-                    Diferença: R$ {(parseFloat(closingBalance) - calculateExpectedBalance()).toFixed(2)}
-                  </div>
-                )}
-                <div>
-                  <Label>Observações</Label>
-                  <Textarea
-                    value={closeNotes}
-                    onChange={(e) => setCloseNotes(e.target.value)}
-                    placeholder="Observações sobre o fechamento..."
-                  />
-                </div>
-                <Button onClick={handleCloseCashRegister} className="w-full">
-                  Confirmar Fechamento
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
+                    {/* Total */}
+                    <div className="bg-orange-100 p-4 rounded-lg border-2 border-orange-300">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-orange-800">Valor de Abertura:</span>
+                        <span className="text-2xl font-bold text-orange-600">
+                          R$ {calculateOpeningBalance().toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
 
-      {currentSession && (
-        <Card className="border-orange-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-700">
-              <DollarSign className="h-5 w-5" />
-              Caixa Atual
-            </CardTitle>
-            <CardDescription>
-              Aberto por {currentSession.opened_by} em {format(new Date(currentSession.opened_at), "dd/MM/yyyy 'às' HH:mm")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-orange-100 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                <p className="text-2xl font-bold text-orange-700">R$ {currentSession.opening_balance.toFixed(2)}</p>
-              </div>
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Entradas</p>
-                <p className="text-2xl font-bold text-orange-600">R$ {calculateTotalSales().toFixed(2)}</p>
-              </div>
-              <div className="bg-amber-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saídas</p>
-                <p className="text-2xl font-bold text-orange-800">R$ {calculateTotalExpenses().toFixed(2)}</p>
-              </div>
-              <div className="bg-orange-200 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                <p className="text-2xl font-bold text-orange-700">R$ {calculateExpectedBalance().toFixed(2)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!currentSession && lastClosedSession && (
-        <Card className="bg-secondary/20 border-2 border-orange-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-700">
-              <FileText className="h-5 w-5" />
-              Último Caixa Fechado - Histórico
-            </CardTitle>
-            <CardDescription>
-              Fechado em {format(new Date(lastClosedSession.closed_at!), "dd/MM/yyyy 'às' HH:mm")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-orange-100 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                <p className="text-2xl font-bold text-orange-700">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
-              </div>
-              <div className="bg-orange-200 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                <p className="text-2xl font-bold text-orange-700">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
-              </div>
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Saldo Final</p>
-                <p className="text-2xl font-bold text-orange-600">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
-              </div>
-              <div className="bg-amber-50 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Diferença</p>
-                <p className={`text-2xl font-bold ${(lastClosedSession.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  R$ {(lastClosedSession.difference || 0).toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!currentSession && !lastClosedSession && (
-        <Card className="border-orange-200">
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Nenhum caixa aberto. Abra um caixa para registrar movimentações.
-          </CardContent>
-        </Card>
-      )}
-      
-      {currentSession && (
-        <Collapsible open={movementDrawerOpen} onOpenChange={setMovementDrawerOpen}>
-          <Card className="border-orange-200">
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-orange-50/50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-orange-700">
-                    <Receipt className="h-5 w-5" />
-                    Registrar Movimentação
-                  </CardTitle>
-                  <ChevronDown className={`h-5 w-5 text-orange-600 transition-transform ${movementDrawerOpen ? 'rotate-180' : ''}`} />
-                </div>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Tipo de Movimentação</Label>
-                    <Select value={movementType} onValueChange={setMovementType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="entrada">Entrada</SelectItem>
-                        <SelectItem value="saida">Saída</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Button onClick={handleOpenCashRegister} className="w-full bg-orange-500 hover:bg-orange-600 text-white">
+                      <Wallet className="h-4 w-4 mr-2" />
+                      Abrir Caixa
+                    </Button>
                   </div>
-                  <div>
-                    <Label>Valor (R$)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={movementAmount}
-                      onChange={(e) => setMovementAmount(e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <Label>Descrição</Label>
-                    <Input
-                      value={movementDescription}
-                      onChange={(e) => setMovementDescription(e.target.value)}
-                      placeholder="Descrição da movimentação"
-                    />
-                  </div>
-                  <div>
-                    <Label>Categoria (opcional)</Label>
-                    <Input
-                      value={movementCategory}
-                      onChange={(e) => setMovementCategory(e.target.value)}
-                      placeholder="Ex: Alimentação, Limpeza..."
-                    />
-                  </div>
-                  <div>
-                    <Label>Forma de Pagamento</Label>
-                    <Select value={movementPaymentMethod} onValueChange={setMovementPaymentMethod}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                        <SelectItem value="pix">PIX</SelectItem>
-                        <SelectItem value="credito">Crédito</SelectItem>
-                        <SelectItem value="debito">Débito</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Responsável</Label>
-                    <Input
-                      value={movementCreatedBy}
-                      onChange={(e) => setMovementCreatedBy(e.target.value)}
-                      placeholder="Nome do responsável"
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleAddMovement} className="w-full mt-4 bg-orange-500 hover:bg-orange-600 text-white">
-                  {movementType === "entrada" ? (
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                  ) : (
-                    <MinusCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Registrar Movimentação
-                </Button>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      )}
-
-      <Card className="border-orange-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-orange-700">
-            <FileText className="h-5 w-5" />
-            Histórico de Movimentações
-          </CardTitle>
-          <CardDescription>
-            {currentSession 
-              ? `${movements.length} movimentações registradas nesta sessão`
-              : lastClosedSession
-                ? `${movements.length} movimentações do último caixa fechado`
-                : "Abra o caixa para ver as movimentações"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {movements.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                Nenhuma movimentação registrada
-              </p>
+                </DialogContent>
+              </Dialog>
             ) : (
-              movements.map((mov) => (
-                <div key={mov.id} className="flex items-center justify-between p-4 border border-orange-100 rounded-lg hover:bg-orange-50/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    {mov.movement_type === "entrada" ? (
-                      <TrendingUp className="h-5 w-5 text-orange-600" />
-                    ) : (
-                      <TrendingDown className="h-5 w-5 text-orange-800" />
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" size="lg" className="gap-2">
+                    <Wallet className="h-5 w-5" />
+                    Fechar Caixa
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Fechar Caixa</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="bg-orange-50 p-4 rounded-lg space-y-2 border border-orange-200">
+                      <div className="flex justify-between">
+                        <span>Saldo inicial:</span>
+                        <span className="font-bold">R$ {currentSession.opening_balance.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Saldo esperado:</span>
+                        <span className="font-bold text-orange-600">R$ {calculateExpectedBalance().toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Responsável pelo fechamento</Label>
+                      <Input
+                        value={closedBy}
+                        onChange={(e) => setClosedBy(e.target.value)}
+                        placeholder="Nome do responsável"
+                      />
+                    </div>
+                    <div>
+                      <Label>Saldo real no caixa (R$)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={closingBalance}
+                        onChange={(e) => setClosingBalance(e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    {closingBalance && (
+                      <div className={`p-3 rounded-lg ${
+                        parseFloat(closingBalance) - calculateExpectedBalance() >= 0 
+                          ? "bg-green-100 text-green-800" 
+                          : "bg-red-100 text-red-800"
+                      }`}>
+                        Diferença: R$ {(parseFloat(closingBalance) - calculateExpectedBalance()).toFixed(2)}
+                      </div>
                     )}
                     <div>
-                      <p className="font-medium">{mov.description}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {mov.movement_type} • {mov.payment_method} • {mov.created_by}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(mov.created_at), "dd/MM/yyyy 'às' HH:mm")}
-                      </p>
+                      <Label>Observações</Label>
+                      <Textarea
+                        value={closeNotes}
+                        onChange={(e) => setCloseNotes(e.target.value)}
+                        placeholder="Observações sobre o fechamento..."
+                      />
                     </div>
+                    <Button onClick={handleCloseCashRegister} className="w-full">
+                      Confirmar Fechamento
+                    </Button>
                   </div>
-                  <div className={`text-lg font-bold ${
-                    mov.movement_type === "entrada"
-                      ? "text-orange-600"
-                      : "text-orange-800"
-                  }`}>
-                    {mov.movement_type === "entrada" ? "+" : "-"}
-                    R$ {mov.amount.toFixed(2)}
-                  </div>
-                </div>
-              ))
+                </DialogContent>
+              </Dialog>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Tab: Fluxo de Caixa */}
+        <TabsContent value="fluxo" className="space-y-6 mt-0">
+          {currentSession && (
+            <Card className="border-orange-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-orange-700">
+                  <DollarSign className="h-5 w-5" />
+                  Caixa Atual
+                </CardTitle>
+                <CardDescription>
+                  Aberto por {currentSession.opened_by} em {format(new Date(currentSession.opened_at), "dd/MM/yyyy 'às' HH:mm")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-orange-100 p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Saldo Inicial</p>
+                    <p className="text-2xl font-bold text-orange-700">R$ {currentSession.opening_balance.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Entradas</p>
+                    <p className="text-2xl font-bold text-orange-600">R$ {calculateTotalSales().toFixed(2)}</p>
+                  </div>
+                  <div className="bg-amber-50 p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Saídas</p>
+                    <p className="text-2xl font-bold text-orange-800">R$ {calculateTotalExpenses().toFixed(2)}</p>
+                  </div>
+                  <div className="bg-orange-200 p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Saldo Esperado</p>
+                    <p className="text-2xl font-bold text-orange-700">R$ {calculateExpectedBalance().toFixed(2)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!currentSession && lastClosedSession && (
+            <Card className="bg-secondary/20 border-2 border-orange-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-orange-700">
+                  <FileText className="h-5 w-5" />
+                  Último Caixa Fechado
+                </CardTitle>
+                <CardDescription>
+                  Fechado em {format(new Date(lastClosedSession.closed_at!), "dd/MM/yyyy 'às' HH:mm")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-orange-100 p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Saldo Inicial</p>
+                    <p className="text-2xl font-bold text-orange-700">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-orange-200 p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Saldo Esperado</p>
+                    <p className="text-2xl font-bold text-orange-700">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
+                  </div>
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Saldo Final</p>
+                    <p className="text-2xl font-bold text-orange-600">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
+                  </div>
+                  <div className="bg-amber-50 p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Diferença</p>
+                    <p className={`text-2xl font-bold ${(lastClosedSession.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      R$ {(lastClosedSession.difference || 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!currentSession && !lastClosedSession && (
+            <Card className="border-orange-200">
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Nenhum caixa aberto. Abra um caixa para registrar movimentações.
+              </CardContent>
+            </Card>
+          )}
+          
+          {currentSession && (
+            <Collapsible open={movementDrawerOpen} onOpenChange={setMovementDrawerOpen}>
+              <Card className="border-orange-200">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-orange-50/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-orange-700">
+                        <Receipt className="h-5 w-5" />
+                        Registrar Movimentação
+                      </CardTitle>
+                      <ChevronDown className={`h-5 w-5 text-orange-600 transition-transform ${movementDrawerOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Tipo de Movimentação</Label>
+                        <Select value={movementType} onValueChange={setMovementType}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="entrada">Entrada</SelectItem>
+                            <SelectItem value="saida">Saída</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Valor (R$)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={movementAmount}
+                          onChange={(e) => setMovementAmount(e.target.value)}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <Label>Descrição</Label>
+                        <Input
+                          value={movementDescription}
+                          onChange={(e) => setMovementDescription(e.target.value)}
+                          placeholder="Descrição da movimentação"
+                        />
+                      </div>
+                      <div>
+                        <Label>Categoria (opcional)</Label>
+                        <Input
+                          value={movementCategory}
+                          onChange={(e) => setMovementCategory(e.target.value)}
+                          placeholder="Ex: Alimentação, Limpeza..."
+                        />
+                      </div>
+                      <div>
+                        <Label>Forma de Pagamento</Label>
+                        <Select value={movementPaymentMethod} onValueChange={setMovementPaymentMethod}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                            <SelectItem value="pix">PIX</SelectItem>
+                            <SelectItem value="credito">Crédito</SelectItem>
+                            <SelectItem value="debito">Débito</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Responsável</Label>
+                        <Input
+                          value={movementCreatedBy}
+                          onChange={(e) => setMovementCreatedBy(e.target.value)}
+                          placeholder="Nome do responsável"
+                        />
+                      </div>
+                    </div>
+                    <Button onClick={handleAddMovement} className="w-full mt-4 bg-orange-500 hover:bg-orange-600 text-white">
+                      {movementType === "entrada" ? (
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                      ) : (
+                        <MinusCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Registrar Movimentação
+                    </Button>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          )}
+
+          <Card className="border-orange-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-700">
+                <FileText className="h-5 w-5" />
+                Histórico de Movimentações
+              </CardTitle>
+              <CardDescription>
+                {currentSession 
+                  ? `${movements.length} movimentações registradas nesta sessão`
+                  : lastClosedSession
+                    ? `${movements.length} movimentações do último caixa fechado`
+                    : "Abra o caixa para ver as movimentações"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-2 pr-4">
+                  {movements.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      Nenhuma movimentação registrada
+                    </p>
+                  ) : (
+                    movements.map((mov) => (
+                      <div key={mov.id} className="flex items-center justify-between p-4 border border-orange-100 rounded-lg hover:bg-orange-50/50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          {mov.movement_type === "entrada" ? (
+                            <TrendingUp className="h-5 w-5 text-orange-600" />
+                          ) : (
+                            <TrendingDown className="h-5 w-5 text-orange-800" />
+                          )}
+                          <div>
+                            <p className="font-medium">{mov.description}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {mov.movement_type} • {mov.payment_method} • {mov.created_by}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(mov.created_at), "dd/MM/yyyy 'às' HH:mm")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className={`text-lg font-bold ${
+                          mov.movement_type === "entrada"
+                            ? "text-orange-600"
+                            : "text-orange-800"
+                        }`}>
+                          {mov.movement_type === "entrada" ? "+" : "-"}
+                          R$ {mov.amount.toFixed(2)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Histórico de Caixa */}
+        <TabsContent value="historico" className="mt-0">
+          <Card className="border-orange-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-700">
+                <FileText className="h-5 w-5" />
+                Histórico de Caixa
+              </CardTitle>
+              <CardDescription>
+                Todos os caixas fechados
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Filtros */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Pesquisar por nome..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Select value={dateFilter} onValueChange={setDateFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Filtrar por data" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="today">Hoje</SelectItem>
+                      <SelectItem value="yesterday">Ontem</SelectItem>
+                      <SelectItem value="7days">Últimos 7 dias</SelectItem>
+                      <SelectItem value="thisMonth">Este mês</SelectItem>
+                      <SelectItem value="lastMonth">Mês passado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Lista de Caixas com Scroll */}
+              <ScrollArea className="h-[500px]">
+                <div className="space-y-3 pr-4">
+                  {filteredSessions.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      Nenhum caixa encontrado
+                    </p>
+                  ) : (
+                    filteredSessions.map((session) => (
+                      <div
+                        key={session.id}
+                        onClick={() => handleSelectSession(session)}
+                        className="p-4 border border-orange-100 rounded-lg hover:bg-orange-50 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-2 text-sm">
+                          <Wallet className="h-4 w-4 text-green-600" />
+                          <span className="font-medium">{session.opened_by}</span>
+                          <span className="text-muted-foreground">abriu</span>
+                          <span>{format(new Date(session.opened_at), "dd/MM/yyyy 'às' HH:mm")}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm mt-1">
+                          <Wallet className="h-4 w-4 text-red-600" />
+                          <span className="font-medium">{session.closed_by || "—"}</span>
+                          <span className="text-muted-foreground">fechou</span>
+                          <span>{session.closed_at ? format(new Date(session.closed_at), "dd/MM/yyyy 'às' HH:mm") : "—"}</span>
+                        </div>
+                        <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                          <span>Saldo: <strong className="text-orange-700">R$ {(session.closing_balance || 0).toFixed(2)}</strong></span>
+                          <span>Diferença: <strong className={`${(session.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>R$ {(session.difference || 0).toFixed(2)}</strong></span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialog de Detalhes do Caixa */}
+      <Dialog open={!!selectedSession} onOpenChange={() => setSelectedSession(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-orange-600" />
+              Caixa - {selectedSession && format(new Date(selectedSession.opened_at), "dd/MM/yyyy")}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedSession && (
+            <div className="space-y-4">
+              {/* Resumo */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-orange-100 p-3 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Saldo Inicial</p>
+                  <p className="text-lg font-bold text-orange-700">R$ {selectedSession.opening_balance.toFixed(2)}</p>
+                </div>
+                <div className="bg-orange-50 p-3 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Saldo Esperado</p>
+                  <p className="text-lg font-bold text-orange-600">R$ {(selectedSession.expected_balance || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-orange-200 p-3 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Saldo Final</p>
+                  <p className="text-lg font-bold text-orange-700">R$ {(selectedSession.closing_balance || 0).toFixed(2)}</p>
+                </div>
+                <div className={`p-3 rounded-lg ${(selectedSession.difference || 0) >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                  <p className="text-xs text-muted-foreground">Diferença</p>
+                  <p className={`text-lg font-bold ${(selectedSession.difference || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                    R$ {(selectedSession.difference || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Quem abriu/fechou */}
+              <div className="text-sm text-muted-foreground border-t pt-3">
+                <p>Aberto por <strong>{selectedSession.opened_by}</strong> em {format(new Date(selectedSession.opened_at), "dd/MM/yyyy 'às' HH:mm")}</p>
+                {selectedSession.closed_at && (
+                  <p>Fechado por <strong>{selectedSession.closed_by}</strong> em {format(new Date(selectedSession.closed_at), "dd/MM/yyyy 'às' HH:mm")}</p>
+                )}
+                {selectedSession.notes && (
+                  <p className="mt-2 italic">Obs: {selectedSession.notes}</p>
+                )}
+              </div>
+              
+              {/* Movimentações */}
+              <div>
+                <h4 className="font-medium mb-2 flex items-center gap-2">
+                  <Receipt className="h-4 w-4" />
+                  Movimentações ({selectedSessionMovements.length})
+                </h4>
+                <ScrollArea className="h-[300px] border rounded-lg">
+                  <div className="p-3 space-y-2">
+                    {selectedSessionMovements.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">
+                        Nenhuma movimentação registrada
+                      </p>
+                    ) : (
+                      selectedSessionMovements.map((mov) => (
+                        <div key={mov.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            {mov.movement_type === "entrada" ? (
+                              <TrendingUp className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <TrendingDown className="h-4 w-4 text-red-600" />
+                            )}
+                            <div>
+                              <p className="font-medium text-sm">{mov.description}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {mov.payment_method} • {mov.created_by} • {format(new Date(mov.created_at), "HH:mm")}
+                              </p>
+                            </div>
+                          </div>
+                          <span className={`font-bold ${mov.movement_type === "entrada" ? 'text-green-600' : 'text-red-600'}`}>
+                            {mov.movement_type === "entrada" ? "+" : "-"}R$ {mov.amount.toFixed(2)}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
