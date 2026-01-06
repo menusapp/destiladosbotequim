@@ -13,6 +13,7 @@ import Menu from "./pages/Menu";
 import Comanda from "./pages/Comanda";
 import DeliveryMenu from "./pages/DeliveryMenu";
 import OrderConfirmation from "./pages/OrderConfirmation";
+import Reservations from "./pages/Reservations";
 import NotFound from "./pages/NotFound";
 import { TableDetailView } from "./components/admin/TableDetailView";
 
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/comanda/:restaurantSlug/:tableNumber" element={<Comanda />} />
             <Route path="/delivery/:restaurantSlug" element={<DeliveryMenu />} />
             <Route path="/delivery/:restaurantSlug/pedido/:orderId" element={<OrderConfirmation />} />
+            <Route path="/reservas/:restaurantSlug" element={<Reservations />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

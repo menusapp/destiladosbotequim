@@ -21,6 +21,7 @@ import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import PDVTab from "@/components/admin/PDVTab";
 import ClientesTab from "@/components/admin/ClientesTab";
 import FidelityTab from "@/components/admin/FidelityTab";
+import ReservasTab from "@/components/admin/ReservasTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
@@ -479,6 +480,10 @@ const RestaurantAdmin = () => {
       // Mesas e Comandas
       case "mesas-comandas":
         return <TablesTab restaurantId={restaurant.id} />;
+      
+      // Reservas
+      case "reservas":
+        return <ReservasTab restaurantId={restaurant.id} restaurantSlug={restaurant.slug} />;
       
       // Cardápio
       case "cardapio":
