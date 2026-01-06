@@ -19,6 +19,8 @@ import {
   Search,
   Image,
   FileText,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -103,6 +105,7 @@ export default function ReservasTab({ restaurantId, restaurantSlug }: ReservasTa
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancellationReason, setCancellationReason] = useState("");
+  const [uploading, setUploading] = useState(false);
   
   // Form state
   const [tableForm, setTableForm] = useState({
@@ -178,6 +181,36 @@ export default function ReservasTab({ restaurantId, restaurantSlug }: ReservasTa
     const link = `${window.location.origin}/reservas/${slug}`;
     navigator.clipboard.writeText(link);
     toast.success("Link copiado!");
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploading(true);
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${restaurantId}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('reservation-tables')
+        .upload(fileName, file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('reservation-tables')
+        .getPublicUrl(fileName);
+      
+      setTableForm({ ...tableForm, image_url: publicUrl });
+      toast.success("Imagem enviada!");
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Erro ao fazer upload da imagem");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const openTableDialog = (table?: ReservationTable) => {
@@ -690,12 +723,52 @@ export default function ReservasTab({ restaurantId, restaurantSlug }: ReservasTa
               />
             </div>
             <div className="space-y-2">
-              <Label>URL da Foto</Label>
-              <Input
-                placeholder="https://..."
-                value={tableForm.image_url}
-                onChange={(e) => setTableForm({ ...tableForm, image_url: e.target.value })}
-              />
+              <Label>Foto da Mesa</Label>
+              
+              {tableForm.image_url ? (
+                <div className="relative w-full h-40 rounded-lg overflow-hidden border">
+                  <img 
+                    src={tableForm.image_url}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2"
+                    onClick={() => setTableForm({ ...tableForm, image_url: "" })}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="table-image-upload"
+                    disabled={uploading}
+                  />
+                  <label 
+                    htmlFor="table-image-upload"
+                    className="cursor-pointer flex flex-col items-center gap-2"
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    ) : (
+                      <>
+                        <Upload className="h-8 w-8 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          Clique para selecionar uma imagem
+                        </span>
+                      </>
+                    )}
+                  </label>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
