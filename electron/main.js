@@ -8,6 +8,7 @@ const Database = require('./database');
 const FileManager = require('./fileManager');
 const BackupService = require('./backupService');
 const ImageStorage = require('./imageStorage');
+const PrinterService = require('./printerService');
 const { eventBus } = require('./eventBus');
 
 let mainWindow;
@@ -15,6 +16,7 @@ let db;
 let fileManager;
 let backupService;
 let imageStorage;
+let printerService;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -63,6 +65,7 @@ app.whenReady().then(() => {
   // Initialize other services
   backupService = new BackupService(db, fileManager);
   imageStorage = new ImageStorage(fileManager);
+  printerService = new PrinterService();
   
   // Start auto backup
   backupService.startAutoBackup(24); // Every 24 hours
@@ -71,6 +74,9 @@ app.whenReady().then(() => {
   setupIpcHandlers();
   
   createWindow();
+  
+  // Set main window for printer service after window is created
+  printerService.setMainWindow(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -390,6 +396,19 @@ function setupIpcHandlers() {
   ipcMain.handle('db:getOrdersForPeriod', (_, restaurantId, startDate, endDate) => db.getOrdersForPeriod(restaurantId, startDate, endDate));
   ipcMain.handle('db:getSalesReport', (_, restaurantId, startDate, endDate) => db.getSalesReport(restaurantId, startDate, endDate));
   ipcMain.handle('db:getCounterOrdersForPeriod', (_, restaurantId, startDate, endDate) => db.getCounterOrdersForPeriod(restaurantId, startDate, endDate));
+
+  // =============================================
+  // PRINTER CONFIG
+  // =============================================
+  ipcMain.handle('db:getPrinterConfig', (_, restaurantId) => db.getPrinterConfig(restaurantId));
+  ipcMain.handle('db:savePrinterConfig', (_, config) => db.savePrinterConfig(config));
+
+  // =============================================
+  // PRINTERS
+  // =============================================
+  ipcMain.handle('printer:getList', () => printerService.getPrinters());
+  ipcMain.handle('printer:print', (_, printerName, content, options) => printerService.print(printerName, content, options));
+  ipcMain.handle('printer:test', (_, printerName, paperSize) => printerService.testPrint(printerName, paperSize));
 
   // =============================================
   // BACKUP

@@ -772,6 +772,24 @@ class LocalDatabase {
       );
 
       -- =============================================
+      -- PRINTER CONFIG
+      -- =============================================
+
+      CREATE TABLE IF NOT EXISTS printer_config (
+        id TEXT PRIMARY KEY,
+        restaurant_id TEXT NOT NULL UNIQUE,
+        comanda_printer TEXT,
+        comanda_paper_size TEXT DEFAULT '80mm',
+        comanda_auto_print INTEGER DEFAULT 0,
+        cupom_printer TEXT,
+        cupom_paper_size TEXT DEFAULT '80mm',
+        cupom_auto_print INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+      );
+
+      -- =============================================
       -- INDEXES
       -- =============================================
 
@@ -1943,6 +1961,57 @@ class LocalDatabase {
         AND created_at <= ?
       ORDER BY created_at DESC
     `).all(restaurantId, startDate, endDate);
+  }
+
+  // =============================================
+  // PRINTER CONFIG
+  // =============================================
+
+  getPrinterConfig(restaurantId) {
+    return this.db.prepare(`
+      SELECT * FROM printer_config WHERE restaurant_id = ?
+    `).get(restaurantId);
+  }
+
+  savePrinterConfig(config) {
+    const existing = this.getPrinterConfig(config.restaurant_id);
+    
+    if (existing) {
+      return this.db.prepare(`
+        UPDATE printer_config 
+        SET comanda_printer = ?,
+            comanda_paper_size = ?,
+            comanda_auto_print = ?,
+            cupom_printer = ?,
+            cupom_paper_size = ?,
+            cupom_auto_print = ?,
+            updated_at = datetime('now')
+        WHERE restaurant_id = ?
+      `).run(
+        config.comanda_printer,
+        config.comanda_paper_size,
+        config.comanda_auto_print,
+        config.cupom_printer,
+        config.cupom_paper_size,
+        config.cupom_auto_print,
+        config.restaurant_id
+      );
+    } else {
+      const id = this.generateId();
+      return this.db.prepare(`
+        INSERT INTO printer_config (id, restaurant_id, comanda_printer, comanda_paper_size, comanda_auto_print, cupom_printer, cupom_paper_size, cupom_auto_print)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        id,
+        config.restaurant_id,
+        config.comanda_printer,
+        config.comanda_paper_size,
+        config.comanda_auto_print,
+        config.cupom_printer,
+        config.cupom_paper_size,
+        config.cupom_auto_print
+      );
+    }
   }
 
   // =============================================
