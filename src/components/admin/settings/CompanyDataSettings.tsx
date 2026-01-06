@@ -224,7 +224,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
               </p>
             </div>
             {settings.banner_url && (
-              <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
+              <div className="relative w-full max-h-48 rounded-lg overflow-hidden border">
                 <img 
                   src={settings.banner_url} 
                   alt="Banner atual" 

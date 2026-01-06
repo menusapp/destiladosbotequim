@@ -265,6 +265,12 @@ contextBridge.exposeInMainWorld('electronDB', {
   getOrdersForPeriod: (restaurantId, startDate, endDate) => ipcRenderer.invoke('db:getOrdersForPeriod', restaurantId, startDate, endDate),
   getSalesReport: (restaurantId, startDate, endDate) => ipcRenderer.invoke('db:getSalesReport', restaurantId, startDate, endDate),
   getCounterOrdersForPeriod: (restaurantId, startDate, endDate) => ipcRenderer.invoke('db:getCounterOrdersForPeriod', restaurantId, startDate, endDate),
+
+  // =============================================
+  // PRINTER CONFIG
+  // =============================================
+  getPrinterConfig: (restaurantId) => ipcRenderer.invoke('db:getPrinterConfig', restaurantId),
+  savePrinterConfig: (config) => ipcRenderer.invoke('db:savePrinterConfig', config),
 });
 
 // Expose backup API
@@ -333,6 +339,13 @@ contextBridge.exposeInMainWorld('electronEvents', {
 
 // Detect if running in Electron
 contextBridge.exposeInMainWorld('isElectron', true);
+
+// Expose printer API
+contextBridge.exposeInMainWorld('electronPrinter', {
+  getList: () => ipcRenderer.invoke('printer:getList'),
+  print: (printerName, content, options) => ipcRenderer.invoke('printer:print', printerName, content, options),
+  test: (printerName, paperSize) => ipcRenderer.invoke('printer:test', printerName, paperSize),
+});
 
 // Expose platform info
 contextBridge.exposeInMainWorld('electronPlatform', {
