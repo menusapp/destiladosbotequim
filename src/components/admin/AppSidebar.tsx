@@ -21,7 +21,6 @@ import {
   MessageSquare,
   Megaphone,
   Gift,
-  CalendarCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -64,8 +63,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         hasNotification: (hasNewOrders || hasNewBills)
       },
       { id: "pdv", label: "PDV", icon: CreditCard },
-      { id: "mesas-comandas", label: "Mesas e Comandas", icon: Users2 },
-      { id: "reservas", label: "Reservas", icon: CalendarCheck },
+      { id: "mesas-reservas", label: "Mesas e Reservas", icon: Users2 },
       { id: "cardapio", label: "Cardápio", icon: Utensils },
       { id: "caixa", label: "Caixa", icon: CircleDollarSign },
       { id: "estoque", label: "Estoque", icon: Warehouse },

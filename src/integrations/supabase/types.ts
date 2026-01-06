@@ -2192,6 +2192,7 @@ export type Database = {
           reservation_time: string
           restaurant_id: string
           status: string | null
+          table_id: string | null
         }
         Insert: {
           cancellation_reason?: string | null
@@ -2211,6 +2212,7 @@ export type Database = {
           reservation_time: string
           restaurant_id: string
           status?: string | null
+          table_id?: string | null
         }
         Update: {
           cancellation_reason?: string | null
@@ -2230,6 +2232,7 @@ export type Database = {
           reservation_time?: string
           restaurant_id?: string
           status?: string | null
+          table_id?: string | null
         }
         Relationships: [
           {
@@ -2244,6 +2247,13 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
             referencedColumns: ["id"]
           },
         ]
@@ -2566,32 +2576,53 @@ export type Database = {
       tables: {
         Row: {
           created_at: string | null
+          description: string | null
+          display_order: number | null
           id: string
+          image_url: string | null
+          is_available_for_reservation: boolean | null
           is_occupied: boolean | null
+          max_capacity: number | null
+          min_capacity: number | null
           occupied_at: string | null
           occupied_by: string | null
           qr_code: string | null
           restaurant_id: string
+          table_name: string | null
           table_number: number
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
+          display_order?: number | null
           id?: string
+          image_url?: string | null
+          is_available_for_reservation?: boolean | null
           is_occupied?: boolean | null
+          max_capacity?: number | null
+          min_capacity?: number | null
           occupied_at?: string | null
           occupied_by?: string | null
           qr_code?: string | null
           restaurant_id: string
+          table_name?: string | null
           table_number: number
         }
         Update: {
           created_at?: string | null
+          description?: string | null
+          display_order?: number | null
           id?: string
+          image_url?: string | null
+          is_available_for_reservation?: boolean | null
           is_occupied?: boolean | null
+          max_capacity?: number | null
+          min_capacity?: number | null
           occupied_at?: string | null
           occupied_by?: string | null
           qr_code?: string | null
           restaurant_id?: string
+          table_name?: string | null
           table_number?: number
         }
         Relationships: [

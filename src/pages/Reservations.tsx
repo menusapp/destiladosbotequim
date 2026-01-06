@@ -42,24 +42,25 @@ interface Restaurant {
   reservations_enabled: boolean;
 }
 
-interface ReservationTable {
+interface TableData {
   id: string;
   restaurant_id: string;
-  table_name: string;
+  table_number: number;
+  table_name: string | null;
   description: string | null;
   image_url: string | null;
   min_capacity: number;
   max_capacity: number;
-  is_available: boolean;
+  is_available_for_reservation: boolean;
 }
 
 const Reservations = () => {
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-  const [tables, setTables] = useState<ReservationTable[]>([]);
+  const [tables, setTables] = useState<TableData[]>([]);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<"tables" | "login" | "form" | "success">("tables");
-  const [selectedTable, setSelectedTable] = useState<ReservationTable | null>(null);
+  const [selectedTable, setSelectedTable] = useState<TableData | null>(null);
   
   // Customer data
   const [customerName, setCustomerName] = useState("");
@@ -99,13 +100,15 @@ const Reservations = () => {
 
       setRestaurant(restaurantData);
 
-      // Fetch available tables
+      // Fetch available tables from unified tables table
       const { data: tablesData } = await supabase
-        .from("reservation_tables")
+        .from("tables")
         .select("*")
         .eq("restaurant_id", restaurantData.id)
-        .eq("is_available", true)
-        .order("display_order");
+        .eq("is_available_for_reservation", true)
+        .neq("table_number", 9999)
+        .order("display_order")
+        .order("table_number");
 
       setTables(tablesData || []);
     } catch (error) {
@@ -116,7 +119,7 @@ const Reservations = () => {
     }
   };
 
-  const handleSelectTable = (table: ReservationTable) => {
+  const handleSelectTable = (table: TableData) => {
     setSelectedTable(table);
     // Check if already logged in
     const savedCpf = localStorage.getItem(`reservation_cpf_${restaurant?.id}`);
@@ -154,11 +157,14 @@ const Reservations = () => {
 
     setSubmitting(true);
     try {
+      // Insert reservation - using table_id for the unified tables system
+      // reservation_table_id is kept for backwards compatibility but we pass the same ID
       const { error } = await supabase.from("reservations").insert({
         restaurant_id: restaurant.id,
-        reservation_table_id: selectedTable.id,
+        reservation_table_id: selectedTable.id, // Required by schema for backwards compatibility
+        table_id: selectedTable.id,
         customer_name: customerName,
-        customer_cpf: customerCpf,
+        customer_cpf: customerCpf.replace(/\D/g, ""),
         customer_phone: customerPhone,
         reservation_date: format(reservationDate, "yyyy-MM-dd"),
         reservation_time: reservationTime,
@@ -305,7 +311,7 @@ const Reservations = () => {
                     {table.image_url ? (
                       <img
                         src={table.image_url}
-                        alt={table.table_name}
+                        alt={table.table_name || `Mesa ${table.table_number}`}
                         className="w-full h-48 object-cover"
                       />
                     ) : (
@@ -314,7 +320,7 @@ const Reservations = () => {
                       </div>
                     )}
                     <CardContent className="p-4">
-                      <h3 className="font-semibold text-lg">{table.table_name}</h3>
+                      <h3 className="font-semibold text-lg">{table.table_name || `Mesa ${table.table_number}`}</h3>
                       <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                         <Users className="h-4 w-4" />
                         {table.min_capacity}-{table.max_capacity} pessoas
@@ -390,12 +396,12 @@ const Reservations = () => {
               {selectedTable.image_url && (
                 <img
                   src={selectedTable.image_url}
-                  alt={selectedTable.table_name}
+                  alt={selectedTable.table_name || `Mesa ${selectedTable.table_number}`}
                   className="w-full h-48 object-cover"
                 />
               )}
               <CardContent className="p-4">
-                <h3 className="font-semibold text-lg">{selectedTable.table_name}</h3>
+                <h3 className="font-semibold text-lg">{selectedTable.table_name || `Mesa ${selectedTable.table_number}`}</h3>
                 <p className="text-sm text-muted-foreground">
                   Capacidade: {selectedTable.min_capacity}-{selectedTable.max_capacity} pessoas
                 </p>
