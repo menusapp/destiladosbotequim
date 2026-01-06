@@ -2123,6 +2123,131 @@ export type Database = {
         }
         Relationships: []
       }
+      reservation_tables: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          image_url: string | null
+          is_available: boolean | null
+          max_capacity: number
+          min_capacity: number
+          restaurant_id: string
+          table_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean | null
+          max_capacity?: number
+          min_capacity?: number
+          restaurant_id: string
+          table_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean | null
+          max_capacity?: number
+          min_capacity?: number
+          restaurant_id?: string
+          table_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservation_tables_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reservations: {
+        Row: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          customer_cpf: string
+          customer_name: string
+          customer_phone: string
+          id: string
+          notes: string | null
+          party_size: number
+          reservation_date: string
+          reservation_table_id: string
+          reservation_time: string
+          restaurant_id: string
+          status: string | null
+        }
+        Insert: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          customer_cpf: string
+          customer_name: string
+          customer_phone: string
+          id?: string
+          notes?: string | null
+          party_size: number
+          reservation_date: string
+          reservation_table_id: string
+          reservation_time: string
+          restaurant_id: string
+          status?: string | null
+        }
+        Update: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          customer_cpf?: string
+          customer_name?: string
+          customer_phone?: string
+          id?: string
+          notes?: string | null
+          party_size?: number
+          reservation_date?: string
+          reservation_table_id?: string
+          reservation_time?: string
+          restaurant_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservations_reservation_table_id_fkey"
+            columns: ["reservation_table_id"]
+            isOneToOne: false
+            referencedRelation: "reservation_tables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restaurant_credentials: {
         Row: {
           created_at: string | null
@@ -2240,6 +2365,7 @@ export type Database = {
           prep_time_minutes: number | null
           primary_color: string | null
           rating: number | null
+          reservations_enabled: boolean | null
           review_count: number | null
           secondary_color: string | null
           service_fee_enabled: boolean | null
@@ -2267,6 +2393,7 @@ export type Database = {
           prep_time_minutes?: number | null
           primary_color?: string | null
           rating?: number | null
+          reservations_enabled?: boolean | null
           review_count?: number | null
           secondary_color?: string | null
           service_fee_enabled?: boolean | null
@@ -2294,6 +2421,7 @@ export type Database = {
           prep_time_minutes?: number | null
           primary_color?: string | null
           rating?: number | null
+          reservations_enabled?: boolean | null
           review_count?: number | null
           secondary_color?: string | null
           service_fee_enabled?: boolean | null
