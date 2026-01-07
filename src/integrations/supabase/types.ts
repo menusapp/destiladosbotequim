@@ -2188,7 +2188,7 @@ export type Database = {
           notes: string | null
           party_size: number
           reservation_date: string
-          reservation_table_id: string
+          reservation_table_id: string | null
           reservation_time: string
           restaurant_id: string
           status: string | null
@@ -2208,7 +2208,7 @@ export type Database = {
           notes?: string | null
           party_size: number
           reservation_date: string
-          reservation_table_id: string
+          reservation_table_id?: string | null
           reservation_time: string
           restaurant_id: string
           status?: string | null
@@ -2228,20 +2228,13 @@ export type Database = {
           notes?: string | null
           party_size?: number
           reservation_date?: string
-          reservation_table_id?: string
+          reservation_table_id?: string | null
           reservation_time?: string
           restaurant_id?: string
           status?: string | null
           table_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "reservations_reservation_table_id_fkey"
-            columns: ["reservation_table_id"]
-            isOneToOne: false
-            referencedRelation: "reservation_tables"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "reservations_restaurant_id_fkey"
             columns: ["restaurant_id"]

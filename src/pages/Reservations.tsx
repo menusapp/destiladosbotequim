@@ -67,6 +67,7 @@ const Reservations = () => {
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [tables, setTables] = useState<TableData[]>([]);
+  const [reservedTableIds, setReservedTableIds] = useState<string[]>([]);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<"tables" | "form" | "success">("tables");
@@ -132,6 +133,7 @@ const Reservations = () => {
         .order("table_number");
 
       setTables(tablesData || []);
+      setRestaurant(restaurantData);
     } catch (error) {
       console.error("Error fetching restaurant:", error);
       toast.error("Restaurante não encontrado");
@@ -139,6 +141,29 @@ const Reservations = () => {
       setLoading(false);
     }
   };
+
+  // Função para buscar mesas já reservadas para uma data específica
+  const fetchReservedTables = async (date: Date) => {
+    if (!restaurant) return;
+    
+    const dateStr = format(date, "yyyy-MM-dd");
+    
+    const { data } = await supabase
+      .from("reservations")
+      .select("table_id")
+      .eq("restaurant_id", restaurant.id)
+      .eq("reservation_date", dateStr)
+      .eq("status", "confirmed");
+    
+    setReservedTableIds((data || []).map(r => r.table_id).filter(Boolean) as string[]);
+  };
+
+  // Atualizar mesas reservadas quando a data mudar
+  useEffect(() => {
+    if (reservationDate && restaurant) {
+      fetchReservedTables(reservationDate);
+    }
+  }, [reservationDate, restaurant]);
 
   const handleSelectTable = (table: TableData) => {
     setSelectedTable(table);
@@ -176,11 +201,26 @@ const Reservations = () => {
       return;
     }
 
+    // Verificar se a mesa já está reservada para essa data
+    const { data: existingReservation } = await supabase
+      .from("reservations")
+      .select("id")
+      .eq("restaurant_id", restaurant.id)
+      .eq("table_id", selectedTable.id)
+      .eq("reservation_date", format(reservationDate, "yyyy-MM-dd"))
+      .eq("status", "confirmed")
+      .maybeSingle();
+
+    if (existingReservation) {
+      toast.error("Esta mesa já está reservada para esta data. Escolha outra data ou mesa.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const { error } = await supabase.from("reservations").insert({
         restaurant_id: restaurant.id,
-        reservation_table_id: selectedTable.id,
+        reservation_table_id: null, // Campo legado, agora usamos apenas table_id
         table_id: selectedTable.id,
         customer_name: customerName,
         customer_cpf: customerCpf.replace(/\D/g, ""),
@@ -476,6 +516,11 @@ const Reservations = () => {
                       />
                     </PopoverContent>
                   </Popover>
+                  {reservationDate && selectedTable && reservedTableIds.includes(selectedTable.id) && (
+                    <p className="text-sm text-destructive mt-1">
+                      ⚠️ Esta mesa já possui uma reserva confirmada para esta data. Escolha outra data.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -529,7 +574,7 @@ const Reservations = () => {
                   className="w-full"
                   style={{ backgroundColor: primaryColor }}
                   onClick={handleSubmitReservation}
-                  disabled={submitting}
+                  disabled={submitting || !reservationDate || !reservationTime || (selectedTable && reservedTableIds.includes(selectedTable.id))}
                 >
                   {submitting ? "Enviando..." : "Confirmar Reserva"}
                 </Button>
