@@ -25,6 +25,7 @@ import FidelityTab from "@/components/admin/FidelityTab";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
+import { NewReservationNotification } from "@/components/admin/NewReservationNotification";
 // Settings sub-tabs
 import CompanyDataSettings from "@/components/admin/settings/CompanyDataSettings";
 import BusinessHoursSettings from "@/components/admin/settings/BusinessHoursSettings";
@@ -65,12 +66,23 @@ const RestaurantAdmin = () => {
     total: number;
     customerName: string;
   } | null>(null);
+  const [reservationNotification, setReservationNotification] = useState<{
+    reservationId: string;
+    customerName: string;
+    tableName: string;
+    date: string;
+    time: string;
+    partySize: number;
+  } | null>(null);
   const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
   const [notifiedBills, setNotifiedBills] = useState<Set<string>>(new Set());
+  const [notifiedReservations, setNotifiedReservations] = useState<Set<string>>(new Set());
   const notifiedOrdersRef = useRef<Set<string>>(new Set());
   const notifiedBillsRef = useRef<Set<string>>(new Set());
+  const notifiedReservationsRef = useRef<Set<string>>(new Set());
   const globalNotificationRef = useRef<typeof globalNotification>(null);
   const billNotificationRef = useRef<typeof billNotification>(null);
+  const reservationNotificationRef = useRef<typeof reservationNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
   
   // Sync refs with state to avoid stale closure in realtime callback
@@ -83,12 +95,20 @@ const RestaurantAdmin = () => {
   }, [notifiedBills]);
   
   useEffect(() => {
+    notifiedReservationsRef.current = notifiedReservations;
+  }, [notifiedReservations]);
+  
+  useEffect(() => {
     globalNotificationRef.current = globalNotification;
   }, [globalNotification]);
   
   useEffect(() => {
     billNotificationRef.current = billNotification;
   }, [billNotification]);
+
+  useEffect(() => {
+    reservationNotificationRef.current = reservationNotification;
+  }, [reservationNotification]);
   
   useInactivityLogout();
 
@@ -289,9 +309,75 @@ const RestaurantAdmin = () => {
       )
       .subscribe();
 
+    // Canal para novas reservas
+    const reservationsChannel = supabase
+      .channel('new-reservations-notification')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'reservations',
+        },
+        async (payload) => {
+          const reservation = payload.new as any;
+          const reservationId = reservation.id;
+          
+          // Verificar se já foi notificado
+          if (notifiedReservationsRef.current.has(reservationId)) return;
+          
+          // Verificar se é do restaurante atual e está pendente
+          if (reservation.restaurant_id === restaurantId && reservation.status === 'pending') {
+            // Buscar dados da mesa
+            const { data: tableData } = await supabase
+              .from('tables')
+              .select('table_name, table_number')
+              .eq('id', reservation.table_id)
+              .single();
+            
+            setReservationNotification({
+              reservationId: reservationId,
+              customerName: reservation.customer_name,
+              tableName: tableData?.table_name || `Mesa ${tableData?.table_number || '?'}`,
+              date: reservation.reservation_date,
+              time: reservation.reservation_time,
+              partySize: reservation.party_size,
+            });
+            
+            // Marcar como notificado
+            const updated = new Set(notifiedReservationsRef.current);
+            updated.add(reservationId);
+            notifiedReservationsRef.current = updated;
+            setNotifiedReservations(updated);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'reservations',
+        },
+        (payload) => {
+          const reservation = payload.new as any;
+          const reservationId = reservation.id;
+          const status = reservation.status;
+          
+          // Se a reserva foi confirmada/cancelada, fechar notificação
+          if (reservationNotificationRef.current && 
+              reservationNotificationRef.current.reservationId === reservationId && 
+              status !== 'pending') {
+            setReservationNotification(null);
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(billsChannel);
+      supabase.removeChannel(reservationsChannel);
     };
   };
 
@@ -463,6 +549,16 @@ const RestaurantAdmin = () => {
     setBillNotification(null);
   };
 
+  const handleViewReservation = () => {
+    if (!reservationNotification) return;
+
+    // Navegar para mesas e reservas
+    setActiveSection('mesas-reservas');
+
+    // Fechar notificação
+    setReservationNotification(null);
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       // Pedidos Online (apenas delivery/retirada)
@@ -590,6 +686,20 @@ const RestaurantAdmin = () => {
             customerName={billNotification.customerName}
             onView={handleViewBill}
             onDismiss={() => setBillNotification(null)}
+          />
+        )}
+
+        {/* Global Reservation Notification */}
+        {reservationNotification && (
+          <NewReservationNotification
+            reservationId={reservationNotification.reservationId}
+            customerName={reservationNotification.customerName}
+            tableName={reservationNotification.tableName}
+            date={reservationNotification.date}
+            time={reservationNotification.time}
+            partySize={reservationNotification.partySize}
+            onView={handleViewReservation}
+            onDismiss={() => setReservationNotification(null)}
           />
         )}
       </div>
