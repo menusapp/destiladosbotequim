@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
             client_id: mpAppId,
             client_secret: mpClientSecret,
             code: code,
-            redirect_uri: `${supabaseUrl}/functions/v1/payment-oauth`
+            redirect_uri: "https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/payment-oauth"
           })
         });
 
@@ -135,7 +135,8 @@ Deno.serve(async (req) => {
           );
         }
 
-        const redirectUri = `${supabaseUrl}/functions/v1/payment-oauth`;
+        // IMPORTANTE: Usar URL exata conforme cadastrado no Mercado Pago (sem barra final)
+        const redirectUri = "https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/payment-oauth";
         const authUrl = `${MP_AUTH_URL}?client_id=${mpAppId}&response_type=code&platform_id=mp&state=${restaurantId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
         return new Response(
