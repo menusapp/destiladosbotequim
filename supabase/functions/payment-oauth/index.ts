@@ -109,10 +109,28 @@ Deno.serve(async (req) => {
       }
 
       if (action === "authorize") {
-        // Gerar URL de autorização
+        // Verificar se secrets estão configurados
         if (!mpAppId) {
           return new Response(
-            JSON.stringify({ error: "Integração Mercado Pago não configurada" }),
+            JSON.stringify({ error: "Secret MERCADOPAGO_APP_ID não configurado. Entre em contato com o suporte." }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Criar/atualizar registro com status 'connecting' ANTES de redirecionar
+        const { error: upsertError } = await supabase
+          .from("online_payment_config")
+          .upsert({
+            restaurant_id: restaurantId,
+            provider: "mercadopago",
+            connection_status: "connecting",
+            updated_at: new Date().toISOString()
+          }, { onConflict: "restaurant_id" });
+
+        if (upsertError) {
+          console.error("Upsert error:", upsertError);
+          return new Response(
+            JSON.stringify({ error: "Erro ao preparar conexão com Mercado Pago" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
