@@ -1575,6 +1575,158 @@ export type Database = {
           },
         ]
       }
+      online_payment_config: {
+        Row: {
+          accept_card: boolean | null
+          accept_pix: boolean | null
+          connected_at: string | null
+          connection_status: string | null
+          created_at: string | null
+          enable_for_delivery: boolean | null
+          enabled: boolean | null
+          id: string
+          mp_access_token: string | null
+          mp_public_key: string | null
+          mp_refresh_token: string | null
+          mp_token_expires_at: string | null
+          mp_user_id: string | null
+          provider: string | null
+          require_prepayment: boolean | null
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          accept_card?: boolean | null
+          accept_pix?: boolean | null
+          connected_at?: string | null
+          connection_status?: string | null
+          created_at?: string | null
+          enable_for_delivery?: boolean | null
+          enabled?: boolean | null
+          id?: string
+          mp_access_token?: string | null
+          mp_public_key?: string | null
+          mp_refresh_token?: string | null
+          mp_token_expires_at?: string | null
+          mp_user_id?: string | null
+          provider?: string | null
+          require_prepayment?: boolean | null
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          accept_card?: boolean | null
+          accept_pix?: boolean | null
+          connected_at?: string | null
+          connection_status?: string | null
+          created_at?: string | null
+          enable_for_delivery?: boolean | null
+          enabled?: boolean | null
+          id?: string
+          mp_access_token?: string | null
+          mp_public_key?: string | null
+          mp_refresh_token?: string | null
+          mp_token_expires_at?: string | null
+          mp_user_id?: string | null
+          provider?: string | null
+          require_prepayment?: boolean | null
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "online_payment_config_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      online_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          customer_cpf: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          id: string
+          order_id: string | null
+          paid_at: string | null
+          payment_method: string | null
+          pix_expiration: string | null
+          pix_qr_code: string | null
+          pix_qr_code_base64: string | null
+          provider: string
+          provider_payment_id: string | null
+          provider_preference_id: string | null
+          restaurant_id: string
+          status: string | null
+          updated_at: string | null
+          webhook_received_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          customer_cpf?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          order_id?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          pix_expiration?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
+          provider?: string
+          provider_payment_id?: string | null
+          provider_preference_id?: string | null
+          restaurant_id: string
+          status?: string | null
+          updated_at?: string | null
+          webhook_received_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          customer_cpf?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          order_id?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          pix_expiration?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
+          provider?: string
+          provider_payment_id?: string | null
+          provider_preference_id?: string | null
+          restaurant_id?: string
+          status?: string | null
+          updated_at?: string | null
+          webhook_received_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "online_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "online_payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operational_costs: {
         Row: {
           created_at: string | null
@@ -1721,7 +1873,9 @@ export type Database = {
           loyalty_points_earned: number | null
           loyalty_points_used: number | null
           notes: string | null
+          online_payment_id: string | null
           order_type: string | null
+          payment_status: string | null
           payment_type: string | null
           restaurant_id: string
           reward_discount: number | null
@@ -1747,7 +1901,9 @@ export type Database = {
           loyalty_points_earned?: number | null
           loyalty_points_used?: number | null
           notes?: string | null
+          online_payment_id?: string | null
           order_type?: string | null
+          payment_status?: string | null
           payment_type?: string | null
           restaurant_id: string
           reward_discount?: number | null
@@ -1773,7 +1929,9 @@ export type Database = {
           loyalty_points_earned?: number | null
           loyalty_points_used?: number | null
           notes?: string | null
+          online_payment_id?: string | null
           order_type?: string | null
+          payment_status?: string | null
           payment_type?: string | null
           restaurant_id?: string
           reward_discount?: number | null
@@ -1788,6 +1946,13 @@ export type Database = {
             columns: ["comanda_id"]
             isOneToOne: false
             referencedRelation: "comandas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_online_payment_id_fkey"
+            columns: ["online_payment_id"]
+            isOneToOne: false
+            referencedRelation: "online_payments"
             referencedColumns: ["id"]
           },
           {
@@ -2721,6 +2886,8 @@ export type Database = {
           message_cancelled: string | null
           message_delivered: string | null
           message_out_for_delivery: string | null
+          message_payment_approved: string | null
+          message_payment_rejected: string | null
           message_picked_up: string | null
           message_ready_for_pickup: string | null
           message_reservation_cancelled: string | null
@@ -2743,6 +2910,8 @@ export type Database = {
           message_cancelled?: string | null
           message_delivered?: string | null
           message_out_for_delivery?: string | null
+          message_payment_approved?: string | null
+          message_payment_rejected?: string | null
           message_picked_up?: string | null
           message_ready_for_pickup?: string | null
           message_reservation_cancelled?: string | null
@@ -2765,6 +2934,8 @@ export type Database = {
           message_cancelled?: string | null
           message_delivered?: string | null
           message_out_for_delivery?: string | null
+          message_payment_approved?: string | null
+          message_payment_rejected?: string | null
           message_picked_up?: string | null
           message_ready_for_pickup?: string | null
           message_reservation_cancelled?: string | null
