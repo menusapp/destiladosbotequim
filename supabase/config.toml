@@ -17,3 +17,18 @@ verify_jwt = false
 
 [functions.loyalty-processor]
 verify_jwt = false
+
+[functions.payment-config]
+verify_jwt = false
+
+[functions.payment-oauth]
+verify_jwt = false
+
+[functions.payment-create]
+verify_jwt = false
+
+[functions.payment-status]
+verify_jwt = false
+
+[functions.payment-webhook]
+verify_jwt = false
