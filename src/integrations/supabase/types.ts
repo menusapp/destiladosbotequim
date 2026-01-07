@@ -2723,6 +2723,9 @@ export type Database = {
           message_out_for_delivery: string | null
           message_picked_up: string | null
           message_ready_for_pickup: string | null
+          message_reservation_cancelled: string | null
+          message_reservation_confirmed: string | null
+          message_reservation_created: string | null
           phone_number: string | null
           restaurant_id: string
           updated_at: string | null
@@ -2742,6 +2745,9 @@ export type Database = {
           message_out_for_delivery?: string | null
           message_picked_up?: string | null
           message_ready_for_pickup?: string | null
+          message_reservation_cancelled?: string | null
+          message_reservation_confirmed?: string | null
+          message_reservation_created?: string | null
           phone_number?: string | null
           restaurant_id: string
           updated_at?: string | null
@@ -2761,6 +2767,9 @@ export type Database = {
           message_out_for_delivery?: string | null
           message_picked_up?: string | null
           message_ready_for_pickup?: string | null
+          message_reservation_cancelled?: string | null
+          message_reservation_confirmed?: string | null
+          message_reservation_created?: string | null
           phone_number?: string | null
           restaurant_id?: string
           updated_at?: string | null

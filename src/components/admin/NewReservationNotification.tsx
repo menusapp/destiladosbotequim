@@ -103,16 +103,16 @@ export const NewReservationNotification = ({
 
   return (
     <div className="fixed top-4 right-4 z-[100] w-96 animate-in slide-in-from-top-5">
-      <Card className="bg-purple-50 border-purple-200 shadow-2xl">
+      <Card className="bg-orange-50 border-orange-200 shadow-2xl">
         <div className="p-6 space-y-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center animate-bounce">
+              <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center animate-bounce">
                 <CalendarCheck className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-purple-900">Nova Reserva!</h3>
-                <p className="text-sm text-purple-700">
+                <h3 className="text-xl font-bold text-orange-900">Nova Reserva!</h3>
+                <p className="text-sm text-orange-700">
                   📅 {formatDate(date)} às {time.slice(0, 5)}
                 </p>
               </div>
@@ -121,18 +121,18 @@ export const NewReservationNotification = ({
               variant="ghost"
               size="icon"
               onClick={handleClose}
-              className="h-8 w-8 text-purple-700 hover:text-purple-900 hover:bg-purple-100"
+              className="h-8 w-8 text-orange-700 hover:text-orange-900 hover:bg-orange-100"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
           
           <div className="space-y-1">
-            <p className="text-lg font-semibold text-purple-800">
+            <p className="text-lg font-semibold text-orange-800">
               {tableName}
             </p>
-            <p className="text-purple-700">{customerName}</p>
-            <p className="text-sm text-purple-600">
+            <p className="text-orange-700">{customerName}</p>
+            <p className="text-sm text-orange-600">
               👥 {partySize} {partySize === 1 ? 'pessoa' : 'pessoas'}
             </p>
           </div>
@@ -140,14 +140,14 @@ export const NewReservationNotification = ({
           <div className="flex gap-2">
             <Button
               onClick={handleView}
-              className="flex-1 bg-purple-600 hover:bg-purple-700"
+              className="flex-1 bg-orange-600 hover:bg-orange-700"
             >
               VER RESERVA
             </Button>
             <Button
               onClick={handleStopSound}
               variant="outline"
-              className="flex-1 border-purple-300 text-purple-700 hover:bg-purple-100"
+              className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-100"
             >
               Parar Som
             </Button>
