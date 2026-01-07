@@ -2870,7 +2870,7 @@ export type Database = {
         Returns: boolean
       }
       is_restaurant_admin: {
-        Args: { _restaurant_id: string; _user_id: string }
+        Args: { rest_id: string; user_uuid: string }
         Returns: boolean
       }
       is_restaurant_closed_by_order_item: {

@@ -33,6 +33,7 @@ import DeliveryZonesSettings from "@/components/admin/settings/DeliveryZonesSett
 import PaymentMethodsSettings from "@/components/admin/settings/PaymentMethodsSettings";
 import PrintersSettings from "@/components/admin/settings/PrintersSettings";
 import WhatsAppSettings from "@/components/admin/settings/WhatsAppSettings";
+import OnlinePaymentsSettings from "@/components/admin/settings/OnlinePaymentsSettings";
 
 interface Restaurant {
   id: string;
@@ -626,6 +627,8 @@ const RestaurantAdmin = () => {
         return <DeliveryZonesSettings restaurantId={restaurant.id} />;
       case "config-pagamentos":
         return <PaymentMethodsSettings restaurantId={restaurant.id} />;
+      case "config-pagamentos-online":
+        return <OnlinePaymentsSettings restaurantId={restaurant.id} />;
       case "config-impressoras":
         return <PrintersSettings restaurantId={restaurant.id} />;
       case "config-whatsapp":
