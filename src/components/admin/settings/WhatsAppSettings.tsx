@@ -35,6 +35,9 @@ interface WhatsAppConfig {
   message_ready_for_pickup: string | null;
   message_picked_up: string | null;
   message_cancelled: string | null;
+  message_reservation_created: string | null;
+  message_reservation_confirmed: string | null;
+  message_reservation_cancelled: string | null;
 }
 
 const DEFAULT_MESSAGES = {
@@ -43,7 +46,10 @@ const DEFAULT_MESSAGES = {
   delivered: "🎉 Pedido #{pedido} entregue com sucesso! Obrigado pela preferência, {nome}!",
   ready_for_pickup: "📍 Seu pedido #{pedido} está pronto para retirada! Aguardamos você!",
   picked_up: "✅ Pedido #{pedido} retirado com sucesso! Obrigado pela preferência, {nome}! 🙏",
-  cancelled: "❌ Olá {nome}, infelizmente seu pedido #{pedido} foi cancelado. Entre em contato conosco para mais informações."
+  cancelled: "❌ Olá {nome}, infelizmente seu pedido #{pedido} foi cancelado. Entre em contato conosco para mais informações.",
+  reservation_created: "📅 Olá {nome}! Sua reserva foi recebida e está aguardando confirmação.\n\n🪑 Mesa: {mesa}\n📆 Data: {data}\n⏰ Horário: {horario}\n👥 Pessoas: {pessoas}\n\nEm breve você receberá a confirmação!",
+  reservation_confirmed: "✅ Olá {nome}! Sua reserva foi CONFIRMADA!\n\n🪑 Mesa: {mesa}\n📆 Data: {data}\n⏰ Horário: {horario}\n👥 Pessoas: {pessoas}\n\nAguardamos você! 🎉",
+  reservation_cancelled: "❌ Olá {nome}, infelizmente sua reserva para {data} às {horario} foi cancelada.\n\nEntre em contato conosco para mais informações ou faça uma nova reserva."
 };
 
 const SUPABASE_URL = "https://nrddbsudiphrvgfneqle.supabase.co";
@@ -63,7 +69,10 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     delivered: DEFAULT_MESSAGES.delivered,
     ready_for_pickup: DEFAULT_MESSAGES.ready_for_pickup,
     picked_up: DEFAULT_MESSAGES.picked_up,
-    cancelled: DEFAULT_MESSAGES.cancelled
+    cancelled: DEFAULT_MESSAGES.cancelled,
+    reservation_created: DEFAULT_MESSAGES.reservation_created,
+    reservation_confirmed: DEFAULT_MESSAGES.reservation_confirmed,
+    reservation_cancelled: DEFAULT_MESSAGES.reservation_cancelled
   });
   
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -127,7 +136,10 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
           delivered: data.message_delivered || DEFAULT_MESSAGES.delivered,
           ready_for_pickup: data.message_ready_for_pickup || DEFAULT_MESSAGES.ready_for_pickup,
           picked_up: data.message_picked_up || DEFAULT_MESSAGES.picked_up,
-          cancelled: data.message_cancelled || DEFAULT_MESSAGES.cancelled
+          cancelled: data.message_cancelled || DEFAULT_MESSAGES.cancelled,
+          reservation_created: data.message_reservation_created || DEFAULT_MESSAGES.reservation_created,
+          reservation_confirmed: data.message_reservation_confirmed || DEFAULT_MESSAGES.reservation_confirmed,
+          reservation_cancelled: data.message_reservation_cancelled || DEFAULT_MESSAGES.reservation_cancelled
         });
       }
     } catch (error) {
@@ -361,6 +373,9 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
           message_ready_for_pickup: messages.ready_for_pickup,
           message_picked_up: messages.picked_up,
           message_cancelled: messages.cancelled,
+          message_reservation_created: messages.reservation_created,
+          message_reservation_confirmed: messages.reservation_confirmed,
+          message_reservation_cancelled: messages.reservation_cancelled,
           updated_at: new Date().toISOString()
         }, { onConflict: 'restaurant_id' });
 
@@ -672,6 +687,60 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
                 onChange={(e) => setMessages(prev => ({ ...prev, cancelled: e.target.value }))}
                 rows={3}
                 placeholder="Mensagem quando o pedido for cancelado..."
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Reservations Section */}
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">📅 Reservas</h4>
+            
+            <p className="text-sm text-muted-foreground">
+              Variáveis disponíveis: <code className="bg-muted px-1 rounded">{'{nome}'}</code>, 
+              <code className="bg-muted px-1 rounded ml-1">{'{mesa}'}</code>, 
+              <code className="bg-muted px-1 rounded ml-1">{'{data}'}</code>,
+              <code className="bg-muted px-1 rounded ml-1">{'{horario}'}</code>,
+              <code className="bg-muted px-1 rounded ml-1">{'{pessoas}'}</code>
+            </p>
+            
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-yellow-600" />
+                Reserva Criada (Pendente)
+              </Label>
+              <Textarea
+                value={messages.reservation_created}
+                onChange={(e) => setMessages(prev => ({ ...prev, reservation_created: e.target.value }))}
+                rows={4}
+                placeholder="Mensagem quando uma reserva for criada..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Reserva Confirmada
+              </Label>
+              <Textarea
+                value={messages.reservation_confirmed}
+                onChange={(e) => setMessages(prev => ({ ...prev, reservation_confirmed: e.target.value }))}
+                rows={4}
+                placeholder="Mensagem quando a reserva for confirmada..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-red-600" />
+                Reserva Cancelada
+              </Label>
+              <Textarea
+                value={messages.reservation_cancelled}
+                onChange={(e) => setMessages(prev => ({ ...prev, reservation_cancelled: e.target.value }))}
+                rows={3}
+                placeholder="Mensagem quando a reserva for cancelada..."
               />
             </div>
           </div>

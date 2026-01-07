@@ -237,6 +237,41 @@ const Reservations = () => {
         throw error;
       }
 
+      // Enviar WhatsApp de reserva criada
+      const tableName = selectedTable.table_name || `Mesa ${selectedTable.table_number}`;
+      const cleanPhone = customerPhone.replace(/\D/g, "");
+      
+      if (cleanPhone) {
+        // Buscar config do WhatsApp
+        const { data: whatsappConfig } = await supabase
+          .from('whatsapp_config')
+          .select('enabled, instance_status, message_reservation_created')
+          .eq('restaurant_id', restaurant.id)
+          .maybeSingle();
+
+        if (whatsappConfig?.enabled && whatsappConfig?.instance_status === 'connected') {
+          const defaultMessage = "📅 Olá {nome}! Sua reserva foi recebida e está aguardando confirmação.\n\n🪑 Mesa: {mesa}\n📆 Data: {data}\n⏰ Horário: {horario}\n👥 Pessoas: {pessoas}\n\nEm breve você receberá a confirmação!";
+          const template = whatsappConfig.message_reservation_created || defaultMessage;
+          
+          const message = template
+            .replace(/{nome}/g, customerName)
+            .replace(/{mesa}/g, tableName)
+            .replace(/{data}/g, format(reservationDate, "dd/MM/yyyy"))
+            .replace(/{horario}/g, reservationTime)
+            .replace(/{pessoas}/g, partySize.toString());
+
+          // Enviar em background (não bloquear o fluxo)
+          supabase.functions.invoke('whatsapp-send', {
+            body: {
+              restaurantId: restaurant.id,
+              phone: cleanPhone,
+              message,
+              messageType: 'reservation_created'
+            }
+          }).catch(err => console.error('[WhatsApp] Erro ao enviar:', err));
+        }
+      }
+
       setStep("success");
       toast.success("Reserva enviada com sucesso!");
     } catch (error) {

@@ -521,6 +521,58 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     toast.success("Link copiado!");
   };
 
+  // Helper para enviar WhatsApp de reserva
+  const sendReservationWhatsApp = async (
+    reservation: Reservation,
+    messageType: 'confirmed' | 'cancelled'
+  ) => {
+    try {
+      const table = tables.find(t => t.id === reservation.table_id);
+      const tableName = table?.table_name || `Mesa ${table?.table_number}`;
+      
+      const { data: whatsappConfig } = await supabase
+        .from('whatsapp_config')
+        .select('enabled, instance_status, message_reservation_confirmed, message_reservation_cancelled')
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+
+      if (!whatsappConfig?.enabled || whatsappConfig?.instance_status !== 'connected') {
+        return;
+      }
+
+      const defaultMessages = {
+        confirmed: "✅ Olá {nome}! Sua reserva foi CONFIRMADA!\n\n🪑 Mesa: {mesa}\n📆 Data: {data}\n⏰ Horário: {horario}\n👥 Pessoas: {pessoas}\n\nAguardamos você! 🎉",
+        cancelled: "❌ Olá {nome}, infelizmente sua reserva para {data} às {horario} foi cancelada.\n\nEntre em contato conosco para mais informações ou faça uma nova reserva."
+      };
+
+      const template = messageType === 'confirmed'
+        ? (whatsappConfig.message_reservation_confirmed || defaultMessages.confirmed)
+        : (whatsappConfig.message_reservation_cancelled || defaultMessages.cancelled);
+
+      // Formatar data
+      const [year, month, day] = reservation.reservation_date.split('-');
+      const formattedDate = `${day}/${month}/${year}`;
+
+      const message = template
+        .replace(/{nome}/g, reservation.customer_name)
+        .replace(/{mesa}/g, tableName)
+        .replace(/{data}/g, formattedDate)
+        .replace(/{horario}/g, reservation.reservation_time.slice(0, 5))
+        .replace(/{pessoas}/g, reservation.party_size.toString());
+
+      await supabase.functions.invoke('whatsapp-send', {
+        body: {
+          restaurantId,
+          phone: reservation.customer_phone,
+          message,
+          messageType: `reservation_${messageType}`
+        }
+      });
+    } catch (error) {
+      console.error('[WhatsApp] Erro ao enviar:', error);
+    }
+  };
+
   const handleConfirmReservation = async () => {
     if (!selectedReservation) return;
 
@@ -537,6 +589,9 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       toast.error("Erro ao confirmar reserva");
       return;
     }
+
+    // Enviar WhatsApp
+    sendReservationWhatsApp(selectedReservation, 'confirmed');
 
     toast.success("Reserva confirmada!");
     setConfirmDialogOpen(false);
@@ -561,6 +616,9 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       toast.error("Erro ao cancelar reserva");
       return;
     }
+
+    // Enviar WhatsApp
+    sendReservationWhatsApp(selectedReservation, 'cancelled');
 
     toast.success("Reserva cancelada!");
     setCancelDialogOpen(false);
