@@ -115,6 +115,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const [tables, setTables] = useState<Table[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [reservationsEnabled, setReservationsEnabled] = useState(false);
+  const [followBusinessHours, setFollowBusinessHours] = useState(true);
   const [restaurantSlug, setRestaurantSlug] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
@@ -174,13 +175,14 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const fetchRestaurantData = async () => {
     const { data } = await supabase
       .from("restaurants")
-      .select("slug, reservations_enabled")
+      .select("slug, reservations_enabled, reservations_follow_business_hours")
       .eq("id", restaurantId)
       .single();
 
     if (data) {
       setRestaurantSlug(data.slug);
       setReservationsEnabled(data.reservations_enabled || false);
+      setFollowBusinessHours(data.reservations_follow_business_hours ?? true);
     }
   };
 
@@ -496,6 +498,21 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
     setReservationsEnabled(enabled);
     toast.success(enabled ? "Reservas ativadas!" : "Reservas desativadas");
+  };
+
+  const handleToggleFollowBusinessHours = async (enabled: boolean) => {
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ reservations_follow_business_hours: enabled })
+      .eq("id", restaurantId);
+
+    if (error) {
+      toast.error("Erro ao atualizar configuração");
+      return;
+    }
+
+    setFollowBusinessHours(enabled);
+    toast.success(enabled ? "Reservas seguirão horário de funcionamento" : "Reservas usarão horário padrão");
   };
 
   const handleCopyReservationLink = () => {
@@ -1082,19 +1099,43 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
         {/* Reservas Tab */}
         <TabsContent value="reservas" className="mt-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="reservations-toggle">Ativar Reservas Online</Label>
+          {/* Configurações */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Configurações de Reserva</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="reservations-toggle" className="font-medium">Ativar Reservas Online</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Permite que clientes façam reservas pelo link público
+                  </p>
+                </div>
                 <Switch
                   id="reservations-toggle"
                   checked={reservationsEnabled}
                   onCheckedChange={handleToggleReservations}
                 />
               </div>
-            </div>
-          </div>
+              
+              {reservationsEnabled && (
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div>
+                    <Label htmlFor="business-hours-toggle" className="font-medium">Seguir Horário de Funcionamento</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Mostrar apenas horários disponíveis conforme configurado em Configurações → Horário de Funcionamento
+                    </p>
+                  </div>
+                  <Switch
+                    id="business-hours-toggle"
+                    checked={followBusinessHours}
+                    onCheckedChange={handleToggleFollowBusinessHours}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {reservationsEnabled && (
             <Card className="border-primary/20 bg-primary/5">

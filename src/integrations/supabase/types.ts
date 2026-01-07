@@ -2376,6 +2376,7 @@ export type Database = {
           primary_color: string | null
           rating: number | null
           reservations_enabled: boolean | null
+          reservations_follow_business_hours: boolean | null
           review_count: number | null
           secondary_color: string | null
           service_fee_enabled: boolean | null
@@ -2404,6 +2405,7 @@ export type Database = {
           primary_color?: string | null
           rating?: number | null
           reservations_enabled?: boolean | null
+          reservations_follow_business_hours?: boolean | null
           review_count?: number | null
           secondary_color?: string | null
           service_fee_enabled?: boolean | null
@@ -2432,6 +2434,7 @@ export type Database = {
           primary_color?: string | null
           rating?: number | null
           reservations_enabled?: boolean | null
+          reservations_follow_business_hours?: boolean | null
           review_count?: number | null
           secondary_color?: string | null
           service_fee_enabled?: boolean | null

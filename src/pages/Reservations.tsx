@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
 
 interface Restaurant {
   id: string;
@@ -40,6 +41,7 @@ interface Restaurant {
   logo_url: string | null;
   primary_color: string | null;
   reservations_enabled: boolean;
+  reservations_follow_business_hours: boolean;
 }
 
 interface TableData {
@@ -54,13 +56,22 @@ interface TableData {
   is_available_for_reservation: boolean;
 }
 
+interface BusinessHour {
+  day_of_week: number;
+  is_open: boolean;
+  open_time: string | null;
+  close_time: string | null;
+}
+
 const Reservations = () => {
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [tables, setTables] = useState<TableData[]>([]);
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState<"tables" | "login" | "form" | "success">("tables");
+  const [step, setStep] = useState<"tables" | "form" | "success">("tables");
   const [selectedTable, setSelectedTable] = useState<TableData | null>(null);
+  const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   
   // Customer data
   const [customerName, setCustomerName] = useState("");
@@ -85,7 +96,7 @@ const Reservations = () => {
     try {
       const { data: restaurantData, error: restaurantError } = await supabase
         .from("restaurants")
-        .select("id, name, slug, logo_url, primary_color, reservations_enabled")
+        .select("id, name, slug, logo_url, primary_color, reservations_enabled, reservations_follow_business_hours")
         .eq("slug", restaurantSlug)
         .single();
 
@@ -99,6 +110,16 @@ const Reservations = () => {
       }
 
       setRestaurant(restaurantData);
+
+      // Fetch business hours if following business hours
+      if (restaurantData.reservations_follow_business_hours) {
+        const { data: hoursData } = await supabase
+          .from("business_hours")
+          .select("day_of_week, is_open, open_time, close_time")
+          .eq("restaurant_id", restaurantData.id);
+        
+        setBusinessHours(hoursData || []);
+      }
 
       // Fetch available tables from unified tables table
       const { data: tablesData } = await supabase
@@ -131,21 +152,21 @@ const Reservations = () => {
       setCustomerPhone(savedPhone || "");
       setStep("form");
     } else {
-      setStep("login");
+      setShowCustomerDialog(true);
     }
   };
 
-  const handleLogin = () => {
-    if (!customerName || !customerCpf || !customerPhone) {
-      toast.error("Preencha todos os campos");
-      return;
-    }
-
+  const handleCustomerInfoSubmit = (name: string, cpf: string, phone?: string) => {
+    setCustomerName(name);
+    setCustomerCpf(cpf);
+    setCustomerPhone(phone || "");
+    
     // Save to localStorage
-    localStorage.setItem(`reservation_cpf_${restaurant?.id}`, customerCpf);
-    localStorage.setItem(`reservation_name_${restaurant?.id}`, customerName);
-    localStorage.setItem(`reservation_phone_${restaurant?.id}`, customerPhone);
-
+    localStorage.setItem(`reservation_cpf_${restaurant?.id}`, cpf);
+    localStorage.setItem(`reservation_name_${restaurant?.id}`, name);
+    if (phone) localStorage.setItem(`reservation_phone_${restaurant?.id}`, phone);
+    
+    setShowCustomerDialog(false);
     setStep("form");
   };
 
@@ -157,15 +178,13 @@ const Reservations = () => {
 
     setSubmitting(true);
     try {
-      // Insert reservation - using table_id for the unified tables system
-      // reservation_table_id is kept for backwards compatibility but we pass the same ID
       const { error } = await supabase.from("reservations").insert({
         restaurant_id: restaurant.id,
-        reservation_table_id: selectedTable.id, // Required by schema for backwards compatibility
+        reservation_table_id: selectedTable.id,
         table_id: selectedTable.id,
         customer_name: customerName,
         customer_cpf: customerCpf.replace(/\D/g, ""),
-        customer_phone: customerPhone,
+        customer_phone: customerPhone.replace(/\D/g, ""),
         reservation_date: format(reservationDate, "yyyy-MM-dd"),
         reservation_time: reservationTime,
         party_size: partySize,
@@ -173,9 +192,13 @@ const Reservations = () => {
         status: "pending",
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Reservation error:", error);
+        throw error;
+      }
 
       setStep("success");
+      toast.success("Reserva enviada com sucesso!");
     } catch (error) {
       console.error("Error creating reservation:", error);
       toast.error("Erro ao criar reserva. Tente novamente.");
@@ -184,30 +207,74 @@ const Reservations = () => {
     }
   };
 
-  const formatCpf = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    return numbers
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
-      .replace(/(-\d{2})\d+?$/, "$1");
-  };
-
-  const formatPhone = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    return numbers
-      .replace(/(\d{2})(\d)/, "($1) $2")
-      .replace(/(\d{5})(\d)/, "$1-$2")
-      .replace(/(-\d{4})\d+?$/, "$1");
-  };
-
-  const generateTimeSlots = () => {
-    const slots = [];
+  const generateTimeSlots = (date: Date | undefined) => {
+    if (!date) return [];
+    
+    const dayOfWeek = date.getDay();
+    const dayHours = businessHours.find(h => h.day_of_week === dayOfWeek);
+    
+    // Se segue horário de funcionamento e o dia está definido
+    if (restaurant?.reservations_follow_business_hours && dayHours?.is_open && dayHours.open_time && dayHours.close_time) {
+      const openParts = dayHours.open_time.split(':');
+      const closeParts = dayHours.close_time.split(':');
+      const openHour = parseInt(openParts[0]);
+      const openMinute = parseInt(openParts[1] || '0');
+      const closeHour = parseInt(closeParts[0]);
+      const closeMinute = parseInt(closeParts[1] || '0');
+      
+      const slots: string[] = [];
+      
+      // Generate slots from open to close
+      for (let hour = openHour; hour <= closeHour; hour++) {
+        // First slot of the hour (00)
+        if (hour === openHour && openMinute > 0) {
+          // If opens at :30, only add :30
+          if (openMinute <= 30) {
+            slots.push(`${hour.toString().padStart(2, "0")}:30`);
+          }
+        } else if (hour === closeHour) {
+          // On closing hour, only add if there's time
+          if (closeMinute >= 0) {
+            slots.push(`${hour.toString().padStart(2, "0")}:00`);
+          }
+          if (closeMinute >= 30) {
+            slots.push(`${hour.toString().padStart(2, "0")}:30`);
+          }
+        } else {
+          slots.push(`${hour.toString().padStart(2, "0")}:00`);
+          slots.push(`${hour.toString().padStart(2, "0")}:30`);
+        }
+      }
+      
+      return slots;
+    }
+    
+    // Fallback: horários padrão
+    const slots: string[] = [];
     for (let hour = 11; hour <= 23; hour++) {
       slots.push(`${hour.toString().padStart(2, "0")}:00`);
       slots.push(`${hour.toString().padStart(2, "0")}:30`);
     }
     return slots;
+  };
+
+  const isDateDisabled = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const compareDate = new Date(date);
+    compareDate.setHours(0, 0, 0, 0);
+    
+    // Não pode ser no passado
+    if (compareDate < today) return true;
+    
+    // Se segue horário de funcionamento, desabilitar dias fechados
+    if (restaurant?.reservations_follow_business_hours && businessHours.length > 0) {
+      const dayOfWeek = date.getDay();
+      const dayHours = businessHours.find(h => h.day_of_week === dayOfWeek);
+      if (!dayHours?.is_open) return true;
+    }
+    
+    return false;
   };
 
   const primaryColor = restaurant?.primary_color || "#f97316";
@@ -262,8 +329,7 @@ const Reservations = () => {
               size="icon"
               className="text-white hover:bg-white/20"
               onClick={() => {
-                if (step === "login") setStep("tables");
-                else if (step === "form") setStep("login");
+                if (step === "form") setStep("tables");
                 else if (step === "success") setStep("tables");
               }}
             >
@@ -285,6 +351,17 @@ const Reservations = () => {
       </header>
 
       <main className="max-w-4xl mx-auto p-6">
+        {/* Customer Info Dialog */}
+        <CustomerInfoDialog
+          open={showCustomerDialog}
+          onClose={() => setShowCustomerDialog(false)}
+          onSubmit={handleCustomerInfoSubmit}
+          restaurantColor={primaryColor}
+          restaurantId={restaurant?.id}
+          requireName={true}
+          requirePhone={true}
+        />
+
         {/* Step: Select Table */}
         {step === "tables" && (
           <div className="space-y-6">
@@ -342,53 +419,6 @@ const Reservations = () => {
           </div>
         )}
 
-        {/* Step: Login */}
-        {step === "login" && (
-          <Card className="max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle>Seus Dados</CardTitle>
-              <CardDescription>
-                Informe seus dados para fazer a reserva
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nome Completo *</Label>
-                <Input
-                  placeholder="Seu nome"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>CPF *</Label>
-                <Input
-                  placeholder="000.000.000-00"
-                  value={customerCpf}
-                  onChange={(e) => setCustomerCpf(formatCpf(e.target.value))}
-                  maxLength={14}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Telefone (WhatsApp) *</Label>
-                <Input
-                  placeholder="(00) 00000-0000"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(formatPhone(e.target.value))}
-                  maxLength={15}
-                />
-              </div>
-              <Button
-                className="w-full"
-                style={{ backgroundColor: primaryColor }}
-                onClick={handleLogin}
-              >
-                Continuar
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Step: Reservation Form */}
         {step === "form" && selectedTable && (
           <div className="space-y-6 max-w-md mx-auto">
@@ -437,8 +467,11 @@ const Reservations = () => {
                       <Calendar
                         mode="single"
                         selected={reservationDate}
-                        onSelect={setReservationDate}
-                        disabled={(date) => date < new Date()}
+                        onSelect={(date) => {
+                          setReservationDate(date);
+                          setReservationTime(""); // Reset time when date changes
+                        }}
+                        disabled={isDateDisabled}
                         locale={ptBR}
                       />
                     </PopoverContent>
@@ -452,7 +485,7 @@ const Reservations = () => {
                       <SelectValue placeholder="Selecione o horário" />
                     </SelectTrigger>
                     <SelectContent>
-                      {generateTimeSlots().map((time) => (
+                      {generateTimeSlots(reservationDate).map((time) => (
                         <SelectItem key={time} value={time}>
                           {time}
                         </SelectItem>
