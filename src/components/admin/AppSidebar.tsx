@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Megaphone,
   Gift,
+  Smartphone,
 } from "lucide-react";
 import {
   Sidebar,
@@ -82,6 +83,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "config-horario", label: "Horário de Funcionamento", icon: Clock },
       { id: "config-regioes", label: "Regiões de Entrega", icon: MapPin },
       { id: "config-pagamentos", label: "Formas de Pagamento", icon: CreditCard },
+      { id: "config-pagamentos-online", label: "Pagamentos Online", icon: Smartphone },
       { id: "config-impressoras", label: "Impressoras", icon: Printer },
       { id: "config-whatsapp", label: "Automação WhatsApp", icon: MessageSquare },
     ],
