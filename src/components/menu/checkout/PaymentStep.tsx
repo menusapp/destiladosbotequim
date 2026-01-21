@@ -6,8 +6,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Banknote, CreditCard, Smartphone, Utensils, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { OnlinePaymentStep } from "./OnlinePaymentStep";
-import { paymentService } from "@/services/paymentService";
 
 interface PaymentMethod {
   id: string;
@@ -78,7 +76,6 @@ export const PaymentStep = ({
   customerPhone: phoneProp,
   customerEmail: emailProp,
 }: PaymentStepProps) => {
-  const [paymentType, setPaymentType] = useState<"delivery" | "online">("delivery");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [changeFor, setChangeFor] = useState("");
   const [customerName, setCustomerName] = useState(nameProp || "");
@@ -86,22 +83,13 @@ export const PaymentStep = ({
   const [customerPhone, setCustomerPhone] = useState(phoneProp || "");
   const [availableMethods, setAvailableMethods] = useState<{ value: string; label: string; icon: any; brands: string[] }[]>(DEFAULT_METHODS);
   const [loading, setLoading] = useState(true);
-  const [showOnlinePayment, setShowOnlinePayment] = useState(false);
-  
-  // Config de pagamento online
-  const [onlinePaymentConfig, setOnlinePaymentConfig] = useState<{
-    enabled: boolean;
-    acceptPix: boolean;
-    acceptCard: boolean;
-    publicKey?: string;
-  } | null>(null);
 
   const getBrandInfo = (brandCode: string) => {
     const allBrands = [...CARD_BRANDS, ...MEAL_VOUCHER_BRANDS];
     return allBrands.find(b => b.code === brandCode);
   };
 
-  // Carregar métodos de pagamento ativos do restaurante e config de pagamento online
+  // Carregar métodos de pagamento ativos do restaurante
   useEffect(() => {
     const fetchData = async () => {
       if (!restaurantId) {
@@ -109,7 +97,6 @@ export const PaymentStep = ({
         return;
       }
 
-      // Buscar métodos de pagamento presenciais
       const { data, error } = await supabase
         .from("payment_methods")
         .select("*")
@@ -126,24 +113,6 @@ export const PaymentStep = ({
           brands: m.accepted_brands || [],
         }));
         setAvailableMethods(methods);
-      }
-
-      // Buscar config de pagamento online
-      try {
-        const config = await paymentService.getConfig(restaurantId);
-        if (config && config.enabled && config.connectionStatus === "connected") {
-          // Buscar public key do backend usando método correto
-          const publicKey = await paymentService.getPublicKey(restaurantId);
-          
-          setOnlinePaymentConfig({
-            enabled: true,
-            acceptPix: config.acceptPix,
-            acceptCard: config.acceptCard,
-            publicKey: publicKey || undefined
-          });
-        }
-      } catch (err) {
-        console.log("Pagamento online não configurado");
       }
       
       setLoading(false);
@@ -227,10 +196,9 @@ export const PaymentStep = ({
       sessionStorage.setItem("customer_phone", customerPhone);
     }
 
-    // Passar o method_type para salvar no banco (cash, credit, debit, pix, meal_voucher)
     onContinue({
-      type: paymentType,
-      method: methodType, // Salvar method_type, não o nome
+      type: "delivery",
+      method: methodType,
       changeFor: methodType === "cash" ? changeFor : null,
     });
   };
@@ -282,201 +250,111 @@ export const PaymentStep = ({
       
       <h2 className="text-xl font-bold">Como você quer pagar?</h2>
 
-      {/* Payment Type Selection */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card
-          className={`cursor-pointer transition-colors ${
-            paymentType === "delivery"
-              ? "border-primary bg-primary/5"
-              : "hover:border-primary/50"
-          }`}
-          onClick={() => setPaymentType("delivery")}
-        >
-          <CardContent className="p-4">
-            <h3 className="font-medium mb-1">Pagar pessoalmente</h3>
-            <p className="text-sm text-muted-foreground">
-              Quando você receber o pedido
+      {/* Payment Methods */}
+      <div className="space-y-3">
+        {availableMethods.length === 0 ? (
+          <Card className="p-4 border-amber-500 bg-amber-500/10">
+            <p className="text-sm text-amber-700">
+              Nenhuma forma de pagamento configurada
             </p>
-          </CardContent>
-        </Card>
+          </Card>
+        ) : (
+          availableMethods.map((method) => {
+            const isSelected = paymentMethod === method.value;
+            const methodType = (method as any).methodType || method.value;
+            const hasBrands = method.brands && method.brands.length > 0;
+            const Icon = method.icon;
+            
+            return (
+              <Card
+                key={method.value}
+                className={`cursor-pointer transition-colors ${
+                  isSelected
+                    ? "border-primary bg-primary/5"
+                    : "hover:border-primary/50"
+                }`}
+                onClick={() => setPaymentMethod(method.value)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-5 h-5" />
+                      <span className="font-medium">{method.label}</span>
+                    </div>
+                    {hasBrands && (
+                      isSelected ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )
+                    )}
+                  </div>
+                  
+                  {/* Gavetinha de bandeiras */}
+                  {isSelected && hasBrands && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {method.brands.map((brandCode) => {
+                          const brand = getBrandInfo(brandCode);
+                          if (!brand) return null;
+                          return (
+                            <div 
+                              key={brandCode} 
+                              className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
+                            >
+                              <img 
+                                src={brand.logo} 
+                                alt={brand.name} 
+                                className="h-4 w-auto object-contain"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                              <span className="text-xs font-medium">{brand.name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
 
-        <Card
-          className={`cursor-pointer transition-colors ${
-            paymentType === "online"
-              ? "border-primary bg-primary/5"
-              : onlinePaymentConfig?.enabled 
-                ? "hover:border-primary/50"
-                : "opacity-50 cursor-not-allowed"
-          }`}
-          onClick={() => {
-            if (onlinePaymentConfig?.enabled) {
-              setPaymentType("online");
-            }
-          }}
-        >
-          <CardContent className="p-4">
-            <h3 className="font-medium mb-1">Pagar online</h3>
-            <p className="text-sm text-muted-foreground mb-2">
-              {onlinePaymentConfig?.enabled 
-                ? "Pague agora de forma segura" 
-                : "Em breve"}
-            </p>
-            {onlinePaymentConfig?.enabled && (
-              <div className="flex gap-1">
-                {onlinePaymentConfig.acceptPix && (
-                  <span className="text-xs px-2 py-0.5 bg-primary/10 rounded">Pix</span>
-                )}
-                {onlinePaymentConfig.acceptCard && (
-                  <span className="text-xs px-2 py-0.5 bg-primary/10 rounded">Cartão</span>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Troco para dinheiro */}
+        {paymentMethod && (() => {
+          const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
+          const methodType = (selectedMethod as any)?.methodType || selectedMethod?.value;
+          return methodType === "cash";
+        })() && (
+          <div className="mt-4">
+            <Label htmlFor="changeFor">
+              Troco para quanto? <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="changeFor"
+              type="number"
+              step="0.01"
+              value={changeFor}
+              onChange={(e) => setChangeFor(e.target.value)}
+              placeholder="Ex: 50.00"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Payment Methods for Delivery */}
-      {paymentType === "delivery" && (
-        <div className="space-y-3">
-          {availableMethods.length === 0 ? (
-            <Card className="p-4 border-amber-500 bg-amber-500/10">
-              <p className="text-sm text-amber-700">
-                Nenhuma forma de pagamento configurada
-              </p>
-            </Card>
-          ) : (
-            availableMethods.map((method) => {
-              const isSelected = paymentMethod === method.value;
-              const methodType = (method as any).methodType || method.value;
-              const hasBrands = method.brands && method.brands.length > 0;
-              const Icon = method.icon;
-              
-              return (
-                <Card
-                  key={method.value}
-                  className={`cursor-pointer transition-colors ${
-                    isSelected
-                      ? "border-primary bg-primary/5"
-                      : "hover:border-primary/50"
-                  }`}
-                  onClick={() => setPaymentMethod(method.value)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Icon className="w-5 h-5" />
-                        <span className="font-medium">{method.label}</span>
-                      </div>
-                      {hasBrands && (
-                        isSelected ? (
-                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        )
-                      )}
-                    </div>
-                    
-                    {/* Gavetinha de bandeiras */}
-                    {isSelected && hasBrands && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {method.brands.map((brandCode) => {
-                            const brand = getBrandInfo(brandCode);
-                            if (!brand) return null;
-                            return (
-                              <div 
-                                key={brandCode} 
-                                className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
-                              >
-                                <img 
-                                  src={brand.logo} 
-                                  alt={brand.name} 
-                                  className="h-4 w-auto object-contain"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                                <span className="text-xs font-medium">{brand.name}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-
-          {/* Troco para dinheiro */}
-          {paymentMethod && (() => {
-            const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
-            const methodType = (selectedMethod as any)?.methodType || selectedMethod?.value;
-            return methodType === "cash";
-          })() && (
-            <div className="mt-4">
-              <Label htmlFor="changeFor">
-                Troco para quanto? <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="changeFor"
-                type="number"
-                step="0.01"
-                value={changeFor}
-                onChange={(e) => setChangeFor(e.target.value)}
-                placeholder="Ex: 50.00"
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Online Payment */}
-      {paymentType === "online" && onlinePaymentConfig?.enabled && (
-        <OnlinePaymentStep
-          restaurantId={restaurantId!}
-          amount={orderTotal}
-          customer={{
-            name: customerName || nameProp || "",
-            email: emailProp,
-            cpf: customerCPF || cpfProp || "",
-            phone: customerPhone || phoneProp,
-          }}
-          onBack={() => setPaymentType("delivery")}
-          onPaymentComplete={(paymentId, method) => {
-            onContinue({
-              type: "online",
-              method,
-              onlinePaymentId: paymentId,
-            });
-          }}
-          primaryColor={primaryColor}
-          publicKey={onlinePaymentConfig.publicKey}
-          acceptPix={onlinePaymentConfig.acceptPix}
-          acceptCard={onlinePaymentConfig.acceptCard}
-        />
-      )}
-
-      {paymentType === "online" && !onlinePaymentConfig?.enabled && (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">
-            Pagamento online não disponível no momento
-          </p>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-2 pt-4">
-        <Button variant="outline" onClick={onBack} className="flex-1">
+      {/* Buttons */}
+      <div className="flex gap-3">
+        <Button variant="outline" className="flex-1" onClick={onBack}>
           Voltar
         </Button>
-        <Button
+        <Button 
+          className="flex-1" 
           onClick={handleContinue}
-          disabled={!paymentMethod || availableMethods.length === 0}
-          className="flex-1"
-          style={primaryColor ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
+          style={primaryColor ? { backgroundColor: primaryColor } : undefined}
         >
           Continuar
         </Button>
