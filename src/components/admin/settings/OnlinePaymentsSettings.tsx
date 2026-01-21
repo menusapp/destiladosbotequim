@@ -6,11 +6,11 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { paymentService, PaymentConfig } from "@/services/paymentService";
 import { 
   CreditCard, 
-  Wifi, 
   WifiOff, 
   Loader2,
   CheckCircle2,
@@ -18,7 +18,9 @@ import {
   QrCode,
   Smartphone,
   AlertCircle,
-  RefreshCw
+  Key,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 interface OnlinePaymentsSettingsProps {
@@ -38,6 +40,11 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
   const [acceptPix, setAcceptPix] = useState(true);
   const [acceptCard, setAcceptCard] = useState(true);
   const [enableForDelivery, setEnableForDelivery] = useState(true);
+  
+  // Conexão manual
+  const [showManualConnect, setShowManualConnect] = useState(false);
+  const [manualAccessToken, setManualAccessToken] = useState("");
+  const [savingManual, setSavingManual] = useState(false);
 
   // Buscar configuração
   const fetchConfig = useCallback(async () => {
@@ -75,17 +82,28 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
       window.history.replaceState({}, '', window.location.pathname);
       fetchConfig();
     } else if (oauthStatus === 'error') {
-      const errorMsg = urlParams.get('error') || 'Falha ao conectar';
+      const errorCode = urlParams.get('error') || 'unknown';
+      const errorMessages: Record<string, string> = {
+        'missing_params': 'Parâmetros de autenticação ausentes. Tente novamente.',
+        'config_error': 'Configuração do Mercado Pago não encontrada. Contate o suporte.',
+        'token_exchange_failed': 'Falha ao obter token do Mercado Pago. A aplicação pode não estar pronta.',
+        'database_error': 'Erro ao salvar credenciais. Tente novamente.',
+        'server_error': 'Erro interno do servidor. Tente novamente.',
+        'unknown': 'Erro desconhecido ao conectar. Tente a conexão manual.'
+      };
+      
       toast({
-        title: "Erro na conexão",
-        description: errorMsg,
+        title: "Erro na conexão OAuth",
+        description: errorMessages[errorCode] || errorMessages['unknown'],
         variant: "destructive"
       });
       window.history.replaceState({}, '', window.location.pathname);
+      // Mostrar opção manual automaticamente após erro OAuth
+      setShowManualConnect(true);
     }
   }, [fetchConfig, toast]);
 
-  // Conectar com Mercado Pago
+  // Conectar com Mercado Pago via OAuth
   const handleConnect = async () => {
     setConnecting(true);
     
@@ -100,12 +118,53 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
       }
     } catch (error) {
       console.error('Error connecting:', error);
+      const errorMessage = error instanceof Error ? error.message : "Falha ao conectar com Mercado Pago";
       toast({
         title: "Erro",
-        description: error instanceof Error ? error.message : "Falha ao conectar com Mercado Pago",
+        description: `${errorMessage}. Tente a conexão manual abaixo.`,
         variant: "destructive"
       });
       setConnecting(false);
+      setShowManualConnect(true);
+    }
+  };
+
+  // Conectar manualmente com Access Token
+  const handleManualConnect = async () => {
+    if (!manualAccessToken.trim()) {
+      toast({
+        title: "Token vazio",
+        description: "Cole o Access Token do Mercado Pago",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSavingManual(true);
+    
+    try {
+      const result = await paymentService.connectManually(restaurantId, manualAccessToken.trim());
+      
+      if (result.success) {
+        toast({
+          title: "Conectado!",
+          description: "Access Token configurado com sucesso"
+        });
+        setManualAccessToken("");
+        setShowManualConnect(false);
+        await fetchConfig();
+      } else {
+        throw new Error(result.error || 'Token inválido');
+      }
+    } catch (error) {
+      console.error('Error manual connect:', error);
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Token inválido ou expirado",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingManual(false);
     }
   };
 
@@ -269,6 +328,59 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
               )}
             </div>
           </div>
+
+          {/* Conexão Manual - Alternativa ao OAuth */}
+          {!isConnected && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setShowManualConnect(!showManualConnect)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Key className="h-4 w-4" />
+                <span>Conexão manual com Access Token</span>
+                {showManualConnect ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </button>
+              
+              {showManualConnect && (
+                <div className="p-4 rounded-lg border bg-muted/20 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Se o botão acima não funcionar, você pode conectar manualmente usando seu Access Token do Mercado Pago.
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="accessToken">Access Token</Label>
+                    <Input
+                      id="accessToken"
+                      type="password"
+                      placeholder="APP_USR-..."
+                      value={manualAccessToken}
+                      onChange={(e) => setManualAccessToken(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Encontre em: Mercado Pago → Seu negócio → Configurações → Gestão e Administração → Credenciais
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleManualConnect}
+                    disabled={savingManual || !manualAccessToken.trim()}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {savingManual ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Key className="h-4 w-4" />
+                    )}
+                    Conectar com Token
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Informação de segurança */}
           <Alert>

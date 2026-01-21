@@ -151,6 +151,31 @@ export const paymentService = {
   },
 
   /**
+   * Conectar manualmente com Access Token
+   * Alternativa ao OAuth quando a aplicação não está pronta
+   */
+  async connectManually(restaurantId: string, accessToken: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`${BASE_URL}/payment-oauth`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action: 'manual_connect', restaurantId, accessToken }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Token inválido' };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('paymentService.connectManually error:', error);
+      return { success: false, error: 'Erro de conexão' };
+    }
+  },
+
+  /**
    * Processar callback do OAuth (chamado pela Edge Function, não pelo frontend)
    */
   async handleOAuthCallback(code: string, state: string): Promise<{ success: boolean; error?: string }> {
