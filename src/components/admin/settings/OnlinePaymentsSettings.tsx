@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { paymentService, PaymentConfig } from "@/services/paymentService";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   CreditCard, 
   WifiOff, 
@@ -49,7 +50,9 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
   // Buscar configuração
   const fetchConfig = useCallback(async () => {
     try {
+      console.log("fetchConfig - restaurantId:", restaurantId);
       const data = await paymentService.getConfig(restaurantId);
+      console.log("fetchConfig - data received:", data);
       
       if (data) {
         setConfig(data);
@@ -200,11 +203,14 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
     }
   };
 
-  // Salvar configurações
+  // Salvar configurações - tenta via Edge Function, fallback para Supabase direto
   const handleSave = async () => {
     setSaving(true);
     
     try {
+      console.log("handleSave - Tentando salvar:", { enabled, requirePrepayment, acceptPix, acceptCard, enableForDelivery });
+      
+      // Primeiro tenta via Edge Function
       const success = await paymentService.updateConfig(restaurantId, {
         enabled,
         requirePrepayment,
@@ -213,6 +219,8 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
         enableForDelivery
       });
       
+      console.log("handleSave - Edge Function result:", success);
+      
       if (success) {
         toast({
           title: "Salvo",
@@ -220,7 +228,32 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
         });
         await fetchConfig();
       } else {
-        throw new Error('Falha ao salvar');
+        // Fallback: salvar diretamente via Supabase SDK
+        console.log("handleSave - Tentando fallback via Supabase SDK");
+        
+        const { error } = await supabase
+          .from('online_payment_config')
+          .upsert({
+            restaurant_id: restaurantId,
+            enabled,
+            require_prepayment: requirePrepayment,
+            accept_pix: acceptPix,
+            accept_card: acceptCard,
+            enable_for_delivery: enableForDelivery,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'restaurant_id' });
+        
+        if (error) {
+          console.error("handleSave - Supabase error:", error);
+          throw error;
+        }
+        
+        console.log("handleSave - Fallback success");
+        toast({
+          title: "Salvo",
+          description: "Configurações salvas com sucesso"
+        });
+        await fetchConfig();
       }
     } catch (error) {
       console.error('Error saving:', error);

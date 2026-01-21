@@ -132,13 +132,26 @@ export const paymentService = {
    */
   async updateConfig(restaurantId: string, config: Partial<PaymentConfig>): Promise<boolean> {
     try {
+      console.log("updateConfig - Enviando para:", `${BASE_URL}/payment-config`);
+      console.log("updateConfig - Body:", JSON.stringify({ restaurantId, ...config }));
+      
       const res = await fetch(`${BASE_URL}/payment-config`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ restaurantId, ...config }),
       });
       
-      return res.ok;
+      console.log("updateConfig - Status:", res.status);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("updateConfig - Error response:", errorText);
+        return false;
+      }
+      
+      const data = await res.json();
+      console.log("updateConfig - Response:", data);
+      return true;
     } catch (error) {
       console.error('paymentService.updateConfig error:', error);
       return false;
