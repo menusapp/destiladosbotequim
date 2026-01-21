@@ -164,10 +164,18 @@ Deno.serve(async (req) => {
           .update({ status: "rejected" })
           .eq("id", payment.id);
 
+        // Traduzir erro do Mercado Pago
+        let errorMessage = "Erro ao criar pagamento";
+        if (mpData.cause?.[0]?.code === "2067" || mpData.message?.includes("Invalid user identification number")) {
+          errorMessage = "CPF inválido. Verifique o número informado.";
+        } else if (mpData.message) {
+          errorMessage = mpData.message;
+        }
+
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: mpData.message || "Erro ao criar pagamento no Mercado Pago" 
+            error: errorMessage 
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -244,10 +252,32 @@ Deno.serve(async (req) => {
             .update({ status: "rejected" })
             .eq("id", payment.id);
 
+          // Traduzir erros comuns de cartão
+          let errorMessage = "Erro ao processar cartão";
+          const causeCode = mpData.cause?.[0]?.code;
+          
+          if (causeCode === "cc_rejected_bad_filled_card_number") {
+            errorMessage = "Número do cartão inválido";
+          } else if (causeCode === "cc_rejected_bad_filled_date") {
+            errorMessage = "Data de validade inválida";
+          } else if (causeCode === "cc_rejected_bad_filled_security_code") {
+            errorMessage = "Código de segurança inválido";
+          } else if (causeCode === "cc_rejected_insufficient_amount") {
+            errorMessage = "Saldo insuficiente";
+          } else if (causeCode === "cc_rejected_call_for_authorize") {
+            errorMessage = "Cartão recusado. Entre em contato com o banco.";
+          } else if (mpData.cause?.[0]?.code === "2067" || mpData.message?.includes("Invalid user identification number")) {
+            errorMessage = "CPF inválido. Verifique o número informado.";
+          } else if (mpData.message) {
+            errorMessage = mpData.message;
+          } else if (mpData.cause?.[0]?.description) {
+            errorMessage = mpData.cause[0].description;
+          }
+
           return new Response(
             JSON.stringify({ 
               success: false, 
-              error: mpData.message || mpData.cause?.[0]?.description || "Erro ao processar cartão" 
+              error: errorMessage 
             }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );

@@ -47,6 +47,13 @@ export const OnlinePaymentStep = ({
   } | null>(null);
 
   const handleSelectPix = async () => {
+    // Validar CPF antes de criar pagamento
+    const cleanCPF = customer.cpf.replace(/\D/g, "");
+    if (!cleanCPF || cleanCPF.length !== 11) {
+      toast.error("CPF inválido. Informe um CPF com 11 dígitos.");
+      return;
+    }
+
     setLoading(true);
     try {
       const request: CreatePaymentRequest = {
@@ -54,7 +61,10 @@ export const OnlinePaymentStep = ({
         amount,
         description: "Pedido Delivery",
         paymentMethod: "pix",
-        customer,
+        customer: {
+          ...customer,
+          cpf: cleanCPF, // Enviar apenas números
+        },
       };
 
       const result = await paymentService.createPayment(request);
@@ -84,6 +94,13 @@ export const OnlinePaymentStep = ({
     paymentMethodId: string;
     installments: number;
   }) => {
+    // Validar CPF
+    const cleanCPF = customer.cpf.replace(/\D/g, "");
+    if (!cleanCPF || cleanCPF.length !== 11) {
+      toast.error("CPF inválido. Informe um CPF com 11 dígitos.");
+      return;
+    }
+
     setLoading(true);
     try {
       const request: CreatePaymentRequest = {
@@ -91,7 +108,10 @@ export const OnlinePaymentStep = ({
         amount,
         description: "Pedido Delivery",
         paymentMethod: "credit_card",
-        customer,
+        customer: {
+          ...customer,
+          cpf: cleanCPF,
+        },
         cardToken: data.cardToken,
         installments: data.installments,
         paymentMethodId: data.paymentMethodId,
