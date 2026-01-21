@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Banknote, CreditCard, Smartphone, Utensils, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { OnlinePaymentStep } from "./OnlinePaymentStep";
+import { paymentService } from "@/services/paymentService";
 
 interface PaymentMethod {
   id: string;
@@ -23,6 +24,10 @@ interface PaymentStepProps {
   orderTotal?: number;
   restaurantId?: string;
   primaryColor?: string;
+  customerCPF?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
 }
 
 const METHOD_ICONS: Record<string, any> = {
@@ -67,30 +72,44 @@ export const PaymentStep = ({
   requireCustomerInfo, 
   orderTotal = 0,
   restaurantId,
-  primaryColor
+  primaryColor,
+  customerCPF: cpfProp,
+  customerName: nameProp,
+  customerPhone: phoneProp,
+  customerEmail: emailProp,
 }: PaymentStepProps) => {
   const [paymentType, setPaymentType] = useState<"delivery" | "online">("delivery");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [changeFor, setChangeFor] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerCPF, setCustomerCPF] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerName, setCustomerName] = useState(nameProp || "");
+  const [customerCPF, setCustomerCPF] = useState(cpfProp || "");
+  const [customerPhone, setCustomerPhone] = useState(phoneProp || "");
   const [availableMethods, setAvailableMethods] = useState<{ value: string; label: string; icon: any; brands: string[] }[]>(DEFAULT_METHODS);
   const [loading, setLoading] = useState(true);
+  const [showOnlinePayment, setShowOnlinePayment] = useState(false);
+  
+  // Config de pagamento online
+  const [onlinePaymentConfig, setOnlinePaymentConfig] = useState<{
+    enabled: boolean;
+    acceptPix: boolean;
+    acceptCard: boolean;
+    publicKey?: string;
+  } | null>(null);
 
   const getBrandInfo = (brandCode: string) => {
     const allBrands = [...CARD_BRANDS, ...MEAL_VOUCHER_BRANDS];
     return allBrands.find(b => b.code === brandCode);
   };
 
-  // Carregar métodos de pagamento ativos do restaurante
+  // Carregar métodos de pagamento ativos do restaurante e config de pagamento online
   useEffect(() => {
-    const fetchPaymentMethods = async () => {
+    const fetchData = async () => {
       if (!restaurantId) {
         setLoading(false);
         return;
       }
 
+      // Buscar métodos de pagamento presenciais
       const { data, error } = await supabase
         .from("payment_methods")
         .select("*")
@@ -98,23 +117,42 @@ export const PaymentStep = ({
         .eq("is_active", true);
 
       if (!error && data && data.length > 0) {
-        // Usar métodos configurados pelo admin
         const methods = data.map((m: PaymentMethod) => ({
           value: m.id,
           methodType: m.method_type,
           label: m.name,
-          methodName: m.name, // Guardar o nome para salvar no banco
+          methodName: m.name,
           icon: METHOD_ICONS[m.method_type] || CreditCard,
           brands: m.accepted_brands || [],
         }));
         setAvailableMethods(methods);
       }
-      // Se não há métodos configurados, usa os padrões
+
+      // Buscar config de pagamento online
+      try {
+        const config = await paymentService.getConfig(restaurantId);
+        if (config && config.enabled && config.connectionStatus === "connected") {
+          // Buscar public key do backend
+          const { data: pubKeyData } = await supabase.functions.invoke("payment-config", {
+            method: "GET",
+            body: { restaurantId, getPublicKey: true }
+          });
+          
+          setOnlinePaymentConfig({
+            enabled: true,
+            acceptPix: config.acceptPix,
+            acceptCard: config.acceptCard,
+            publicKey: pubKeyData?.publicKey
+          });
+        }
+      } catch (err) {
+        console.log("Pagamento online não configurado");
+      }
       
       setLoading(false);
     };
 
-    fetchPaymentMethods();
+    fetchData();
   }, [restaurantId]);
 
   useEffect(() => {
@@ -269,16 +307,33 @@ export const PaymentStep = ({
           className={`cursor-pointer transition-colors ${
             paymentType === "online"
               ? "border-primary bg-primary/5"
-              : "hover:border-primary/50"
+              : onlinePaymentConfig?.enabled 
+                ? "hover:border-primary/50"
+                : "opacity-50 cursor-not-allowed"
           }`}
-          onClick={() => setPaymentType("online")}
+          onClick={() => {
+            if (onlinePaymentConfig?.enabled) {
+              setPaymentType("online");
+            }
+          }}
         >
           <CardContent className="p-4">
             <h3 className="font-medium mb-1">Pagar online</h3>
             <p className="text-sm text-muted-foreground mb-2">
-              Pague agora de forma segura
+              {onlinePaymentConfig?.enabled 
+                ? "Pague agora de forma segura" 
+                : "Em breve"}
             </p>
-            <Badge variant="secondary">Em breve</Badge>
+            {onlinePaymentConfig?.enabled && (
+              <div className="flex gap-1">
+                {onlinePaymentConfig.acceptPix && (
+                  <span className="text-xs px-2 py-0.5 bg-primary/10 rounded">Pix</span>
+                )}
+                {onlinePaymentConfig.acceptCard && (
+                  <span className="text-xs px-2 py-0.5 bg-primary/10 rounded">Cartão</span>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -381,11 +436,36 @@ export const PaymentStep = ({
         </div>
       )}
 
-      {/* Online Payment (Coming Soon) */}
-      {paymentType === "online" && (
+      {/* Online Payment */}
+      {paymentType === "online" && onlinePaymentConfig?.enabled && (
+        <OnlinePaymentStep
+          restaurantId={restaurantId!}
+          amount={orderTotal}
+          customer={{
+            name: customerName || nameProp || "",
+            email: emailProp,
+            cpf: customerCPF || cpfProp || "",
+            phone: customerPhone || phoneProp,
+          }}
+          onBack={() => setPaymentType("delivery")}
+          onPaymentComplete={(paymentId, method) => {
+            onContinue({
+              type: "online",
+              method,
+              onlinePaymentId: paymentId,
+            });
+          }}
+          primaryColor={primaryColor}
+          publicKey={onlinePaymentConfig.publicKey}
+          acceptPix={onlinePaymentConfig.acceptPix}
+          acceptCard={onlinePaymentConfig.acceptCard}
+        />
+      )}
+
+      {paymentType === "online" && !onlinePaymentConfig?.enabled && (
         <div className="text-center py-8">
           <p className="text-muted-foreground">
-            Em breve você poderá pagar online com cartão de crédito ou PIX
+            Pagamento online não disponível no momento
           </p>
         </div>
       )}

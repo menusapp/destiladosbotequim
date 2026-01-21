@@ -21,6 +21,7 @@ Deno.serve(async (req) => {
     if (req.method === "GET") {
       // GET - Retorna configuração do restaurante
       const restaurantId = url.searchParams.get("restaurantId");
+      const getPublicKey = url.searchParams.get("getPublicKey");
       
       if (!restaurantId) {
         return new Response(
@@ -51,6 +52,21 @@ Deno.serve(async (req) => {
             acceptPix: true,
             acceptCard: true,
             enableForDelivery: true
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Se solicitou public key para o SDK do frontend
+      if (getPublicKey === "true") {
+        const publicKey = Deno.env.get("MERCADOPAGO_PUBLIC_KEY");
+        return new Response(
+          JSON.stringify({
+            publicKey: publicKey || null,
+            enabled: data.enabled,
+            connectionStatus: data.connection_status,
+            acceptPix: data.accept_pix,
+            acceptCard: data.accept_card,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
