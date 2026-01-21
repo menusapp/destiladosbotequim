@@ -8,6 +8,8 @@ const corsHeaders = {
 const MP_API_URL = "https://api.mercadopago.com";
 
 Deno.serve(async (req) => {
+  console.log("payment-create called:", req.method);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -25,6 +27,8 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
+    console.log("payment-create body:", JSON.stringify(body));
+    
     const { 
       restaurantId, 
       orderId, 
@@ -41,8 +45,30 @@ Deno.serve(async (req) => {
 
     // Validações
     if (!restaurantId || !amount || !paymentMethod || !customer?.name || !customer?.cpf) {
+      console.error("Validation failed - missing fields");
       return new Response(
         JSON.stringify({ error: "Dados obrigatórios não fornecidos" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validar e limpar CPF
+    const cleanCPF = customer.cpf.replace(/\D/g, "");
+    console.log("CPF original:", customer.cpf, "CPF limpo:", cleanCPF);
+    
+    if (cleanCPF.length !== 11) {
+      console.error("CPF inválido - não tem 11 dígitos:", cleanCPF);
+      return new Response(
+        JSON.stringify({ error: "CPF inválido. Deve conter 11 dígitos." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Validar se não é CPF com todos dígitos iguais
+    if (/^(\d)\1{10}$/.test(cleanCPF)) {
+      console.error("CPF inválido - todos dígitos iguais:", cleanCPF);
+      return new Response(
+        JSON.stringify({ error: "CPF inválido. Número não pode ter todos dígitos iguais." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -121,23 +147,25 @@ Deno.serve(async (req) => {
       throw paymentError;
     }
 
-    // Preparar dados para API do Mercado Pago
+    // Preparar dados para API do Mercado Pago (usar CPF limpo)
     const mpPayload: any = {
       transaction_amount: parseFloat(amount.toFixed(2)),
       description: paymentDescription,
       payment_method_id: paymentMethod === "pix" ? "pix" : undefined,
       payer: {
-        email: customer.email || `${customer.cpf}@temp.com`,
+        email: customer.email || `cliente${cleanCPF.slice(0, 5)}@email.com`,
         first_name: customer.name.split(" ")[0],
-        last_name: customer.name.split(" ").slice(1).join(" ") || customer.name,
+        last_name: customer.name.split(" ").slice(1).join(" ") || customer.name.split(" ")[0],
         identification: {
           type: "CPF",
-          number: customer.cpf.replace(/\D/g, "")
+          number: cleanCPF
         }
       },
       external_reference: payment.id,
       notification_url: `${supabaseUrl}/functions/v1/payment-webhook`
     };
+    
+    console.log("MP payload payer:", JSON.stringify(mpPayload.payer));
 
     let result: any;
 
