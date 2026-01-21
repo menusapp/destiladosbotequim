@@ -6,6 +6,8 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  console.log("payment-config called:", req.method, req.url);
+  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -19,6 +21,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
 
     if (req.method === "GET") {
+      console.log("GET - restaurantId:", url.searchParams.get("restaurantId"));
       // GET - Retorna configuração do restaurante
       const restaurantId = url.searchParams.get("restaurantId");
       const getPublicKey = url.searchParams.get("getPublicKey");
@@ -90,6 +93,7 @@ Deno.serve(async (req) => {
     } else if (req.method === "PUT") {
       // PUT - Atualiza configuração
       const body = await req.json();
+      console.log("PUT - body received:", JSON.stringify(body));
       const { restaurantId, enabled, requirePrepayment, acceptPix, acceptCard, enableForDelivery } = body;
 
       if (!restaurantId) {
