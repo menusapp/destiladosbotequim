@@ -132,17 +132,14 @@ export const PaymentStep = ({
       try {
         const config = await paymentService.getConfig(restaurantId);
         if (config && config.enabled && config.connectionStatus === "connected") {
-          // Buscar public key do backend
-          const { data: pubKeyData } = await supabase.functions.invoke("payment-config", {
-            method: "GET",
-            body: { restaurantId, getPublicKey: true }
-          });
+          // Buscar public key do backend usando método correto
+          const publicKey = await paymentService.getPublicKey(restaurantId);
           
           setOnlinePaymentConfig({
             enabled: true,
             acceptPix: config.acceptPix,
             acceptCard: config.acceptCard,
-            publicKey: pubKeyData?.publicKey
+            publicKey: publicKey || undefined
           });
         }
       } catch (err) {

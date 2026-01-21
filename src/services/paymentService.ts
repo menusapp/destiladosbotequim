@@ -108,6 +108,26 @@ export const paymentService = {
   },
 
   /**
+   * Buscar public key do Mercado Pago (para SDK frontend)
+   */
+  async getPublicKey(restaurantId: string): Promise<string | null> {
+    try {
+      const res = await fetch(`${BASE_URL}/payment-config?restaurantId=${restaurantId}&getPublicKey=true`, {
+        method: 'GET',
+        headers: getHeaders(),
+      });
+      
+      if (!res.ok) return null;
+      
+      const data = await res.json();
+      return data.publicKey || null;
+    } catch (error) {
+      console.error('paymentService.getPublicKey error:', error);
+      return null;
+    }
+  },
+
+  /**
    * Atualizar configuração de pagamento online
    */
   async updateConfig(restaurantId: string, config: Partial<PaymentConfig>): Promise<boolean> {
