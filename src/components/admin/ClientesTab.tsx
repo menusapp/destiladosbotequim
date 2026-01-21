@@ -65,7 +65,7 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
   const [newEmail, setNewEmail] = useState("");
   const [newNotes, setNewNotes] = useState("");
 
-  // Fetch customers with order stats
+  // Fetch customers with order stats (including comandas/bills + delivery orders)
   const { data: customers, isLoading, refetch } = useQuery({
     queryKey: ["customers", restaurantId],
     queryFn: async () => {
@@ -78,9 +78,10 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
 
       if (error) throw error;
 
-      // Fetch order stats for each customer
+      // Fetch order stats for each customer (delivery orders + comandas/bills)
       const customersWithStats = await Promise.all(
         (customersData || []).map(async (customer) => {
+          // 1. Fetch delivery orders stats
           const { data: ordersData } = await supabase
             .from("orders")
             .select(`
@@ -90,18 +91,40 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
             .eq("restaurant_id", restaurantId)
             .eq("customer_cpf", customer.cpf);
 
-          const totalOrders = ordersData?.length || 0;
-          const totalSpent = ordersData?.reduce((sum, order) => {
+          const deliveryOrdersCount = ordersData?.length || 0;
+          const deliverySpent = ordersData?.reduce((sum, order) => {
             return sum + (order.order_items?.reduce((itemSum: number, item: any) => {
               const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
               return itemSum + (item.price_at_order + extrasTotal) * item.quantity;
             }, 0) || 0);
           }, 0) || 0;
 
+          // 2. Fetch comandas/bills stats (local orders at tables)
+          const { data: comandasData } = await supabase
+            .from("comandas")
+            .select(`
+              id,
+              bills(total_amount, status)
+            `)
+            .eq("restaurant_id", restaurantId)
+            .eq("customer_cpf", customer.cpf);
+
+          const comandasCount = comandasData?.length || 0;
+          const comandasSpent = comandasData?.reduce((sum, comanda) => {
+            // Only count paid bills
+            const billTotal = comanda.bills?.reduce((billSum: number, bill: any) => {
+              if (bill.status === 'paid') {
+                return billSum + (bill.total_amount || 0);
+              }
+              return billSum;
+            }, 0) || 0;
+            return sum + billTotal;
+          }, 0) || 0;
+
           return {
             ...customer,
-            total_orders: totalOrders,
-            total_spent: totalSpent,
+            total_orders: deliveryOrdersCount + comandasCount,
+            total_spent: deliverySpent + comandasSpent,
           };
         })
       );
