@@ -61,6 +61,10 @@ export interface CreatePaymentRequest {
     phone?: string;
   };
   callbackUrl?: string;
+  // Campos para Checkout Transparente com cartão
+  cardToken?: string;
+  installments?: number;
+  paymentMethodId?: string; // visa, master, elo, etc
 }
 
 export interface PaymentResult {

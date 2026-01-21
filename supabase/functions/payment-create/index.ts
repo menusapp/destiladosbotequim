@@ -32,7 +32,11 @@ Deno.serve(async (req) => {
       description, 
       paymentMethod, 
       customer,
-      callbackUrl 
+      callbackUrl,
+      // Campos para Checkout Transparente
+      cardToken,
+      installments,
+      paymentMethodId
     } = body;
 
     // Validações
@@ -194,71 +198,147 @@ Deno.serve(async (req) => {
       };
 
     } else {
-      // Para cartão, criar preferência (checkout Pro)
-      const preferencePayload = {
-        items: [{
-          title: paymentDescription,
-          quantity: 1,
-          unit_price: parseFloat(amount.toFixed(2)),
-          currency_id: "BRL"
-        }],
-        payer: mpPayload.payer,
-        external_reference: payment.id,
-        notification_url: `${supabaseUrl}/functions/v1/payment-webhook`,
-        back_urls: {
-          success: callbackUrl || `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/delivery?payment=success`,
-          failure: callbackUrl || `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/delivery?payment=failure`,
-          pending: callbackUrl || `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/delivery?payment=pending`
-        },
-        auto_return: "approved",
-        payment_methods: {
-          excluded_payment_types: [{ id: "ticket" }, { id: "atm" }],
-          installments: 12
-        }
-      };
-
-      const mpResponse = await fetch(`${MP_API_URL}/checkout/preferences`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${config.mp_access_token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(preferencePayload)
-      });
-
-      const mpData = await mpResponse.json();
-
-      if (!mpResponse.ok) {
-        console.error("MP preference error:", mpData);
+      // Para cartão de crédito
+      // Verificar se temos cardToken (Checkout Transparente) ou se devemos usar Checkout Pro
+      
+      if (cardToken) {
+        // CHECKOUT TRANSPARENTE - Pagamento direto com token
+        // Usar token de teste se disponível, senão usar OAuth token
+        const testAccessToken = Deno.env.get("MERCADOPAGO_TEST_ACCESS_TOKEN");
+        const accessToken = testAccessToken || config.mp_access_token;
         
+        const cardPayload = {
+          transaction_amount: parseFloat(amount.toFixed(2)),
+          token: cardToken,
+          description: paymentDescription,
+          installments: installments || 1,
+          payment_method_id: paymentMethodId || "visa",
+          payer: {
+            email: customer.email || `${customer.cpf}@temp.com`,
+            identification: {
+              type: "CPF",
+              number: customer.cpf.replace(/\D/g, "")
+            }
+          },
+          external_reference: payment.id,
+          notification_url: `${supabaseUrl}/functions/v1/payment-webhook`
+        };
+
+        const mpResponse = await fetch(`${MP_API_URL}/v1/payments`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            "X-Idempotency-Key": `card-${payment.id}`
+          },
+          body: JSON.stringify(cardPayload)
+        });
+
+        const mpData = await mpResponse.json();
+
+        if (!mpResponse.ok) {
+          console.error("MP card payment error:", mpData);
+          
+          await supabase
+            .from("online_payments")
+            .update({ status: "rejected" })
+            .eq("id", payment.id);
+
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: mpData.message || mpData.cause?.[0]?.description || "Erro ao processar cartão" 
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Atualizar com dados do pagamento
+        const paymentStatus = mpData.status === "approved" ? "approved" 
+          : mpData.status === "rejected" ? "rejected" 
+          : "pending";
+
         await supabase
           .from("online_payments")
-          .update({ status: "rejected" })
+          .update({
+            provider_payment_id: mpData.id?.toString(),
+            status: paymentStatus
+          })
           .eq("id", payment.id);
 
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: mpData.message || "Erro ao criar checkout" 
-          }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        result = {
+          success: true,
+          paymentId: payment.id,
+          status: paymentStatus
+        };
+
+      } else {
+        // CHECKOUT PRO - Redirecionar para página do Mercado Pago (fallback)
+        const preferencePayload = {
+          items: [{
+            title: paymentDescription,
+            quantity: 1,
+            unit_price: parseFloat(amount.toFixed(2)),
+            currency_id: "BRL"
+          }],
+          payer: mpPayload.payer,
+          external_reference: payment.id,
+          notification_url: `${supabaseUrl}/functions/v1/payment-webhook`,
+          back_urls: {
+            success: callbackUrl || `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/delivery?payment=success`,
+            failure: callbackUrl || `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/delivery?payment=failure`,
+            pending: callbackUrl || `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/delivery?payment=pending`
+          },
+          auto_return: "approved",
+          payment_methods: {
+            excluded_payment_types: [{ id: "ticket" }, { id: "atm" }],
+            installments: 12
+          }
+        };
+
+        const mpResponse = await fetch(`${MP_API_URL}/checkout/preferences`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${config.mp_access_token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(preferencePayload)
+        });
+
+        const mpData = await mpResponse.json();
+
+        if (!mpResponse.ok) {
+          console.error("MP preference error:", mpData);
+          
+          await supabase
+            .from("online_payments")
+            .update({ status: "rejected" })
+            .eq("id", payment.id);
+
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: mpData.message || "Erro ao criar checkout" 
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Atualizar com ID da preferência
+        await supabase
+          .from("online_payments")
+          .update({
+            provider_preference_id: mpData.id
+          })
+          .eq("id", payment.id);
+
+        result = {
+          success: true,
+          paymentId: payment.id,
+          status: "pending",
+          checkoutUrl: mpData.init_point
+        };
       }
-
-      // Atualizar com ID da preferência
-      await supabase
-        .from("online_payments")
-        .update({
-          provider_preference_id: mpData.id
-        })
-        .eq("id", payment.id);
-
-      result = {
-        success: true,
-        paymentId: payment.id,
-        status: "pending",
-        checkoutUrl: mpData.init_point
-      };
     }
 
     // Vincular pagamento ao pedido se existir
