@@ -144,6 +144,66 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
 
+      } else if (action === "manual_connect") {
+        // Conexão manual com Access Token (alternativa ao OAuth)
+        const { accessToken } = body;
+        
+        if (!accessToken) {
+          return new Response(
+            JSON.stringify({ error: "Access Token é obrigatório" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Validar o token fazendo uma chamada à API do Mercado Pago
+        try {
+          const validateResponse = await fetch("https://api.mercadopago.com/users/me", {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+
+          if (!validateResponse.ok) {
+            return new Response(
+              JSON.stringify({ error: "Access Token inválido ou expirado" }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const userData = await validateResponse.json();
+
+          // Salvar token no banco
+          const { error: dbError } = await supabase
+            .from("online_payment_config")
+            .upsert({
+              restaurant_id: restaurantId,
+              provider: "mercadopago",
+              mp_access_token: accessToken,
+              mp_user_id: userData.id?.toString(),
+              connection_status: "connected",
+              connected_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, { onConflict: "restaurant_id" });
+
+          if (dbError) {
+            console.error("Database error:", dbError);
+            return new Response(
+              JSON.stringify({ error: "Erro ao salvar configuração" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({ success: true, userId: userData.id }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+
+        } catch (err) {
+          console.error("Token validation error:", err);
+          return new Response(
+            JSON.stringify({ error: "Erro ao validar token" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
       } else if (action === "disconnect") {
         // Remover conexão
         const { error } = await supabase
