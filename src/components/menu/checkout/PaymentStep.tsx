@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Banknote, CreditCard, Smartphone, Utensils, ChevronDown, ChevronUp } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Banknote, CreditCard, Smartphone, Utensils, ChevronDown, ChevronUp, QrCode, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -13,6 +14,14 @@ interface PaymentMethod {
   name: string;
   is_active: boolean;
   accepted_brands: string[];
+}
+
+interface OnlinePaymentConfig {
+  enabled: boolean;
+  accept_pix: boolean;
+  accept_card: boolean;
+  enable_for_delivery: boolean;
+  connection_status: string;
 }
 
 interface PaymentStepProps {
@@ -83,13 +92,14 @@ export const PaymentStep = ({
   const [customerPhone, setCustomerPhone] = useState(phoneProp || "");
   const [availableMethods, setAvailableMethods] = useState<{ value: string; label: string; icon: any; brands: string[] }[]>(DEFAULT_METHODS);
   const [loading, setLoading] = useState(true);
+  const [onlineConfig, setOnlineConfig] = useState<OnlinePaymentConfig | null>(null);
 
   const getBrandInfo = (brandCode: string) => {
     const allBrands = [...CARD_BRANDS, ...MEAL_VOUCHER_BRANDS];
     return allBrands.find(b => b.code === brandCode);
   };
 
-  // Carregar métodos de pagamento ativos do restaurante
+  // Carregar métodos de pagamento ativos do restaurante + online config
   useEffect(() => {
     const fetchData = async () => {
       if (!restaurantId) {
@@ -97,14 +107,22 @@ export const PaymentStep = ({
         return;
       }
 
-      const { data, error } = await supabase
-        .from("payment_methods")
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .eq("is_active", true);
+      // Fetch local payment methods and online config in parallel
+      const [methodsResult, onlineResult] = await Promise.all([
+        supabase
+          .from("payment_methods")
+          .select("*")
+          .eq("restaurant_id", restaurantId)
+          .eq("is_active", true),
+        supabase
+          .from("online_payment_config")
+          .select("enabled, accept_pix, accept_card, enable_for_delivery, connection_status")
+          .eq("restaurant_id", restaurantId)
+          .maybeSingle(),
+      ]);
 
-      if (!error && data && data.length > 0) {
-        const methods = data.map((m: PaymentMethod) => ({
+      if (!methodsResult.error && methodsResult.data && methodsResult.data.length > 0) {
+        const methods = methodsResult.data.map((m: PaymentMethod) => ({
           value: m.id,
           methodType: m.method_type,
           label: m.name,
@@ -113,6 +131,11 @@ export const PaymentStep = ({
           brands: m.accepted_brands || [],
         }));
         setAvailableMethods(methods);
+      }
+
+      // Set online config if available and active
+      if (!onlineResult.error && onlineResult.data && onlineResult.data.enable_for_delivery && onlineResult.data.connection_status === "connected") {
+        setOnlineConfig(onlineResult.data as OnlinePaymentConfig);
       }
       
       setLoading(false);
@@ -165,6 +188,27 @@ export const PaymentStep = ({
       return;
     }
 
+    // Check if online method selected
+    if (paymentMethod === "pix_online" || paymentMethod === "credit_card_online") {
+      if (requireCustomerInfo) {
+        if (!customerName || !customerCPF || !customerPhone) {
+          toast.error("Preencha todos os dados");
+          return;
+        }
+        sessionStorage.setItem("customer_name", customerName);
+        sessionStorage.setItem("customer_cpf", customerCPF);
+        sessionStorage.setItem("customer_phone", customerPhone);
+      }
+
+      onContinue({
+        type: "delivery",
+        method: paymentMethod,
+        isOnlinePayment: true,
+        onlineMethod: paymentMethod === "pix_online" ? "pix" : "credit_card",
+      });
+      return;
+    }
+
     const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
     const methodType = (selectedMethod as any)?.methodType || selectedMethod?.value;
 
@@ -211,6 +255,9 @@ export const PaymentStep = ({
     );
   }
 
+  const isOnlineMethod = paymentMethod === "pix_online" || paymentMethod === "credit_card_online";
+  const showOnlineSection = onlineConfig && (onlineConfig.accept_pix || onlineConfig.accept_card);
+
   return (
     <div className="p-4 space-y-6">
       {requireCustomerInfo && (
@@ -250,78 +297,89 @@ export const PaymentStep = ({
       
       <h2 className="text-xl font-bold">Como você quer pagar?</h2>
 
-      {/* Payment Methods */}
+      {/* Local Payment Methods */}
       <div className="space-y-3">
-        {availableMethods.length === 0 ? (
+        {availableMethods.length === 0 && !showOnlineSection ? (
           <Card className="p-4 border-amber-500 bg-amber-500/10">
             <p className="text-sm text-amber-700">
               Nenhuma forma de pagamento configurada
             </p>
           </Card>
         ) : (
-          availableMethods.map((method) => {
-            const isSelected = paymentMethod === method.value;
-            const methodType = (method as any).methodType || method.value;
-            const hasBrands = method.brands && method.brands.length > 0;
-            const Icon = method.icon;
-            
-            return (
-              <Card
-                key={method.value}
-                className={`cursor-pointer transition-colors ${
-                  isSelected
-                    ? "border-primary bg-primary/5"
-                    : "hover:border-primary/50"
-                }`}
-                onClick={() => setPaymentMethod(method.value)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-5 h-5" />
-                      <span className="font-medium">{method.label}</span>
-                    </div>
-                    {hasBrands && (
-                      isSelected ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )
-                    )}
-                  </div>
+          <>
+            {availableMethods.length > 0 && (
+              <>
+                {showOnlineSection && (
+                  <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    Na entrega / retirada
+                  </p>
+                )}
+                {availableMethods.map((method) => {
+                  const isSelected = paymentMethod === method.value;
+                  const methodType = (method as any).methodType || method.value;
+                  const hasBrands = method.brands && method.brands.length > 0;
+                  const Icon = method.icon;
                   
-                  {/* Gavetinha de bandeiras */}
-                  {isSelected && hasBrands && (
-                    <div className="mt-3 pt-3 border-t">
-                      <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {method.brands.map((brandCode) => {
-                          const brand = getBrandInfo(brandCode);
-                          if (!brand) return null;
-                          return (
-                            <div 
-                              key={brandCode} 
-                              className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
-                            >
-                              <img 
-                                src={brand.logo} 
-                                alt={brand.name} 
-                                className="h-4 w-auto object-contain"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                              />
-                              <span className="text-xs font-medium">{brand.name}</span>
+                  return (
+                    <Card
+                      key={method.value}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected
+                          ? "border-primary bg-primary/5"
+                          : "hover:border-primary/50"
+                      }`}
+                      onClick={() => setPaymentMethod(method.value)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Icon className="w-5 h-5" />
+                            <span className="font-medium">{method.label}</span>
+                          </div>
+                          {hasBrands && (
+                            isSelected ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )
+                          )}
+                        </div>
+                        
+                        {/* Gavetinha de bandeiras */}
+                        {isSelected && hasBrands && (
+                          <div className="mt-3 pt-3 border-t">
+                            <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {method.brands.map((brandCode) => {
+                                const brand = getBrandInfo(brandCode);
+                                if (!brand) return null;
+                                return (
+                                  <div 
+                                    key={brandCode} 
+                                    className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
+                                  >
+                                    <img 
+                                      src={brand.logo} 
+                                      alt={brand.name} 
+                                      className="h-4 w-auto object-contain"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                    <span className="text-xs font-medium">{brand.name}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </>
+            )}
+          </>
         )}
 
         {/* Troco para dinheiro */}
@@ -343,6 +401,62 @@ export const PaymentStep = ({
               placeholder="Ex: 50.00"
             />
           </div>
+        )}
+
+        {/* Online Payment Methods */}
+        {showOnlineSection && (
+          <>
+            <div className="flex items-center gap-3 pt-2">
+              <Separator className="flex-1" />
+              <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                <Globe className="w-3 h-3" />
+                Pagamento Online
+              </span>
+              <Separator className="flex-1" />
+            </div>
+
+            {onlineConfig.accept_pix && (
+              <Card
+                className={`cursor-pointer transition-colors ${
+                  paymentMethod === "pix_online"
+                    ? "border-primary bg-primary/5"
+                    : "hover:border-primary/50"
+                }`}
+                onClick={() => setPaymentMethod("pix_online")}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <QrCode className="w-5 h-5" />
+                    <div>
+                      <span className="font-medium">Pix Online</span>
+                      <p className="text-xs text-muted-foreground">Pague instantaneamente via QR Code</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {onlineConfig.accept_card && (
+              <Card
+                className={`cursor-pointer transition-colors ${
+                  paymentMethod === "credit_card_online"
+                    ? "border-primary bg-primary/5"
+                    : "hover:border-primary/50"
+                }`}
+                onClick={() => setPaymentMethod("credit_card_online")}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="w-5 h-5" />
+                    <div>
+                      <span className="font-medium">Cartão de Crédito Online</span>
+                      <p className="text-xs text-muted-foreground">Pague com cartão de crédito agora</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
       </div>
 

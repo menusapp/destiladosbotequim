@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CartItem } from "@/types/menu";
-import { MapPin, CreditCard, Clock, Gift } from "lucide-react";
+import { MapPin, CreditCard, Clock, Gift, CheckCircle2 } from "lucide-react";
 import { DiscountReward } from "./LoyaltyRewardNotification";
 
 interface DeliveryZone {
@@ -110,6 +110,9 @@ export const SummaryStep = ({
   const estimatedTime = deliveryZone?.estimated_time_minutes ?? restaurant.prep_time_minutes ?? 30;
 
   const getPaymentLabel = () => {
+    if (paymentData.isOnlinePayment) {
+      return paymentData.onlineMethod === "pix" ? "Pix Online" : "Cartão de Crédito Online";
+    }
     const labels = {
       cash: "Dinheiro",
       debit: "Cartão de Débito",
@@ -208,8 +211,18 @@ export const SummaryStep = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm">{getPaymentLabel()}</p>
-          {paymentData.changeFor && (
+          <p className="text-sm flex items-center gap-2">
+            {paymentData.isOnlinePayment && (
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+            )}
+            {getPaymentLabel()}
+            {paymentData.isOnlinePayment && (
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                Pago
+              </span>
+            )}
+          </p>
+          {paymentData.changeFor && !paymentData.isOnlinePayment && (
             <p className="text-sm text-muted-foreground">
               Troco para: R$ {paymentData.changeFor}
             </p>

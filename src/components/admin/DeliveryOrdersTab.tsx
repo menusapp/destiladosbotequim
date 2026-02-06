@@ -101,6 +101,7 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
           delivery_fee,
           coupon_discount,
           loyalty_points_used,
+          payment_status,
           order_items(
             id,
             quantity,
@@ -471,6 +472,11 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
               <Badge variant={order.delivery_type === "pickup" ? "secondary" : "default"}>
                 {order.delivery_type === "pickup" ? "🏪 Retirada" : "🚚 Delivery"}
               </Badge>
+              {(order as any).payment_status === "confirmed" && (
+                <Badge className="bg-green-500 text-white hover:bg-green-600">
+                  💳 Pago Online
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-1 text-muted-foreground text-sm">
               <Clock className="w-4 h-4" />
@@ -622,6 +628,11 @@ export default function DeliveryOrdersTab({ restaurantId }: DeliveryOrdersTabPro
           <Badge variant={order.status === "delivered" || order.status === "picked_up" ? "default" : "outline"} className="text-xs">
             {order.delivery_type === "pickup" ? "🏪 Retirado" : "🚚 Entregue"}
           </Badge>
+          {(order as any).payment_status === "confirmed" && (
+            <Badge className="bg-green-500 text-white hover:bg-green-600 text-xs">
+              💳 Pago
+            </Badge>
+          )}
         </div>
 
         {/* Coluna 2: Data/Hora */}

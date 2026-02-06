@@ -61,6 +61,7 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
   const [formState, setFormState] = useState("");
   const [formIncomeValue, setFormIncomeValue] = useState("");
   const [formBirthDate, setFormBirthDate] = useState("");
+  const [formCompanyType, setFormCompanyType] = useState("");
 
   useEffect(() => {
     fetchConfig();
@@ -94,8 +95,16 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
   };
 
   const handleCreateAccount = async () => {
+    const cleanDoc = formCpfCnpj.replace(/\D/g, "");
+    const isCnpj = cleanDoc.length >= 14;
+
     if (!formName || !formCpfCnpj || !formEmail || !formPhone) {
       toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    if (isCnpj && !formCompanyType) {
+      toast.error("Selecione o tipo de empresa para CNPJ");
       return;
     }
 
@@ -117,6 +126,7 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
           state: formState,
           income_value: formIncomeValue ? parseFloat(formIncomeValue) : undefined,
           birth_date: formBirthDate || undefined,
+          company_type: formCompanyType || undefined,
         },
       });
 
@@ -348,6 +358,23 @@ const NotConnectedView = (props: NotConnectedViewProps) => (
                 Obrigatório para pessoa física (CPF)
               </p>
             </div>
+            {/* Company Type - only for CNPJ */}
+            {props.formCpfCnpj.replace(/\D/g, "").length >= 14 && (
+              <div className="space-y-2">
+                <Label>Tipo de Empresa *</Label>
+                <select
+                  value={props.formCompanyType || ""}
+                  onChange={(e) => props.onCompanyTypeChange(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Selecione...</option>
+                  <option value="MEI">MEI</option>
+                  <option value="LIMITED">Limitada (LTDA)</option>
+                  <option value="INDIVIDUAL">Individual (EI)</option>
+                  <option value="ASSOCIATION">Associação</option>
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
