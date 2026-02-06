@@ -1,190 +1,211 @@
 
-# Integra Asaas -- Pagamentos Online (Subcontas)
 
-## Resumo
+# Fase 2 e 3: Cobranças Pix/Cartão + Checkout Completo
 
-Implementar a integracao completa com o Asaas para que cada restaurante possa criar uma subconta, receber pagamentos online via Pix e Cartao de Credito, e (futuramente) emitir notas fiscais. A marca Asaas pode aparecer normalmente para o cliente final.
+## Problemas encontrados na reanálise
+
+Antes de avançar, identifiquei 3 correções necessárias no que já foi construído:
+
+### Correção 1: Campo `companyType` obrigatório para CNPJ
+Os logs mostram que o Asaas retorna erro `"O campo companyType deve ser informado"` quando o cadastro é feito com CNPJ. O formulário atual não tem esse campo. Preciso:
+- Adicionar um campo de seleção "Tipo de Empresa" (MEI, ME, EPP, etc.) no formulário de `OnlinePaymentsSettings.tsx`
+- Detectar automaticamente se é CPF ou CNPJ (pelo tamanho) e exibir o campo apenas quando for CNPJ
+- Enviar o `companyType` na edge function `asaas-provision`
+
+### Correção 2: Default do provider na tabela `online_payments`
+A tabela `online_payments` ainda tem `provider` com default `'mercadopago'`. Precisa de uma migration rápida para mudar para `'asaas'`.
+
+### Correção 3: Validações no formulário
+- Data de nascimento é obrigatória para CPF (a API retorna erro sem ela)
+- Telefone celular é obrigatório
 
 ---
 
-## Fase 1: Infraestrutura (Banco de Dados + Secrets)
+## Sobre o Wallet ID
 
-### 1.1 Configurar Secret da API Key Master
-- Adicionar o secret `ASAAS_API_KEY` com a chave de Sandbox que voce ja tem
-- Adicionar o secret `ASAAS_ENVIRONMENT` com valor `sandbox` (depois muda pra `production`)
+**Não preciso do seu Wallet ID da conta master.** O wallet ID é usado para **split de pagamentos** (cobrar comissão automática sobre cada pagamento). Como você disse que não quer cobrar comissão por enquanto, não é necessário.
 
-### 1.2 Migrar tabela `online_payment_config`
-Reaproveitar a tabela existente, adicionando colunas para o Asaas e removendo as do Mercado Pago:
+O que acontece é:
+- Quando a edge function `asaas-provision` cria uma subconta, o Asaas retorna automaticamente o `walletId` e o `apiKey` dessa subconta
+- Esses valores já estão sendo salvos no banco de dados
+- As cobranças são feitas usando a API Key da subconta do restaurante (não a sua master)
+- O dinheiro cai direto na conta do restaurante
 
-| Acao | Campo |
+Se no futuro você quiser cobrar comissão, aí sim precisaríamos do seu wallet ID para configurar o split.
+
+---
+
+## Implementação completa
+
+### Passo 1: Migration para corrigir default do provider
+
+Alterar o default da coluna `provider` na tabela `online_payments` de `'mercadopago'` para `'asaas'`.
+
+### Passo 2: Corrigir `asaas-provision` e formulário
+
+- Adicionar campo `companyType` (Select com opções: MEI, LIMITED, INDIVIDUAL, ASSOCIATION)
+- Mostrar campo apenas quando o documento informado for CNPJ (14+ dígitos)
+- Enviar `companyType` no payload da edge function
+
+### Passo 3: Edge Function `asaas-charge`
+
+Cria cobranças Pix e Cartão usando a API Key da subconta.
+
+**Fluxo Pix:**
+1. Recebe `restaurant_id`, `order_id`, `amount`, dados do cliente
+2. Busca `asaas_api_key` do restaurante na tabela `online_payment_config`
+3. Verifica se o cliente já existe no Asaas (tabela `asaas_customers` por CPF)
+4. Se não existe, cria via `POST /v3/customers`
+5. Cria cobrança via `POST /v3/payments` com `billingType: "PIX"`
+6. Busca QR Code via `GET /v3/payments/{id}/pixQrCode`
+7. Salva tudo na tabela `online_payments`
+8. Retorna QR Code (imagem base64 + código copia-e-cola)
+
+**Fluxo Cartão:**
+1. Mesmos passos 1-4
+2. Cria cobrança via `POST /v3/payments` com `billingType: "CREDIT_CARD"` + dados do cartão (número, nome, validade, CVV) + dados do titular (CPF, nome, email, CEP, número do endereço, telefone)
+3. Resposta já vem com status confirmado/recusado
+4. Salva na tabela `online_payments`
+
+### Passo 4: Edge Function `asaas-webhook`
+
+Recebe notificações automáticas do Asaas quando status de pagamento muda.
+
+- Valida o evento recebido
+- Busca o pagamento na tabela `online_payments` pelo `provider_payment_id`
+- Atualiza `online_payments.status` conforme o evento:
+  - `PAYMENT_CONFIRMED` / `PAYMENT_RECEIVED` -> status = `confirmed`, atualiza `paid_at`
+  - `PAYMENT_OVERDUE` -> status = `overdue`
+  - `PAYMENT_REFUNDED` -> status = `refunded`
+- Atualiza `orders.payment_status` para `confirmed` quando pagamento aprovado
+- Dispara notificação WhatsApp se configurado
+
+### Passo 5: Edge Function `asaas-status`
+
+Consulta o status atual da subconta do restaurante no Asaas.
+
+- Busca `asaas_account_id` no banco
+- Chama `GET /v3/myAccount/status` usando a API Key da subconta
+- Atualiza `online_payment_config.asaas_account_status` e `connection_status`
+
+### Passo 6: Componente `OnlinePaymentStep.tsx`
+
+Novo componente de checkout que aparece entre "pagamento" e "resumo":
+
+**Modo Pix:**
+- Chama `asaas-charge` com billingType PIX
+- Exibe QR Code (imagem) + código copia-e-cola com botão "Copiar"
+- Timer de expiração (30 minutos)
+- Polling a cada 5 segundos na tabela `online_payments` verificando se status mudou para `confirmed`
+- Quando confirmado: avança automaticamente
+
+**Modo Cartão:**
+- Formulário com: número do cartão, nome no cartão, validade (MM/AA), CVV
+- Campos do titular: CPF, nome, email, CEP, número do endereço, telefone
+- Botão "Pagar R$ XX,XX"
+- Loading enquanto processa
+- Se aprovado: avança automaticamente
+- Se recusado: mostra erro e permite tentar novamente
+
+### Passo 7: Adaptar `PaymentStep.tsx`
+
+Adicionar seção "Pagamento Online" com duas opções:
+- "Pix Online" (ícone de QR Code + texto)
+- "Cartão de Crédito Online" (ícone de cartão + texto)
+
+Estas opções só aparecem se:
+- O restaurante tem `online_payment_config` com `enable_for_delivery = true`
+- `accept_pix = true` para mostrar Pix
+- `accept_card = true` para mostrar Cartão
+
+Separação visual entre "Pagamento na Entrega/Retirada" e "Pagamento Online" com um divisor.
+
+Quando o cliente seleciona um método online, o `paymentData` inclui `isOnlinePayment: true` e `onlineMethod: 'pix' | 'credit_card'`.
+
+### Passo 8: Adaptar `CheckoutDrawer.tsx`
+
+- Adicionar step `"online-payment"` ao tipo `CheckoutStep`
+- Quando `paymentData.isOnlinePayment === true`, ir para step `"online-payment"` em vez de `"summary"`
+- No step `"online-payment"`, renderizar `OnlinePaymentStep`
+- Quando pagamento online confirmado:
+  - Criar pedido com `payment_status = 'confirmed'` e `online_payment_id` vinculado
+  - `payment_type` = `'pix_online'` ou `'credit_card_online'`
+- Atualizar barra de progresso para incluir o novo step
+- Atualizar título do drawer para "Pagamento Online"
+
+### Passo 9: Adaptar `SummaryStep.tsx`
+
+- Quando `paymentData.isOnlinePayment`, mostrar "Pago via Pix Online" ou "Pago via Cartão Online" com ícone verde de confirmação
+- Não mostrar "Troco para" quando for pagamento online
+
+### Passo 10: Badge "Pago Online" no painel admin
+
+No `DeliveryOrdersTab.tsx`:
+- Incluir `payment_status` na query de pedidos
+- No `OrderCard`, exibir badge verde "Pago Online" quando `payment_status === 'confirmed'`
+- No `FinishedOrderCard`, mesma badge
+
+---
+
+## Seção Técnica
+
+### Arquivos a criar
+| Arquivo | Descrição |
 |---|---|
-| Adicionar | `asaas_api_key` (text) - API Key da subconta |
-| Adicionar | `asaas_wallet_id` (text) - Wallet ID da subconta |
-| Adicionar | `asaas_account_id` (text) - ID da conta no Asaas |
-| Adicionar | `asaas_onboarding_url` (text) - Link para envio de documentos |
-| Adicionar | `asaas_account_status` (text, default 'pending') - Status da conta |
-| Remover | `mp_access_token`, `mp_refresh_token`, `mp_token_expires_at`, `mp_user_id`, `mp_public_key` |
-| Alterar | `provider` default de 'mercadopago' para 'asaas' |
+| `supabase/functions/asaas-charge/index.ts` | Cobrança Pix e Cartão |
+| `supabase/functions/asaas-webhook/index.ts` | Webhook de confirmação |
+| `supabase/functions/asaas-status/index.ts` | Consulta status da subconta |
+| `src/components/menu/checkout/OnlinePaymentStep.tsx` | Step de pagamento online no checkout |
 
-### 1.3 Criar tabela `asaas_customers`
-Mapeia clientes (CPF) para IDs do Asaas por restaurante:
-
-| Campo | Tipo |
+### Arquivos a modificar
+| Arquivo | Mudança |
 |---|---|
-| `id` | uuid (PK) |
-| `restaurant_id` | uuid (FK) |
-| `customer_cpf` | text |
-| `asaas_customer_id` | text |
-| `created_at` | timestamptz |
-
-Constraint unique em `(restaurant_id, customer_cpf)`.
-
----
-
-## Fase 2: Edge Functions (Backend)
-
-### 2.1 `asaas-provision` - Criar subconta do restaurante
-- Recebe dados da empresa (nome, CPF/CNPJ, email, telefone, endereco, faturamento)
-- Chama `POST /v3/accounts` na API do Asaas usando a API Key master
-- Salva `asaas_api_key`, `asaas_wallet_id`, `asaas_account_id` e `asaas_onboarding_url` na tabela `online_payment_config`
-- Retorna o link de onboarding para envio de documentos
-
-### 2.2 `asaas-charge` - Criar cobranca
-- Recebe: `restaurant_id`, `order_id`, `amount`, `billing_type` (PIX ou CREDIT_CARD), dados do cliente
-- Busca a `asaas_api_key` do restaurante no banco
-- Primeiro verifica/cria o cliente no Asaas (tabela `asaas_customers`)
-- Chama `POST /v3/payments` usando a API Key do restaurante
-- Para PIX: retorna QR Code e copia-e-cola
-- Para Cartao: processa o pagamento com tokenizacao
-- Salva registro na tabela `online_payments`
-
-### 2.3 `asaas-webhook` - Receber confirmacoes de pagamento
-- Recebe notificacoes do Asaas quando pagamento e confirmado/cancelado
-- Atualiza `online_payments.status` e `orders.payment_status`
-- Se confirmado, pode disparar notificacao WhatsApp (se configurado)
-
-### 2.4 `asaas-status` - Consultar status da subconta
-- Verifica se a conta do restaurante esta ativa/pendente/aprovada
-- Usado pela tela de configuracoes para mostrar o status atual
-
----
-
-## Fase 3: Interface Admin (Configuracoes > Pagamentos Online)
-
-### 3.1 Substituir o placeholder "Em Desenvolvimento"
-O componente `OnlinePaymentsSettings.tsx` sera completamente reescrito com 3 estados:
-
-**Estado 1 - Nao conectado:** Formulario de cadastro da subconta com campos:
-- Nome / Razao Social
-- CPF ou CNPJ
-- E-mail
-- Telefone
-- CEP + Endereco completo
-- Faturamento mensal (campo estimado)
-- Botao "Criar Conta de Pagamentos"
-
-**Estado 2 - Conta criada, pendente de documentos:**
-- Status: "Aguardando documentos"
-- Link/botao para abrir a pagina de onboarding do Asaas (envio de documentos)
-- Toggle para aceitar Pix / Cartao
-- Toggle para ativar no delivery
-
-**Estado 3 - Conta ativa:**
-- Status: "Conectado" com indicador verde
-- Toggles: Aceitar Pix, Aceitar Cartao, Ativar para Delivery
-- Botao para desconectar
-
----
-
-## Fase 4: Checkout do Delivery (Cliente)
-
-### 4.1 Adaptar `PaymentStep.tsx`
-- Verificar se o restaurante tem pagamento online ativo
-- Se sim, adicionar opcoes "Pagar com Pix Online" e "Pagar com Cartao Online" alem dos metodos locais
-- Distinguir visualmente as opcoes online das locais
-
-### 4.2 Criar novo step de pagamento online
-Quando o cliente escolher pagar online:
-- **Pix**: Chamar edge function `asaas-charge`, exibir QR Code e codigo copia-e-cola, tela de "Aguardando pagamento" com polling/realtime
-- **Cartao**: Formulario de dados do cartao (usando tokenizacao do Asaas via JS), processar e confirmar
-
-### 4.3 Adaptar `CheckoutDrawer.tsx`
-- Adicionar logica para o novo step de pagamento online entre "payment" e "summary"
-- Se pagamento online for confirmado, criar o pedido com `payment_status = 'confirmed'`
-- Se pagamento local, manter fluxo atual com `payment_status = 'pending'`
-
-### 4.4 Adaptar `SummaryStep.tsx`
-- Mostrar "Pago online" quando o pagamento ja foi confirmado
-- Mostrar metodo de pagamento online (Pix/Cartao) no resumo
-
----
-
-## Fase 5: Indicadores no Painel Admin
-
-### 5.1 Indicador visual nos pedidos
-- Na lista de pedidos delivery, mostrar badge "Pago Online" quando `payment_status = 'confirmed'`
-- Diferenciar de pedidos com pagamento na entrega
-
----
-
-## Secao Tecnica
-
-### Arquitetura do fluxo de pagamento
-
-```text
-CLIENTE ESCOLHE "PAGAR PIX ONLINE"
-  |
-  v
-Frontend chama Edge Function "asaas-charge"
-  |
-  v
-Edge Function:
-  1. Busca asaas_api_key do restaurante
-  2. Cria/busca cliente no Asaas
-  3. POST /v3/payments (billingType: PIX)
-  4. Salva em online_payments
-  5. Retorna QR Code
-  |
-  v
-Frontend exibe QR Code + polling status
-  |
-  v
-Asaas confirma pagamento -> Webhook
-  |
-  v
-Edge Function "asaas-webhook":
-  1. Atualiza online_payments.status
-  2. Atualiza orders.payment_status
-  |
-  v
-Frontend detecta confirmacao -> Avanca para resumo
-```
+| `supabase/functions/asaas-provision/index.ts` | Garantir envio de `companyType` |
+| `src/components/admin/settings/OnlinePaymentsSettings.tsx` | Campo Tipo de Empresa (CNPJ) |
+| `src/components/menu/checkout/PaymentStep.tsx` | Opções Pix/Cartão Online |
+| `src/components/menu/CheckoutDrawer.tsx` | Novo step + lógica de pedido pago |
+| `src/components/menu/checkout/SummaryStep.tsx` | Indicador "Pago Online" |
+| `src/components/admin/DeliveryOrdersTab.tsx` | Badge "Pago Online" |
 
 ### Endpoints Asaas utilizados
-- `POST /v3/accounts` - Criar subconta
-- `GET /v3/accounts/{id}` - Verificar status da conta
 - `POST /v3/customers` - Criar cliente
-- `GET /v3/customers?cpfCnpj=` - Buscar cliente por CPF
-- `POST /v3/payments` - Criar cobranca (Pix/Cartao)
-- `GET /v3/payments/{id}/pixQrCode` - Obter QR Code Pix
+- `GET /v3/customers?cpfCnpj={cpf}` - Buscar cliente
+- `POST /v3/payments` - Criar cobrança
+- `GET /v3/payments/{id}/pixQrCode` - QR Code Pix
+- `GET /v3/myAccount/status` - Status da conta
 
-### Ambiente
-- Sandbox: `https://sandbox.asaas.com/api/v3/`
-- Producao: `https://api.asaas.com/api/v3/`
+### Fluxo do checkout adaptado
 
-### Campos ja existentes na tabela `orders`
-- `payment_status` (text, default 'pending') - ja existe
-- `online_payment_id` (uuid, FK) - ja existe
+```text
+Sacola -> Tipo Entrega -> Endereço -> Pagamento
+                                        |
+                          +-------------+-------------+
+                          |                           |
+                    Método LOCAL                Método ONLINE
+                    (dinheiro, pix              (Pix Online ou
+                     local, cartão               Cartão Online)
+                     maquininha)                      |
+                          |                 Online Payment Step
+                          |                 (QR Code ou Form Cartão)
+                          |                      |
+                          |                Pagamento Confirmado
+                          |                      |
+                          +----------+-----------+
+                                     |
+                                  Resumo
+                                     |
+                               Pedido Criado
+```
 
-### Tabela `online_payments` - reaproveitada
-- Campos existentes servem perfeitamente (amount, status, provider, pix_qr_code, etc.)
-- Mudar `provider` para 'asaas'
+### Ordem de execução
+1. Migration (corrigir default provider)
+2. Corrigir formulário + asaas-provision (companyType)
+3. Edge function asaas-charge
+4. Edge function asaas-webhook
+5. Edge function asaas-status
+6. Componente OnlinePaymentStep.tsx
+7. Adaptar PaymentStep.tsx
+8. Adaptar CheckoutDrawer.tsx
+9. Adaptar SummaryStep.tsx
+10. Badge no DeliveryOrdersTab.tsx
 
-### Ordem de implementacao sugerida
-1. Secret + Migracao do banco
-2. Edge function `asaas-provision` + UI de cadastro admin
-3. Edge function `asaas-charge` (Pix primeiro)
-4. Edge function `asaas-webhook`
-5. UI de checkout (QR Code Pix)
-6. Cartao de credito (fase posterior)
-7. Notas fiscais (fase posterior)
