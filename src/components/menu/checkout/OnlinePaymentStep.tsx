@@ -95,6 +95,11 @@ export const OnlinePaymentStep = ({
 
   const createPixCharge = async () => {
     try {
+      if (amount < 5) {
+        setPaymentStatus("error");
+        setErrorMessage("O valor mínimo para pagamento online é de R$ 5,00.");
+        return;
+      }
       setPaymentStatus("loading");
       const { data, error } = await supabase.functions.invoke("asaas-charge", {
         body: {
@@ -166,6 +171,11 @@ export const OnlinePaymentStep = ({
 
     if (!cardHolderCpf || !cardHolderPostalCode || !cardHolderAddressNumber) {
       toast.error("Preencha CPF, CEP e número do endereço do titular");
+      return;
+    }
+
+    if (amount < 5) {
+      toast.error("O valor mínimo para pagamento online é de R$ 5,00.");
       return;
     }
 
