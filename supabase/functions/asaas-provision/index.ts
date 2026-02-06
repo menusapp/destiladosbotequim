@@ -17,12 +17,19 @@ Deno.serve(async (req) => {
     const asaasMasterKey = Deno.env.get("ASAAS_API_KEY")!;
     const asaasEnv = Deno.env.get("ASAAS_ENVIRONMENT") || "sandbox";
 
+    // Debug: log environment and key prefix
+    console.log("[asaas-provision] Environment:", asaasEnv);
+    console.log("[asaas-provision] API Key prefix:", asaasMasterKey?.substring(0, 15) + "...");
+    console.log("[asaas-provision] API Key length:", asaasMasterKey?.length);
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const baseUrl =
       asaasEnv === "production"
         ? "https://api.asaas.com/api/v3"
         : "https://sandbox.asaas.com/api/v3";
+    
+    console.log("[asaas-provision] Using base URL:", baseUrl);
 
     const body = await req.json();
     const {
