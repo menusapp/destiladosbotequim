@@ -226,6 +226,7 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
           formState={formState}
           formIncomeValue={formIncomeValue}
           formBirthDate={formBirthDate}
+          formCompanyType={formCompanyType}
           onNameChange={setFormName}
           onCpfCnpjChange={setFormCpfCnpj}
           onEmailChange={setFormEmail}
@@ -242,6 +243,7 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
           onStateChange={setFormState}
           onIncomeValueChange={setFormIncomeValue}
           onBirthDateChange={setFormBirthDate}
+          onCompanyTypeChange={setFormCompanyType}
           onSubmit={handleCreateAccount}
           submitting={submitting}
         />
@@ -278,6 +280,7 @@ interface NotConnectedViewProps {
   formState: string;
   formIncomeValue: string;
   formBirthDate: string;
+  formCompanyType: string;
   onNameChange: (v: string) => void;
   onCpfCnpjChange: (v: string) => void;
   onEmailChange: (v: string) => void;
@@ -291,6 +294,7 @@ interface NotConnectedViewProps {
   onStateChange: (v: string) => void;
   onIncomeValueChange: (v: string) => void;
   onBirthDateChange: (v: string) => void;
+  onCompanyTypeChange: (v: string) => void;
   onSubmit: () => void;
   submitting: boolean;
 }
