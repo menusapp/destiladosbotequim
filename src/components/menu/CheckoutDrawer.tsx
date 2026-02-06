@@ -6,13 +6,14 @@ import { CartStep } from "./checkout/CartStep";
 import { AddressStep } from "./checkout/AddressStep";
 import { PaymentStep } from "./checkout/PaymentStep";
 import { SummaryStep } from "./checkout/SummaryStep";
+import { OnlinePaymentStep } from "./checkout/OnlinePaymentStep";
 import { DeliveryTypeStep } from "./checkout/DeliveryTypeStep";
 import { CartItem } from "@/types/menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { DiscountReward } from "./checkout/LoyaltyRewardNotification";
 
-type CheckoutStep = "cart" | "delivery-type" | "address" | "payment" | "summary";
+type CheckoutStep = "cart" | "delivery-type" | "address" | "payment" | "online-payment" | "summary";
 
 interface DeliveryZone {
   id: string;
@@ -92,7 +93,9 @@ export const CheckoutDrawer = ({
   }, [open]);
 
   const getProgressValue = () => {
-    const steps = { cart: 20, "delivery-type": 40, address: 60, payment: 80, summary: 100 };
+    const steps: Record<CheckoutStep, number> = { 
+      cart: 16, "delivery-type": 32, address: 48, payment: 64, "online-payment": 80, summary: 100 
+    };
     return steps[step];
   };
 
@@ -599,8 +602,46 @@ export const CheckoutDrawer = ({
                 }
               }
               
+              // If online payment, go to online-payment step
+              if (data.isOnlinePayment) {
+                setStep("online-payment");
+              } else {
+                setStep("summary");
+              }
+            }}
+          />
+        );
+      case "online-payment":
+        const onlineTotal = (() => {
+          const cd = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
+          const ld = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
+          const rd = calculateRewardDiscount(subtotal);
+          const df = getDeliveryFee();
+          const sf = restaurant.service_fee_enabled ? (subtotal * restaurant.service_fee_percentage / 100) : 0;
+          return subtotal + sf + df - cd - ld - rd;
+        })();
+
+        return (
+          <OnlinePaymentStep
+            onBack={() => setStep("payment")}
+            onConfirm={(onlinePaymentId) => {
+              // Update payment data with the online payment ID
+              setPaymentData((prev: any) => ({ 
+                ...prev, 
+                onlinePaymentId,
+                confirmed: true,
+              }));
               setStep("summary");
             }}
+            method={paymentData?.onlineMethod || "pix"}
+            amount={onlineTotal}
+            restaurantId={restaurant.id}
+            orderId={undefined}
+            customerName={customerData?.name || sessionStorage.getItem("customer_name") || ""}
+            customerCPF={customerData?.cpf || sessionStorage.getItem("customer_cpf") || ""}
+            customerPhone={customerData?.phone || sessionStorage.getItem("customer_phone") || ""}
+            customerEmail={sessionStorage.getItem("customer_email") || ""}
+            primaryColor={primaryColorFromRestaurant(restaurant)}
           />
         );
       case "summary":
@@ -652,6 +693,7 @@ export const CheckoutDrawer = ({
               {step === "delivery-type" && "Tipo de Entrega"}
               {step === "address" && "Endereço de Entrega"}
               {step === "payment" && "Forma de Pagamento"}
+              {step === "online-payment" && "Pagamento Online"}
               {step === "summary" && "Confirmar Pedido"}
             </DrawerTitle>
             <div className="w-6" />
