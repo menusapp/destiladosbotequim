@@ -106,7 +106,35 @@ Deno.serve(async (req) => {
       body: JSON.stringify(accountPayload),
     });
 
-    const asaasData = await asaasResponse.json();
+    // Safely read response - check content type before parsing as JSON
+    const responseText = await asaasResponse.text();
+    const contentType = asaasResponse.headers.get("content-type") || "";
+    
+    console.log("[asaas-provision] Response status:", asaasResponse.status);
+    console.log("[asaas-provision] Response content-type:", contentType);
+    console.log("[asaas-provision] Response preview:", responseText.substring(0, 300));
+
+    let asaasData: any;
+    if (contentType.includes("application/json") || (responseText.trim().startsWith("{") || responseText.trim().startsWith("["))) {
+      try {
+        asaasData = JSON.parse(responseText);
+      } catch {
+        console.error("[asaas-provision] Failed to parse JSON:", responseText.substring(0, 500));
+        return new Response(
+          JSON.stringify({ error: "Resposta inválida da API do Asaas", details: responseText.substring(0, 300) }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      console.error("[asaas-provision] Asaas returned non-JSON:", responseText.substring(0, 500));
+      return new Response(
+        JSON.stringify({ 
+          error: "A API do Asaas retornou uma resposta inesperada. Verifique se a chave API está correta e é de produção.", 
+          details: `Status: ${asaasResponse.status}, Content-Type: ${contentType}` 
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!asaasResponse.ok) {
       console.error("[asaas-provision] Asaas error:", JSON.stringify(asaasData));
