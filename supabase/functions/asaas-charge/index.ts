@@ -207,9 +207,10 @@ Deno.serve(async (req) => {
       const errorMsg =
         paymentData.errors?.map((e: any) => e.description).join(", ") ||
         "Erro ao criar cobrança";
+      // Return 200 with success:false so Supabase SDK can read the body
       return new Response(
-        JSON.stringify({ error: errorMsg, details: paymentData }),
-        { status: paymentRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: errorMsg, details: paymentData }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

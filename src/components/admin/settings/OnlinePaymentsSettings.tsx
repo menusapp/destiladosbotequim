@@ -36,16 +36,36 @@ interface PaymentConfig {
   asaas_wallet_id: string | null;
   asaas_onboarding_url: string | null;
   asaas_account_status: string | null;
+  asaas_documents_data: AsaasDocument[] | null;
   connected_at: string | null;
 }
 
+interface AsaasDocument {
+  id: string;
+  status: string;
+  type: string;
+  title: string;
+  description: string | null;
+  responsible: string | null;
+  onboardingUrl: string | null;
+}
+
 type ViewState = "loading" | "not_connected" | "pending" | "connected";
+
+interface DetailedStatus {
+  general: string;
+  commercialInfo: string;
+  documentation: string;
+}
 
 const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) => {
   const [viewState, setViewState] = useState<ViewState>("loading");
   const [config, setConfig] = useState<PaymentConfig | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [savingToggles, setSavingToggles] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [detailedStatus, setDetailedStatus] = useState<DetailedStatus | null>(null);
+  const [pendingDocuments, setPendingDocuments] = useState<AsaasDocument[]>([]);
 
   // Form fields
   const [formName, setFormName] = useState("");
@@ -78,19 +98,52 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
       if (error) throw error;
 
       if (data && data.asaas_account_id) {
-        setConfig(data as PaymentConfig);
+        setConfig(data as unknown as PaymentConfig);
         if (data.asaas_api_key && data.connection_status === "connected") {
           setViewState("connected");
         } else {
           setViewState("pending");
         }
       } else {
-        setConfig(data as PaymentConfig | null);
+        setConfig(data as unknown as PaymentConfig | null);
         setViewState("not_connected");
       }
     } catch (error) {
       console.error("Error fetching config:", error);
       setViewState("not_connected");
+    }
+  };
+
+  const handleCheckStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("asaas-status", {
+        body: { restaurant_id: restaurantId },
+      });
+
+      if (error) throw error;
+
+      if (data?.detailed_status) {
+        setDetailedStatus(data.detailed_status);
+      }
+      if (data?.documents) {
+        setPendingDocuments(data.documents);
+      }
+
+      // If approved, switch to connected view
+      if (data?.account_status === "approved") {
+        toast.success("Conta aprovada! Pagamentos online disponíveis.");
+        await fetchConfig();
+      } else if (data?.account_status === "rejected") {
+        toast.error("Conta reprovada. Verifique os documentos e tente novamente.");
+      } else {
+        toast.info("Status atualizado. Documentação ainda pendente.");
+      }
+    } catch (error: any) {
+      console.error("Error checking status:", error);
+      toast.error("Erro ao verificar status");
+    } finally {
+      setCheckingStatus(false);
     }
   };
 
@@ -250,7 +303,13 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
       )}
 
       {viewState === "pending" && config && (
-        <PendingView config={config} onRefresh={fetchConfig} />
+        <PendingView
+          config={config}
+          onCheckStatus={handleCheckStatus}
+          checkingStatus={checkingStatus}
+          detailedStatus={detailedStatus}
+          documents={pendingDocuments}
+        />
       )}
 
       {viewState === "connected" && config && (
@@ -491,53 +550,154 @@ const NotConnectedView = (props: NotConnectedViewProps) => (
 
 interface PendingViewProps {
   config: PaymentConfig;
-  onRefresh: () => void;
+  onCheckStatus: () => void;
+  checkingStatus: boolean;
+  detailedStatus: DetailedStatus | null;
+  documents: AsaasDocument[];
 }
 
-const PendingView = ({ config, onRefresh }: PendingViewProps) => (
-  <>
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-yellow-500" />
-          Conta Criada — Aguardando Ativação
-        </CardTitle>
-        <CardDescription>
-          Sua conta de pagamentos foi criada. Complete o envio de documentos para ativá-la.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-          <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
-          <div>
-            <p className="font-medium text-sm">Documentação pendente</p>
-            <p className="text-sm text-muted-foreground">
-              Acesse o link abaixo para enviar os documentos necessários e ativar sua conta.
-            </p>
+const statusLabel = (s: string) => {
+  switch (s) {
+    case "APPROVED": return "Aprovado";
+    case "REJECTED": return "Reprovado";
+    case "AWAITING_APPROVAL": return "Em análise";
+    default: return "Pendente";
+  }
+};
+
+const statusVariant = (s: string): "default" | "secondary" | "destructive" | "outline" => {
+  switch (s) {
+    case "APPROVED": return "default";
+    case "REJECTED": return "destructive";
+    case "AWAITING_APPROVAL": return "secondary";
+    default: return "outline";
+  }
+};
+
+const PendingView = ({ config, onCheckStatus, checkingStatus, detailedStatus, documents }: PendingViewProps) => {
+  const isRejected = config.asaas_account_status === "rejected";
+  const pendingDocs = documents.filter(d => d.status !== "APPROVED" && d.status !== "NOT_REQUIRED");
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {isRejected ? (
+              <AlertCircle className="h-5 w-5 text-destructive" />
+            ) : (
+              <Clock className="h-5 w-5 text-amber-500" />
+            )}
+            {isRejected ? "Conta Reprovada — Reenvie Documentos" : "Conta Criada — Aguardando Ativação"}
+          </CardTitle>
+          <CardDescription>
+            {isRejected
+              ? "Sua conta foi reprovada. Envie os documentos pendentes para reativar."
+              : "Sua conta de pagamentos foi criada. Complete o envio de documentos para ativá-la."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Status badges */}
+          {detailedStatus && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center space-y-1">
+                <p className="text-xs text-muted-foreground">Dados Comerciais</p>
+                <Badge variant={statusVariant(detailedStatus.commercialInfo)}>
+                  {statusLabel(detailedStatus.commercialInfo)}
+                </Badge>
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-xs text-muted-foreground">Documentação</p>
+                <Badge variant={statusVariant(detailedStatus.documentation)}>
+                  {statusLabel(detailedStatus.documentation)}
+                </Badge>
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-xs text-muted-foreground">Geral</p>
+                <Badge variant={statusVariant(detailedStatus.general)}>
+                  {statusLabel(detailedStatus.general)}
+                </Badge>
+              </div>
+            </div>
+          )}
+
+          {/* Pending documents with onboarding links */}
+          {pendingDocs.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Documentos Pendentes
+              </h4>
+              {pendingDocs.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <p className="text-sm font-medium">{doc.title}</p>
+                    {doc.description && (
+                      <p className="text-xs text-muted-foreground">{doc.description}</p>
+                    )}
+                    <Badge variant={statusVariant(doc.status)} className="mt-1">
+                      {statusLabel(doc.status)}
+                    </Badge>
+                  </div>
+                  {doc.onboardingUrl && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={doc.onboardingUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        Enviar
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Fallback: old onboarding URL if no documents loaded yet */}
+          {pendingDocs.length === 0 && config.asaas_onboarding_url && (
+            <Button variant="outline" className="w-full" asChild>
+              <a href={config.asaas_onboarding_url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Enviar Documentos
+              </a>
+            </Button>
+          )}
+
+          {pendingDocs.length === 0 && !config.asaas_onboarding_url && !detailedStatus && (
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Documentação pendente</p>
+                <p className="text-sm text-muted-foreground">
+                  Clique em "Verificar Status" para carregar os links de envio de documentos.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p><strong>ID da Conta:</strong> {config.asaas_account_id}</p>
+            <p><strong>Status:</strong> {config.asaas_account_status || "pending"}</p>
           </div>
-        </div>
 
-        {config.asaas_onboarding_url && (
-          <Button variant="outline" className="w-full" asChild>
-            <a href={config.asaas_onboarding_url} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Enviar Documentos
-            </a>
+          <Button
+            variant="ghost"
+            onClick={onCheckStatus}
+            disabled={checkingStatus}
+            className="w-full"
+          >
+            {checkingStatus ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verificando...
+              </>
+            ) : (
+              "Verificar Status"
+            )}
           </Button>
-        )}
-
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p><strong>ID da Conta:</strong> {config.asaas_account_id}</p>
-          <p><strong>Status:</strong> {config.asaas_account_status || "pending"}</p>
-        </div>
-
-        <Button variant="ghost" onClick={onRefresh} className="w-full">
-          Verificar Status
-        </Button>
-      </CardContent>
-    </Card>
-  </>
-);
+        </CardContent>
+      </Card>
+    </>
+  );
+};
 
 // ─── Connected (Active account) ────────────────────────────
 

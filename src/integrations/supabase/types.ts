@@ -1606,6 +1606,7 @@ export type Database = {
           asaas_account_id: string | null
           asaas_account_status: string | null
           asaas_api_key: string | null
+          asaas_documents_data: Json | null
           asaas_onboarding_url: string | null
           asaas_wallet_id: string | null
           connected_at: string | null
@@ -1625,6 +1626,7 @@ export type Database = {
           asaas_account_id?: string | null
           asaas_account_status?: string | null
           asaas_api_key?: string | null
+          asaas_documents_data?: Json | null
           asaas_onboarding_url?: string | null
           asaas_wallet_id?: string | null
           connected_at?: string | null
@@ -1644,6 +1646,7 @@ export type Database = {
           asaas_account_id?: string | null
           asaas_account_status?: string | null
           asaas_api_key?: string | null
+          asaas_documents_data?: Json | null
           asaas_onboarding_url?: string | null
           asaas_wallet_id?: string | null
           connected_at?: string | null
