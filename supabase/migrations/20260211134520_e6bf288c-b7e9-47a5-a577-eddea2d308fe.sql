@@ -1,0 +1,1 @@
+ALTER TABLE public.online_payment_config ADD COLUMN IF NOT EXISTS asaas_documents_data jsonb DEFAULT NULL;

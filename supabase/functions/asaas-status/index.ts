@@ -14,7 +14,6 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const asaasMasterKey = Deno.env.get("ASAAS_API_KEY")!;
     const asaasEnv = Deno.env.get("ASAAS_ENVIRONMENT") || "sandbox";
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -48,37 +47,81 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check account status using master key
-    const statusRes = await fetch(`${baseUrl}/accounts/${config.asaas_account_id}`, {
-      headers: { access_token: asaasMasterKey },
-    });
+    const subAccountApiKey = config.asaas_api_key;
 
-    if (!statusRes.ok) {
-      console.error("[asaas-status] Error fetching status:", await statusRes.text());
-      return new Response(
-        JSON.stringify({ error: "Erro ao consultar status da conta" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // 1. Fetch account status using sub-account API key (myAccount/status)
+    let accountStatusData: Record<string, string> = {};
+    if (subAccountApiKey) {
+      try {
+        const myStatusRes = await fetch(`${baseUrl}/myAccount/status`, {
+          headers: { access_token: subAccountApiKey },
+        });
+        if (myStatusRes.ok) {
+          accountStatusData = await myStatusRes.json();
+          console.log("[asaas-status] myAccount/status:", JSON.stringify(accountStatusData));
+        } else {
+          console.error("[asaas-status] myAccount/status error:", await myStatusRes.text());
+        }
+      } catch (e) {
+        console.error("[asaas-status] myAccount/status fetch error:", e);
+      }
     }
 
-    const accountData = await statusRes.json();
+    // 2. Fetch pending documents using sub-account API key (myAccount/documents)
+    let documentsData: any[] = [];
+    if (subAccountApiKey) {
+      try {
+        const docsRes = await fetch(`${baseUrl}/myAccount/documents`, {
+          headers: { access_token: subAccountApiKey },
+        });
+        if (docsRes.ok) {
+          const docsResponse = await docsRes.json();
+          documentsData = docsResponse.data || [];
+          console.log("[asaas-status] myAccount/documents:", JSON.stringify(documentsData.length), "documents");
+        } else {
+          console.error("[asaas-status] myAccount/documents error:", await docsRes.text());
+        }
+      } catch (e) {
+        console.error("[asaas-status] myAccount/documents fetch error:", e);
+      }
+    }
 
-    // Determine connection status
-    const hasApiKey = !!config.asaas_api_key;
-    const accountStatus = accountData.commercialInfoExpiration?.isExpired === false
-      ? "active"
-      : accountData.loginEmail
-        ? "pending_documents"
-        : "pending";
+    // 3. Determine status from myAccount/status response
+    const generalStatus = accountStatusData.general || "PENDING";
+    const commercialInfoStatus = accountStatusData.commercialInfo || "PENDING";
+    const documentationStatus = accountStatusData.documentation || "PENDING";
 
-    const connectionStatus = hasApiKey ? "connected" : "pending";
+    let dbAccountStatus: string;
+    if (generalStatus === "APPROVED") {
+      dbAccountStatus = "approved";
+    } else if (generalStatus === "REJECTED") {
+      dbAccountStatus = "rejected";
+    } else {
+      dbAccountStatus = "pending";
+    }
 
-    // Update config in database
+    const connectionStatus = subAccountApiKey && dbAccountStatus === "approved"
+      ? "connected"
+      : "pending";
+
+    // 4. Map documents for frontend
+    const mappedDocuments = documentsData.map((doc: any) => ({
+      id: doc.id,
+      status: doc.status,
+      type: doc.type,
+      title: doc.title || doc.type,
+      description: doc.description || null,
+      responsible: doc.responsible || null,
+      onboardingUrl: doc.onboardingUrl || null,
+    }));
+
+    // 5. Update config in database
     const { error: updateError } = await supabase
       .from("online_payment_config")
       .update({
-        asaas_account_status: accountStatus,
+        asaas_account_status: dbAccountStatus,
         connection_status: connectionStatus,
+        asaas_documents_data: mappedDocuments.length > 0 ? mappedDocuments : null,
       })
       .eq("restaurant_id", restaurant_id);
 
@@ -88,13 +131,14 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        account_status: accountStatus,
+        account_status: dbAccountStatus,
         connection_status: connectionStatus,
-        account_data: {
-          name: accountData.name,
-          email: accountData.email,
-          cpfCnpj: accountData.cpfCnpj,
+        detailed_status: {
+          general: generalStatus,
+          commercialInfo: commercialInfoStatus,
+          documentation: documentationStatus,
         },
+        documents: mappedDocuments,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
