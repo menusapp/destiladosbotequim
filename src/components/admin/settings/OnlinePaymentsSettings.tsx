@@ -82,6 +82,7 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
   const [formIncomeValue, setFormIncomeValue] = useState("");
   const [formBirthDate, setFormBirthDate] = useState("");
   const [formCompanyType, setFormCompanyType] = useState("");
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -247,6 +248,28 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
     }
   };
 
+  const handleDisconnect = async () => {
+    if (!confirm("Tem certeza que deseja desconectar a conta de pagamentos? Você precisará criar uma nova conta para voltar a receber pagamentos online.")) return;
+    setDisconnecting(true);
+    try {
+      const { error } = await supabase
+        .from("online_payment_config")
+        .delete()
+        .eq("restaurant_id", restaurantId);
+      if (error) throw error;
+      setConfig(null);
+      setViewState("not_connected");
+      setDetailedStatus(null);
+      setPendingDocuments([]);
+      toast.success("Conta de pagamentos desconectada.");
+    } catch (error) {
+      console.error("Error disconnecting:", error);
+      toast.error("Erro ao desconectar conta");
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
   if (viewState === "loading") {
     return (
       <div className="flex items-center justify-center py-12">
@@ -309,6 +332,8 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
           checkingStatus={checkingStatus}
           detailedStatus={detailedStatus}
           documents={pendingDocuments}
+          onDisconnect={handleDisconnect}
+          disconnecting={disconnecting}
         />
       )}
 
@@ -317,6 +342,8 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
           config={config}
           onToggle={handleToggle}
           savingToggles={savingToggles}
+          onDisconnect={handleDisconnect}
+          disconnecting={disconnecting}
         />
       )}
     </div>
@@ -554,6 +581,8 @@ interface PendingViewProps {
   checkingStatus: boolean;
   detailedStatus: DetailedStatus | null;
   documents: AsaasDocument[];
+  onDisconnect: () => void;
+  disconnecting: boolean;
 }
 
 const statusLabel = (s: string) => {
@@ -574,7 +603,7 @@ const statusVariant = (s: string): "default" | "secondary" | "destructive" | "ou
   }
 };
 
-const PendingView = ({ config, onCheckStatus, checkingStatus, detailedStatus, documents }: PendingViewProps) => {
+const PendingView = ({ config, onCheckStatus, checkingStatus, detailedStatus, documents, onDisconnect, disconnecting }: PendingViewProps) => {
   const isRejected = config.asaas_account_status === "rejected";
   const pendingDocs = documents.filter(d => d.status !== "APPROVED" && d.status !== "NOT_REQUIRED");
 
@@ -678,21 +707,31 @@ const PendingView = ({ config, onCheckStatus, checkingStatus, detailedStatus, do
             <p><strong>Status:</strong> {config.asaas_account_status || "pending"}</p>
           </div>
 
-          <Button
-            variant="ghost"
-            onClick={onCheckStatus}
-            disabled={checkingStatus}
-            className="w-full"
-          >
-            {checkingStatus ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Verificando...
-              </>
-            ) : (
-              "Verificar Status"
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              onClick={onCheckStatus}
+              disabled={checkingStatus}
+              className="flex-1"
+            >
+              {checkingStatus ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verificando...
+                </>
+              ) : (
+                "Verificar Status"
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onDisconnect}
+              disabled={disconnecting}
+              className="text-destructive hover:text-destructive"
+            >
+              {disconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desconectar"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </>
@@ -705,9 +744,11 @@ interface ConnectedViewProps {
   config: PaymentConfig;
   onToggle: (field: string, value: boolean) => void;
   savingToggles: boolean;
+  onDisconnect: () => void;
+  disconnecting: boolean;
 }
 
-const ConnectedView = ({ config, onToggle, savingToggles }: ConnectedViewProps) => (
+const ConnectedView = ({ config, onToggle, savingToggles, onDisconnect, disconnecting }: ConnectedViewProps) => (
   <>
     <Card>
       <CardHeader>
@@ -785,9 +826,20 @@ const ConnectedView = ({ config, onToggle, savingToggles }: ConnectedViewProps) 
 
         <Separator />
 
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p><strong>ID da Conta:</strong> {config.asaas_account_id}</p>
-          <p><strong>Conectado em:</strong> {config.connected_at ? new Date(config.connected_at).toLocaleDateString("pt-BR") : "-"}</p>
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p><strong>ID da Conta:</strong> {config.asaas_account_id}</p>
+            <p><strong>Conectado em:</strong> {config.connected_at ? new Date(config.connected_at).toLocaleDateString("pt-BR") : "-"}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDisconnect}
+            disabled={disconnecting}
+            className="text-destructive hover:text-destructive"
+          >
+            {disconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desconectar Conta"}
+          </Button>
         </div>
       </CardContent>
     </Card>
