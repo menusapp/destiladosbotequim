@@ -17,15 +17,3 @@ verify_jwt = false
 
 [functions.loyalty-processor]
 verify_jwt = false
-
-[functions.asaas-provision]
-verify_jwt = false
-
-[functions.asaas-charge]
-verify_jwt = false
-
-[functions.asaas-webhook]
-verify_jwt = false
-
-[functions.asaas-status]
-verify_jwt = false
