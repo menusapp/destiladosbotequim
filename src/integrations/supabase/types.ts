@@ -47,30 +47,6 @@ export type Database = {
         }
         Relationships: []
       }
-      asaas_customers: {
-        Row: {
-          asaas_customer_id: string
-          created_at: string
-          customer_cpf: string
-          id: string
-          restaurant_id: string
-        }
-        Insert: {
-          asaas_customer_id: string
-          created_at?: string
-          customer_cpf: string
-          id?: string
-          restaurant_id: string
-        }
-        Update: {
-          asaas_customer_id?: string
-          created_at?: string
-          customer_cpf?: string
-          id?: string
-          restaurant_id?: string
-        }
-        Relationships: []
-      }
       bills: {
         Row: {
           change_amount: number | null
@@ -1603,18 +1579,14 @@ export type Database = {
         Row: {
           accept_card: boolean | null
           accept_pix: boolean | null
-          asaas_account_id: string | null
-          asaas_account_status: string | null
-          asaas_api_key: string | null
-          asaas_documents_data: Json | null
-          asaas_onboarding_url: string | null
-          asaas_wallet_id: string | null
           connected_at: string | null
           connection_status: string | null
           created_at: string | null
           enable_for_delivery: boolean | null
           enabled: boolean | null
           id: string
+          mp_access_token: string | null
+          mp_public_key: string | null
           provider: string | null
           require_prepayment: boolean | null
           restaurant_id: string
@@ -1623,18 +1595,14 @@ export type Database = {
         Insert: {
           accept_card?: boolean | null
           accept_pix?: boolean | null
-          asaas_account_id?: string | null
-          asaas_account_status?: string | null
-          asaas_api_key?: string | null
-          asaas_documents_data?: Json | null
-          asaas_onboarding_url?: string | null
-          asaas_wallet_id?: string | null
           connected_at?: string | null
           connection_status?: string | null
           created_at?: string | null
           enable_for_delivery?: boolean | null
           enabled?: boolean | null
           id?: string
+          mp_access_token?: string | null
+          mp_public_key?: string | null
           provider?: string | null
           require_prepayment?: boolean | null
           restaurant_id: string
@@ -1643,18 +1611,14 @@ export type Database = {
         Update: {
           accept_card?: boolean | null
           accept_pix?: boolean | null
-          asaas_account_id?: string | null
-          asaas_account_status?: string | null
-          asaas_api_key?: string | null
-          asaas_documents_data?: Json | null
-          asaas_onboarding_url?: string | null
-          asaas_wallet_id?: string | null
           connected_at?: string | null
           connection_status?: string | null
           created_at?: string | null
           enable_for_delivery?: boolean | null
           enabled?: boolean | null
           id?: string
+          mp_access_token?: string | null
+          mp_public_key?: string | null
           provider?: string | null
           require_prepayment?: boolean | null
           restaurant_id?: string
