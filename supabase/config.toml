@@ -17,3 +17,12 @@ verify_jwt = false
 
 [functions.loyalty-processor]
 verify_jwt = false
+
+[functions.mercadopago-charge]
+verify_jwt = false
+
+[functions.mercadopago-webhook]
+verify_jwt = false
+
+[functions.focusnfe-emit]
+verify_jwt = false

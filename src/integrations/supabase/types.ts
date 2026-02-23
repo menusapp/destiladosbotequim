@@ -2508,10 +2508,14 @@ export type Database = {
         Row: {
           auto_open_close: boolean | null
           banner_url: string | null
+          certificado_digital_ref: string | null
+          cnpj: string | null
           created_at: string | null
+          endereco_fiscal: string | null
           featured_section_enabled: boolean | null
           featured_section_title: string | null
           id: string
+          inscricao_estadual: string | null
           is_open: boolean | null
           login_require_name: boolean | null
           login_require_phone: boolean | null
@@ -2519,11 +2523,13 @@ export type Database = {
           loyalty_enabled: boolean | null
           loyalty_points_per_real: number | null
           loyalty_real_per_point: number | null
+          municipio_codigo: string | null
           name: string
           pickup_time_minutes: number | null
           prep_time_minutes: number | null
           primary_color: string | null
           rating: number | null
+          razao_social: string | null
           reservations_enabled: boolean | null
           reservations_follow_business_hours: boolean | null
           review_count: number | null
@@ -2532,15 +2538,20 @@ export type Database = {
           service_fee_percentage: number | null
           slug: string
           target_cmv_percentage: number | null
+          uf: string | null
           updated_at: string | null
         }
         Insert: {
           auto_open_close?: boolean | null
           banner_url?: string | null
+          certificado_digital_ref?: string | null
+          cnpj?: string | null
           created_at?: string | null
+          endereco_fiscal?: string | null
           featured_section_enabled?: boolean | null
           featured_section_title?: string | null
           id?: string
+          inscricao_estadual?: string | null
           is_open?: boolean | null
           login_require_name?: boolean | null
           login_require_phone?: boolean | null
@@ -2548,11 +2559,13 @@ export type Database = {
           loyalty_enabled?: boolean | null
           loyalty_points_per_real?: number | null
           loyalty_real_per_point?: number | null
+          municipio_codigo?: string | null
           name: string
           pickup_time_minutes?: number | null
           prep_time_minutes?: number | null
           primary_color?: string | null
           rating?: number | null
+          razao_social?: string | null
           reservations_enabled?: boolean | null
           reservations_follow_business_hours?: boolean | null
           review_count?: number | null
@@ -2561,15 +2574,20 @@ export type Database = {
           service_fee_percentage?: number | null
           slug: string
           target_cmv_percentage?: number | null
+          uf?: string | null
           updated_at?: string | null
         }
         Update: {
           auto_open_close?: boolean | null
           banner_url?: string | null
+          certificado_digital_ref?: string | null
+          cnpj?: string | null
           created_at?: string | null
+          endereco_fiscal?: string | null
           featured_section_enabled?: boolean | null
           featured_section_title?: string | null
           id?: string
+          inscricao_estadual?: string | null
           is_open?: boolean | null
           login_require_name?: boolean | null
           login_require_phone?: boolean | null
@@ -2577,11 +2595,13 @@ export type Database = {
           loyalty_enabled?: boolean | null
           loyalty_points_per_real?: number | null
           loyalty_real_per_point?: number | null
+          municipio_codigo?: string | null
           name?: string
           pickup_time_minutes?: number | null
           prep_time_minutes?: number | null
           primary_color?: string | null
           rating?: number | null
+          razao_social?: string | null
           reservations_enabled?: boolean | null
           reservations_follow_business_hours?: boolean | null
           review_count?: number | null
@@ -2590,6 +2610,7 @@ export type Database = {
           service_fee_percentage?: number | null
           slug?: string
           target_cmv_percentage?: number | null
+          uf?: string | null
           updated_at?: string | null
         }
         Relationships: []

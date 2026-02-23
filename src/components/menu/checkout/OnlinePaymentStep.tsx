@@ -101,7 +101,7 @@ export const OnlinePaymentStep = ({
         return;
       }
       setPaymentStatus("loading");
-      const { data, error } = await supabase.functions.invoke("asaas-charge", {
+      const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
           order_id: orderId,
@@ -183,7 +183,7 @@ export const OnlinePaymentStep = ({
     setErrorMessage("");
 
     try {
-      const { data, error } = await supabase.functions.invoke("asaas-charge", {
+      const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
           order_id: orderId,
