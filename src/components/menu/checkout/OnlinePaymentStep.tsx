@@ -95,9 +95,9 @@ export const OnlinePaymentStep = ({
 
   const createPixCharge = async () => {
     try {
-      if (amount < 5) {
+      if (amount < 1) {
         setPaymentStatus("error");
-        setErrorMessage("O valor mínimo para pagamento online é de R$ 5,00.");
+        setErrorMessage("O valor mínimo para pagamento online é de R$ 1,00.");
         return;
       }
       setPaymentStatus("loading");
@@ -174,8 +174,8 @@ export const OnlinePaymentStep = ({
       return;
     }
 
-    if (amount < 5) {
-      toast.error("O valor mínimo para pagamento online é de R$ 5,00.");
+    if (amount < 1) {
+      toast.error("O valor mínimo para pagamento online é de R$ 1,00.");
       return;
     }
 
