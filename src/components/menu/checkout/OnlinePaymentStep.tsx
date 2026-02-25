@@ -90,6 +90,21 @@ export const OnlinePaymentStep = ({
 
     let cancelled = false;
 
+    const waitForElement = (selector: string): Promise<Element> => {
+      return new Promise((resolve) => {
+        const el = document.querySelector(selector);
+        if (el) return resolve(el);
+        const observer = new MutationObserver(() => {
+          const found = document.querySelector(selector);
+          if (found) {
+            observer.disconnect();
+            resolve(found);
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+      });
+    };
+
     const initSecureFields = async () => {
       // Fetch public key
       const { data: config } = await supabase
@@ -100,8 +115,8 @@ export const OnlinePaymentStep = ({
 
       if (cancelled || !config?.mp_public_key) return;
 
-      // Wait for DOM containers to be ready
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      // Wait for DOM containers to actually exist (handles Dialog animation delay)
+      await waitForElement("#mp-card-number");
       if (cancelled) return;
 
       const mp = new (window as any).MercadoPago(config.mp_public_key);
