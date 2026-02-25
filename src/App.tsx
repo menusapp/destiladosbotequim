@@ -16,6 +16,7 @@ import OrderConfirmation from "./pages/OrderConfirmation";
 import Reservations from "./pages/Reservations";
 import NotFound from "./pages/NotFound";
 import { TableDetailView } from "./components/admin/TableDetailView";
+import MercadoPagoCallback from "./pages/MercadoPagoCallback";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,11 @@ const App = () => (
             <Route path="/admin/table/:tableId" element={
               <ProtectedRoute>
                 <TableDetailView />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/mercadopago/callback" element={
+              <ProtectedRoute>
+                <MercadoPagoCallback />
               </ProtectedRoute>
             } />
             <Route path="/menu/:restaurantSlug/:tableNumber" element={<Menu />} />
