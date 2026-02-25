@@ -25,7 +25,21 @@ Deno.serve(async (req) => {
       card_token,
       payment_method_id,
       installments,
+      // Cart items for anti-fraud
+      items,
     } = await req.json();
+
+    // Build additional_info.items for MP anti-fraud
+    const mpItems = Array.isArray(items) && items.length > 0
+      ? items.map((item: any) => ({
+          id: item.id || "unknown",
+          title: item.name || "Produto",
+          description: item.name || "Produto",
+          quantity: item.quantity || 1,
+          unit_price: Number(item.unit_price) || 0,
+          category_id: "food",
+        }))
+      : [{ id: "order", title: `Pedido ${order_id || "delivery"}`, description: "Pedido delivery", quantity: 1, unit_price: amount, category_id: "food" }];
 
     if (!restaurant_id || !amount || !billing_type) {
       return new Response(
@@ -71,6 +85,7 @@ Deno.serve(async (req) => {
           transaction_amount: amount,
           payment_method_id: "pix",
           notification_url: webhookUrl,
+          external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
           payer: {
             email: customer_email || "cliente@email.com",
             first_name: customer_name || "Cliente",
@@ -79,6 +94,9 @@ Deno.serve(async (req) => {
               : undefined,
           },
           description: `Pedido ${order_id || "delivery"}`,
+          additional_info: {
+            items: mpItems,
+          },
         }),
       });
 
@@ -148,6 +166,7 @@ Deno.serve(async (req) => {
           payment_method_id: payment_method_id,
           installments: installments || 1,
           notification_url: webhookUrl,
+          external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
           payer: {
             email: customer_email || "cliente@email.com",
             first_name: customer_name || "Cliente",
@@ -156,6 +175,9 @@ Deno.serve(async (req) => {
               : undefined,
           },
           description: `Pedido ${order_id || "delivery"}`,
+          additional_info: {
+            items: mpItems,
+          },
         }),
       });
 
