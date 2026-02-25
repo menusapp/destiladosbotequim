@@ -54,17 +54,18 @@ export const OnlinePaymentStep = ({
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Credit card state
-  const [cardNumber, setCardNumber] = useState("");
   const [cardHolderName, setCardHolderName] = useState("");
-  const [cardExpiryMonth, setCardExpiryMonth] = useState("");
-  const [cardExpiryYear, setCardExpiryYear] = useState("");
-  const [cardCcv, setCardCcv] = useState("");
   const [cardHolderCpf, setCardHolderCpf] = useState(customerCPF);
   const [cardHolderEmail, setCardHolderEmail] = useState(customerEmail || "");
   const [cardHolderPhone, setCardHolderPhone] = useState(customerPhone);
   const [cardHolderPostalCode, setCardHolderPostalCode] = useState("");
   const [cardHolderAddressNumber, setCardHolderAddressNumber] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [mpReady, setMpReady] = useState(false);
+
+  // Secure Fields refs
+  const mpInstanceRef = useRef<any>(null);
+  const secureFieldsRef = useRef<{ cardNumber?: any; expirationDate?: any; securityCode?: any }>({});
 
   // Timer for PIX expiration
   const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 minutes in seconds
@@ -82,6 +83,72 @@ export const OnlinePaymentStep = ({
       }
     };
   }, []);
+
+  // Initialize Mercado Pago Secure Fields for credit card
+  useEffect(() => {
+    if (method !== "credit_card" || paymentStatus !== "waiting") return;
+
+    let cancelled = false;
+
+    const initSecureFields = async () => {
+      // Fetch public key
+      const { data: config } = await supabase
+        .from("online_payment_config")
+        .select("mp_public_key")
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
+
+      if (cancelled || !config?.mp_public_key) return;
+
+      // Wait for DOM containers to be ready
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      if (cancelled) return;
+
+      const mp = new (window as any).MercadoPago(config.mp_public_key);
+      mpInstanceRef.current = mp;
+
+      const style = {
+        height: "100%",
+        padding: "10px",
+        fontSize: "16px",
+        color: "#333",
+        placeholderColor: "#999",
+      };
+
+      try {
+        const cardNumberField = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style });
+        const expirationDateField = mp.fields.create("expirationDate", { placeholder: "MM/AA", style });
+        const securityCodeField = mp.fields.create("securityCode", { placeholder: "CVV", style });
+
+        cardNumberField.mount("#mp-card-number");
+        expirationDateField.mount("#mp-expiration-date");
+        securityCodeField.mount("#mp-security-code");
+
+        secureFieldsRef.current = {
+          cardNumber: cardNumberField,
+          expirationDate: expirationDateField,
+          securityCode: securityCodeField,
+        };
+        setMpReady(true);
+      } catch (err) {
+        console.error("[SecureFields] Mount error:", err);
+      }
+    };
+
+    initSecureFields();
+
+    return () => {
+      cancelled = true;
+      try {
+        secureFieldsRef.current.cardNumber?.unmount();
+        secureFieldsRef.current.expirationDate?.unmount();
+        secureFieldsRef.current.securityCode?.unmount();
+      } catch {}
+      secureFieldsRef.current = {};
+      mpInstanceRef.current = null;
+      setMpReady(false);
+    };
+  }, [method, paymentStatus, restaurantId]);
 
   // Timer countdown for PIX
   useEffect(() => {
@@ -174,13 +241,18 @@ export const OnlinePaymentStep = ({
   };
 
   const handleCreditCardPayment = async () => {
-    if (!cardNumber || !cardHolderName || !cardExpiryMonth || !cardExpiryYear || !cardCcv) {
-      toast.error("Preencha todos os dados do cartão");
+    if (!cardHolderName) {
+      toast.error("Preencha o nome no cartão");
       return;
     }
 
     if (!cardHolderCpf || !cardHolderPostalCode || !cardHolderAddressNumber) {
       toast.error("Preencha CPF, CEP e número do endereço do titular");
+      return;
+    }
+
+    if (!mpInstanceRef.current || !mpReady) {
+      toast.error("Campos do cartão ainda carregando. Aguarde.");
       return;
     }
 
@@ -193,26 +265,9 @@ export const OnlinePaymentStep = ({
     setErrorMessage("");
 
     try {
-      // 1. Fetch restaurant's MP public key
-      const { data: config, error: configError } = await supabase
-        .from("online_payment_config")
-        .select("mp_public_key")
-        .eq("restaurant_id", restaurantId)
-        .maybeSingle();
-
-      if (configError || !config?.mp_public_key) {
-        throw new Error("Mercado Pago não configurado para este restaurante");
-      }
-
-      // 2. Initialize MP SDK and tokenize card
-      const mp = new (window as any).MercadoPago(config.mp_public_key);
-      
-      const cardTokenResult = await mp.createCardToken({
-        cardNumber: cardNumber.replace(/\s/g, ""),
+      // Tokenize via Secure Fields
+      const cardTokenResult = await mpInstanceRef.current.fields.createCardToken({
         cardholderName: cardHolderName,
-        cardExpirationMonth: cardExpiryMonth,
-        cardExpirationYear: cardExpiryYear,
-        securityCode: cardCcv,
         identificationType: "CPF",
         identificationNumber: cardHolderCpf.replace(/\D/g, ""),
       });
@@ -221,29 +276,7 @@ export const OnlinePaymentStep = ({
         throw new Error("Erro ao tokenizar cartão. Verifique os dados e tente novamente.");
       }
 
-      // 3. Detect payment_method_id from BIN
-      const bin = cardNumber.replace(/\s/g, "").substring(0, 6);
-      let paymentMethodId = "visa"; // default
-      try {
-        const binResponse = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?bins=${bin}`, {
-          headers: { Authorization: `Bearer ${config.mp_public_key}` },
-        });
-        if (binResponse.ok) {
-          const binData = await binResponse.json();
-          if (binData?.results?.[0]?.id) {
-            paymentMethodId = binData.results[0].id;
-          }
-        }
-      } catch {
-        // Fallback: detect by first digit
-        const firstDigit = cardNumber.replace(/\s/g, "")[0];
-        if (firstDigit === "4") paymentMethodId = "visa";
-        else if (firstDigit === "5") paymentMethodId = "master";
-        else if (firstDigit === "3") paymentMethodId = "amex";
-        else if (firstDigit === "6") paymentMethodId = "elo";
-      }
-
-      // 4. Send tokenized data to backend
+      // Send tokenized data to backend
       const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
@@ -255,7 +288,7 @@ export const OnlinePaymentStep = ({
           customer_email: customerEmail || cardHolderEmail,
           customer_phone: customerPhone || cardHolderPhone,
           card_token: cardTokenResult.id,
-          payment_method_id: paymentMethodId,
+          payment_method_id: cardTokenResult.payment_method_id || "visa",
           installments: 1,
           items: cartItems,
         },
@@ -291,11 +324,6 @@ export const OnlinePaymentStep = ({
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const formatCardNumber = (value: string) => {
-    const digits = value.replace(/\D/g, "").slice(0, 16);
-    return digits.replace(/(\d{4})(?=\d)/g, "$1 ");
   };
 
   // ─── CONFIRMED STATE ───
@@ -446,12 +474,7 @@ export const OnlinePaymentStep = ({
         </h3>
         <div className="space-y-2">
           <Label>Número do Cartão *</Label>
-          <Input
-            value={cardNumber}
-            onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-            placeholder="0000 0000 0000 0000"
-            maxLength={19}
-          />
+          <div id="mp-card-number" className="h-[45px] w-full border border-input rounded-md bg-background relative"></div>
         </div>
         <div className="space-y-2">
           <Label>Nome no Cartão *</Label>
@@ -461,34 +484,14 @@ export const OnlinePaymentStep = ({
             placeholder="NOME COMO NO CARTÃO"
           />
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <div className="space-y-2">
-            <Label>Mês *</Label>
-            <Input
-              value={cardExpiryMonth}
-              onChange={(e) => setCardExpiryMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
-              placeholder="MM"
-              maxLength={2}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Ano *</Label>
-            <Input
-              value={cardExpiryYear}
-              onChange={(e) => setCardExpiryYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              placeholder="AAAA"
-              maxLength={4}
-            />
+            <Label>Validade *</Label>
+            <div id="mp-expiration-date" className="h-[45px] w-full border border-input rounded-md bg-background relative"></div>
           </div>
           <div className="space-y-2">
             <Label>CVV *</Label>
-            <Input
-              type="password"
-              value={cardCcv}
-              onChange={(e) => setCardCcv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              placeholder="***"
-              maxLength={4}
-            />
+            <div id="mp-security-code" className="h-[45px] w-full border border-input rounded-md bg-background relative"></div>
           </div>
         </div>
       </div>
