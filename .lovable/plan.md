@@ -1,81 +1,84 @@
 
 
-## Diagnostico
+## Plano: Mercado Pago Connect (OAuth 2.0)
 
-O erro `"payment_method_id attribute can't be null"` nos logs do `mercadopago-charge` ocorre porque a API do Mercado Pago exige que os dados do cartao sejam **tokenizados no frontend** usando o SDK JavaScript do Mercado Pago (`MercadoPago.js`). O backend atual espera receber um `card_token`, mas o frontend envia os dados brutos do cartao (numero, validade, CVV), que nunca sao convertidos em token.
+Implementacao completa do fluxo OAuth para conectar contas Mercado Pago dos restaurantes, substituindo a entrada manual de credenciais.
 
-O Mercado Pago **proibe** que dados sensíveis do cartao trafeguem diretamente para o seu servidor. O fluxo correto e:
+---
 
-```text
-Frontend (browser)                    Mercado Pago SDK             Seu Backend
-     |                                      |                          |
-     |-- dados do cartao ----------------->|                          |
-     |                                      |-- tokeniza via API MP -->|
-     |<-- card_token -----------------------|                          |
-     |                                      |                          |
-     |-- card_token + amount ------------------------------------->|
-     |                                      |                          |-- POST /v1/payments
+### 1. Migration: Adicionar colunas na tabela `online_payment_config`
+
+Adicionar `mp_refresh_token` (TEXT) e `mp_user_id` (TEXT) a tabela existente.
+
+```sql
+ALTER TABLE online_payment_config 
+  ADD COLUMN IF NOT EXISTS mp_refresh_token TEXT,
+  ADD COLUMN IF NOT EXISTS mp_user_id TEXT;
 ```
 
-## Plano de Correcao
+---
 
-### 1. Carregar o SDK do Mercado Pago no frontend
+### 2. Edge Function: `mercadopago-oauth`
 
-Adicionar o script `https://sdk.mercadopago.com/js/v2` no `index.html` para disponibilizar o objeto global `MercadoPago`.
+Criar `supabase/functions/mercadopago-oauth/index.ts`.
 
-**Arquivo:** `index.html` -- adicionar `<script src="https://sdk.mercadopago.com/js/v2"></script>` no `<head>`.
+- Aceita POST com `{ code, state, redirectUri }`
+- Troca o `code` por tokens via `POST https://api.mercadopago.com/oauth/token`
+- Usa `MERCADOPAGO_APP_ID` e `MERCADOPAGO_CLIENT_SECRET` (secrets ja existentes)
+- Salva `access_token`, `public_key`, `refresh_token`, `user_id` na tabela `online_payment_config` usando service role key (ignora RLS)
+- Atualiza `connection_status` para `connected` e `connected_at`
+- Retorna sucesso/erro com CORS headers
 
-### 2. Buscar a `mp_public_key` do restaurante
+Registrar em `supabase/config.toml`:
+```toml
+[functions.mercadopago-oauth]
+verify_jwt = false
+```
 
-O frontend precisa da chave publica do Mercado Pago do restaurante para inicializar o SDK. Antes de tokenizar, fazer um fetch na tabela `online_payment_config` para obter `mp_public_key`.
+---
 
-### 3. Tokenizar o cartao no frontend antes de enviar
+### 3. Pagina de Callback: `src/pages/MercadoPagoCallback.tsx`
 
-No `OnlinePaymentStep.tsx`, na funcao `handleCreditCardPayment`:
+- Rota: `/admin/mercadopago/callback`
+- No `useEffect`, captura `code` e `state` dos search params
+- Chama `supabase.functions.invoke('mercadopago-oauth', { body: { code, state, redirectUri } })`
+- Sucesso: toast verde + redirect para `/admin` (que volta para config-pagamentos-online)
+- Erro: toast vermelho + redirect para `/admin`
 
-1. Inicializar `const mp = new MercadoPago(publicKey)`.
-2. Chamar `mp.createCardToken({ cardNumber, cardholderName, cardExpirationMonth, cardExpirationYear, securityCode, identificationType: "CPF", identificationNumber: cpf })`.
-3. Enviar o `token.id` resultante como `card_token` para o backend.
+Adicionar rota em `App.tsx` dentro de `ProtectedRoute`.
 
-### 4. Ajustar o backend para usar o token corretamente
+---
 
-O backend (`mercadopago-charge`) ja espera `card_token` e o envia como `token` na API. Porem, ele tambem precisa do `payment_method_id` (ex: "visa", "master"). O SDK do Mercado Pago retorna isso junto com o token. Adicionar `payment_method_id` no payload enviado ao MP.
+### 4. Atualizar `OnlinePaymentsSettings.tsx`
 
-### Resumo dos arquivos alterados
+- Remover inputs manuais de Access Token e Public Key
+- Remover estados `mpAccessToken`, `mpPublicKey`, `handleConnect`
+- Adicionar botao "Conectar com Mercado Pago" que redireciona para:
+  ```
+  https://auth.mercadopago.com.br/authorization?client_id=${MP_APP_ID}&response_type=code&platform_id=mp&state=${configId}&redirect_uri=${origin}/admin/mercadopago/callback
+  ```
+- O `configId` sera o `id` do registro em `online_payment_config`. Se nao existir, criar um registro vazio primeiro (upsert com `connection_status: 'pending'`)
+- O `MP_APP_ID` precisa estar acessivel no frontend. Opcoes:
+  - Usar o `MERCADOPAGO_APP_ID` que ja esta nos secrets, exposto via uma edge function simples, OU
+  - Hardcodar como variavel de ambiente VITE (mas nao temos). 
+  - **Melhor abordagem**: Criar uma mini edge function `mercadopago-app-id` que retorna o client_id, ou embutir no `mercadopago-oauth` com GET. Usaremos GET no `mercadopago-oauth` para retornar apenas o `client_id`.
 
-| Arquivo | Mudanca |
+**Ajuste na edge function**: Alem do POST, aceitar GET que retorna `{ client_id }` lido de `Deno.env.get('MERCADOPAGO_APP_ID')`.
+
+---
+
+### Resumo dos arquivos
+
+| Arquivo | Acao |
 |---|---|
-| `index.html` | Adicionar script do SDK MercadoPago.js |
-| `src/components/menu/checkout/OnlinePaymentStep.tsx` | Buscar `mp_public_key`, tokenizar cartao com SDK, enviar `card_token` e `payment_method_id` |
-| `supabase/functions/mercadopago-charge/index.ts` | Aceitar `payment_method_id` do frontend e incluir no payload da API |
+| Migration SQL | Adicionar `mp_refresh_token`, `mp_user_id` |
+| `supabase/functions/mercadopago-oauth/index.ts` | Criar (POST: troca code, GET: retorna client_id) |
+| `supabase/config.toml` | Adicionar `[functions.mercadopago-oauth]` |
+| `src/pages/MercadoPagoCallback.tsx` | Criar pagina de callback |
+| `src/App.tsx` | Adicionar rota `/admin/mercadopago/callback` |
+| `src/components/admin/settings/OnlinePaymentsSettings.tsx` | Substituir inputs por botao OAuth |
 
-### Detalhes tecnicos
+### Secrets necessarios
 
-**Tokenizacao no frontend:**
-```typescript
-const mp = new window.MercadoPago(publicKey);
-const cardToken = await mp.createCardToken({
-  cardNumber: cardNumber.replace(/\s/g, ""),
-  cardholderName: cardHolderName,
-  cardExpirationMonth: cardExpiryMonth,
-  cardExpirationYear: cardExpiryYear,
-  securityCode: cardCcv,
-  identificationType: "CPF",
-  identificationNumber: customerCPF.replace(/\D/g, ""),
-});
-// cardToken.id -> enviar como card_token
-```
-
-**Backend -- adicionar payment_method_id no body:**
-```typescript
-body: JSON.stringify({
-  transaction_amount: amount,
-  token: card_token,
-  payment_method_id: payment_method_id, // "visa", "master", etc.
-  installments: installments || 1,
-  ...
-})
-```
-
-O `payment_method_id` pode ser detectado automaticamente pelo primeiro digito do cartao (BIN) ou retornado pelo SDK. Implementaremos deteccao automatica baseada no BIN para simplicidade.
+Ja existem: `MERCADOPAGO_APP_ID` e `MERCADOPAGO_CLIENT_SECRET`. Nenhum novo secret necessario.
 
