@@ -642,6 +642,12 @@ export const CheckoutDrawer = ({
             customerPhone={customerData?.phone || sessionStorage.getItem("customer_phone") || ""}
             customerEmail={sessionStorage.getItem("customer_email") || ""}
             primaryColor={primaryColorFromRestaurant(restaurant)}
+            cartItems={cart.filter(i => !i.isRewardItem && !i.isCouponFreeItem).map(i => ({
+              id: i.product.id,
+              name: i.product.name,
+              quantity: i.quantity,
+              unit_price: i.product.promotional_price ?? i.product.price,
+            }))}
           />
         );
       case "summary":

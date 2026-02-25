@@ -8,6 +8,13 @@ import { Loader2, Copy, CheckCircle2, AlertCircle, CreditCard, Smartphone, Clock
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+interface CartItemForPayment {
+  id: string;
+  name: string;
+  quantity: number;
+  unit_price: number;
+}
+
 interface OnlinePaymentStepProps {
   onBack: () => void;
   onConfirm: (onlinePaymentId: string) => void;
@@ -20,6 +27,7 @@ interface OnlinePaymentStepProps {
   customerPhone: string;
   customerEmail?: string;
   primaryColor?: string;
+  cartItems?: CartItemForPayment[];
 }
 
 export const OnlinePaymentStep = ({
@@ -34,6 +42,7 @@ export const OnlinePaymentStep = ({
   customerPhone,
   customerEmail,
   primaryColor,
+  cartItems,
 }: OnlinePaymentStepProps) => {
   // PIX state
   const [pixQrCode, setPixQrCode] = useState<string | null>(null);
@@ -111,6 +120,7 @@ export const OnlinePaymentStep = ({
           customer_cpf: customerCPF,
           customer_email: customerEmail,
           customer_phone: customerPhone,
+          items: cartItems,
         },
       });
 
@@ -247,6 +257,7 @@ export const OnlinePaymentStep = ({
           card_token: cardTokenResult.id,
           payment_method_id: paymentMethodId,
           installments: 1,
+          items: cartItems,
         },
       });
 
