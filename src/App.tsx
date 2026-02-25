@@ -45,11 +45,7 @@ const App = () => (
                 <TableDetailView />
               </ProtectedRoute>
             } />
-            <Route path="/admin/mercadopago/callback" element={
-              <ProtectedRoute>
-                <MercadoPagoCallback />
-              </ProtectedRoute>
-            } />
+            <Route path="/admin/mercadopago/callback" element={<MercadoPagoCallback />} />
             <Route path="/menu/:restaurantSlug/:tableNumber" element={<Menu />} />
             <Route path="/comanda/:restaurantSlug/:tableNumber" element={<Comanda />} />
             <Route path="/delivery/:restaurantSlug" element={<DeliveryMenu />} />
