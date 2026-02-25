@@ -426,7 +426,7 @@ export const OnlinePaymentStep = ({
       <div className="space-y-4">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
         <div className="space-y-2">
-          <Label>Número do Cartão *</Label>
+          <Label className="w-fit">Número do Cartão *</Label>
           <div id="mp-card-number" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"></div>
         </div>
         <div className="space-y-2">
@@ -440,11 +440,11 @@ export const OnlinePaymentStep = ({
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Validade *</Label>
+            <Label className="w-fit">Validade *</Label>
             <div id="mp-expiration-date" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"></div>
           </div>
           <div className="space-y-2">
-            <Label>CVV *</Label>
+            <Label className="w-fit">CVV *</Label>
             <div id="mp-security-code" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"></div>
           </div>
         </div>
