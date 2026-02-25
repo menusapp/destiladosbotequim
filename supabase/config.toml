@@ -26,6 +26,3 @@ verify_jwt = false
 
 [functions.focusnfe-emit]
 verify_jwt = false
-
-[functions.mercadopago-cards]
-verify_jwt = false

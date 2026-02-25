@@ -732,59 +732,6 @@ export type Database = {
         }
         Relationships: []
       }
-      customer_cards: {
-        Row: {
-          card_id: string
-          created_at: string | null
-          customer_cpf: string
-          customer_phone: string
-          expiration_month: number | null
-          expiration_year: number | null
-          first_six_digits: string | null
-          id: string
-          last_four_digits: string
-          mp_customer_id: string
-          payment_method_id: string
-          restaurant_id: string
-        }
-        Insert: {
-          card_id: string
-          created_at?: string | null
-          customer_cpf: string
-          customer_phone: string
-          expiration_month?: number | null
-          expiration_year?: number | null
-          first_six_digits?: string | null
-          id?: string
-          last_four_digits: string
-          mp_customer_id: string
-          payment_method_id: string
-          restaurant_id: string
-        }
-        Update: {
-          card_id?: string
-          created_at?: string | null
-          customer_cpf?: string
-          customer_phone?: string
-          expiration_month?: number | null
-          expiration_year?: number | null
-          first_six_digits?: string | null
-          id?: string
-          last_four_digits?: string
-          mp_customer_id?: string
-          payment_method_id?: string
-          restaurant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_cards_restaurant_id_fkey"
-            columns: ["restaurant_id"]
-            isOneToOne: false
-            referencedRelation: "restaurants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       customer_loyalty_progress: {
         Row: {
           created_at: string | null

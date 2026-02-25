@@ -687,7 +687,7 @@ export const CheckoutDrawer = ({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onClose} handleOnly>
+    <Drawer open={open} onOpenChange={onClose}>
       <DrawerContent className="max-h-[95vh]">
         <DrawerHeader className="border-b border-border pb-4">
           <div className="flex items-center justify-between mb-4">
