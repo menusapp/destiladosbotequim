@@ -52,6 +52,7 @@ Deno.serve(async (req) => {
     }
 
     const mpAccessToken = config.mp_access_token;
+    const webhookUrl = `${supabaseUrl}/functions/v1/mercadopago-webhook`;
 
     let mpResponse: Response;
     let mpData: any;
@@ -68,6 +69,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           transaction_amount: amount,
           payment_method_id: "pix",
+          notification_url: webhookUrl,
           payer: {
             email: customer_email || "cliente@email.com",
             first_name: customer_name || "Cliente",
@@ -143,6 +145,7 @@ Deno.serve(async (req) => {
           transaction_amount: amount,
           token: card_token,
           installments: installments || 1,
+          notification_url: webhookUrl,
           payer: {
             email: customer_email || "cliente@email.com",
             first_name: customer_name || "Cliente",
