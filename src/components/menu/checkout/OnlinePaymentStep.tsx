@@ -86,103 +86,55 @@ export const OnlinePaymentStep = ({
 
   // Initialize Mercado Pago Secure Fields for credit card
   useEffect(() => {
-    if (method !== "credit_card" || paymentStatus !== "waiting") return;
-
-    let cancelled = false;
-
-    const waitForElement = (selector: string): Promise<Element> => {
-      return new Promise((resolve) => {
-        const el = document.querySelector(selector);
-        if (el) return resolve(el);
-        const observer = new MutationObserver(() => {
-          const found = document.querySelector(selector);
-          if (found) {
-            observer.disconnect();
-            resolve(found);
-          }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-      });
-    };
-
-    const initSecureFields = async () => {
-      // Fetch public key
-      const { data: config } = await supabase
-        .from("online_payment_config")
-        .select("mp_public_key")
-        .eq("restaurant_id", restaurantId)
-        .maybeSingle();
-
-      if (cancelled || !config?.mp_public_key) return;
-
-      // Wait for DOM containers to actually exist (handles Dialog animation delay)
-      await waitForElement("#mp-card-number");
-      if (cancelled) return;
-
-      const mp = new (window as any).MercadoPago(config.mp_public_key);
-      mpInstanceRef.current = mp;
-
-      const style = {
-        height: "100%",
-        padding: "10px",
-        fontSize: "16px",
-        color: "#333",
-        placeholderColor: "#999",
-      };
-
+    if (method !== "credit_card") return;
+    let isCancelled = false;
+    const initMP = async () => {
+      await new Promise((r) => setTimeout(r, 600)); // Espera o modal abrir
+      if (isCancelled) return;
+      const checkContainer = () => document.getElementById("mp-card-number");
+      if (!checkContainer()) {
+        setTimeout(initMP, 200);
+        return;
+      }
       try {
-        const cardNumberField = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style });
-        const expirationDateField = mp.fields.create("expirationDate", { placeholder: "MM/AA", style });
-        const securityCodeField = mp.fields.create("securityCode", { placeholder: "CVV", style });
-
-        cardNumberField.mount("#mp-card-number");
-        expirationDateField.mount("#mp-expiration-date");
-        securityCodeField.mount("#mp-security-code");
-
-        secureFieldsRef.current = {
-          cardNumber: cardNumberField,
-          expirationDate: expirationDateField,
-          securityCode: securityCodeField,
-        };
+        const { data: config } = await supabase
+          .from("online_payment_config")
+          .select("mp_public_key")
+          .eq("restaurant_id", restaurantId)
+          .maybeSingle();
+        if (!config?.mp_public_key || isCancelled) return;
+        secureFieldsRef.current.forEach((f) => {
+          try {
+            f.unmount();
+          } catch (e) {}
+        });
+        secureFieldsRef.current = [];
+        const mp = new (window as any).MercadoPago(config.mp_public_key);
+        mpInstanceRef.current = mp;
+        const fieldStyle = { fontSize: "16px", color: "#333333", placeholderColor: "#999999" };
+        const cardNumber = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style: fieldStyle });
+        const expirationDate = mp.fields.create("expirationDate", { placeholder: "MM/AA", style: fieldStyle });
+        const securityCode = mp.fields.create("securityCode", { placeholder: "CVV", style: fieldStyle });
+        cardNumber.mount("mp-card-number");
+        expirationDate.mount("mp-expiration-date");
+        securityCode.mount("mp-security-code");
+        secureFieldsRef.current = [cardNumber, expirationDate, securityCode];
         setMpReady(true);
       } catch (err) {
-        console.error("[SecureFields] Mount error:", err);
+        console.error("Erro MP:", err);
       }
     };
-
-    initSecureFields();
-
+    initMP();
     return () => {
-      cancelled = true;
-      try {
-        secureFieldsRef.current.cardNumber?.unmount();
-        secureFieldsRef.current.expirationDate?.unmount();
-        secureFieldsRef.current.securityCode?.unmount();
-      } catch {}
-      secureFieldsRef.current = {};
-      mpInstanceRef.current = null;
+      isCancelled = true;
+      secureFieldsRef.current.forEach((f) => {
+        try {
+          f.unmount();
+        } catch (e) {}
+      });
       setMpReady(false);
     };
-  }, [method, paymentStatus, restaurantId]);
-
-  // Timer countdown for PIX
-  useEffect(() => {
-    if (method !== "pix" || paymentStatus !== "waiting") return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setPaymentStatus("error");
-          setErrorMessage("QR Code Pix expirado. Tente novamente.");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [method, paymentStatus]);
+  }, [method, restaurantId]);
 
   const createPixCharge = async () => {
     try {
@@ -233,11 +185,7 @@ export const OnlinePaymentStep = ({
 
   const startPolling = (paymentId: string) => {
     pollingRef.current = setInterval(async () => {
-      const { data, error } = await supabase
-        .from("online_payments")
-        .select("status")
-        .eq("id", paymentId)
-        .maybeSingle();
+      const { data, error } = await supabase.from("online_payments").select("status").eq("id", paymentId).maybeSingle();
 
       if (!error && data?.status === "confirmed") {
         if (pollingRef.current) clearInterval(pollingRef.current);
@@ -375,9 +323,7 @@ export const OnlinePaymentStep = ({
             <Smartphone className="h-5 w-5" />
             Pague via Pix
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Escaneie o QR Code ou copie o código para pagar
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Escaneie o QR Code ou copie o código para pagar</p>
         </div>
 
         {/* Amount */}
@@ -394,12 +340,7 @@ export const OnlinePaymentStep = ({
               <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
               <div>
                 <p className="font-medium text-sm text-destructive">{errorMessage}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={createPixCharge}
-                >
+                <Button variant="outline" size="sm" className="mt-2" onClick={createPixCharge}>
                   Tentar novamente
                 </Button>
               </div>
@@ -412,11 +353,7 @@ export const OnlinePaymentStep = ({
           <>
             <div className="flex justify-center">
               <div className="bg-white p-4 rounded-lg border">
-                <img
-                  src={`data:image/png;base64,${pixQrCodeBase64}`}
-                  alt="QR Code Pix"
-                  className="w-56 h-56"
-                />
+                <img src={`data:image/png;base64,${pixQrCodeBase64}`} alt="QR Code Pix" className="w-56 h-56" />
               </div>
             </div>
 
@@ -425,11 +362,7 @@ export const OnlinePaymentStep = ({
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Código Pix (Copia e Cola)</Label>
                 <div className="flex gap-2">
-                  <Input
-                    value={pixQrCode}
-                    readOnly
-                    className="text-xs font-mono"
-                  />
+                  <Input value={pixQrCode} readOnly className="text-xs font-mono" />
                   <Button variant="outline" size="icon" onClick={handleCopyPixCode}>
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -484,12 +417,13 @@ export const OnlinePaymentStep = ({
 
       {/* Card data */}
       <div className="space-y-3">
-        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-          Dados do Cartão
-        </h3>
+        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
         <div className="space-y-2">
           <Label>Número do Cartão *</Label>
-          <div id="mp-card-number" className="h-[45px] w-full border border-input rounded-md bg-background relative"></div>
+          <div
+            id="mp-card-number"
+            className="h-[45px] w-full border border-input rounded-md bg-background relative"
+          ></div>
         </div>
         <div className="space-y-2">
           <Label>Nome no Cartão *</Label>
@@ -502,11 +436,17 @@ export const OnlinePaymentStep = ({
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-2">
             <Label>Validade *</Label>
-            <div id="mp-expiration-date" className="h-[45px] w-full border border-input rounded-md bg-background relative"></div>
+            <div
+              id="mp-expiration-date"
+              className="h-[45px] w-full border border-input rounded-md bg-background relative"
+            ></div>
           </div>
           <div className="space-y-2">
             <Label>CVV *</Label>
-            <div id="mp-security-code" className="h-[45px] w-full border border-input rounded-md bg-background relative"></div>
+            <div
+              id="mp-security-code"
+              className="h-[45px] w-full border border-input rounded-md bg-background relative"
+            ></div>
           </div>
         </div>
       </div>
@@ -515,9 +455,7 @@ export const OnlinePaymentStep = ({
 
       {/* Holder info */}
       <div className="space-y-3">
-        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-          Dados do Titular
-        </h3>
+        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Titular</h3>
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-2">
             <Label>CPF do Titular *</Label>
