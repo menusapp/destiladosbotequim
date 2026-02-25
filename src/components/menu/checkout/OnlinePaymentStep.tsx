@@ -622,7 +622,7 @@ export const OnlinePaymentStep = ({
               </Label>
               <div
                 id="mp-card-number"
-                className="relative h-10 w-full min-h-[40px] rounded-md border border-input bg-background [&>iframe]:h-full [&>iframe]:w-full"
+                className="relative z-10 pointer-events-auto h-10 w-full min-h-[40px] rounded-md border border-input bg-background [&>iframe]:h-full [&>iframe]:w-full"
               />
             </div>
 
@@ -642,14 +642,14 @@ export const OnlinePaymentStep = ({
                 <Label>Validade *</Label>
                 <div
                   id="mp-expiration-date"
-                  className="relative h-10 w-full min-h-[40px] rounded-md border border-input bg-background [&>iframe]:h-full [&>iframe]:w-full"
+                  className="relative z-10 pointer-events-auto h-10 w-full min-h-[40px] rounded-md border border-input bg-background [&>iframe]:h-full [&>iframe]:w-full"
                 />
               </div>
               <div className="space-y-2">
                 <Label>CVV *</Label>
                 <div
                   id="mp-security-code"
-                  className="relative h-10 w-full min-h-[40px] rounded-md border border-input bg-background [&>iframe]:h-full [&>iframe]:w-full"
+                  className="relative z-10 pointer-events-auto h-10 w-full min-h-[40px] rounded-md border border-input bg-background [&>iframe]:h-full [&>iframe]:w-full"
                 />
               </div>
             </div>
