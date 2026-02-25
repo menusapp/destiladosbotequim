@@ -1,0 +1,1 @@
+ALTER TABLE online_payments ALTER COLUMN provider SET DEFAULT 'mercadopago';
