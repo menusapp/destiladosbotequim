@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +10,7 @@ import {
   Loader2,
   CheckCircle2,
   Smartphone,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,11 +40,7 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
   const [config, setConfig] = useState<PaymentConfig | null>(null);
   const [savingToggles, setSavingToggles] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-
-  // Form fields for connecting MP
-  const [mpAccessToken, setMpAccessToken] = useState("");
-  const [mpPublicKey, setMpPublicKey] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [startingOAuth, setStartingOAuth] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -76,39 +72,42 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
     }
   };
 
-  const handleConnect = async () => {
-    if (!mpAccessToken || !mpPublicKey) {
-      toast.error("Preencha o Access Token e a Public Key do Mercado Pago");
-      return;
-    }
-
-    setSubmitting(true);
+  const handleStartOAuth = async () => {
+    setStartingOAuth(true);
     try {
-      const configData = {
-        restaurant_id: restaurantId,
-        provider: "mercadopago",
-        mp_access_token: mpAccessToken,
-        mp_public_key: mpPublicKey,
-        connection_status: "connected",
-        connected_at: new Date().toISOString(),
-        enabled: false,
-      };
+      // 1. Ensure a config row exists to use as state
+      let configId = config?.id;
+      if (!configId) {
+        const { data: newConfig, error: upsertError } = await supabase
+          .from("online_payment_config")
+          .upsert(
+            { restaurant_id: restaurantId, connection_status: "pending", provider: "mercadopago" },
+            { onConflict: "restaurant_id" }
+          )
+          .select("id")
+          .single();
 
-      const { error } = await supabase
-        .from("online_payment_config")
-        .upsert(configData, { onConflict: "restaurant_id" });
+        if (upsertError) throw upsertError;
+        configId = newConfig.id;
+      }
+
+      // 2. Fetch client_id from edge function
+      const { data, error } = await supabase.functions.invoke("mercadopago-oauth", {
+        method: "GET",
+      });
 
       if (error) throw error;
+      if (!data?.client_id) throw new Error("client_id não disponível");
 
-      toast.success("Mercado Pago conectado com sucesso!");
-      setMpAccessToken("");
-      setMpPublicKey("");
-      await fetchConfig();
+      // 3. Redirect to Mercado Pago authorization
+      const redirectUri = `${window.location.origin}/admin/mercadopago/callback`;
+      const authUrl = `https://auth.mercadopago.com.br/authorization?client_id=${data.client_id}&response_type=code&platform_id=mp&state=${configId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+      window.location.href = authUrl;
     } catch (error: any) {
-      console.error("Error connecting MP:", error);
-      toast.error(error.message || "Erro ao conectar Mercado Pago");
-    } finally {
-      setSubmitting(false);
+      console.error("Error starting OAuth:", error);
+      toast.error(error.message || "Erro ao iniciar conexão com Mercado Pago");
+      setStartingOAuth(false);
     }
   };
 
@@ -185,45 +184,29 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
               Conectar Mercado Pago
             </CardTitle>
             <CardDescription>
-              Insira as credenciais do Mercado Pago para ativar pagamentos online
+              Conecte sua conta do Mercado Pago para ativar pagamentos online de forma segura via OAuth
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Access Token *</Label>
-              <Input
-                value={mpAccessToken}
-                onChange={(e) => setMpAccessToken(e.target.value)}
-                placeholder="APP_USR-..."
-                type="password"
-              />
-              <p className="text-xs text-muted-foreground">
-                Encontre em: Mercado Pago → Seu negócio → Configurações → Credenciais
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>Public Key *</Label>
-              <Input
-                value={mpPublicKey}
-                onChange={(e) => setMpPublicKey(e.target.value)}
-                placeholder="APP_USR-..."
-              />
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Ao clicar no botão abaixo, você será redirecionado para o Mercado Pago para autorizar a conexão. 
+              Nenhuma credencial manual é necessária.
+            </p>
             <Button
-              onClick={handleConnect}
-              disabled={submitting}
+              onClick={handleStartOAuth}
+              disabled={startingOAuth}
               className="w-full"
               size="lg"
             >
-              {submitting ? (
+              {startingOAuth ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Conectando...
+                  Redirecionando...
                 </>
               ) : (
                 <>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Conectar Mercado Pago
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Conectar com Mercado Pago
                 </>
               )}
             </Button>
@@ -248,7 +231,6 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Toggle: Accept Pix */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Smartphone className="h-5 w-5 text-muted-foreground" />
@@ -268,7 +250,6 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
 
             <Separator />
 
-            {/* Toggle: Accept Card */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <CreditCard className="h-5 w-5 text-muted-foreground" />
@@ -288,7 +269,6 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
 
             <Separator />
 
-            {/* Toggle: Enable for Delivery */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <CreditCard className="h-5 w-5 text-muted-foreground" />

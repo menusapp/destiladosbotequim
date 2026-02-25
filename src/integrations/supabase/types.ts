@@ -1587,6 +1587,8 @@ export type Database = {
           id: string
           mp_access_token: string | null
           mp_public_key: string | null
+          mp_refresh_token: string | null
+          mp_user_id: string | null
           provider: string | null
           require_prepayment: boolean | null
           restaurant_id: string
@@ -1603,6 +1605,8 @@ export type Database = {
           id?: string
           mp_access_token?: string | null
           mp_public_key?: string | null
+          mp_refresh_token?: string | null
+          mp_user_id?: string | null
           provider?: string | null
           require_prepayment?: boolean | null
           restaurant_id: string
@@ -1619,6 +1623,8 @@ export type Database = {
           id?: string
           mp_access_token?: string | null
           mp_public_key?: string | null
+          mp_refresh_token?: string | null
+          mp_user_id?: string | null
           provider?: string | null
           require_prepayment?: boolean | null
           restaurant_id?: string
