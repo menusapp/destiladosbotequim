@@ -65,7 +65,7 @@ export const OnlinePaymentStep = ({
 
   // Secure Fields refs
   const mpInstanceRef = useRef<any>(null);
-  const secureFieldsRef = useRef<{ cardNumber?: any; expirationDate?: any; securityCode?: any }>({});
+  const secureFieldsRef = useRef<{ cardNumber?: any; expirationDate?: any; securityCode?: any }>([]);
 
   // Timer for PIX expiration
   const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 minutes in seconds
@@ -88,50 +88,57 @@ export const OnlinePaymentStep = ({
   useEffect(() => {
     if (method !== "credit_card") return;
     let isCancelled = false;
+
     const initMP = async () => {
-      await new Promise((r) => setTimeout(r, 600)); // Espera o modal abrir
+      await new Promise(r => setTimeout(r, 800)); // Delay um pouco maior para o Modal
       if (isCancelled) return;
+      
       const checkContainer = () => document.getElementById("mp-card-number");
       if (!checkContainer()) {
         setTimeout(initMP, 200);
         return;
       }
+      
       try {
         const { data: config } = await supabase
           .from("online_payment_config")
           .select("mp_public_key")
           .eq("restaurant_id", restaurantId)
           .maybeSingle();
+          
         if (!config?.mp_public_key || isCancelled) return;
-        secureFieldsRef.current.forEach((f) => {
-          try {
-            f.unmount();
-          } catch (e) {}
-        });
+        
+        // Limpeza segura: desmonsta o que já existir
+        secureFieldsRef.current.forEach(f => { try { f.unmount(); } catch(e) {} });
         secureFieldsRef.current = [];
+
         const mp = new (window as any).MercadoPago(config.mp_public_key);
         mpInstanceRef.current = mp;
-        const fieldStyle = { fontSize: "16px", color: "#333333", placeholderColor: "#999999" };
-        const cardNumber = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style: fieldStyle });
-        const expirationDate = mp.fields.create("expirationDate", { placeholder: "MM/AA", style: fieldStyle });
-        const securityCode = mp.fields.create("securityCode", { placeholder: "CVV", style: fieldStyle });
+        
+        const style = { fontSize: "16px", color: "#333333", placeholderColor: "#999999" };
+        
+        const cardNumber = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style });
+        const expirationDate = mp.fields.create("expirationDate", { placeholder: "MM/AA", style });
+        const securityCode = mp.fields.create("securityCode", { placeholder: "CVV", style });
+        
         cardNumber.mount("mp-card-number");
         expirationDate.mount("mp-expiration-date");
         securityCode.mount("mp-security-code");
+        
+        // Salva como ARRAY para o forEach funcionar
         secureFieldsRef.current = [cardNumber, expirationDate, securityCode];
         setMpReady(true);
       } catch (err) {
         console.error("Erro MP:", err);
       }
     };
+
     initMP();
+
     return () => {
       isCancelled = true;
-      secureFieldsRef.current.forEach((f) => {
-        try {
-          f.unmount();
-        } catch (e) {}
-      });
+      secureFieldsRef.current.forEach(f => { try { f.unmount(); } catch(e) {} });
+      secureFieldsRef.current = [];
       setMpReady(false);
     };
   }, [method, restaurantId]);
@@ -421,9 +428,7 @@ export const OnlinePaymentStep = ({
         <div className="space-y-2">
           <Label>Número do Cartão *</Label>
           <div
-            id="mp-card-number"
-            className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"
-          ></div>
+            <div id="mp-card-number" className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"></div>
         </div>
         <div className="space-y-2">
           <Label>Nome Impresso no Cartão *</Label>
@@ -437,17 +442,11 @@ export const OnlinePaymentStep = ({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Validade *</Label>
-            <div
-              id="mp-expiration-date"
-              className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"
-            ></div>
+            <div id="mp-expiration-date" className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"></div>
           </div>
           <div className="space-y-2">
             <Label>CVV *</Label>
-            <div
-              id="mp-security-code"
-              className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"
-            ></div>
+            <div id="mp-security-code" className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"></div>
           </div>
         </div>
       </div>
