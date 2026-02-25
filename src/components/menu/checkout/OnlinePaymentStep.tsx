@@ -427,7 +427,7 @@ export const OnlinePaymentStep = ({
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
         <div className="space-y-2">
           <Label>Número do Cartão *</Label>
-          <div id="mp-card-number" className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"></div>
+          <div id="mp-card-number" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden"></div>
         </div>
         <div className="space-y-2">
           <Label>Nome Impresso no Cartão *</Label>
@@ -435,17 +435,17 @@ export const OnlinePaymentStep = ({
             value={cardHolderName}
             onChange={(e) => setCardHolderName(e.target.value.toUpperCase())}
             placeholder="NOME COMO NO CARTÃO"
-            className="h-11"
+            className="h-11 relative z-30"
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Validade *</Label>
-            <div id="mp-expiration-date" className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"></div>
+            <div id="mp-expiration-date" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden"></div>
           </div>
           <div className="space-y-2">
             <Label>CVV *</Label>
-            <div id="mp-security-code" className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"></div>
+            <div id="mp-security-code" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden"></div>
           </div>
         </div>
       </div>
@@ -453,7 +453,7 @@ export const OnlinePaymentStep = ({
       <Separator />
 
       {/* Holder info */}
-      <div className="space-y-3">
+      <div className="space-y-3 relative z-20">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Titular</h3>
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-2">
@@ -462,6 +462,7 @@ export const OnlinePaymentStep = ({
               value={cardHolderCpf}
               onChange={(e) => setCardHolderCpf(e.target.value)}
               placeholder="000.000.000-00"
+              className="relative z-30"
             />
           </div>
           <div className="space-y-2">
@@ -470,6 +471,7 @@ export const OnlinePaymentStep = ({
               value={cardHolderEmail}
               onChange={(e) => setCardHolderEmail(e.target.value)}
               placeholder="email@exemplo.com"
+              className="relative z-30"
             />
           </div>
         </div>
@@ -479,6 +481,7 @@ export const OnlinePaymentStep = ({
             value={cardHolderPhone}
             onChange={(e) => setCardHolderPhone(e.target.value)}
             placeholder="(00) 00000-0000"
+            className="relative z-30"
           />
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -488,6 +491,7 @@ export const OnlinePaymentStep = ({
               value={cardHolderPostalCode}
               onChange={(e) => setCardHolderPostalCode(e.target.value)}
               placeholder="00000-000"
+              className="relative z-30"
             />
           </div>
           <div className="space-y-2">
@@ -496,6 +500,7 @@ export const OnlinePaymentStep = ({
               value={cardHolderAddressNumber}
               onChange={(e) => setCardHolderAddressNumber(e.target.value)}
               placeholder="123"
+              className="relative z-30"
             />
           </div>
         </div>
