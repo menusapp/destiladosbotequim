@@ -1,134 +1,112 @@
 
 
-## Plano: Checkout de Cartao com Secure Fields, Cartoes Salvos e Limpeza de Formulario
+## Correção: Secure Fields "Container not found"
 
-Este plano abrange 5 acoes: limpeza do formulario, Secure Fields do MP, tabela de cartoes salvos, fluxo de salvar/pagar com cartao salvo no backend, e UI de cartoes salvos.
-
----
-
-### Acao 1: Limpeza de Formulario e Auto-fill
-
-**Arquivo:** `src/components/menu/checkout/OnlinePaymentStep.tsx`
-
-- Remover os campos: CEP (`cardHolderPostalCode`), N Endereco (`cardHolderAddressNumber`), Telefone (`cardHolderPhone`) e seus estados
-- Manter apenas CPF do Titular e E-mail (exigidos pelo MP)
-- Auto-preencher CPF e E-mail a partir dos props `customerCPF` e `customerEmail` (ja parcialmente feito)
-- Se CPF e Email ja estiverem preenchidos, exibir em modo read-only com badge de "preenchido automaticamente"
-- Remover a validacao de CEP/endereco em `handleCreditCardPayment`
+O problema é um race condition clássico: o `mount()` executa antes das `div` containers existirem no DOM porque o formulário é renderizado condicionalmente e a espera fixa de 300ms não é suficiente.
 
 ---
 
-### Acao 2: Secure Fields (PCI Compliance)
+### Arquivo: `src/components/menu/checkout/OnlinePaymentStep.tsx`
 
-**Arquivo:** `src/components/menu/checkout/OnlinePaymentStep.tsx`
+**3 correções no `useEffect` de Secure Fields (linhas ~140-207):**
 
-O SDK do MP JS v2 ja esta carregado no `index.html`. Vamos usar os Secure Fields nativos:
+1. **Polling do DOM em vez de delay fixo** — Substituir o `await new Promise(r => setTimeout(r, 300))` por uma função `waitForContainers()` que verifica `document.getElementById("mp-card-number")` a cada 150ms, até 20 tentativas (3s max). Só monta os campos quando o container realmente existe.
 
-- Substituir os `<Input>` de Numero do Cartao, Validade (mes/ano) e CVV por containers `<div>` com IDs unicos
-- No `useEffect`, ao entrar no modo credit_card:
-  1. Inicializar `new MercadoPago(publicKey)` 
-  2. Criar os campos seguros via `mp.fields.create("cardNumber").mount("#card-number-container")`, `mp.fields.create("expirationDate").mount(...)`, `mp.fields.create("securityCode").mount(...)`
-  3. Estilizar os campos com o objeto `style` do SDK
-- Na hora de tokenizar, usar `mp.fields.createCardToken({ cardholderName, identificationType: "CPF", identificationNumber })` em vez de `mp.createCardToken()` com dados em texto plano
-- Remover os estados `cardNumber`, `cardExpiryMonth`, `cardExpiryYear`, `cardCcv` (nao teremos mais acesso a esses dados)
-- Para detectar bandeira, usar o evento `binChange` dos Secure Fields
+2. **Unmount na limpeza** — Armazenar as instâncias dos campos (`cardNumber`, `expirationDate`, `securityCode`) em um `useRef<any[]>([])` chamado `secureFieldInstancesRef`. No cleanup do `useEffect`, chamar `.unmount()` em cada instância antes de nullificar, evitando iframes duplicados se o efeito re-executar.
 
-**Resultado:** Os dados sensiveis do cartao nunca tocam nosso DOM/JS, eliminando o aviso de PCI.
+3. **Unmount antes de re-mount** — Antes de criar novos campos, fazer unmount dos anteriores (se existirem) para garantir idempotência.
 
----
+**Código resultante (substituir linhas 140-207):**
 
-### Acao 3: Tabela `customer_cards` no Banco de Dados
+```typescript
+const secureFieldInstancesRef = useRef<any[]>([]);
 
-**Migration SQL:**
+useEffect(() => {
+  if (method !== "credit_card" || selectedSavedCard !== "new") return;
+  
+  let cancelled = false;
+  let retryTimer: ReturnType<typeof setTimeout>;
 
-```sql
-CREATE TABLE public.customer_cards (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_phone text NOT NULL,
-  customer_cpf text NOT NULL,
-  restaurant_id uuid NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
-  mp_customer_id text NOT NULL,
-  card_id text NOT NULL,
-  last_four_digits text NOT NULL,
-  payment_method_id text NOT NULL,
-  first_six_digits text,
-  expiration_month integer,
-  expiration_year integer,
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(restaurant_id, customer_cpf, card_id)
-);
+  const waitForContainers = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      let attempts = 0;
+      const check = () => {
+        attempts++;
+        if (document.getElementById("mp-card-number")) {
+          resolve(true);
+        } else if (attempts < 20) {
+          retryTimer = setTimeout(check, 150);
+        } else {
+          console.error("[OnlinePayment] Containers not found after retries");
+          resolve(false);
+        }
+      };
+      check();
+    });
+  };
 
-ALTER TABLE public.customer_cards ENABLE ROW LEVEL SECURITY;
+  const initSecureFields = async () => {
+    try {
+      const { data: config } = await supabase
+        .from("online_payment_config")
+        .select("mp_public_key")
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
 
-CREATE POLICY "Allow all operations on customer_cards"
-  ON public.customer_cards FOR ALL
-  USING (true) WITH CHECK (true);
+      if (cancelled || !config?.mp_public_key) return;
+
+      const containersReady = await waitForContainers();
+      if (cancelled || !containersReady) return;
+
+      // Unmount previous instances
+      secureFieldInstancesRef.current.forEach((f) => { try { f.unmount(); } catch {} });
+      secureFieldInstancesRef.current = [];
+
+      const mp = new (window as any).MercadoPago(config.mp_public_key);
+      mpInstanceRef.current = mp;
+
+      const style = { height: "100%", width: "100%", fontSize: "16px", fontFamily: "inherit", color: "#333", "::placeholder": { color: "#999" } };
+
+      const cardNumber = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style });
+      const expirationDate = mp.fields.create("expirationDate", { placeholder: "MM/AA", style });
+      const securityCode = mp.fields.create("securityCode", { placeholder: "CVV", style });
+
+      secureFieldInstancesRef.current = [cardNumber, expirationDate, securityCode];
+
+      cardNumber.mount("#mp-card-number");
+      expirationDate.mount("#mp-expiration-date");
+      securityCode.mount("#mp-security-code");
+
+      cardNumber.on("binChange", (data: any) => { /* brand detection logic unchanged */ });
+
+      secureFieldsReadyRef.current = true;
+      setSecureFieldsLoaded(true);
+    } catch (err) {
+      console.error("[OnlinePayment] Secure Fields init error:", err);
+    }
+  };
+
+  initSecureFields();
+  return () => {
+    cancelled = true;
+    clearTimeout(retryTimer);
+    secureFieldInstancesRef.current.forEach((f) => { try { f.unmount(); } catch {} });
+    secureFieldInstancesRef.current = [];
+    secureFieldsReadyRef.current = false;
+    setSecureFieldsLoaded(false);
+    mpInstanceRef.current = null;
+  };
+}, [method, selectedSavedCard, restaurantId]);
 ```
 
-Campos chave:
-- `customer_phone` + `customer_cpf`: identificam o cliente (sem auth)
-- `mp_customer_id`: ID do Customer criado na API do MP (por restaurante)
-- `card_id`: ID do cartao salvo no MP
-- `last_four_digits` / `payment_method_id`: para exibir na UI
+**IDs no JSX (linhas ~592-622)** — Já estão corretos (`mp-card-number`, `mp-expiration-date`, `mp-security-code`). Nenhuma alteração necessária no JSX.
 
 ---
 
-### Acao 4: Backend - Salvar Cartao e Pagar com Cartao Salvo
+### Resumo das mudanças
 
-**Arquivo:** `supabase/functions/mercadopago-charge/index.ts`
-
-Adicionar novos campos no body: `save_card`, `saved_card_id`, `saved_mp_customer_id`
-
-**Fluxo "Salvar Cartao" (`save_card: true`):**
-1. Apos o pagamento ser aprovado, verificar se o cliente ja tem `mp_customer_id` na tabela `customer_cards`
-2. Se nao tiver, criar Customer via `POST /v1/customers` com email do cliente
-3. Salvar o cartao via `POST /v1/customers/{customer_id}/cards` com o `card_token`
-4. Inserir registro em `customer_cards` com os dados retornados
-
-**Fluxo "Pagar com Cartao Salvo" (`saved_card_id` presente):**
-1. Buscar o `mp_customer_id` e `card_id` da tabela `customer_cards`
-2. Enviar pagamento para `/v1/payments` com `payer.id` = Customer ID e `token` = card_id (sem necessidade de tokenizar novamente)
-
-**Novo endpoint auxiliar** (nova Edge Function `mercadopago-cards`):
-- `GET` (via body): listar cartoes salvos do cliente (consulta tabela `customer_cards`)
-- `DELETE`: remover cartao - chama `DELETE /v1/customers/{customer_id}/cards/{card_id}` e remove da tabela
-
----
-
-### Acao 5: UI - Lista de Cartoes Salvos
-
-**Arquivo:** `src/components/menu/checkout/OnlinePaymentStep.tsx`
-
-Ao selecionar "Cartao de Credito":
-
-1. Consultar `customer_cards` filtrado por `customer_cpf` + `restaurant_id`
-2. Se houver cartoes salvos, exibir:
-   - Lista com RadioGroup: cada opcao mostra icone da bandeira (visa/master/elo/amex) + "•••• 4567"
-   - Botao de lixeira (Trash2) ao lado de cada cartao para excluir (chama a Edge Function de delete)
-   - Botao "+ Usar novo cartao" abaixo da lista
-3. Se usuario escolher cartao salvo:
-   - Ocultar formulario de Secure Fields
-   - No submit, enviar `saved_card_id` e `saved_mp_customer_id` para a Edge Function
-4. Se usuario clicar "Novo cartao":
-   - Mostrar Secure Fields + checkbox "Salvar cartao para proximas compras"
-   - Enviar `save_card: true` no payload se marcado
-5. Manter campo Nome no Cartao como input normal (nao e dado sensivel)
-
----
-
-### Estrutura de Arquivos Modificados
-
-```text
-src/components/menu/checkout/OnlinePaymentStep.tsx  -- refatoracao completa do CC
-supabase/functions/mercadopago-charge/index.ts       -- save_card + saved_card flows
-supabase/functions/mercadopago-cards/index.ts        -- NOVA: delete card
-Migration SQL                                        -- tabela customer_cards
-```
-
-### Detalhes Tecnicos
-
-- Os Secure Fields do MP usam iframes internos; o estilo e aplicado via objeto JS `{ fontSize: "16px", color: "#333" }` passado no `mount()`
-- A deteccao de bandeira via `binChange` substitui a chamada atual ao endpoint `/v1/payment_methods/search` que usa a public key como Bearer (incorreto -- deveria ser access token)
-- O card_token gerado pelo Secure Fields e single-use; para cartoes salvos, o MP usa o `card_id` diretamente com o `payer.id`
-- O `mp_customer_id` e por restaurante (cada restaurante tem seu access token), entao um mesmo CPF pode ter customer_ids diferentes em restaurantes diferentes
+- 1 arquivo modificado: `OnlinePaymentStep.tsx`
+- Polling inteligente substitui delay fixo — campos só montam quando o DOM está pronto
+- Cleanup com `unmount()` evita duplicação de iframes
+- Sem alterações no JSX ou CSS
 
