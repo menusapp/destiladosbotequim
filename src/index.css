@@ -137,3 +137,12 @@ All colors MUST be HSL.
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Mercado Pago Secure Fields iframe sizing */
+#mp-card-number iframe,
+#mp-expiration-date iframe,
+#mp-security-code iframe {
+  height: 100% !important;
+  width: 100% !important;
+  min-height: 40px;
+}
