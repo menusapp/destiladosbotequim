@@ -90,41 +90,51 @@ export const OnlinePaymentStep = ({
     let isCancelled = false;
 
     const initMP = async () => {
-      await new Promise(r => setTimeout(r, 800)); // Delay um pouco maior para o Modal
+      await new Promise((r) => setTimeout(r, 800)); // Delay um pouco maior para o Modal
       if (isCancelled) return;
-      
+
       const checkContainer = () => document.getElementById("mp-card-number");
       if (!checkContainer()) {
         setTimeout(initMP, 200);
         return;
       }
-      
+
       try {
         const { data: config } = await supabase
           .from("online_payment_config")
           .select("mp_public_key")
           .eq("restaurant_id", restaurantId)
           .maybeSingle();
-          
+
         if (!config?.mp_public_key || isCancelled) return;
-        
+
         // Limpeza segura: desmonsta o que já existir
-        secureFieldsRef.current.forEach(f => { try { f.unmount(); } catch(e) {} });
+        secureFieldsRef.current.forEach((f) => {
+          try {
+            f.unmount();
+          } catch (e) {}
+        });
         secureFieldsRef.current = [];
 
         const mp = new (window as any).MercadoPago(config.mp_public_key);
         mpInstanceRef.current = mp;
-        
-        const style = { fontSize: "16px", color: "#333333", placeholderColor: "#999999", width: "100%", height: "100%" };
-        
+
+        const style = {
+          fontSize: "16px",
+          color: "#333333",
+          placeholderColor: "#999999",
+          width: "100%",
+          height: "100%",
+        };
+
         const cardNumber = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style });
         const expirationDate = mp.fields.create("expirationDate", { placeholder: "MM/AA", style });
         const securityCode = mp.fields.create("securityCode", { placeholder: "CVV", style });
-        
+
         cardNumber.mount("mp-card-number");
         expirationDate.mount("mp-expiration-date");
         securityCode.mount("mp-security-code");
-        
+
         // Salva como ARRAY para o forEach funcionar
         secureFieldsRef.current = [cardNumber, expirationDate, securityCode];
         setMpReady(true);
@@ -137,7 +147,11 @@ export const OnlinePaymentStep = ({
 
     return () => {
       isCancelled = true;
-      secureFieldsRef.current.forEach(f => { try { f.unmount(); } catch(e) {} });
+      secureFieldsRef.current.forEach((f) => {
+        try {
+          f.unmount();
+        } catch (e) {}
+      });
       secureFieldsRef.current = [];
       setMpReady(false);
     };
@@ -401,8 +415,22 @@ export const OnlinePaymentStep = ({
   }
 
   // ─── CREDIT CARD MODE ───
+  // ─── CREDIT CARD MODE ───
   return (
     <div className="p-4 space-y-4">
+      <style>{`
+        #mp-card-number iframe,
+        #mp-expiration-date iframe,
+        #mp-security-code iframe {
+          height: 100% !important;
+          width: 100% !important;
+          border: none !important;
+          outline: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+      `}</style>
+
       <div className="text-center">
         <h2 className="text-xl font-bold flex items-center justify-center gap-2">
           <CreditCard className="h-5 w-5" />
@@ -426,8 +454,11 @@ export const OnlinePaymentStep = ({
       <div className="space-y-4">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
         <div className="space-y-2">
-          <Label className="w-fit">Número do Cartão *</Label>
-          <div id="mp-card-number" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"></div>
+          <Label>Número do Cartão *</Label>
+          <div
+            id="mp-card-number"
+            className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"
+          ></div>
         </div>
         <div className="space-y-2">
           <Label>Nome Impresso no Cartão *</Label>
@@ -440,12 +471,18 @@ export const OnlinePaymentStep = ({
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label className="w-fit">Validade *</Label>
-            <div id="mp-expiration-date" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"></div>
+            <Label>Validade *</Label>
+            <div
+              id="mp-expiration-date"
+              className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"
+            ></div>
           </div>
           <div className="space-y-2">
-            <Label className="w-fit">CVV *</Label>
-            <div id="mp-security-code" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"></div>
+            <Label>CVV *</Label>
+            <div
+              id="mp-security-code"
+              className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"
+            ></div>
           </div>
         </div>
       </div>
