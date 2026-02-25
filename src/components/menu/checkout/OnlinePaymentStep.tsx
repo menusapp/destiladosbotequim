@@ -65,7 +65,7 @@ export const OnlinePaymentStep = ({
 
   // Secure Fields refs
   const mpInstanceRef = useRef<any>(null);
-  const secureFieldsRef = useRef<{ cardNumber?: any; expirationDate?: any; securityCode?: any }>([]);
+  const secureFieldsRef = useRef<any[]>([]);
 
   // Timer for PIX expiration
   const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 minutes in seconds
@@ -239,10 +239,10 @@ export const OnlinePaymentStep = ({
       const tokenResult = await mpInstanceRef.current.fields.createCardToken({
         cardholderName: cardHolderName,
         identificationType: "CPF",
-        identificationNumber: cardHolderCPF.replace(/\D/g, ""),
+        identificationNumber: cardHolderCpf.replace(/\D/g, ""),
       });
 
-      if (!cardTokenResult?.id) {
+      if (!tokenResult?.id) {
         throw new Error("Erro ao tokenizar cartão. Verifique os dados e tente novamente.");
       }
 
@@ -257,8 +257,8 @@ export const OnlinePaymentStep = ({
           customer_cpf: customerCPF,
           customer_email: customerEmail || cardHolderEmail,
           customer_phone: customerPhone || cardHolderPhone,
-          card_token: cardTokenResult.id,
-          payment_method_id: cardTokenResult.payment_method_id || "visa",
+          card_token: tokenResult.id,
+          payment_method_id: tokenResult.payment_method_id || "visa",
           installments: 1,
           items: cartItems,
         },
@@ -427,8 +427,7 @@ export const OnlinePaymentStep = ({
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
         <div className="space-y-2">
           <Label>Número do Cartão *</Label>
-          <div
-            <div id="mp-card-number" className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"></div>
+          <div id="mp-card-number" className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"></div>
         </div>
         <div className="space-y-2">
           <Label>Nome Impresso no Cartão *</Label>
