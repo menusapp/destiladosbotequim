@@ -1,84 +1,134 @@
 
 
-## Plano: Mercado Pago Connect (OAuth 2.0)
+## Plano: Checkout de Cartao com Secure Fields, Cartoes Salvos e Limpeza de Formulario
 
-Implementacao completa do fluxo OAuth para conectar contas Mercado Pago dos restaurantes, substituindo a entrada manual de credenciais.
+Este plano abrange 5 acoes: limpeza do formulario, Secure Fields do MP, tabela de cartoes salvos, fluxo de salvar/pagar com cartao salvo no backend, e UI de cartoes salvos.
 
 ---
 
-### 1. Migration: Adicionar colunas na tabela `online_payment_config`
+### Acao 1: Limpeza de Formulario e Auto-fill
 
-Adicionar `mp_refresh_token` (TEXT) e `mp_user_id` (TEXT) a tabela existente.
+**Arquivo:** `src/components/menu/checkout/OnlinePaymentStep.tsx`
+
+- Remover os campos: CEP (`cardHolderPostalCode`), N Endereco (`cardHolderAddressNumber`), Telefone (`cardHolderPhone`) e seus estados
+- Manter apenas CPF do Titular e E-mail (exigidos pelo MP)
+- Auto-preencher CPF e E-mail a partir dos props `customerCPF` e `customerEmail` (ja parcialmente feito)
+- Se CPF e Email ja estiverem preenchidos, exibir em modo read-only com badge de "preenchido automaticamente"
+- Remover a validacao de CEP/endereco em `handleCreditCardPayment`
+
+---
+
+### Acao 2: Secure Fields (PCI Compliance)
+
+**Arquivo:** `src/components/menu/checkout/OnlinePaymentStep.tsx`
+
+O SDK do MP JS v2 ja esta carregado no `index.html`. Vamos usar os Secure Fields nativos:
+
+- Substituir os `<Input>` de Numero do Cartao, Validade (mes/ano) e CVV por containers `<div>` com IDs unicos
+- No `useEffect`, ao entrar no modo credit_card:
+  1. Inicializar `new MercadoPago(publicKey)` 
+  2. Criar os campos seguros via `mp.fields.create("cardNumber").mount("#card-number-container")`, `mp.fields.create("expirationDate").mount(...)`, `mp.fields.create("securityCode").mount(...)`
+  3. Estilizar os campos com o objeto `style` do SDK
+- Na hora de tokenizar, usar `mp.fields.createCardToken({ cardholderName, identificationType: "CPF", identificationNumber })` em vez de `mp.createCardToken()` com dados em texto plano
+- Remover os estados `cardNumber`, `cardExpiryMonth`, `cardExpiryYear`, `cardCcv` (nao teremos mais acesso a esses dados)
+- Para detectar bandeira, usar o evento `binChange` dos Secure Fields
+
+**Resultado:** Os dados sensiveis do cartao nunca tocam nosso DOM/JS, eliminando o aviso de PCI.
+
+---
+
+### Acao 3: Tabela `customer_cards` no Banco de Dados
+
+**Migration SQL:**
 
 ```sql
-ALTER TABLE online_payment_config 
-  ADD COLUMN IF NOT EXISTS mp_refresh_token TEXT,
-  ADD COLUMN IF NOT EXISTS mp_user_id TEXT;
+CREATE TABLE public.customer_cards (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_phone text NOT NULL,
+  customer_cpf text NOT NULL,
+  restaurant_id uuid NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+  mp_customer_id text NOT NULL,
+  card_id text NOT NULL,
+  last_four_digits text NOT NULL,
+  payment_method_id text NOT NULL,
+  first_six_digits text,
+  expiration_month integer,
+  expiration_year integer,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(restaurant_id, customer_cpf, card_id)
+);
+
+ALTER TABLE public.customer_cards ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all operations on customer_cards"
+  ON public.customer_cards FOR ALL
+  USING (true) WITH CHECK (true);
 ```
 
+Campos chave:
+- `customer_phone` + `customer_cpf`: identificam o cliente (sem auth)
+- `mp_customer_id`: ID do Customer criado na API do MP (por restaurante)
+- `card_id`: ID do cartao salvo no MP
+- `last_four_digits` / `payment_method_id`: para exibir na UI
+
 ---
 
-### 2. Edge Function: `mercadopago-oauth`
+### Acao 4: Backend - Salvar Cartao e Pagar com Cartao Salvo
 
-Criar `supabase/functions/mercadopago-oauth/index.ts`.
+**Arquivo:** `supabase/functions/mercadopago-charge/index.ts`
 
-- Aceita POST com `{ code, state, redirectUri }`
-- Troca o `code` por tokens via `POST https://api.mercadopago.com/oauth/token`
-- Usa `MERCADOPAGO_APP_ID` e `MERCADOPAGO_CLIENT_SECRET` (secrets ja existentes)
-- Salva `access_token`, `public_key`, `refresh_token`, `user_id` na tabela `online_payment_config` usando service role key (ignora RLS)
-- Atualiza `connection_status` para `connected` e `connected_at`
-- Retorna sucesso/erro com CORS headers
+Adicionar novos campos no body: `save_card`, `saved_card_id`, `saved_mp_customer_id`
 
-Registrar em `supabase/config.toml`:
-```toml
-[functions.mercadopago-oauth]
-verify_jwt = false
+**Fluxo "Salvar Cartao" (`save_card: true`):**
+1. Apos o pagamento ser aprovado, verificar se o cliente ja tem `mp_customer_id` na tabela `customer_cards`
+2. Se nao tiver, criar Customer via `POST /v1/customers` com email do cliente
+3. Salvar o cartao via `POST /v1/customers/{customer_id}/cards` com o `card_token`
+4. Inserir registro em `customer_cards` com os dados retornados
+
+**Fluxo "Pagar com Cartao Salvo" (`saved_card_id` presente):**
+1. Buscar o `mp_customer_id` e `card_id` da tabela `customer_cards`
+2. Enviar pagamento para `/v1/payments` com `payer.id` = Customer ID e `token` = card_id (sem necessidade de tokenizar novamente)
+
+**Novo endpoint auxiliar** (nova Edge Function `mercadopago-cards`):
+- `GET` (via body): listar cartoes salvos do cliente (consulta tabela `customer_cards`)
+- `DELETE`: remover cartao - chama `DELETE /v1/customers/{customer_id}/cards/{card_id}` e remove da tabela
+
+---
+
+### Acao 5: UI - Lista de Cartoes Salvos
+
+**Arquivo:** `src/components/menu/checkout/OnlinePaymentStep.tsx`
+
+Ao selecionar "Cartao de Credito":
+
+1. Consultar `customer_cards` filtrado por `customer_cpf` + `restaurant_id`
+2. Se houver cartoes salvos, exibir:
+   - Lista com RadioGroup: cada opcao mostra icone da bandeira (visa/master/elo/amex) + "•••• 4567"
+   - Botao de lixeira (Trash2) ao lado de cada cartao para excluir (chama a Edge Function de delete)
+   - Botao "+ Usar novo cartao" abaixo da lista
+3. Se usuario escolher cartao salvo:
+   - Ocultar formulario de Secure Fields
+   - No submit, enviar `saved_card_id` e `saved_mp_customer_id` para a Edge Function
+4. Se usuario clicar "Novo cartao":
+   - Mostrar Secure Fields + checkbox "Salvar cartao para proximas compras"
+   - Enviar `save_card: true` no payload se marcado
+5. Manter campo Nome no Cartao como input normal (nao e dado sensivel)
+
+---
+
+### Estrutura de Arquivos Modificados
+
+```text
+src/components/menu/checkout/OnlinePaymentStep.tsx  -- refatoracao completa do CC
+supabase/functions/mercadopago-charge/index.ts       -- save_card + saved_card flows
+supabase/functions/mercadopago-cards/index.ts        -- NOVA: delete card
+Migration SQL                                        -- tabela customer_cards
 ```
 
----
+### Detalhes Tecnicos
 
-### 3. Pagina de Callback: `src/pages/MercadoPagoCallback.tsx`
-
-- Rota: `/admin/mercadopago/callback`
-- No `useEffect`, captura `code` e `state` dos search params
-- Chama `supabase.functions.invoke('mercadopago-oauth', { body: { code, state, redirectUri } })`
-- Sucesso: toast verde + redirect para `/admin` (que volta para config-pagamentos-online)
-- Erro: toast vermelho + redirect para `/admin`
-
-Adicionar rota em `App.tsx` dentro de `ProtectedRoute`.
-
----
-
-### 4. Atualizar `OnlinePaymentsSettings.tsx`
-
-- Remover inputs manuais de Access Token e Public Key
-- Remover estados `mpAccessToken`, `mpPublicKey`, `handleConnect`
-- Adicionar botao "Conectar com Mercado Pago" que redireciona para:
-  ```
-  https://auth.mercadopago.com.br/authorization?client_id=${MP_APP_ID}&response_type=code&platform_id=mp&state=${configId}&redirect_uri=${origin}/admin/mercadopago/callback
-  ```
-- O `configId` sera o `id` do registro em `online_payment_config`. Se nao existir, criar um registro vazio primeiro (upsert com `connection_status: 'pending'`)
-- O `MP_APP_ID` precisa estar acessivel no frontend. Opcoes:
-  - Usar o `MERCADOPAGO_APP_ID` que ja esta nos secrets, exposto via uma edge function simples, OU
-  - Hardcodar como variavel de ambiente VITE (mas nao temos). 
-  - **Melhor abordagem**: Criar uma mini edge function `mercadopago-app-id` que retorna o client_id, ou embutir no `mercadopago-oauth` com GET. Usaremos GET no `mercadopago-oauth` para retornar apenas o `client_id`.
-
-**Ajuste na edge function**: Alem do POST, aceitar GET que retorna `{ client_id }` lido de `Deno.env.get('MERCADOPAGO_APP_ID')`.
-
----
-
-### Resumo dos arquivos
-
-| Arquivo | Acao |
-|---|---|
-| Migration SQL | Adicionar `mp_refresh_token`, `mp_user_id` |
-| `supabase/functions/mercadopago-oauth/index.ts` | Criar (POST: troca code, GET: retorna client_id) |
-| `supabase/config.toml` | Adicionar `[functions.mercadopago-oauth]` |
-| `src/pages/MercadoPagoCallback.tsx` | Criar pagina de callback |
-| `src/App.tsx` | Adicionar rota `/admin/mercadopago/callback` |
-| `src/components/admin/settings/OnlinePaymentsSettings.tsx` | Substituir inputs por botao OAuth |
-
-### Secrets necessarios
-
-Ja existem: `MERCADOPAGO_APP_ID` e `MERCADOPAGO_CLIENT_SECRET`. Nenhum novo secret necessario.
+- Os Secure Fields do MP usam iframes internos; o estilo e aplicado via objeto JS `{ fontSize: "16px", color: "#333" }` passado no `mount()`
+- A deteccao de bandeira via `binChange` substitui a chamada atual ao endpoint `/v1/payment_methods/search` que usa a public key como Bearer (incorreto -- deveria ser access token)
+- O card_token gerado pelo Secure Fields e single-use; para cartoes salvos, o MP usa o `card_id` diretamente com o `payer.id`
+- O `mp_customer_id` e por restaurante (cada restaurante tem seu access token), entao um mesmo CPF pode ter customer_ids diferentes em restaurantes diferentes
 
