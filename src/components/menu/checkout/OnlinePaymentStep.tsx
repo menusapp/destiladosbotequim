@@ -138,10 +138,32 @@ export const OnlinePaymentStep = ({
   }, []);
 
   // ─── Initialize Secure Fields when "new card" is selected ───
+  const secureFieldInstancesRef = useRef<any[]>([]);
+
   useEffect(() => {
     if (method !== "credit_card" || selectedSavedCard !== "new") return;
     
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    const waitForContainers = (): Promise<boolean> => {
+      return new Promise((resolve) => {
+        let attempts = 0;
+        const check = () => {
+          attempts++;
+          if (document.getElementById("mp-card-number")) {
+            resolve(true);
+          } else if (attempts < 20) {
+            retryTimer = setTimeout(check, 150);
+          } else {
+            console.error("[OnlinePayment] Containers not found after retries");
+            resolve(false);
+          }
+        };
+        check();
+      });
+    };
+
     const initSecureFields = async () => {
       try {
         const { data: config } = await supabase
@@ -151,6 +173,13 @@ export const OnlinePaymentStep = ({
           .maybeSingle();
 
         if (cancelled || !config?.mp_public_key) return;
+
+        const containersReady = await waitForContainers();
+        if (cancelled || !containersReady) return;
+
+        // Unmount previous instances before re-mounting
+        secureFieldInstancesRef.current.forEach((f) => { try { f.unmount(); } catch {} });
+        secureFieldInstancesRef.current = [];
 
         const mp = new (window as any).MercadoPago(config.mp_public_key);
         mpInstanceRef.current = mp;
@@ -164,13 +193,11 @@ export const OnlinePaymentStep = ({
           "::placeholder": { color: "#999" },
         };
 
-        // Small delay to ensure DOM containers are mounted
-        await new Promise(r => setTimeout(r, 300));
-        if (cancelled) return;
-
         const cardNumber = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style });
         const expirationDate = mp.fields.create("expirationDate", { placeholder: "MM/AA", style });
         const securityCode = mp.fields.create("securityCode", { placeholder: "CVV", style });
+
+        secureFieldInstancesRef.current = [cardNumber, expirationDate, securityCode];
 
         cardNumber.mount("#mp-card-number");
         expirationDate.mount("#mp-expiration-date");
@@ -200,6 +227,9 @@ export const OnlinePaymentStep = ({
     initSecureFields();
     return () => {
       cancelled = true;
+      clearTimeout(retryTimer);
+      secureFieldInstancesRef.current.forEach((f) => { try { f.unmount(); } catch {} });
+      secureFieldInstancesRef.current = [];
       secureFieldsReadyRef.current = false;
       setSecureFieldsLoaded(false);
       mpInstanceRef.current = null;
