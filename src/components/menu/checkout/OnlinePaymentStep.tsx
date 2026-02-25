@@ -183,6 +183,57 @@ export const OnlinePaymentStep = ({
     setErrorMessage("");
 
     try {
+      // 1. Fetch restaurant's MP public key
+      const { data: config, error: configError } = await supabase
+        .from("online_payment_config")
+        .select("mp_public_key")
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
+
+      if (configError || !config?.mp_public_key) {
+        throw new Error("Mercado Pago não configurado para este restaurante");
+      }
+
+      // 2. Initialize MP SDK and tokenize card
+      const mp = new (window as any).MercadoPago(config.mp_public_key);
+      
+      const cardTokenResult = await mp.createCardToken({
+        cardNumber: cardNumber.replace(/\s/g, ""),
+        cardholderName: cardHolderName,
+        cardExpirationMonth: cardExpiryMonth,
+        cardExpirationYear: cardExpiryYear,
+        securityCode: cardCcv,
+        identificationType: "CPF",
+        identificationNumber: cardHolderCpf.replace(/\D/g, ""),
+      });
+
+      if (!cardTokenResult?.id) {
+        throw new Error("Erro ao tokenizar cartão. Verifique os dados e tente novamente.");
+      }
+
+      // 3. Detect payment_method_id from BIN
+      const bin = cardNumber.replace(/\s/g, "").substring(0, 6);
+      let paymentMethodId = "visa"; // default
+      try {
+        const binResponse = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?bins=${bin}`, {
+          headers: { Authorization: `Bearer ${config.mp_public_key}` },
+        });
+        if (binResponse.ok) {
+          const binData = await binResponse.json();
+          if (binData?.results?.[0]?.id) {
+            paymentMethodId = binData.results[0].id;
+          }
+        }
+      } catch {
+        // Fallback: detect by first digit
+        const firstDigit = cardNumber.replace(/\s/g, "")[0];
+        if (firstDigit === "4") paymentMethodId = "visa";
+        else if (firstDigit === "5") paymentMethodId = "master";
+        else if (firstDigit === "3") paymentMethodId = "amex";
+        else if (firstDigit === "6") paymentMethodId = "elo";
+      }
+
+      // 4. Send tokenized data to backend
       const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
@@ -191,18 +242,11 @@ export const OnlinePaymentStep = ({
           billing_type: "CREDIT_CARD",
           customer_name: customerName,
           customer_cpf: customerCPF,
-          customer_email: customerEmail,
-          customer_phone: customerPhone,
-          card_holder_name: cardHolderName,
-          card_number: cardNumber,
-          card_expiry_month: cardExpiryMonth,
-          card_expiry_year: cardExpiryYear,
-          card_ccv: cardCcv,
-          card_holder_cpf: cardHolderCpf,
-          card_holder_email: cardHolderEmail,
-          card_holder_phone: cardHolderPhone,
-          card_holder_postal_code: cardHolderPostalCode,
-          card_holder_address_number: cardHolderAddressNumber,
+          customer_email: customerEmail || cardHolderEmail,
+          customer_phone: customerPhone || cardHolderPhone,
+          card_token: cardTokenResult.id,
+          payment_method_id: paymentMethodId,
+          installments: 1,
         },
       });
 
