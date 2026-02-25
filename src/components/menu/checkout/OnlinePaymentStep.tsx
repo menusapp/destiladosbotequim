@@ -229,10 +229,10 @@ export const OnlinePaymentStep = ({
 
     try {
       // Tokenize via Secure Fields
-      const cardTokenResult = await mpInstanceRef.current.fields.createCardToken({
+      const tokenResult = await mpInstanceRef.current.fields.createCardToken({
         cardholderName: cardHolderName,
         identificationType: "CPF",
-        identificationNumber: cardHolderCpf.replace(/\D/g, ""),
+        identificationNumber: cardHolderCPF.replace(/\D/g, ""),
       });
 
       if (!cardTokenResult?.id) {
@@ -416,36 +416,37 @@ export const OnlinePaymentStep = ({
       )}
 
       {/* Card data */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
         <div className="space-y-2">
           <Label>Número do Cartão *</Label>
           <div
             id="mp-card-number"
-            className="h-[45px] w-full border border-input rounded-md bg-background relative"
+            className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"
           ></div>
         </div>
         <div className="space-y-2">
-          <Label>Nome no Cartão *</Label>
+          <Label>Nome Impresso no Cartão *</Label>
           <Input
             value={cardHolderName}
             onChange={(e) => setCardHolderName(e.target.value.toUpperCase())}
             placeholder="NOME COMO NO CARTÃO"
+            className="h-11"
           />
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Validade *</Label>
             <div
               id="mp-expiration-date"
-              className="h-[45px] w-full border border-input rounded-md bg-background relative"
+              className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"
             ></div>
           </div>
           <div className="space-y-2">
             <Label>CVV *</Label>
             <div
               id="mp-security-code"
-              className="h-[45px] w-full border border-input rounded-md bg-background relative"
+              className="h-[48px] w-full border border-input rounded-md bg-background relative z-10"
             ></div>
           </div>
         </div>
