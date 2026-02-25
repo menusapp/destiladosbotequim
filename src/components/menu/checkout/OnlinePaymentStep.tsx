@@ -452,35 +452,38 @@ export const OnlinePaymentStep = ({
       {/* Card data */}
       <div className="space-y-4">
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
-        <div className="space-y-2">
-          <Label>Número do Cartão *</Label>
+
+        <div className="space-y-1 relative">
+          <Label className="w-fit pointer-events-none block z-40 relative">Número do Cartão *</Label>
           <div
             id="mp-card-number"
-            className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"
+            className="h-[48px] w-full border border-input rounded-md bg-background relative overflow-hidden cursor-text flex items-center"
           ></div>
         </div>
-        <div className="space-y-2">
-          <Label>Nome Impresso no Cartão *</Label>
+
+        <div className="space-y-1 relative">
+          <Label className="w-fit pointer-events-none block z-40 relative">Nome Impresso no Cartão *</Label>
           <Input
             value={cardHolderName}
             onChange={(e) => setCardHolderName(e.target.value.toUpperCase())}
             placeholder="NOME COMO NO CARTÃO"
-            className="h-11 relative z-30"
+            className="h-[48px] relative z-30"
           />
         </div>
+
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Validade *</Label>
+          <div className="space-y-1 relative">
+            <Label className="w-fit pointer-events-none block z-40 relative">Validade *</Label>
             <div
               id="mp-expiration-date"
-              className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"
+              className="h-[48px] w-full border border-input rounded-md bg-background relative overflow-hidden cursor-text flex items-center"
             ></div>
           </div>
-          <div className="space-y-2">
-            <Label>CVV *</Label>
+          <div className="space-y-1 relative">
+            <Label className="w-fit pointer-events-none block z-40 relative">CVV *</Label>
             <div
               id="mp-security-code"
-              className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"
+              className="h-[48px] w-full border border-input rounded-md bg-background relative overflow-hidden cursor-text flex items-center"
             ></div>
           </div>
         </div>
