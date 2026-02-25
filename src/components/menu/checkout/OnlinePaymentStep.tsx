@@ -188,9 +188,10 @@ export const OnlinePaymentStep = ({
           height: "100%",
           width: "100%",
           fontSize: "16px",
-          fontFamily: "inherit",
+          fontFamily: "Arial, sans-serif",
           color: "#333",
-          "::placeholder": { color: "#999" },
+          placeholderColor: "#999",
+          padding: "8px 12px",
         };
 
         const cardNumber = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style });
@@ -621,7 +622,7 @@ export const OnlinePaymentStep = ({
               </Label>
               <div
                 id="mp-card-number"
-                className="h-10 w-full min-h-[40px] rounded-md border border-input bg-background overflow-hidden [&>iframe]{h-full w-full}"
+                className="relative h-10 w-full min-h-[40px] rounded-md border border-input bg-background [&>iframe]:h-full [&>iframe]:w-full"
               />
             </div>
 
@@ -641,14 +642,14 @@ export const OnlinePaymentStep = ({
                 <Label>Validade *</Label>
                 <div
                   id="mp-expiration-date"
-                  className="h-10 w-full min-h-[40px] rounded-md border border-input bg-background overflow-hidden"
+                  className="relative h-10 w-full min-h-[40px] rounded-md border border-input bg-background [&>iframe]:h-full [&>iframe]:w-full"
                 />
               </div>
               <div className="space-y-2">
                 <Label>CVV *</Label>
                 <div
                   id="mp-security-code"
-                  className="h-10 w-full min-h-[40px] rounded-md border border-input bg-background overflow-hidden"
+                  className="relative h-10 w-full min-h-[40px] rounded-md border border-input bg-background [&>iframe]:h-full [&>iframe]:w-full"
                 />
               </div>
             </div>
