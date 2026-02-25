@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
       customer_phone,
       // Credit card fields
       card_token,
+      payment_method_id,
       installments,
     } = await req.json();
 
@@ -144,6 +145,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           transaction_amount: amount,
           token: card_token,
+          payment_method_id: payment_method_id,
           installments: installments || 1,
           notification_url: webhookUrl,
           payer: {
