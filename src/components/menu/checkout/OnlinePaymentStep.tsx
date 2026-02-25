@@ -115,7 +115,7 @@ export const OnlinePaymentStep = ({
         const mp = new (window as any).MercadoPago(config.mp_public_key);
         mpInstanceRef.current = mp;
         
-        const style = { fontSize: "16px", color: "#333333", placeholderColor: "#999999" };
+        const style = { fontSize: "16px", color: "#333333", placeholderColor: "#999999", width: "100%", height: "100%" };
         
         const cardNumber = mp.fields.create("cardNumber", { placeholder: "0000 0000 0000 0000", style });
         const expirationDate = mp.fields.create("expirationDate", { placeholder: "MM/AA", style });
@@ -427,7 +427,7 @@ export const OnlinePaymentStep = ({
         <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
         <div className="space-y-2">
           <Label>Número do Cartão *</Label>
-          <div id="mp-card-number" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden"></div>
+          <div id="mp-card-number" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"></div>
         </div>
         <div className="space-y-2">
           <Label>Nome Impresso no Cartão *</Label>
@@ -441,11 +441,11 @@ export const OnlinePaymentStep = ({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Validade *</Label>
-            <div id="mp-expiration-date" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden"></div>
+            <div id="mp-expiration-date" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"></div>
           </div>
           <div className="space-y-2">
             <Label>CVV *</Label>
-            <div id="mp-security-code" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden"></div>
+            <div id="mp-security-code" className="h-[48px] w-full border border-input rounded-md bg-background overflow-hidden p-0 flex items-stretch cursor-text [&>iframe]:!w-full [&>iframe]:!h-full [&>iframe]:!border-none [&>iframe]:!p-0"></div>
           </div>
         </div>
       </div>
