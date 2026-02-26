@@ -185,21 +185,7 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Create token from saved card via MP API
-        const tokenResponse = await fetch(`https://api.mercadopago.com/v1/customers/${savedCard.mp_customer_id}/cards/${savedCard.card_id}`, {
-          headers: { Authorization: `Bearer ${mpAccessToken}` },
-        });
-        
-        if (!tokenResponse.ok) {
-          console.error("[MP Charge] Saved card fetch error");
-          return new Response(
-            JSON.stringify({ success: false, error: "Erro ao recuperar cartão salvo. Tente um novo cartão." }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        const cardData = await tokenResponse.json();
-
+        // For saved cards, use payer.id (MP customer ID) — no token needed
         mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
           method: "POST",
           headers: {
@@ -210,7 +196,6 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             transaction_amount: roundedAmount,
             payment_method_id: savedCard.payment_method_id,
-            token: cardData.id || card_token,
             installments: installments || 1,
             notification_url: webhookUrl,
             external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
