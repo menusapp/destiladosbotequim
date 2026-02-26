@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
       customer_phone,
       card_token,
       payment_method_id,
+      issuer_id,
       installments,
       items,
       action,
@@ -185,7 +186,23 @@ Deno.serve(async (req) => {
           );
         }
 
-        // For saved cards, use payer.id (MP customer ID) — no token needed
+        // Fetch actual card details from MP to get correct payment_method_id
+        let resolvedPaymentMethodId = savedCard.payment_method_id;
+        try {
+          const cardDetailRes = await fetch(
+            `https://api.mercadopago.com/v1/customers/${savedCard.mp_customer_id}/cards/${savedCard.card_id}`,
+            { headers: { Authorization: `Bearer ${mpAccessToken}` } }
+          );
+          if (cardDetailRes.ok) {
+            const cardDetail = await cardDetailRes.json();
+            if (cardDetail.payment_method?.id) {
+              resolvedPaymentMethodId = cardDetail.payment_method.id;
+            }
+          }
+        } catch (e) {
+          console.warn("[MP Charge] Card detail fetch failed, using stored payment_method_id:", e);
+        }
+
         mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
           method: "POST",
           headers: {
@@ -195,7 +212,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             transaction_amount: roundedAmount,
-            payment_method_id: savedCard.payment_method_id,
+            payment_method_id: resolvedPaymentMethodId,
             installments: installments || 1,
             notification_url: webhookUrl,
             external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
@@ -224,6 +241,7 @@ Deno.serve(async (req) => {
             transaction_amount: roundedAmount,
             token: card_token,
             payment_method_id: payment_method_id,
+            issuer_id: issuer_id || undefined,
             installments: installments || 1,
             notification_url: webhookUrl,
             external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,

@@ -353,6 +353,34 @@ export const OnlinePaymentStep = ({
         throw new Error("Erro ao tokenizar cartão. Verifique os dados e tente novamente.");
       }
 
+      // Get correct payment_method_id and issuer_id from BIN
+      let detectedPaymentMethodId = tokenResult.payment_method_id;
+      let detectedIssuerId: string | undefined;
+      const bin = tokenResult.first_six_digits;
+      if (bin && mpInstanceRef.current) {
+        try {
+          const pmResponse = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?bins=${bin}&site_id=MLB`, {
+            headers: { "Content-Type": "application/json" },
+          });
+          // Alternative: use the public key endpoint
+          const { data: config } = await supabase
+            .from("online_payment_config")
+            .select("mp_public_key")
+            .eq("restaurant_id", restaurantId)
+            .maybeSingle();
+          if (config?.mp_public_key) {
+            const binResponse = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${config.mp_public_key}&bins=${bin}`);
+            const binData = await binResponse.json();
+            if (binData?.results?.[0]) {
+              detectedPaymentMethodId = binData.results[0].id;
+              detectedIssuerId = binData.results[0].issuer?.id?.toString();
+            }
+          }
+        } catch (binErr) {
+          console.warn("[OnlinePayment] BIN lookup failed, using token data:", binErr);
+        }
+      }
+
       const safeAmount = Number(Math.max(0.1, Math.round(amount * 100) / 100).toFixed(2));
       const safeEmail = customerEmail && customerEmail.trim() ? customerEmail.trim() : `cliente-${Date.now()}@pedido.com`;
       const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
@@ -366,7 +394,8 @@ export const OnlinePaymentStep = ({
           customer_email: safeEmail,
           customer_phone: customerPhone,
           card_token: tokenResult.id,
-          payment_method_id: tokenResult.payment_method_id || "visa",
+          payment_method_id: detectedPaymentMethodId,
+          issuer_id: detectedIssuerId,
           installments: 1,
           save_card: saveNewCard,
           items: cartItems,
