@@ -139,7 +139,7 @@ export const CheckoutDrawer = ({
     }
   };
 
-  const handleFinishOrder = async () => {
+  const handleFinishOrder = async (onlinePaymentId?: string) => {
     if (submitting) return;
     
     setSubmitting(true);
@@ -179,14 +179,16 @@ export const CheckoutDrawer = ({
         delivery_phone: phoneToUse,
         delivery_neighborhood: deliveryType === "delivery" ? addressData?.address?.neighborhood : null,
         delivery_city: deliveryType === "delivery" ? addressData?.address?.city : null,
-        payment_type: paymentData.method,
+        payment_type: paymentData?.method || (onlinePaymentId ? "online" : "pending"),
         coupon_code: coupon?.code,
         coupon_discount: couponDiscount,
         delivery_fee: deliveryFee,
         loyalty_points_used: loyaltyPointsUsed,
         loyalty_points_earned: Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1)),
-        status: "pending",
-        notes: paymentData.changeFor ? `Troco para: R$ ${paymentData.changeFor}` : null,
+        status: onlinePaymentId ? "confirmed" : "pending",
+        payment_status: onlinePaymentId ? "paid" : "pending",
+        notes: paymentData?.changeFor ? `Troco para: R$ ${paymentData.changeFor}` : null,
+        online_payment_id: onlinePaymentId || paymentData?.onlinePaymentId || null,
         reward_discount: rewardDiscount,
         reward_id: activeRewardDiscount?.id || null,
       };
@@ -669,13 +671,14 @@ export const CheckoutDrawer = ({
           <OnlinePaymentStep
             onBack={() => setStep("payment")}
             onConfirm={(onlinePaymentId) => {
-              // Update payment data with the online payment ID
+              // Online payment confirmed — skip summary, submit order directly
               setPaymentData((prev: any) => ({ 
                 ...prev, 
                 onlinePaymentId,
                 confirmed: true,
+                isOnlinePayment: true,
               }));
-              setStep("summary");
+              handleFinishOrder(onlinePaymentId);
             }}
             method={paymentData?.onlineMethod || "pix"}
             amount={onlineTotal}
