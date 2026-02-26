@@ -588,6 +588,10 @@ export const CheckoutDrawer = ({
             orderTotal={orderTotal}
             restaurantId={restaurant.id}
             primaryColor={primaryColorFromRestaurant(restaurant)}
+            customerCPF={customerData?.cpf || getCustomerCPF()}
+            customerName={customerData?.name || sessionStorage.getItem("customer_name") || ""}
+            customerPhone={customerData?.phone || sessionStorage.getItem("customer_phone") || ""}
+            customerEmail={sessionStorage.getItem("customer_email") || ""}
             onContinue={(data) => {
               setPaymentData(data);
               
