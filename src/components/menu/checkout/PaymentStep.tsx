@@ -191,7 +191,7 @@ export const PaymentStep = ({
     // Check if online method selected
     if (paymentMethod === "pix_online" || paymentMethod === "credit_card_online") {
       if (requireCustomerInfo) {
-        if (!customerName || !customerCPF || !customerPhone) {
+        if (!customerName || !customerCPF) {
           toast.error("Preencha todos os dados");
           return;
         }
@@ -231,7 +231,7 @@ export const PaymentStep = ({
     }
 
     if (requireCustomerInfo) {
-      if (!customerName || !customerCPF || !customerPhone) {
+      if (!customerName || !customerCPF) {
         toast.error("Preencha todos os dados");
         return;
       }

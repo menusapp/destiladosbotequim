@@ -588,17 +588,17 @@ export const CheckoutDrawer = ({
             orderTotal={orderTotal}
             restaurantId={restaurant.id}
             primaryColor={primaryColorFromRestaurant(restaurant)}
-            customerCPF={customerData?.cpf || getCustomerCPF()}
-            customerName={customerData?.name || sessionStorage.getItem("customer_name") || ""}
-            customerPhone={customerData?.phone || sessionStorage.getItem("customer_phone") || ""}
+            customerCPF={customerData?.cpf || getCustomerCPF() || sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`) || ""}
+            customerName={customerData?.name || sessionStorage.getItem("customer_name") || sessionStorage.getItem(`delivery-customer-${restaurantSlug}`) || ""}
+            customerPhone={customerData?.phone || sessionStorage.getItem("customer_phone") || sessionStorage.getItem(`delivery-phone-${restaurantSlug}`) || ""}
             customerEmail={sessionStorage.getItem("customer_email") || ""}
             onContinue={(data) => {
               setPaymentData(data);
               
               if (deliveryType === "pickup") {
-                const cpf = sessionStorage.getItem("customer_cpf") || "";
-                const name = sessionStorage.getItem("customer_name") || "";
-                const phone = sessionStorage.getItem("customer_phone") || "";
+                const cpf = sessionStorage.getItem("customer_cpf") || sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`) || "";
+                const name = sessionStorage.getItem("customer_name") || sessionStorage.getItem(`delivery-customer-${restaurantSlug}`) || "";
+                const phone = sessionStorage.getItem("customer_phone") || sessionStorage.getItem(`delivery-phone-${restaurantSlug}`) || "";
                 setCustomerData({ name, cpf, phone });
                 
                 if (restaurant.loyalty_enabled && cpf) {
