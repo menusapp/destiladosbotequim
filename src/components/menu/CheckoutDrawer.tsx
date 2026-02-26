@@ -711,7 +711,7 @@ export const CheckoutDrawer = ({
           <Progress value={getProgressValue()} className="h-1" />
         </DrawerHeader>
 
-        <div className="overflow-y-auto flex-1">
+        <div className="overflow-y-auto flex-1" data-vaul-no-drag>
           {renderStep()}
         </div>
       </DrawerContent>
