@@ -664,7 +664,7 @@ export const OnlinePaymentStep = ({
       )}
 
       {/* Actions */}
-      <div className="flex gap-3 pt-2">
+      <div className="flex gap-3 pt-2 relative z-50 pointer-events-auto pb-safe">
         <Button variant="outline" className="flex-1" onClick={onBack} disabled={processing}>
           Voltar
         </Button>
