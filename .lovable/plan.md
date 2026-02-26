@@ -1,86 +1,72 @@
 
 
-## Root Cause Found
+## Root Cause (definitive this time)
 
-The issue is **NOT about touch events or vaul drag interception**. The button IS being clicked, but `handleContinue()` silently returns early due to a validation failure.
+The problem is in `PaymentStep.tsx` lines 147-183. Here's what happens:
 
-### The Problem
+1. **Initial state is correct** — `useState(nameProp || "")` initializes from props passed by CheckoutDrawer (which correctly resolve the slug-based sessionStorage keys). So initially `customerName` and `customerCPF` have values.
 
-In `PaymentStep.tsx`, when `requireCustomerInfo` is `true` (which happens only for **Retirada**, line 587 of CheckoutDrawer), `handleContinue` validates:
+2. **Then `loadUserData` useEffect fires** — it calls `supabase.auth.getUser()`. If the user logged in via the delivery menu's custom login (which uses sessionStorage, not Supabase Auth), `user` is `null`.
 
-```tsx
-if (requireCustomerInfo) {
-  if (!customerName || !customerCPF || !customerPhone) {
-    toast.error("Preencha todos os dados");
-    return;  // ← Button "doesn't work"
-  }
-}
-```
+3. **When user is null AND `requireCustomerInfo` is true (only for Retirada!)**, lines 175-178 execute and **OVERWRITE** the state with `sessionStorage.getItem("customer_name") || ""` — which returns EMPTY because the delivery login stores keys as `delivery-customer-${slug}`, not `customer_name`.
 
-The customer data is empty because of **mismatched sessionStorage keys**:
+4. **Result**: The correctly-initialized prop values get replaced with empty strings. Validation at line 234 fails: `if (!customerName || !customerCPF)` → returns early.
 
-- **DeliveryMenu.tsx** stores data with keys: `delivery-customer-${slug}`, `delivery-cpf-${slug}`, `delivery-phone-${slug}`
-- **PaymentStep.tsx** reads from keys: `customer_name`, `customer_cpf`, `customer_phone`
+5. **Why you don't see the error toast**: The Toaster component in `sonner.tsx` is disabled (`const Toaster = () => null`), so `toast.error()` fires but nothing renders. The button appears to "do nothing".
 
-These keys never match, so for Retirada the data is empty.
+6. **Why it works for Entrega**: `requireCustomerInfo` is `false` for delivery, so lines 175-178 never execute, and the initial prop values survive untouched.
 
-For **Entrega**, it works because the AddressStep collects data and passes it via `customerData` prop — sessionStorage is never consulted.
+7. **Why it works on desktop**: On desktop the user is likely logged in via Supabase Auth (admin panel), so `user` is not null, the profile query succeeds at line 151-172, and the state gets filled correctly from the profile — never reaching the problematic lines 175-178.
 
-For **Retirada**, the flow skips AddressStep, `customerData` is null, so the props fallback to sessionStorage which has the wrong keys → empty → validation fails → toast fires (probably unnoticed on mobile) → button appears to "not work".
+## Fix
 
-### Why it broke after the frictionless changes
+### Edit 1 — `src/components/menu/checkout/PaymentStep.tsx` (lines 147-183)
 
-Before the frictionless changes, PaymentStep had visible input fields for name/CPF/phone that the user could fill manually. After removing those fields, the component relies entirely on auto-fill which fails due to the key mismatch.
-
-### The Fix
-
-Two changes needed:
-
-**1. CheckoutDrawer.tsx (lines 586-616)** — When rendering PaymentStep for pickup, pass the customer data from the correct sessionStorage keys (the ones DeliveryMenu actually writes to):
-
-Replace the PaymentStep render block to properly resolve customer data before passing props. Use the slug-based keys as fallback.
-
-**2. PaymentStep.tsx (lines 233-241)** — Make phone optional in validation since `login_require_phone` defaults to `false`. Phone is not always collected during login, so requiring it blocks checkout:
+Fix the `loadUserData` useEffect to not overwrite state when props already provided valid data. Also use slug-prefixed sessionStorage keys as fallback:
 
 ```tsx
-// Before:
-if (!customerName || !customerCPF || !customerPhone) {
-
-// After: 
-if (!customerName || !customerCPF) {
+useEffect(() => {
+    const loadUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, cpf, phone")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile) {
+          if (profile.full_name && !nameProp) {
+            setCustomerName(profile.full_name);
+            sessionStorage.setItem("customer_name", profile.full_name);
+          }
+          if (profile.cpf && !cpfProp) {
+            setCustomerCPF(profile.cpf);
+            sessionStorage.setItem("customer_cpf", profile.cpf);
+          }
+          if (profile.phone && !phoneProp) {
+            setCustomerPhone(profile.phone);
+            sessionStorage.setItem("customer_phone", profile.phone);
+          }
+          return;
+        }
+      }
+      
+      // Only fill from sessionStorage if props didn't provide values
+      if (requireCustomerInfo) {
+        if (!nameProp) setCustomerName(sessionStorage.getItem("customer_name") || "");
+        if (!cpfProp) setCustomerCPF(sessionStorage.getItem("customer_cpf") || "");
+        if (!phoneProp) setCustomerPhone(sessionStorage.getItem("customer_phone") || "");
+      }
+    };
+    
+    loadUserData();
+  }, [requireCustomerInfo, nameProp, cpfProp, phoneProp]);
 ```
 
-### Detailed Edits
+The key change: if `nameProp` or `cpfProp` were already passed with valid data, the useEffect will NOT overwrite them. This preserves the correctly-resolved values from CheckoutDrawer.
 
-**File: `src/components/menu/CheckoutDrawer.tsx`**
-
-In the PaymentStep render section (~line 584-616), resolve customer name/CPF/phone from the correct sessionStorage keys. Add a helper that checks both key formats:
-
-```tsx
-// Before passing props, resolve from slug-based keys too
-const resolvedName = customerData?.name 
-  || sessionStorage.getItem("customer_name") 
-  || sessionStorage.getItem(`delivery-customer-${restaurantSlug}`) 
-  || "";
-const resolvedCPF = customerData?.cpf 
-  || getCustomerCPF() 
-  || sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`) 
-  || "";
-const resolvedPhone = customerData?.phone 
-  || sessionStorage.getItem("customer_phone") 
-  || sessionStorage.getItem(`delivery-phone-${restaurantSlug}`) 
-  || "";
-```
-
-And use these resolved values in the PaymentStep props AND in the `onContinue` callback for pickup.
-
-**File: `src/components/menu/checkout/PaymentStep.tsx`**
-
-1. Line 91-92: Also initialize state from the slug-based keys as fallback
-2. Lines 233-237: Remove `!customerPhone` from the validation — phone is not always required
-3. Lines 193-194: Same for the online payment validation
-
-### Files Changed
-- `src/components/menu/CheckoutDrawer.tsx` — Fix sessionStorage key resolution for pickup flow
-- `src/components/menu/checkout/PaymentStep.tsx` — Remove phone from required validation, fix data initialization
+### Files changed
+- `src/components/menu/checkout/PaymentStep.tsx` — Fix useEffect overwriting prop-initialized state
 
