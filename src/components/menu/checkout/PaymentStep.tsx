@@ -434,7 +434,7 @@ export const PaymentStep = ({
       </div>
 
       {/* Buttons */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 relative z-50 pointer-events-auto pb-safe">
         <Button variant="outline" className="flex-1" onClick={onBack}>
           Voltar
         </Button>

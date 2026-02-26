@@ -125,7 +125,7 @@ export const DeliveryTypeStep = ({
         </Card>
       </div>
 
-      <div className="flex gap-2 pt-4">
+      <div className="flex gap-2 pt-4 relative z-50 pointer-events-auto pb-safe">
         <Button variant="outline" onClick={onBack} className="flex-1">
           Voltar
         </Button>
