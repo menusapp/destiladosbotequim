@@ -1,30 +1,27 @@
 
 
-## Trocar credenciais do Mercado Pago para modo teste
+## Diagnóstico: Credenciais NÃO estão em modo teste
 
-O usuário precisa substituir as credenciais de produção pelas de teste do Mercado Pago para evitar bloqueios do antifraude durante desenvolvimento.
+As credenciais na tabela `online_payment_config` (que são as efetivamente usadas tanto no frontend quanto na Edge Function) ainda são de **produção**:
 
-### Secrets a atualizar
+- `mp_public_key`: `APP_USR-4393506a...` (produção — teste começa com `TEST-`)
+- `mp_access_token`: `APP_USR-1390445...` (produção — teste começa com `TEST-`)
 
-1. **MERCADOPAGO_ACCESS_TOKEN** — Access Token de teste (começa com `TEST-...`)
-2. **MERCADOPAGO_PUBLIC_KEY** — Public Key de teste (começa com `TEST-...`)
-3. **MERCADOPAGO_APP_ID** — App ID (mesmo valor, mas confirmar)
+O erro `bin_not_found` nos logs confirma: você está tentando usar cartões de teste com credenciais de produção. O Mercado Pago rejeita porque os BINs dos cartões de teste só funcionam com credenciais de teste.
 
-### Onde encontrar as credenciais de teste
+**Os secrets do projeto não são usados pelo sistema de pagamento.** O código busca as credenciais diretamente da tabela `online_payment_config` no banco de dados. Atualizar os secrets não muda nada.
 
-1. Acesse [mercadopago.com.br/developers](https://www.mercadopago.com.br/developers)
-2. Vá em **Suas integrações** → selecione sua aplicação
-3. Na aba **Credenciais de teste**, copie:
-   - `Access Token` (TEST-...)
-   - `Public Key` (TEST-...)
+## Plano
 
-### Implementação
+### Passo 1 — Atualizar credenciais na tabela do banco de dados
 
-Usar a ferramenta `add_secret` para cada um dos 3 secrets, permitindo que o usuário cole os novos valores de teste.
+Executar um SQL migration para atualizar os campos `mp_access_token` e `mp_public_key` na tabela `online_payment_config` com os valores de teste. Como não posso ver os valores dos secrets, vou criar uma abordagem onde o usuário insere as credenciais via painel de settings (que já existe).
 
-### Importante
+**Alternativa rápida**: Se o usuário fornecer as credenciais TEST, posso rodar um UPDATE direto na tabela.
 
-- Com credenciais de teste, use os [cartões de teste do MP](https://www.mercadopago.com.br/developers/pt/docs/your-integrations/test/cards) (ex: `5031 4332 1540 6351`, CVV `123`, validade futura)
-- PIX de teste também funciona normalmente
-- Quando for para produção, basta trocar de volta para as credenciais reais
+### Passo 2 — Verificar se o painel de Settings já salva na tabela correta
+
+Verificar `OnlinePaymentsSettings.tsx` para confirmar que o fluxo de configuração do MP salva na tabela `online_payment_config`. Se sim, basta o usuário ir em Settings e colar as novas credenciais de teste lá.
+
+O usuário precisa ir nas **Configurações > Pagamentos Online** do painel admin e atualizar o Access Token e Public Key para os valores de teste (que começam com `TEST-`). Essa é a única forma de realmente trocar as credenciais usadas pelo sistema.
 
