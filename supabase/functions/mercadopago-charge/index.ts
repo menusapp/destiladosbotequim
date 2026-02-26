@@ -222,15 +222,50 @@ Deno.serve(async (req) => {
           );
         }
 
+        // Generate a card_token from the saved card_id (required by MP for all card payments)
+        let generatedTokenId: string | null = null;
+        try {
+          const tokenRes = await fetch("https://api.mercadopago.com/v1/card_tokens", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${mpAccessToken}`,
+            },
+            body: JSON.stringify({
+              card_id: savedCard.card_id,
+              customer_id: savedCard.mp_customer_id,
+            }),
+          });
+          const tokenData = await tokenRes.json();
+          console.log("[MP Charge] Card token response:", JSON.stringify({ status: tokenRes.status, id: tokenData.id, error: tokenData.message }));
+          if (tokenRes.ok && tokenData.id) {
+            generatedTokenId = tokenData.id;
+          } else {
+            console.error("[MP Charge] Failed to generate card token:", JSON.stringify(tokenData));
+            return new Response(
+              JSON.stringify({ success: false, error: "Não foi possível gerar token do cartão salvo" }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } catch (e) {
+          console.error("[MP Charge] Card token generation error:", e);
+          return new Response(
+            JSON.stringify({ success: false, error: "Erro ao gerar token do cartão salvo" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         console.log("[MP Charge] Saved card payment payload:", JSON.stringify({
           payment_method_id: resolvedPaymentMethodId,
           issuer_id: resolvedIssuerId,
           payer_id: savedCard.mp_customer_id,
+          token: generatedTokenId,
           amount: roundedAmount,
         }));
 
         const savedCardPayload: any = {
           transaction_amount: roundedAmount,
+          token: generatedTokenId,
           payment_method_id: resolvedPaymentMethodId,
           installments: installments || 1,
           notification_url: webhookUrl,
