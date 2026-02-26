@@ -1,26 +1,20 @@
 
 
-## Diagnóstico
+## Diagnosis
 
-O erro `not found public_key: TEST-1390445596449726-...` confirma que o campo `mp_public_key` na tabela `online_payment_config` contém o **Access Token** em vez da **Public Key**. Os valores foram trocados ou duplicados durante a sincronização anterior.
+Two problems found:
 
-- O valor `TEST-1390445596449726-012111-...` é formato de **Access Token** (numérico longo)
-- Uma Public Key de teste tem formato diferente, tipicamente `TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (formato UUID)
+1. **Edge Function returns non-200 status codes**: The `mercadopago-charge` function returns `status: 400` or `status: 500` when errors occur. The Supabase client's `functions.invoke()` interprets any non-2xx response as a generic error, hiding the actual error details (e.g., `bin_not_found`). The function should always return HTTP 200 and include `{ success: false, error: "..." }` in the body.
 
-## Plano
+2. **`bin_not_found` persists**: This specific MP error means the card number's BIN is not recognized. With test credentials, only [test card numbers](https://www.mercadopago.com.br/developers/pt/docs/your-integrations/test/cards) work (e.g., `5031 4332 1540 6351`). Real card numbers will always fail with test keys.
 
-### Passo 1 — Corrigir mp_public_key no banco de dados
+## Plan
 
-Criar e executar uma Edge Function temporária (`fix-mp-keys`) que:
-1. Leia o secret `MERCADOPAGO_PUBLIC_KEY` (que deve conter a public key correta)
-2. Leia o secret `MERCADOPAGO_ACCESS_TOKEN` (access token correto)
-3. Atualize a tabela `online_payment_config` com os valores nos campos corretos:
-   - `mp_public_key` ← `MERCADOPAGO_PUBLIC_KEY`
-   - `mp_access_token` ← `MERCADOPAGO_ACCESS_TOKEN`
+### Step 1 — Fix `mercadopago-charge` to always return HTTP 200
 
-### Passo 2 — Verificar se os secrets estão corretos
+Change all `return new Response(..., { status: 400 })` and `status: 500` to `status: 200`, wrapping error responses in `{ success: false, error: "message" }` format. This ensures the frontend receives the actual error message instead of a generic exception.
 
-Se ambos os secrets contêm o mesmo valor (access token), será necessário pedir ao usuário para atualizar o secret `MERCADOPAGO_PUBLIC_KEY` com o valor correto do portal do Mercado Pago.
+### Step 2 — Update frontend error handling
 
-### Passo 3 — Deletar a Edge Function temporária
+In `OnlinePaymentStep.tsx`, update error handling to check `data?.success === false` or `data?.error` instead of relying on thrown exceptions from `supabase.functions.invoke`.
 
