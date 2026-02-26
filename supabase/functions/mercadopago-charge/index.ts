@@ -16,36 +16,51 @@ Deno.serve(async (req) => {
       restaurant_id,
       order_id,
       amount,
-      billing_type, // "PIX" or "CREDIT_CARD"
+      billing_type,
       customer_name,
       customer_cpf,
       customer_email,
       customer_phone,
-      // Credit card fields
       card_token,
       payment_method_id,
       installments,
-      // Cart items for anti-fraud
       items,
     } = await req.json();
 
-    // Build additional_info.items for MP anti-fraud
-    const mpItems = Array.isArray(items) && items.length > 0
-      ? items.map((item: any) => ({
-          id: item.id || "unknown",
-          title: item.name || "Produto",
-          description: item.name || "Produto",
-          quantity: item.quantity || 1,
-          unit_price: Number(item.unit_price) || 0,
-          category_id: "food",
-        }))
-      : [{ id: "order", title: `Pedido ${order_id || "delivery"}`, description: "Pedido delivery", quantity: 1, unit_price: amount, category_id: "food" }];
+    // Round amount to 2 decimal places and validate
+    const roundedAmount = Math.round(Number(amount) * 100) / 100;
 
-    if (!restaurant_id || !amount || !billing_type) {
+    if (!restaurant_id || !roundedAmount || roundedAmount <= 0 || !billing_type) {
       return new Response(
-        JSON.stringify({ error: "restaurant_id, amount e billing_type são obrigatórios" }),
+        JSON.stringify({ error: "Valor inválido ou dados obrigatórios ausentes" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Build additional_info.items for MP anti-fraud, filtering out zero-price items
+    const mpItems = Array.isArray(items) && items.length > 0
+      ? items
+          .filter((item: any) => Number(item.unit_price) > 0)
+          .map((item: any) => ({
+            id: item.id || "unknown",
+            title: item.name || "Produto",
+            description: item.name || "Produto",
+            quantity: item.quantity || 1,
+            unit_price: Math.round(Number(item.unit_price) * 100) / 100,
+            category_id: "food",
+          }))
+      : [];
+
+    // Fallback if all items were filtered out
+    if (mpItems.length === 0) {
+      mpItems.push({
+        id: "order",
+        title: `Pedido ${order_id || "delivery"}`,
+        description: "Pedido delivery",
+        quantity: 1,
+        unit_price: roundedAmount,
+        category_id: "food",
+      });
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -73,7 +88,6 @@ Deno.serve(async (req) => {
     let mpData: any;
 
     if (billing_type === "PIX") {
-      // Create PIX payment via Mercado Pago
       mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
         method: "POST",
         headers: {
@@ -82,7 +96,7 @@ Deno.serve(async (req) => {
           "X-Idempotency-Key": `${restaurant_id}-${order_id || Date.now()}`,
         },
         body: JSON.stringify({
-          transaction_amount: amount,
+          transaction_amount: roundedAmount,
           payment_method_id: "pix",
           notification_url: webhookUrl,
           external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
@@ -94,9 +108,7 @@ Deno.serve(async (req) => {
               : undefined,
           },
           description: `Pedido ${order_id || "delivery"}`,
-          additional_info: {
-            items: mpItems,
-          },
+          additional_info: { items: mpItems },
         }),
       });
 
@@ -112,13 +124,12 @@ Deno.serve(async (req) => {
 
       const pixData = mpData.point_of_interaction?.transaction_data;
 
-      // Save to online_payments
       const { data: payment, error: paymentError } = await supabase
         .from("online_payments")
         .insert({
           restaurant_id,
           order_id: order_id || null,
-          amount,
+          amount: roundedAmount,
           provider: "mercadopago",
           provider_payment_id: String(mpData.id),
           status: "pending",
@@ -152,7 +163,6 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else if (billing_type === "CREDIT_CARD") {
-      // Create credit card payment via Mercado Pago
       mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
         method: "POST",
         headers: {
@@ -161,7 +171,7 @@ Deno.serve(async (req) => {
           "X-Idempotency-Key": `${restaurant_id}-${order_id || Date.now()}-cc`,
         },
         body: JSON.stringify({
-          transaction_amount: amount,
+          transaction_amount: roundedAmount,
           token: card_token,
           payment_method_id: payment_method_id,
           installments: installments || 1,
@@ -175,9 +185,7 @@ Deno.serve(async (req) => {
               : undefined,
           },
           description: `Pedido ${order_id || "delivery"}`,
-          additional_info: {
-            items: mpItems,
-          },
+          additional_info: { items: mpItems },
         }),
       });
 
@@ -198,7 +206,7 @@ Deno.serve(async (req) => {
         .insert({
           restaurant_id,
           order_id: order_id || null,
-          amount,
+          amount: roundedAmount,
           provider: "mercadopago",
           provider_payment_id: String(mpData.id),
           status: isApproved ? "confirmed" : "pending",
