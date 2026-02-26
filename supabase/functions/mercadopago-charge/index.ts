@@ -29,6 +29,7 @@ Deno.serve(async (req) => {
       action,
       saved_card_id,
       save_card,
+      security_code,
     } = await req.json();
 
     // Round amount to 2 decimal places and validate
@@ -234,6 +235,7 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               card_id: savedCard.card_id,
               customer_id: savedCard.mp_customer_id,
+              security_code: security_code || undefined,
             }),
           });
           const tokenData = await tokenRes.json();

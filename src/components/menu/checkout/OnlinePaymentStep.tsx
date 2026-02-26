@@ -64,6 +64,7 @@ export const OnlinePaymentStep = ({
   const [selectedCardId, setSelectedCardId] = useState<string>("new");
   const [isLoadingCards, setIsLoadingCards] = useState(false);
   const [saveNewCard, setSaveNewCard] = useState(false);
+  const [savedCardCvv, setSavedCardCvv] = useState("");
 
   // Secure Fields refs
   const mpInstanceRef = useRef<any>(null);
@@ -273,6 +274,11 @@ export const OnlinePaymentStep = ({
         return;
       }
 
+      if (!savedCardCvv || savedCardCvv.length < 3) {
+        toast.error("Digite o CVV do cartão");
+        return;
+      }
+
       setProcessing(true);
       setErrorMessage("");
 
@@ -287,6 +293,7 @@ export const OnlinePaymentStep = ({
             billing_type: "CREDIT_CARD",
             action: "pay_with_saved_card",
             saved_card_id: selectedCardId,
+            security_code: savedCardCvv,
             customer_name: customerName,
             customer_cpf: customerCPF,
             customer_email: safeEmail,
@@ -623,6 +630,22 @@ export const OnlinePaymentStep = ({
                 </Button>
               </div>
             ))}
+
+            {/* CVV input for saved card */}
+            {selectedCardId !== "new" && (
+              <div className="mt-2 max-w-[140px]">
+                <Label className="text-sm font-medium">CVV *</Label>
+                <Input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={4}
+                  placeholder="CVV"
+                  value={savedCardCvv}
+                  onChange={(e) => setSavedCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  className="h-[44px] text-center tracking-widest text-lg"
+                />
+              </div>
+            )}
 
             {/* New card option */}
             <div
