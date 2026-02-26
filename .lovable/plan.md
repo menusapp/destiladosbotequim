@@ -1,72 +1,110 @@
 
 
-## Root Cause (definitive this time)
+## Analysis Confirmed
 
-The problem is in `PaymentStep.tsx` lines 147-183. Here's what happens:
+The edge function logs show the exact error: `Invalid transaction_amount` from Mercado Pago API. This happens because:
 
-1. **Initial state is correct** — `useState(nameProp || "")` initializes from props passed by CheckoutDrawer (which correctly resolve the slug-based sessionStorage keys). So initially `customerName` and `customerCPF` have values.
+1. **Floating point precision**: `calculateRewardDiscount` can produce values like `subtotal * 0.15 = 8.849999999999998`, making the final `onlineTotal` have excessive decimal places. MP requires exactly 2 decimal places.
 
-2. **Then `loadUserData` useEffect fires** — it calls `supabase.auth.getUser()`. If the user logged in via the delivery menu's custom login (which uses sessionStorage, not Supabase Auth), `user` is `null`.
+2. **Zero/negative total**: When a 100% discount reward is applied, `onlineTotal` becomes 0 or negative. MP rejects `transaction_amount <= 0`.
 
-3. **When user is null AND `requireCustomerInfo` is true (only for Retirada!)**, lines 175-178 execute and **OVERWRITE** the state with `sessionStorage.getItem("customer_name") || ""` — which returns EMPTY because the delivery login stores keys as `delivery-customer-${slug}`, not `customer_name`.
+3. The frontend already checks `amount < 1` inside `OnlinePaymentStep`, but by that point the edge function call has already been triggered for PIX (line 77: `createPixCharge()` runs on mount).
 
-4. **Result**: The correctly-initialized prop values get replaced with empty strings. Validation at line 234 fails: `if (!customerName || !customerCPF)` → returns early.
+## Plan
 
-5. **Why you don't see the error toast**: The Toaster component in `sonner.tsx` is disabled (`const Toaster = () => null`), so `toast.error()` fires but nothing renders. The button appears to "do nothing".
+### Edit 1 — `src/components/menu/CheckoutDrawer.tsx` (~line 645-652)
 
-6. **Why it works for Entrega**: `requireCustomerInfo` is `false` for delivery, so lines 175-178 never execute, and the initial prop values survive untouched.
-
-7. **Why it works on desktop**: On desktop the user is likely logged in via Supabase Auth (admin panel), so `user` is not null, the profile query succeeds at line 151-172, and the state gets filled correctly from the profile — never reaching the problematic lines 175-178.
-
-## Fix
-
-### Edit 1 — `src/components/menu/checkout/PaymentStep.tsx` (lines 147-183)
-
-Fix the `loadUserData` useEffect to not overwrite state when props already provided valid data. Also use slug-prefixed sessionStorage keys as fallback:
+Round `onlineTotal` to 2 decimal places and ensure it's not negative:
 
 ```tsx
-useEffect(() => {
-    const loadUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name, cpf, phone")
-          .eq("id", user.id)
-          .single();
-        
-        if (profile) {
-          if (profile.full_name && !nameProp) {
-            setCustomerName(profile.full_name);
-            sessionStorage.setItem("customer_name", profile.full_name);
-          }
-          if (profile.cpf && !cpfProp) {
-            setCustomerCPF(profile.cpf);
-            sessionStorage.setItem("customer_cpf", profile.cpf);
-          }
-          if (profile.phone && !phoneProp) {
-            setCustomerPhone(profile.phone);
-            sessionStorage.setItem("customer_phone", profile.phone);
-          }
-          return;
-        }
-      }
-      
-      // Only fill from sessionStorage if props didn't provide values
-      if (requireCustomerInfo) {
-        if (!nameProp) setCustomerName(sessionStorage.getItem("customer_name") || "");
-        if (!cpfProp) setCustomerCPF(sessionStorage.getItem("customer_cpf") || "");
-        if (!phoneProp) setCustomerPhone(sessionStorage.getItem("customer_phone") || "");
-      }
-    };
-    
-    loadUserData();
-  }, [requireCustomerInfo, nameProp, cpfProp, phoneProp]);
+const onlineTotal = (() => {
+  const cd = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
+  const ld = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
+  const rd = calculateRewardDiscount(subtotal);
+  const df = getDeliveryFee();
+  const sf = restaurant.service_fee_enabled ? (subtotal * restaurant.service_fee_percentage / 100) : 0;
+  const raw = subtotal + sf + df - cd - ld - rd;
+  return Math.max(0, Math.round(raw * 100) / 100);
+})();
 ```
 
-The key change: if `nameProp` or `cpfProp` were already passed with valid data, the useEffect will NOT overwrite them. This preserves the correctly-resolved values from CheckoutDrawer.
+### Edit 2 — `src/components/menu/CheckoutDrawer.tsx` (~line 608)
+
+Same rounding fix for `orderTotal` in the payment step:
+
+```tsx
+const orderTotal = Math.max(0, Math.round((subtotal + serviceFee + deliveryFee - couponDiscount - loyaltyDiscount - rewardDiscount) * 100) / 100);
+```
+
+### Edit 3 — `src/components/menu/CheckoutDrawer.tsx` (~line 636)
+
+When `onlineTotal` is 0 (100% discount), skip online payment and go directly to summary, marking order as "paid":
+
+```tsx
+if (data.isOnlinePayment) {
+  // Recalculate total to check if payment is needed
+  const cd2 = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
+  const ld2 = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
+  const rd2 = calculateRewardDiscount(subtotal);
+  const df2 = getDeliveryFee();
+  const sf2 = restaurant.service_fee_enabled ? (subtotal * restaurant.service_fee_percentage / 100) : 0;
+  const finalTotal = Math.max(0, Math.round((subtotal + sf2 + df2 - cd2 - ld2 - rd2) * 100) / 100);
+  
+  if (finalTotal < 1) {
+    // Total is zero/minimal after discounts — skip payment gateway
+    toast.success("Desconto aplicado! Pedido sem custo adicional.");
+    setStep("summary");
+  } else {
+    setStep("online-payment");
+  }
+} else {
+  setStep("summary");
+}
+```
+
+### Edit 4 — `supabase/functions/mercadopago-charge/index.ts` (~line 38-49)
+
+Add server-side validation — round `amount` to 2 decimal places and reject if <= 0:
+
+```typescript
+// After extracting amount from req.json()
+const roundedAmount = Math.round(Number(amount) * 100) / 100;
+
+if (!restaurant_id || !roundedAmount || roundedAmount <= 0 || !billing_type) {
+  return new Response(
+    JSON.stringify({ error: "Valor inválido ou dados obrigatórios ausentes" }),
+    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+```
+
+Then use `roundedAmount` instead of `amount` in all places within the function (transaction_amount, mpItems fallback, DB insert).
+
+### Edit 5 — `supabase/functions/mercadopago-charge/index.ts` (mpItems construction)
+
+Filter out items with `unit_price <= 0` to prevent MP rejection:
+
+```typescript
+const mpItems = Array.isArray(items) && items.length > 0
+  ? items
+      .filter((item: any) => Number(item.unit_price) > 0)
+      .map((item: any) => ({
+        id: item.id || "unknown",
+        title: item.name || "Produto",
+        description: item.name || "Produto",
+        quantity: item.quantity || 1,
+        unit_price: Math.round(Number(item.unit_price) * 100) / 100,
+        category_id: "food",
+      }))
+  : [];
+
+// Fallback if all items were filtered
+if (mpItems.length === 0) {
+  mpItems.push({ id: "order", title: `Pedido ${order_id || "delivery"}`, description: "Pedido delivery", quantity: 1, unit_price: roundedAmount, category_id: "food" });
+}
+```
 
 ### Files changed
-- `src/components/menu/checkout/PaymentStep.tsx` — Fix useEffect overwriting prop-initialized state
+- `src/components/menu/CheckoutDrawer.tsx` — Round totals, skip gateway when total is 0
+- `supabase/functions/mercadopago-charge/index.ts` — Round amount, filter zero-price items
 
