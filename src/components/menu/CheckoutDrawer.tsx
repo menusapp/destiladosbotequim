@@ -605,7 +605,7 @@ export const CheckoutDrawer = ({
           ? (subtotal * restaurant.service_fee_percentage / 100) 
           : 0;
         
-        const orderTotal = subtotal + serviceFee + deliveryFee - couponDiscount - loyaltyDiscount - rewardDiscount;
+        const orderTotal = Math.max(0, Math.round((subtotal + serviceFee + deliveryFee - couponDiscount - loyaltyDiscount - rewardDiscount) * 100) / 100);
 
         return (
           <PaymentStep
@@ -634,7 +634,20 @@ export const CheckoutDrawer = ({
               
               // If online payment, go to online-payment step
               if (data.isOnlinePayment) {
-                setStep("online-payment");
+                // Recalculate total to check if payment is actually needed
+                const cd2 = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
+                const ld2 = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
+                const rd2 = calculateRewardDiscount(subtotal);
+                const df2 = getDeliveryFee();
+                const sf2 = restaurant.service_fee_enabled ? (subtotal * restaurant.service_fee_percentage / 100) : 0;
+                const finalTotal = Math.max(0, Math.round((subtotal + sf2 + df2 - cd2 - ld2 - rd2) * 100) / 100);
+                
+                if (finalTotal < 1) {
+                  toast.success("Desconto aplicado! Pedido sem custo adicional.");
+                  setStep("summary");
+                } else {
+                  setStep("online-payment");
+                }
               } else {
                 setStep("summary");
               }
@@ -648,7 +661,8 @@ export const CheckoutDrawer = ({
           const rd = calculateRewardDiscount(subtotal);
           const df = getDeliveryFee();
           const sf = restaurant.service_fee_enabled ? (subtotal * restaurant.service_fee_percentage / 100) : 0;
-          return subtotal + sf + df - cd - ld - rd;
+          const raw = subtotal + sf + df - cd - ld - rd;
+          return Math.max(0, Math.round(raw * 100) / 100);
         })();
 
         return (
