@@ -136,21 +136,8 @@ export const ProfileView = ({
         return;
       }
 
-      // Find the last redemption to get the baseline
-      const { data: lastRedemption } = await supabase
-        .from("loyalty_reward_redemptions")
-        .select("redeemed_at")
-        .eq("restaurant_id", restaurantId)
-        .eq("customer_cpf", customerCPF)
-        .eq("program_id", program.id)
-        .order("redeemed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // Baseline: the later of program activation or last redemption
-      const programActivatedAt = program.activated_at ? new Date(program.activated_at) : new Date(0);
-      const lastRedeemedAt = lastRedemption?.redeemed_at ? new Date(lastRedemption.redeemed_at) : new Date(0);
-      const baselineAt = programActivatedAt > lastRedeemedAt ? programActivatedAt : lastRedeemedAt;
+      // Use program activation as baseline (all-time, no cycle reset)
+      const programActivatedAt = program.activated_at || new Date(0).toISOString();
 
       // Fetch products for free_item rewards
       const rewards = program.loyalty_program_rewards || [];
@@ -186,7 +173,7 @@ export const ProfileView = ({
       };
       setLoyaltyProgram(programData);
 
-      // Fetch customer's orders AFTER baseline (reset logic)
+      // Fetch ALL customer orders since program activation
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(`
@@ -196,7 +183,7 @@ export const ProfileView = ({
         .eq("restaurant_id", restaurantId)
         .eq("customer_cpf", customerCPF)
         .in("status", ["delivered", "picked_up", "completed"])
-        .gte("created_at", baselineAt.toISOString());
+        .gte("created_at", programActivatedAt);
 
       if (ordersError) throw ordersError;
 

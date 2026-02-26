@@ -202,6 +202,28 @@ Deno.serve(async (req) => {
     if (triggeredReward) {
       console.log('[Loyalty] Reward triggered!', triggeredReward);
 
+      // Security check: verify this reward hasn't been redeemed already (all-time)
+      const { data: existingRedemption } = await supabase
+        .from('loyalty_reward_redemptions')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .eq('customer_cpf', order.customer_cpf)
+        .eq('program_id', program.id)
+        .eq('reward_id', triggeredReward.id)
+        .maybeSingle();
+
+      if (existingRedemption) {
+        console.log('[Loyalty] Reward already redeemed, skipping:', triggeredReward.id);
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Reward already redeemed',
+            progress: { purchase_count: newPurchaseCount, total_spent: newTotalSpent }
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Atualizar last_reward_trigger
       await supabase
         .from('customer_loyalty_progress')
