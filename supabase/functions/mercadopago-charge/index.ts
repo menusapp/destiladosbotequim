@@ -186,8 +186,9 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Fetch actual card details from MP to get correct payment_method_id
+        // Fetch actual card details from MP to get correct payment_method_id and issuer
         let resolvedPaymentMethodId = savedCard.payment_method_id;
+        let resolvedIssuerId: string | undefined;
         try {
           const cardDetailRes = await fetch(
             `https://api.mercadopago.com/v1/customers/${savedCard.mp_customer_id}/cards/${savedCard.card_id}`,
@@ -195,12 +196,59 @@ Deno.serve(async (req) => {
           );
           if (cardDetailRes.ok) {
             const cardDetail = await cardDetailRes.json();
+            console.log("[MP Charge] Saved card detail:", JSON.stringify({
+              payment_method: cardDetail.payment_method,
+              issuer: cardDetail.issuer,
+              id: cardDetail.id,
+            }));
             if (cardDetail.payment_method?.id) {
               resolvedPaymentMethodId = cardDetail.payment_method.id;
             }
+            if (cardDetail.issuer?.id) {
+              resolvedIssuerId = String(cardDetail.issuer.id);
+            }
+          } else {
+            const errBody = await cardDetailRes.text();
+            console.error("[MP Charge] Card detail fetch error:", cardDetailRes.status, errBody);
           }
         } catch (e) {
           console.warn("[MP Charge] Card detail fetch failed, using stored payment_method_id:", e);
+        }
+
+        if (!resolvedPaymentMethodId) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Não foi possível identificar a bandeira do cartão salvo" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        console.log("[MP Charge] Saved card payment payload:", JSON.stringify({
+          payment_method_id: resolvedPaymentMethodId,
+          issuer_id: resolvedIssuerId,
+          payer_id: savedCard.mp_customer_id,
+          amount: roundedAmount,
+        }));
+
+        const savedCardPayload: any = {
+          transaction_amount: roundedAmount,
+          payment_method_id: resolvedPaymentMethodId,
+          installments: installments || 1,
+          notification_url: webhookUrl,
+          external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
+          payer: {
+            id: savedCard.mp_customer_id,
+            email: safeEmail,
+            first_name: customer_name || "Cliente",
+            identification: customer_cpf
+              ? { type: "CPF", number: customer_cpf.replace(/\D/g, "") }
+              : undefined,
+          },
+          description: `Pedido ${order_id || "delivery"}`,
+          additional_info: { items: mpItems },
+        };
+
+        if (resolvedIssuerId) {
+          savedCardPayload.issuer_id = resolvedIssuerId;
         }
 
         mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -210,23 +258,7 @@ Deno.serve(async (req) => {
             Authorization: `Bearer ${mpAccessToken}`,
             "X-Idempotency-Key": `${restaurant_id}-${order_id || Date.now()}-saved-${saved_card_id}`,
           },
-          body: JSON.stringify({
-            transaction_amount: roundedAmount,
-            payment_method_id: resolvedPaymentMethodId,
-            installments: installments || 1,
-            notification_url: webhookUrl,
-            external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
-            payer: {
-              id: savedCard.mp_customer_id,
-              email: safeEmail,
-              first_name: customer_name || "Cliente",
-              identification: customer_cpf
-                ? { type: "CPF", number: customer_cpf.replace(/\D/g, "") }
-                : undefined,
-            },
-            description: `Pedido ${order_id || "delivery"}`,
-            additional_info: { items: mpItems },
-          }),
+          body: JSON.stringify(savedCardPayload),
         });
       } else {
         // New card payment
