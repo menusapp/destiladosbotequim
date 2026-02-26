@@ -1,64 +1,51 @@
 
 
-## Analysis
+## Root Cause Analysis
 
-The current `OnlinePaymentStep.tsx` credit card mode has:
-1. **"Dados do Titular" section** (lines 494-545) with manual CPF, Email, Phone, CEP, Address Number inputs — these should be removed since data comes from props
-2. **No saved cards logic** — the `customer_cards` table already exists with `card_id`, `last_four_digits`, `payment_method_id`, `first_six_digits`, `customer_cpf`, `restaurant_id`, etc.
-3. **handleCreditCardPayment** validates holder fields that will no longer exist
+The issue is **NOT a CSS z-index problem**. It's vaul (the Drawer library) intercepting touch events.
 
-The Secure Fields injection (style tag, useEffect, and container divs) must remain untouched.
+Here's what happens:
 
-## Plan — `src/components/menu/checkout/OnlinePaymentStep.tsx`
+1. **Vaul's drag handler**: When you touch anywhere inside the Drawer content, vaul captures the pointer event to detect drag-to-close gestures. It checks `shouldDrag()` (line 979-982 of vaul source) which walks up the DOM tree looking for scrollable containers or elements with `data-vaul-no-drag`.
 
-### 1. Add new imports
-- `Checkbox` from `@/components/ui/checkbox`
-- `RadioGroup`, `RadioGroupItem` from `@/components/ui/radio-group`
-- `Trash2` icon from lucide-react
+2. **Why only "Retirada"**: When "Entrega" is selected, the flow goes through AddressStep first, which has many form fields and a scrollable container. By the time PaymentStep renders, the drawer content is tall enough that vaul detects a scrollable child and allows normal touch behavior. When "Retirada" is selected, PaymentStep renders directly with minimal content — the buttons sit in a zone where vaul's `shouldDrag()` returns `true`, so the touch is consumed as a drag gesture instead of passed through as a click.
 
-### 2. Add new state variables (after existing credit card state)
-```typescript
-const [savedCards, setSavedCards] = useState<any[]>([]);
-const [selectedCardId, setSelectedCardId] = useState<string>("new");
-const [isLoadingCards, setIsLoadingCards] = useState(false);
-const [saveNewCard, setSaveNewCard] = useState(false);
+3. **Why z-50 didn't fix it**: `z-index` and `pointer-events` are CSS properties. Vaul's issue is at the JavaScript event handler level — it intercepts `onPointerDown` before the CSS layer can matter.
+
+**Proof**: Vaul explicitly supports `data-vaul-no-drag` attribute (line 981 of vaul source): elements (or children of elements) with this attribute are excluded from drag detection.
+
+## Plan
+
+### Edit 1 — `src/components/menu/checkout/PaymentStep.tsx` (line ~437)
+
+Add `data-vaul-no-drag` to the button container so vaul ignores touch events on the buttons:
+
+```tsx
+<div className="flex gap-3 relative z-50 pointer-events-auto pb-safe" data-vaul-no-drag>
 ```
 
-### 3. Remove unused state variables
-Remove: `cardHolderCpf`, `cardHolderEmail`, `cardHolderPhone`, `cardHolderPostalCode`, `cardHolderAddressNumber` — no longer needed since props are used directly.
+### Edit 2 — `src/components/menu/checkout/DeliveryTypeStep.tsx` (line ~128)
 
-### 4. Add useEffect to fetch saved cards
-When `method === "credit_card"`, query `customer_cards` table filtering by `customer_cpf` and `restaurant_id`. Set `savedCards` state. If cards exist, default `selectedCardId` to the first card's ID.
+Same fix for the DeliveryTypeStep buttons:
 
-### 5. Add handleDeleteCard function
-Delete from `customer_cards` by ID, then remove from local `savedCards` state. If deleted card was selected, reset to `"new"`.
+```tsx
+<div className="flex gap-2 pt-4 relative z-50 pointer-events-auto pb-safe" data-vaul-no-drag>
+```
 
-### 6. Update handleCreditCardPayment
-- Remove validations for removed fields (CPF, CEP, address number)
-- **If `selectedCardId === "new"`**: tokenize via Secure Fields using `customerCPF` prop directly, call edge function with `card_token`, `save_card: saveNewCard`
-- **If saved card selected**: call edge function with `action: "pay_with_saved_card"`, `saved_card_id: selectedCardId` (no tokenization needed)
+### Edit 3 — `src/components/menu/CheckoutDrawer.tsx` (line 714)
 
-### 7. Update Credit Card UI (lines 452-568)
-Replace the entire section between the error card and the action buttons:
+Add `data-vaul-no-drag` to the content wrapper so vaul doesn't intercept any touches inside the step content. This prevents the drag-to-close gesture from eating button clicks across ALL steps:
 
-**A. Saved Cards List** (rendered if `savedCards.length > 0`):
-- RadioGroup with each saved card as a selectable option showing payment method icon + `•••• {last_four_digits}` + delete button
-- Plus a "Adicionar Novo Cartão" radio option
+```tsx
+<div className="overflow-y-auto flex-1" data-vaul-no-drag>
+```
 
-**B. Conditional New Card Form** (only when `selectedCardId === "new"`):
-- Keep existing Secure Fields divs (card number, expiration, CVV) and card holder name input — UNTOUCHED
-- Add Checkbox "Salvar este cartão para compras futuras" below the name input
-- Remove the entire "Dados do Titular" section (Separator + CPF/Email/Phone/CEP/Address fields)
+### Why this works
 
-**C. When saved card selected**: Hide Secure Fields and name input entirely, show only the Pay button
+Vaul's `shouldDrag()` function checks: `element.hasAttribute('data-vaul-no-drag') || element.closest('[data-vaul-no-drag]')`. If either is true, it returns `false` and vaul does NOT capture the pointer event — allowing the button's `onClick` to fire normally. The drawer can still be closed via the ✕ button or overlay click.
 
 ### Files changed
-- `src/components/menu/checkout/OnlinePaymentStep.tsx` (single file)
-
-### What stays untouched
-- `<style>` tag for iframe overrides
-- `useEffect` for MP SDK initialization
-- Container divs `#mp-card-number`, `#mp-expiration-date`, `#mp-security-code` with their exact classes
-- PIX flow
-- Confirmed/Loading states
+- `src/components/menu/checkout/PaymentStep.tsx` (1 attribute)
+- `src/components/menu/checkout/DeliveryTypeStep.tsx` (1 attribute)
+- `src/components/menu/CheckoutDrawer.tsx` (1 attribute)
 
