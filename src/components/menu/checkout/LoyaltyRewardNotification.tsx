@@ -71,6 +71,7 @@ export const LoyaltyRewardNotification = ({
   onUseCoupon,
 }: LoyaltyRewardNotificationProps) => {
   const [earnedRewards, setEarnedRewards] = useState<Reward[]>([]);
+  const [redeemedRewards, setRedeemedRewards] = useState<Reward[]>([]);
   const [lockedRewards, setLockedRewards] = useState<{ reward: Reward; missing: number; unit: string }[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -166,29 +167,17 @@ export const LoyaltyRewardNotification = ({
 
       if (!program) {
         setEarnedRewards([]);
+        setRedeemedRewards([]);
         setLockedRewards([]);
         return;
       }
 
       setProgramType(program.type as "purchases" | "spending");
 
-      // Find the last redemption to get the baseline
-      const { data: lastRedemption } = await supabase
-        .from("loyalty_reward_redemptions")
-        .select("redeemed_at")
-        .eq("restaurant_id", restaurantId)
-        .eq("customer_cpf", customerCPF)
-        .eq("program_id", program.id)
-        .order("redeemed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Use program activation as baseline (count ALL orders since program started)
+      const programActivatedAt = program.activated_at || new Date(0).toISOString();
 
-      // Baseline: the later of program activation or last redemption
-      const programActivatedAt = program.activated_at ? new Date(program.activated_at) : new Date(0);
-      const lastRedeemedAt = lastRedemption?.redeemed_at ? new Date(lastRedemption.redeemed_at) : new Date(0);
-      const baselineAt = programActivatedAt > lastRedeemedAt ? programActivatedAt : lastRedeemedAt;
-
-      // Fetch customer orders AFTER the baseline
+      // Fetch ALL customer orders since program activation
       const { data: ordersData } = await supabase
         .from("orders")
         .select(`
@@ -198,7 +187,7 @@ export const LoyaltyRewardNotification = ({
         .eq("restaurant_id", restaurantId)
         .eq("customer_cpf", customerCPF)
         .in("status", ["delivered", "picked_up", "completed"])
-        .gte("created_at", baselineAt.toISOString());
+        .gte("created_at", programActivatedAt);
 
       // Calculate progress from baseline
       let purchase_count = 0;
@@ -218,27 +207,30 @@ export const LoyaltyRewardNotification = ({
       const currentVal = program.type === "purchases" ? purchase_count + 1 : total_spent;
       setCurrentValue(currentVal);
 
-      // Fetch redemptions AFTER the baseline (current cycle only)
-      const { data: cycleRedemptions } = await supabase
+      // Fetch ALL redemptions for this customer in this program (all-time, not cycle-based)
+      const { data: allRedemptions } = await supabase
         .from("loyalty_reward_redemptions")
         .select("reward_id")
         .eq("restaurant_id", restaurantId)
         .eq("customer_cpf", customerCPF)
-        .eq("program_id", program.id)
-        .gt("redeemed_at", baselineAt.toISOString());
+        .eq("program_id", program.id);
 
-      const redeemedRewardIds = new Set(cycleRedemptions?.map(r => r.reward_id) || []);
+      const redeemedRewardIds = new Set(allRedemptions?.map(r => r.reward_id) || []);
 
       // All rewards for the program
       const allRewards = (program.loyalty_program_rewards || []) as any[];
 
-      // Separate earned and locked rewards
+      // Separate earned, already-redeemed, and locked rewards
       const earned = allRewards
         .filter((r: any) => r.trigger_value <= currentVal && !redeemedRewardIds.has(r.id))
         .sort((a: any, b: any) => b.trigger_value - a.trigger_value);
 
+      const alreadyRedeemed = allRewards
+        .filter((r: any) => r.trigger_value <= currentVal && redeemedRewardIds.has(r.id))
+        .sort((a: any, b: any) => a.trigger_value - b.trigger_value);
+
       const locked = allRewards
-        .filter((r: any) => r.trigger_value > currentVal)
+        .filter((r: any) => r.trigger_value > currentVal && !redeemedRewardIds.has(r.id))
         .map((r: any) => ({
           reward: r,
           missing: r.trigger_value - currentVal,
@@ -247,7 +239,7 @@ export const LoyaltyRewardNotification = ({
         .sort((a: any, b: any) => a.missing - b.missing);
 
       // Fetch products for free_item rewards
-      const allRewardsToEnrich = [...earned, ...locked.map(l => l.reward)];
+      const allRewardsToEnrich = [...earned, ...alreadyRedeemed, ...locked.map(l => l.reward)];
       const freeItemRewards = allRewardsToEnrich.filter((r: any) => r.reward_type === "free_item" && r.reward_product_id);
       const productIds = freeItemRewards.map((r: any) => r.reward_product_id);
 
@@ -310,7 +302,21 @@ export const LoyaltyRewardNotification = ({
         unit: l.unit,
       }));
 
+      // Build already-redeemed rewards list
+      const redeemedRewardsList: Reward[] = alreadyRedeemed.map((r: any) => ({
+        id: r.id,
+        trigger_value: r.trigger_value,
+        reward_type: r.reward_type,
+        reward_value: r.reward_value,
+        reward_product_id: r.reward_product_id,
+        reward_extra_id: r.reward_extra_id,
+        description: r.description,
+        product: r.reward_product_id ? productsMap[r.reward_product_id] : undefined,
+        extra: r.reward_extra_id ? extrasMap[r.reward_extra_id] : undefined,
+      }));
+
       setEarnedRewards(earnedRewardsList);
+      setRedeemedRewards(redeemedRewardsList);
       setLockedRewards(lockedRewardsList);
     } catch (error) {
       console.error("Error checking rewards:", error);
@@ -418,7 +424,7 @@ export const LoyaltyRewardNotification = ({
     if (restaurantId) fetchProgramId();
   }, [restaurantId]);
 
-  const hasRewards = earnedRewards.length > 0 || lockedRewards.length > 0;
+  const hasRewards = earnedRewards.length > 0 || lockedRewards.length > 0 || redeemedRewards.length > 0;
   const hasCoupons = customerCoupons.length > 0;
   const hasContent = hasRewards || hasCoupons;
 
@@ -584,6 +590,48 @@ export const LoyaltyRewardNotification = ({
                                   ) : (
                                     "Resgatar"
                                   )}
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Already Redeemed Rewards Section */}
+                  {redeemedRewards.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold flex items-center gap-2 mb-3 text-muted-foreground">
+                        <Check className="w-4 h-4" />
+                        Já Resgatado
+                      </h3>
+                      <div className="space-y-2">
+                        {redeemedRewards.map((reward) => (
+                          <Card key={reward.id} className="overflow-hidden opacity-50">
+                            <CardContent className="p-0">
+                              <div className="flex items-center gap-3 p-3">
+                                {reward.product?.image_url ? (
+                                  <img
+                                    src={reward.product.image_url}
+                                    alt={reward.product.name}
+                                    className="w-14 h-14 object-cover rounded-lg flex-shrink-0 grayscale"
+                                  />
+                                ) : (
+                                  <div className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground font-bold text-lg">
+                                    {getRewardIcon(reward.reward_type) || <Gift className="w-6 h-6" />}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-sm text-muted-foreground line-through">
+                                    {getRewardDescription(reward)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    ✅ Já resgatado
+                                  </p>
+                                </div>
+                                <Button size="sm" disabled variant="outline" className="text-xs">
+                                  Já Resgatado
                                 </Button>
                               </div>
                             </CardContent>

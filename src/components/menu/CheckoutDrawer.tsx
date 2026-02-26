@@ -246,6 +246,21 @@ export const CheckoutDrawer = ({
 
         if (activeProgram) {
           for (const rewardItem of rewardItems) {
+            // Security: check if reward was already redeemed
+            const { data: existingRedemption } = await supabase
+              .from("loyalty_reward_redemptions")
+              .select("id")
+              .eq("restaurant_id", restaurant.id)
+              .eq("customer_cpf", customerData.cpf)
+              .eq("program_id", activeProgram.id)
+              .eq("reward_id", rewardItem.rewardId)
+              .maybeSingle();
+
+            if (existingRedemption) {
+              console.warn("Reward already redeemed, skipping:", rewardItem.rewardId);
+              continue;
+            }
+
             // Get the reward's trigger_value
             const { data: reward } = await supabase
               .from("loyalty_program_rewards")
@@ -268,15 +283,26 @@ export const CheckoutDrawer = ({
 
       // Record redemption for discount rewards
       if (activeRewardDiscount) {
-        await supabase.from("loyalty_reward_redemptions").insert({
-          restaurant_id: restaurant.id,
-          customer_cpf: customerData.cpf,
-          program_id: activeRewardDiscount.programId,
-          reward_id: activeRewardDiscount.id,
-          order_id: order.id,
-          trigger_value: activeRewardDiscount.triggerValue,
-          redeemed_at: new Date().toISOString(),
-        });
+        // Security: check if discount reward was already redeemed
+        const { data: existingDiscountRedemption } = await supabase
+          .from("loyalty_reward_redemptions")
+          .select("id")
+          .eq("restaurant_id", restaurant.id)
+          .eq("customer_cpf", customerData.cpf)
+          .eq("reward_id", activeRewardDiscount.id)
+          .maybeSingle();
+
+        if (!existingDiscountRedemption) {
+          await supabase.from("loyalty_reward_redemptions").insert({
+            restaurant_id: restaurant.id,
+            customer_cpf: customerData.cpf,
+            program_id: activeRewardDiscount.programId,
+            reward_id: activeRewardDiscount.id,
+            order_id: order.id,
+            trigger_value: activeRewardDiscount.triggerValue,
+            redeemed_at: new Date().toISOString(),
+          });
+        }
       }
 
       if (coupon) {
