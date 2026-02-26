@@ -144,13 +144,13 @@ export const CheckoutDrawer = ({
     
     setSubmitting(true);
     try {
-      const couponDiscount = coupon ? calculateCouponDiscount(subtotal, coupon) : 0;
-      const loyaltyDiscount = loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01);
-      const rewardDiscount = calculateRewardDiscount(subtotal);
-      const deliveryFee = getDeliveryFee();
-      const serviceFee = restaurant.service_fee_enabled 
+      const couponDiscount = Math.round((coupon ? calculateCouponDiscount(subtotal, coupon) : 0) * 100) / 100;
+      const loyaltyDiscount = Math.round((loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01)) * 100) / 100;
+      const rewardDiscount = Math.round(calculateRewardDiscount(subtotal) * 100) / 100;
+      const deliveryFee = Math.round(getDeliveryFee() * 100) / 100;
+      const serviceFee = Math.round((restaurant.service_fee_enabled 
         ? (subtotal * restaurant.service_fee_percentage / 100) 
-        : 0;
+        : 0) * 100) / 100;
 
       // PRIORIDADE: Buscar telefone do cadastro do cliente (fonte da verdade para WhatsApp)
       let phoneToUse = customerData.phone;

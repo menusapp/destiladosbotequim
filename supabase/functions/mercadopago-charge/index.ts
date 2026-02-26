@@ -25,6 +25,9 @@ Deno.serve(async (req) => {
       payment_method_id,
       installments,
       items,
+      action,
+      saved_card_id,
+      save_card,
     } = await req.json();
 
     // Round amount to 2 decimal places and validate
@@ -101,7 +104,7 @@ Deno.serve(async (req) => {
           notification_url: webhookUrl,
           external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
           payer: {
-            email: customer_email || "cliente@email.com",
+            email: (customer_email && customer_email.trim()) ? customer_email.trim() : `cliente-${Date.now()}@pedido.com`,
             first_name: customer_name || "Cliente",
             identification: customer_cpf
               ? { type: "CPF", number: customer_cpf.replace(/\D/g, "") }
@@ -163,31 +166,98 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else if (billing_type === "CREDIT_CARD") {
-      mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${mpAccessToken}`,
-          "X-Idempotency-Key": `${restaurant_id}-${order_id || Date.now()}-cc`,
-        },
-        body: JSON.stringify({
-          transaction_amount: roundedAmount,
-          token: card_token,
-          payment_method_id: payment_method_id,
-          installments: installments || 1,
-          notification_url: webhookUrl,
-          external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
-          payer: {
-            email: customer_email || "cliente@email.com",
-            first_name: customer_name || "Cliente",
-            identification: customer_cpf
-              ? { type: "CPF", number: customer_cpf.replace(/\D/g, "") }
-              : undefined,
+      const safeEmail = (customer_email && customer_email.trim()) ? customer_email.trim() : `cliente-${Date.now()}@pedido.com`;
+
+      // Handle saved card payment
+      if (action === "pay_with_saved_card" && saved_card_id) {
+        // Fetch saved card details
+        const { data: savedCard, error: cardError } = await supabase
+          .from("customer_cards")
+          .select("*")
+          .eq("id", saved_card_id)
+          .single();
+
+        if (cardError || !savedCard) {
+          return new Response(
+            JSON.stringify({ error: "Cartão salvo não encontrado" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Create token from saved card via MP API
+        const tokenResponse = await fetch(`https://api.mercadopago.com/v1/customers/${savedCard.mp_customer_id}/cards/${savedCard.card_id}`, {
+          headers: { Authorization: `Bearer ${mpAccessToken}` },
+        });
+        
+        if (!tokenResponse.ok) {
+          console.error("[MP Charge] Saved card fetch error");
+          return new Response(
+            JSON.stringify({ error: "Erro ao recuperar cartão salvo. Tente um novo cartão." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const cardData = await tokenResponse.json();
+
+        mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${mpAccessToken}`,
+            "X-Idempotency-Key": `${restaurant_id}-${order_id || Date.now()}-saved-${saved_card_id}`,
           },
-          description: `Pedido ${order_id || "delivery"}`,
-          additional_info: { items: mpItems },
-        }),
-      });
+          body: JSON.stringify({
+            transaction_amount: roundedAmount,
+            payment_method_id: savedCard.payment_method_id,
+            token: cardData.id || card_token,
+            installments: installments || 1,
+            notification_url: webhookUrl,
+            external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
+            payer: {
+              id: savedCard.mp_customer_id,
+              email: safeEmail,
+              first_name: customer_name || "Cliente",
+              identification: customer_cpf
+                ? { type: "CPF", number: customer_cpf.replace(/\D/g, "") }
+                : undefined,
+            },
+            description: `Pedido ${order_id || "delivery"}`,
+            additional_info: { items: mpItems },
+          }),
+        });
+      } else {
+        // New card payment
+        mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${mpAccessToken}`,
+            "X-Idempotency-Key": `${restaurant_id}-${order_id || Date.now()}-cc`,
+          },
+          body: JSON.stringify({
+            transaction_amount: roundedAmount,
+            token: card_token,
+            payment_method_id: payment_method_id,
+            installments: installments || 1,
+            notification_url: webhookUrl,
+            external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
+            payer: {
+              email: safeEmail,
+              first_name: customer_name || "Cliente",
+              identification: customer_cpf
+                ? { type: "CPF", number: customer_cpf.replace(/\D/g, "") }
+                : undefined,
+            },
+            description: `Pedido ${order_id || "delivery"}`,
+            additional_info: { items: mpItems },
+          }),
+        });
+
+        // Save card if requested and payment succeeds
+        if (save_card && card_token) {
+          // Will save after checking payment status below
+        }
+      }
 
       mpData = await mpResponse.json();
 
@@ -200,6 +270,73 @@ Deno.serve(async (req) => {
       }
 
       const isApproved = mpData.status === "approved";
+
+      // Save card if requested and payment was approved
+      if (save_card && isApproved && card_token && mpData.card && customer_cpf) {
+        try {
+          // Create or find MP customer
+          const cleanCpf = customer_cpf.replace(/\D/g, "");
+          const safeEmail = (customer_email && customer_email.trim()) ? customer_email.trim() : `cliente-${Date.now()}@pedido.com`;
+          
+          // Search existing customer
+          let mpCustomerId: string | null = null;
+          const searchRes = await fetch(`https://api.mercadopago.com/v1/customers/search?email=${encodeURIComponent(safeEmail)}`, {
+            headers: { Authorization: `Bearer ${mpAccessToken}` },
+          });
+          const searchData = await searchRes.json();
+          
+          if (searchData.results && searchData.results.length > 0) {
+            mpCustomerId = searchData.results[0].id;
+          } else {
+            // Create customer
+            const createRes = await fetch("https://api.mercadopago.com/v1/customers", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${mpAccessToken}`,
+              },
+              body: JSON.stringify({
+                email: safeEmail,
+                first_name: customer_name || "Cliente",
+                identification: { type: "CPF", number: cleanCpf },
+              }),
+            });
+            const createData = await createRes.json();
+            mpCustomerId = createData.id;
+          }
+
+          if (mpCustomerId) {
+            // Save card to MP customer
+            const cardRes = await fetch(`https://api.mercadopago.com/v1/customers/${mpCustomerId}/cards`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${mpAccessToken}`,
+              },
+              body: JSON.stringify({ token: card_token }),
+            });
+            const savedCardData = await cardRes.json();
+
+            if (savedCardData.id) {
+              await supabase.from("customer_cards").insert({
+                restaurant_id,
+                customer_cpf: cleanCpf,
+                customer_phone: customer_phone || "",
+                mp_customer_id: mpCustomerId,
+                card_id: savedCardData.id,
+                last_four_digits: savedCardData.last_four_digits || mpData.card?.last_four_digits || "****",
+                first_six_digits: savedCardData.first_six_digits || mpData.card?.first_six_digits || null,
+                payment_method_id: savedCardData.payment_method?.id || payment_method_id || "unknown",
+                expiration_month: savedCardData.expiration_month || null,
+                expiration_year: savedCardData.expiration_year || null,
+              });
+              console.log("[MP Charge] Card saved successfully");
+            }
+          }
+        } catch (saveErr) {
+          console.error("[MP Charge] Error saving card (non-fatal):", saveErr);
+        }
+      }
 
       const { data: payment, error: paymentError } = await supabase
         .from("online_payments")
