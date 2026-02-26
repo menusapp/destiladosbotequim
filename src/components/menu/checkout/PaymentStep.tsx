@@ -260,38 +260,11 @@ export const PaymentStep = ({
 
   return (
     <div className="p-4 space-y-6">
-      {requireCustomerInfo && (
-        <div className="space-y-4 pb-4 border-b">
-          <h3 className="text-lg font-semibold">Seus Dados</h3>
-          <div className="space-y-2">
-            <Label htmlFor="customer-name">Nome Completo</Label>
-            <Input
-              id="customer-name"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Digite seu nome"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="customer-cpf">CPF</Label>
-            <Input
-              id="customer-cpf"
-              value={customerCPF}
-              onChange={(e) => setCustomerCPF(e.target.value)}
-              placeholder="000.000.000-00"
-              maxLength={14}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="customer-phone">Telefone</Label>
-            <Input
-              id="customer-phone"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="(00) 00000-0000"
-              maxLength={15}
-            />
-          </div>
+      {requireCustomerInfo && customerName && (
+        <div className="pb-4 border-b">
+          <p className="text-sm text-muted-foreground">
+            Pedido para <span className="font-semibold text-foreground">{customerName}</span>
+          </p>
         </div>
       )}
       
