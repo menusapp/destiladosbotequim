@@ -1,31 +1,28 @@
 
 
-## Plano: Corrigir pagamento com cartão salvo
+## Plano: Adicionar input de CVV para cartões salvos
 
 ### Causa Raiz
-A API do Mercado Pago **exige um `token`** em todo pagamento de cartão de crédito — inclusive para cartões salvos. O código atual omite o `token` para cartões salvos, causando o erro "Cannot infer Payment Method" (code 2131).
+O erro `security_code_id can't be null` (code 3031) ocorre porque a API do Mercado Pago **exige o CVV** ao gerar um `card_token` a partir de um cartão salvo. O `POST /v1/card_tokens` atual envia apenas `card_id` e `customer_id`, mas falta o campo `security_code`.
 
 ### Solução
-Gerar um `card_token` no backend a partir do `card_id` salvo antes de criar o pagamento.
+Adicionar um campo de CVV na UI quando o usuário seleciona um cartão salvo, enviar esse valor para a Edge Function, e incluí-lo no body do `POST /v1/card_tokens`.
 
-**Arquivo: `supabase/functions/mercadopago-charge/index.ts`**
+### Mudanças
 
-No bloco `pay_with_saved_card` (após buscar os detalhes do cartão na API do MP), adicionar uma chamada para gerar o token:
+**1. Frontend — `src/components/menu/checkout/OnlinePaymentStep.tsx`**
+- Adicionar estado `savedCardCvv` para armazenar o CVV digitado
+- Renderizar um input de CVV (3-4 dígitos) abaixo do cartão salvo selecionado (quando `selectedCardId !== "new"`)
+- Enviar `security_code: savedCardCvv` no payload da função `mercadopago-charge`
 
-```text
-POST https://api.mercadopago.com/v1/card_tokens
-Authorization: Bearer {access_token}
-Body: { "card_id": savedCard.card_id }
-```
-
-Isso retorna um `token.id` que será incluído no payload do pagamento (`savedCardPayload.token = generatedToken`).
-
-### Mudanças específicas
-
-1. **Após o bloco de fetch dos detalhes do cartão (~linha 216)**: Inserir `POST /v1/card_tokens` com `{ card_id: savedCard.card_id }` usando o `mpAccessToken`
-2. **No `savedCardPayload` (~linha 232)**: Adicionar `token: generatedTokenId`
-3. **Nenhuma mudança no frontend** — o fluxo de novos cartões e PIX permanece intacto
+**2. Backend — `supabase/functions/mercadopago-charge/index.ts`**
+- Receber `security_code` do body da request
+- Incluir `security_code` no body do `POST /v1/card_tokens`:
+  ```json
+  { "card_id": "...", "customer_id": "...", "security_code": "123" }
+  ```
 
 ### Escopo
-- `supabase/functions/mercadopago-charge/index.ts` — única alteração
+- 2 arquivos modificados
+- Nenhuma mudança no fluxo de novos cartões ou PIX
 
