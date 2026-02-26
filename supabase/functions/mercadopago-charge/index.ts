@@ -35,8 +35,8 @@ Deno.serve(async (req) => {
 
     if (!restaurant_id || !roundedAmount || roundedAmount <= 0 || !billing_type) {
       return new Response(
-        JSON.stringify({ error: "Valor inválido ou dados obrigatórios ausentes" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Valor inválido ou dados obrigatórios ausentes" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -79,8 +79,8 @@ Deno.serve(async (req) => {
 
     if (configError || !config?.mp_access_token) {
       return new Response(
-        JSON.stringify({ error: "Mercado Pago não configurado para este restaurante" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Mercado Pago não configurado para este restaurante" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -120,8 +120,8 @@ Deno.serve(async (req) => {
       if (!mpResponse.ok) {
         console.error("[MP Charge] PIX error:", JSON.stringify(mpData));
         return new Response(
-          JSON.stringify({ error: mpData.message || "Erro ao gerar Pix no Mercado Pago" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ success: false, error: mpData.message || "Erro ao gerar Pix no Mercado Pago" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -151,13 +151,14 @@ Deno.serve(async (req) => {
       if (paymentError) {
         console.error("[MP Charge] DB error:", paymentError);
         return new Response(
-          JSON.stringify({ error: "Erro ao salvar pagamento" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ success: false, error: "Erro ao salvar pagamento" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       return new Response(
         JSON.stringify({
+          success: true,
           online_payment_id: payment.id,
           pix_qr_code: pixData?.qr_code,
           pix_qr_code_base64: pixData?.qr_code_base64,
@@ -179,8 +180,8 @@ Deno.serve(async (req) => {
 
         if (cardError || !savedCard) {
           return new Response(
-            JSON.stringify({ error: "Cartão salvo não encontrado" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ success: false, error: "Cartão salvo não encontrado" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
@@ -192,8 +193,8 @@ Deno.serve(async (req) => {
         if (!tokenResponse.ok) {
           console.error("[MP Charge] Saved card fetch error");
           return new Response(
-            JSON.stringify({ error: "Erro ao recuperar cartão salvo. Tente um novo cartão." }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ success: false, error: "Erro ao recuperar cartão salvo. Tente um novo cartão." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
@@ -263,9 +264,10 @@ Deno.serve(async (req) => {
 
       if (!mpResponse.ok) {
         console.error("[MP Charge] Card error:", JSON.stringify(mpData));
+        const detail = mpData.cause?.[0]?.description || mpData.message || "Erro ao processar cartão";
         return new Response(
-          JSON.stringify({ error: mpData.message || "Erro ao processar cartão" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ success: false, error: detail, mp_status_detail: mpData.cause?.[0]?.code }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -360,13 +362,14 @@ Deno.serve(async (req) => {
       if (paymentError) {
         console.error("[MP Charge] DB error:", paymentError);
         return new Response(
-          JSON.stringify({ error: "Erro ao salvar pagamento" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ success: false, error: "Erro ao salvar pagamento" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       return new Response(
         JSON.stringify({
+          success: true,
           online_payment_id: payment.id,
           confirmed: isApproved,
           mp_status: mpData.status,
@@ -377,14 +380,14 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ error: "billing_type inválido. Use PIX ou CREDIT_CARD" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: false, error: "billing_type inválido. Use PIX ou CREDIT_CARD" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     console.error("[MP Charge] Unexpected error:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Erro interno" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: false, error: error.message || "Erro interno" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
