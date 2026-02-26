@@ -1,51 +1,86 @@
 
 
-## Root Cause Analysis
+## Root Cause Found
 
-The issue is **NOT a CSS z-index problem**. It's vaul (the Drawer library) intercepting touch events.
+The issue is **NOT about touch events or vaul drag interception**. The button IS being clicked, but `handleContinue()` silently returns early due to a validation failure.
 
-Here's what happens:
+### The Problem
 
-1. **Vaul's drag handler**: When you touch anywhere inside the Drawer content, vaul captures the pointer event to detect drag-to-close gestures. It checks `shouldDrag()` (line 979-982 of vaul source) which walks up the DOM tree looking for scrollable containers or elements with `data-vaul-no-drag`.
-
-2. **Why only "Retirada"**: When "Entrega" is selected, the flow goes through AddressStep first, which has many form fields and a scrollable container. By the time PaymentStep renders, the drawer content is tall enough that vaul detects a scrollable child and allows normal touch behavior. When "Retirada" is selected, PaymentStep renders directly with minimal content — the buttons sit in a zone where vaul's `shouldDrag()` returns `true`, so the touch is consumed as a drag gesture instead of passed through as a click.
-
-3. **Why z-50 didn't fix it**: `z-index` and `pointer-events` are CSS properties. Vaul's issue is at the JavaScript event handler level — it intercepts `onPointerDown` before the CSS layer can matter.
-
-**Proof**: Vaul explicitly supports `data-vaul-no-drag` attribute (line 981 of vaul source): elements (or children of elements) with this attribute are excluded from drag detection.
-
-## Plan
-
-### Edit 1 — `src/components/menu/checkout/PaymentStep.tsx` (line ~437)
-
-Add `data-vaul-no-drag` to the button container so vaul ignores touch events on the buttons:
+In `PaymentStep.tsx`, when `requireCustomerInfo` is `true` (which happens only for **Retirada**, line 587 of CheckoutDrawer), `handleContinue` validates:
 
 ```tsx
-<div className="flex gap-3 relative z-50 pointer-events-auto pb-safe" data-vaul-no-drag>
+if (requireCustomerInfo) {
+  if (!customerName || !customerCPF || !customerPhone) {
+    toast.error("Preencha todos os dados");
+    return;  // ← Button "doesn't work"
+  }
+}
 ```
 
-### Edit 2 — `src/components/menu/checkout/DeliveryTypeStep.tsx` (line ~128)
+The customer data is empty because of **mismatched sessionStorage keys**:
 
-Same fix for the DeliveryTypeStep buttons:
+- **DeliveryMenu.tsx** stores data with keys: `delivery-customer-${slug}`, `delivery-cpf-${slug}`, `delivery-phone-${slug}`
+- **PaymentStep.tsx** reads from keys: `customer_name`, `customer_cpf`, `customer_phone`
+
+These keys never match, so for Retirada the data is empty.
+
+For **Entrega**, it works because the AddressStep collects data and passes it via `customerData` prop — sessionStorage is never consulted.
+
+For **Retirada**, the flow skips AddressStep, `customerData` is null, so the props fallback to sessionStorage which has the wrong keys → empty → validation fails → toast fires (probably unnoticed on mobile) → button appears to "not work".
+
+### Why it broke after the frictionless changes
+
+Before the frictionless changes, PaymentStep had visible input fields for name/CPF/phone that the user could fill manually. After removing those fields, the component relies entirely on auto-fill which fails due to the key mismatch.
+
+### The Fix
+
+Two changes needed:
+
+**1. CheckoutDrawer.tsx (lines 586-616)** — When rendering PaymentStep for pickup, pass the customer data from the correct sessionStorage keys (the ones DeliveryMenu actually writes to):
+
+Replace the PaymentStep render block to properly resolve customer data before passing props. Use the slug-based keys as fallback.
+
+**2. PaymentStep.tsx (lines 233-241)** — Make phone optional in validation since `login_require_phone` defaults to `false`. Phone is not always collected during login, so requiring it blocks checkout:
 
 ```tsx
-<div className="flex gap-2 pt-4 relative z-50 pointer-events-auto pb-safe" data-vaul-no-drag>
+// Before:
+if (!customerName || !customerCPF || !customerPhone) {
+
+// After: 
+if (!customerName || !customerCPF) {
 ```
 
-### Edit 3 — `src/components/menu/CheckoutDrawer.tsx` (line 714)
+### Detailed Edits
 
-Add `data-vaul-no-drag` to the content wrapper so vaul doesn't intercept any touches inside the step content. This prevents the drag-to-close gesture from eating button clicks across ALL steps:
+**File: `src/components/menu/CheckoutDrawer.tsx`**
+
+In the PaymentStep render section (~line 584-616), resolve customer name/CPF/phone from the correct sessionStorage keys. Add a helper that checks both key formats:
 
 ```tsx
-<div className="overflow-y-auto flex-1" data-vaul-no-drag>
+// Before passing props, resolve from slug-based keys too
+const resolvedName = customerData?.name 
+  || sessionStorage.getItem("customer_name") 
+  || sessionStorage.getItem(`delivery-customer-${restaurantSlug}`) 
+  || "";
+const resolvedCPF = customerData?.cpf 
+  || getCustomerCPF() 
+  || sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`) 
+  || "";
+const resolvedPhone = customerData?.phone 
+  || sessionStorage.getItem("customer_phone") 
+  || sessionStorage.getItem(`delivery-phone-${restaurantSlug}`) 
+  || "";
 ```
 
-### Why this works
+And use these resolved values in the PaymentStep props AND in the `onContinue` callback for pickup.
 
-Vaul's `shouldDrag()` function checks: `element.hasAttribute('data-vaul-no-drag') || element.closest('[data-vaul-no-drag]')`. If either is true, it returns `false` and vaul does NOT capture the pointer event — allowing the button's `onClick` to fire normally. The drawer can still be closed via the ✕ button or overlay click.
+**File: `src/components/menu/checkout/PaymentStep.tsx`**
 
-### Files changed
-- `src/components/menu/checkout/PaymentStep.tsx` (1 attribute)
-- `src/components/menu/checkout/DeliveryTypeStep.tsx` (1 attribute)
-- `src/components/menu/CheckoutDrawer.tsx` (1 attribute)
+1. Line 91-92: Also initialize state from the slug-based keys as fallback
+2. Lines 233-237: Remove `!customerPhone` from the validation — phone is not always required
+3. Lines 193-194: Same for the online payment validation
+
+### Files Changed
+- `src/components/menu/CheckoutDrawer.tsx` — Fix sessionStorage key resolution for pickup flow
+- `src/components/menu/checkout/PaymentStep.tsx` — Remove phone from required validation, fix data initialization
 
