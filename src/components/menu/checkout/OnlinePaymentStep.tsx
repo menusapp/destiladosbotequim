@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Loader2, Copy, CheckCircle2, AlertCircle, CreditCard, Smartphone, Clock } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Loader2, Copy, CheckCircle2, AlertCircle, CreditCard, Smartphone, Clock, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -55,20 +56,21 @@ export const OnlinePaymentStep = ({
 
   // Credit card state
   const [cardHolderName, setCardHolderName] = useState("");
-  const [cardHolderCpf, setCardHolderCpf] = useState(customerCPF);
-  const [cardHolderEmail, setCardHolderEmail] = useState(customerEmail || "");
-  const [cardHolderPhone, setCardHolderPhone] = useState(customerPhone);
-  const [cardHolderPostalCode, setCardHolderPostalCode] = useState("");
-  const [cardHolderAddressNumber, setCardHolderAddressNumber] = useState("");
   const [processing, setProcessing] = useState(false);
   const [mpReady, setMpReady] = useState(false);
+
+  // Saved cards state
+  const [savedCards, setSavedCards] = useState<any[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<string>("new");
+  const [isLoadingCards, setIsLoadingCards] = useState(false);
+  const [saveNewCard, setSaveNewCard] = useState(false);
 
   // Secure Fields refs
   const mpInstanceRef = useRef<any>(null);
   const secureFieldsRef = useRef<any[]>([]);
 
   // Timer for PIX expiration
-  const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(30 * 60);
 
   useEffect(() => {
     if (method === "pix") {
@@ -84,13 +86,40 @@ export const OnlinePaymentStep = ({
     };
   }, []);
 
+  // Fetch saved cards
+  useEffect(() => {
+    if (method !== "credit_card" || !customerCPF) return;
+
+    const fetchSavedCards = async () => {
+      setIsLoadingCards(true);
+      try {
+        const { data, error } = await supabase
+          .from("customer_cards")
+          .select("*")
+          .eq("customer_cpf", customerCPF.replace(/\D/g, ""))
+          .eq("restaurant_id", restaurantId);
+
+        if (!error && data && data.length > 0) {
+          setSavedCards(data);
+          setSelectedCardId(data[0].id);
+        }
+      } catch (err) {
+        console.error("Error fetching saved cards:", err);
+      } finally {
+        setIsLoadingCards(false);
+      }
+    };
+
+    fetchSavedCards();
+  }, [method, customerCPF, restaurantId]);
+
   // Initialize Mercado Pago Secure Fields for credit card
   useEffect(() => {
     if (method !== "credit_card") return;
     let isCancelled = false;
 
     const initMP = async () => {
-      await new Promise((r) => setTimeout(r, 800)); // Delay um pouco maior para o Modal
+      await new Promise((r) => setTimeout(r, 800));
       if (isCancelled) return;
 
       const checkContainer = () => document.getElementById("mp-card-number");
@@ -108,7 +137,6 @@ export const OnlinePaymentStep = ({
 
         if (!config?.mp_public_key || isCancelled) return;
 
-        // Limpeza segura: desmonsta o que já existir
         secureFieldsRef.current.forEach((f) => {
           try {
             f.unmount();
@@ -135,7 +163,6 @@ export const OnlinePaymentStep = ({
         expirationDate.mount("mp-expiration-date");
         securityCode.mount("mp-security-code");
 
-        // Salva como ARRAY para o forEach funcionar
         secureFieldsRef.current = [cardNumber, expirationDate, securityCode];
         setMpReady(true);
       } catch (err) {
@@ -193,7 +220,6 @@ export const OnlinePaymentStep = ({
       setOnlinePaymentId(data.online_payment_id);
       setPaymentStatus("waiting");
 
-      // Start polling for payment confirmation
       if (data.online_payment_id) {
         startPolling(data.online_payment_id);
       }
@@ -224,14 +250,78 @@ export const OnlinePaymentStep = ({
     }
   };
 
+  const handleDeleteCard = async (cardId: string) => {
+    try {
+      await supabase.from("customer_cards").delete().eq("id", cardId);
+      setSavedCards((prev) => prev.filter((c) => c.id !== cardId));
+      if (selectedCardId === cardId) {
+        setSelectedCardId("new");
+      }
+      toast.success("Cartão removido");
+    } catch (err) {
+      toast.error("Erro ao remover cartão");
+    }
+  };
+
   const handleCreditCardPayment = async () => {
-    if (!cardHolderName) {
-      toast.error("Preencha o nome no cartão");
+    // Paying with saved card
+    if (selectedCardId !== "new") {
+      if (amount < 1) {
+        toast.error("O valor mínimo para pagamento online é de R$ 1,00.");
+        return;
+      }
+
+      setProcessing(true);
+      setErrorMessage("");
+
+      try {
+        const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
+          body: {
+            restaurant_id: restaurantId,
+            order_id: orderId,
+            amount,
+            billing_type: "CREDIT_CARD",
+            action: "pay_with_saved_card",
+            saved_card_id: selectedCardId,
+            customer_name: customerName,
+            customer_cpf: customerCPF,
+            customer_email: customerEmail,
+            customer_phone: customerPhone,
+            installments: 1,
+            items: cartItems,
+          },
+        });
+
+        if (error) throw error;
+
+        if (data?.error) {
+          setErrorMessage(data.error);
+          toast.error(data.error);
+          return;
+        }
+
+        if (data?.confirmed) {
+          setOnlinePaymentId(data.online_payment_id);
+          setPaymentStatus("confirmed");
+          toast.success("Pagamento aprovado! ✅");
+          setTimeout(() => onConfirm(data.online_payment_id), 1500);
+        } else {
+          setErrorMessage("Pagamento não aprovado. Tente novamente.");
+          toast.error("Pagamento não aprovado");
+        }
+      } catch (error: any) {
+        console.error("[OnlinePayment] Saved card error:", error);
+        setErrorMessage(error.message || "Erro ao processar pagamento");
+        toast.error("Erro ao processar pagamento");
+      } finally {
+        setProcessing(false);
+      }
       return;
     }
 
-    if (!cardHolderCpf || !cardHolderPostalCode || !cardHolderAddressNumber) {
-      toast.error("Preencha CPF, CEP e número do endereço do titular");
+    // Paying with new card
+    if (!cardHolderName) {
+      toast.error("Preencha o nome no cartão");
       return;
     }
 
@@ -249,18 +339,16 @@ export const OnlinePaymentStep = ({
     setErrorMessage("");
 
     try {
-      // Tokenize via Secure Fields
       const tokenResult = await mpInstanceRef.current.fields.createCardToken({
         cardholderName: cardHolderName,
         identificationType: "CPF",
-        identificationNumber: cardHolderCpf.replace(/\D/g, ""),
+        identificationNumber: customerCPF.replace(/\D/g, ""),
       });
 
       if (!tokenResult?.id) {
         throw new Error("Erro ao tokenizar cartão. Verifique os dados e tente novamente.");
       }
 
-      // Send tokenized data to backend
       const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
@@ -269,11 +357,12 @@ export const OnlinePaymentStep = ({
           billing_type: "CREDIT_CARD",
           customer_name: customerName,
           customer_cpf: customerCPF,
-          customer_email: customerEmail || cardHolderEmail,
-          customer_phone: customerPhone || cardHolderPhone,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
           card_token: tokenResult.id,
           payment_method_id: tokenResult.payment_method_id || "visa",
           installments: 1,
+          save_card: saveNewCard,
           items: cartItems,
         },
       });
@@ -308,6 +397,17 @@ export const OnlinePaymentStep = ({
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const getCardBrandLabel = (paymentMethodId: string) => {
+    const brands: Record<string, string> = {
+      visa: "Visa",
+      master: "Mastercard",
+      amex: "Amex",
+      elo: "Elo",
+      hipercard: "Hipercard",
+    };
+    return brands[paymentMethodId] || paymentMethodId;
   };
 
   // ─── CONFIRMED STATE ───
@@ -347,14 +447,12 @@ export const OnlinePaymentStep = ({
           <p className="text-sm text-muted-foreground mt-1">Escaneie o QR Code ou copie o código para pagar</p>
         </div>
 
-        {/* Amount */}
         <div className="text-center">
           <p className="text-3xl font-bold" style={{ color: primaryColor }}>
             R$ {amount.toFixed(2).replace(".", ",")}
           </p>
         </div>
 
-        {/* Error state */}
         {paymentStatus === "error" && (
           <Card className="border-destructive bg-destructive/5">
             <CardContent className="p-4 flex items-center gap-3">
@@ -369,7 +467,6 @@ export const OnlinePaymentStep = ({
           </Card>
         )}
 
-        {/* QR Code */}
         {paymentStatus === "waiting" && pixQrCodeBase64 && (
           <>
             <div className="flex justify-center">
@@ -378,7 +475,6 @@ export const OnlinePaymentStep = ({
               </div>
             </div>
 
-            {/* Copy code */}
             {pixQrCode && (
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Código Pix (Copia e Cola)</Label>
@@ -391,13 +487,11 @@ export const OnlinePaymentStep = ({
               </div>
             )}
 
-            {/* Timer */}
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               <span>Expira em: {formatTime(timeLeft)}</span>
             </div>
 
-            {/* Waiting indicator */}
             <div className="flex items-center justify-center gap-2 text-sm">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
               <span className="text-muted-foreground">Aguardando pagamento...</span>
@@ -449,101 +543,125 @@ export const OnlinePaymentStep = ({
         </Card>
       )}
 
-      {/* Card data */}
-      <div className="space-y-4">
-        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
-
-        <div className="space-y-1 relative">
-          <Label className="w-fit pointer-events-none block z-40 relative">Número do Cartão *</Label>
-          <div
-            id="mp-card-number"
-            className="h-[48px] w-full border border-input rounded-md bg-background relative overflow-hidden cursor-text flex items-center"
-          ></div>
+      {/* Saved Cards List */}
+      {isLoadingCards ? (
+        <div className="flex items-center justify-center gap-2 py-4">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm text-muted-foreground">Carregando cartões...</span>
         </div>
+      ) : savedCards.length > 0 ? (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Seus Cartões</h3>
+          <RadioGroup value={selectedCardId} onValueChange={setSelectedCardId} className="space-y-2">
+            {savedCards.map((card) => (
+              <div
+                key={card.id}
+                className={`flex items-center justify-between border rounded-lg p-3 cursor-pointer transition-colors ${
+                  selectedCardId === card.id ? "border-primary bg-primary/5" : "border-input"
+                }`}
+                onClick={() => setSelectedCardId(card.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <RadioGroupItem value={card.id} id={`card-${card.id}`} />
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      {getCardBrandLabel(card.payment_method_id)} •••• {card.last_four_digits}
+                    </p>
+                    {card.expiration_month && card.expiration_year && (
+                      <p className="text-xs text-muted-foreground">
+                        {String(card.expiration_month).padStart(2, "0")}/{card.expiration_year}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteCard(card.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
 
-        <div className="space-y-1 relative">
-          <Label className="w-fit pointer-events-none block z-40 relative">Nome Impresso no Cartão *</Label>
-          <Input
-            value={cardHolderName}
-            onChange={(e) => setCardHolderName(e.target.value.toUpperCase())}
-            placeholder="NOME COMO NO CARTÃO"
-            className="h-[48px] relative z-30"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1 relative">
-            <Label className="w-fit pointer-events-none block z-40 relative">Validade *</Label>
+            {/* New card option */}
             <div
-              id="mp-expiration-date"
+              className={`flex items-center border rounded-lg p-3 cursor-pointer transition-colors ${
+                selectedCardId === "new" ? "border-primary bg-primary/5" : "border-input"
+              }`}
+              onClick={() => setSelectedCardId("new")}
+            >
+              <div className="flex items-center gap-3">
+                <RadioGroupItem value="new" id="card-new" />
+                <CreditCard className="h-5 w-5 text-muted-foreground" />
+                <p className="text-sm font-medium">Adicionar Novo Cartão</p>
+              </div>
+            </div>
+          </RadioGroup>
+        </div>
+      ) : null}
+
+      {/* New Card Form — only when "new" is selected */}
+      {selectedCardId === "new" && (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Cartão</h3>
+
+          <div className="space-y-1 relative">
+            <Label className="w-fit pointer-events-none block z-40 relative">Número do Cartão *</Label>
+            <div
+              id="mp-card-number"
               className="h-[48px] w-full border border-input rounded-md bg-background relative overflow-hidden cursor-text flex items-center"
             ></div>
           </div>
+
           <div className="space-y-1 relative">
-            <Label className="w-fit pointer-events-none block z-40 relative">CVV *</Label>
-            <div
-              id="mp-security-code"
-              className="h-[48px] w-full border border-input rounded-md bg-background relative overflow-hidden cursor-text flex items-center"
-            ></div>
+            <Label className="w-fit pointer-events-none block z-40 relative">Nome Impresso no Cartão *</Label>
+            <Input
+              value={cardHolderName}
+              onChange={(e) => setCardHolderName(e.target.value.toUpperCase())}
+              placeholder="NOME COMO NO CARTÃO"
+              className="h-[48px] relative z-30"
+            />
           </div>
-        </div>
-      </div>
 
-      <Separator />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1 relative">
+              <Label className="w-fit pointer-events-none block z-40 relative">Validade *</Label>
+              <div
+                id="mp-expiration-date"
+                className="h-[48px] w-full border border-input rounded-md bg-background relative overflow-hidden cursor-text flex items-center"
+              ></div>
+            </div>
+            <div className="space-y-1 relative">
+              <Label className="w-fit pointer-events-none block z-40 relative">CVV *</Label>
+              <div
+                id="mp-security-code"
+                className="h-[48px] w-full border border-input rounded-md bg-background relative overflow-hidden cursor-text flex items-center"
+              ></div>
+            </div>
+          </div>
 
-      {/* Holder info */}
-      <div className="space-y-3 relative z-20">
-        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Dados do Titular</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-2">
-            <Label>CPF do Titular *</Label>
-            <Input
-              value={cardHolderCpf}
-              onChange={(e) => setCardHolderCpf(e.target.value)}
-              placeholder="000.000.000-00"
-              className="relative z-30"
+          {/* Save card checkbox */}
+          <div className="flex items-center space-x-2 pt-1">
+            <Checkbox
+              id="save-card"
+              checked={saveNewCard}
+              onCheckedChange={(checked) => setSaveNewCard(checked === true)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label>E-mail</Label>
-            <Input
-              value={cardHolderEmail}
-              onChange={(e) => setCardHolderEmail(e.target.value)}
-              placeholder="email@exemplo.com"
-              className="relative z-30"
-            />
+            <label
+              htmlFor="save-card"
+              className="text-sm text-muted-foreground cursor-pointer leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Salvar este cartão para compras futuras
+            </label>
           </div>
         </div>
-        <div className="space-y-2">
-          <Label>Telefone</Label>
-          <Input
-            value={cardHolderPhone}
-            onChange={(e) => setCardHolderPhone(e.target.value)}
-            placeholder="(00) 00000-0000"
-            className="relative z-30"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-2">
-            <Label>CEP *</Label>
-            <Input
-              value={cardHolderPostalCode}
-              onChange={(e) => setCardHolderPostalCode(e.target.value)}
-              placeholder="00000-000"
-              className="relative z-30"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Nº Endereço *</Label>
-            <Input
-              value={cardHolderAddressNumber}
-              onChange={(e) => setCardHolderAddressNumber(e.target.value)}
-              placeholder="123"
-              className="relative z-30"
-            />
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
