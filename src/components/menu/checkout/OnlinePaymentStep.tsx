@@ -192,15 +192,17 @@ export const OnlinePaymentStep = ({
         return;
       }
       setPaymentStatus("loading");
+      const safeAmount = Number(Math.max(0.1, Math.round(amount * 100) / 100).toFixed(2));
+      const safeEmail = customerEmail && customerEmail.trim() ? customerEmail.trim() : `cliente-${Date.now()}@pedido.com`;
       const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
           order_id: orderId,
-          amount,
+          amount: safeAmount,
           billing_type: "PIX",
           customer_name: customerName,
           customer_cpf: customerCPF,
-          customer_email: customerEmail,
+          customer_email: safeEmail,
           customer_phone: customerPhone,
           items: cartItems,
         },
@@ -275,17 +277,19 @@ export const OnlinePaymentStep = ({
       setErrorMessage("");
 
       try {
+        const safeAmount = Number(Math.max(0.1, Math.round(amount * 100) / 100).toFixed(2));
+        const safeEmail = customerEmail && customerEmail.trim() ? customerEmail.trim() : `cliente-${Date.now()}@pedido.com`;
         const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
           body: {
             restaurant_id: restaurantId,
             order_id: orderId,
-            amount,
+            amount: safeAmount,
             billing_type: "CREDIT_CARD",
             action: "pay_with_saved_card",
             saved_card_id: selectedCardId,
             customer_name: customerName,
             customer_cpf: customerCPF,
-            customer_email: customerEmail,
+            customer_email: safeEmail,
             customer_phone: customerPhone,
             installments: 1,
             items: cartItems,
@@ -349,15 +353,17 @@ export const OnlinePaymentStep = ({
         throw new Error("Erro ao tokenizar cartão. Verifique os dados e tente novamente.");
       }
 
+      const safeAmount = Number(Math.max(0.1, Math.round(amount * 100) / 100).toFixed(2));
+      const safeEmail = customerEmail && customerEmail.trim() ? customerEmail.trim() : `cliente-${Date.now()}@pedido.com`;
       const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
           order_id: orderId,
-          amount,
+          amount: safeAmount,
           billing_type: "CREDIT_CARD",
           customer_name: customerName,
           customer_cpf: customerCPF,
-          customer_email: customerEmail,
+          customer_email: safeEmail,
           customer_phone: customerPhone,
           card_token: tokenResult.id,
           payment_method_id: tokenResult.payment_method_id || "visa",
