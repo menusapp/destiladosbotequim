@@ -349,6 +349,7 @@ export const CheckoutDrawer = ({
 
       localStorage.removeItem(`delivery-cart-${restaurantSlug}`);
       onClearCart();
+      onClose();
 
       navigate(`/delivery/${restaurantSlug}/pedido/${order.id}`);
       toast.success("Pedido realizado com sucesso! 🎉");
@@ -358,6 +359,8 @@ export const CheckoutDrawer = ({
         ? `Erro: ${error.message}` 
         : "Erro ao finalizar pedido. Tente novamente.";
       toast.error(errorMessage);
+      // Reset to payment step so user isn't stuck on loading screen
+      setStep("payment");
     } finally {
       setSubmitting(false);
     }
