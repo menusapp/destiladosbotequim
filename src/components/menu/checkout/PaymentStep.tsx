@@ -156,15 +156,15 @@ export const PaymentStep = ({
           .single();
         
         if (profile) {
-          if (profile.full_name) {
+          if (profile.full_name && !nameProp) {
             setCustomerName(profile.full_name);
             sessionStorage.setItem("customer_name", profile.full_name);
           }
-          if (profile.cpf) {
+          if (profile.cpf && !cpfProp) {
             setCustomerCPF(profile.cpf);
             sessionStorage.setItem("customer_cpf", profile.cpf);
           }
-          if (profile.phone) {
+          if (profile.phone && !phoneProp) {
             setCustomerPhone(profile.phone);
             sessionStorage.setItem("customer_phone", profile.phone);
           }
@@ -172,15 +172,16 @@ export const PaymentStep = ({
         }
       }
       
+      // Only fill from sessionStorage if props didn't provide values
       if (requireCustomerInfo) {
-        setCustomerName(sessionStorage.getItem("customer_name") || "");
-        setCustomerCPF(sessionStorage.getItem("customer_cpf") || "");
-        setCustomerPhone(sessionStorage.getItem("customer_phone") || "");
+        if (!nameProp) setCustomerName(sessionStorage.getItem("customer_name") || "");
+        if (!cpfProp) setCustomerCPF(sessionStorage.getItem("customer_cpf") || "");
+        if (!phoneProp) setCustomerPhone(sessionStorage.getItem("customer_phone") || "");
       }
     };
     
     loadUserData();
-  }, [requireCustomerInfo]);
+  }, [requireCustomerInfo, nameProp, cpfProp, phoneProp]);
 
   const handleContinue = () => {
     if (!paymentMethod) {
