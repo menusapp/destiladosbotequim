@@ -1081,6 +1081,86 @@ export type Database = {
           },
         ]
       }
+      fiscal_configs: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          certificate_file_path: string | null
+          certificate_password: string | null
+          cnpj: string | null
+          complemento: string | null
+          created_at: string | null
+          csc_code: string | null
+          csc_id: string | null
+          email: string | null
+          id: string
+          inscricao_estadual: string | null
+          logradouro: string | null
+          municipio_codigo: string | null
+          nome_fantasia: string | null
+          numero: string | null
+          razao_social: string | null
+          restaurant_id: string
+          telefone: string | null
+          uf: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          certificate_file_path?: string | null
+          certificate_password?: string | null
+          cnpj?: string | null
+          complemento?: string | null
+          created_at?: string | null
+          csc_code?: string | null
+          csc_id?: string | null
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logradouro?: string | null
+          municipio_codigo?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          razao_social?: string | null
+          restaurant_id: string
+          telefone?: string | null
+          uf?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          certificate_file_path?: string | null
+          certificate_password?: string | null
+          cnpj?: string | null
+          complemento?: string | null
+          created_at?: string | null
+          csc_code?: string | null
+          csc_id?: string | null
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logradouro?: string | null
+          municipio_codigo?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          razao_social?: string | null
+          restaurant_id?: string
+          telefone?: string | null
+          uf?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_configs_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fixed_costs: {
         Row: {
           amount: number
