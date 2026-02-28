@@ -35,6 +35,7 @@ import PrintersSettings from "@/components/admin/settings/PrintersSettings";
 import WhatsAppSettings from "@/components/admin/settings/WhatsAppSettings";
 import OnlinePaymentsSettings from "@/components/admin/settings/OnlinePaymentsSettings";
 import FiscalSettingsTab from "@/components/admin/FiscalSettingsTab";
+import NotasFiscaisTab from "@/components/admin/NotasFiscaisTab";
 
 interface Restaurant {
   id: string;
@@ -618,6 +619,10 @@ const RestaurantAdmin = () => {
       // Fiscal
       case "fiscal":
         return <FiscalSettingsTab restaurantId={restaurant.id} />;
+      
+      // Notas Fiscais
+      case "notas-fiscais":
+        return <NotasFiscaisTab restaurantId={restaurant.id} />;
       
       // Em Desenvolvimento
       case "modulos":

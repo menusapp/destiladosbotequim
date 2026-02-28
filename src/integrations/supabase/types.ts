@@ -1904,6 +1904,60 @@ export type Database = {
           },
         ]
       }
+      order_fiscal_notes: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          nfe_number: string | null
+          order_id: string
+          pdf_url: string | null
+          restaurant_id: string
+          status: string
+          updated_at: string | null
+          xml_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          nfe_number?: string | null
+          order_id: string
+          pdf_url?: string | null
+          restaurant_id: string
+          status?: string
+          updated_at?: string | null
+          xml_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          nfe_number?: string | null
+          order_id?: string
+          pdf_url?: string | null
+          restaurant_id?: string
+          status?: string
+          updated_at?: string | null
+          xml_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_fiscal_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_fiscal_notes_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_item_extras: {
         Row: {
           created_at: string | null
