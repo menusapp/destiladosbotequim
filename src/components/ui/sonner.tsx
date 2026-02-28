@@ -1,6 +1,5 @@
-import { toast } from "sonner";
+import { Toaster as SonnerToaster, toast } from "sonner";
 
-// Toaster desabilitado - não renderiza nenhuma notificação
-const Toaster = () => null;
+const Toaster = () => <SonnerToaster position="top-right" richColors closeButton />;
 
 export { Toaster, toast };

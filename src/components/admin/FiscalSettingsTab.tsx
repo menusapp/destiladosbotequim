@@ -131,6 +131,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
   };
 
   const handleSave = async () => {
+    console.log('Botão clicado, iniciando submit', config);
     setIsSubmitting(true);
     try {
       let certificatePath = config.certificate_file_path;
