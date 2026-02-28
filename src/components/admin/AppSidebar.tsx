@@ -23,6 +23,7 @@ import {
   Gift,
   Smartphone,
   FileText,
+  Receipt,
 } from "lucide-react";
 import {
   Sidebar,
@@ -76,6 +77,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "fidelidade", label: "Fidelidade", icon: Gift },
       { id: "marketing", label: "Marketing", icon: Megaphone },
       { id: "fiscal", label: "Fiscal", icon: FileText },
+      { id: "notas-fiscais", label: "Notas Fiscais", icon: Receipt },
     ],
     development: [
       { id: "modulos", label: "Módulos", icon: Construction },

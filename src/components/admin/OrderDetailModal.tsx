@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,10 @@ import {
   Play,
   Plus,
   Home,
-  Trash2
+  Trash2,
+  FileText,
+  Download,
+  FileCode
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -72,6 +75,43 @@ export const OrderDetailModal = ({
 }: OrderDetailModalProps) => {
   const navigate = useNavigate();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [fiscalNote, setFiscalNote] = useState<{ status: string; pdf_url?: string | null; xml_url?: string | null } | null>(null);
+  const [emittingNote, setEmittingNote] = useState(false);
+
+  // Check if fiscal note exists for this order
+  useEffect(() => {
+    const fetchFiscalNote = async () => {
+      const { data } = await supabase
+        .from("order_fiscal_notes")
+        .select("status, pdf_url, xml_url")
+        .eq("order_id", order.id)
+        .maybeSingle();
+      if (data) setFiscalNote(data);
+    };
+    fetchFiscalNote();
+  }, [order.id]);
+
+  const handleEmitNFCe = async () => {
+    setEmittingNote(true);
+    try {
+      // Create pending fiscal note record (integration with API will come later)
+      const { error } = await supabase
+        .from("order_fiscal_notes")
+        .insert({
+          restaurant_id: restaurantId,
+          order_id: order.id,
+          status: "pending",
+        });
+      if (error) throw error;
+      setFiscalNote({ status: "pending" });
+      toast.success("Nota fiscal criada como pendente. A emissão será processada em breve.");
+    } catch (err: any) {
+      console.error("Erro ao criar nota fiscal:", err);
+      toast.error("Erro ao criar nota fiscal");
+    } finally {
+      setEmittingNote(false);
+    }
+  };
 
   const getElapsedTime = () => {
     const elapsed = Date.now() - new Date(order.created_at).getTime();
@@ -383,6 +423,31 @@ export const OrderDetailModal = ({
                   <MessageCircle className="w-4 h-4" />
                   WhatsApp
                 </Button>
+              )}
+
+              {/* NFC-e Buttons */}
+              {["delivered", "picked_up"].includes(order.status) && !fiscalNote && (
+                <Button variant="outline" onClick={handleEmitNFCe} disabled={emittingNote} className="gap-2">
+                  <FileText className="w-4 h-4" />
+                  {emittingNote ? "Emitindo..." : "Emitir NFC-e"}
+                </Button>
+              )}
+              {fiscalNote && fiscalNote.status === "authorized" && fiscalNote.pdf_url && (
+                <Button variant="outline" onClick={() => window.open(fiscalNote.pdf_url!, "_blank")} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  Baixar Nota
+                </Button>
+              )}
+              {fiscalNote && fiscalNote.status === "authorized" && fiscalNote.xml_url && (
+                <Button variant="outline" onClick={() => window.open(fiscalNote.xml_url!, "_blank")} className="gap-2">
+                  <FileCode className="w-4 h-4" />
+                  Baixar XML
+                </Button>
+              )}
+              {fiscalNote && fiscalNote.status === "pending" && (
+                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 self-center">
+                  <Clock className="w-3 h-3 mr-1" /> NFC-e Pendente
+                </Badge>
               )}
             </CardContent>
           </Card>
