@@ -1099,6 +1099,7 @@ export type Database = {
           municipio_codigo: string | null
           nome_fantasia: string | null
           numero: string | null
+          nuvem_fiscal_status: string | null
           razao_social: string | null
           restaurant_id: string
           telefone: string | null
@@ -1122,6 +1123,7 @@ export type Database = {
           municipio_codigo?: string | null
           nome_fantasia?: string | null
           numero?: string | null
+          nuvem_fiscal_status?: string | null
           razao_social?: string | null
           restaurant_id: string
           telefone?: string | null
@@ -1145,6 +1147,7 @@ export type Database = {
           municipio_codigo?: string | null
           nome_fantasia?: string | null
           numero?: string | null
+          nuvem_fiscal_status?: string | null
           razao_social?: string | null
           restaurant_id?: string
           telefone?: string | null
