@@ -22,6 +22,7 @@ import {
   Megaphone,
   Gift,
   Smartphone,
+  FileText,
 } from "lucide-react";
 import {
   Sidebar,
@@ -74,6 +75,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "clientes", label: "Clientes", icon: Users },
       { id: "fidelidade", label: "Fidelidade", icon: Gift },
       { id: "marketing", label: "Marketing", icon: Megaphone },
+      { id: "fiscal", label: "Fiscal", icon: FileText },
     ],
     development: [
       { id: "modulos", label: "Módulos", icon: Construction },

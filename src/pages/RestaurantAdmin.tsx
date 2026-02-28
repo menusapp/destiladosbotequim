@@ -34,6 +34,7 @@ import PaymentMethodsSettings from "@/components/admin/settings/PaymentMethodsSe
 import PrintersSettings from "@/components/admin/settings/PrintersSettings";
 import WhatsAppSettings from "@/components/admin/settings/WhatsAppSettings";
 import OnlinePaymentsSettings from "@/components/admin/settings/OnlinePaymentsSettings";
+import FiscalSettingsTab from "@/components/admin/FiscalSettingsTab";
 
 interface Restaurant {
   id: string;
@@ -613,6 +614,10 @@ const RestaurantAdmin = () => {
       // Marketing
       case "marketing":
         return <MarketingTab restaurantId={restaurant.id} onNavigateToWhatsApp={() => setActiveSection("config-whatsapp")} />;
+      
+      // Fiscal
+      case "fiscal":
+        return <FiscalSettingsTab restaurantId={restaurant.id} />;
       
       // Em Desenvolvimento
       case "modulos":
