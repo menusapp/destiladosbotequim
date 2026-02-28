@@ -1,66 +1,33 @@
 
 
-## Plano Atualizado: Módulo Fiscal (NFC-e) - Base de Configuração
+## Diagnóstico
 
-Confirmado: todos os campos solicitados foram incorporados ao escopo.
+O problema é claro: o login do painel do restaurante (Landing.tsx) usa a RPC `validate_restaurant_credentials` e salva o `restaurant_id` no `localStorage`, mas **não cria uma sessão de autenticação Supabase**. O usuário está efetivamente como `anon` (anônimo), não como `authenticated`.
 
-### 1. Migração SQL - Tabela `fiscal_configs`
+As políticas do bucket `fiscal-certificates` exigem role `authenticated`, por isso o upload retorna 400 RLS violation.
+
+## Plano de Correção
+
+### 1. Migração SQL - Alterar policies do bucket para `anon`
+
+Dropar as 4 policies atuais (que usam `TO authenticated`) e recriá-las com `TO anon, authenticated`:
 
 ```sql
-CREATE TABLE public.fiscal_configs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  restaurant_id uuid NOT NULL UNIQUE REFERENCES public.restaurants(id) ON DELETE CASCADE,
-  -- Dados da empresa
-  cnpj text,
-  razao_social text,
-  nome_fantasia text,
-  inscricao_estadual text,
-  email text,
-  telefone text,
-  -- Endereço desmembrado
-  cep text,
-  logradouro text,
-  numero text,
-  complemento text,
-  bairro text,
-  municipio_codigo text,
-  uf text DEFAULT 'SP',
-  -- NFC-e / Certificado
-  csc_id text,
-  csc_code text,
-  certificate_password text,
-  certificate_file_path text,
-  -- Timestamps
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
+DROP POLICY IF EXISTS "fiscal_insert" ON storage.objects;
+DROP POLICY IF EXISTS "fiscal_select" ON storage.objects;
+DROP POLICY IF EXISTS "fiscal_update" ON storage.objects;
+DROP POLICY IF EXISTS "fiscal_delete" ON storage.objects;
 
-ALTER TABLE public.fiscal_configs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all operations on fiscal_configs" ON public.fiscal_configs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "fiscal_insert" ON storage.objects FOR INSERT TO anon, authenticated WITH CHECK (bucket_id = 'fiscal-certificates');
+CREATE POLICY "fiscal_select" ON storage.objects FOR SELECT TO anon, authenticated USING (bucket_id = 'fiscal-certificates');
+CREATE POLICY "fiscal_update" ON storage.objects FOR UPDATE TO anon, authenticated USING (bucket_id = 'fiscal-certificates');
+CREATE POLICY "fiscal_delete" ON storage.objects FOR DELETE TO anon, authenticated USING (bucket_id = 'fiscal-certificates');
 ```
 
-Storage bucket `fiscal-certificates` (privado) com policy para authenticated users.
-
-### 2. Sidebar - `AppSidebar.tsx`
-
-Adicionar `{ id: "fiscal", label: "Fiscal", icon: FileText }` ao array `menuStructure.main` após "marketing".
-
-### 3. Roteamento - `RestaurantAdmin.tsx`
-
-Importar `FiscalSettingsTab` e adicionar case `"fiscal"` no `renderContent()`.
-
-### 4. Novo componente - `FiscalSettingsTab.tsx`
-
-Formulário com seções:
-- **Dados da Empresa**: CNPJ (máscara), Razão Social, Nome Fantasia, Inscrição Estadual, Email, Telefone
-- **Endereço Fiscal**: CEP, Logradouro, Número, Complemento, Bairro, Município (código IBGE), UF
-- **Certificado Digital**: ID do CSC, Código do CSC, Senha do Certificado, Upload .pfx
-- Botão "Salvar" faz upsert em `fiscal_configs`
-
 ### Escopo
+- 1 migração SQL (drop + recreate 4 storage policies)
+- Zero alterações de código frontend
 
-- 1 migração SQL (tabela + bucket + policies)
-- 1 novo componente (`FiscalSettingsTab.tsx`)
-- 2 arquivos modificados (`AppSidebar.tsx`, `RestaurantAdmin.tsx`)
-- Zero integrações com APIs externas
+### Nota de Segurança
+Isso permite que qualquer requisição com a anon key faça upload neste bucket. Como o bucket é privado e o path usa `restaurant_id`, o risco é baixo, mas futuramente convém migrar o login do restaurante para sessão autenticada real.
 
