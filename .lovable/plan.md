@@ -1,28 +1,66 @@
 
 
-## Plano: Adicionar input de CVV para cartões salvos
+## Plano Atualizado: Módulo Fiscal (NFC-e) - Base de Configuração
 
-### Causa Raiz
-O erro `security_code_id can't be null` (code 3031) ocorre porque a API do Mercado Pago **exige o CVV** ao gerar um `card_token` a partir de um cartão salvo. O `POST /v1/card_tokens` atual envia apenas `card_id` e `customer_id`, mas falta o campo `security_code`.
+Confirmado: todos os campos solicitados foram incorporados ao escopo.
 
-### Solução
-Adicionar um campo de CVV na UI quando o usuário seleciona um cartão salvo, enviar esse valor para a Edge Function, e incluí-lo no body do `POST /v1/card_tokens`.
+### 1. Migração SQL - Tabela `fiscal_configs`
 
-### Mudanças
+```sql
+CREATE TABLE public.fiscal_configs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id uuid NOT NULL UNIQUE REFERENCES public.restaurants(id) ON DELETE CASCADE,
+  -- Dados da empresa
+  cnpj text,
+  razao_social text,
+  nome_fantasia text,
+  inscricao_estadual text,
+  email text,
+  telefone text,
+  -- Endereço desmembrado
+  cep text,
+  logradouro text,
+  numero text,
+  complemento text,
+  bairro text,
+  municipio_codigo text,
+  uf text DEFAULT 'SP',
+  -- NFC-e / Certificado
+  csc_id text,
+  csc_code text,
+  certificate_password text,
+  certificate_file_path text,
+  -- Timestamps
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
 
-**1. Frontend — `src/components/menu/checkout/OnlinePaymentStep.tsx`**
-- Adicionar estado `savedCardCvv` para armazenar o CVV digitado
-- Renderizar um input de CVV (3-4 dígitos) abaixo do cartão salvo selecionado (quando `selectedCardId !== "new"`)
-- Enviar `security_code: savedCardCvv` no payload da função `mercadopago-charge`
+ALTER TABLE public.fiscal_configs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on fiscal_configs" ON public.fiscal_configs FOR ALL USING (true) WITH CHECK (true);
+```
 
-**2. Backend — `supabase/functions/mercadopago-charge/index.ts`**
-- Receber `security_code` do body da request
-- Incluir `security_code` no body do `POST /v1/card_tokens`:
-  ```json
-  { "card_id": "...", "customer_id": "...", "security_code": "123" }
-  ```
+Storage bucket `fiscal-certificates` (privado) com policy para authenticated users.
+
+### 2. Sidebar - `AppSidebar.tsx`
+
+Adicionar `{ id: "fiscal", label: "Fiscal", icon: FileText }` ao array `menuStructure.main` após "marketing".
+
+### 3. Roteamento - `RestaurantAdmin.tsx`
+
+Importar `FiscalSettingsTab` e adicionar case `"fiscal"` no `renderContent()`.
+
+### 4. Novo componente - `FiscalSettingsTab.tsx`
+
+Formulário com seções:
+- **Dados da Empresa**: CNPJ (máscara), Razão Social, Nome Fantasia, Inscrição Estadual, Email, Telefone
+- **Endereço Fiscal**: CEP, Logradouro, Número, Complemento, Bairro, Município (código IBGE), UF
+- **Certificado Digital**: ID do CSC, Código do CSC, Senha do Certificado, Upload .pfx
+- Botão "Salvar" faz upsert em `fiscal_configs`
 
 ### Escopo
-- 2 arquivos modificados
-- Nenhuma mudança no fluxo de novos cartões ou PIX
+
+- 1 migração SQL (tabela + bucket + policies)
+- 1 novo componente (`FiscalSettingsTab.tsx`)
+- 2 arquivos modificados (`AppSidebar.tsx`, `RestaurantAdmin.tsx`)
+- Zero integrações com APIs externas
 
