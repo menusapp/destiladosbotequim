@@ -71,11 +71,22 @@ Deno.serve(async (req) => {
       }),
     });
 
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) {
-      console.error("OAuth error:", tokenData);
+    const tokenText = await tokenRes.text();
+    let tokenData: any;
+    try {
+      tokenData = JSON.parse(tokenText);
+    } catch {
+      console.error("OAuth response not JSON:", tokenText);
       return new Response(
-        JSON.stringify({ success: false, error: "Falha na autenticação com Nuvem Fiscal" }),
+        JSON.stringify({ success: false, error: `Resposta inválida do OAuth: ${tokenText.substring(0, 200)}` }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!tokenRes.ok || !tokenData.access_token) {
+      console.error("OAuth error:", tokenRes.status, tokenData);
+      return new Response(
+        JSON.stringify({ success: false, error: `Falha na autenticação Nuvem Fiscal (${tokenRes.status}): ${tokenData.error_description || tokenData.error || "desconhecido"}` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -114,13 +125,23 @@ Deno.serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    const companyData = await companyRes.json();
+    const companyText = await companyRes.text();
+    let companyData: any;
+    try {
+      companyData = JSON.parse(companyText);
+    } catch {
+      console.error("Company API response not JSON:", companyText);
+      return new Response(
+        JSON.stringify({ success: false, error: `Resposta inválida da API: ${companyText.substring(0, 300)}` }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!companyRes.ok) {
       console.error("Nuvem Fiscal API error:", companyRes.status, companyData);
       const errorMsg = companyData?.error?.message || companyData?.message || JSON.stringify(companyData);
       return new Response(
-        JSON.stringify({ success: false, error: `Erro Nuvem Fiscal: ${errorMsg}` }),
+        JSON.stringify({ success: false, error: `Erro Nuvem Fiscal (${companyRes.status}): ${errorMsg}` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
