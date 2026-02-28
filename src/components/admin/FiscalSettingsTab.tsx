@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { FileText, Upload, Check, Loader2, X } from "lucide-react";
+import { FileText, Upload, Check, Loader2, X, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface FiscalSettingsTabProps {
   restaurantId: string;
@@ -66,6 +67,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [existingFileName, setExistingFileName] = useState<string | null>(null);
+  const [nuvemFiscalStatus, setNuvemFiscalStatus] = useState<string>("pending");
 
   useEffect(() => {
     fetchConfig();
@@ -93,6 +95,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
           csc_code: data.csc_code || "", certificate_password: data.certificate_password || "",
           certificate_file_path: data.certificate_file_path || "",
         });
+        setNuvemFiscalStatus((data as any).nuvem_fiscal_status || "pending");
         if (data.certificate_file_path) {
           setExistingFileName(data.certificate_file_path.split("/").pop() || null);
         }
@@ -188,6 +191,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
           toast.error(nfData.error || "Erro na sincronização fiscal");
         } else {
           toast.success("Empresa sincronizada com a Nuvem Fiscal!");
+          await fetchConfig();
         }
       } catch (invokeErr: any) {
         console.error("Exceção ao invocar edge function:", invokeErr);
@@ -217,6 +221,23 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
         <FileText className="h-6 w-6 text-primary" />
         <h2 className="text-2xl font-bold">Configurações Fiscais</h2>
       </div>
+
+      {/* Status da Nuvem Fiscal */}
+      {nuvemFiscalStatus === "synced" ? (
+        <Alert className="border-green-500/50 bg-green-50 dark:bg-green-950/30">
+          <CheckCircle2 className="h-5 w-5 text-green-600" />
+          <AlertDescription className="text-green-700 dark:text-green-400 font-medium ml-2">
+            ✅ Empresa Sincronizada e Ativa na Nuvem Fiscal
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/30">
+          <AlertTriangle className="h-5 w-5 text-yellow-600" />
+          <AlertDescription className="text-yellow-700 dark:text-yellow-400 font-medium ml-2">
+            Empresa pendente de sincronização com a Sefaz
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Dados da Empresa */}
       <Card>

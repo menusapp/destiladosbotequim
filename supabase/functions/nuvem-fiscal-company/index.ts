@@ -149,6 +149,16 @@ Deno.serve(async (req) => {
 
     console.log("Company created successfully:", companyData);
 
+    // Update fiscal_configs status to 'synced'
+    const { error: updateError } = await supabase
+      .from("fiscal_configs")
+      .update({ nuvem_fiscal_status: "synced" })
+      .eq("restaurant_id", restaurantId);
+
+    if (updateError) {
+      console.error("Failed to update nuvem_fiscal_status:", updateError);
+    }
+
     return new Response(
       JSON.stringify({ success: true, data: companyData }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
