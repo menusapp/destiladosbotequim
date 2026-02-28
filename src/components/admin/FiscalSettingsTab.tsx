@@ -170,6 +170,23 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
       }
 
       toast.success("Configurações fiscais salvas com sucesso!");
+
+      // 3. Sync company with Nuvem Fiscal
+      toast.info("Sincronizando empresa com a Receita...");
+      const { data: nfData, error: nfError } = await supabase.functions.invoke(
+        "nuvem-fiscal-company",
+        { body: { restaurantId } }
+      );
+
+      if (nfError) {
+        console.error("Erro ao chamar nuvem-fiscal-company:", nfError);
+        toast.error("Erro ao sincronizar com Nuvem Fiscal");
+      } else if (nfData && !nfData.success) {
+        console.error("Nuvem Fiscal retornou erro:", nfData.error);
+        toast.error(nfData.error || "Erro na sincronização fiscal");
+      } else {
+        toast.success("Empresa sincronizada com a Nuvem Fiscal!");
+      }
     } catch (error: any) {
       console.error("Erro ao salvar:", error);
       toast.error(error?.message || "Erro ao salvar configurações fiscais");
