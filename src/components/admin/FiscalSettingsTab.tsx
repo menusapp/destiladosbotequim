@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { FileText, Upload, Check, Loader2 } from "lucide-react";
+import { FileText, Upload, Check, Loader2, X } from "lucide-react";
 
 interface FiscalSettingsTabProps {
   restaurantId: string;
@@ -32,23 +32,10 @@ interface FiscalConfig {
 }
 
 const emptyConfig: FiscalConfig = {
-  cnpj: "",
-  razao_social: "",
-  nome_fantasia: "",
-  inscricao_estadual: "",
-  email: "",
-  telefone: "",
-  cep: "",
-  logradouro: "",
-  numero: "",
-  complemento: "",
-  bairro: "",
-  municipio_codigo: "",
-  uf: "SP",
-  csc_id: "",
-  csc_code: "",
-  certificate_password: "",
-  certificate_file_path: "",
+  cnpj: "", razao_social: "", nome_fantasia: "", inscricao_estadual: "",
+  email: "", telefone: "", cep: "", logradouro: "", numero: "",
+  complemento: "", bairro: "", municipio_codigo: "", uf: "SP",
+  csc_id: "", csc_code: "", certificate_password: "", certificate_file_path: "",
 };
 
 const formatCNPJ = (value: string) => {
@@ -76,9 +63,9 @@ const formatCEP = (value: string) => {
 export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabProps) {
   const [config, setConfig] = useState<FiscalConfig>(emptyConfig);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [certificateFileName, setCertificateFileName] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [existingFileName, setExistingFileName] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConfig();
@@ -96,30 +83,23 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
 
       if (data) {
         setConfig({
-          cnpj: data.cnpj || "",
-          razao_social: data.razao_social || "",
-          nome_fantasia: data.nome_fantasia || "",
-          inscricao_estadual: data.inscricao_estadual || "",
-          email: data.email || "",
-          telefone: data.telefone || "",
-          cep: data.cep || "",
-          logradouro: data.logradouro || "",
-          numero: data.numero || "",
-          complemento: data.complemento || "",
-          bairro: data.bairro || "",
-          municipio_codigo: data.municipio_codigo || "",
-          uf: data.uf || "SP",
-          csc_id: data.csc_id || "",
-          csc_code: data.csc_code || "",
-          certificate_password: data.certificate_password || "",
+          cnpj: data.cnpj || "", razao_social: data.razao_social || "",
+          nome_fantasia: data.nome_fantasia || "", inscricao_estadual: data.inscricao_estadual || "",
+          email: data.email || "", telefone: data.telefone || "",
+          cep: data.cep || "", logradouro: data.logradouro || "",
+          numero: data.numero || "", complemento: data.complemento || "",
+          bairro: data.bairro || "", municipio_codigo: data.municipio_codigo || "",
+          uf: data.uf || "SP", csc_id: data.csc_id || "",
+          csc_code: data.csc_code || "", certificate_password: data.certificate_password || "",
           certificate_file_path: data.certificate_file_path || "",
         });
         if (data.certificate_file_path) {
-          setCertificateFileName(data.certificate_file_path.split("/").pop() || null);
+          setExistingFileName(data.certificate_file_path.split("/").pop() || null);
         }
       }
     } catch (error) {
       console.error("Erro ao carregar configurações fiscais:", error);
+      toast.error("Erro ao carregar configurações fiscais");
     } finally {
       setLoading(false);
     }
@@ -133,42 +113,46 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
     setConfig((prev) => ({ ...prev, [field]: formatted }));
   };
 
-  const handleUploadCertificate = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.name.endsWith(".pfx")) {
       toast.error("Apenas arquivos .pfx são aceitos");
+      e.target.value = "";
       return;
     }
 
-    setUploading(true);
-    try {
-      const filePath = `${restaurantId}/certificate.pfx`;
+    setSelectedFile(file);
+  };
 
-      const { error } = await supabase.storage
-        .from("fiscal-certificates")
-        .upload(filePath, file, { upsert: true });
-
-      if (error) throw error;
-
-      setConfig((prev) => ({ ...prev, certificate_file_path: filePath }));
-      setCertificateFileName(file.name);
-      toast.success("Certificado enviado com sucesso");
-    } catch (error: any) {
-      console.error("Erro ao enviar certificado:", error);
-      toast.error("Erro ao enviar certificado");
-    } finally {
-      setUploading(false);
-    }
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
   };
 
   const handleSave = async () => {
-    setSaving(true);
+    setIsSubmitting(true);
     try {
+      let certificatePath = config.certificate_file_path;
+
+      // 1. Upload new certificate if selected
+      if (selectedFile) {
+        const filePath = `${restaurantId}/certificate.pfx`;
+        const { error: uploadError } = await supabase.storage
+          .from("fiscal-certificates")
+          .upload(filePath, selectedFile, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        certificatePath = filePath;
+        toast.success("Certificado enviado com sucesso");
+      }
+
+      // 2. Upsert fiscal config
       const payload = {
         restaurant_id: restaurantId,
         ...config,
+        certificate_file_path: certificatePath,
       };
 
       const { error } = await supabase
@@ -176,12 +160,20 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
         .upsert(payload, { onConflict: "restaurant_id" });
 
       if (error) throw error;
+
+      // Update local state
+      setConfig((prev) => ({ ...prev, certificate_file_path: certificatePath }));
+      if (selectedFile) {
+        setExistingFileName(selectedFile.name);
+        setSelectedFile(null);
+      }
+
       toast.success("Configurações fiscais salvas com sucesso!");
     } catch (error: any) {
       console.error("Erro ao salvar:", error);
-      toast.error("Erro ao salvar configurações fiscais");
+      toast.error(error?.message || "Erro ao salvar configurações fiscais");
     } finally {
-      setSaving(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -193,6 +185,8 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
     );
   }
 
+  const displayFileName = selectedFile?.name || existingFileName;
+
   return (
     <div className="space-y-6 p-4 md:p-6 max-w-4xl">
       <div className="flex items-center gap-2">
@@ -202,194 +196,115 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
 
       {/* Dados da Empresa */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Dados da Empresa</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-lg">Dados da Empresa</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>CNPJ</Label>
-            <Input
-              placeholder="00.000.000/0000-00"
-              value={config.cnpj}
-              onChange={(e) => handleChange("cnpj", e.target.value)}
-            />
+            <Input placeholder="00.000.000/0000-00" value={config.cnpj} onChange={(e) => handleChange("cnpj", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Razão Social</Label>
-            <Input
-              placeholder="Razão Social da empresa"
-              value={config.razao_social}
-              onChange={(e) => handleChange("razao_social", e.target.value)}
-            />
+            <Input placeholder="Razão Social da empresa" value={config.razao_social} onChange={(e) => handleChange("razao_social", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Nome Fantasia</Label>
-            <Input
-              placeholder="Nome Fantasia"
-              value={config.nome_fantasia}
-              onChange={(e) => handleChange("nome_fantasia", e.target.value)}
-            />
+            <Input placeholder="Nome Fantasia" value={config.nome_fantasia} onChange={(e) => handleChange("nome_fantasia", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Inscrição Estadual</Label>
-            <Input
-              placeholder="Inscrição Estadual"
-              value={config.inscricao_estadual}
-              onChange={(e) => handleChange("inscricao_estadual", e.target.value)}
-            />
+            <Input placeholder="Inscrição Estadual" value={config.inscricao_estadual} onChange={(e) => handleChange("inscricao_estadual", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Email</Label>
-            <Input
-              type="email"
-              placeholder="email@empresa.com"
-              value={config.email}
-              onChange={(e) => handleChange("email", e.target.value)}
-            />
+            <Input type="email" placeholder="email@empresa.com" value={config.email} onChange={(e) => handleChange("email", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Telefone</Label>
-            <Input
-              placeholder="(00) 00000-0000"
-              value={config.telefone}
-              onChange={(e) => handleChange("telefone", e.target.value)}
-            />
+            <Input placeholder="(00) 00000-0000" value={config.telefone} onChange={(e) => handleChange("telefone", e.target.value)} />
           </div>
         </CardContent>
       </Card>
 
       {/* Endereço Fiscal */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Endereço Fiscal</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-lg">Endereço Fiscal</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>CEP</Label>
-            <Input
-              placeholder="00000-000"
-              value={config.cep}
-              onChange={(e) => handleChange("cep", e.target.value)}
-            />
+            <Input placeholder="00000-000" value={config.cep} onChange={(e) => handleChange("cep", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Logradouro</Label>
-            <Input
-              placeholder="Rua, Avenida..."
-              value={config.logradouro}
-              onChange={(e) => handleChange("logradouro", e.target.value)}
-            />
+            <Input placeholder="Rua, Avenida..." value={config.logradouro} onChange={(e) => handleChange("logradouro", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Número</Label>
-            <Input
-              placeholder="Nº"
-              value={config.numero}
-              onChange={(e) => handleChange("numero", e.target.value)}
-            />
+            <Input placeholder="Nº" value={config.numero} onChange={(e) => handleChange("numero", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Complemento</Label>
-            <Input
-              placeholder="Sala, Bloco..."
-              value={config.complemento}
-              onChange={(e) => handleChange("complemento", e.target.value)}
-            />
+            <Input placeholder="Sala, Bloco..." value={config.complemento} onChange={(e) => handleChange("complemento", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Bairro</Label>
-            <Input
-              placeholder="Bairro"
-              value={config.bairro}
-              onChange={(e) => handleChange("bairro", e.target.value)}
-            />
+            <Input placeholder="Bairro" value={config.bairro} onChange={(e) => handleChange("bairro", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Código do Município (IBGE)</Label>
-            <Input
-              placeholder="Ex: 3550308"
-              value={config.municipio_codigo}
-              onChange={(e) => handleChange("municipio_codigo", e.target.value)}
-            />
+            <Input placeholder="Ex: 3550308" value={config.municipio_codigo} onChange={(e) => handleChange("municipio_codigo", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>UF</Label>
-            <Input
-              placeholder="SP"
-              maxLength={2}
-              value={config.uf}
-              onChange={(e) => handleChange("uf", e.target.value.toUpperCase())}
-            />
+            <Input placeholder="SP" maxLength={2} value={config.uf} onChange={(e) => handleChange("uf", e.target.value.toUpperCase())} />
           </div>
         </CardContent>
       </Card>
 
       {/* Certificado Digital */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Certificado Digital (NFC-e)</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-lg">Certificado Digital (NFC-e)</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>ID do CSC</Label>
-            <Input
-              placeholder="ID do CSC"
-              value={config.csc_id}
-              onChange={(e) => handleChange("csc_id", e.target.value)}
-            />
+            <Input placeholder="ID do CSC" value={config.csc_id} onChange={(e) => handleChange("csc_id", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Código do CSC</Label>
-            <Input
-              placeholder="Código do CSC"
-              value={config.csc_code}
-              onChange={(e) => handleChange("csc_code", e.target.value)}
-            />
+            <Input placeholder="Código do CSC" value={config.csc_code} onChange={(e) => handleChange("csc_code", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Senha do Certificado</Label>
-            <Input
-              type="password"
-              placeholder="Senha do certificado .pfx"
-              value={config.certificate_password}
-              onChange={(e) => handleChange("certificate_password", e.target.value)}
-            />
+            <Input type="password" placeholder="Senha do certificado .pfx" value={config.certificate_password} onChange={(e) => handleChange("certificate_password", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Certificado Digital (.pfx)</Label>
-            <div className="flex items-center gap-2">
-              <label className="flex-1 cursor-pointer">
+            {displayFileName ? (
+              <div className="flex items-center gap-2 border border-input rounded-md px-3 py-2 text-sm bg-muted/50">
+                <Check className="h-4 w-4 text-primary shrink-0" />
+                <span className="truncate flex-1">{displayFileName}</span>
+                <button
+                  type="button"
+                  onClick={handleRemoveFile}
+                  className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <label className="cursor-pointer block">
                 <div className="flex items-center gap-2 border border-input rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors">
-                  {uploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : certificateFileName ? (
-                    <Check className="h-4 w-4 text-primary" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  <span className="text-muted-foreground truncate">
-                    {uploading
-                      ? "Enviando..."
-                      : certificateFileName
-                        ? certificateFileName
-                        : "Selecionar arquivo .pfx"}
-                  </span>
+                  <Upload className="h-4 w-4" />
+                  <span className="text-muted-foreground">Selecionar arquivo .pfx</span>
                 </div>
-                <input
-                  type="file"
-                  accept=".pfx"
-                  className="hidden"
-                  onChange={handleUploadCertificate}
-                  disabled={uploading}
-                />
+                <input type="file" accept=".pfx" className="hidden" onChange={handleFileSelect} />
               </label>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      <Button onClick={handleSave} disabled={saving} className="w-full md:w-auto">
-        {saving ? (
+      <Button onClick={handleSave} disabled={isSubmitting} className="w-full md:w-auto">
+        {isSubmitting ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
             Salvando...
