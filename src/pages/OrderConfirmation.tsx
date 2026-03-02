@@ -185,13 +185,30 @@ export default function OrderConfirmation() {
           table: "orders",
           filter: `id=eq.${orderId}`,
         },
-        (payload) => {
-          setOrder(payload.new as Order);
+        async (payload) => {
+          const newStatus = (payload.new as any).status;
+          const deliveryType = (payload.new as any).delivery_type;
+
+          // Re-fetch full order with relations instead of using incomplete payload
+          const { data: fullOrder } = await supabase
+            .from("orders")
+            .select(`
+              *,
+              order_items (
+                id,
+                quantity,
+                price_at_order,
+                products (name)
+              )
+            `)
+            .eq("id", orderId)
+            .single();
+
+          if (fullOrder) {
+            setOrder(fullOrder as Order);
+          }
 
           // Notificações de mudança de status
-          const newStatus = payload.new.status;
-          const deliveryType = payload.new.delivery_type;
-          
           if (newStatus === "accepted") {
             toast.success("Seu pedido foi aceito e está em preparo! 🎉");
           } else if (newStatus === "out_for_delivery") {
@@ -230,7 +247,7 @@ export default function OrderConfirmation() {
 
   const calculateSubtotal = () => {
     if (!order) return 0;
-    return order.order_items.reduce(
+    return (order.order_items ?? []).reduce(
       (sum, item) => sum + item.price_at_order * item.quantity,
       0
     );
@@ -380,10 +397,10 @@ export default function OrderConfirmation() {
             <CardTitle>Detalhes do Pedido</CardTitle>
           </CardHeader>
           <CardContent>
-            {order.order_items.map((item) => (
+            {(order.order_items ?? []).map((item) => (
               <div key={item.id} className="flex justify-between mb-2">
                 <span>
-                  {item.quantity}x {item.products.name}
+                  {item.quantity}x {item.products?.name}
                 </span>
                 <span>R$ {(item.price_at_order * item.quantity).toFixed(2)}</span>
               </div>
