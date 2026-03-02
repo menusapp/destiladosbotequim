@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react";
+import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -155,7 +155,8 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="flex flex-wrap gap-3 items-center">
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm">
@@ -194,6 +195,15 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
             <SelectItem value="canceled">Canceladas</SelectItem>
           </SelectContent>
         </Select>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => toast.info("A funcionalidade de compactação de XMLs em formato .ZIP será ativada junto com a integração da SEFAZ.")}
+          className="gap-2"
+        >
+          <FileArchive className="h-4 w-4" />
+          Exportar XMLs (Mês Atual)
+        </Button>
       </div>
 
       {/* Table */}
