@@ -715,7 +715,7 @@ export const CheckoutDrawer = ({
             loyaltyPointsUsed={loyaltyPointsUsed}
             deliveryType={deliveryType}
             onBack={() => setStep("payment")}
-            onConfirm={handleFinishOrder}
+            onConfirm={() => handleFinishOrder()}
             submitting={submitting}
             deliveryZone={deliveryZone}
             activeRewardDiscount={activeRewardDiscount}
