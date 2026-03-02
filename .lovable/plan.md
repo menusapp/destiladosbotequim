@@ -1,29 +1,44 @@
 
 
-## Diagnostico: `internal_error` 500 do Mercado Pago com credenciais TEST
+## Plano: Email obrigatorio para pagamento online + salvar no CRM
 
-### Causa Provavel
+### Situacao Atual
 
-O erro `internal_error` com status 500 da API do Mercado Pago em modo teste acontece por uma razao principal:
+- A tabela `customers` ja tem coluna `email` (nullable).
+- O `customerEmail` no checkout vem de `sessionStorage.getItem("customer_email")` — que quase nunca esta preenchido.
+- A Edge Function `mercadopago-charge` recebe `customer_email` e usa fallback `cliente-{timestamp}@pedido.com` quando vazio — que causa erro 500 no sandbox.
 
-**Mismatch de credenciais entre frontend e backend.** O `card_token` e gerado no frontend usando a `mp_public_key` da tabela `online_payment_config`. O pagamento e processado no backend usando o `mp_access_token` da mesma tabela. **Ambas precisam ser do mesmo ambiente (TEST ou PRODUCAO).**
+### O Que Sera Feito
 
-Se voce atualizou apenas o `mp_access_token` para TEST mas a `mp_public_key` ainda esta como `APP_USR-...` (producao), ou vice-versa, o token do cartao gerado em um ambiente nao e valido no outro — e o Mercado Pago retorna `internal_error` 500.
+**1. Adicionar campo de email obrigatorio no `PaymentStep` quando o usuario selecionar pagamento online**
 
-Alem disso, em modo teste do Mercado Pago, voce deve usar **contas de teste** (test users) e os **cartoes de teste oficiais** com dados especificos (nome, CPF de teste, etc).
+Quando o cliente selecionar PIX Online ou Cartao Online, antes de prosseguir, exibir um campo de email obrigatorio. O campo sera pre-preenchido se o cliente ja tiver email salvo no CRM (buscado via CPF). Validacao: formato de email valido + nao vazio.
 
-### Acoes Necessarias
+**2. Buscar email salvo do CRM automaticamente**
 
-**1. Adicionar logging detalhado na Edge Function** para capturar o payload exato enviado ao Mercado Pago e confirmar qual access token esta sendo usado (prefixo TEST ou APP_USR).
+No `PaymentStep`, ao detectar que o metodo selecionado e online, fazer query na tabela `customers` pelo CPF + restaurant_id para puxar o email salvo. Se existir, preencher automaticamente.
 
-**2. Verificar no banco** se AMBAS as credenciais (`mp_access_token` E `mp_public_key`) na tabela `online_payment_config` comecam com `TEST-`. Se apenas uma foi trocada, esse e o problema.
+**3. Salvar email no CRM ao prosseguir**
 
-### Plano de Implementacao
+Quando o usuario preencher o email e clicar em continuar, atualizar a tabela `customers` com o email informado (upsert por CPF + restaurant_id). Proxima vez que o mesmo CPF logar, o email ja estara la.
 
-1. **Editar `supabase/functions/mercadopago-charge/index.ts`**: Adicionar um `console.log` antes da chamada de pagamento que registre:
-   - O prefixo do access token sendo usado (primeiros 8 chars)
-   - O payload completo enviado ao MP (sem dados sensiveis)
-   - Isso permitira diagnosticar o erro exato nos logs
+**4. Propagar o email para o `OnlinePaymentStep`**
 
-2. **Nenhuma mudanca de codigo no frontend** — o problema e de configuracao ou de dados de teste.
+O `PaymentStep` ja passa dados via `onContinue(data)`. Adicionar `customerEmail` ao objeto `data`. O `CheckoutDrawer` repassa esse email para o `OnlinePaymentStep`.
+
+**5. Corrigir email para sandbox na Edge Function**
+
+Adicionar deteccao de sandbox (`TEST-` prefix) no `mercadopago-charge` para substituir o email por `test_user_{timestamp}@testuser.com` automaticamente, resolvendo o erro 500.
+
+### Arquivos a Editar
+
+1. **`src/components/menu/checkout/PaymentStep.tsx`** — Adicionar state `customerEmail`, buscar do CRM por CPF, exibir campo quando metodo online selecionado, salvar no CRM ao continuar, incluir no `onContinue(data)`
+2. **`src/components/menu/CheckoutDrawer.tsx`** — Ler `customerEmail` do `paymentData` e passar para `OnlinePaymentStep`
+3. **`supabase/functions/mercadopago-charge/index.ts`** — Adicionar `safePayer` helper com deteccao de sandbox em todos os fluxos (PIX, cartao novo, cartao salvo)
+
+### Nao Sera Alterado
+
+- Tabela `customers` (ja tem coluna `email`)
+- `OnlinePaymentStep` (ja recebe `customerEmail` como prop)
+- Fluxo de login/identificacao do cliente (CPF + nome continuam iguais)
 
