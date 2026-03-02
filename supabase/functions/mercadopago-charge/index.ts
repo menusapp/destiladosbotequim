@@ -89,9 +89,14 @@ Deno.serve(async (req) => {
     const mpAccessToken = config.mp_access_token;
     const webhookUrl = `${supabaseUrl}/functions/v1/mercadopago-webhook`;
 
-    // Diagnostic logging
-    console.log("[MP Charge] Token prefix:", mpAccessToken.substring(0, 10));
-    console.log("[MP Charge] Public key prefix:", config.mp_public_key?.substring(0, 10));
+    // Sandbox detection + safe email helper
+    const isSandbox = mpAccessToken.startsWith("TEST-");
+    const safePayer = (email: string | undefined) => {
+      if (isSandbox) return `test_user_${Date.now()}@testuser.com`;
+      return (email && email.trim()) ? email.trim() : `cliente-${Date.now()}@pedido.com`;
+    };
+
+    console.log("[MP Charge] Token prefix:", mpAccessToken.substring(0, 10), "isSandbox:", isSandbox);
     console.log("[MP Charge] billing_type:", billing_type, "amount:", roundedAmount);
 
     let mpResponse: Response;
@@ -111,7 +116,7 @@ Deno.serve(async (req) => {
           notification_url: webhookUrl,
           external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
           payer: {
-            email: (customer_email && customer_email.trim()) ? customer_email.trim() : `cliente-${Date.now()}@pedido.com`,
+            email: safePayer(customer_email),
             first_name: customer_name || "Cliente",
             identification: customer_cpf
               ? { type: "CPF", number: customer_cpf.replace(/\D/g, "") }
@@ -174,7 +179,7 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else if (billing_type === "CREDIT_CARD") {
-      const safeEmail = (customer_email && customer_email.trim()) ? customer_email.trim() : `cliente-${Date.now()}@pedido.com`;
+      const safeEmail = safePayer(customer_email);
 
       // Handle saved card payment
       if (action === "pay_with_saved_card" && saved_card_id) {
@@ -381,7 +386,7 @@ Deno.serve(async (req) => {
         try {
           // Create or find MP customer
           const cleanCpf = customer_cpf.replace(/\D/g, "");
-          const safeEmail = (customer_email && customer_email.trim()) ? customer_email.trim() : `cliente-${Date.now()}@pedido.com`;
+          const safeEmail = safePayer(customer_email);
           
           // Search existing customer
           let mpCustomerId: string | null = null;
