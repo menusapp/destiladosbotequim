@@ -57,6 +57,7 @@ interface CheckoutDrawerProps {
   restaurantSlug?: string;
   onAddRewardItem?: (item: CartItem) => void;
   customerCPF?: string;
+  onSuggestionClick?: (product: any) => void;
 }
 
 const primaryColorFromRestaurant = (restaurant: any) => restaurant?.primary_color || "#fe9516";
@@ -72,6 +73,7 @@ export const CheckoutDrawer = ({
   restaurantSlug,
   onAddRewardItem,
   customerCPF: customerCPFProp,
+  onSuggestionClick,
 }: CheckoutDrawerProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>("cart");
@@ -558,6 +560,7 @@ export const CheckoutDrawer = ({
             onRedeemDiscount={handleRedeemDiscount}
             activeRewardDiscount={activeRewardDiscount}
             onClearRewardDiscount={handleClearRewardDiscount}
+            onSuggestionClick={onSuggestionClick}
           />
         );
       case "delivery-type":

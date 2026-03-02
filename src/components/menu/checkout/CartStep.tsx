@@ -42,6 +42,7 @@ interface CartStepProps {
   onRedeemDiscount?: (discount: DiscountReward) => void;
   activeRewardDiscount?: DiscountReward | null;
   onClearRewardDiscount?: () => void;
+  onSuggestionClick?: (product: any) => void;
 }
 
 export const CartStep = ({
@@ -62,6 +63,7 @@ export const CartStep = ({
   onRedeemDiscount,
   activeRewardDiscount,
   onClearRewardDiscount,
+  onSuggestionClick,
 }: CartStepProps) => {
   const couponInputRef = useRef<CouponInputRef>(null);
 
@@ -253,6 +255,7 @@ export const CartStep = ({
         restaurantId={restaurant.id}
         excludeIds={cart.map((item) => item.product.id)}
         primaryColor={restaurant.primary_color}
+        onProductClick={onSuggestionClick}
       />
 
       {/* Coupon */}
