@@ -1,34 +1,29 @@
 
 
-## Diagnóstico: Pagamentos em Produção em vez de Sandbox
+## Diagnostico: `internal_error` 500 do Mercado Pago com credenciais TEST
 
-### Causa Raiz Confirmada
+### Causa Provavel
 
-As credenciais armazenadas no banco de dados sao de **PRODUCAO**, nao de teste:
+O erro `internal_error` com status 500 da API do Mercado Pago em modo teste acontece por uma razao principal:
 
-- `mp_access_token`: `APP_USR-1390445...` (prefixo `APP_USR` = producao)
-- `mp_public_key`: `APP_USR-4393506a...` (prefixo `APP_USR` = producao)
+**Mismatch de credenciais entre frontend e backend.** O `card_token` e gerado no frontend usando a `mp_public_key` da tabela `online_payment_config`. O pagamento e processado no backend usando o `mp_access_token` da mesma tabela. **Ambas precisam ser do mesmo ambiente (TEST ou PRODUCAO).**
 
-Credenciais de teste do Mercado Pago sempre comecam com `TEST-`:
-- Access Token de teste: `TEST-1390445...`
-- Public Key de teste: `TEST-4393506a...`
+Se voce atualizou apenas o `mp_access_token` para TEST mas a `mp_public_key` ainda esta como `APP_USR-...` (producao), ou vice-versa, o token do cartao gerado em um ambiente nao e valido no outro — e o Mercado Pago retorna `internal_error` 500.
 
-Os logs do webhook confirmam: `"live_mode":true` em todos os pagamentos recentes.
+Alem disso, em modo teste do Mercado Pago, voce deve usar **contas de teste** (test users) e os **cartoes de teste oficiais** com dados especificos (nome, CPF de teste, etc).
 
-### Por que os pagamentos sao recusados
+### Acoes Necessarias
 
-Com credenciais de producao, o Mercado Pago aplica validacao antifraude real. Cartoes de teste (como `5031 4332 1540 6351`) sao rejeitados imediatamente porque nao sao cartoes reais.
+**1. Adicionar logging detalhado na Edge Function** para capturar o payload exato enviado ao Mercado Pago e confirmar qual access token esta sendo usado (prefixo TEST ou APP_USR).
 
-### Correcao Necessaria
+**2. Verificar no banco** se AMBAS as credenciais (`mp_access_token` E `mp_public_key`) na tabela `online_payment_config` comecam com `TEST-`. Se apenas uma foi trocada, esse e o problema.
 
-**Nenhuma alteracao de codigo e necessaria.** O problema e exclusivamente de configuracao no banco de dados.
+### Plano de Implementacao
 
-Voce precisa atualizar as credenciais na tabela `online_payment_config` para usar os valores de teste. No painel administrativo do seu app (Configuracoes > Pagamentos Online), substitua:
+1. **Editar `supabase/functions/mercadopago-charge/index.ts`**: Adicionar um `console.log` antes da chamada de pagamento que registre:
+   - O prefixo do access token sendo usado (primeiros 8 chars)
+   - O payload completo enviado ao MP (sem dados sensiveis)
+   - Isso permitira diagnosticar o erro exato nos logs
 
-1. **Access Token**: Troque `APP_USR-1390445...` por `TEST-1390445596449726-030212-...-1505979876` (pegue o valor exato no painel do Mercado Pago em Credenciais de Teste)
-2. **Public Key**: Troque `APP_USR-4393506a...` por `TEST-4393506a-...` (mesmo local)
-
-Ambos os valores estao disponiveis em: **Mercado Pago > Suas Integracoes > [Seu App] > Credenciais de Teste**
-
-Quer que eu atualize diretamente no banco de dados se voce me fornecer as credenciais TEST corretas?
+2. **Nenhuma mudanca de codigo no frontend** — o problema e de configuracao ou de dados de teste.
 
