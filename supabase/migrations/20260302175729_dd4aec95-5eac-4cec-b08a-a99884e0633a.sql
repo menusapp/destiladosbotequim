@@ -1,0 +1,1 @@
+UPDATE online_payment_config SET mp_sandbox_payer_email = 'test_user_670140404644143527@testuser.com' WHERE id = 'c56833d5-a334-48f4-a013-7a4648dad929';
