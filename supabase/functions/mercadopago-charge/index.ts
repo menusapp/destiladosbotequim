@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     // Fetch restaurant's MP access token
     const { data: config, error: configError } = await supabase
       .from("online_payment_config")
-      .select("mp_access_token, mp_public_key")
+      .select("mp_access_token, mp_public_key, mp_sandbox_payer_email")
       .eq("restaurant_id", restaurant_id)
       .maybeSingle();
 
@@ -89,35 +89,21 @@ Deno.serve(async (req) => {
     const mpAccessToken = config.mp_access_token;
     const webhookUrl = `${supabaseUrl}/functions/v1/mercadopago-webhook`;
 
-    // Sandbox detection + safe email helper
+    // Sandbox detection + safe email
     const isSandbox = mpAccessToken.startsWith("TEST-");
-    const getSafePayerEmail = async (email: string | undefined): Promise<string> => {
-      if (!isSandbox) {
-        return (email && email.trim()) ? email.trim() : `cliente-${Date.now()}@pedido.com`;
+    let safePayerEmail: string;
+    if (isSandbox) {
+      if (config.mp_sandbox_payer_email && config.mp_sandbox_payer_email.trim()) {
+        safePayerEmail = config.mp_sandbox_payer_email.trim();
+      } else {
+        return new Response(
+          JSON.stringify({ success: false, error: "Email de teste (sandbox) não configurado. Vá em Configurações > Pagamentos Online e preencha o campo 'Email de teste'." }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
-      // In sandbox, create a real MP test user to get a valid email
-      try {
-        const res = await fetch("https://api.mercadopago.com/users/test_user", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${mpAccessToken}`,
-          },
-          body: JSON.stringify({ site_id: "MLB" }),
-        });
-        const data = await res.json();
-        if (res.ok && data.email) {
-          console.log("[MP Charge] Created sandbox test user:", data.email);
-          return data.email;
-        }
-        console.warn("[MP Charge] Failed to create test user:", JSON.stringify(data));
-      } catch (e) {
-        console.warn("[MP Charge] Test user creation error:", e);
-      }
-      return `test_user_${Date.now()}@testuser.com`;
-    };
-    // Pre-resolve the payer email once for this request
-    const safePayerEmail = await getSafePayerEmail(customer_email);
+    } else {
+      safePayerEmail = (customer_email && customer_email.trim()) ? customer_email.trim() : `cliente-${Date.now()}@pedido.com`;
+    }
 
     console.log("[MP Charge] Token prefix:", mpAccessToken.substring(0, 10), "isSandbox:", isSandbox);
     console.log("[MP Charge] billing_type:", billing_type, "amount:", roundedAmount);
@@ -409,7 +395,7 @@ Deno.serve(async (req) => {
         try {
           // Create or find MP customer
           const cleanCpf = customer_cpf.replace(/\D/g, "");
-          const safeEmail = safePayer(customer_email);
+          const safeEmail = safePayerEmail;
           
           // Search existing customer
           let mpCustomerId: string | null = null;

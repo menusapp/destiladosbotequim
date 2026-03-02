@@ -1724,6 +1724,7 @@ export type Database = {
           mp_access_token: string | null
           mp_public_key: string | null
           mp_refresh_token: string | null
+          mp_sandbox_payer_email: string | null
           mp_user_id: string | null
           provider: string | null
           require_prepayment: boolean | null
@@ -1742,6 +1743,7 @@ export type Database = {
           mp_access_token?: string | null
           mp_public_key?: string | null
           mp_refresh_token?: string | null
+          mp_sandbox_payer_email?: string | null
           mp_user_id?: string | null
           provider?: string | null
           require_prepayment?: boolean | null
@@ -1760,6 +1762,7 @@ export type Database = {
           mp_access_token?: string | null
           mp_public_key?: string | null
           mp_refresh_token?: string | null
+          mp_sandbox_payer_email?: string | null
           mp_user_id?: string | null
           provider?: string | null
           require_prepayment?: boolean | null

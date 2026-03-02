@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ interface PaymentConfig {
   connection_status: string;
   mp_access_token: string | null;
   mp_public_key: string | null;
+  mp_sandbox_payer_email: string | null;
   connected_at: string | null;
 }
 
@@ -41,6 +43,8 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
   const [savingToggles, setSavingToggles] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [startingOAuth, setStartingOAuth] = useState(false);
+  const [sandboxEmail, setSandboxEmail] = useState("");
+  const [savingSandboxEmail, setSavingSandboxEmail] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -59,6 +63,7 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
       if (data && data.mp_access_token && data.connection_status === "connected") {
         setConfig(data as unknown as PaymentConfig);
         setViewState("connected");
+        setSandboxEmail(data.mp_sandbox_payer_email || "");
       } else if (data) {
         setConfig(data as unknown as PaymentConfig);
         setViewState("not_connected");
@@ -136,6 +141,25 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
       toast.error("Erro ao atualizar configuração");
     } finally {
       setSavingToggles(false);
+    }
+  };
+
+  const handleSaveSandboxEmail = async () => {
+    if (!config) return;
+    setSavingSandboxEmail(true);
+    try {
+      const { error } = await supabase
+        .from("online_payment_config")
+        .update({ mp_sandbox_payer_email: sandboxEmail.trim() || null } as any)
+        .eq("restaurant_id", restaurantId);
+      if (error) throw error;
+      setConfig({ ...config, mp_sandbox_payer_email: sandboxEmail.trim() || null });
+      toast.success("Email de teste salvo!");
+    } catch (error) {
+      console.error("Error saving sandbox email:", error);
+      toast.error("Erro ao salvar email de teste");
+    } finally {
+      setSavingSandboxEmail(false);
     }
   };
 
@@ -285,6 +309,41 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
                 disabled={savingToggles}
               />
             </div>
+
+            {config.mp_access_token?.startsWith("TEST-") && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <div>
+                    <Label className="font-medium">Email de teste (Sandbox)</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Informe o email de um Test User válido do Mercado Pago. 
+                      Crie em <a href="https://www.mercadopago.com.br/developers/pt/docs/your-integrations/test/accounts" target="_blank" rel="noopener noreferrer" className="underline text-primary">Contas de teste</a>.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="test_user_123456@testuser.com"
+                      value={sandboxEmail}
+                      onChange={(e) => setSandboxEmail(e.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSaveSandboxEmail}
+                      disabled={savingSandboxEmail}
+                    >
+                      {savingSandboxEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                    </Button>
+                  </div>
+                  {!sandboxEmail.trim() && (
+                    <p className="text-sm text-destructive">
+                      ⚠️ Sem este email, pagamentos em modo teste serão rejeitados.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             <Separator />
 
