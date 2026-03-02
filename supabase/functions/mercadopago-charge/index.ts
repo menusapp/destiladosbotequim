@@ -91,10 +91,33 @@ Deno.serve(async (req) => {
 
     // Sandbox detection + safe email helper
     const isSandbox = mpAccessToken.startsWith("TEST-");
-    const safePayer = (email: string | undefined) => {
-      if (isSandbox) return `test_user_${Date.now()}@testuser.com`;
-      return (email && email.trim()) ? email.trim() : `cliente-${Date.now()}@pedido.com`;
+    const getSafePayerEmail = async (email: string | undefined): Promise<string> => {
+      if (!isSandbox) {
+        return (email && email.trim()) ? email.trim() : `cliente-${Date.now()}@pedido.com`;
+      }
+      // In sandbox, create a real MP test user to get a valid email
+      try {
+        const res = await fetch("https://api.mercadopago.com/users/test_user", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${mpAccessToken}`,
+          },
+          body: JSON.stringify({ site_id: "MLB" }),
+        });
+        const data = await res.json();
+        if (res.ok && data.email) {
+          console.log("[MP Charge] Created sandbox test user:", data.email);
+          return data.email;
+        }
+        console.warn("[MP Charge] Failed to create test user:", JSON.stringify(data));
+      } catch (e) {
+        console.warn("[MP Charge] Test user creation error:", e);
+      }
+      return `test_user_${Date.now()}@testuser.com`;
     };
+    // Pre-resolve the payer email once for this request
+    const safePayerEmail = await getSafePayerEmail(customer_email);
 
     console.log("[MP Charge] Token prefix:", mpAccessToken.substring(0, 10), "isSandbox:", isSandbox);
     console.log("[MP Charge] billing_type:", billing_type, "amount:", roundedAmount);
@@ -116,7 +139,7 @@ Deno.serve(async (req) => {
           notification_url: webhookUrl,
           external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
           payer: {
-            email: safePayer(customer_email),
+            email: safePayerEmail,
             first_name: customer_name || "Cliente",
             identification: customer_cpf
               ? { type: "CPF", number: customer_cpf.replace(/\D/g, "") }
@@ -179,7 +202,7 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else if (billing_type === "CREDIT_CARD") {
-      const safeEmail = safePayer(customer_email);
+      const safeEmail = safePayerEmail;
 
       // Handle saved card payment
       if (action === "pay_with_saved_card" && saved_card_id) {
