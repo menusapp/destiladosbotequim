@@ -1,44 +1,25 @@
 
 
-## Plano: Email obrigatorio para pagamento online + salvar no CRM
+## Diagnóstico: "Payer email forbidden" (403, código 4390)
 
-### Situacao Atual
+### Causa Raiz
 
-- A tabela `customers` ja tem coluna `email` (nullable).
-- O `customerEmail` no checkout vem de `sessionStorage.getItem("customer_email")` — que quase nunca esta preenchido.
-- A Edge Function `mercadopago-charge` recebe `customer_email` e usa fallback `cliente-{timestamp}@pedido.com` quando vazio — que causa erro 500 no sandbox.
+O erro mudou de `internal_error` (500) para `Payer email forbidden` (403). Isso confirma que o MP agora está validando o email corretamente, mas **rejeita emails `@testuser.com` inventados**. 
 
-### O Que Sera Feito
+No sandbox do Mercado Pago, o email do pagador precisa ser de um **Test User real** criado via API do MP — não basta o domínio `@testuser.com`, o email precisa existir como usuário de teste registrado.
 
-**1. Adicionar campo de email obrigatorio no `PaymentStep` quando o usuario selecionar pagamento online**
+### Solução
 
-Quando o cliente selecionar PIX Online ou Cartao Online, antes de prosseguir, exibir um campo de email obrigatorio. O campo sera pre-preenchido se o cliente ja tiver email salvo no CRM (buscado via CPF). Validacao: formato de email valido + nao vazio.
+Modificar a Edge Function `mercadopago-charge` para, quando em modo sandbox, **criar automaticamente um Test User via API do MP** (`POST /users/test_user`) e usar o email retornado como payer. O test user criado é cacheado no próprio request.
 
-**2. Buscar email salvo do CRM automaticamente**
+### Arquivo a editar
 
-No `PaymentStep`, ao detectar que o metodo selecionado e online, fazer query na tabela `customers` pelo CPF + restaurant_id para puxar o email salvo. Se existir, preencher automaticamente.
+**`supabase/functions/mercadopago-charge/index.ts`** — Substituir o `safePayer` atual por uma função async que:
 
-**3. Salvar email no CRM ao prosseguir**
+1. Se `isSandbox`, faz `POST https://api.mercadopago.com/users/test_user` com `{ site_id: "MLB" }` usando o `mpAccessToken`
+2. Retorna o `email` do test user criado pela API
+3. Se a criação falhar, usa fallback `test_user_{timestamp}@testuser.com` (tentativa)
+4. Em produção, mantém comportamento atual (email real ou fallback `@pedido.com`)
 
-Quando o usuario preencher o email e clicar em continuar, atualizar a tabela `customers` com o email informado (upsert por CPF + restaurant_id). Proxima vez que o mesmo CPF logar, o email ja estara la.
-
-**4. Propagar o email para o `OnlinePaymentStep`**
-
-O `PaymentStep` ja passa dados via `onContinue(data)`. Adicionar `customerEmail` ao objeto `data`. O `CheckoutDrawer` repassa esse email para o `OnlinePaymentStep`.
-
-**5. Corrigir email para sandbox na Edge Function**
-
-Adicionar deteccao de sandbox (`TEST-` prefix) no `mercadopago-charge` para substituir o email por `test_user_{timestamp}@testuser.com` automaticamente, resolvendo o erro 500.
-
-### Arquivos a Editar
-
-1. **`src/components/menu/checkout/PaymentStep.tsx`** — Adicionar state `customerEmail`, buscar do CRM por CPF, exibir campo quando metodo online selecionado, salvar no CRM ao continuar, incluir no `onContinue(data)`
-2. **`src/components/menu/CheckoutDrawer.tsx`** — Ler `customerEmail` do `paymentData` e passar para `OnlinePaymentStep`
-3. **`supabase/functions/mercadopago-charge/index.ts`** — Adicionar `safePayer` helper com deteccao de sandbox em todos os fluxos (PIX, cartao novo, cartao salvo)
-
-### Nao Sera Alterado
-
-- Tabela `customers` (ja tem coluna `email`)
-- `OnlinePaymentStep` (ja recebe `customerEmail` como prop)
-- Fluxo de login/identificacao do cliente (CPF + nome continuam iguais)
+Essa é a forma oficial do MP para gerar pagadores válidos no sandbox — cada chamada cria um test user efêmero cujo email é aceito pela API.
 
