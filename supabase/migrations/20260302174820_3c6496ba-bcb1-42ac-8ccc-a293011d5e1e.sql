@@ -1,0 +1,1 @@
+ALTER TABLE public.online_payment_config ADD COLUMN IF NOT EXISTS mp_sandbox_payer_email text DEFAULT NULL;
