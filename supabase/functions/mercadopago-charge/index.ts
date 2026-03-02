@@ -89,6 +89,11 @@ Deno.serve(async (req) => {
     const mpAccessToken = config.mp_access_token;
     const webhookUrl = `${supabaseUrl}/functions/v1/mercadopago-webhook`;
 
+    // Diagnostic logging
+    console.log("[MP Charge] Token prefix:", mpAccessToken.substring(0, 10));
+    console.log("[MP Charge] Public key prefix:", config.mp_public_key?.substring(0, 10));
+    console.log("[MP Charge] billing_type:", billing_type, "amount:", roundedAmount);
+
     let mpResponse: Response;
     let mpData: any;
 
@@ -300,6 +305,27 @@ Deno.serve(async (req) => {
         });
       } else {
         // New card payment
+        // Log new card payment payload for diagnostics
+        const newCardPayload = {
+          transaction_amount: roundedAmount,
+          token: card_token,
+          payment_method_id: payment_method_id,
+          issuer_id: issuer_id ? Number(issuer_id) : undefined,
+          installments: installments || 1,
+          notification_url: webhookUrl,
+          external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
+          payer: {
+            email: safeEmail,
+            first_name: customer_name || "Cliente",
+            identification: customer_cpf
+              ? { type: "CPF", number: customer_cpf.replace(/\D/g, "") }
+              : undefined,
+          },
+          description: `Pedido ${order_id || "delivery"}`,
+          additional_info: { items: mpItems },
+        };
+        console.log("[MP Charge] New card payload:", JSON.stringify(newCardPayload));
+
         mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
           method: "POST",
           headers: {
