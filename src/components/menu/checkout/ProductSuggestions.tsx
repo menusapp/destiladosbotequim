@@ -7,12 +7,14 @@ interface ProductSuggestionsProps {
   restaurantId: string;
   excludeIds: string[];
   primaryColor: string;
+  onProductClick?: (product: Product) => void;
 }
 
 export const ProductSuggestions = ({
   restaurantId,
   excludeIds,
   primaryColor,
+  onProductClick,
 }: ProductSuggestionsProps) => {
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -51,6 +53,7 @@ export const ProductSuggestions = ({
           <Card
             key={product.id}
             className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => onProductClick?.(product)}
           >
             <CardContent className="p-2">
               <div className="aspect-square bg-muted rounded-lg mb-2 overflow-hidden">

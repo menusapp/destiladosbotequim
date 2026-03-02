@@ -473,6 +473,10 @@ export default function DeliveryMenu() {
             restaurantSlug={restaurantSlug}
             onAddRewardItem={(item) => setCart(prev => [...prev, item])}
             customerCPF={customerCPF}
+            onSuggestionClick={(product) => {
+              setCheckoutOpen(false);
+              handleProductClick(product);
+            }}
           />
 
           <CustomerInfoDialog
