@@ -322,8 +322,9 @@ export const OnlinePaymentStep = ({
         }
       } catch (error: any) {
         console.error("[OnlinePayment] Saved card error:", error);
-        setErrorMessage(error.message || "Erro ao processar pagamento");
-        toast.error("Erro ao processar pagamento");
+        const msg = error?.context?.body ? (typeof error.context.body === 'string' ? error.context.body : JSON.stringify(error.context.body)) : (error.message || "Erro ao processar pagamento");
+        setErrorMessage(msg);
+        toast.error(msg);
       } finally {
         setProcessing(false);
       }
@@ -428,8 +429,9 @@ export const OnlinePaymentStep = ({
       }
     } catch (error: any) {
       console.error("[OnlinePayment] Credit card error:", error);
-      setErrorMessage(error.message || "Erro ao processar pagamento");
-      toast.error("Erro ao processar pagamento");
+      const msg = error?.context?.body ? (typeof error.context.body === 'string' ? error.context.body : JSON.stringify(error.context.body)) : (error.message || "Erro ao processar pagamento");
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setProcessing(false);
     }
