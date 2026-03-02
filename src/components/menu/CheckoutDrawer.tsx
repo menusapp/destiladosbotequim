@@ -693,7 +693,7 @@ export const CheckoutDrawer = ({
             customerName={customerData?.name || sessionStorage.getItem("customer_name") || ""}
             customerCPF={customerData?.cpf || sessionStorage.getItem("customer_cpf") || ""}
             customerPhone={customerData?.phone || sessionStorage.getItem("customer_phone") || ""}
-            customerEmail={sessionStorage.getItem("customer_email") || ""}
+            customerEmail={paymentData?.customerEmail || sessionStorage.getItem("customer_email") || ""}
             primaryColor={primaryColorFromRestaurant(restaurant)}
             cartItems={cart.filter(i => !i.isRewardItem && !i.isCouponFreeItem).map(i => ({
               id: i.product.id,

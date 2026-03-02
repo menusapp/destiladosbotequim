@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Banknote, CreditCard, Smartphone, Utensils, ChevronDown, ChevronUp, QrCode, Globe } from "lucide-react";
+import { Banknote, CreditCard, Smartphone, Utensils, ChevronDown, ChevronUp, QrCode, Globe, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -93,6 +93,8 @@ export const PaymentStep = ({
   const [availableMethods, setAvailableMethods] = useState<{ value: string; label: string; icon: any; brands: string[] }[]>(DEFAULT_METHODS);
   const [loading, setLoading] = useState(true);
   const [onlineConfig, setOnlineConfig] = useState<OnlinePaymentConfig | null>(null);
+  const [customerEmail, setCustomerEmail] = useState(emailProp || "");
+  const [emailFetched, setEmailFetched] = useState(false);
 
   const getBrandInfo = (brandCode: string) => {
     const allBrands = [...CARD_BRANDS, ...MEAL_VOUCHER_BRANDS];
@@ -191,6 +193,10 @@ export const PaymentStep = ({
 
     // Check if online method selected
     if (paymentMethod === "pix_online" || paymentMethod === "credit_card_online") {
+      if (!customerEmail || !isValidEmail(customerEmail)) {
+        toast.error("Informe um email válido para pagamento online");
+        return;
+      }
       if (requireCustomerInfo) {
         if (!customerName || !customerCPF) {
           toast.error("Preencha todos os dados");
@@ -201,11 +207,24 @@ export const PaymentStep = ({
         sessionStorage.setItem("customer_phone", customerPhone);
       }
 
+      // Save email to sessionStorage and CRM
+      sessionStorage.setItem("customer_email", customerEmail);
+      const cpf = customerCPF || cpfProp || sessionStorage.getItem("customer_cpf") || "";
+      if (cpf && restaurantId) {
+        supabase
+          .from("customers")
+          .update({ email: customerEmail })
+          .eq("cpf", cpf.replace(/\D/g, ""))
+          .eq("restaurant_id", restaurantId)
+          .then(() => console.log("[PaymentStep] Email saved to CRM"));
+      }
+
       onContinue({
         type: "delivery",
         method: paymentMethod,
         isOnlinePayment: true,
         onlineMethod: paymentMethod === "pix_online" ? "pix" : "credit_card",
+        customerEmail,
       });
       return;
     }
@@ -248,6 +267,31 @@ export const PaymentStep = ({
     });
   };
 
+  const isOnlineMethod = paymentMethod === "pix_online" || paymentMethod === "credit_card_online";
+  const showOnlineSection = onlineConfig && (onlineConfig.accept_pix || onlineConfig.accept_card);
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  // Fetch email from CRM when online method is selected
+  useEffect(() => {
+    if (!isOnlineMethod || emailFetched || !restaurantId) return;
+    const cpf = customerCPF || cpfProp || sessionStorage.getItem("customer_cpf") || "";
+    if (!cpf) return;
+
+    const fetchEmail = async () => {
+      const { data } = await supabase
+        .from("customers")
+        .select("email")
+        .eq("cpf", cpf.replace(/\D/g, ""))
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
+      if (data?.email && !customerEmail) {
+        setCustomerEmail(data.email);
+      }
+      setEmailFetched(true);
+    };
+    fetchEmail();
+  }, [isOnlineMethod, emailFetched, restaurantId, customerCPF, cpfProp, customerEmail]);
+
   if (loading) {
     return (
       <div className="p-4 flex items-center justify-center min-h-[200px]">
@@ -255,9 +299,6 @@ export const PaymentStep = ({
       </div>
     );
   }
-
-  const isOnlineMethod = paymentMethod === "pix_online" || paymentMethod === "credit_card_online";
-  const showOnlineSection = onlineConfig && (onlineConfig.accept_pix || onlineConfig.accept_card);
 
   return (
     <div className="p-4 space-y-6">
@@ -374,6 +415,27 @@ export const PaymentStep = ({
               onChange={(e) => setChangeFor(e.target.value)}
               placeholder="Ex: 50.00"
             />
+          </div>
+        )}
+
+        {/* Email field for online payment */}
+        {isOnlineMethod && (
+          <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-2">
+            <Label htmlFor="customerEmail" className="flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              Email para pagamento <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="customerEmail"
+              type="email"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              placeholder="seu@email.com"
+              className={customerEmail && !isValidEmail(customerEmail) ? "border-red-500" : ""}
+            />
+            <p className="text-xs text-muted-foreground">
+              Necessário para processar o pagamento online
+            </p>
           </div>
         )}
 
