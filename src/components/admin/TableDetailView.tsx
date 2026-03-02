@@ -18,9 +18,6 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  FileText,
-  Download,
-  FileCode
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -75,8 +72,6 @@ export const TableDetailView = () => {
   const [loading, setLoading] = useState(true);
   const [restaurantId, setRestaurantId] = useState<string>("");
   const [expandedComandas, setExpandedComandas] = useState<Set<string>>(new Set());
-  const [fiscalNotes, setFiscalNotes] = useState<Record<string, { status: string; pdf_url?: string | null; xml_url?: string | null }>>({});
-  const [emittingNotes, setEmittingNotes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (tableId) {
@@ -195,19 +190,6 @@ export const TableDetailView = () => {
 
       setComandas(comandasWithDetails);
 
-      // Fetch fiscal notes for all orders
-      const allOrderIds = filteredOrders.map(o => o.id);
-      if (allOrderIds.length > 0) {
-        const { data: notesData } = await supabase
-          .from("order_fiscal_notes")
-          .select("order_id, status, pdf_url, xml_url")
-          .in("order_id", allOrderIds);
-        if (notesData) {
-          const notesMap: Record<string, { status: string; pdf_url?: string | null; xml_url?: string | null }> = {};
-          notesData.forEach(n => { notesMap[n.order_id] = n; });
-          setFiscalNotes(notesMap);
-        }
-      }
     } catch (error) {
       console.error("Erro ao buscar dados da mesa:", error);
       toast.error("Erro ao carregar dados da mesa");
@@ -279,22 +261,8 @@ export const TableDetailView = () => {
     }
   };
 
-  const handleEmitNFCe = async (orderId: string) => {
-    setEmittingNotes(prev => new Set(prev).add(orderId));
-    try {
-      const { error } = await supabase
-        .from("order_fiscal_notes")
-        .insert({ restaurant_id: restaurantId, order_id: orderId, status: "pending" });
-      if (error) throw error;
-      setFiscalNotes(prev => ({ ...prev, [orderId]: { status: "pending" } }));
-      toast.success("Nota fiscal criada como pendente.");
-    } catch (err) {
-      console.error("Erro ao criar nota fiscal:", err);
-      toast.error("Erro ao criar nota fiscal");
-    } finally {
-      setEmittingNotes(prev => { const s = new Set(prev); s.delete(orderId); return s; });
-    }
-  };
+
+
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
@@ -582,33 +550,6 @@ export const TableDetailView = () => {
                         <Trash2 className="w-4 h-4" />
                       </Button>
 
-                      {/* NFC-e Buttons */}
-                      {order.status === "delivered" && !fiscalNotes[order.id] && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEmitNFCe(order.id)}
-                          disabled={emittingNotes.has(order.id)}
-                        >
-                          <FileText className="w-4 h-4 mr-1" />
-                          {emittingNotes.has(order.id) ? "Emitindo..." : "Emitir NFC-e"}
-                        </Button>
-                      )}
-                      {fiscalNotes[order.id]?.status === "authorized" && fiscalNotes[order.id]?.pdf_url && (
-                        <Button size="sm" variant="outline" onClick={() => window.open(fiscalNotes[order.id].pdf_url!, "_blank")}>
-                          <Download className="w-4 h-4 mr-1" /> Nota
-                        </Button>
-                      )}
-                      {fiscalNotes[order.id]?.status === "authorized" && fiscalNotes[order.id]?.xml_url && (
-                        <Button size="sm" variant="outline" onClick={() => window.open(fiscalNotes[order.id].xml_url!, "_blank")}>
-                          <FileCode className="w-4 h-4 mr-1" /> XML
-                        </Button>
-                      )}
-                      {fiscalNotes[order.id]?.status === "pending" && (
-                        <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 self-center text-xs">
-                          <Clock className="w-3 h-3 mr-1" /> NFC-e Pendente
-                        </Badge>
-                      )}
                     </div>
                   </div>
                 ))}

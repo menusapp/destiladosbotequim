@@ -7,8 +7,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive } from "lucide-react";
+import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Plus } from "lucide-react";
 import { format } from "date-fns";
+import NovaEmissaoModal from "./NovaEmissaoModal";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 
@@ -37,6 +38,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   const [notes, setNotes] = useState<FiscalNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showEmissaoModal, setShowEmissaoModal] = useState(false);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
     const today = new Date();
     const from = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -118,12 +120,18 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <FileText className="h-6 w-6 text-primary" />
-        <div>
-          <h2 className="text-2xl font-bold">Central de Notas Fiscais</h2>
-          <p className="text-sm text-muted-foreground">Gerencie todas as NFC-e emitidas pelo sistema</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <FileText className="h-6 w-6 text-primary" />
+          <div>
+            <h2 className="text-2xl font-bold">Central de Notas Fiscais</h2>
+            <p className="text-sm text-muted-foreground">Gerencie todas as NFC-e emitidas pelo sistema</p>
+          </div>
         </div>
+        <Button onClick={() => setShowEmissaoModal(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Nova Emissão
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -293,6 +301,13 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
           )}
         </CardContent>
       </Card>
+      {/* Modal Nova Emissão */}
+      <NovaEmissaoModal
+        open={showEmissaoModal}
+        onClose={() => setShowEmissaoModal(false)}
+        restaurantId={restaurantId}
+        onEmitted={fetchNotes}
+      />
     </div>
   );
 };
