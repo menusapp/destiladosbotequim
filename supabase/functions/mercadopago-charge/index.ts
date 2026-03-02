@@ -273,6 +273,7 @@ Deno.serve(async (req) => {
           notification_url: webhookUrl,
           external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
           payer: {
+            type: "customer",
             id: savedCard.mp_customer_id,
             email: safeEmail,
             first_name: customer_name || "Cliente",
@@ -285,7 +286,7 @@ Deno.serve(async (req) => {
         };
 
         if (resolvedIssuerId) {
-          savedCardPayload.issuer_id = resolvedIssuerId;
+          savedCardPayload.issuer_id = Number(resolvedIssuerId);
         }
 
         mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -310,7 +311,7 @@ Deno.serve(async (req) => {
             transaction_amount: roundedAmount,
             token: card_token,
             payment_method_id: payment_method_id,
-            issuer_id: issuer_id || undefined,
+            issuer_id: issuer_id ? Number(issuer_id) : undefined,
             installments: installments || 1,
             notification_url: webhookUrl,
             external_reference: order_id || `ref-${restaurant_id}-${Date.now()}`,
@@ -336,9 +337,13 @@ Deno.serve(async (req) => {
 
       if (!mpResponse.ok) {
         console.error("[MP Charge] Card error:", JSON.stringify(mpData));
+        console.error("[MP Charge] Card error status:", mpResponse.status);
         const detail = mpData.cause?.[0]?.description || mpData.message || "Erro ao processar cartão";
+        const friendlyMsg = detail === "internal_error" 
+          ? "Erro temporário no gateway de pagamento. Tente novamente em alguns instantes."
+          : detail;
         return new Response(
-          JSON.stringify({ success: false, error: detail, mp_status_detail: mpData.cause?.[0]?.code }),
+          JSON.stringify({ success: false, error: friendlyMsg, mp_status_detail: mpData.cause?.[0]?.code }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
