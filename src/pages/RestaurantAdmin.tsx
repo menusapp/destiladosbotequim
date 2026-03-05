@@ -660,6 +660,7 @@ const RestaurantAdmin = () => {
           hasNewOrders={hasNewOrders}
           hasNewBills={hasNewBills}
           hasNewDeliveryOrders={hasNewDeliveryOrders}
+          isSectionAllowed={isSectionAllowed}
         />
         <SidebarInset className="flex-1 flex flex-col">
           <AdminHeader
