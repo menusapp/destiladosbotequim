@@ -95,8 +95,9 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   };
 
   const isConfigActive = activeSection.startsWith("config-");
-
-  // Configurações agora fica no menu principal
+  const checkAllowed = (id: string) => !isSectionAllowed || isSectionAllowed(id);
+  const filteredMain = menuStructure.main.filter(item => checkAllowed(item.id));
+  const filteredConfig = menuStructure.configSubItems.filter(item => checkAllowed(item.id));
   const renderConfigMenu = () => (
     <SidebarMenuItem>
       <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
