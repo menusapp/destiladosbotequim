@@ -44,9 +44,10 @@ interface AppSidebarProps {
   hasNewOrders?: boolean;
   hasNewBills?: boolean;
   hasNewDeliveryOrders?: boolean;
+  isSectionAllowed?: (sectionId: string) => boolean;
 }
 
-export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders }: AppSidebarProps) {
+export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
