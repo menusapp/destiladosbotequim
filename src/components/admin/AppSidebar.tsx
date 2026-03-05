@@ -123,7 +123,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         </CollapsibleTrigger>
         {!collapsed && (
           <CollapsibleContent className="pl-4 space-y-1 mt-1">
-            {menuStructure.configSubItems.map((subItem) => (
+            {filteredConfig.map((subItem) => (
               <SidebarMenuButton
                 key={subItem.id}
                 onClick={() => onSectionChange(subItem.id)}
