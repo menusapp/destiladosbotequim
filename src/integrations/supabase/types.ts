@@ -2703,6 +2703,60 @@ export type Database = {
           },
         ]
       }
+      restaurant_subscriptions: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          last_payment_at: string | null
+          next_payment_at: string | null
+          plan_id: string
+          restaurant_id: string
+          started_at: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          last_payment_at?: string | null
+          next_payment_at?: string | null
+          plan_id: string
+          restaurant_id: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          last_payment_at?: string | null
+          next_payment_at?: string | null
+          plan_id?: string
+          restaurant_id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_subscriptions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restaurants: {
         Row: {
           auto_open_close: boolean | null
@@ -2944,6 +2998,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subscription_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          payment_date: string | null
+          reference_month: string
+          restaurant_id: string
+          status: string
+          subscription_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          payment_date?: string | null
+          reference_month: string
+          restaurant_id: string
+          status?: string
+          subscription_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          payment_date?: string | null
+          reference_month?: string
+          restaurant_id?: string
+          status?: string
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "restaurant_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          features: Json
+          id: string
+          is_active: boolean | null
+          name: string
+          price: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price?: number
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       tables: {
         Row: {
