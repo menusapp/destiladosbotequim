@@ -1,49 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plano: Login com seleção de papel (CEO/Dev) + melhorias nos painéis
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
-### 1. Tela de Login (`AdminPanel.tsx`)
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
-Redesenhar a tela `/admin-panel` para ter **duas etapas**:
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
 
-**Etapa 1 — Seleção de papel**: Dois botões grandes lado a lado:
-- "Login CEO" (icone Crown/Briefcase) — cor dourada/premium
-- "Login Dev" (icone Code/Terminal) — cor azul/tech
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
 
-**Etapa 2 — Formulário de credenciais**: Após clicar, mostra o formulário de email/senha com o título indicando qual papel foi escolhido. Botão "Voltar" para trocar.
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
 
-Na validação pós-login: verificar se o usuário realmente tem a role selecionada. Se não tiver, mostrar erro "Você não tem acesso como [CEO/Dev]".
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
 
-### 2. Painel CEO — Melhorias
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
 
-Expandir o dashboard com mais cards de resumo:
-- **Total de Restaurantes** (já existe)
-- **MRR (Receita Mensal)** — soma dos planos ativos de `restaurant_subscriptions` + `subscription_plans`
-- **Inadimplentes** — assinaturas com `status = 'suspended'` ou `expires_at < now()`
-- **Novos este mês** — restaurantes criados no mês atual
+Detalhes técnicos:
+```text
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
+```
 
-Na lista de restaurantes, adicionar colunas:
-- **Plano ativo** (buscar de `restaurant_subscriptions` + `subscription_plans`)
-- **Status da assinatura** (badge: ativo/suspenso/cancelado)
-- **Data de criação**
-
-### 3. Painel Dev — Melhorias
-
-Expandir com mais cards e tabs:
-- **Card: Versão Atual** — mostra a versão marcada como `is_current` da tabela `app_versions`
-- **Card: Total de Versões** — contagem de `app_versions`
-- **Tab: Configurações** — placeholder para futuras configurações remotas
-- Melhorar tab de Versões com badge visual para `is_current`
-
-### Componentes afetados
-
-| Arquivo | Mudança |
-|---|---|
-| `src/pages/AdminPanel.tsx` | Redesenhar com seleção CEO/Dev antes do form |
-| `src/pages/CEODashboard.tsx` | Adicionar cards MRR, inadimplentes, novos; expandir lista restaurantes com plano/status |
-| `src/pages/DevDashboard.tsx` | Adicionar cards versão atual e total; tab configurações |
-
-### Sem mudanças no banco
-
-Todas as tabelas necessárias já existem (`subscription_plans`, `restaurant_subscriptions`, `app_versions`). Apenas consultas novas no frontend.
-
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
