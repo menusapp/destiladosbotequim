@@ -7,7 +7,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Landing from "./pages/Landing";
 
+import AdminPanel from "./pages/AdminPanel";
 import CEODashboard from "./pages/CEODashboard";
+import DevDashboard from "./pages/DevDashboard";
 import RestaurantAdmin from "./pages/RestaurantAdmin";
 import Menu from "./pages/Menu";
 import Comanda from "./pages/Comanda";
@@ -30,11 +32,20 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             
-            <Route path="/ceo" element={
+            {/* Admin Panel - Dev/CEO Login */}
+            <Route path="/admin-panel" element={<AdminPanel />} />
+            <Route path="/admin-panel/ceo" element={
               <ProtectedRoute>
                 <CEODashboard />
               </ProtectedRoute>
             } />
+            <Route path="/admin-panel/dev" element={
+              <ProtectedRoute>
+                <DevDashboard />
+              </ProtectedRoute>
+            } />
+
+            {/* Restaurant Admin */}
             <Route path="/admin" element={
               <ProtectedRoute>
                 <RestaurantAdmin />
@@ -46,11 +57,14 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/admin/mercadopago/callback" element={<MercadoPagoCallback />} />
+
+            {/* Public routes */}
             <Route path="/menu/:restaurantSlug/:tableNumber" element={<Menu />} />
             <Route path="/comanda/:restaurantSlug/:tableNumber" element={<Comanda />} />
             <Route path="/delivery/:restaurantSlug" element={<DeliveryMenu />} />
             <Route path="/delivery/:restaurantSlug/pedido/:orderId" element={<OrderConfirmation />} />
             <Route path="/reservas/:restaurantSlug" element={<Reservations />} />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

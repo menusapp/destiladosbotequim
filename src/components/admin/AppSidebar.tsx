@@ -44,9 +44,10 @@ interface AppSidebarProps {
   hasNewOrders?: boolean;
   hasNewBills?: boolean;
   hasNewDeliveryOrders?: boolean;
+  isSectionAllowed?: (sectionId: string) => boolean;
 }
 
-export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders }: AppSidebarProps) {
+export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
@@ -94,6 +95,9 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   };
 
   const isConfigActive = activeSection.startsWith("config-");
+  const checkAllowed = (id: string) => !isSectionAllowed || isSectionAllowed(id);
+  const filteredMain = menuStructure.main.filter(item => checkAllowed(item.id));
+  const filteredConfig = menuStructure.configSubItems.filter(item => checkAllowed(item.id));
 
   // Configurações agora fica no menu principal
   const renderConfigMenu = () => (
@@ -119,7 +123,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         </CollapsibleTrigger>
         {!collapsed && (
           <CollapsibleContent className="pl-4 space-y-1 mt-1">
-            {menuStructure.configSubItems.map((subItem) => (
+            {filteredConfig.map((subItem) => (
               <SidebarMenuButton
                 key={subItem.id}
                 onClick={() => onSectionChange(subItem.id)}
@@ -143,7 +147,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2 pt-4">
-              {menuStructure.main.map((item) => (
+              {filteredMain.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     onClick={() => onSectionChange(item.id)}
