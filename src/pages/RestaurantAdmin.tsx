@@ -115,6 +115,7 @@ const RestaurantAdmin = () => {
   }, [reservationNotification]);
   
   useInactivityLogout();
+  const { isSectionAllowed } = useRestaurantModules(restaurant?.id || null);
 
   useEffect(() => {
     const restaurantId = localStorage.getItem('restaurant_id');
