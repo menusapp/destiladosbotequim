@@ -147,7 +147,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2 pt-4">
-              {menuStructure.main.map((item) => (
+              {filteredMain.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     onClick={() => onSectionChange(item.id)}
