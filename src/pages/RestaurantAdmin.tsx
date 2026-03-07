@@ -625,13 +625,9 @@ const RestaurantAdmin = () => {
       case "marketing":
         return <MarketingTab restaurantId={restaurant.id} onNavigateToWhatsApp={() => setActiveSection("config-whatsapp")} />;
       
-      // Fiscal
+      // Fiscal (unified: settings + invoices)
       case "fiscal":
-        return <FiscalSettingsTab restaurantId={restaurant.id} />;
-      
-      // Notas Fiscais
-      case "notas-fiscais":
-        return <NotasFiscaisTab restaurantId={restaurant.id} />;
+        return <FiscalTab restaurantId={restaurant.id} />;
       
       // Em Desenvolvimento
       case "modulos":

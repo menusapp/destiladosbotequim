@@ -68,7 +68,6 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "fidelidade", label: "Fidelidade", icon: Gift },
       { id: "marketing", label: "Marketing", icon: Megaphone },
       { id: "fiscal", label: "Fiscal", icon: FileText },
-      { id: "notas-fiscais", label: "Notas Fiscais", icon: Receipt },
       { id: "modulos", label: "Módulos", icon: Construction },
     ],
     configSubItems: [
