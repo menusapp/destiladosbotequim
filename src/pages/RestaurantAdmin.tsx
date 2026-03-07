@@ -36,8 +36,7 @@ import PaymentMethodsSettings from "@/components/admin/settings/PaymentMethodsSe
 import PrintersSettings from "@/components/admin/settings/PrintersSettings";
 import WhatsAppSettings from "@/components/admin/settings/WhatsAppSettings";
 import OnlinePaymentsSettings from "@/components/admin/settings/OnlinePaymentsSettings";
-import FiscalSettingsTab from "@/components/admin/FiscalSettingsTab";
-import NotasFiscaisTab from "@/components/admin/NotasFiscaisTab";
+import FiscalTab from "@/components/admin/FiscalTab";
 
 interface Restaurant {
   id: string;
@@ -626,13 +625,9 @@ const RestaurantAdmin = () => {
       case "marketing":
         return <MarketingTab restaurantId={restaurant.id} onNavigateToWhatsApp={() => setActiveSection("config-whatsapp")} />;
       
-      // Fiscal
+      // Fiscal (unified: settings + invoices)
       case "fiscal":
-        return <FiscalSettingsTab restaurantId={restaurant.id} />;
-      
-      // Notas Fiscais
-      case "notas-fiscais":
-        return <NotasFiscaisTab restaurantId={restaurant.id} />;
+        return <FiscalTab restaurantId={restaurant.id} />;
       
       // Em Desenvolvimento
       case "modulos":
