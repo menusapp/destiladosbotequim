@@ -636,7 +636,7 @@ const RestaurantAdmin = () => {
       
       // Em Desenvolvimento
       case "modulos":
-        return <DevelopmentPlaceholder title="Módulos e Assinaturas" />;
+        return <ModulosTab restaurantId={restaurant.id} />;
       
       // Configurações - Subabas
       case "config-dados":
