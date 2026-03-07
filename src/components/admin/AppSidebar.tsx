@@ -23,7 +23,6 @@ import {
   Gift,
   Smartphone,
   FileText,
-  Receipt,
 } from "lucide-react";
 import {
   Sidebar,
