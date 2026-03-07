@@ -95,8 +95,13 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
 
   const isConfigActive = activeSection.startsWith("config-");
   const checkAllowed = (id: string) => !isSectionAllowed || isSectionAllowed(id);
-  const filteredMain = menuStructure.main.filter(item => checkAllowed(item.id));
-  const filteredConfig = menuStructure.configSubItems.filter(item => checkAllowed(item.id));
+  
+  // When no active subscription, only show "modulos"
+  const noSubscription = hasActiveSubscription === false;
+  const filteredMain = noSubscription 
+    ? menuStructure.main.filter(item => item.id === "modulos")
+    : menuStructure.main.filter(item => checkAllowed(item.id));
+  const filteredConfig = noSubscription ? [] : menuStructure.configSubItems.filter(item => checkAllowed(item.id));
 
   // Configurações agora fica no menu principal
   const renderConfigMenu = () => (
