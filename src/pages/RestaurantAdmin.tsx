@@ -116,7 +116,14 @@ const RestaurantAdmin = () => {
   }, [reservationNotification]);
   
   useInactivityLogout();
-  const { isSectionAllowed } = useRestaurantModules(restaurant?.id || null);
+  const { isSectionAllowed, hasActiveSubscription } = useRestaurantModules(restaurant?.id || null);
+
+  // Force "modulos" section when no active subscription
+  useEffect(() => {
+    if (hasActiveSubscription === false && activeSection !== "modulos") {
+      setActiveSection("modulos");
+    }
+  }, [hasActiveSubscription]);
 
   useEffect(() => {
     const restaurantId = localStorage.getItem('restaurant_id');
