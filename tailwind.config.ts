@@ -13,6 +13,16 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+      },
+      fontSize: {
+        'page-title': ['20px', { lineHeight: '28px', fontWeight: '600' }],
+        'section-title': ['16px', { lineHeight: '24px', fontWeight: '600' }],
+        'body': ['14px', { lineHeight: '20px', fontWeight: '400' }],
+        'label': ['13px', { lineHeight: '18px', fontWeight: '400' }],
+        'small': ['12px', { lineHeight: '16px', fontWeight: '400' }],
+      },
       colors: {
         "primary-orange": "hsl(var(--primary))",
         "primary-hover": "hsl(var(--primary-hover))",
@@ -64,10 +74,10 @@ export default {
         },
       },
       borderRadius: {
-        lg: "var(--radius)", /* 12px */
-        md: "calc(var(--radius) - 2px)", /* 10px */
-        sm: "calc(var(--radius) - 4px)", /* 8px */
-        button: "var(--radius-button)", /* 10px */
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+        button: "var(--radius-button)",
       },
       boxShadow: {
         card: "var(--shadow-card)",
@@ -75,20 +85,12 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {
