@@ -58,11 +58,16 @@ export function CEOReportsTab() {
 
   const fetchReports = async () => {
     try {
-      // Fetch all payments
+      const startISO = startDate.toISOString();
+      const endISO = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59).toISOString();
+
+      // Fetch all payments in date range
       const { data: payments } = await supabase
         .from("subscription_payments" as any)
         .select("*")
-        .eq("status", "paid") as any;
+        .eq("status", "paid")
+        .gte("payment_date", startISO)
+        .lte("payment_date", endISO) as any;
 
       // Fetch active subscriptions with plan prices
       const { data: subs } = await supabase
