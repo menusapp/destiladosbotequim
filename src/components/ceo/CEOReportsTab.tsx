@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, DollarSign, TrendingUp, Store, ShoppingBag, Package, Users, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { format } from "date-fns";
+import { BarChart3, DollarSign, TrendingUp, Store, ShoppingBag, Package, Users, ArrowUpRight, ArrowDownRight, CalendarIcon } from "lucide-react";
+import { format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface RestaurantStats {
   restaurant_id: string;
@@ -45,18 +49,25 @@ export function CEOReportsTab() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<string>("all");
   const [totalPlatformOrders, setTotalPlatformOrders] = useState(0);
   const [totalPlatformRevenue, setTotalPlatformRevenue] = useState(0);
+  const [startDate, setStartDate] = useState<Date>(startOfMonth(new Date()));
+  const [endDate, setEndDate] = useState<Date>(new Date());
 
   useEffect(() => {
     fetchReports();
-  }, []);
+  }, [startDate, endDate]);
 
   const fetchReports = async () => {
     try {
-      // Fetch all payments
+      const startISO = startDate.toISOString();
+      const endISO = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59).toISOString();
+
+      // Fetch all payments in date range
       const { data: payments } = await supabase
         .from("subscription_payments" as any)
         .select("*")
-        .eq("status", "paid") as any;
+        .eq("status", "paid")
+        .gte("payment_date", startISO)
+        .lte("payment_date", endISO) as any;
 
       // Fetch active subscriptions with plan prices
       const { data: subs } = await supabase
@@ -100,24 +111,33 @@ export function CEOReportsTab() {
       setSummaries(summaryList);
 
       // === RESTAURANT SALES STATS ===
+      const startISO2 = startISO;
+      const endISO2 = endISO;
+
       // Delivery orders
       const { data: deliveryOrders } = await supabase
         .from("orders")
         .select("id, restaurant_id, created_at, order_items(quantity, price_at_order)")
         .eq("order_type", "delivery")
-        .in("status", ["delivered", "picked_up"]);
+        .in("status", ["delivered", "picked_up"])
+        .gte("created_at", startISO2)
+        .lte("created_at", endISO2);
 
       // Local orders (bills paid)
       const { data: bills } = await supabase
         .from("bills")
         .select("id, table_id, total_amount, paid_at, status")
-        .eq("status", "paid");
+        .eq("status", "paid")
+        .gte("paid_at", startISO2)
+        .lte("paid_at", endISO2);
 
       // Counter orders
       const { data: counterOrders } = await supabase
         .from("counter_orders")
         .select("id, restaurant_id, total_amount, finalized_at, status")
-        .eq("status", "paid");
+        .eq("status", "paid")
+        .gte("finalized_at", startISO2)
+        .lte("finalized_at", endISO2);
 
       // Products count per restaurant
       const { data: products } = await supabase
@@ -238,19 +258,44 @@ export function CEOReportsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Relatórios & Analytics</h2>
-        <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Filtrar restaurante" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os restaurantes</SelectItem>
-            {restaurantStats.map(s => (
-              <SelectItem key={s.restaurant_id} value={s.restaurant_id}>{s.restaurant_name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(startDate, "dd/MM/yyyy")}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={startDate} onSelect={(d) => d && setStartDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <span className="text-muted-foreground text-sm">até</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(endDate, "dd/MM/yyyy")}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={endDate} onSelect={(d) => d && setEndDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Filtrar restaurante" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os restaurantes</SelectItem>
+              {restaurantStats.map(s => (
+                <SelectItem key={s.restaurant_id} value={s.restaurant_id}>{s.restaurant_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Platform Overview */}
