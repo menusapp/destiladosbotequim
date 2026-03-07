@@ -258,19 +258,44 @@ export function CEOReportsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Relatórios & Analytics</h2>
-        <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Filtrar restaurante" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os restaurantes</SelectItem>
-            {restaurantStats.map(s => (
-              <SelectItem key={s.restaurant_id} value={s.restaurant_id}>{s.restaurant_name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(startDate, "dd/MM/yyyy")}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={startDate} onSelect={(d) => d && setStartDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <span className="text-muted-foreground text-sm">até</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(endDate, "dd/MM/yyyy")}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={endDate} onSelect={(d) => d && setEndDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Filtrar restaurante" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os restaurantes</SelectItem>
+              {restaurantStats.map(s => (
+                <SelectItem key={s.restaurant_id} value={s.restaurant_id}>{s.restaurant_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Platform Overview */}
