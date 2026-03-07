@@ -24,6 +24,7 @@ import FidelityTab from "@/components/admin/FidelityTab";
 // ReservasTab removed - unified into TablesTab
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { useRestaurantModules } from "@/hooks/useRestaurantModules";
+import ModulosTab from "@/components/admin/ModulosTab";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
 import { NewReservationNotification } from "@/components/admin/NewReservationNotification";
@@ -115,7 +116,14 @@ const RestaurantAdmin = () => {
   }, [reservationNotification]);
   
   useInactivityLogout();
-  const { isSectionAllowed } = useRestaurantModules(restaurant?.id || null);
+  const { isSectionAllowed, hasActiveSubscription } = useRestaurantModules(restaurant?.id || null);
+
+  // Force "modulos" section when no active subscription
+  useEffect(() => {
+    if (hasActiveSubscription === false && activeSection !== "modulos") {
+      setActiveSection("modulos");
+    }
+  }, [hasActiveSubscription]);
 
   useEffect(() => {
     const restaurantId = localStorage.getItem('restaurant_id');
@@ -628,7 +636,7 @@ const RestaurantAdmin = () => {
       
       // Em Desenvolvimento
       case "modulos":
-        return <DevelopmentPlaceholder title="Módulos e Assinaturas" />;
+        return <ModulosTab restaurantId={restaurant.id} />;
       
       // Configurações - Subabas
       case "config-dados":
@@ -661,6 +669,7 @@ const RestaurantAdmin = () => {
           hasNewBills={hasNewBills}
           hasNewDeliveryOrders={hasNewDeliveryOrders}
           isSectionAllowed={isSectionAllowed}
+          hasActiveSubscription={hasActiveSubscription}
         />
         <SidebarInset className="flex-1 flex flex-col">
           <AdminHeader

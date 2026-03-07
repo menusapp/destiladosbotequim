@@ -45,9 +45,10 @@ interface AppSidebarProps {
   hasNewBills?: boolean;
   hasNewDeliveryOrders?: boolean;
   isSectionAllowed?: (sectionId: string) => boolean;
+  hasActiveSubscription?: boolean | null;
 }
 
-export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed }: AppSidebarProps) {
+export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed, hasActiveSubscription }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
@@ -79,8 +80,6 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "marketing", label: "Marketing", icon: Megaphone },
       { id: "fiscal", label: "Fiscal", icon: FileText },
       { id: "notas-fiscais", label: "Notas Fiscais", icon: Receipt },
-    ],
-    development: [
       { id: "modulos", label: "Módulos", icon: Construction },
     ],
     configSubItems: [
@@ -96,8 +95,13 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
 
   const isConfigActive = activeSection.startsWith("config-");
   const checkAllowed = (id: string) => !isSectionAllowed || isSectionAllowed(id);
-  const filteredMain = menuStructure.main.filter(item => checkAllowed(item.id));
-  const filteredConfig = menuStructure.configSubItems.filter(item => checkAllowed(item.id));
+  
+  // When no active subscription, only show "modulos"
+  const noSubscription = hasActiveSubscription === false;
+  const filteredMain = noSubscription 
+    ? menuStructure.main.filter(item => item.id === "modulos")
+    : menuStructure.main.filter(item => checkAllowed(item.id));
+  const filteredConfig = noSubscription ? [] : menuStructure.configSubItems.filter(item => checkAllowed(item.id));
 
   // Configurações agora fica no menu principal
   const renderConfigMenu = () => (
@@ -167,37 +171,8 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                 </SidebarMenuItem>
               ))}
               
-              {/* Configurações - Menu Expansível (no menu principal, após Clientes) */}
-              {renderConfigMenu()}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Separador */}
-        <div className="my-2 border-t border-sidebar-border" />
-
-        {/* Em Desenvolvimento */}
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="text-xs text-muted-foreground px-4">
-              Em Desenvolvimento
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1 px-2">
-              {menuStructure.development.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    onClick={() => onSectionChange(item.id)}
-                    isActive={activeSection === item.id}
-                    tooltip={item.label}
-                    className="opacity-60"
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {!collapsed && <span>{item.label}</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {/* Configurações - Menu Expansível */}
+              {filteredConfig.length > 0 && renderConfigMenu()}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
