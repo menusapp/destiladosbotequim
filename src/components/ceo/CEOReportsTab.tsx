@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, DollarSign, TrendingUp, Store, ShoppingBag, Package, Users, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { format } from "date-fns";
+import { BarChart3, DollarSign, TrendingUp, Store, ShoppingBag, Package, Users, ArrowUpRight, ArrowDownRight, CalendarIcon } from "lucide-react";
+import { format, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface RestaurantStats {
   restaurant_id: string;
