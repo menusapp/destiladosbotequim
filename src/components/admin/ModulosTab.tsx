@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Check, Crown, ArrowUp, ArrowDown, Package } from "lucide-react";
+import { Check, Crown, ArrowUp, ArrowDown, Package, Sparkles } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -105,12 +104,10 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
 
   const handleSelectPlan = (plan: Plan) => {
     if (activeSub?.plan_id === plan.id) return;
-
     let action = "Assinar";
     if (activeSub) {
       action = plan.price > activeSub.plan_price ? "Fazer Upgrade" : "Fazer Downgrade";
     }
-
     setConfirmDialog({ plan, action });
   };
 
@@ -119,7 +116,6 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
     setSubmitting(true);
 
     try {
-      // Deactivate current subscription if exists
       if (activeSub) {
         const { error: deactivateErr } = await supabase
           .from("restaurant_subscriptions")
@@ -128,7 +124,6 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         if (deactivateErr) throw deactivateErr;
       }
 
-      // Create new subscription
       const { error: insertErr } = await supabase
         .from("restaurant_subscriptions")
         .insert({
@@ -141,7 +136,6 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
       toast.success(`Plano "${confirmDialog.plan.name}" ativado com sucesso!`);
       setConfirmDialog(null);
       fetchData();
-      // Reload page to refresh sidebar modules
       setTimeout(() => window.location.reload(), 500);
     } catch (err: any) {
       toast.error(err.message || "Erro ao alterar plano");
@@ -151,96 +145,131 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
   };
 
   if (loading) {
-    return <p className="text-muted-foreground p-4">Carregando planos...</p>;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-pulse text-muted-foreground">Carregando planos...</div>
+      </div>
+    );
   }
 
   if (plans.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full">
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Nenhum plano disponível no momento.</p>
-          </CardContent>
-        </Card>
+        <div className="text-center space-y-3">
+          <Package className="h-12 w-12 mx-auto text-muted-foreground/40" />
+          <p className="text-muted-foreground">Nenhum plano disponível no momento.</p>
+        </div>
       </div>
     );
   }
 
+  // Find the "recommended" plan (middle one, or most expensive if only 2)
+  const recommendedIndex = plans.length <= 2 ? plans.length - 1 : 1;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Módulos e Assinaturas</h2>
-        <p className="text-muted-foreground mt-1">
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">Escolha seu plano</h2>
+        <p className="text-muted-foreground text-sm max-w-md mx-auto">
           {activeSub
-            ? `Plano atual: ${activeSub.plan_name} — R$ ${activeSub.plan_price.toFixed(2)}/mês`
-            : "Escolha um plano para desbloquear os módulos do sistema"}
+            ? <>Plano atual: <span className="font-semibold text-primary">{activeSub.plan_name}</span> — R$ {activeSub.plan_price.toFixed(2)}/mês</>
+            : "Selecione o plano ideal para desbloquear os módulos do seu restaurante"}
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {plans.map((plan) => {
+      {/* Plans Grid */}
+      <div className="grid gap-5 md:grid-cols-3 items-start">
+        {plans.map((plan, index) => {
           const isCurrent = activeSub?.plan_id === plan.id;
+          const isRecommended = index === recommendedIndex && !isCurrent;
           const isUpgrade = activeSub ? plan.price > activeSub.plan_price : false;
           const isDowngrade = activeSub ? plan.price < activeSub.plan_price : false;
 
           return (
-            <Card
+            <div
               key={plan.id}
-              className={`relative transition-all ${
-                isCurrent
-                  ? "border-primary ring-2 ring-primary/20"
-                  : "hover:border-primary/50"
-              }`}
+              className={`
+                relative rounded-2xl border bg-card p-6 transition-all duration-200
+                ${isCurrent
+                  ? "border-primary/60 ring-2 ring-primary/15 shadow-md"
+                  : isRecommended
+                    ? "border-primary/30 shadow-lg scale-[1.02]"
+                    : "border-border hover:border-primary/20 hover:shadow-sm"
+                }
+              `}
             >
+              {/* Badges */}
               {isCurrent && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground gap-1">
-                    <Crown className="h-3 w-3" /> Plano Atual
+                  <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-3 py-0.5 shadow-sm">
+                    <Crown className="h-3 w-3" /> Atual
                   </Badge>
                 </div>
               )}
-              <CardHeader className="pb-3">
-                <CardTitle className="text-xl">{plan.name}</CardTitle>
-                <p className="text-3xl font-bold text-primary">
-                  R$ {plan.price.toFixed(2)}
-                  <span className="text-sm text-muted-foreground font-normal">/mês</span>
-                </p>
-                {plan.description && (
-                  <p className="text-sm text-muted-foreground">{plan.description}</p>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  {plan.features.map((f) => (
-                    <div key={f} className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-primary shrink-0" />
-                      <span>{ALL_MODULES[f] || f}</span>
-                    </div>
-                  ))}
+              {isRecommended && !isCurrent && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-3 py-0.5 shadow-sm">
+                    <Sparkles className="h-3 w-3" /> Recomendado
+                  </Badge>
+                </div>
+              )}
+
+              {/* Plan Info */}
+              <div className="pt-2 space-y-4">
+                <div>
+                  <h3 className="font-semibold text-lg text-foreground">{plan.name}</h3>
+                  {plan.description && (
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{plan.description}</p>
+                  )}
                 </div>
 
+                {/* Price */}
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold text-foreground">
+                    R$ {plan.price.toFixed(2).replace(".", ",")}
+                  </span>
+                  <span className="text-xs text-muted-foreground">/mês</span>
+                </div>
+
+                {/* CTA Button */}
                 {isCurrent ? (
-                  <Button disabled className="w-full" variant="outline">
+                  <Button disabled variant="outline" className="w-full text-xs h-9 opacity-60">
                     Plano Ativo
                   </Button>
                 ) : (
                   <Button
-                    className="w-full"
+                    className="w-full text-xs h-9"
                     variant={isUpgrade || !activeSub ? "default" : "outline"}
                     onClick={() => handleSelectPlan(plan)}
                   >
-                    {isUpgrade && <ArrowUp className="h-4 w-4 mr-1" />}
-                    {isDowngrade && <ArrowDown className="h-4 w-4 mr-1" />}
+                    {isUpgrade && <ArrowUp className="h-3.5 w-3.5 mr-1" />}
+                    {isDowngrade && <ArrowDown className="h-3.5 w-3.5 mr-1" />}
                     {!activeSub ? "Assinar" : isUpgrade ? "Upgrade" : "Downgrade"}
                   </Button>
                 )}
-              </CardContent>
-            </Card>
+
+                {/* Divider */}
+                <div className="border-t border-border" />
+
+                {/* Features */}
+                <ul className="space-y-2.5">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-center gap-2.5 text-sm text-foreground">
+                      <div className="flex-shrink-0 h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Check className="h-2.5 w-2.5 text-primary" />
+                      </div>
+                      <span className="text-xs">{ALL_MODULES[f] || f}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           );
         })}
       </div>
 
+      {/* Confirm Dialog */}
       <AlertDialog open={!!confirmDialog} onOpenChange={() => setConfirmDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -248,14 +277,14 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
             <AlertDialogDescription>
               {activeSub ? (
                 <>
-                  Você está trocando do plano <strong>{activeSub.plan_name}</strong> para o plano{" "}
+                  Trocar de <strong>{activeSub.plan_name}</strong> para{" "}
                   <strong>{confirmDialog?.plan.name}</strong> (R${" "}
-                  {confirmDialog?.plan.price.toFixed(2)}/mês). Deseja continuar?
+                  {confirmDialog?.plan.price.toFixed(2)}/mês)?
                 </>
               ) : (
                 <>
-                  Você está assinando o plano <strong>{confirmDialog?.plan.name}</strong> por R${" "}
-                  {confirmDialog?.plan.price.toFixed(2)}/mês. Deseja continuar?
+                  Assinar o plano <strong>{confirmDialog?.plan.name}</strong> por R${" "}
+                  {confirmDialog?.plan.price.toFixed(2)}/mês?
                 </>
               )}
             </AlertDialogDescription>
