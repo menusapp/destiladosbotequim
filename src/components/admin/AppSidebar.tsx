@@ -171,37 +171,8 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                 </SidebarMenuItem>
               ))}
               
-              {/* Configurações - Menu Expansível (no menu principal, após Clientes) */}
-              {renderConfigMenu()}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Separador */}
-        <div className="my-2 border-t border-sidebar-border" />
-
-        {/* Em Desenvolvimento */}
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="text-xs text-muted-foreground px-4">
-              Em Desenvolvimento
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1 px-2">
-              {menuStructure.development.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    onClick={() => onSectionChange(item.id)}
-                    isActive={activeSection === item.id}
-                    tooltip={item.label}
-                    className="opacity-60"
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {!collapsed && <span>{item.label}</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {/* Configurações - Menu Expansível */}
+              {filteredConfig.length > 0 && renderConfigMenu()}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
