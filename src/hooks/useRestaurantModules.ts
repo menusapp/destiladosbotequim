@@ -34,6 +34,7 @@ const ALWAYS_AVAILABLE = [
 
 export function useRestaurantModules(restaurantId: string | null) {
   const [allowedModules, setAllowedModules] = useState<string[] | null>(null);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
