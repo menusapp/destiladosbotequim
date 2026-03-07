@@ -45,6 +45,7 @@ interface AppSidebarProps {
   hasNewBills?: boolean;
   hasNewDeliveryOrders?: boolean;
   isSectionAllowed?: (sectionId: string) => boolean;
+  hasActiveSubscription?: boolean | null;
 }
 
 export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed }: AppSidebarProps) {
