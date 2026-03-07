@@ -61,9 +61,11 @@ export function useRestaurantModules(restaurantId: string | null) {
       if (sub && sub.subscription_plans) {
         const plan = sub.subscription_plans as any;
         setAllowedModules(plan.features || []);
+        setHasActiveSubscription(true);
       } else {
         // No active subscription = full access (default behavior)
         setAllowedModules(null);
+        setHasActiveSubscription(false);
       }
     } catch {
       setAllowedModules(null);
