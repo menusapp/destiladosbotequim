@@ -111,24 +111,33 @@ export function CEOReportsTab() {
       setSummaries(summaryList);
 
       // === RESTAURANT SALES STATS ===
+      const startISO2 = startISO;
+      const endISO2 = endISO;
+
       // Delivery orders
       const { data: deliveryOrders } = await supabase
         .from("orders")
         .select("id, restaurant_id, created_at, order_items(quantity, price_at_order)")
         .eq("order_type", "delivery")
-        .in("status", ["delivered", "picked_up"]);
+        .in("status", ["delivered", "picked_up"])
+        .gte("created_at", startISO2)
+        .lte("created_at", endISO2);
 
       // Local orders (bills paid)
       const { data: bills } = await supabase
         .from("bills")
         .select("id, table_id, total_amount, paid_at, status")
-        .eq("status", "paid");
+        .eq("status", "paid")
+        .gte("paid_at", startISO2)
+        .lte("paid_at", endISO2);
 
       // Counter orders
       const { data: counterOrders } = await supabase
         .from("counter_orders")
         .select("id, restaurant_id, total_amount, finalized_at, status")
-        .eq("status", "paid");
+        .eq("status", "paid")
+        .gte("finalized_at", startISO2)
+        .lte("finalized_at", endISO2);
 
       // Products count per restaurant
       const { data: products } = await supabase
