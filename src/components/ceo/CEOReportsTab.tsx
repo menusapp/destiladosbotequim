@@ -49,10 +49,12 @@ export function CEOReportsTab() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<string>("all");
   const [totalPlatformOrders, setTotalPlatformOrders] = useState(0);
   const [totalPlatformRevenue, setTotalPlatformRevenue] = useState(0);
+  const [startDate, setStartDate] = useState<Date>(startOfMonth(new Date()));
+  const [endDate, setEndDate] = useState<Date>(new Date());
 
   useEffect(() => {
     fetchReports();
-  }, []);
+  }, [startDate, endDate]);
 
   const fetchReports = async () => {
     try {
