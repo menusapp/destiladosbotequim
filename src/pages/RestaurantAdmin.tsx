@@ -24,6 +24,7 @@ import FidelityTab from "@/components/admin/FidelityTab";
 // ReservasTab removed - unified into TablesTab
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { useRestaurantModules } from "@/hooks/useRestaurantModules";
+import ModulosTab from "@/components/admin/ModulosTab";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
 import { NewReservationNotification } from "@/components/admin/NewReservationNotification";
