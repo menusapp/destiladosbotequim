@@ -492,6 +492,18 @@ export default function DeliveryMenu() {
         </>
       )}
 
+      {activeTab === "pedidos" && customerCPF && (
+        <div className="pt-4">
+          <h1 className="text-2xl font-bold px-4 mb-4">Meus Pedidos</h1>
+          <PedidosHistory
+            customerCPF={customerCPF}
+            restaurantId={restaurant.id}
+            restaurantSlug={restaurantSlug || ""}
+            onAddToCart={handleBulkAddToCart}
+          />
+        </div>
+      )}
+
       {activeTab === "reservas" && customerCPF && restaurant.reservations_enabled && (
         <div className="pt-4">
           <h1 className="text-2xl font-bold px-4 mb-4">Reservas</h1>
