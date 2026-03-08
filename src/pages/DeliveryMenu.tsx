@@ -492,19 +492,30 @@ export default function DeliveryMenu() {
         </>
       )}
 
-      {activeTab === "pedidos" && customerCPF && (
+      {activeTab === "reservas" && customerCPF && restaurant.reservations_enabled && (
         <div className="pt-4">
-          <h1 className="text-2xl font-bold px-4 mb-4">Meus Pedidos</h1>
-          <PedidosHistory
+          <h1 className="text-2xl font-bold px-4 mb-4">Reservas</h1>
+          <ReservationsView
+            restaurant={restaurant}
             customerCPF={customerCPF}
-            restaurantId={restaurant.id}
-            restaurantSlug={restaurantSlug || ""}
-            onAddToCart={handleBulkAddToCart}
+            customerName={customerName}
+            customerPhone={sessionStorage.getItem(`delivery-phone-${restaurantSlug}`) || ""}
+            primaryColor={primaryColor}
           />
         </div>
       )}
 
       {activeTab === "perfil" && customerCPF && (
+        <div className="pt-4">
+          <h1 className="text-2xl font-bold px-4 mb-4">Meu Perfil</h1>
+          <ProfileView
+            customerName={customerName}
+            customerCPF={customerCPF}
+            restaurantId={restaurant.id}
+            onNameUpdate={handleNameUpdate}
+          />
+        </div>
+      )}
         <div className="pt-4">
           <h1 className="text-2xl font-bold px-4 mb-4">Meu Perfil</h1>
           <ProfileView
