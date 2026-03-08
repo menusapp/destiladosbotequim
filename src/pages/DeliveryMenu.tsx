@@ -13,6 +13,7 @@ import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
 import { DeliveryBottomNav } from "@/components/menu/DeliveryBottomNav";
 import { PedidosHistory } from "@/components/menu/PedidosHistory";
 import { ProfileView } from "@/components/menu/ProfileView";
+import { ReservationsView } from "@/components/menu/ReservationsView";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "sonner";
 
