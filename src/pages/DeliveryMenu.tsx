@@ -33,7 +33,7 @@ export default function DeliveryMenu() {
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "perfil">("menu");
+  const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "reservas" | "perfil">("menu");
 
   const fetchRestaurantData = useCallback(async () => {
     try {
