@@ -13,6 +13,7 @@ import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
 import { DeliveryBottomNav } from "@/components/menu/DeliveryBottomNav";
 import { PedidosHistory } from "@/components/menu/PedidosHistory";
 import { ProfileView } from "@/components/menu/ProfileView";
+import { ReservationsView } from "@/components/menu/ReservationsView";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "sonner";
 
@@ -32,7 +33,7 @@ export default function DeliveryMenu() {
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "perfil">("menu");
+  const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "reservas" | "perfil">("menu");
 
   const fetchRestaurantData = useCallback(async () => {
     try {
@@ -503,6 +504,19 @@ export default function DeliveryMenu() {
         </div>
       )}
 
+      {activeTab === "reservas" && customerCPF && restaurant.reservations_enabled && (
+        <div className="pt-4">
+          <h1 className="text-2xl font-bold px-4 mb-4">Reservas</h1>
+          <ReservationsView
+            restaurant={restaurant}
+            customerCPF={customerCPF}
+            customerName={customerName}
+            customerPhone={sessionStorage.getItem(`delivery-phone-${restaurantSlug}`) || ""}
+            primaryColor={primaryColor}
+          />
+        </div>
+      )}
+
       {activeTab === "perfil" && customerCPF && (
         <div className="pt-4">
           <h1 className="text-2xl font-bold px-4 mb-4">Meu Perfil</h1>
@@ -519,6 +533,7 @@ export default function DeliveryMenu() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         primaryColor={primaryColor}
+        showReservations={!!restaurant.reservations_enabled}
       />
     </div>
   );
