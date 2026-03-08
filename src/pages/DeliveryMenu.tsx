@@ -516,21 +516,12 @@ export default function DeliveryMenu() {
           />
         </div>
       )}
-        <div className="pt-4">
-          <h1 className="text-2xl font-bold px-4 mb-4">Meu Perfil</h1>
-          <ProfileView
-            customerName={customerName}
-            customerCPF={customerCPF}
-            restaurantId={restaurant.id}
-            onNameUpdate={handleNameUpdate}
-          />
-        </div>
-      )}
 
       <DeliveryBottomNav
         activeTab={activeTab}
         onTabChange={setActiveTab}
         primaryColor={primaryColor}
+        showReservations={!!restaurant.reservations_enabled}
       />
     </div>
   );
