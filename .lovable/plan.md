@@ -1,51 +1,62 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plan: Integrate Reservations into Delivery Menu
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### Overview
+Add a "Reservas" tab to the delivery menu bottom navigation (conditionally shown when restaurant has `reservations_enabled`), with reservation history for the logged-in customer, a "New Reservation" flow, past-time slot filtering, and proper status display when reservation is accepted.
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+### Changes
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+#### 1. Create `ReservationsView` component
+**New file: `src/components/menu/ReservationsView.tsx`**
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+A mobile-friendly component that combines:
+- **Reservation history list** at the top — fetches reservations from `reservations` table filtered by `customer_cpf` + `restaurant_id`, showing status badges:
+  - `pending` → "Aguardando Confirmação" (yellow)
+  - `confirmed` → "Reserva Confirmada" (green)  
+  - `cancelled` → "Cancelada" (red)
+- **"Fazer Nova Reserva" button** at the top that opens the reservation flow
+- **New reservation flow** (reuses logic from `Reservations.tsx`):
+  - Step 1: Select table (grid of available tables)
+  - Step 2: Form (date, time, party size, notes)
+  - Step 3: Success confirmation
+- **Time slot filtering**: In `generateTimeSlots`, if the selected date is **today**, filter out all slots where the time is <= current time (e.g., if it's 12:15, hide 08:00–12:00)
+- **Realtime subscription** on `reservations` table for the customer's CPF to update status live (so when restaurant confirms, badge updates instantly)
+- WhatsApp integration on submit (same as current `Reservations.tsx`)
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+#### 2. Update `DeliveryBottomNav`
+**Edit: `src/components/menu/DeliveryBottomNav.tsx`**
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+- Change type from `"menu" | "pedidos" | "perfil"` to `"menu" | "pedidos" | "reservas" | "perfil"`
+- Conditionally include the "Reservas" tab (with `CalendarCheck` icon) — controlled by a new `showReservations` prop
+- Update grid from `grid-cols-3` to `grid-cols-3` or `grid-cols-4` based on whether reservations is shown
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
+#### 3. Update `DeliveryMenu` page
+**Edit: `src/pages/DeliveryMenu.tsx`**
+
+- Add `activeTab` type to include `"reservas"`
+- Fetch `reservations_enabled` from restaurant data (already fetched via `select("*")`)
+- Render `ReservationsView` when `activeTab === "reservas"`, passing `customerCPF`, `restaurant`, `primaryColor`, and `businessHours`
+- Pass `showReservations={restaurant.reservations_enabled}` to `DeliveryBottomNav`
+
+#### 4. Time slot past-time filtering (inside ReservationsView)
+In the `generateTimeSlots` function:
+```
+const now = new Date();
+const isToday = date same day as now;
+if (isToday) {
+  filter slots where hour:minute <= now hour:minute
+}
 ```
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+#### 5. Status mapping
+- `pending` → "Aguardando Confirmação" (amber badge)
+- `confirmed` → "Mesa Reservada ✅" (green badge)
+- `cancelled` → "Cancelada" (red badge)
+
+### What stays unchanged
+- All backend logic, database schema, RLS policies
+- WhatsApp automation for reservations (reused as-is)
+- The standalone `/reservas/:restaurantSlug` route continues to work
+- Admin reservation management unchanged
+
