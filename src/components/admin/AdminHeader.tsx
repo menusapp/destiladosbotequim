@@ -60,7 +60,7 @@ export const AdminHeader = ({
     setUpdatingOpen(false);
   };
 
-  const menuUrl = `${window.location.origin}/delivery/${restaurantSlug}`;
+  const menuUrl = `${window.location.origin}/${restaurantSlug}`;
 
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(menuUrl);
