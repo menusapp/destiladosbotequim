@@ -1,51 +1,81 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plan: Sistema de Contas com Permissões Customizáveis por Cargo
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### Conceito Principal
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+Cada cargo vem com permissões **pré-selecionadas** (defaults), mas o admin pode customizar livremente quais seções cada conta de staff pode acessar. As permissões são salvas **por conta** (não por cargo global).
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+### Cargos e Defaults Pré-selecionados
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
-
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
-
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
-
-Detalhes técnicos:
 ```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
+┌──────────────┬────────────────────────────────────────────────────────────┐
+│ Cargo        │ Seções pré-selecionadas (editáveis pelo admin)            │
+├──────────────┼────────────────────────────────────────────────────────────┤
+│ admin        │ TODAS + "Contas" (fixo, não editável)                     │
+│ gerente      │ Tudo EXCETO "Contas" e "Módulos"                          │
+│ caixa        │ PDV, Caixa, Pedidos Online, Pedidos Locais                │
+│ garcom       │ Pedidos Locais, Mesas e Reservas, PDV                     │
+│ cozinha      │ Pedidos Online, Pedidos Locais                            │
+│ atendente    │ Pedidos Online, Pedidos Locais, Clientes, Mesas e Reservas│
+└──────────────┴────────────────────────────────────────────────────────────┘
 ```
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+Quando o admin cria uma conta e seleciona o cargo, as checkboxes das seções vêm pré-marcadas conforme a tabela acima. O admin pode marcar/desmarcar qualquer seção. As permissões finais ficam salvas em um campo JSONB `allowed_sections` na tabela `restaurant_staff`.
+
+### Database (1 migration)
+
+**Tabela `restaurant_staff`:**
+- `id` uuid PK
+- `restaurant_id` uuid NOT NULL
+- `username` text NOT NULL
+- `password_hash` text NOT NULL
+- `display_name` text NOT NULL
+- `role` text NOT NULL (admin, gerente, caixa, garcom, cozinha, atendente)
+- `allowed_sections` jsonb NOT NULL DEFAULT '[]' (array de section IDs permitidos)
+- `is_active` boolean DEFAULT true
+- `created_at`, `updated_at` timestamps
+- UNIQUE(restaurant_id, username)
+
+**RPC `validate_staff_credentials`:**
+- Recebe `p_restaurant_id uuid`, `p_username text`, `p_password text`
+- Retorna `staff_id`, `display_name`, `role`, `allowed_sections`
+- Security definer, filtra por `is_active = true`
+
+### Fluxo de Login
+
+1. **Landing (`/`)** — Login do restaurante (existente, sem mudança)
+2. Ao logar, redireciona para **`/staff-login`** (nova página) em vez de `/admin`
+3. **StaffLogin** — Campos usuário/senha, valida via RPC `validate_staff_credentials`
+4. Salva em localStorage: `staff_id`, `staff_name`, `staff_role`, `staff_allowed_sections`
+5. Redireciona para `/admin`
+
+### Frontend
+
+**Novos arquivos:**
+- `src/pages/StaffLogin.tsx` — tela de login do funcionário
+- `src/components/admin/ContasTab.tsx` — CRUD de contas com checkboxes de permissões
+- `src/lib/staffPermissions.ts` — defaults por cargo + lista de todas as seções
+
+**Edições:**
+- `src/pages/Landing.tsx` — redirecionar para `/staff-login` após login do restaurante
+- `src/App.tsx` — adicionar rota `/staff-login`
+- `src/components/admin/AppSidebar.tsx` — adicionar item "Contas" (ícone Users), filtrar seções por `allowed_sections` do staff logado
+- `src/pages/RestaurantAdmin.tsx` — ler `staff_role`/`staff_allowed_sections` do localStorage, passar para sidebar, renderizar `ContasTab`
+- `src/components/admin/AdminHeader.tsx` — mostrar nome do staff logado, logout limpa dados do staff
+
+**ContasTab (admin only):**
+- Lista de funcionários com nome, cargo, status ativo/inativo
+- Formulário de criação/edição:
+  - Username, senha, nome de exibição
+  - Select de cargo — ao trocar, preenche checkboxes com defaults
+  - Grid de checkboxes com todas as seções do sistema (pré-marcadas pelo cargo)
+  - O admin marca/desmarca livremente
+- Admin pode editar suas próprias credenciais mas não pode se desativar
+- Não pode criar outro admin
+
+### Segurança
+- Senhas em texto simples (mesmo padrão de `restaurant_credentials`)
+- RLS: acesso anon/authenticated com `true` (mesmo padrão do projeto)
+- Conta admin criada pelo CEO ao cadastrar restaurante (editar `CEODashboard.tsx`)
+
