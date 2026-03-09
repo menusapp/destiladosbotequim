@@ -254,8 +254,8 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <ScrollReveal className="text-center mb-14">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Funcionalidades</span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-tight">Tudo que seu restaurante precisa</h2>
-            <p className="mt-3 text-base text-muted-foreground max-w-2xl mx-auto">Um sistema completo que substitui dezenas de ferramentas fragmentadas.</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">Tudo que seu restaurante precisa</h2>
+            <p className="mt-3 text-lg text-muted-foreground max-w-2xl mx-auto font-light">Um sistema completo que substitui dezenas de ferramentas fragmentadas.</p>
           </ScrollReveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
