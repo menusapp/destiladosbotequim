@@ -285,10 +285,10 @@ const LandingPage = () => {
           <div className="flex flex-col lg:flex-row gap-12 items-center">
             <ScrollReveal className="flex-1 space-y-5">
               <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">Operação</span>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight tracking-[-0.025em]">
                 Gestor de pedidos completo
               </h2>
-              <p className="text-base text-muted-foreground leading-relaxed">
+              <p className="text-base text-muted-foreground leading-relaxed font-light">
                 PDV integrado, app de garçom, comandas digitais e confirmação automática de pedidos. Gerencie toda a operação do balcão ao delivery num só lugar.
               </p>
               <ul className="space-y-3 pt-2">
