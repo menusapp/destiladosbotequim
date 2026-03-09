@@ -46,6 +46,9 @@ const App = () => (
               </ProtectedRoute>
             } />
 
+            {/* Staff Login */}
+            <Route path="/staff-login" element={<StaffLogin />} />
+
             {/* Restaurant Admin */}
             <Route path="/admin" element={
               <ProtectedRoute>

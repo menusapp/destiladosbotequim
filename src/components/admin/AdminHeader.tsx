@@ -175,7 +175,9 @@ export const AdminHeader = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleLogout}>Sair</DropdownMenuItem>
+          {staffRole && <DropdownMenuItem className="text-xs text-muted-foreground" disabled>{staffRole === 'admin' ? 'Administrador' : staffRole.charAt(0).toUpperCase() + staffRole.slice(1)}</DropdownMenuItem>}
+          <DropdownMenuItem onClick={handleLogout}>Trocar Conta</DropdownMenuItem>
+          <DropdownMenuItem onClick={handleFullLogout}>Sair do Restaurante</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

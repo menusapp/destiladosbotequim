@@ -86,11 +86,18 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   const isConfigActive = activeSection.startsWith("config-");
   const checkAllowed = (id: string) => !isSectionAllowed || isSectionAllowed(id);
   
+  // Staff-based section filtering
+  const isStaffAllowed = (id: string) => {
+    if (!staffRole || staffRole === "admin") return true;
+    if (id === "contas") return false;
+    return staffAllowedSections?.includes(id) ?? true;
+  };
+
   const noSubscription = hasActiveSubscription === false;
   const filteredMain = noSubscription 
     ? menuStructure.main.filter(item => item.id === "modulos")
-    : menuStructure.main.filter(item => checkAllowed(item.id));
-  const filteredConfig = noSubscription ? [] : menuStructure.configSubItems.filter(item => checkAllowed(item.id));
+    : menuStructure.main.filter(item => checkAllowed(item.id) && isStaffAllowed(item.id));
+  const filteredConfig = noSubscription ? [] : menuStructure.configSubItems.filter(item => checkAllowed(item.id) && isStaffAllowed(item.id));
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background w-[240px]">
