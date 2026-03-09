@@ -146,7 +146,8 @@ const RestaurantAdmin = () => {
 
     // If no staff session, redirect to staff login
     if (!staffId) {
-      navigate("/staff-login");
+      const slug = localStorage.getItem("restaurant_slug") || "";
+      navigate(`/login/staff`);
       return;
     }
 
