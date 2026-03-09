@@ -74,7 +74,7 @@ export const AdminHeader = ({
     localStorage.removeItem('staff_role');
     localStorage.removeItem('staff_allowed_sections');
     toast.success("Logout realizado com sucesso");
-    navigate("/staff-login");
+    navigate("/login/staff");
   };
 
   const handleFullLogout = () => {
