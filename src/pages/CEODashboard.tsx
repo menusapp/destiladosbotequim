@@ -147,6 +147,24 @@ const CEODashboard = () => {
           const { error: credError } = await supabase.from("restaurant_credentials" as any)
             .insert({ restaurant_id: restaurant.id, username: formUsername, password_hash: formPassword } as any);
           if (credError) throw credError;
+
+          // Create default admin staff account
+          const allSections = [
+            "pedidos-online","pedidos-locais","pdv","mesas-reservas","cardapio","caixa",
+            "estoque","custos","margens","relatorios","clientes","fidelidade","marketing",
+            "fiscal","modulos","config-dados","config-horario","config-regioes",
+            "config-pagamentos","config-pagamentos-online","config-impressoras","config-whatsapp"
+          ];
+          const { error: staffError } = await supabase.from("restaurant_staff" as any)
+            .insert({
+              restaurant_id: restaurant.id,
+              username: formUsername,
+              password_hash: formPassword,
+              display_name: "Administrador",
+              role: "admin",
+              allowed_sections: allSections,
+            } as any);
+          if (staffError) console.error("Erro ao criar conta admin:", staffError);
         }
         toast.success("Restaurante criado com sucesso!");
       }
