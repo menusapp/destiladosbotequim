@@ -515,7 +515,7 @@ const LandingPage = () => {
               <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-4 tracking-[-0.025em]">
                 Pronto para transformar seu restaurante?
               </h2>
-              <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
+              <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto font-light">
                 Comece hoje mesmo. Setup em menos de 2 minutos.
               </p>
               <Button size="lg" className="text-base px-10 h-13 font-bold shadow-lg shadow-primary/25" onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}>
