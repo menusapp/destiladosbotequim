@@ -81,7 +81,7 @@ const StaffLogin = () => {
       <Card className="w-full max-w-md shadow-lg border-border/50">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-24 h-24 flex items-center justify-center">
-            <img src={menusLogo} alt="Menu's" className="w-full h-full object-contain" />
+            <img src={restaurantLogo || menusLogo} alt={restaurantName || "Menu's"} className="w-full h-full object-contain rounded-lg" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-foreground">{restaurantName}</h2>
