@@ -19,7 +19,7 @@ const StaffLogin = () => {
 
   // If no restaurant session, redirect to landing
   if (!restaurantId || !restaurantName) {
-    navigate("/");
+    navigate("/login");
     return null;
   }
 
