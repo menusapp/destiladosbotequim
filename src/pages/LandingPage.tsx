@@ -266,8 +266,8 @@ const LandingPage = () => {
                     <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/15 group-hover:scale-110 transition-all duration-300">
                       <f.icon className="h-6 w-6 text-primary" />
                     </div>
-                    <h3 className="text-lg font-bold text-foreground mb-2">{f.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">{f.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed font-light">{f.desc}</p>
                   </CardContent>
                 </Card>
               </ScrollReveal>
