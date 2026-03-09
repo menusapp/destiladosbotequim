@@ -23,16 +23,19 @@ export default function Auth() {
 
   useEffect(() => {
     // Check if user is already logged in
+    const slug = localStorage.getItem("restaurant_slug") || "";
+    const adminPath = slug ? `/${slug}/admin` : "/login";
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/admin");
+        navigate(adminPath);
       }
       setCheckingSession(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        navigate("/admin");
+        navigate(adminPath);
       }
     });
 

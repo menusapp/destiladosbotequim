@@ -146,7 +146,8 @@ const RestaurantAdmin = () => {
 
     // If no staff session, redirect to staff login
     if (!staffId) {
-      navigate("/staff-login");
+      const slug = localStorage.getItem("restaurant_slug") || "";
+      navigate(`/login/staff`);
       return;
     }
 
@@ -504,7 +505,7 @@ const RestaurantAdmin = () => {
     localStorage.removeItem('staff_role');
     localStorage.removeItem('staff_allowed_sections');
     toast.success("Logout realizado com sucesso");
-    navigate("/staff-login");
+    navigate("/login/staff");
   };
 
   const handleToggleRestaurant = async (isOpen: boolean) => {
