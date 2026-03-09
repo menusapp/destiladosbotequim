@@ -70,6 +70,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "marketing", label: "Marketing", icon: Megaphone },
       { id: "fiscal", label: "Fiscal", icon: FileText },
       { id: "modulos", label: "Módulos", icon: Construction },
+      ...(staffRole === "admin" ? [{ id: "contas", label: "Contas", icon: Users }] : []),
     ],
     configSubItems: [
       { id: "config-dados", label: "Dados da Empresa", icon: Building2 },
