@@ -470,8 +470,8 @@ const LandingPage = () => {
                   <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
                     <span className="text-2xl font-extrabold text-primary">{s.num}</span>
                   </div>
-                  <h3 className="text-lg font-bold text-foreground">{s.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
+                  <h3 className="text-lg font-semibold text-foreground">{s.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed font-light">{s.desc}</p>
                 </div>
               </ScrollReveal>
             ))}
