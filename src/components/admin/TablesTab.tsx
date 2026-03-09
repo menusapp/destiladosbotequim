@@ -123,7 +123,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [tableToEmpty, setTableToEmpty] = useState<Table | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("pending");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   
   // Form state for new/edit table
