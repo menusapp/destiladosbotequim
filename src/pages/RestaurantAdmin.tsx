@@ -37,6 +37,7 @@ import PrintersSettings from "@/components/admin/settings/PrintersSettings";
 import WhatsAppSettings from "@/components/admin/settings/WhatsAppSettings";
 import OnlinePaymentsSettings from "@/components/admin/settings/OnlinePaymentsSettings";
 import FiscalTab from "@/components/admin/FiscalTab";
+import ContasTab from "@/components/admin/ContasTab";
 
 interface Restaurant {
   id: string;
