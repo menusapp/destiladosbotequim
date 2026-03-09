@@ -433,11 +433,17 @@ export const ReservationsView = ({
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {tables.map((table) => (
+            {tables.map((table) => {
+              const isReserved = reservedTableIds.includes(table.id);
+              return (
               <Card
                 key={table.id}
-                className="overflow-hidden cursor-pointer transition-all active:scale-[0.98]"
+                className={cn(
+                  "overflow-hidden transition-all",
+                  isReserved ? "opacity-60 cursor-not-allowed" : "cursor-pointer active:scale-[0.98]"
+                )}
                 onClick={() => {
+                  if (isReserved) return;
                   setSelectedTable(table);
                   setPartySize(table.min_capacity);
                   setView("form");
