@@ -13,9 +13,23 @@ const StaffLogin = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [restaurantLogo, setRestaurantLogo] = useState<string | null>(null);
 
   const restaurantId = localStorage.getItem("restaurant_id");
   const restaurantName = localStorage.getItem("restaurant_name");
+
+  useEffect(() => {
+    if (restaurantId) {
+      supabase
+        .from("restaurants")
+        .select("logo_url")
+        .eq("id", restaurantId)
+        .single()
+        .then(({ data }) => {
+          if (data?.logo_url) setRestaurantLogo(data.logo_url);
+        });
+    }
+  }, [restaurantId]);
 
   // If no restaurant session, redirect to landing
   if (!restaurantId || !restaurantName) {
