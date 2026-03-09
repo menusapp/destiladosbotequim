@@ -139,7 +139,7 @@ const LandingPage = () => {
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-foreground tracking-tight leading-[1.08]">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-foreground tracking-[-0.025em] leading-[1.08]">
               O sistema completo
               <br />
               para <TypingEffect />
