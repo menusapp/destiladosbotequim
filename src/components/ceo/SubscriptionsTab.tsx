@@ -5,24 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CreditCard, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { CreditCard, CheckCircle, XCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 
-interface Restaurant {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-interface Plan {
-  id: string;
-  name: string;
-  price: number;
-}
-
+interface Restaurant { id: string; name: string; slug: string; }
+interface Plan { id: string; name: string; price: number; }
 interface Subscription {
   id: string;
   restaurant_id: string;
@@ -32,10 +22,11 @@ interface Subscription {
   expires_at: string | null;
   next_payment_at: string | null;
   last_payment_at: string | null;
+  created_at: string | null;
 }
 
 export function SubscriptionsTab() {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [latestSubs, setLatestSubs] = useState<Subscription[]>([]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,19 +39,31 @@ export function SubscriptionsTab() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMonth, setPaymentMonth] = useState("");
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
+  useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
     const [subsRes, restRes, planRes] = await Promise.all([
-      supabase.from("restaurant_subscriptions").select("*").order("created_at", { ascending: false }),
+      supabase.from("restaurant_subscriptions" as any).select("*").order("created_at", { ascending: false }) as any,
       supabase.from("restaurants").select("id, name, slug").order("name"),
       supabase.from("subscription_plans").select("id, name, price").eq("is_active", true),
     ]);
-    setSubscriptions(subsRes.data || []);
-    setRestaurants(restRes.data || []);
-    setPlans(planRes.data || []);
+
+    const allSubs: Subscription[] = subsRes.data || [];
+    const restaurants = restRes.data || [];
+    const plans = planRes.data || [];
+
+    // Keep only the most recent subscription per restaurant
+    const latestMap: Record<string, Subscription> = {};
+    allSubs.forEach(s => {
+      const existing = latestMap[s.restaurant_id];
+      if (!existing || new Date(s.created_at || 0) > new Date(existing.created_at || 0)) {
+        latestMap[s.restaurant_id] = s;
+      }
+    });
+
+    setLatestSubs(Object.values(latestMap));
+    setRestaurants(restaurants);
+    setPlans(plans);
     setLoading(false);
   };
 
@@ -83,7 +86,12 @@ export function SubscriptionsTab() {
     const nextPayment = new Date();
     nextPayment.setMonth(nextPayment.getMonth() + 1);
 
-    const { error } = await supabase.from("restaurant_subscriptions").insert({
+    // Cancel all previous subscriptions for this restaurant
+    await (supabase.from("restaurant_subscriptions" as any) as any)
+      .update({ status: "cancelled" })
+      .eq("restaurant_id", formRestaurant);
+
+    const { error } = await (supabase.from("restaurant_subscriptions" as any) as any).insert({
       restaurant_id: formRestaurant,
       plan_id: formPlan,
       status: "active",
@@ -101,7 +109,7 @@ export function SubscriptionsTab() {
 
   const handleToggleStatus = async (sub: Subscription) => {
     const newStatus = sub.status === "active" ? "suspended" : "active";
-    const { error } = await supabase.from("restaurant_subscriptions").update({ status: newStatus }).eq("id", sub.id);
+    const { error } = await (supabase.from("restaurant_subscriptions" as any) as any).update({ status: newStatus }).eq("id", sub.id);
     if (error) toast.error(error.message);
     else { toast.success(`Assinatura ${newStatus === "active" ? "reativada" : "suspensa"}`); fetchAll(); }
   };
@@ -110,7 +118,7 @@ export function SubscriptionsTab() {
     e.preventDefault();
     if (!selectedSub) return;
 
-    const { error } = await supabase.from("subscription_payments").insert({
+    const { error } = await (supabase.from("subscription_payments" as any) as any).insert({
       subscription_id: selectedSub.id,
       restaurant_id: selectedSub.restaurant_id,
       amount: parseFloat(paymentAmount),
@@ -122,7 +130,7 @@ export function SubscriptionsTab() {
     if (!error) {
       const nextPayment = new Date();
       nextPayment.setMonth(nextPayment.getMonth() + 1);
-      await supabase.from("restaurant_subscriptions").update({
+      await (supabase.from("restaurant_subscriptions" as any) as any).update({
         last_payment_at: new Date().toISOString(),
         next_payment_at: nextPayment.toISOString(),
         status: "active",
@@ -145,7 +153,7 @@ export function SubscriptionsTab() {
         <h2 className="text-xl font-semibold">Assinaturas</h2>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button><CreditCard className="h-4 w-4 mr-2" /> Nova Assinatura</Button>
+            <Button size="sm"><CreditCard className="h-4 w-4 mr-2" /> Nova Assinatura</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Nova Assinatura</DialogTitle></DialogHeader>
@@ -174,7 +182,6 @@ export function SubscriptionsTab() {
         </Dialog>
       </div>
 
-      {/* Payment dialog */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Registrar Pagamento</DialogTitle></DialogHeader>
@@ -192,21 +199,21 @@ export function SubscriptionsTab() {
         </DialogContent>
       </Dialog>
 
-      {subscriptions.length === 0 ? (
+      {latestSubs.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-40" />
             <p>Nenhuma assinatura ativa</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {subscriptions.map(sub => (
+          {latestSubs.map(sub => (
             <Card key={sub.id}>
               <CardContent className="flex items-center justify-between p-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold">{getRestaurantName(sub.restaurant_id)}</span>
+                    <span className="font-medium">{getRestaurantName(sub.restaurant_id)}</span>
                     {statusBadge(sub.status)}
                   </div>
                   <p className="text-sm text-muted-foreground">Plano: {getPlanName(sub.plan_id)}</p>

@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LogOut, Code, Monitor, Store, Loader2, Tag, Layers, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { VersionsTab } from "@/components/dev/VersionsTab";
+import { RemoteConfigsTab } from "@/components/dev/RemoteConfigsTab";
 
 const DevDashboard = () => {
   const navigate = useNavigate();
@@ -43,32 +44,32 @@ const DevDashboard = () => {
   const handleLogout = async () => { await supabase.auth.signOut(); navigate("/admin-panel"); };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">Painel Dev — Menu's</h1>
-            <p className="text-muted-foreground mt-1">Gestão técnica do sistema</p>
+            <h1 className="text-2xl font-semibold text-foreground">Painel Dev — Menu's</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Gestão técnica do sistema</p>
           </div>
-          <Button onClick={handleLogout} variant="outline"><LogOut className="h-4 w-4 mr-2" /> Sair</Button>
+          <Button onClick={handleLogout} variant="outline" size="sm"><LogOut className="h-4 w-4 mr-2" /> Sair</Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Restaurantes Ativos</CardTitle></CardHeader>
-            <CardContent className="flex items-center gap-3"><Store className="h-8 w-8 text-primary opacity-60" /><p className="text-3xl font-bold text-primary">{restaurantCount}</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Restaurantes Ativos</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-semibold">{restaurantCount}</p></CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Versão Atual</CardTitle></CardHeader>
-            <CardContent className="flex items-center gap-3"><Tag className="h-8 w-8 text-green-500 opacity-60" /><p className="text-3xl font-bold text-green-600">{currentVersion || "—"}</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Versão Atual</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-semibold text-green-600">{currentVersion || "—"}</p></CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total de Versões</CardTitle></CardHeader>
-            <CardContent className="flex items-center gap-3"><Layers className="h-8 w-8 text-blue-500 opacity-60" /><p className="text-3xl font-bold text-blue-600">{totalVersions}</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total de Versões</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-semibold">{totalVersions}</p></CardContent>
           </Card>
         </div>
 
@@ -80,22 +81,13 @@ const DevDashboard = () => {
           </TabsList>
 
           <TabsContent value="versions"><VersionsTab /></TabsContent>
-
-          <TabsContent value="config">
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                <Settings className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium">Configurações Remotas</p>
-                <p className="text-sm">Em breve: Feature flags, avisos globais e configurações do sistema.</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <TabsContent value="config"><RemoteConfigsTab /></TabsContent>
 
           <TabsContent value="monitoring">
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                <Monitor className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium">Monitoramento</p>
+                <Monitor className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                <p className="font-medium">Monitoramento</p>
                 <p className="text-sm">Funcionalidade disponível quando o app desktop (Tauri) estiver ativo.</p>
               </CardContent>
             </Card>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut, Plus, Store, Trash2, Edit, CreditCard, Package, BarChart3, Loader2, TrendingUp, AlertTriangle, CalendarPlus, Badge } from "lucide-react";
+import { LogOut, Plus, Store, Trash2, Edit, CreditCard, Package, BarChart3, Loader2, TrendingUp, AlertTriangle, CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -20,8 +20,6 @@ interface Restaurant {
   name: string;
   slug: string;
   logo_url: string | null;
-  primary_color: string | null;
-  secondary_color: string | null;
   created_at: string;
 }
 
@@ -45,8 +43,6 @@ const CEODashboard = () => {
 
   const [formName, setFormName] = useState("");
   const [formSlug, setFormSlug] = useState("");
-  const [formPrimaryColor, setFormPrimaryColor] = useState("#FF6B35");
-  const [formSecondaryColor, setFormSecondaryColor] = useState("#1A1A1A");
   const [formUsername, setFormUsername] = useState("");
   const [formPassword, setFormPassword] = useState("");
 
@@ -66,25 +62,32 @@ const CEODashboard = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch restaurants
       const { data: restData } = await supabase.from("restaurants").select("*").order("created_at", { ascending: false });
       setRestaurants(restData || []);
 
-      // Fetch subscriptions with plan info
       const { data: subs } = await supabase
         .from("restaurant_subscriptions" as any)
-        .select("restaurant_id, status, plan_id") as any;
+        .select("restaurant_id, status, plan_id, created_at") as any;
 
       const { data: plans } = await supabase.from("subscription_plans").select("id, name, price");
 
       const planMap: Record<string, { name: string; price: number }> = {};
       (plans || []).forEach((p: any) => { planMap[p.id] = { name: p.name, price: p.price }; });
 
+      // Group by restaurant, keep only the most recent subscription
+      const latestByRestaurant: Record<string, any> = {};
+      ((subs as any[]) || []).forEach((s: any) => {
+        const existing = latestByRestaurant[s.restaurant_id];
+        if (!existing || new Date(s.created_at) > new Date(existing.created_at)) {
+          latestByRestaurant[s.restaurant_id] = s;
+        }
+      });
+
       const subMap: Record<string, SubscriptionInfo> = {};
       let mrrTotal = 0;
       let delinquent = 0;
 
-      ((subs as any[]) || []).forEach((s: any) => {
+      Object.values(latestByRestaurant).forEach((s: any) => {
         const plan = planMap[s.plan_id];
         subMap[s.restaurant_id] = {
           restaurant_id: s.restaurant_id,
@@ -100,7 +103,6 @@ const CEODashboard = () => {
       setMrr(mrrTotal);
       setDelinquentCount(delinquent);
 
-      // New this month
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
@@ -117,13 +119,10 @@ const CEODashboard = () => {
     if (restaurant) {
       setEditingRestaurant(restaurant);
       setFormName(restaurant.name); setFormSlug(restaurant.slug);
-      setFormPrimaryColor(restaurant.primary_color || "#FF6B35");
-      setFormSecondaryColor(restaurant.secondary_color || "#1A1A1A");
       setFormUsername(""); setFormPassword("");
     } else {
       setEditingRestaurant(null);
       setFormName(""); setFormSlug("");
-      setFormPrimaryColor("#FF6B35"); setFormSecondaryColor("#1A1A1A");
       setFormUsername(""); setFormPassword("");
     }
     setDialogOpen(true);
@@ -134,13 +133,13 @@ const CEODashboard = () => {
     try {
       if (editingRestaurant) {
         const { error } = await supabase.from("restaurants")
-          .update({ name: formName, slug: formSlug, primary_color: formPrimaryColor, secondary_color: formSecondaryColor })
+          .update({ name: formName, slug: formSlug })
           .eq("id", editingRestaurant.id);
         if (error) throw error;
         toast.success("Restaurante atualizado com sucesso!");
       } else {
         const { data: restaurant, error } = await supabase.from("restaurants")
-          .insert({ name: formName, slug: formSlug, primary_color: formPrimaryColor, secondary_color: formSecondaryColor })
+          .insert({ name: formName, slug: formSlug })
           .select().single();
         if (error) throw error;
         if (formUsername && formPassword) {
@@ -148,7 +147,6 @@ const CEODashboard = () => {
             .insert({ restaurant_id: restaurant.id, username: formUsername, password_hash: formPassword } as any);
           if (credError) throw credError;
 
-          // Create default admin staff account
           const allSections = [
             "pedidos-online","pedidos-locais","pdv","mesas-reservas","cardapio","caixa",
             "estoque","custos","margens","relatorios","clientes","fidelidade","marketing",
@@ -194,36 +192,36 @@ const CEODashboard = () => {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">Painel CEO — Menu's</h1>
-            <p className="text-muted-foreground mt-1">Gerencie restaurantes, planos e assinaturas</p>
+            <h1 className="text-2xl font-semibold text-foreground">Painel CEO — Menu's</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Gerencie restaurantes, planos e assinaturas</p>
           </div>
-          <Button onClick={handleLogout} variant="outline"><LogOut className="h-4 w-4 mr-2" /> Sair</Button>
+          <Button onClick={handleLogout} variant="outline" size="sm"><LogOut className="h-4 w-4 mr-2" /> Sair</Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total de Restaurantes</CardTitle></CardHeader>
-            <CardContent className="flex items-center gap-3"><Store className="h-8 w-8 text-primary opacity-60" /><p className="text-3xl font-bold text-primary">{restaurants.length}</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Restaurantes</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-semibold">{restaurants.length}</p></CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">MRR (Receita Mensal)</CardTitle></CardHeader>
-            <CardContent className="flex items-center gap-3"><TrendingUp className="h-8 w-8 text-green-500 opacity-60" /><p className="text-3xl font-bold text-green-600">R$ {mrr.toFixed(2)}</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">MRR</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-semibold text-green-600">R$ {mrr.toFixed(2)}</p></CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Inadimplentes</CardTitle></CardHeader>
-            <CardContent className="flex items-center gap-3"><AlertTriangle className="h-8 w-8 text-amber-500 opacity-60" /><p className="text-3xl font-bold text-amber-600">{delinquentCount}</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Inadimplentes</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-semibold text-amber-600">{delinquentCount}</p></CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Novos este Mês</CardTitle></CardHeader>
-            <CardContent className="flex items-center gap-3"><CalendarPlus className="h-8 w-8 text-blue-500 opacity-60" /><p className="text-3xl font-bold text-blue-600">{newThisMonth}</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Novos este Mês</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-semibold">{newThisMonth}</p></CardContent>
           </Card>
         </div>
 
@@ -241,7 +239,7 @@ const CEODashboard = () => {
                 <div><CardTitle>Restaurantes Cadastrados</CardTitle><CardDescription>Gerencie os restaurantes da plataforma</CardDescription></div>
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={() => handleOpenDialog()}><Plus className="h-4 w-4 mr-2" /> Novo Restaurante</Button>
+                    <Button onClick={() => handleOpenDialog()} size="sm"><Plus className="h-4 w-4 mr-2" /> Novo Restaurante</Button>
                   </DialogTrigger>
                   <DialogContent className="max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
@@ -256,16 +254,6 @@ const CEODashboard = () => {
                       <div className="space-y-2">
                         <Label htmlFor="slug">Slug (URL)</Label>
                         <Input id="slug" value={formSlug} onChange={(e) => setFormSlug(e.target.value)} placeholder="Ex: pizzaria-do-joao" required />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Cor Primária</Label>
-                          <div className="flex gap-2"><Input type="color" value={formPrimaryColor} onChange={(e) => setFormPrimaryColor(e.target.value)} className="w-20 h-10" /><Input value={formPrimaryColor} onChange={(e) => setFormPrimaryColor(e.target.value)} /></div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Cor Secundária</Label>
-                          <div className="flex gap-2"><Input type="color" value={formSecondaryColor} onChange={(e) => setFormSecondaryColor(e.target.value)} className="w-20 h-10" /><Input value={formSecondaryColor} onChange={(e) => setFormSecondaryColor(e.target.value)} /></div>
-                        </div>
                       </div>
                       {!editingRestaurant && (
                         <>
@@ -286,13 +274,13 @@ const CEODashboard = () => {
                     {restaurants.map((restaurant) => {
                       const sub = subscriptionMap[restaurant.id];
                       return (
-                        <div key={restaurant.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors">
+                        <div key={restaurant.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${restaurant.primary_color || '#FF6B35'}, ${restaurant.secondary_color || '#1A1A1A'})` }}>
-                              <Store className="h-6 w-6 text-white" />
+                            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                              <Store className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div>
-                              <p className="font-semibold">{restaurant.name}</p>
+                              <p className="font-medium">{restaurant.name}</p>
                               <p className="text-sm text-muted-foreground">/{restaurant.slug}</p>
                             </div>
                             <div className="hidden md:flex items-center gap-3 ml-4">
