@@ -4,9 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Printer, RefreshCw, AlertCircle, CheckCircle2, Monitor } from "lucide-react";
+import { Printer, RefreshCw, AlertCircle, CheckCircle2, Monitor, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { isElectronApp } from "@/lib/localDB";
+import { supabase } from "@/integrations/supabase/client";
 
 // Type assertions for Electron APIs
 const getElectronPrinter = () => (window as any).electronPrinter;
@@ -33,30 +34,45 @@ interface PrinterConfig {
   };
 }
 
+interface WebPrinterConfig {
+  paperSize: string;
+  autoPrintOrders: boolean;
+  autoPrintReceipts: boolean;
+}
+
 const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
-  const [isElectron, setIsElectron] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const isElectron = isElectronApp();
+
+  // Electron config
   const [config, setConfig] = useState<PrinterConfig>({
     comanda: { printerName: '', paperSize: '80mm', autoPrint: false },
     cupom: { printerName: '', paperSize: '80mm', autoPrint: false }
   });
 
+  // Web config
+  const [webConfig, setWebConfig] = useState<WebPrinterConfig>({
+    paperSize: '80mm',
+    autoPrintOrders: false,
+    autoPrintReceipts: false,
+  });
+
   useEffect(() => {
-    const checkElectron = isElectronApp();
-    setIsElectron(checkElectron);
-    
-    if (checkElectron) {
+    if (isElectron) {
       loadPrinters();
-      loadConfig();
+      loadElectronConfig();
+    } else {
+      loadWebConfig();
     }
   }, [restaurantId]);
 
+  // ── Electron helpers ──────────────────────────────────────
   const loadPrinters = async () => {
     const electronPrinter = getElectronPrinter();
     if (!electronPrinter) return;
-    
     setLoading(true);
     try {
       const list = await electronPrinter.getList();
@@ -69,10 +85,9 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  const loadConfig = async () => {
+  const loadElectronConfig = async () => {
     const electronDB = getElectronDB();
     if (!electronDB) return;
-    
     try {
       const savedConfig = await electronDB.getPrinterConfig(restaurantId);
       if (savedConfig) {
@@ -94,10 +109,9 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  const saveConfig = async () => {
+  const saveElectronConfig = async () => {
     const electronDB = getElectronDB();
     if (!electronDB) return;
-    
     try {
       await electronDB.savePrinterConfig({
         restaurant_id: restaurantId,
@@ -115,26 +129,17 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  const testPrint = async (type: 'comanda' | 'cupom') => {
+  const testElectronPrint = async (type: 'comanda' | 'cupom') => {
     const electronPrinter = getElectronPrinter();
     if (!electronPrinter) return;
-    
     const printerName = config[type].printerName;
     const paperSize = config[type].paperSize;
-    
-    if (!printerName) {
-      toast.error('Selecione uma impressora primeiro');
-      return;
-    }
-
+    if (!printerName) { toast.error('Selecione uma impressora primeiro'); return; }
     setTesting(type);
     try {
       const result = await electronPrinter.test(printerName, paperSize);
-      if (result.success) {
-        toast.success('Impressão de teste enviada!');
-      } else {
-        toast.error(result.error || 'Erro ao imprimir');
-      }
+      if (result.success) toast.success('Impressão de teste enviada!');
+      else toast.error(result.error || 'Erro ao imprimir');
     } catch (error) {
       console.error('Test print error:', error);
       toast.error('Erro ao imprimir teste');
@@ -143,31 +148,214 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  // Show web-only message
+  // ── Web helpers ───────────────────────────────────────────
+  const loadWebConfig = async () => {
+    try {
+      const { data } = await supabase
+        .from('printer_settings')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+      if (data) {
+        setWebConfig({
+          paperSize: data.paper_size || '80mm',
+          autoPrintOrders: Boolean(data.auto_print_orders),
+          autoPrintReceipts: Boolean(data.auto_print_receipts),
+        });
+      }
+    } catch (error) {
+      console.error('Error loading web printer config:', error);
+    }
+  };
+
+  const saveWebConfig = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('printer_settings')
+        .upsert({
+          restaurant_id: restaurantId,
+          paper_size: webConfig.paperSize,
+          auto_print_orders: webConfig.autoPrintOrders,
+          auto_print_receipts: webConfig.autoPrintReceipts,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'restaurant_id' });
+      if (error) throw error;
+      toast.success('Configurações salvas!');
+    } catch (error) {
+      console.error('Error saving web config:', error);
+      toast.error('Erro ao salvar configurações');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const testWebPrint = () => {
+    setTesting('web');
+    const width = webConfig.paperSize === '58mm' ? '58mm' : '80mm';
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) {
+      toast.error('Popup bloqueado. Permita popups para imprimir.');
+      setTesting(null);
+      return;
+    }
+    printWindow.document.write(`
+      <html>
+      <head>
+        <title>Teste de Impressão</title>
+        <style>
+          @page { margin: 0; size: ${width} auto; }
+          body { font-family: monospace; width: ${width}; margin: 0 auto; padding: 8px; font-size: 12px; }
+          .center { text-align: center; }
+          .line { border-top: 1px dashed #000; margin: 8px 0; }
+          h2 { margin: 4px 0; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="center">
+          <h2>*** TESTE DE IMPRESSÃO ***</h2>
+          <p>Menu's - Sistema de Gestão</p>
+        </div>
+        <div class="line"></div>
+        <p>Tamanho do papel: ${width}</p>
+        <p>Data: ${new Date().toLocaleString('pt-BR')}</p>
+        <div class="line"></div>
+        <table style="width:100%">
+          <tr><td>Item Exemplo 1</td><td style="text-align:right">R$ 25,90</td></tr>
+          <tr><td>Item Exemplo 2</td><td style="text-align:right">R$ 18,50</td></tr>
+          <tr><td>Item Exemplo 3</td><td style="text-align:right">R$ 32,00</td></tr>
+        </table>
+        <div class="line"></div>
+        <table style="width:100%">
+          <tr><td><strong>TOTAL</strong></td><td style="text-align:right"><strong>R$ 76,40</strong></td></tr>
+        </table>
+        <div class="line"></div>
+        <div class="center">
+          <p>✓ Impressão funcionando!</p>
+          <p>Obrigado pela preferência</p>
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      setTesting(null);
+    }, 500);
+  };
+
+  // ── Render: Web mode ──────────────────────────────────────
   if (!isElectron) {
     return (
       <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-bold">Impressoras</h2>
-          <p className="text-muted-foreground">Configure as impressoras para comandas e cupons</p>
+          <p className="text-muted-foreground">Configure a impressão de pedidos e cupons via navegador</p>
         </div>
 
+        {/* Como funciona */}
         <Card>
-          <CardContent className="py-12 text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Monitor className="h-12 w-12 text-muted-foreground" />
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Impressão via Navegador
+            </CardTitle>
+            <CardDescription>
+              Na versão web, a impressão usa o diálogo nativo do navegador (Ctrl+P / Cmd+P)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-3">
+              <CheckCircle2 className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">Como configurar:</p>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Instale o driver da impressora térmica no seu computador</li>
+                  <li>Conecte a impressora (USB, rede ou Bluetooth)</li>
+                  <li>Escolha o tamanho do papel abaixo</li>
+                  <li>Clique em "Testar Impressão" para verificar</li>
+                  <li>No diálogo de impressão do navegador, selecione sua impressora térmica</li>
+                  <li>Salve as configurações</li>
+                </ol>
+              </div>
             </div>
-            <h3 className="text-lg font-medium mb-2">Disponível apenas na versão Desktop</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              A configuração de impressoras está disponível apenas na versão desktop (Windows) do Menu's. 
-              Baixe o instalador .exe para usar esta funcionalidade.
-            </p>
           </CardContent>
         </Card>
+
+        {/* Configurações */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Printer className="h-5 w-5" />
+              Configurações de Impressão
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-2 max-w-xs">
+              <Label>Tamanho do Papel</Label>
+              <Select
+                value={webConfig.paperSize}
+                onValueChange={(value) => setWebConfig(prev => ({ ...prev, paperSize: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="80mm">80mm (padrão)</SelectItem>
+                  <SelectItem value="58mm">58mm</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label>Auto-abrir impressão de pedidos</Label>
+                <p className="text-sm text-muted-foreground">
+                  Abrir automaticamente o diálogo de impressão quando um novo pedido chegar
+                </p>
+              </div>
+              <Switch
+                checked={webConfig.autoPrintOrders}
+                onCheckedChange={(checked) => setWebConfig(prev => ({ ...prev, autoPrintOrders: checked }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label>Auto-abrir impressão de cupons</Label>
+                <p className="text-sm text-muted-foreground">
+                  Abrir automaticamente o diálogo de impressão ao fechar uma conta
+                </p>
+              </div>
+              <Switch
+                checked={webConfig.autoPrintReceipts}
+                onCheckedChange={(checked) => setWebConfig(prev => ({ ...prev, autoPrintReceipts: checked }))}
+              />
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={testWebPrint}
+              disabled={testing === 'web'}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              {testing === 'web' ? 'Abrindo...' : 'Testar Impressão'}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Save */}
+        <div className="flex justify-end">
+          <Button onClick={saveWebConfig} disabled={saving}>
+            {saving ? 'Salvando...' : 'Salvar Configurações'}
+          </Button>
+        </div>
       </div>
     );
   }
 
+  // ── Render: Electron mode (unchanged) ─────────────────────
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -175,11 +363,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           <h2 className="text-2xl font-bold">Impressoras</h2>
           <p className="text-muted-foreground">Configure as impressoras para comandas e cupons</p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={loadPrinters} 
-          disabled={loading}
-        >
+        <Button variant="outline" onClick={loadPrinters} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Atualizar Lista
         </Button>
@@ -200,51 +384,26 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
       {/* Impressora de Comandas */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Printer className="h-5 w-5" />
-            Impressora de Comandas
-          </CardTitle>
-          <CardDescription>
-            Impressora usada para imprimir pedidos que vão para a cozinha/bar
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2"><Printer className="h-5 w-5" />Impressora de Comandas</CardTitle>
+          <CardDescription>Impressora usada para imprimir pedidos que vão para a cozinha/bar</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Impressora</Label>
-              <Select
-                value={config.comanda.printerName}
-                onValueChange={(value) => setConfig(prev => ({
-                  ...prev,
-                  comanda: { ...prev.comanda, printerName: value }
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma impressora" />
-                </SelectTrigger>
+              <Select value={config.comanda.printerName} onValueChange={(v) => setConfig(p => ({ ...p, comanda: { ...p.comanda, printerName: v } }))}>
+                <SelectTrigger><SelectValue placeholder="Selecione uma impressora" /></SelectTrigger>
                 <SelectContent>
-                  {printers.map((printer) => (
-                    <SelectItem key={printer.name} value={printer.name}>
-                      {printer.displayName}
-                      {printer.isDefault && ' (Padrão)'}
-                    </SelectItem>
+                  {printers.map((p) => (
+                    <SelectItem key={p.name} value={p.name}>{p.displayName}{p.isDefault && ' (Padrão)'}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Tamanho do Papel</Label>
-              <Select
-                value={config.comanda.paperSize}
-                onValueChange={(value) => setConfig(prev => ({
-                  ...prev,
-                  comanda: { ...prev.comanda, paperSize: value }
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={config.comanda.paperSize} onValueChange={(v) => setConfig(p => ({ ...p, comanda: { ...p.comanda, paperSize: v } }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="80mm">80mm (padrão)</SelectItem>
                   <SelectItem value="58mm">58mm</SelectItem>
@@ -252,28 +411,14 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
               </Select>
             </div>
           </div>
-
           <div className="flex items-center justify-between py-2">
             <div>
               <Label>Auto-imprimir novos pedidos</Label>
-              <p className="text-sm text-muted-foreground">
-                Imprimir automaticamente quando um novo pedido chegar
-              </p>
+              <p className="text-sm text-muted-foreground">Imprimir automaticamente quando um novo pedido chegar</p>
             </div>
-            <Switch
-              checked={config.comanda.autoPrint}
-              onCheckedChange={(checked) => setConfig(prev => ({
-                ...prev,
-                comanda: { ...prev.comanda, autoPrint: checked }
-              }))}
-            />
+            <Switch checked={config.comanda.autoPrint} onCheckedChange={(c) => setConfig(p => ({ ...p, comanda: { ...p.comanda, autoPrint: c } }))} />
           </div>
-
-          <Button
-            variant="outline"
-            onClick={() => testPrint('comanda')}
-            disabled={testing === 'comanda' || !config.comanda.printerName}
-          >
+          <Button variant="outline" onClick={() => testElectronPrint('comanda')} disabled={testing === 'comanda' || !config.comanda.printerName}>
             <Printer className="h-4 w-4 mr-2" />
             {testing === 'comanda' ? 'Imprimindo...' : 'Testar Impressão'}
           </Button>
@@ -283,51 +428,26 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
       {/* Impressora de Cupons */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Printer className="h-5 w-5" />
-            Impressora de Cupons
-          </CardTitle>
-          <CardDescription>
-            Impressora usada para imprimir recibos para o cliente
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2"><Printer className="h-5 w-5" />Impressora de Cupons</CardTitle>
+          <CardDescription>Impressora usada para imprimir recibos para o cliente</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Impressora</Label>
-              <Select
-                value={config.cupom.printerName}
-                onValueChange={(value) => setConfig(prev => ({
-                  ...prev,
-                  cupom: { ...prev.cupom, printerName: value }
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma impressora" />
-                </SelectTrigger>
+              <Select value={config.cupom.printerName} onValueChange={(v) => setConfig(p => ({ ...p, cupom: { ...p.cupom, printerName: v } }))}>
+                <SelectTrigger><SelectValue placeholder="Selecione uma impressora" /></SelectTrigger>
                 <SelectContent>
-                  {printers.map((printer) => (
-                    <SelectItem key={printer.name} value={printer.name}>
-                      {printer.displayName}
-                      {printer.isDefault && ' (Padrão)'}
-                    </SelectItem>
+                  {printers.map((p) => (
+                    <SelectItem key={p.name} value={p.name}>{p.displayName}{p.isDefault && ' (Padrão)'}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Tamanho do Papel</Label>
-              <Select
-                value={config.cupom.paperSize}
-                onValueChange={(value) => setConfig(prev => ({
-                  ...prev,
-                  cupom: { ...prev.cupom, paperSize: value }
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={config.cupom.paperSize} onValueChange={(v) => setConfig(p => ({ ...p, cupom: { ...p.cupom, paperSize: v } }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="80mm">80mm (padrão)</SelectItem>
                   <SelectItem value="58mm">58mm</SelectItem>
@@ -335,19 +455,14 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
               </Select>
             </div>
           </div>
-
-          <Button
-            variant="outline"
-            onClick={() => testPrint('cupom')}
-            disabled={testing === 'cupom' || !config.cupom.printerName}
-          >
+          <Button variant="outline" onClick={() => testElectronPrint('cupom')} disabled={testing === 'cupom' || !config.cupom.printerName}>
             <Printer className="h-4 w-4 mr-2" />
             {testing === 'cupom' ? 'Imprimindo...' : 'Testar Impressão'}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Info Card */}
+      {/* Info */}
       <Card>
         <CardContent className="py-4">
           <div className="flex gap-3">
@@ -367,11 +482,9 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
         </CardContent>
       </Card>
 
-      {/* Save Button */}
+      {/* Save */}
       <div className="flex justify-end">
-        <Button onClick={saveConfig}>
-          Salvar Configurações
-        </Button>
+        <Button onClick={saveElectronConfig}>Salvar Configurações</Button>
       </div>
     </div>
   );
