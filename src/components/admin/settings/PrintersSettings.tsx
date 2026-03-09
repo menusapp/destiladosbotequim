@@ -310,9 +310,9 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
 
             <div className="flex items-center justify-between py-2">
               <div>
-                <Label>Auto-abrir impressão de pedidos</Label>
+                <Label>Imprimir ao aceitar pedido</Label>
                 <p className="text-sm text-muted-foreground">
-                  Abrir automaticamente o diálogo de impressão quando um novo pedido chegar
+                  Ao aceitar um pedido, abre automaticamente o diálogo de impressão com a comanda formatada
                 </p>
               </div>
               <Switch
@@ -323,9 +323,9 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
 
             <div className="flex items-center justify-between py-2">
               <div>
-                <Label>Auto-abrir impressão de cupons</Label>
+                <Label>Imprimir cupom ao fechar conta</Label>
                 <p className="text-sm text-muted-foreground">
-                  Abrir automaticamente o diálogo de impressão ao fechar uma conta
+                  Ao marcar uma conta como paga, abre automaticamente o diálogo de impressão do cupom
                 </p>
               </div>
               <Switch
