@@ -159,7 +159,7 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
   };
 
   const handleCopyLink = () => {
-    const link = `${window.location.origin}/delivery/${restaurantSlug}`;
+    const link = `${window.location.origin}/${restaurantSlug}`;
     navigator.clipboard.writeText(link);
     toast.success("Link copiado para a área de transferência!");
   };
@@ -206,7 +206,7 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
               <div className="flex gap-2">
                 <Input
                   id="delivery-link"
-                  value={`${window.location.origin}/delivery/${restaurantSlug}`}
+                  value={`${window.location.origin}/${restaurantSlug}`}
                   readOnly
                   className="flex-1"
                 />

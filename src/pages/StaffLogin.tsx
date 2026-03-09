@@ -19,7 +19,7 @@ const StaffLogin = () => {
 
   // If no restaurant session, redirect to landing
   if (!restaurantId || !restaurantName) {
-    navigate("/");
+    navigate("/login");
     return null;
   }
 
@@ -42,8 +42,9 @@ const StaffLogin = () => {
         localStorage.setItem("staff_name", staff.display_name);
         localStorage.setItem("staff_role", staff.role);
         localStorage.setItem("staff_allowed_sections", JSON.stringify(staff.allowed_sections));
+        const slug = localStorage.getItem("restaurant_slug") || restaurantId;
         toast.success(`Bem-vindo, ${staff.display_name}!`);
-        navigate("/admin");
+        navigate(`/${slug}/admin`);
       } else {
         toast.error("Credenciais inválidas");
       }
@@ -57,7 +58,8 @@ const StaffLogin = () => {
   const handleBackToRestaurantLogin = () => {
     localStorage.removeItem("restaurant_id");
     localStorage.removeItem("restaurant_name");
-    navigate("/");
+    localStorage.removeItem("restaurant_slug");
+    navigate("/login");
   };
 
   return (

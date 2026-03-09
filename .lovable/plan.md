@@ -1,103 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plano: Reestruturação de Rotas + Landing Page Comercial
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
-### Nova Estrutura de URLs
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
+
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
+
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
+
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+
+Detalhes técnicos:
 ```text
-menusapp.com.br/                    → Landing page comercial (planos, features)
-menusapp.com.br/login               → Login do restaurante (atual Landing)
-menusapp.com.br/login/staff         → Login do staff (atual StaffLogin)
-menusapp.com.br/admin-panel         → Login CEO/Dev (sem mudança)
-menusapp.com.br/admin-panel/ceo     → Painel CEO
-menusapp.com.br/admin-panel/dev     → Painel Dev
-
-menusapp.com.br/:slug               → Cardápio delivery (atual DeliveryMenu)
-menusapp.com.br/:slug/mesa/:numero  → Cardápio local/mesa (atual Menu)
-menusapp.com.br/:slug/comanda/:num  → Comanda da mesa (atual Comanda)
-menusapp.com.br/:slug/pedido/:id    → Confirmação de pedido
-menusapp.com.br/:slug/reservas      → Reservas
-menusapp.com.br/:slug/admin         → Painel admin do restaurante
-menusapp.com.br/:slug/admin/mesa/:id → Detalhe mesa (admin)
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
 ```
 
-**Futuro VPS (subdomínio):**
-```text
-rods.menusapp.com.br/               → Cardápio delivery
-rods.menusapp.com.br/mesa/1         → Mesa 1
-rods.menusapp.com.br/admin          → Painel admin
-```
-
-### 1. Landing Page Comercial (NOVO)
-
-Nova página `src/pages/LandingPage.tsx` — página de vendas do Menu's:
-- Hero section com headline, subtítulo e CTA
-- Seção de features/benefícios (cardápio digital, pedidos, delivery, gestão)
-- Seção de planos/preços (3 cards: Básico, Intermediário, Completo) — botões de compra como placeholder por agora
-- Seção de depoimentos/social proof
-- Footer com links
-- Design profissional com a identidade laranja (#FF6B00)
-- Totalmente responsivo (mobile-first)
-
-### 2. Reestruturação de Rotas (`App.tsx`)
-
-Mover as rotas existentes para a nova estrutura:
-
-| Rota antiga | Rota nova |
-|---|---|
-| `/` (login restaurante) | `/login` |
-| `/staff-login` | `/login/staff` |
-| `/admin` | `/:slug/admin` |
-| `/admin/table/:tableId` | `/:slug/admin/mesa/:tableId` |
-| `/delivery/:restaurantSlug` | `/:slug` |
-| `/menu/:restaurantSlug/:tableNumber` | `/:slug/mesa/:tableNumber` |
-| `/comanda/:restaurantSlug/:tableNumber` | `/:slug/comanda/:tableNumber` |
-| `/delivery/:restaurantSlug/pedido/:orderId` | `/:slug/pedido/:orderId` |
-| `/reservas/:restaurantSlug` | `/:slug/reservas` |
-
-**Importante:** A rota `/:slug` é um catch-all dinâmico — precisa ficar DEPOIS das rotas fixas (`/login`, `/admin-panel`) para não conflitar.
-
-### 3. Adaptar Componentes para Novas Rotas
-
-**Páginas que usam `useParams` para `restaurantSlug`:**
-- `DeliveryMenu.tsx` — mudar param de `restaurantSlug` para `slug`
-- `Menu.tsx` — mudar param de `restaurantSlug` para `slug`  
-- `Comanda.tsx` — mudar param de `restaurantSlug` para `slug`
-- `OrderConfirmation.tsx` — mudar param
-- `Reservations.tsx` — mudar param
-
-**Páginas de admin:**
-- `RestaurantAdmin.tsx` — agora recebe `:slug` da URL, busca restaurant por slug em vez de localStorage (ou valida que o slug bate com o localStorage)
-- `Landing.tsx` → renomear para `RestaurantLogin.tsx`, redirecionar para `/login/staff` após login
-- `StaffLogin.tsx` — redirecionar para `/:slug/admin` após login (usando slug do localStorage)
-
-**Navegação interna:**
-- `AdminHeader.tsx` — links de logout para `/login`
-- `AppSidebar.tsx` — se tiver links internos, ajustar
-- Componentes de checkout/delivery — ajustar links de confirmação de pedido
-
-### 4. Helper de Subdomínio (preparação VPS)
-
-Criar `src/lib/slugResolver.ts`:
-- Função `getSlugFromURL()` que verifica:
-  1. Se há subdomínio (ex: `rods.menusapp.com.br`) → retorna `rods`
-  2. Senão, retorna o slug do path da URL
-- Usado pelos componentes públicos para resolver o restaurante
-- No Lovable funciona por path; na VPS funciona por subdomínio automaticamente
-
-### Arquivos
-
-- **Criar:** `src/pages/LandingPage.tsx` (landing comercial)
-- **Criar:** `src/lib/slugResolver.ts` (helper subdomínio)
-- **Renomear/Editar:** `src/pages/Landing.tsx` → `src/pages/RestaurantLogin.tsx`
-- **Editar:** `src/App.tsx` (rotas)
-- **Editar:** `src/pages/StaffLogin.tsx` (redirect)
-- **Editar:** `src/pages/RestaurantAdmin.tsx` (slug na URL)
-- **Editar:** `src/pages/DeliveryMenu.tsx` (param slug)
-- **Editar:** `src/pages/Menu.tsx` (param slug)
-- **Editar:** `src/pages/Comanda.tsx` (param slug)
-- **Editar:** `src/pages/OrderConfirmation.tsx` (param slug)
-- **Editar:** `src/pages/Reservations.tsx` (param slug)
-- **Editar:** `src/components/admin/AdminHeader.tsx` (links)
-- **Editar:** `src/components/ProtectedRoute.tsx` (ajustar redirect)
-
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.

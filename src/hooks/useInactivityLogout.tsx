@@ -17,7 +17,7 @@ export const useInactivityLogout = () => {
     timeoutRef.current = setTimeout(async () => {
       await supabase.auth.signOut();
       toast.info("Sessão expirada por inatividade");
-      navigate("/");
+      navigate("/login");
     }, INACTIVITY_TIMEOUT);
   };
 

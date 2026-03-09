@@ -60,7 +60,7 @@ export const AdminHeader = ({
     setUpdatingOpen(false);
   };
 
-  const menuUrl = `${window.location.origin}/delivery/${restaurantSlug}`;
+  const menuUrl = `${window.location.origin}/${restaurantSlug}`;
 
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(menuUrl);
@@ -74,7 +74,7 @@ export const AdminHeader = ({
     localStorage.removeItem('staff_role');
     localStorage.removeItem('staff_allowed_sections');
     toast.success("Logout realizado com sucesso");
-    navigate("/staff-login");
+    navigate("/login/staff");
   };
 
   const handleFullLogout = () => {
@@ -83,9 +83,10 @@ export const AdminHeader = ({
     localStorage.removeItem('staff_id');
     localStorage.removeItem('staff_name');
     localStorage.removeItem('staff_role');
+    localStorage.removeItem('restaurant_slug');
     localStorage.removeItem('staff_allowed_sections');
     toast.success("Logout realizado com sucesso");
-    navigate("/");
+    navigate("/login");
   };
 
   const userName = localStorage.getItem('staff_name') || localStorage.getItem('restaurant_name') || 'Usuário';

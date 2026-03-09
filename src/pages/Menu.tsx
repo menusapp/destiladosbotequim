@@ -17,7 +17,7 @@ import { ReviewModal } from "@/components/menu/ReviewModal";
 import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
 
 const Menu = () => {
-  const { restaurantSlug, tableNumber } = useParams();
+  const { slug: restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -1075,7 +1075,7 @@ const Menu = () => {
           status={comandaStatus}
           isVisible={showComandaBar}
           hasSubmittedOrders={hasOpenComanda}
-          onViewComanda={() => navigate(`/comanda/${restaurantSlug}/${tableNumber}`)}
+          onViewComanda={() => navigate(`/${restaurantSlug}/comanda/${tableNumber}`)}
         />
       )}
 
@@ -1120,7 +1120,7 @@ const Menu = () => {
         onAddMoreItems={() => setShowCartDrawer(false)}
         onContinue={() => {
           setShowCartDrawer(false);
-          navigate(`/comanda/${restaurantSlug}/${tableNumber}`);
+          navigate(`/${restaurantSlug}/comanda/${tableNumber}`);
         }}
         mode="local"
       />

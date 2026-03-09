@@ -91,7 +91,7 @@ const getStatusConfig = (status: string, deliveryType?: string) => {
 };
 
 export default function OrderConfirmation() {
-  const { restaurantSlug, orderId } = useParams();
+  const { slug: restaurantSlug, orderId } = useParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -304,7 +304,7 @@ export default function OrderConfirmation() {
             <p className="text-muted-foreground mb-4">
               Não foi possível encontrar este pedido
             </p>
-            <Button onClick={() => navigate(`/delivery/${restaurantSlug}`)}>
+            <Button onClick={() => navigate(`/${restaurantSlug}`)}>
               Voltar ao Cardápio
             </Button>
           </CardContent>
@@ -481,7 +481,7 @@ export default function OrderConfirmation() {
         <Button
           className="w-full"
           size="lg"
-          onClick={() => navigate(`/delivery/${restaurantSlug}`)}
+          onClick={() => navigate(`/${restaurantSlug}`)}
         >
           Fazer Novo Pedido
         </Button>

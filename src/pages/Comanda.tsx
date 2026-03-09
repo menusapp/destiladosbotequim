@@ -108,7 +108,7 @@ interface CartItem {
 }
 
 const Comanda = () => {
-  const { restaurantSlug, tableNumber } = useParams();
+  const { slug: restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
   
   const [orders, setOrders] = useState<Order[]>([]);
@@ -228,7 +228,7 @@ const Comanda = () => {
         sessionStorage.removeItem("customerInfo");
         
         setTimeout(() => {
-          navigate(`/menu/${restaurantSlug}/${tableNumber}`);
+          navigate(`/${restaurantSlug}/mesa/${tableNumber}`);
         }, 2000);
       };
 
@@ -325,7 +325,7 @@ const Comanda = () => {
             sessionStorage.removeItem("customerInfo");
             
             setTimeout(() => {
-              navigate(`/menu/${restaurantSlug}/${tableNumber}`);
+              navigate(`/${restaurantSlug}/mesa/${tableNumber}`);
             }, 1500);
           }
         )
@@ -840,7 +840,7 @@ const Comanda = () => {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(`/menu/${restaurantSlug}/${tableNumber}`)}
+          onClick={() => navigate(`/${restaurantSlug}/mesa/${tableNumber}`)}
           className="mb-4 text-white hover:bg-white/20"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />

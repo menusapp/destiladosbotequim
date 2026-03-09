@@ -406,7 +406,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
   const copyTableLink = async (table: Table, e: React.MouseEvent) => {
     e.stopPropagation();
-    const link = `${window.location.origin}/menu/${restaurantSlug}/${table.table_number}`;
+    const link = `${window.location.origin}/${restaurantSlug}/mesa/${table.table_number}`;
     try {
       await navigator.clipboard.writeText(link);
       toast.success(`Link da Mesa ${table.table_number} copiado!`);
@@ -422,7 +422,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const downloadQRCode = async (table: Table) => {
-    const link = `${window.location.origin}/menu/${restaurantSlug}/${table.table_number}`;
+    const link = `${window.location.origin}/${restaurantSlug}/mesa/${table.table_number}`;
     const qrCode = await QRCode.toDataURL(link, { width: 512, margin: 2 });
     const downloadLink = document.createElement("a");
     downloadLink.href = qrCode;
@@ -516,7 +516,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleCopyReservationLink = () => {
-    const link = `${window.location.origin}/reservas/${restaurantSlug}`;
+    const link = `${window.location.origin}/${restaurantSlug}/reservas`;
     navigator.clipboard.writeText(link);
     toast.success("Link copiado!");
   };
