@@ -512,7 +512,7 @@ const LandingPage = () => {
         <ScrollReveal>
           <div className="max-w-4xl mx-auto px-4 text-center relative">
             <div className="rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/15 p-10 sm:p-16">
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-4 tracking-tight">
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-4 tracking-[-0.025em]">
                 Pronto para transformar seu restaurante?
               </h2>
               <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
