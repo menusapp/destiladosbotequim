@@ -1195,24 +1195,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
             </CardContent>
           </Card>
 
-          {reservationsEnabled && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="py-4">
-                <div className="flex flex-col md:flex-row md:items-center gap-4">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Link público para reservas:</p>
-                    <code className="text-sm text-muted-foreground">
-                      {window.location.origin}/reservas/{restaurantSlug}
-                    </code>
-                  </div>
-                  <Button variant="outline" onClick={handleCopyReservationLink}>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copiar Link
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          
 
           <Tabs defaultValue="pending" className="w-full">
             <TabsList className="grid w-full grid-cols-3 max-w-lg">
