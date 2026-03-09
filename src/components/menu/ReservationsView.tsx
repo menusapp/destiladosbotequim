@@ -232,10 +232,10 @@ export const ReservationsView = ({
       date.getDate() === now.getDate();
 
     if (isToday) {
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const bufferMinutes = now.getHours() * 60 + now.getMinutes() + 60;
       slots = slots.filter(slot => {
         const [h, m] = slot.split(":").map(Number);
-        return h * 60 + m > currentMinutes;
+        return h * 60 + m > bufferMinutes;
       });
     }
 
