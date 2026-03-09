@@ -139,7 +139,7 @@ const LandingPage = () => {
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-foreground tracking-tight leading-[1.08]">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-foreground tracking-[-0.025em] leading-[1.08]">
               O sistema completo
               <br />
               para <TypingEffect />
@@ -147,9 +147,9 @@ const LandingPage = () => {
           </ScrollReveal>
 
           <ScrollReveal delay={200}>
-            <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed font-light">
               Cardápio digital, pedidos online, delivery, estoque automático, financeiro, marketing e muito mais.
-              <span className="font-semibold text-foreground"> Tudo em uma só plataforma.</span>
+              <span className="font-medium text-foreground"> Tudo em uma só plataforma.</span>
             </p>
           </ScrollReveal>
 
@@ -184,8 +184,8 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Funções</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">Funções para você vender mais</h2>
-            <p className="mt-3 text-base text-muted-foreground max-w-xl mx-auto">Tudo o que você precisa num único lugar, sem ferramentas avulsas.</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Funções para você vender mais</h2>
+            <p className="mt-3 text-lg text-muted-foreground max-w-xl mx-auto font-light">Tudo o que você precisa num único lugar, sem ferramentas avulsas.</p>
           </ScrollReveal>
 
           {/* Horizontal scroll */}
@@ -197,8 +197,8 @@ const LandingPage = () => {
                     <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/15 group-hover:scale-110 transition-all duration-300">
                       <item.icon className="h-6 w-6 text-primary" />
                     </div>
-                    <h3 className="text-base font-bold text-foreground mb-1.5">{item.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
+                    <h3 className="text-base font-semibold text-foreground mb-1.5">{item.title}</h3>
+                     <p className="text-sm text-muted-foreground leading-relaxed font-light">{item.desc}</p>
                   </CardContent>
                 </Card>
               </ScrollReveal>
@@ -218,10 +218,10 @@ const LandingPage = () => {
             <div className="rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/15 p-8 sm:p-14 flex flex-col lg:flex-row gap-10 items-center">
               <div className="flex-1 space-y-5">
                 <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">WhatsApp</span>
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight tracking-[-0.025em]">
                   Marketing automático e central de alertas no WhatsApp
                 </h2>
-                <p className="text-base text-muted-foreground leading-relaxed">
+                <p className="text-base text-muted-foreground leading-relaxed font-light">
                   Crie campanhas de remarketing que disparam automaticamente. Cliente inativo? Ele recebe um cupom. Pedido confirmado? Notificação instantânea. Tudo sem você levantar um dedo.
                 </p>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -254,8 +254,8 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <ScrollReveal className="text-center mb-14">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Funcionalidades</span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-tight">Tudo que seu restaurante precisa</h2>
-            <p className="mt-3 text-base text-muted-foreground max-w-2xl mx-auto">Um sistema completo que substitui dezenas de ferramentas fragmentadas.</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">Tudo que seu restaurante precisa</h2>
+            <p className="mt-3 text-lg text-muted-foreground max-w-2xl mx-auto font-light">Um sistema completo que substitui dezenas de ferramentas fragmentadas.</p>
           </ScrollReveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -266,8 +266,8 @@ const LandingPage = () => {
                     <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/15 group-hover:scale-110 transition-all duration-300">
                       <f.icon className="h-6 w-6 text-primary" />
                     </div>
-                    <h3 className="text-lg font-bold text-foreground mb-2">{f.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">{f.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed font-light">{f.desc}</p>
                   </CardContent>
                 </Card>
               </ScrollReveal>
@@ -285,10 +285,10 @@ const LandingPage = () => {
           <div className="flex flex-col lg:flex-row gap-12 items-center">
             <ScrollReveal className="flex-1 space-y-5">
               <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">Operação</span>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight tracking-[-0.025em]">
                 Gestor de pedidos completo
               </h2>
-              <p className="text-base text-muted-foreground leading-relaxed">
+              <p className="text-base text-muted-foreground leading-relaxed font-light">
                 PDV integrado, app de garçom, comandas digitais e confirmação automática de pedidos. Gerencie toda a operação do balcão ao delivery num só lugar.
               </p>
               <ul className="space-y-3 pt-2">
@@ -321,10 +321,10 @@ const LandingPage = () => {
           <div className="flex flex-col lg:flex-row-reverse gap-12 items-center">
             <ScrollReveal className="flex-1 space-y-5">
               <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">Financeiro</span>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight tracking-[-0.025em]">
                 Visão completa do seu negócio
               </h2>
-              <p className="text-base text-muted-foreground leading-relaxed">
+              <p className="text-base text-muted-foreground leading-relaxed font-light">
                 DRE automático, fluxo de caixa diário, CMV por produto, custos fixos e variáveis — tudo calculado a partir das suas vendas reais. Pare de usar planilha.
               </p>
               <ul className="space-y-3 pt-2">
@@ -355,8 +355,8 @@ const LandingPage = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Segmentos</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">Versátil para diversos segmentos</h2>
-            <p className="mt-3 text-base text-muted-foreground">O Menu's se adapta ao seu tipo de negócio.</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Versátil para diversos segmentos</h2>
+            <p className="mt-3 text-lg text-muted-foreground font-light">O Menu's se adapta ao seu tipo de negócio.</p>
           </ScrollReveal>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -406,8 +406,8 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <ScrollReveal className="text-center mb-14">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Planos & Preços</span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-tight">Escolha o plano ideal</h2>
-            <p className="mt-3 text-base text-muted-foreground max-w-xl mx-auto">Sem fidelidade, sem multa. Comece agora e mude quando quiser.</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">Escolha o plano ideal</h2>
+            <p className="mt-3 text-lg text-muted-foreground max-w-xl mx-auto font-light">Sem fidelidade, sem multa. Comece agora e mude quando quiser.</p>
           </ScrollReveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-start">
@@ -460,7 +460,7 @@ const LandingPage = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-14">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Passo a passo</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">Como começar?</h2>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Como começar?</h2>
           </ScrollReveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -470,8 +470,8 @@ const LandingPage = () => {
                   <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
                     <span className="text-2xl font-extrabold text-primary">{s.num}</span>
                   </div>
-                  <h3 className="text-lg font-bold text-foreground">{s.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
+                  <h3 className="text-lg font-semibold text-foreground">{s.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed font-light">{s.desc}</p>
                 </div>
               </ScrollReveal>
             ))}
@@ -487,7 +487,7 @@ const LandingPage = () => {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">FAQ</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">Perguntas frequentes</h2>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Perguntas frequentes</h2>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
@@ -512,10 +512,10 @@ const LandingPage = () => {
         <ScrollReveal>
           <div className="max-w-4xl mx-auto px-4 text-center relative">
             <div className="rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/15 p-10 sm:p-16">
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-4 tracking-tight">
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-4 tracking-[-0.025em]">
                 Pronto para transformar seu restaurante?
               </h2>
-              <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
+              <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto font-light">
                 Comece hoje mesmo. Setup em menos de 2 minutos.
               </p>
               <Button size="lg" className="text-base px-10 h-13 font-bold shadow-lg shadow-primary/25" onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}>
