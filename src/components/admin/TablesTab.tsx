@@ -406,7 +406,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
   const copyTableLink = async (table: Table, e: React.MouseEvent) => {
     e.stopPropagation();
-    const link = `${window.location.origin}/menu/${restaurantSlug}/${table.table_number}`;
+    const link = `${window.location.origin}/${restaurantSlug}/mesa/${table.table_number}`;
     try {
       await navigator.clipboard.writeText(link);
       toast.success(`Link da Mesa ${table.table_number} copiado!`);
