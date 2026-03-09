@@ -58,8 +58,9 @@ const MercadoPagoCallback = () => {
         toast.error(errorMsg);
       } finally {
         // Always redirect back after a short delay
+        const slug = localStorage.getItem("restaurant_slug") || "";
         setTimeout(() => {
-          navigate("/admin", { replace: true });
+          navigate(slug ? `/${slug}/admin` : "/login", { replace: true });
         }, 2500);
       }
     };
