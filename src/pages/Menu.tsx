@@ -1075,7 +1075,7 @@ const Menu = () => {
           status={comandaStatus}
           isVisible={showComandaBar}
           hasSubmittedOrders={hasOpenComanda}
-          onViewComanda={() => navigate(`/comanda/${restaurantSlug}/${tableNumber}`)}
+          onViewComanda={() => navigate(`/${restaurantSlug}/comanda/${tableNumber}`)}
         />
       )}
 
