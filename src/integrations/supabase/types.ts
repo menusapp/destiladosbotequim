@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       app_versions: {
         Row: {
+          build_url: string | null
           created_at: string | null
           download_url_linux: string | null
           download_url_mac: string | null
@@ -26,6 +27,7 @@ export type Database = {
           version: string
         }
         Insert: {
+          build_url?: string | null
           created_at?: string | null
           download_url_linux?: string | null
           download_url_mac?: string | null
@@ -36,6 +38,7 @@ export type Database = {
           version: string
         }
         Update: {
+          build_url?: string | null
           created_at?: string | null
           download_url_linux?: string | null
           download_url_mac?: string | null
@@ -2475,6 +2478,36 @@ export type Database = {
           id?: string
           phone?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      remote_configs: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          updated_at?: string
+          value?: Json
         }
         Relationships: []
       }
