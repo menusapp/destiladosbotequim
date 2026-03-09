@@ -23,7 +23,8 @@ const MercadoPagoCallback = () => {
       setStatus("error");
       setMessage("Parâmetros inválidos no callback do Mercado Pago.");
       toast.error("Parâmetros inválidos no callback do Mercado Pago");
-      setTimeout(() => navigate("/admin", { replace: true }), 2000);
+      const slug = localStorage.getItem("restaurant_slug") || "";
+      setTimeout(() => navigate(slug ? `/${slug}/admin` : "/login", { replace: true }), 2000);
       return;
     }
 
