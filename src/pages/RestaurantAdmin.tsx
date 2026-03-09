@@ -125,13 +125,28 @@ const RestaurantAdmin = () => {
     }
   }, [hasActiveSubscription]);
 
+  // Read staff data from localStorage
+  const staffRole = localStorage.getItem('staff_role') || '';
+  const staffAllowedSections: string[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('staff_allowed_sections') || '[]');
+    } catch { return []; }
+  })();
+
   useEffect(() => {
     const restaurantId = localStorage.getItem('restaurant_id');
     const restaurantName = localStorage.getItem('restaurant_name');
+    const staffId = localStorage.getItem('staff_id');
     
     if (!restaurantId || !restaurantName) {
       toast.error("Você precisa estar logado para acessar esta página");
       navigate("/");
+      return;
+    }
+
+    // If no staff session, redirect to staff login
+    if (!staffId) {
+      navigate("/staff-login");
       return;
     }
 
