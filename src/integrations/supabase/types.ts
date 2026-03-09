@@ -2212,6 +2212,44 @@ export type Database = {
           },
         ]
       }
+      printer_settings: {
+        Row: {
+          auto_print_orders: boolean
+          auto_print_receipts: boolean
+          created_at: string | null
+          id: string
+          paper_size: string
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          auto_print_orders?: boolean
+          auto_print_receipts?: boolean
+          created_at?: string | null
+          id?: string
+          paper_size?: string
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          auto_print_orders?: boolean
+          auto_print_receipts?: boolean
+          created_at?: string | null
+          id?: string
+          paper_size?: string
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "printer_settings_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_complement_groups: {
         Row: {
           created_at: string | null
