@@ -2703,6 +2703,53 @@ export type Database = {
           },
         ]
       }
+      restaurant_staff: {
+        Row: {
+          allowed_sections: Json
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          password_hash: string
+          restaurant_id: string
+          role: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          allowed_sections?: Json
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          password_hash: string
+          restaurant_id: string
+          role?: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          allowed_sections?: Json
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          password_hash?: string
+          restaurant_id?: string
+          role?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_staff_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restaurant_subscriptions: {
         Row: {
           created_at: string | null
@@ -3399,6 +3446,19 @@ export type Database = {
         Returns: {
           restaurant_id: string
           restaurant_name: string
+        }[]
+      }
+      validate_staff_credentials: {
+        Args: {
+          p_password: string
+          p_restaurant_id: string
+          p_username: string
+        }
+        Returns: {
+          allowed_sections: Json
+          display_name: string
+          role: string
+          staff_id: string
         }[]
       }
     }

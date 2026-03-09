@@ -37,6 +37,7 @@ import PrintersSettings from "@/components/admin/settings/PrintersSettings";
 import WhatsAppSettings from "@/components/admin/settings/WhatsAppSettings";
 import OnlinePaymentsSettings from "@/components/admin/settings/OnlinePaymentsSettings";
 import FiscalTab from "@/components/admin/FiscalTab";
+import ContasTab from "@/components/admin/ContasTab";
 
 interface Restaurant {
   id: string;
@@ -124,13 +125,28 @@ const RestaurantAdmin = () => {
     }
   }, [hasActiveSubscription]);
 
+  // Read staff data from localStorage
+  const staffRole = localStorage.getItem('staff_role') || '';
+  const staffAllowedSections: string[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('staff_allowed_sections') || '[]');
+    } catch { return []; }
+  })();
+
   useEffect(() => {
     const restaurantId = localStorage.getItem('restaurant_id');
     const restaurantName = localStorage.getItem('restaurant_name');
+    const staffId = localStorage.getItem('staff_id');
     
     if (!restaurantId || !restaurantName) {
       toast.error("Você precisa estar logado para acessar esta página");
       navigate("/");
+      return;
+    }
+
+    // If no staff session, redirect to staff login
+    if (!staffId) {
+      navigate("/staff-login");
       return;
     }
 
@@ -483,10 +499,12 @@ const RestaurantAdmin = () => {
   }, [restaurant?.id, restaurant?.auto_open_close]);
 
   const handleLogout = () => {
-    localStorage.removeItem('restaurant_id');
-    localStorage.removeItem('restaurant_name');
+    localStorage.removeItem('staff_id');
+    localStorage.removeItem('staff_name');
+    localStorage.removeItem('staff_role');
+    localStorage.removeItem('staff_allowed_sections');
     toast.success("Logout realizado com sucesso");
-    navigate("/");
+    navigate("/staff-login");
   };
 
   const handleToggleRestaurant = async (isOpen: boolean) => {
@@ -629,9 +647,13 @@ const RestaurantAdmin = () => {
       case "fiscal":
         return <FiscalTab restaurantId={restaurant.id} />;
       
-      // Em Desenvolvimento
+      // Módulos
       case "modulos":
         return <ModulosTab restaurantId={restaurant.id} />;
+      
+      // Contas (admin only)
+      case "contas":
+        return staffRole === "admin" ? <ContasTab restaurantId={restaurant.id} /> : null;
       
       // Configurações - Subabas
       case "config-dados":
@@ -665,6 +687,8 @@ const RestaurantAdmin = () => {
           hasNewDeliveryOrders={hasNewDeliveryOrders}
           isSectionAllowed={isSectionAllowed}
           hasActiveSubscription={hasActiveSubscription}
+          staffRole={staffRole}
+          staffAllowedSections={staffAllowedSections}
         />
         <SidebarInset className="flex-1 flex flex-col">
           <AdminHeader

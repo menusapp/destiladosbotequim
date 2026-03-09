@@ -44,9 +44,11 @@ interface AppSidebarProps {
   hasNewDeliveryOrders?: boolean;
   isSectionAllowed?: (sectionId: string) => boolean;
   hasActiveSubscription?: boolean | null;
+  staffRole?: string;
+  staffAllowedSections?: string[];
 }
 
-export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed, hasActiveSubscription }: AppSidebarProps) {
+export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed, hasActiveSubscription, staffRole, staffAllowedSections }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
@@ -68,6 +70,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "marketing", label: "Marketing", icon: Megaphone },
       { id: "fiscal", label: "Fiscal", icon: FileText },
       { id: "modulos", label: "Módulos", icon: Construction },
+      ...(staffRole === "admin" ? [{ id: "contas", label: "Contas", icon: Users }] : []),
     ],
     configSubItems: [
       { id: "config-dados", label: "Dados da Empresa", icon: Building2 },
@@ -83,11 +86,18 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   const isConfigActive = activeSection.startsWith("config-");
   const checkAllowed = (id: string) => !isSectionAllowed || isSectionAllowed(id);
   
+  // Staff-based section filtering
+  const isStaffAllowed = (id: string) => {
+    if (!staffRole || staffRole === "admin") return true;
+    if (id === "contas") return false;
+    return staffAllowedSections?.includes(id) ?? true;
+  };
+
   const noSubscription = hasActiveSubscription === false;
   const filteredMain = noSubscription 
     ? menuStructure.main.filter(item => item.id === "modulos")
-    : menuStructure.main.filter(item => checkAllowed(item.id));
-  const filteredConfig = noSubscription ? [] : menuStructure.configSubItems.filter(item => checkAllowed(item.id));
+    : menuStructure.main.filter(item => checkAllowed(item.id) && isStaffAllowed(item.id));
+  const filteredConfig = noSubscription ? [] : menuStructure.configSubItems.filter(item => checkAllowed(item.id) && isStaffAllowed(item.id));
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background w-[240px]">

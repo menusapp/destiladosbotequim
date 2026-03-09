@@ -17,6 +17,7 @@ import DeliveryMenu from "./pages/DeliveryMenu";
 import OrderConfirmation from "./pages/OrderConfirmation";
 import Reservations from "./pages/Reservations";
 import NotFound from "./pages/NotFound";
+import StaffLogin from "./pages/StaffLogin";
 import { TableDetailView } from "./components/admin/TableDetailView";
 import MercadoPagoCallback from "./pages/MercadoPagoCallback";
 
@@ -44,6 +45,9 @@ const App = () => (
                 <DevDashboard />
               </ProtectedRoute>
             } />
+
+            {/* Staff Login */}
+            <Route path="/staff-login" element={<StaffLogin />} />
 
             {/* Restaurant Admin */}
             <Route path="/admin" element={
