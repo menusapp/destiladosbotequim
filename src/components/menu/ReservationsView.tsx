@@ -470,10 +470,16 @@ export const ReservationsView = ({
                     {table.description && (
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{table.description}</p>
                     )}
+                    {isReserved && (
+                      <Badge className="bg-red-100 text-red-800 border-red-200 mt-1 text-[10px]">
+                        Reservada para esta data
+                      </Badge>
+                    )}
                   </CardContent>
                 </div>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

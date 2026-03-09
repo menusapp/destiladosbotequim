@@ -321,14 +321,34 @@ const Reservations = () => {
         }
       }
       
+      // Filter past+buffer for today
+      const now = new Date();
+      const isTodayDate = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+      if (isTodayDate) {
+        const bufferMinutes = now.getHours() * 60 + now.getMinutes() + 60;
+        return slots.filter(slot => {
+          const [h, m] = slot.split(":").map(Number);
+          return h * 60 + m > bufferMinutes;
+        });
+      }
       return slots;
     }
     
     // Fallback: horários padrão
-    const slots: string[] = [];
+    let slots: string[] = [];
     for (let hour = 11; hour <= 23; hour++) {
       slots.push(`${hour.toString().padStart(2, "0")}:00`);
       slots.push(`${hour.toString().padStart(2, "0")}:30`);
+    }
+
+    const now = new Date();
+    const isTodayDate = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+    if (isTodayDate) {
+      const bufferMinutes = now.getHours() * 60 + now.getMinutes() + 60;
+      slots = slots.filter(slot => {
+        const [h, m] = slot.split(":").map(Number);
+        return h * 60 + m > bufferMinutes;
+      });
     }
     return slots;
   };

@@ -1197,7 +1197,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
           
 
-          <Tabs defaultValue="pending" className="w-full">
+          <Tabs defaultValue="today" className="w-full">
             <TabsList className="grid w-full grid-cols-3 max-w-lg">
               <TabsTrigger value="today">
                 Hoje ({todayReservations.length})
