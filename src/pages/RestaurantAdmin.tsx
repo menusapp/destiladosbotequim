@@ -140,7 +140,7 @@ const RestaurantAdmin = () => {
     
     if (!restaurantId || !restaurantName) {
       toast.error("Você precisa estar logado para acessar esta página");
-      navigate("/");
+      navigate("/login");
       return;
     }
 
