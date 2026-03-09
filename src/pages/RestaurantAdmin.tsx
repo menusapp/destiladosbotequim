@@ -437,7 +437,7 @@ const RestaurantAdmin = () => {
       }
     } catch (error) {
       toast.error("Erro ao carregar dados do restaurante");
-      navigate("/");
+      navigate("/login");
     } finally {
       setLoading(false);
     }
