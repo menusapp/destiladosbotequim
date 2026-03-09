@@ -487,7 +487,7 @@ const LandingPage = () => {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">FAQ</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">Perguntas frequentes</h2>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Perguntas frequentes</h2>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
