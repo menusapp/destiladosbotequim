@@ -108,7 +108,7 @@ interface CartItem {
 }
 
 const Comanda = () => {
-  const { restaurantSlug, tableNumber } = useParams();
+  const { slug: restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
   
   const [orders, setOrders] = useState<Order[]>([]);

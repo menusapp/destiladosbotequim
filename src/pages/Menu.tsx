@@ -17,7 +17,7 @@ import { ReviewModal } from "@/components/menu/ReviewModal";
 import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
 
 const Menu = () => {
-  const { restaurantSlug, tableNumber } = useParams();
+  const { slug: restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);

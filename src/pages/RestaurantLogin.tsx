@@ -32,7 +32,7 @@ const Landing = () => {
         localStorage.setItem('restaurant_id', restaurant_id);
         localStorage.setItem('restaurant_name', restaurant_name);
         toast.success(`Bem-vindo ao ${restaurant_name}!`);
-        navigate('/staff-login');
+        navigate('/login/staff');
       } else {
         toast.error("Credenciais inválidas");
       }

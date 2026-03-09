@@ -18,7 +18,7 @@ import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "sonner";
 
 export default function DeliveryMenu() {
-  const { restaurantSlug } = useParams<{ restaurantSlug: string }>();
+  const { slug: restaurantSlug } = useParams<{ slug: string }>();
   
   const [restaurant, setRestaurant] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);

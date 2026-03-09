@@ -58,7 +58,8 @@ const StaffLogin = () => {
   const handleBackToRestaurantLogin = () => {
     localStorage.removeItem("restaurant_id");
     localStorage.removeItem("restaurant_name");
-    navigate("/");
+    localStorage.removeItem("restaurant_slug");
+    navigate("/login");
   };
 
   return (
