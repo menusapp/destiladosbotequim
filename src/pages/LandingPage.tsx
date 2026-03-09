@@ -218,10 +218,10 @@ const LandingPage = () => {
             <div className="rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/15 p-8 sm:p-14 flex flex-col lg:flex-row gap-10 items-center">
               <div className="flex-1 space-y-5">
                 <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">WhatsApp</span>
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-foreground leading-tight tracking-[-0.025em]">
                   Marketing automático e central de alertas no WhatsApp
                 </h2>
-                <p className="text-base text-muted-foreground leading-relaxed">
+                <p className="text-base text-muted-foreground leading-relaxed font-light">
                   Crie campanhas de remarketing que disparam automaticamente. Cliente inativo? Ele recebe um cupom. Pedido confirmado? Notificação instantânea. Tudo sem você levantar um dedo.
                 </p>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
