@@ -232,10 +232,10 @@ export const ReservationsView = ({
       date.getDate() === now.getDate();
 
     if (isToday) {
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const bufferMinutes = now.getHours() * 60 + now.getMinutes() + 60;
       slots = slots.filter(slot => {
         const [h, m] = slot.split(":").map(Number);
-        return h * 60 + m > currentMinutes;
+        return h * 60 + m > bufferMinutes;
       });
     }
 
@@ -433,11 +433,17 @@ export const ReservationsView = ({
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {tables.map((table) => (
+            {tables.map((table) => {
+              const isReserved = reservedTableIds.includes(table.id);
+              return (
               <Card
                 key={table.id}
-                className="overflow-hidden cursor-pointer transition-all active:scale-[0.98]"
+                className={cn(
+                  "overflow-hidden transition-all",
+                  isReserved ? "opacity-60 cursor-not-allowed" : "cursor-pointer active:scale-[0.98]"
+                )}
                 onClick={() => {
+                  if (isReserved) return;
                   setSelectedTable(table);
                   setPartySize(table.min_capacity);
                   setView("form");
@@ -464,10 +470,16 @@ export const ReservationsView = ({
                     {table.description && (
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{table.description}</p>
                     )}
+                    {isReserved && (
+                      <Badge className="bg-red-100 text-red-800 border-red-200 mt-1 text-[10px]">
+                        Reservada para esta data
+                      </Badge>
+                    )}
                   </CardContent>
                 </div>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

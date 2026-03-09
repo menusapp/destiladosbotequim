@@ -1,34 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plan: Reservation System Adjustments
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
-### Changes
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
-#### 1. Time slot filtering: 1 hour buffer (ReservationsView.tsx + Reservations.tsx)
-In `generateTimeSlots`, change the today filter from "current time" to "current time + 60 minutes":
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
+
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
+
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
+
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+
+Detalhes técnicos:
+```text
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
 ```
-const bufferMinutes = now.getHours() * 60 + now.getMinutes() + 60;
-slots = slots.filter(slot => h * 60 + m > bufferMinutes);
-```
-Apply to both `ReservationsView.tsx` (line ~235) and `Reservations.tsx` (line ~285, which currently has no today filter — add it there too).
 
-#### 2. Show "table already reserved" message in table selection (ReservationsView.tsx)
-When a customer selects a date and a table already has a confirmed reservation for that date, show a visual indicator on the table card (e.g., a red badge "Reservada para esta data") and block selection. Currently `reservedTableIds` is fetched but only checked at submit time — surface this in the table list UI.
-
-#### 3. Remove public reservation link from admin (TablesTab.tsx)
-Remove the card at lines ~1198-1215 that shows the public link and "Copiar Link" button. Also update the description text at line ~1170 from "pelo link público" to "pelo cardápio digital".
-
-#### 4. Change default status filter in History tab (TablesTab.tsx)
-Change `useState("pending")` at line 126 to `useState("all")` so the history tab shows all reservations by default.
-
-#### 5. Set default reservations sub-tab to "today" (TablesTab.tsx)
-Change `<Tabs defaultValue="pending"` at line 1217 to `defaultValue="today"` so the admin sees today's reservations first.
-
-### Files to edit
-- `src/components/menu/ReservationsView.tsx` — 1-hour buffer on time slots, reserved table indicator
-- `src/pages/Reservations.tsx` — 1-hour buffer on time slots
-- `src/components/admin/TablesTab.tsx` — Remove public link card, change default filter to "all", default sub-tab to "today"
-
-### No changes to
-- Backend, database, APIs, WhatsApp automations, business logic
-
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.

@@ -123,7 +123,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [tableToEmpty, setTableToEmpty] = useState<Table | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("pending");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   
   // Form state for new/edit table
@@ -1167,7 +1167,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                 <div>
                   <Label htmlFor="reservations-toggle" className="font-medium">Ativar Reservas Online</Label>
                   <p className="text-sm text-muted-foreground">
-                    Permite que clientes façam reservas pelo link público
+                    Permite que clientes façam reservas pelo cardápio digital
                   </p>
                 </div>
                 <Switch
@@ -1195,26 +1195,9 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
             </CardContent>
           </Card>
 
-          {reservationsEnabled && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="py-4">
-                <div className="flex flex-col md:flex-row md:items-center gap-4">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Link público para reservas:</p>
-                    <code className="text-sm text-muted-foreground">
-                      {window.location.origin}/reservas/{restaurantSlug}
-                    </code>
-                  </div>
-                  <Button variant="outline" onClick={handleCopyReservationLink}>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copiar Link
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          
 
-          <Tabs defaultValue="pending" className="w-full">
+          <Tabs defaultValue="today" className="w-full">
             <TabsList className="grid w-full grid-cols-3 max-w-lg">
               <TabsTrigger value="today">
                 Hoje ({todayReservations.length})
