@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,9 +13,23 @@ const StaffLogin = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [restaurantLogo, setRestaurantLogo] = useState<string | null>(null);
 
   const restaurantId = localStorage.getItem("restaurant_id");
   const restaurantName = localStorage.getItem("restaurant_name");
+
+  useEffect(() => {
+    if (restaurantId) {
+      supabase
+        .from("restaurants")
+        .select("logo_url")
+        .eq("id", restaurantId)
+        .single()
+        .then(({ data }) => {
+          if (data?.logo_url) setRestaurantLogo(data.logo_url);
+        });
+    }
+  }, [restaurantId]);
 
   // If no restaurant session, redirect to landing
   if (!restaurantId || !restaurantName) {
@@ -67,7 +81,7 @@ const StaffLogin = () => {
       <Card className="w-full max-w-md shadow-lg border-border/50">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-24 h-24 flex items-center justify-center">
-            <img src={menusLogo} alt="Menu's" className="w-full h-full object-contain" />
+            <img src={restaurantLogo || menusLogo} alt={restaurantName || "Menu's"} className="w-full h-full object-contain rounded-lg" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-foreground">{restaurantName}</h2>
