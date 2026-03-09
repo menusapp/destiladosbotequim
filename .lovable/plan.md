@@ -1,51 +1,68 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: Redesign da Landing Page no estilo cardapio.ai
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+A landing page atual sera completamente reescrita para seguir a estrutura e estilo do cardapio.ai, adaptada com as cores do Menu's (laranja #FF6B00) e com MUITO mais conteudo.
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+### Estrutura das Secoes (inspirada no cardapio.ai)
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+1. **Header** -- Sticky, clean, com nav links + dropdown "Acesso" com opcoes (Entrar no Painel, Entrar como Staff) + botao CTA "Teste gratis"
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+2. **Hero** -- Imagem/mockup grande no topo (placeholder com gradiente simulando devices), badge social proof ("Sistema usado por mais de 500 restaurantes"), headline com efeito de typing animado ("para restaurantes | hamburguerias | pizzarias | bares"), subtitulo, CTA grande, texto "Acesso gratis por 7 dias"
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+3. **Carousel de Funcoes** -- Cards horizontais com scroll (estilo cardapio.ai "Funcoes para voce vender"), cada card com icone/ilustracao, titulo e descricao curta:
+   - Venda sem taxas (delivery, retirada, balcao, mesa)
+   - Facil e personalizado
+   - Robo de pedidos WhatsApp
+   - Impressao automatica
+   - Gestao de estoque e CMV
+   - Areas de entrega
+   - Suporte dedicado
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+4. **Secao WhatsApp/Automacao** -- Bloco grande com titulo "Marketing automatico e central de alertas no WhatsApp", descricao, highlights com icones
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+5. **Grid de Features visuais** (estilo bento grid do cardapio.ai) -- Cards de tamanhos variados mostrando:
+   - Cardapio personalizado com sua marca
+   - Programa de fidelidade e CRM
+   - Pagamento online (Pix, cartao)
+   - Complementos e adicionais
+   - Controle de estoque automatico
+   - Relatorios, DRE e fluxo de caixa
+   - Nota fiscal eletronica
+   - Reservas de mesas
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+6. **Secao "Versatil para diversos segmentos"** -- Grid com cards: Restaurante, Hamburgueria, Pizzaria, Bar, Cafeteria, "E muito mais!"
+
+7. **Planos e Precos** -- 3 cards (Basico R$99, Profissional R$199, Completo R$349) com destaque no do meio, lista de features, botao CTA, badge "valor por dia"
+
+8. **Secao "Gestor de pedidos"** -- PDV, app garcom, comandas, confirmacao automatica
+
+9. **Secao "Visao de negocios"** -- Faturamento, relatorios, DRE, CMV, fluxo de caixa
+
+10. **Numeros/Social Proof** -- +500 restaurantes, +1M pedidos, +R$X economizados
+
+11. **Secao "Como comecar?"** -- 3 passos: Crie sua conta, Configure seu cardapio, Comece a vender
+
+12. **FAQ** -- Accordion expandivel com 8+ perguntas
+
+13. **CTA Final** -- Secao de chamada com fundo gradiente
+
+14. **Footer** -- Links, copyright
+
+### Design e Animacoes
+
+- **Typing effect** no hero (rotaciona palavras: "restaurantes", "hamburguerias", "pizzarias", "bares", "cafeterias")
+- **Scroll reveal** em todas as secoes (Intersection Observer, fade-in + translate-y)
+- **Carousel horizontal** com scroll snap para cards de funcionalidades
+- **Hover effects** nos cards (scale, shadow, border color transition)
+- **Counter animation** nos numeros de social proof (contagem animada de 0 ate o valor)
+- **Bento grid layout** para features visuais (cards de tamanhos diferentes, 2-3 colunas)
+- Background branco limpo (#FFFFFF) nas secoes principais, cinza claro (#F7F7F8) alternando
+- Tipografia grande e bold no hero, espacamento generoso
+
+### Arquivos
+
+- **Reescrever:** `src/pages/LandingPage.tsx` -- landing completa (~600-800 linhas)
+
+Nenhuma outra pagina sera alterada. Apenas a landing page.
+
