@@ -1,51 +1,58 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: Corrigir Rotas Quebradas + Redesign Landing Page
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### Parte 1: Rotas Quebradas
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+Encontrei 3 referências quebradas:
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+| Arquivo | Rota antiga | Correção |
+|---|---|---|
+| `RestaurantAdmin.tsx` (linha 149) | `/staff-login` | `/login/staff` |
+| `RestaurantAdmin.tsx` (linha 507) | `/staff-login` | `/login/staff` |
+| `Auth.tsx` (linhas 28, 35) | `/admin` | Precisa do slug — redirecionar para `/${slug}/admin` |
+| `MercadoPagoCallback.tsx` (linhas 26, 61) | `/admin` | Precisa do slug — usar `localStorage.getItem('restaurant_slug')` |
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+**Auth.tsx** e **MercadoPagoCallback.tsx** usam `/admin` que não existe mais — precisam construir a URL com o slug do localStorage.
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+---
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+### Parte 2: Redesign Completo da Landing Page
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+A landing page atual é básica demais. Vou reconstruir `LandingPage.tsx` com um design agressivo e profissional, estilo SaaS moderno:
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**Estrutura (seções):**
+
+1. **Header** — Logo + nav sticky com blur, botão "Entrar no Painel"
+2. **Hero** — Headline impactante, subtítulo curto, CTA grande com gradiente, badge "Sistema completo"
+3. **Números/Social proof** — Estatísticas em linha (ex: "500+ restaurantes", "1M+ pedidos")
+4. **Funcionalidades principais** — Grid 3x3 com ícones e descrições curtas:
+   - Cardápio Digital com QR Code
+   - Pedidos Online (delivery + retirada)
+   - PDV e Balcão
+   - Gestão de Mesas + Reservas
+   - Estoque Automático + CMV
+   - Relatórios, DRE, Fluxo de Caixa
+   - Nota Fiscal Eletrônica
+   - CRM + Programa de Fidelidade
+   - Marketing WhatsApp + Remarketing
+5. **Showcase visual** — Seção com mockup/descrição detalhada de 3-4 features principais com alternância esquerda/direita
+6. **Planos e Preços** — 3 cards (Básico R$99, Profissional R$199, Completo R$349) com destaque no do meio
+7. **FAQ** — Accordion com perguntas frequentes
+8. **CTA Final** — Seção de chamada final com fundo destacado
+9. **Footer** — Links, copyright
+
+**Design:**
+- Animações suaves com CSS (fade-in ao scroll via Intersection Observer, hover scale nos cards)
+- Gradientes sutis no hero (laranja para transparente)
+- Cards com hover shadow e transição
+- Espaçamento generoso, tipografia grande no hero
+- Mobile-first e totalmente responsivo
+- Identidade laranja (#FF6B00) como cor de destaque
+
+**Arquivos:**
+- **Editar:** `src/pages/LandingPage.tsx` — redesign completo
+- **Editar:** `src/pages/RestaurantAdmin.tsx` — fix `/staff-login` → `/login/staff`
+- **Editar:** `src/pages/Auth.tsx` — fix `/admin` → `/${slug}/admin`
+- **Editar:** `src/pages/MercadoPagoCallback.tsx` — fix `/admin` → `/${slug}/admin`
+
