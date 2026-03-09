@@ -325,7 +325,7 @@ const Comanda = () => {
             sessionStorage.removeItem("customerInfo");
             
             setTimeout(() => {
-              navigate(`/menu/${restaurantSlug}/${tableNumber}`);
+              navigate(`/${restaurantSlug}/mesa/${tableNumber}`);
             }, 1500);
           }
         )
