@@ -499,10 +499,12 @@ const RestaurantAdmin = () => {
   }, [restaurant?.id, restaurant?.auto_open_close]);
 
   const handleLogout = () => {
-    localStorage.removeItem('restaurant_id');
-    localStorage.removeItem('restaurant_name');
+    localStorage.removeItem('staff_id');
+    localStorage.removeItem('staff_name');
+    localStorage.removeItem('staff_role');
+    localStorage.removeItem('staff_allowed_sections');
     toast.success("Logout realizado com sucesso");
-    navigate("/");
+    navigate("/staff-login");
   };
 
   const handleToggleRestaurant = async (isOpen: boolean) => {
