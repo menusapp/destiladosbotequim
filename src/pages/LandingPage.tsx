@@ -388,7 +388,7 @@ const LandingPage = () => {
             ].map((s, i) => (
               <ScrollReveal key={s.label} delay={i * 100}>
                 <div className="text-3xl sm:text-4xl font-extrabold">
-                  {s.display ? s.display : <AnimatedCounter end={s.end} suffix={s.suffix} prefix={s.prefix} />}
+                  {s.display ? s.display : <AnimatedCounter end={s.end} suffix={s.suffix} />}
                 </div>
                 <p className="text-sm mt-1 opacity-70 font-medium">{s.label}</p>
               </ScrollReveal>
