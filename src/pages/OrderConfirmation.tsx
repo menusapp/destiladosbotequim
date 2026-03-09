@@ -304,7 +304,7 @@ export default function OrderConfirmation() {
             <p className="text-muted-foreground mb-4">
               Não foi possível encontrar este pedido
             </p>
-            <Button onClick={() => navigate(`/delivery/${restaurantSlug}`)}>
+            <Button onClick={() => navigate(`/${restaurantSlug}`)}>
               Voltar ao Cardápio
             </Button>
           </CardContent>
