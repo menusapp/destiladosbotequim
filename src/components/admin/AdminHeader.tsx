@@ -68,13 +68,28 @@ export const AdminHeader = ({
   };
 
   const handleLogout = () => {
+    // Clear staff session, keep restaurant session
+    localStorage.removeItem('staff_id');
+    localStorage.removeItem('staff_name');
+    localStorage.removeItem('staff_role');
+    localStorage.removeItem('staff_allowed_sections');
+    toast.success("Logout realizado com sucesso");
+    navigate("/staff-login");
+  };
+
+  const handleFullLogout = () => {
     localStorage.removeItem('restaurant_id');
     localStorage.removeItem('restaurant_name');
+    localStorage.removeItem('staff_id');
+    localStorage.removeItem('staff_name');
+    localStorage.removeItem('staff_role');
+    localStorage.removeItem('staff_allowed_sections');
     toast.success("Logout realizado com sucesso");
     navigate("/");
   };
 
-  const userName = localStorage.getItem('restaurant_name') || 'Usuário';
+  const userName = localStorage.getItem('staff_name') || localStorage.getItem('restaurant_name') || 'Usuário';
+  const staffRole = localStorage.getItem('staff_role');
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-4">
