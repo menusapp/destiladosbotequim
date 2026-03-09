@@ -184,8 +184,8 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Funções</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">Funções para você vender mais</h2>
-            <p className="mt-3 text-base text-muted-foreground max-w-xl mx-auto">Tudo o que você precisa num único lugar, sem ferramentas avulsas.</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Funções para você vender mais</h2>
+            <p className="mt-3 text-lg text-muted-foreground max-w-xl mx-auto font-light">Tudo o que você precisa num único lugar, sem ferramentas avulsas.</p>
           </ScrollReveal>
 
           {/* Horizontal scroll */}
