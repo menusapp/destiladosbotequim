@@ -516,7 +516,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleCopyReservationLink = () => {
-    const link = `${window.location.origin}/reservas/${restaurantSlug}`;
+    const link = `${window.location.origin}/${restaurantSlug}/reservas`;
     navigator.clipboard.writeText(link);
     toast.success("Link copiado!");
   };

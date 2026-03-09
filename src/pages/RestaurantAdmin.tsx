@@ -545,7 +545,7 @@ const RestaurantAdmin = () => {
             <p className="text-muted-foreground mb-4">
               Faça login para acessar o painel do restaurante.
             </p>
-            <Button onClick={() => navigate("/")}>Ir para Login</Button>
+            <Button onClick={() => navigate("/login")}>Ir para Login</Button>
           </CardContent>
         </Card>
       </div>
