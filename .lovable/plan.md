@@ -1,51 +1,72 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: Profissionalizar Painéis CEO/Dev + Correções de Assinaturas + Conta Admin Rods
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### 1. Visual Profissional nos Painéis CEO e Dev
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+Os painéis usam gradientes coloridos (amber/blue) nos títulos e cards com ícones grandes. Vou:
+- Trocar os gradientes de texto por cores sólidas neutras (foreground)
+- Reduzir tamanho dos ícones nos cards de stats
+- Usar cores mais discretas e profissionais (cinza/slate em vez de amber/blue/green)
+- Remover `bg-gradient-to-br` dos backgrounds, usar fundo limpo
+- Manter a identidade laranja (#FF6B00) do sistema, sem rosa
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+**Arquivos:** `CEODashboard.tsx`, `DevDashboard.tsx`
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+### 2. Remover Cores Primária/Secundária do Formulário de Restaurante (CEO)
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+O usuário não entende para que servem — e o restaurante já pode configurar isso dentro do próprio painel. Vou remover os campos de cor do dialog de criação/edição de restaurante no CEO.
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+**Arquivo:** `CEODashboard.tsx`
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+### 3. Corrigir Lógica de Assinaturas: 1 por Restaurante
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**Problema:** Ao criar nova assinatura, as antigas (suspensas/canceladas) ficam listadas, causando duplicatas e contagem errada de inadimplentes.
+
+**Solução:**
+- **`SubscriptionsTab.tsx`**: Ao criar nova assinatura para um restaurante, cancelar automaticamente todas as assinaturas anteriores desse restaurante antes de inserir a nova
+- Filtrar a listagem para mostrar apenas a assinatura mais recente por restaurante (agrupar por `restaurant_id`, pegar a mais recente)
+- **`CEODashboard.tsx`**: Na contagem de inadimplentes, considerar apenas a assinatura mais recente de cada restaurante (se a mais recente estiver ativa, não é inadimplente)
+
+### 4. Dev Panel — Adaptar Versões para Web
+
+O VersionsTab atual tem campos de download URL por plataforma (Windows/Mac/Linux) que eram para o Tauri. Como agora é web:
+- Substituir os 3 campos de URL por um único campo "Changelog / Release Notes" mais proeminente
+- Adicionar campo "URL do Build" (single URL for the web deploy zip)
+- Manter o conceito de "Versão Atual" para controle
+
+**Arquivo:** `VersionsTab.tsx`, `DevDashboard.tsx`
+
+### 5. Dev Panel — Ativar Configurações Remotas
+
+Substituir o placeholder de "Configurações Remotas" por uma interface funcional de feature flags / configs. Criar uma tabela `remote_configs` para armazenar key-value configs e uma UI simples de CRUD.
+
+**Migration:** Criar tabela `remote_configs` (id, key, value, description, is_active, created_at, updated_at)
+**Novo arquivo:** `src/components/dev/RemoteConfigsTab.tsx`
+**Editar:** `DevDashboard.tsx`
+
+### 6. Criar Conta Admin para o Restaurante "Rods"
+
+O restaurante "rods" (ID: `8947a1f1-eaee-4f15-90eb-dad7c2a0339a`) existe mas não tem conta staff. Vou inserir via migration:
+- Username: `admin`
+- Password: `admin123`
+- Role: `admin`
+- Display name: `Administrador`
+- allowed_sections: todas as seções
+
+### Arquivos a editar/criar
+
+- **Editar:** `src/pages/CEODashboard.tsx` — visual profissional, remover cores, fix inadimplentes
+- **Editar:** `src/pages/DevDashboard.tsx` — visual profissional
+- **Editar:** `src/components/ceo/SubscriptionsTab.tsx` — 1 assinatura por restaurante
+- **Editar:** `src/components/dev/VersionsTab.tsx` — adaptar para web
+- **Criar:** `src/components/dev/RemoteConfigsTab.tsx` — feature flags
+- **Migration 1:** Tabela `remote_configs` + seed configs iniciais
+- **Migration 2:** Inserir conta admin staff para restaurante rods
+
+### Credenciais do Rods
+
+Para logar no restaurante Rods:
+1. Tela inicial: `rods` / `rods123` (credenciais do restaurante — verificar a senha real)
+2. Tela de staff: `admin` / `admin123`
+
