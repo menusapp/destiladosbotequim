@@ -422,7 +422,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const downloadQRCode = async (table: Table) => {
-    const link = `${window.location.origin}/menu/${restaurantSlug}/${table.table_number}`;
+    const link = `${window.location.origin}/${restaurantSlug}/mesa/${table.table_number}`;
     const qrCode = await QRCode.toDataURL(link, { width: 512, margin: 2 });
     const downloadLink = document.createElement("a");
     downloadLink.href = qrCode;

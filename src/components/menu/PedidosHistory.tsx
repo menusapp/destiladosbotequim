@@ -201,7 +201,7 @@ export const PedidosHistory = ({
           <Card 
             key={order.id}
             className="cursor-pointer hover:bg-accent transition-colors"
-            onClick={() => navigate(`/delivery/${restaurantSlug}/pedido/${order.id}`)}
+            onClick={() => navigate(`/${restaurantSlug}/pedido/${order.id}`)}
           >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">

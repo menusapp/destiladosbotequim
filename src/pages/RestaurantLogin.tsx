@@ -31,6 +31,11 @@ const Landing = () => {
         const { restaurant_id, restaurant_name } = data[0];
         localStorage.setItem('restaurant_id', restaurant_id);
         localStorage.setItem('restaurant_name', restaurant_name);
+        // Also store slug for route navigation
+        const slugData = await supabase.from('restaurants').select('slug').eq('id', restaurant_id).single();
+        if (slugData.data?.slug) {
+          localStorage.setItem('restaurant_slug', slugData.data.slug);
+        }
         toast.success(`Bem-vindo ao ${restaurant_name}!`);
         navigate('/login/staff');
       } else {

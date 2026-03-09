@@ -206,7 +206,7 @@ export default function DeliveryTab({ restaurantId }: DeliveryTabProps) {
               <div className="flex gap-2">
                 <Input
                   id="delivery-link"
-                  value={`${window.location.origin}/delivery/${restaurantSlug}`}
+                  value={`${window.location.origin}/${restaurantSlug}`}
                   readOnly
                   className="flex-1"
                 />

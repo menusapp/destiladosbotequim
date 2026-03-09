@@ -60,7 +60,7 @@ export const useMenuInactivityLogout = (
 
       // Mostrar mensagem e recarregar a página para forçar o dialog de login
       toast.info("Sessão expirada por inatividade");
-      window.location.href = `/menu/${restaurantSlug}/${tableNumber}`;
+      window.location.href = `/${restaurantSlug}/mesa/${tableNumber}`;
     } catch (error) {
       console.error("Erro ao verificar pedidos ativos:", error);
     }

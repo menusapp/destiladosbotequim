@@ -481,7 +481,7 @@ export default function OrderConfirmation() {
         <Button
           className="w-full"
           size="lg"
-          onClick={() => navigate(`/delivery/${restaurantSlug}`)}
+          onClick={() => navigate(`/${restaurantSlug}`)}
         >
           Fazer Novo Pedido
         </Button>

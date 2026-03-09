@@ -1120,7 +1120,7 @@ const Menu = () => {
         onAddMoreItems={() => setShowCartDrawer(false)}
         onContinue={() => {
           setShowCartDrawer(false);
-          navigate(`/comanda/${restaurantSlug}/${tableNumber}`);
+          navigate(`/${restaurantSlug}/comanda/${tableNumber}`);
         }}
         mode="local"
       />
