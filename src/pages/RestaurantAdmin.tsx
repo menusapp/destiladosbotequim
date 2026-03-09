@@ -647,9 +647,13 @@ const RestaurantAdmin = () => {
       case "fiscal":
         return <FiscalTab restaurantId={restaurant.id} />;
       
-      // Em Desenvolvimento
+      // Módulos
       case "modulos":
         return <ModulosTab restaurantId={restaurant.id} />;
+      
+      // Contas (admin only)
+      case "contas":
+        return staffRole === "admin" ? <ContasTab restaurantId={restaurant.id} /> : null;
       
       // Configurações - Subabas
       case "config-dados":
