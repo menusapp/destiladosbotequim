@@ -147,9 +147,9 @@ const LandingPage = () => {
           </ScrollReveal>
 
           <ScrollReveal delay={200}>
-            <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed font-light">
               Cardápio digital, pedidos online, delivery, estoque automático, financeiro, marketing e muito mais.
-              <span className="font-semibold text-foreground"> Tudo em uma só plataforma.</span>
+              <span className="font-medium text-foreground"> Tudo em uma só plataforma.</span>
             </p>
           </ScrollReveal>
 
