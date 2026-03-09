@@ -1167,7 +1167,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                 <div>
                   <Label htmlFor="reservations-toggle" className="font-medium">Ativar Reservas Online</Label>
                   <p className="text-sm text-muted-foreground">
-                    Permite que clientes façam reservas pelo link público
+                    Permite que clientes façam reservas pelo cardápio digital
                   </p>
                 </div>
                 <Switch
