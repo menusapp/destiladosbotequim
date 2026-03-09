@@ -355,8 +355,8 @@ const LandingPage = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Segmentos</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">Versátil para diversos segmentos</h2>
-            <p className="mt-3 text-base text-muted-foreground">O Menu's se adapta ao seu tipo de negócio.</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Versátil para diversos segmentos</h2>
+            <p className="mt-3 text-lg text-muted-foreground font-light">O Menu's se adapta ao seu tipo de negócio.</p>
           </ScrollReveal>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
