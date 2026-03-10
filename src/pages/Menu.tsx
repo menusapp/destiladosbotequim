@@ -556,12 +556,18 @@ const Menu = () => {
         
         // Quando garçom paga pelo PDV sem cliente pedir conta, INSERT já vem com status='paid'
         if (currentTableId && bill.table_id === currentTableId && bill.status === 'paid') {
-          console.log('💰 Conta PAGA (INSERT direto)! Iniciando avaliação e logout...');
+          // Filtrar por comanda_id para isolamento entre clientes na mesma mesa
+          const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+          const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
           
-          toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
-          
-          setReviewBillId(bill.id);
-          setReviewModalOpen(true);
+          if (billBelongsToMe) {
+            console.log('💰 Conta PAGA (INSERT direto)! Iniciando avaliação e logout...');
+            
+            toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
+            
+            setReviewBillId(bill.id);
+            setReviewModalOpen(true);
+          }
         }
       })
       // 🚪 Listener de mesa para detectar esvaziamento forçado (admin)
