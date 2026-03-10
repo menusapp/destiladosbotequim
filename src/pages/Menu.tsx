@@ -525,16 +525,20 @@ const Menu = () => {
         const currentTableId = tableIdRef.current;
         console.log('💳 Conta atualizada:', { bill, oldBill, currentTableId });
         
-        // Verificar se a conta foi paga e pertence à mesa atual
+        // Verificar se a conta foi paga e pertence à mesa atual E à comanda do cliente
         if (currentTableId && bill.table_id === currentTableId) {
-          if (bill.status === 'paid' && oldBill?.status !== 'paid') {
+          // Filtrar por comanda_id para isolamento entre clientes na mesma mesa
+          const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+          const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
+          
+          if (billBelongsToMe && bill.status === 'paid' && oldBill?.status !== 'paid') {
             console.log('💰 Conta PAGA (UPDATE)! Iniciando avaliação e logout...');
             
             toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
             
             setReviewBillId(bill.id);
             setReviewModalOpen(true);
-          } else if (bill.status === 'on_the_way' && oldBill?.status !== 'on_the_way') {
+          } else if (billBelongsToMe && bill.status === 'on_the_way' && oldBill?.status !== 'on_the_way') {
             toast.info("🏃 Sua conta está a caminho!");
           }
         }
@@ -552,12 +556,18 @@ const Menu = () => {
         
         // Quando garçom paga pelo PDV sem cliente pedir conta, INSERT já vem com status='paid'
         if (currentTableId && bill.table_id === currentTableId && bill.status === 'paid') {
-          console.log('💰 Conta PAGA (INSERT direto)! Iniciando avaliação e logout...');
+          // Filtrar por comanda_id para isolamento entre clientes na mesma mesa
+          const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+          const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
           
-          toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
-          
-          setReviewBillId(bill.id);
-          setReviewModalOpen(true);
+          if (billBelongsToMe) {
+            console.log('💰 Conta PAGA (INSERT direto)! Iniciando avaliação e logout...');
+            
+            toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
+            
+            setReviewBillId(bill.id);
+            setReviewModalOpen(true);
+          }
         }
       })
       // 🚪 Listener de mesa para detectar esvaziamento forçado (admin)
@@ -581,7 +591,7 @@ const Menu = () => {
             
             // Limpar sessão do cliente
             sessionStorage.removeItem("customerInfo");
-            sessionStorage.removeItem("comanda_id");
+            sessionStorage.removeItem(`comanda_id_${tableNumber}`);
             sessionStorage.removeItem(`cart_${tableNumber}`);
             
             // Resetar estados
@@ -934,7 +944,8 @@ const Menu = () => {
 
   const getCartTotal = () => cart.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-    return sum + (item.product.price + extrasTotal) * item.quantity;
+    const effectivePrice = item.product.promotional_price ?? item.product.price;
+    return sum + (effectivePrice + extrasTotal) * item.quantity;
   }, 0);
 
   const getTotalItemCount = () => cart.reduce((sum, item) => sum + item.quantity, 0);
