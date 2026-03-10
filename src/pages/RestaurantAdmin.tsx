@@ -188,18 +188,30 @@ const RestaurantAdmin = () => {
             if (notifiedOrdersRef.current.has(orderId)) return;
 
             // Buscar detalhes completos do pedido para calcular total
-            const { data: orderData } = await supabase
-              .from('orders')
-              .select(`
-                *,
-                order_items(
-                  price_at_order,
-                  quantity,
-                  order_item_extras(price_at_order)
-                )
-              `)
-              .eq('id', orderId)
-              .single();
+            // Pequeno delay para garantir que order_items já foram inseridos (race condition)
+            const fetchOrderWithRetry = async (retries = 3): Promise<any> => {
+              const { data: orderData } = await supabase
+                .from('orders')
+                .select(`
+                  *,
+                  order_items(
+                    price_at_order,
+                    quantity,
+                    order_item_extras(price_at_order)
+                  )
+                `)
+                .eq('id', orderId)
+                .single();
+              
+              // Se não tem itens e ainda tem retries, esperar e tentar novamente
+              if (orderData && (!orderData.order_items || orderData.order_items.length === 0) && retries > 0) {
+                await new Promise(r => setTimeout(r, 500));
+                return fetchOrderWithRetry(retries - 1);
+              }
+              return orderData;
+            };
+
+            const orderData = await fetchOrderWithRetry();
 
             if (orderData) {
               const total = orderData.order_items.reduce((sum: number, item: any) => {

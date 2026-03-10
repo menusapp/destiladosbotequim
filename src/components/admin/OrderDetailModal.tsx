@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
+import { printOrder } from "@/lib/printOrder";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -222,6 +223,23 @@ export const OrderDetailModal = ({
       // Enviar notificação WhatsApp após sucesso (não bloqueia o fluxo)
       sendWhatsAppNotification(newStatus);
       
+      // Auto-print ao aceitar pedido (se configurado)
+      if (newStatus === 'accepted') {
+        try {
+          const { data: printerConfig } = await supabase
+            .from('printer_settings')
+            .select('auto_print_orders')
+            .eq('restaurant_id', restaurantId)
+            .maybeSingle();
+          
+          if (printerConfig?.auto_print_orders) {
+            await printOrder(order, restaurantId);
+          }
+        } catch (printErr) {
+          console.error('Auto-print error:', printErr);
+        }
+      }
+      
       // Disparar gatilho de marketing para campanhas automáticas
       if (newStatus === 'delivered' || newStatus === 'picked_up') {
         supabase.functions.invoke('marketing-trigger', {
@@ -247,8 +265,12 @@ export const OrderDetailModal = ({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    try {
+      await printOrder(order, restaurantId);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao imprimir");
+    }
   };
 
   const handleWhatsApp = () => {
