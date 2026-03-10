@@ -1018,7 +1018,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                 <Card
                   key={table.id}
                   className={`cursor-pointer transition-all hover:shadow-lg ${borderColor}`}
-                  onClick={() => navigate(`/admin/table/${table.id}`)}
+                  onClick={() => navigate(`/${restaurantSlug}/admin/mesa/${table.id}`)}
                 >
                   {table.image_url && (
                     <img 

@@ -262,7 +262,8 @@ export const OrderDetailModal = ({
 
   const handleGoToTable = () => {
     if (order.table_id) {
-      navigate(`/admin/table/${order.table_id}`);
+      const slug = localStorage.getItem("restaurant_slug") || "";
+      navigate(`/${slug}/admin/mesa/${order.table_id}`);
     }
   };
 
