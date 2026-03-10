@@ -591,7 +591,7 @@ const Menu = () => {
             
             // Limpar sessão do cliente
             sessionStorage.removeItem("customerInfo");
-            sessionStorage.removeItem("comanda_id");
+            sessionStorage.removeItem(`comanda_id_${tableNumber}`);
             sessionStorage.removeItem(`cart_${tableNumber}`);
             
             // Resetar estados
