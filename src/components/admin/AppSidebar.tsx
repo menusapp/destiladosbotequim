@@ -46,9 +46,10 @@ interface AppSidebarProps {
   hasActiveSubscription?: boolean | null;
   staffRole?: string;
   staffAllowedSections?: string[];
+  primaryColor?: string;
 }
 
-export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed, hasActiveSubscription, staffRole, staffAllowedSections }: AppSidebarProps) {
+export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed, hasActiveSubscription, staffRole, staffAllowedSections, primaryColor = "#FF6B35" }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
@@ -113,9 +114,10 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                     tooltip={item.label}
                     className={`relative h-9 px-3 rounded-button text-[13px] transition-colors ${
                       activeSection === item.id 
-                        ? "bg-accent text-accent-foreground font-medium" 
+                        ? "font-medium" 
                         : "text-sidebar-foreground hover:bg-muted"
                     }`}
+                    style={activeSection === item.id ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                   >
                     <item.icon className="h-4 w-4" />
                     {!collapsed && <span>{item.label}</span>}
@@ -134,9 +136,10 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                 <SidebarMenuItem>
                   <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
+                       <SidebarMenuButton
                         tooltip="Configurações"
-                        className={`w-full h-9 px-3 rounded-button text-[13px] ${isConfigActive ? "bg-accent text-accent-foreground font-medium" : "text-sidebar-foreground hover:bg-muted"}`}
+                        className={`w-full h-9 px-3 rounded-button text-[13px] ${isConfigActive ? "font-medium" : "text-sidebar-foreground hover:bg-muted"}`}
+                        style={isConfigActive ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                       >
                         <Settings className="h-4 w-4" />
                         {!collapsed && (
@@ -154,11 +157,12 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                             key={subItem.id}
                             onClick={() => onSectionChange(subItem.id)}
                             isActive={activeSection === subItem.id}
-                            className={`w-full h-8 px-3 rounded-button text-[13px] ${
+                           className={`w-full h-8 px-3 rounded-button text-[13px] ${
                               activeSection === subItem.id
-                                ? "bg-accent text-accent-foreground font-medium"
+                                ? "font-medium"
                                 : "text-sidebar-foreground hover:bg-muted"
                             }`}
+                            style={activeSection === subItem.id ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                           >
                             <subItem.icon className="h-3.5 w-3.5" />
                             <span>{subItem.label}</span>

@@ -47,6 +47,7 @@ interface Restaurant {
   prep_time_minutes: number;
   pickup_time_minutes: number;
   auto_open_close?: boolean;
+  primary_color?: string;
 }
 
 const RestaurantAdmin = () => {
@@ -690,6 +691,7 @@ const RestaurantAdmin = () => {
           hasActiveSubscription={hasActiveSubscription}
           staffRole={staffRole}
           staffAllowedSections={staffAllowedSections}
+          primaryColor={restaurant.primary_color}
         />
         <SidebarInset className="flex-1 flex flex-col">
           <AdminHeader
