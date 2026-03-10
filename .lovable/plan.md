@@ -1,51 +1,41 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: 3 Melhorias no Sistema
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### 1. Seção de Avaliações clicável no Cardápio Digital
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+**Problema**: As estrelas e contagem de avaliações no `RestaurantInfoCard` são apenas visuais, sem interação.
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+**Solução**: Criar um componente `ReviewsDrawer` que abre ao clicar nas avaliações. O drawer lista todas as avaliações do restaurante (nome do cliente, estrelas, comentário) buscando da tabela `restaurant_reviews` com join nos pedidos/comandas para pegar o nome do cliente.
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+**Arquivos**:
+- **Criar**: `src/components/menu/ReviewsDrawer.tsx` - Drawer com lista de avaliações (nome, estrelas, comentário, data)
+- **Editar**: `src/components/menu/RestaurantInfoCard.tsx` - Tornar a seção de avaliações clicável, abrir o drawer
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+**Detalhes**: A query buscará `restaurant_reviews` com os campos `rating`, `comment`, `created_at`. Para o nome do cliente, buscaremos via `order_id` -> `orders.customer_name` ou `counter_order_id` -> `counter_orders.customer_name`. Se nenhum nome disponível, exibir "Cliente".
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+---
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+### 2. Cor de marcação na aba ativa do Sidebar (admin)
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**Problema**: A aba ativa no sidebar usa `bg-accent` que é sutil demais, sem cor forte.
+
+**Solução**: Aplicar cor primária do restaurante (ou laranja padrão) como background da aba ativa no sidebar, com texto branco para contraste.
+
+**Arquivos**:
+- **Editar**: `src/components/admin/AppSidebar.tsx` - Mudar estilo da aba ativa para usar cor primária (laranja) como background com texto branco
+- **Editar**: `src/pages/RestaurantAdmin.tsx` - Passar `primaryColor` do restaurante para o `AppSidebar`
+
+---
+
+### 3. Corrigir logout do cliente quando garçom paga pelo PDV sem pedido de conta
+
+**Problema**: Em `Menu.tsx`, o listener de bills só escuta `UPDATE`. Quando o garçom paga pelo PDV sem o cliente ter pedido conta, o sistema faz `INSERT` de uma bill já com `status='paid'`. Como não há listener de INSERT para bills em Menu.tsx, o cliente não recebe notificação, não abre avaliação e não desloga.
+
+O `Comanda.tsx` já tem os listeners corretos (UPDATE + INSERT + DELETE), mas `Menu.tsx` só tem UPDATE.
+
+**Solução**: Adicionar listener de `INSERT` na tabela `bills` em Menu.tsx (similar ao que já existe em Comanda.tsx). Quando uma bill é inserida com `status='paid'` e pertence à mesa atual, disparar o mesmo fluxo de avaliação e logout.
+
+**Arquivos**:
+- **Editar**: `src/pages/Menu.tsx` - Adicionar `.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bills' }, ...)` no canal de realtime existente, verificando se `bill.table_id === currentTableId` e `bill.status === 'paid'`, e então disparar toast + review modal + logout (mesmo fluxo do UPDATE)
+
