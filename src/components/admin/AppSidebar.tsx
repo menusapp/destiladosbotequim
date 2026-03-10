@@ -157,11 +157,12 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                             key={subItem.id}
                             onClick={() => onSectionChange(subItem.id)}
                             isActive={activeSection === subItem.id}
-                            className={`w-full h-8 px-3 rounded-button text-[13px] ${
+                           className={`w-full h-8 px-3 rounded-button text-[13px] ${
                               activeSection === subItem.id
-                                ? "bg-accent text-accent-foreground font-medium"
+                                ? "font-medium"
                                 : "text-sidebar-foreground hover:bg-muted"
                             }`}
+                            style={activeSection === subItem.id ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                           >
                             <subItem.icon className="h-3.5 w-3.5" />
                             <span>{subItem.label}</span>

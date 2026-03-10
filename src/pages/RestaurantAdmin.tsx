@@ -691,6 +691,7 @@ const RestaurantAdmin = () => {
           hasActiveSubscription={hasActiveSubscription}
           staffRole={staffRole}
           staffAllowedSections={staffAllowedSections}
+          primaryColor={restaurant.primary_color}
         />
         <SidebarInset className="flex-1 flex flex-col">
           <AdminHeader

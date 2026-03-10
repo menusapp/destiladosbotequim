@@ -513,7 +513,7 @@ const Menu = () => {
         const currentTableId = tableIdRef.current;
         if (currentTableId) checkOpenComanda(currentTableId, cart);
       })
-      // 💳 Listener de contas (bills) para detectar pagamento (usando ref)
+      // 💳 Listener de contas (bills) UPDATE para detectar pagamento (usando ref)
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
@@ -528,17 +528,36 @@ const Menu = () => {
         // Verificar se a conta foi paga e pertence à mesa atual
         if (currentTableId && bill.table_id === currentTableId) {
           if (bill.status === 'paid' && oldBill?.status !== 'paid') {
-            console.log('💰 Conta PAGA! Iniciando avaliação e logout...');
+            console.log('💰 Conta PAGA (UPDATE)! Iniciando avaliação e logout...');
             
-            // Mostrar toast
             toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
             
-            // Definir bill para avaliação e abrir modal
             setReviewBillId(bill.id);
             setReviewModalOpen(true);
           } else if (bill.status === 'on_the_way' && oldBill?.status !== 'on_the_way') {
             toast.info("🏃 Sua conta está a caminho!");
           }
+        }
+      })
+      // 💳 Listener de contas (bills) INSERT para detectar pagamento direto pelo PDV (usando ref)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'bills'
+      }, (payload) => {
+        const bill = payload.new as any;
+        
+        const currentTableId = tableIdRef.current;
+        console.log('💳 Nova conta inserida:', { bill, currentTableId });
+        
+        // Quando garçom paga pelo PDV sem cliente pedir conta, INSERT já vem com status='paid'
+        if (currentTableId && bill.table_id === currentTableId && bill.status === 'paid') {
+          console.log('💰 Conta PAGA (INSERT direto)! Iniciando avaliação e logout...');
+          
+          toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
+          
+          setReviewBillId(bill.id);
+          setReviewModalOpen(true);
         }
       })
       // 🚪 Listener de mesa para detectar esvaziamento forçado (admin)

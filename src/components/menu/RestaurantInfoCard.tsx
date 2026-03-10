@@ -87,8 +87,11 @@ export const RestaurantInfoCard = ({
           </p>
         )}
 
-        {/* Avaliação */}
-        <div className="flex items-center gap-2 mt-3">
+        {/* Avaliação - Clicável */}
+        <button
+          onClick={() => setReviewsOpen(true)}
+          className="flex items-center gap-2 mt-3 cursor-pointer hover:opacity-80 transition-opacity w-full text-left"
+        >
           <div className="flex gap-0.5">
             {[1, 2, 3, 4, 5].map((star) => (
               <Star
@@ -104,10 +107,18 @@ export const RestaurantInfoCard = ({
           <span className="font-semibold text-foreground">
             {rating > 0 ? rating.toFixed(1) : "0,0"}
           </span>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground underline">
             ({reviewCount} {reviewCount === 1 ? 'avaliação' : 'avaliações'})
           </span>
-        </div>
+        </button>
+
+        <ReviewsDrawer
+          open={reviewsOpen}
+          onOpenChange={setReviewsOpen}
+          restaurantId={restaurantId}
+          rating={rating}
+          reviewCount={reviewCount}
+        />
 
         {/* Tempo e Taxa */}
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
