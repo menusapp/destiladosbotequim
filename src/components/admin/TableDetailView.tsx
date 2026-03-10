@@ -327,7 +327,7 @@ export const TableDetailView = () => {
             </div>
           </div>
         </div>
-        <Button onClick={() => navigate(`/admin#pdv-mesas?table=${tableId}`)}>
+        <Button onClick={() => { const slug = localStorage.getItem("restaurant_slug") || ""; navigate(`/${slug}/admin#pdv-mesas?table=${tableId}`); }}>
           <Plus className="w-4 h-4 mr-2" />
           Adicionar Pedido
         </Button>
