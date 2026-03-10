@@ -114,9 +114,10 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                     tooltip={item.label}
                     className={`relative h-9 px-3 rounded-button text-[13px] transition-colors ${
                       activeSection === item.id 
-                        ? "bg-accent text-accent-foreground font-medium" 
+                        ? "font-medium" 
                         : "text-sidebar-foreground hover:bg-muted"
                     }`}
+                    style={activeSection === item.id ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                   >
                     <item.icon className="h-4 w-4" />
                     {!collapsed && <span>{item.label}</span>}
