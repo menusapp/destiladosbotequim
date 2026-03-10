@@ -29,6 +29,7 @@ export const RestaurantInfoCard = ({
 }: RestaurantInfoCardProps) => {
   const [rating, setRating] = useState<number>(0);
   const [reviewCount, setReviewCount] = useState<number>(0);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
 
   useEffect(() => {
     const fetchRatingStats = async () => {
