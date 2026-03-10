@@ -525,16 +525,20 @@ const Menu = () => {
         const currentTableId = tableIdRef.current;
         console.log('💳 Conta atualizada:', { bill, oldBill, currentTableId });
         
-        // Verificar se a conta foi paga e pertence à mesa atual
+        // Verificar se a conta foi paga e pertence à mesa atual E à comanda do cliente
         if (currentTableId && bill.table_id === currentTableId) {
-          if (bill.status === 'paid' && oldBill?.status !== 'paid') {
+          // Filtrar por comanda_id para isolamento entre clientes na mesma mesa
+          const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+          const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
+          
+          if (billBelongsToMe && bill.status === 'paid' && oldBill?.status !== 'paid') {
             console.log('💰 Conta PAGA (UPDATE)! Iniciando avaliação e logout...');
             
             toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
             
             setReviewBillId(bill.id);
             setReviewModalOpen(true);
-          } else if (bill.status === 'on_the_way' && oldBill?.status !== 'on_the_way') {
+          } else if (billBelongsToMe && bill.status === 'on_the_way' && oldBill?.status !== 'on_the_way') {
             toast.info("🏃 Sua conta está a caminho!");
           }
         }
