@@ -112,6 +112,7 @@ type TableStatus = "available" | "occupied" | "reserved";
 
 const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const navigate = useNavigate();
+  const restaurantSlug = localStorage.getItem("restaurant_slug") || "";
   const [tables, setTables] = useState<Table[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [reservationsEnabled, setReservationsEnabled] = useState(false);
