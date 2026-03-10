@@ -2,6 +2,7 @@ import { Star, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { ReviewsDrawer } from "./ReviewsDrawer";
 
 interface RestaurantInfoCardProps {
   restaurantId: string;
