@@ -46,6 +46,7 @@ interface AppSidebarProps {
   hasActiveSubscription?: boolean | null;
   staffRole?: string;
   staffAllowedSections?: string[];
+  primaryColor?: string;
 }
 
 export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed, hasActiveSubscription, staffRole, staffAllowedSections }: AppSidebarProps) {
