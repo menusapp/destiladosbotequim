@@ -136,9 +136,10 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                 <SidebarMenuItem>
                   <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
+                       <SidebarMenuButton
                         tooltip="Configurações"
-                        className={`w-full h-9 px-3 rounded-button text-[13px] ${isConfigActive ? "bg-accent text-accent-foreground font-medium" : "text-sidebar-foreground hover:bg-muted"}`}
+                        className={`w-full h-9 px-3 rounded-button text-[13px] ${isConfigActive ? "font-medium" : "text-sidebar-foreground hover:bg-muted"}`}
+                        style={isConfigActive ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                       >
                         <Settings className="h-4 w-4" />
                         {!collapsed && (
