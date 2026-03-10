@@ -248,8 +248,12 @@ export const OrderDetailModal = ({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    try {
+      await printOrder(order, restaurantId);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao imprimir");
+    }
   };
 
   const handleWhatsApp = () => {
