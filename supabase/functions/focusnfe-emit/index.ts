@@ -80,10 +80,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch order items with product names
+    // Fetch order items with product names and fiscal data
     const { data: orderItems, error: itemsError } = await supabase
       .from("order_items")
-      .select("quantity, price_at_order, notes, product_id, products(name)")
+      .select("quantity, price_at_order, notes, product_id, products(name, pdv_code, fiscal_ncm, fiscal_cest, fiscal_cfop, fiscal_icms_csosn, fiscal_icms_origin, fiscal_pis_cst, fiscal_cofins_cst)")
       .eq("order_id", order_id);
 
     if (itemsError) {
