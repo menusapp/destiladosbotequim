@@ -248,9 +248,9 @@ const RestaurantAdmin = () => {
             }
 
             // Atualizar badges da sidebar
-            if (orderType === 'delivery' && activeSection !== 'pedidos-online') {
+            if (orderType === 'delivery' && activeSection !== 'pedidos') {
               setHasNewDeliveryOrders(true);
-            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos-locais') {
+            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos') {
               setHasNewOrders(true);
             }
           }
