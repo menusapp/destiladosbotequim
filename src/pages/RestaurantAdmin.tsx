@@ -564,16 +564,9 @@ const RestaurantAdmin = () => {
 
   const handleViewOrder = () => {
     if (!globalNotification) return;
-
-    // Navegar para a aba correta
-    if (globalNotification.orderType === 'delivery') {
-      setActiveSection('pedidos-online');
-    } else {
-      setActiveSection('pedidos-locais');
-    }
-
-    // Definir o pedido a ser aberto
+    setActiveSection('pedidos');
     setPendingOrderToOpen(globalNotification.orderId);
+    setGlobalNotification(null);
 
     // Fechar notificação
     setGlobalNotification(null);
