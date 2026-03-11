@@ -1055,6 +1055,7 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
+          pdv_code: string | null
           price: number
           updated_at: string | null
         }
@@ -1063,6 +1064,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           name: string
+          pdv_code?: string | null
           price?: number
           updated_at?: string | null
         }
@@ -1071,6 +1073,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           name?: string
+          pdv_code?: string | null
           price?: number
           updated_at?: string | null
         }

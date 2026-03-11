@@ -1,0 +1,1 @@
+ALTER TABLE extra_category_items ADD COLUMN IF NOT EXISTS pdv_code text;
