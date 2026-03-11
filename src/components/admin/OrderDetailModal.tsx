@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { printOrder } from "@/lib/printOrder";
+import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -57,6 +58,7 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
   const navigate = useNavigate();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showChangePaymentModal, setShowChangePaymentModal] = useState(false);
+  const [showAddItems, setShowAddItems] = useState(false);
 
   const getElapsedTime = () => {
     const elapsed = Date.now() - new Date(order.created_at).getTime();
@@ -162,12 +164,8 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
 
   const canAddItems = ["pending", "accepted", "preparing"].includes(order.status);
 
-  const handleAddItems = async () => {
-    toast.info("Use o PDV para adicionar itens a este pedido");
-    if (order.table_id) {
-      const slug = localStorage.getItem("restaurant_slug") || "";
-      navigate(`/${slug}/admin/mesa/${order.table_id}`);
-    }
+  const handleAddItems = () => {
+    setShowAddItems(true);
   };
 
   const handleChangePaymentConfirm = async () => {
@@ -350,6 +348,17 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
           onConfirm={handleChangePaymentConfirm}
         />
       )}
+
+      <AddItemsToOrderDrawer
+        open={showAddItems}
+        onClose={() => setShowAddItems(false)}
+        orderId={order.id}
+        restaurantId={restaurantId}
+        onItemsAdded={() => {
+          setShowAddItems(false);
+          onStatusUpdate();
+        }}
+      />
     </>
   );
 };

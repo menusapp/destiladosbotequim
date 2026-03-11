@@ -454,11 +454,7 @@ const Menu = () => {
         
         setRestaurant((prev: any) => ({...prev, ...updatedRestaurant}));
         
-        if (!updatedRestaurant.is_open && restaurant?.is_open) {
-          toast.info("O restaurante acabou de fechar! 🔒");
-        } else if (updatedRestaurant.is_open && !restaurant?.is_open) {
-          toast.success("O restaurante acabou de abrir! 🎉");
-        }
+        // Silenciado para não atrapalhar cliente
       })
       // 🔔 Listener de pedidos com notificações de status (usando refs para evitar stale closures)
       .on('postgres_changes', { 
@@ -481,22 +477,7 @@ const Menu = () => {
           
           if (order.customer_cpf === cleanCPF || order.customer_cpf === currentCustomer.cpf) {
             // Notificar mudança de status apenas se mudou
-            if (order.status !== oldOrder?.status) {
-              const statusMessages: Record<string, { message: string; type: 'success' | 'info' }> = {
-                accepted: { message: '✅ Pedido aceito! Está sendo preparado.', type: 'success' },
-                preparing: { message: '👨‍🍳 Seu pedido está sendo preparado!', type: 'info' },
-                ready: { message: '🍔 Pedido pronto! Aguarde o garçom.', type: 'success' },
-              };
-              
-              const notification = statusMessages[order.status];
-              if (notification) {
-                if (notification.type === 'success') {
-                  toast.success(notification.message);
-                } else {
-                  toast.info(notification.message);
-                }
-              }
-            }
+            // Silenciado - notificações de status removidas do cardápio do cliente
           }
         }
         
@@ -534,12 +515,8 @@ const Menu = () => {
           if (billBelongsToMe && bill.status === 'paid' && oldBill?.status !== 'paid') {
             console.log('💰 Conta PAGA (UPDATE)! Iniciando avaliação e logout...');
             
-            toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
-            
             setReviewBillId(bill.id);
             setReviewModalOpen(true);
-          } else if (billBelongsToMe && bill.status === 'on_the_way' && oldBill?.status !== 'on_the_way') {
-            toast.info("🏃 Sua conta está a caminho!");
           }
         }
       })
@@ -563,8 +540,6 @@ const Menu = () => {
           if (billBelongsToMe) {
             console.log('💰 Conta PAGA (INSERT direto)! Iniciando avaliação e logout...');
             
-            toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
-            
             setReviewBillId(bill.id);
             setReviewModalOpen(true);
           }
@@ -587,7 +562,7 @@ const Menu = () => {
           if (oldTable?.is_occupied === true && table.is_occupied === false) {
             console.log('🚪 Mesa esvaziada pelo admin! Fazendo logout...');
             
-            toast.info("A mesa foi liberada. Até a próxima! 👋", { duration: 5000 });
+            // Silenciado para cliente
             
             // Limpar sessão do cliente
             sessionStorage.removeItem("customerInfo");
@@ -736,7 +711,7 @@ const Menu = () => {
     setShowCustomerDialog(true);
     
     console.log('✅ Cliente deslogado com sucesso');
-    toast.info("Obrigado pela visita! 🙏");
+    // Silenciado
   }, [tableNumber]);
 
   const handleCustomerInfoSubmit = async (name: string, cpf: string, phone?: string) => {
@@ -895,7 +870,7 @@ const Menu = () => {
       setShowCustomerDialog(false);
       
       console.log('✅ Cliente logado com sucesso!', { tableId: tableData.id, comandaId });
-      toast.success(`Bem-vindo, ${finalName}!`);
+      // Silenciado - sem toast de boas-vindas
       
       // Carregar dados
       fetchData();
@@ -933,7 +908,7 @@ const Menu = () => {
       }
       return [...prev, { id: crypto.randomUUID(), product, quantity, extras, notes }];
     });
-    toast.success(`${product.name} adicionado${quantity > 1 ? ` (${quantity}x)` : ''}`);
+    // Silenciado - sem toast ao adicionar ao carrinho
   }, []);
 
   const updateQuantity = (itemId: string, delta: number) => {

@@ -1,89 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plano: Remover Toasts dos Cardápios, Fixar Viewport, e Adicionar Itens Inline no Pedido
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
----
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
-### 1. Remover toasts excessivos das páginas de cliente
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
 
-**Problema**: Notificações (toasts) aparecem o tempo todo nos cardápios digitais e de mesa, atrapalhando a experiência do cliente.
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
 
-**Solução**: Nas páginas `Menu.tsx`, `DeliveryMenu.tsx`, `Comanda.tsx` e `OrderConfirmation.tsx`, remover ou silenciar a maioria dos `toast.*` calls. Manter apenas:
-- `toast.success` para confirmação de pedido enviado
-- `toast.success` para conta paga + logout
-- `toast.error` para erros críticos (mesa não encontrada, erro ao enviar pedido)
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
 
-**Remover**:
-- `toast.success("Bem-vindo, ...")` no login de mesa
-- `toast.info("O restaurante acabou de fechar/abrir")` 
-- `toast.success("... adicionado")` ao adicionar item ao carrinho
-- `toast.success("Comanda limpa")`
-- `toast.info("A conta está a caminho!")`
-- `toast.info("A mesa foi liberada...")`
-- `toast.info("Obrigado pela visita!")`
-- Notificações de mudança de status do pedido (aceito, preparando, pronto) — manter apenas no painel admin
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
 
-**Manter no painel admin**: Todos os toasts continuam normais para o restaurante.
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
 
-**Arquivos**: `src/pages/Menu.tsx`, `src/pages/DeliveryMenu.tsx`, `src/pages/Comanda.tsx`
-
----
-
-### 2. Fixar viewport — impedir zoom nos cardápios
-
-**Problema**: Clientes conseguem dar zoom na tela do cardápio, quebrando a proporção.
-
-**Solução**: No `index.html`, alterar a meta viewport para:
-```html
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+Detalhes técnicos:
+```text
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
 ```
 
-Também adicionar CSS no `src/index.css`:
-```css
-html, body {
-  touch-action: manipulation;
-  -ms-touch-action: manipulation;
-}
-```
-
-Isso impede zoom por pinch e double-tap em dispositivos móveis. Funciona tanto para cardápio digital quanto mesa.
-
-**Arquivos**: `index.html`, `src/index.css`
-
----
-
-### 3. Adicionar itens inline no pedido (sem redirecionar ao PDV)
-
-**Problema**: Ao clicar "Adicionar Itens" no `OrderDetailModal`, aparece toast dizendo "Use o PDV" e redireciona. O usuário quer um drawer lateral com os produtos direto no modal.
-
-**Solução — Criar componente `AddItemsToOrderDrawer`**:
-- Um `Sheet` lateral que:
-  1. Busca os produtos do restaurante (com `product_extras` e `product_complement_groups`)
-  2. Mostra uma grid de categorias + produtos (similar ao PDV mas simplificado)
-  3. Ao clicar num produto, abre o `PDVProductDrawer` existente para selecionar complementos/observações
-  4. Ao confirmar, insere direto em `order_items` + `order_item_extras` via Supabase
-  5. Fecha e chama `onStatusUpdate()` para atualizar os dados do pedido
-
-**Modificar `OrderDetailModal.tsx`**:
-- Importar o novo `AddItemsToOrderDrawer`
-- Estado `showAddItems` para controlar abertura
-- `handleAddItems` agora abre o drawer em vez de redirecionar
-- O drawer recebe `orderId`, `restaurantId` e callback de refresh
-
-**Novo arquivo**: `src/components/admin/AddItemsToOrderDrawer.tsx`
-**Modificar**: `src/components/admin/OrderDetailModal.tsx` (linhas 165-171 — substituir handleAddItems)
-
----
-
-### Resumo de Arquivos
-
-**Criar**: `src/components/admin/AddItemsToOrderDrawer.tsx`
-
-**Modificar**:
-- `index.html` — viewport sem zoom
-- `src/index.css` — touch-action manipulation
-- `src/pages/Menu.tsx` — remover toasts desnecessários
-- `src/pages/DeliveryMenu.tsx` — remover toasts desnecessários
-- `src/pages/Comanda.tsx` — remover toasts desnecessários
-- `src/components/admin/OrderDetailModal.tsx` — abrir drawer de adicionar itens inline
-
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.

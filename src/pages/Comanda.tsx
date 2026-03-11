@@ -253,7 +253,7 @@ const Comanda = () => {
             if (bill?.status === "on_the_way") {
               console.log("💳 Conta a caminho!");
               setBillOnTheWay(true);
-              toast.success("A conta está a caminho! 💳");
+              // Silenciado para cliente
             }
             
             if (bill?.status === "paid") {
@@ -301,7 +301,7 @@ const Comanda = () => {
           (payload) => {
             // Conta removida (paga e encerrada) -> agradecer e sair
             const deletedBill = payload.old as any;
-            toast.success("Conta paga! Obrigado pela preferência!");
+            // Silenciado para cliente
             
             // Fechar comanda ativa
             if (comandaId) {
@@ -355,7 +355,7 @@ const Comanda = () => {
               setHasAcceptedOrder(true);
               const prepTimeMs = (prepTimeMinutes || 30) * 60 * 1000;
               setPrepTimerSeconds(Math.floor(prepTimeMs / 1000));
-              toast.success("Pedido aceito! Preparação iniciada.");
+              // Silenciado para cliente
             }
             
             // Atualiza dados para refletir status

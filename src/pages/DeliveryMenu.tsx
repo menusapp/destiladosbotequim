@@ -128,11 +128,7 @@ export default function DeliveryMenu() {
           ...updatedRestaurant
         }));
         
-        if (!updatedRestaurant.is_open) {
-          toast.info("O restaurante acabou de fechar! 🔒");
-        } else {
-          toast.success("O restaurante acabou de abrir! 🎉");
-        }
+        // Silenciado para cliente
       })
       .on('postgres_changes', {
         event: '*',
@@ -164,22 +160,7 @@ export default function DeliveryMenu() {
         console.log('Pedido do cliente atualizado:', payload);
         
         const order = payload.new as any;
-        if (payload.eventType === 'INSERT') {
-          toast.success('Pedido enviado com sucesso!');
-        } else if (payload.eventType === 'UPDATE' && order?.status) {
-          const statusMessages: Record<string, string> = {
-            accepted: '✅ Pedido aceito! Está sendo preparado.',
-            out_for_delivery: order.delivery_type === 'pickup' 
-              ? '📦 Pedido pronto para retirada!'
-              : '🚚 Pedido saiu para entrega!',
-            delivered: '🎉 Pedido entregue! Bom apetite!',
-            picked_up: '📦 Pedido retirado! Bom apetite!',
-          };
-          
-          if (statusMessages[order.status]) {
-            toast.success(statusMessages[order.status]);
-          }
-        }
+        // Silenciado - notificações de status removidas do cardápio do cliente
       })
       .subscribe();
 
@@ -259,7 +240,6 @@ export default function DeliveryMenu() {
 
     setCart([...cart, newItem]);
     setSelectedProduct(null);
-    toast.success("Item adicionado à sacola!");
   };
 
   const handleUpdateQuantity = (itemId: string, delta: number) => {
@@ -279,7 +259,6 @@ export default function DeliveryMenu() {
 
   const handleClearCart = () => {
     setCart([]);
-    toast.success("Sacola limpa");
   };
 
   const handleBulkAddToCart = (items: CartItem[]) => {
