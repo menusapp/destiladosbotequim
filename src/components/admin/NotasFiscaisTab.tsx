@@ -37,6 +37,7 @@ interface FiscalNote {
 const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   const [notes, setNotes] = useState<FiscalNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showEmissaoModal, setShowEmissaoModal] = useState(false);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
