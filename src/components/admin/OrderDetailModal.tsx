@@ -58,6 +58,7 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
   const navigate = useNavigate();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showChangePaymentModal, setShowChangePaymentModal] = useState(false);
+  const [showAddItems, setShowAddItems] = useState(false);
 
   const getElapsedTime = () => {
     const elapsed = Date.now() - new Date(order.created_at).getTime();
