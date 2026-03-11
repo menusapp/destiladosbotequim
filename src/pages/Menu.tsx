@@ -562,7 +562,7 @@ const Menu = () => {
           if (oldTable?.is_occupied === true && table.is_occupied === false) {
             console.log('🚪 Mesa esvaziada pelo admin! Fazendo logout...');
             
-            toast.info("A mesa foi liberada. Até a próxima! 👋", { duration: 5000 });
+            // Silenciado para cliente
             
             // Limpar sessão do cliente
             sessionStorage.removeItem("customerInfo");
