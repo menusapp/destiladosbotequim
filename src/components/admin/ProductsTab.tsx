@@ -140,6 +140,25 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [productCategoriesOpen, setProductCategoriesOpen] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
 
+  // Fiscal fields
+  const [pdvCode, setPdvCode] = useState("");
+  const [fiscalNcm, setFiscalNcm] = useState("");
+  const [fiscalException, setFiscalException] = useState("");
+  const [fiscalCest, setFiscalCest] = useState("");
+  const [fiscalCfop, setFiscalCfop] = useState("");
+  const [fiscalIcmsCsosn, setFiscalIcmsCsosn] = useState("");
+  const [fiscalIcmsOrigin, setFiscalIcmsOrigin] = useState("0");
+  const [fiscalPisCst, setFiscalPisCst] = useState("");
+  const [fiscalPisAliquota, setFiscalPisAliquota] = useState("");
+  const [fiscalCofinsCst, setFiscalCofinsCst] = useState("");
+  const [fiscalCofinsAliquota, setFiscalCofinsAliquota] = useState("");
+  const [fiscalIbsAliquota, setFiscalIbsAliquota] = useState("");
+  const [fiscalCbsAliquota, setFiscalCbsAliquota] = useState("");
+  const [fiscalBeneficioCode, setFiscalBeneficioCode] = useState("");
+  const [fiscalIndiceProducao, setFiscalIndiceProducao] = useState("");
+  const [fiscalAliquotaTransparencia, setFiscalAliquotaTransparencia] = useState("");
+  const [productsOpen, setProductsOpen] = useState(false);
+
   useEffect(() => {
     fetchCategories();
     fetchProducts();
