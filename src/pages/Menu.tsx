@@ -711,7 +711,7 @@ const Menu = () => {
     setShowCustomerDialog(true);
     
     console.log('✅ Cliente deslogado com sucesso');
-    toast.info("Obrigado pela visita! 🙏");
+    // Silenciado
   }, [tableNumber]);
 
   const handleCustomerInfoSubmit = async (name: string, cpf: string, phone?: string) => {
