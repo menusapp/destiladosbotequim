@@ -240,7 +240,6 @@ export default function DeliveryMenu() {
 
     setCart([...cart, newItem]);
     setSelectedProduct(null);
-    toast.success("Item adicionado à sacola!");
   };
 
   const handleUpdateQuantity = (itemId: string, delta: number) => {
