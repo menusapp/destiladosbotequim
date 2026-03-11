@@ -590,13 +590,9 @@ const RestaurantAdmin = () => {
 
   const renderContent = () => {
     switch (activeSection) {
-      // Pedidos Online (apenas delivery/retirada)
-      case "pedidos-online":
-        return <PedidosTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
-      
-      // Pedidos Locais (mesas e comandas)
-      case "pedidos-locais":
-        return <LocalOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
+      // Pedidos (unified)
+      case "pedidos":
+        return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
       
       // PDV (Balcão + Mesas)
       case "pdv":
