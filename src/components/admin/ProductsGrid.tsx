@@ -1645,6 +1645,86 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                 </div>
               )}
             </div>
+              </TabsContent>
+
+              <TabsContent value="fiscal" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Código PDV</Label>
+                    <Input value={pdvCode} onChange={(e) => setPdvCode(e.target.value)} placeholder="Ex: 001" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>NCM</Label>
+                    <Input value={fiscalNcm} onChange={(e) => setFiscalNcm(e.target.value)} placeholder="Ex: 21069090" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Exceção TIPI</Label>
+                    <Input value={fiscalException} onChange={(e) => setFiscalException(e.target.value)} placeholder="Ex: 01" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CEST</Label>
+                    <Input value={fiscalCest} onChange={(e) => setFiscalCest(e.target.value)} placeholder="Ex: 0300100" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CFOP</Label>
+                    <Input value={fiscalCfop} onChange={(e) => setFiscalCfop(e.target.value)} placeholder="Ex: 5102" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Alíquota Transparência (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalAliquotaTransparencia} onChange={(e) => setFiscalAliquotaTransparencia(e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Código Benefício Fiscal</Label>
+                    <Input value={fiscalBeneficioCode} onChange={(e) => setFiscalBeneficioCode(e.target.value)} placeholder="" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Índice de Produção</Label>
+                    <Input type="number" step="0.01" value={fiscalIndiceProducao} onChange={(e) => setFiscalIndiceProducao(e.target.value)} placeholder="0.00" />
+                  </div>
+                </div>
+                <h4 className="font-semibold text-sm mt-4">ICMS</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Situação Tributária (CSOSN)</Label>
+                    <Input value={fiscalIcmsCsosn} onChange={(e) => setFiscalIcmsCsosn(e.target.value)} placeholder="Ex: 102" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Origem</Label>
+                    <Input value={fiscalIcmsOrigin} onChange={(e) => setFiscalIcmsOrigin(e.target.value)} placeholder="0" />
+                  </div>
+                </div>
+                <h4 className="font-semibold text-sm mt-4">IBS / CBS</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Alíquota IBS (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalIbsAliquota} onChange={(e) => setFiscalIbsAliquota(e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Alíquota CBS (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalCbsAliquota} onChange={(e) => setFiscalCbsAliquota(e.target.value)} placeholder="0.00" />
+                  </div>
+                </div>
+                <h4 className="font-semibold text-sm mt-4">PIS / COFINS</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Situação Tributária PIS</Label>
+                    <Input value={fiscalPisCst} onChange={(e) => setFiscalPisCst(e.target.value)} placeholder="Ex: 49" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Alíquota PIS (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalPisAliquota} onChange={(e) => setFiscalPisAliquota(e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Situação Tributária COFINS</Label>
+                    <Input value={fiscalCofinsCst} onChange={(e) => setFiscalCofinsCst(e.target.value)} placeholder="Ex: 49" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Alíquota COFINS (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalCofinsAliquota} onChange={(e) => setFiscalCofinsAliquota(e.target.value)} placeholder="0.00" />
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <Button type="submit" className="w-full">
               {editingProduct ? "Atualizar Produto" : "Criar Produto"}
