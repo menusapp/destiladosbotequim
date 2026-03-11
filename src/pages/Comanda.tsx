@@ -301,7 +301,7 @@ const Comanda = () => {
           (payload) => {
             // Conta removida (paga e encerrada) -> agradecer e sair
             const deletedBill = payload.old as any;
-            toast.success("Conta paga! Obrigado pela preferência!");
+            // Silenciado para cliente
             
             // Fechar comanda ativa
             if (comandaId) {
