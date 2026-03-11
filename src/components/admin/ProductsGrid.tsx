@@ -824,7 +824,23 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
 
-    // Fetch ingredients (insumos fixos)
+    // Load fiscal fields
+    setPdvCode((product as any).pdv_code || "");
+    setFiscalNcm((product as any).fiscal_ncm || "");
+    setFiscalException((product as any).fiscal_exception || "");
+    setFiscalCest((product as any).fiscal_cest || "");
+    setFiscalCfop((product as any).fiscal_cfop || "");
+    setFiscalIcmsCsosn((product as any).fiscal_icms_csosn || "");
+    setFiscalIcmsOrigin((product as any).fiscal_icms_origin || "0");
+    setFiscalPisCst((product as any).fiscal_pis_cst || "");
+    setFiscalPisAliquota((product as any).fiscal_pis_aliquota?.toString() || "");
+    setFiscalCofinsCst((product as any).fiscal_cofins_cst || "");
+    setFiscalCofinsAliquota((product as any).fiscal_cofins_aliquota?.toString() || "");
+    setFiscalIbsAliquota((product as any).fiscal_ibs_aliquota?.toString() || "");
+    setFiscalCbsAliquota((product as any).fiscal_cbs_aliquota?.toString() || "");
+    setFiscalBeneficioCode((product as any).fiscal_beneficio_code || "");
+    setFiscalIndiceProducao((product as any).fiscal_indice_producao?.toString() || "");
+    setFiscalAliquotaTransparencia((product as any).fiscal_aliquota_transparencia?.toString() || "");
     const { data: ingredientsData } = await supabase
       .from("product_ingredients")
       .select("*, stock_items(name, unit, price_per_unit)")
