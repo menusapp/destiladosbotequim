@@ -2879,6 +2879,7 @@ export type Database = {
         Row: {
           auto_open_close: boolean | null
           banner_url: string | null
+          bill_request_enabled: boolean | null
           certificado_digital_ref: string | null
           cnpj: string | null
           created_at: string | null
@@ -2915,6 +2916,7 @@ export type Database = {
         Insert: {
           auto_open_close?: boolean | null
           banner_url?: string | null
+          bill_request_enabled?: boolean | null
           certificado_digital_ref?: string | null
           cnpj?: string | null
           created_at?: string | null
@@ -2951,6 +2953,7 @@ export type Database = {
         Update: {
           auto_open_close?: boolean | null
           banner_url?: string | null
+          bill_request_enabled?: boolean | null
           certificado_digital_ref?: string | null
           cnpj?: string | null
           created_at?: string | null
