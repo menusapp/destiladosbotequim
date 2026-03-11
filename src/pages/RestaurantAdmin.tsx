@@ -423,12 +423,9 @@ const RestaurantAdmin = () => {
   };
 
   useEffect(() => {
-    // Limpar notificações quando mudar de seção
-    if (activeSection === 'pedidos-locais') {
+    if (activeSection === 'pedidos') {
       setHasNewOrders(false);
       setHasNewBills(false);
-    }
-    if (activeSection === 'pedidos-online') {
       setHasNewDeliveryOrders(false);
     }
   }, [activeSection]);
