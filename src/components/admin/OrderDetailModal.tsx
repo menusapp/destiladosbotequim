@@ -348,6 +348,17 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
           onConfirm={handleChangePaymentConfirm}
         />
       )}
+
+      <AddItemsToOrderDrawer
+        open={showAddItems}
+        onClose={() => setShowAddItems(false)}
+        orderId={order.id}
+        restaurantId={restaurantId}
+        onItemsAdded={() => {
+          setShowAddItems(false);
+          onStatusUpdate();
+        }}
+      />
     </>
   );
 };
