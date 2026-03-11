@@ -1,26 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plano: Botão "Desconectar" da integração Fiscal
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
-### O que faz
-Adicionar um botão "Desconectar" no `FiscalSettingsTab` que:
-1. Reseta o `nuvem_fiscal_status` para `"pending"` na tabela `fiscal_configs`
-2. Limpa os dados sensíveis (CSC, senha do certificado, caminho do certificado)
-3. Remove o arquivo `.pfx` do storage bucket `fiscal-certificates`
-4. Atualiza o estado local para refletir a desconexão
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
-### Onde
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
 
-**Modificar**: `src/components/admin/FiscalSettingsTab.tsx`
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
 
-- Adicionar um botão vermelho "Desconectar" ao lado do alert de status (quando estiver "synced")
-- Com confirmação via `AlertDialog` antes de executar ("Tem certeza? Isso vai remover o certificado e desconectar da Nuvem Fiscal.")
-- Ao confirmar:
-  - `supabase.storage.from('fiscal-certificates').remove([restaurantId + '/certificate.pfx'])`
-  - `supabase.from('fiscal_configs').update({ nuvem_fiscal_status: 'pending', csc_id: '', csc_code: '', certificate_password: '', certificate_file_path: '' }).eq('restaurant_id', restaurantId)`
-  - Resetar estado local e mostrar `toast.success("Desconectado da Nuvem Fiscal")`
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
 
-### UI
-- Botão com ícone `LogOut` e texto "Desconectar", posicionado no canto direito do alert de status "Sincronizada"
-- Dialog de confirmação usando `AlertDialog` já disponível no projeto
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
 
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+
+Detalhes técnicos:
+```text
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
+```
+
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.

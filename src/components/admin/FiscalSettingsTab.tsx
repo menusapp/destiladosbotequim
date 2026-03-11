@@ -5,8 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Upload, Check, Loader2, X, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Upload, Check, Loader2, X, CheckCircle2, AlertTriangle, LogOut } from "lucide-react";
 
 interface FiscalSettingsTabProps {
   restaurantId: string;
@@ -68,6 +72,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [existingFileName, setExistingFileName] = useState<string | null>(null);
   const [nuvemFiscalStatus, setNuvemFiscalStatus] = useState<string>("pending");
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -192,6 +197,37 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
     }
   };
 
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      await supabase.storage.from("fiscal-certificates").remove([`${restaurantId}/certificate.pfx`]);
+
+      const { error } = await supabase
+        .from("fiscal_configs")
+        .update({
+          nuvem_fiscal_status: "pending",
+          csc_id: "",
+          csc_code: "",
+          certificate_password: "",
+          certificate_file_path: "",
+        })
+        .eq("restaurant_id", restaurantId);
+
+      if (error) throw error;
+
+      setConfig((prev) => ({ ...prev, csc_id: "", csc_code: "", certificate_password: "", certificate_file_path: "" }));
+      setNuvemFiscalStatus("pending");
+      setExistingFileName(null);
+      setSelectedFile(null);
+      toast.success("Desconectado da Nuvem Fiscal");
+    } catch (error: any) {
+      console.error("Erro ao desconectar:", error);
+      toast.error(error?.message || "Erro ao desconectar");
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -207,10 +243,36 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
       {/* Status */}
       {nuvemFiscalStatus === "synced" ? (
         <Alert className="border-green-500/30 bg-green-50 dark:bg-green-950/30">
-          <CheckCircle2 className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-700 dark:text-green-400 text-[13px] font-medium ml-2">
-            Empresa sincronizada e ativa na Nuvem Fiscal
-          </AlertDescription>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-700 dark:text-green-400 text-[13px] font-medium ml-2">
+                Empresa sincronizada e ativa na Nuvem Fiscal
+              </AlertDescription>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={isDisconnecting}>
+                  {isDisconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <LogOut className="h-3.5 w-3.5 mr-1.5" />}
+                  Desconectar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Desconectar da Nuvem Fiscal?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Isso vai remover o certificado digital e desconectar sua empresa da Nuvem Fiscal. Você precisará reconfigurar para emitir notas fiscais novamente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDisconnect} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Desconectar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </Alert>
       ) : (
         <Alert className="border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/30">
