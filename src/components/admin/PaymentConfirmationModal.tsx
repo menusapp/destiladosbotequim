@@ -163,18 +163,29 @@ export const PaymentConfirmationModal = ({
 
       if (error) throw error;
 
-      // If local order (has table_id), create a paid bill to trigger customer logout via Realtime
+      // Update existing cash_movements and bills if this is a payment change
       if (order.table_id) {
-        const { error: billError } = await supabase.from("bills").insert({
-          table_id: order.table_id,
-          subtotal: subtotal,
-          service_fee: feeAmount,
-          total_amount: total,
-          payment_method: primaryPayment,
-          status: "paid",
-          paid_at: new Date().toISOString(),
-        });
-        if (billError) console.error("Erro ao criar conta:", billError);
+        // Update existing bills for this order
+        const { data: existingBills } = await supabase.from("bills").select("id").eq("table_id", order.table_id).eq("status", "paid").order("created_at", { ascending: false }).limit(1);
+        
+        if (existingBills && existingBills.length > 0) {
+          // Update existing bill payment method
+          await supabase.from("bills").update({ payment_method: primaryPayment, total_amount: total, subtotal, service_fee: feeAmount }).eq("id", existingBills[0].id);
+          // Update cash_movements linked to this bill
+          await supabase.from("cash_movements").update({ payment_method: primaryPayment }).eq("bill_id", existingBills[0].id);
+        } else {
+          // Create new bill
+          const { error: billError } = await supabase.from("bills").insert({
+            table_id: order.table_id,
+            subtotal: subtotal,
+            service_fee: feeAmount,
+            total_amount: total,
+            payment_method: primaryPayment,
+            status: "paid",
+            paid_at: new Date().toISOString(),
+          });
+          if (billError) console.error("Erro ao criar conta:", billError);
+        }
       }
 
       toast.success("Pagamento confirmado!");
