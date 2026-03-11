@@ -657,7 +657,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       imageUrl = publicUrl;
     }
 
-    const productData = {
+    const productData: any = {
       name: productName,
       description: productDescription,
       price: parseFloat(productPrice),
@@ -665,6 +665,22 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       category_id: productCategoryId,
       image_url: imageUrl,
       prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : null,
+      pdv_code: pdvCode || null,
+      fiscal_ncm: fiscalNcm || null,
+      fiscal_exception: fiscalException || null,
+      fiscal_cest: fiscalCest || null,
+      fiscal_cfop: fiscalCfop || null,
+      fiscal_icms_csosn: fiscalIcmsCsosn || null,
+      fiscal_icms_origin: fiscalIcmsOrigin || "0",
+      fiscal_pis_cst: fiscalPisCst || null,
+      fiscal_pis_aliquota: fiscalPisAliquota ? parseFloat(fiscalPisAliquota) : null,
+      fiscal_cofins_cst: fiscalCofinsCst || null,
+      fiscal_cofins_aliquota: fiscalCofinsAliquota ? parseFloat(fiscalCofinsAliquota) : null,
+      fiscal_ibs_aliquota: fiscalIbsAliquota ? parseFloat(fiscalIbsAliquota) : null,
+      fiscal_cbs_aliquota: fiscalCbsAliquota ? parseFloat(fiscalCbsAliquota) : null,
+      fiscal_beneficio_code: fiscalBeneficioCode || null,
+      fiscal_indice_producao: fiscalIndiceProducao ? parseFloat(fiscalIndiceProducao) : null,
+      fiscal_aliquota_transparencia: fiscalAliquotaTransparencia ? parseFloat(fiscalAliquotaTransparencia) : null,
     };
 
     let productId: string;
