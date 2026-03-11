@@ -477,22 +477,7 @@ const Menu = () => {
           
           if (order.customer_cpf === cleanCPF || order.customer_cpf === currentCustomer.cpf) {
             // Notificar mudança de status apenas se mudou
-            if (order.status !== oldOrder?.status) {
-              const statusMessages: Record<string, { message: string; type: 'success' | 'info' }> = {
-                accepted: { message: '✅ Pedido aceito! Está sendo preparado.', type: 'success' },
-                preparing: { message: '👨‍🍳 Seu pedido está sendo preparado!', type: 'info' },
-                ready: { message: '🍔 Pedido pronto! Aguarde o garçom.', type: 'success' },
-              };
-              
-              const notification = statusMessages[order.status];
-              if (notification) {
-                if (notification.type === 'success') {
-                  toast.success(notification.message);
-                } else {
-                  toast.info(notification.message);
-                }
-              }
-            }
+            // Silenciado - notificações de status removidas do cardápio do cliente
           }
         }
         
