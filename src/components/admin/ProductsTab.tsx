@@ -777,6 +777,24 @@ const handleDelete = async (id: string) => {
     setProductPrepTime((product as any).prep_time_minutes?.toString() || "30");
     setProductImageUrl(product.image_url);
     
+    // Load fiscal fields
+    setPdvCode(product.pdv_code || "");
+    setFiscalNcm(product.fiscal_ncm || "");
+    setFiscalException(product.fiscal_exception || "");
+    setFiscalCest(product.fiscal_cest || "");
+    setFiscalCfop(product.fiscal_cfop || "");
+    setFiscalIcmsCsosn(product.fiscal_icms_csosn || "");
+    setFiscalIcmsOrigin(product.fiscal_icms_origin || "0");
+    setFiscalPisCst(product.fiscal_pis_cst || "");
+    setFiscalPisAliquota(product.fiscal_pis_aliquota?.toString() || "");
+    setFiscalCofinsCst(product.fiscal_cofins_cst || "");
+    setFiscalCofinsAliquota(product.fiscal_cofins_aliquota?.toString() || "");
+    setFiscalIbsAliquota(product.fiscal_ibs_aliquota?.toString() || "");
+    setFiscalCbsAliquota(product.fiscal_cbs_aliquota?.toString() || "");
+    setFiscalBeneficioCode(product.fiscal_beneficio_code || "");
+    setFiscalIndiceProducao(product.fiscal_indice_producao?.toString() || "");
+    setFiscalAliquotaTransparencia(product.fiscal_aliquota_transparencia?.toString() || "");
+    
     // Buscar extras do produto com ingredientes
     const { data: extrasData } = await supabase
       .from("product_extras")
