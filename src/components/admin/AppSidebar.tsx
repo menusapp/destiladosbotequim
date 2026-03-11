@@ -56,8 +56,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
 
   const menuStructure = {
     main: [
-      { id: "pedidos-online", label: "Pedidos Online", icon: ShoppingBag, hasNotification: hasNewDeliveryOrders },
-      { id: "pedidos-locais", label: "Pedidos Locais", icon: Utensils, hasNotification: (hasNewOrders || hasNewBills) },
+      { id: "pedidos", label: "Pedidos", icon: ShoppingBag, hasNotification: (hasNewDeliveryOrders || hasNewOrders || hasNewBills) },
       { id: "pdv", label: "PDV", icon: CreditCard },
       { id: "mesas-reservas", label: "Mesas e Reservas", icon: Users2 },
       { id: "cardapio", label: "Cardápio", icon: Utensils },

@@ -10,8 +10,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { DevelopmentPlaceholder } from "@/components/admin/DevelopmentPlaceholder";
 import MarketingTab from "@/components/admin/MarketingTab";
 import { ReportsTab } from "@/components/admin/ReportsTab";
-import PedidosTab from "@/components/admin/PedidosTab";
-import LocalOrdersTab from "@/components/admin/LocalOrdersTab";
+import UnifiedOrdersTab from "@/components/admin/UnifiedOrdersTab";
 import CardapioTab from "@/components/admin/CardapioTab";
 import TablesTab from "@/components/admin/TablesTab";
 import StockTab from "@/components/admin/StockTab";
@@ -249,9 +248,9 @@ const RestaurantAdmin = () => {
             }
 
             // Atualizar badges da sidebar
-            if (orderType === 'delivery' && activeSection !== 'pedidos-online') {
+            if (orderType === 'delivery' && activeSection !== 'pedidos') {
               setHasNewDeliveryOrders(true);
-            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos-locais') {
+            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos') {
               setHasNewOrders(true);
             }
           }
@@ -325,7 +324,7 @@ const RestaurantAdmin = () => {
             setNotifiedBills(updated);
             
             // Atualizar badge
-            if (activeSection !== 'pedidos-locais') {
+            if (activeSection !== 'pedidos') {
               setHasNewBills(true);
             }
           }
@@ -424,12 +423,9 @@ const RestaurantAdmin = () => {
   };
 
   useEffect(() => {
-    // Limpar notificações quando mudar de seção
-    if (activeSection === 'pedidos-locais') {
+    if (activeSection === 'pedidos') {
       setHasNewOrders(false);
       setHasNewBills(false);
-    }
-    if (activeSection === 'pedidos-online') {
       setHasNewDeliveryOrders(false);
     }
   }, [activeSection]);
@@ -568,16 +564,9 @@ const RestaurantAdmin = () => {
 
   const handleViewOrder = () => {
     if (!globalNotification) return;
-
-    // Navegar para a aba correta
-    if (globalNotification.orderType === 'delivery') {
-      setActiveSection('pedidos-online');
-    } else {
-      setActiveSection('pedidos-locais');
-    }
-
-    // Definir o pedido a ser aberto
+    setActiveSection('pedidos');
     setPendingOrderToOpen(globalNotification.orderId);
+    setGlobalNotification(null);
 
     // Fechar notificação
     setGlobalNotification(null);
@@ -585,11 +574,7 @@ const RestaurantAdmin = () => {
 
   const handleViewBill = () => {
     if (!billNotification) return;
-
-    // Navegar para pedidos locais
-    setActiveSection('pedidos-locais');
-
-    // Fechar notificação
+    setActiveSection('pedidos');
     setBillNotification(null);
   };
 
@@ -605,13 +590,9 @@ const RestaurantAdmin = () => {
 
   const renderContent = () => {
     switch (activeSection) {
-      // Pedidos Online (apenas delivery/retirada)
-      case "pedidos-online":
-        return <PedidosTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
-      
-      // Pedidos Locais (mesas e comandas)
-      case "pedidos-locais":
-        return <LocalOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
+      // Pedidos (unified)
+      case "pedidos":
+        return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
       
       // PDV (Balcão + Mesas)
       case "pdv":
@@ -686,7 +667,7 @@ const RestaurantAdmin = () => {
         return <WhatsAppSettings restaurantId={restaurant.id} />;
       
       default:
-        return <PedidosTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
+        return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
     }
   };
 

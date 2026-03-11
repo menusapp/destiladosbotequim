@@ -1,0 +1,405 @@
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { PDVProductDrawer } from "./PDVProductDrawer";
+import { CustomerSelectDialog } from "./CustomerSelectDialog";
+
+interface CartItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  notes?: string;
+  extras: { extraId: string; name: string; price: number }[];
+}
+
+interface CreateOrderDrawerProps {
+  restaurantId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onOrderCreated: () => void;
+}
+
+export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCreated }: CreateOrderDrawerProps) => {
+  const queryClient = useQueryClient();
+  const [orderType, setOrderType] = useState<"delivery" | "mesa" | "retirada">("delivery");
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+  const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Form fields
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerCpf, setCustomerCpf] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryCep, setDeliveryCep] = useState("");
+  const [deliveryNeighborhood, setDeliveryNeighborhood] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
+  const [notes, setNotes] = useState("");
+  const [paymentType, setPaymentType] = useState("");
+  const [selectedTableId, setSelectedTableId] = useState("");
+
+  const { data: products } = useQuery({
+    queryKey: ["products-create-order", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("products")
+        .select("*, categories!inner(id, name, restaurant_id), product_extras(*)")
+        .eq("categories.restaurant_id", restaurantId)
+        .eq("available", true)
+        .order("name");
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  const { data: tables } = useQuery({
+    queryKey: ["tables-create-order", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("tables").select("*").eq("restaurant_id", restaurantId)
+        .neq("table_number", 9999).order("table_number");
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    if (!searchTerm) return products;
+    return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [products, searchTerm]);
+
+  const cartSubtotal = useMemo(() => {
+    return cart.reduce((sum, item) => {
+      const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+      return sum + (item.price + extrasTotal) * item.quantity;
+    }, 0);
+  }, [cart]);
+
+  const handleAddToCart = (item: CartItem) => {
+    setCart(prev => [...prev, item]);
+    toast.success(`${item.productName} adicionado!`);
+  };
+
+  const handleCustomerSelect = (customer: { id: string; cpf: string; name: string; phone: string | null }) => {
+    setCustomerName(customer.name);
+    setCustomerCpf(customer.cpf);
+    setCustomerPhone(customer.phone || "");
+  };
+
+  const handleCepLookup = async (cep: string) => {
+    setDeliveryCep(cep);
+    const clean = cep.replace(/\D/g, "");
+    if (clean.length !== 8) return;
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setDeliveryAddress(data.logradouro || "");
+        setDeliveryNeighborhood(data.bairro || "");
+        setDeliveryCity(`${data.localidade} - ${data.uf}`);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const clearForm = () => {
+    setCart([]);
+    setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
+    setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
+    setNotes(""); setPaymentType(""); setSelectedTableId("");
+  };
+
+  const handleSubmit = async () => {
+    if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
+    if (!customerName && orderType !== "mesa") { toast.error("Nome do cliente é obrigatório"); return; }
+
+    setSubmitting(true);
+    try {
+      if (orderType === "delivery") {
+        if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
+        const { data: order, error } = await supabase.from("orders").insert({
+          restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
+          status: "pending", customer_name: customerName,
+          customer_cpf: customerCpf || "000.000.000-00",
+          delivery_phone: customerPhone,
+          delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
+          notes: notes || null, payment_type: paymentType || null,
+        }).select().single();
+        if (error) throw error;
+        await insertOrderItems(order.id);
+
+      } else if (orderType === "retirada") {
+        const { data: order, error } = await supabase.from("orders").insert({
+          restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
+          status: "pending", customer_name: customerName,
+          customer_cpf: customerCpf || "000.000.000-00",
+          notes: notes || null, payment_type: paymentType || null,
+        }).select().single();
+        if (error) throw error;
+        await insertOrderItems(order.id);
+
+      } else {
+        // Mesa / Balcão
+        const tableId = selectedTableId;
+        if (!tableId) throw new Error("Selecione uma mesa");
+        const table = tables?.find(t => t.id === tableId);
+        if (!table) throw new Error("Mesa não encontrada");
+
+        let comandaId: string | null = null;
+        if (table.is_occupied) {
+          const { data: existingComanda } = await supabase.from("comandas")
+            .select("*").eq("table_id", tableId).eq("status", "active")
+            .order("created_at", { ascending: false }).limit(1).maybeSingle();
+          if (existingComanda) {
+            comandaId = existingComanda.id;
+          } else {
+            const { data: nc } = await supabase.from("comandas").insert({
+              restaurant_id: restaurantId, table_id: tableId,
+              customer_name: customerName || "Cliente PDV",
+              customer_cpf: customerCpf || "000.000.000-00", status: "active",
+            }).select().single();
+            comandaId = nc?.id || null;
+          }
+        } else {
+          await supabase.from("tables").update({
+            is_occupied: true, occupied_at: new Date().toISOString(),
+            occupied_by: customerName || "PDV",
+          }).eq("id", tableId);
+          const { data: nc } = await supabase.from("comandas").insert({
+            restaurant_id: restaurantId, table_id: tableId,
+            customer_name: customerName || "Cliente PDV",
+            customer_cpf: customerCpf || "000.000.000-00", status: "active",
+          }).select().single();
+          comandaId = nc?.id || null;
+        }
+
+        const { data: order, error } = await supabase.from("orders").insert({
+          restaurant_id: restaurantId, order_type: "local", table_id: tableId,
+          comanda_id: comandaId, status: "pending",
+          customer_name: customerName || "Cliente PDV",
+          customer_cpf: customerCpf || "000.000.000-00",
+          notes: notes || null, payment_type: paymentType || null,
+        }).select().single();
+        if (error) throw error;
+        await insertOrderItems(order.id);
+      }
+
+      toast.success("Pedido criado com sucesso!");
+      clearForm();
+      onOpenChange(false);
+      onOrderCreated();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao criar pedido");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const insertOrderItems = async (orderId: string) => {
+    for (const item of cart) {
+      const { data: oi, error } = await supabase.from("order_items").insert({
+        order_id: orderId, product_id: item.productId,
+        quantity: item.quantity, price_at_order: item.price, notes: item.notes || null,
+      }).select().single();
+      if (error) throw error;
+      if (item.extras.length > 0) {
+        await supabase.from("order_item_extras").insert(
+          item.extras.map(e => ({ order_item_id: oi.id, product_extra_id: e.extraId, price_at_order: e.price }))
+        );
+      }
+    }
+  };
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+          <SheetHeader className="px-4 pt-4 pb-2 border-b">
+            <SheetTitle>Criar Pedido</SheetTitle>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 h-full">
+              {/* Left: Form */}
+              <div className="p-4 space-y-4 border-r overflow-y-auto max-h-[calc(100vh-180px)]">
+                <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)}>
+                  <TabsList className="w-full">
+                    <TabsTrigger value="delivery" className="flex-1">Delivery</TabsTrigger>
+                    <TabsTrigger value="mesa" className="flex-1">Mesa</TabsTrigger>
+                    <TabsTrigger value="retirada" className="flex-1">Retirada</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
+                {/* Customer */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Cliente</Label>
+                    <Button variant="ghost" size="sm" onClick={() => setIsCustomerSelectOpen(true)}>
+                      <UserPlus className="w-3.5 h-3.5 mr-1" /> Buscar
+                    </Button>
+                  </div>
+                  <Input placeholder="Nome do cliente" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                  {(orderType === "delivery") && (
+                    <Input placeholder="Telefone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                  )}
+                  <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => setCustomerCpf(e.target.value)} />
+                </div>
+
+                {/* Type-specific fields */}
+                {orderType === "delivery" && (
+                  <div className="space-y-2">
+                    <Label>Endereço</Label>
+                    <Input placeholder="CEP" value={deliveryCep} onChange={e => handleCepLookup(e.target.value)} />
+                    <Input placeholder="Rua" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
+                    <Input placeholder="Bairro" value={deliveryNeighborhood} onChange={e => setDeliveryNeighborhood(e.target.value)} />
+                    <Input placeholder="Cidade" value={deliveryCity} onChange={e => setDeliveryCity(e.target.value)} />
+                  </div>
+                )}
+
+                {orderType === "mesa" && (
+                  <div className="space-y-2">
+                    <Label>Mesa</Label>
+                    <Select value={selectedTableId} onValueChange={setSelectedTableId}>
+                      <SelectTrigger><SelectValue placeholder="Selecione uma mesa" /></SelectTrigger>
+                      <SelectContent>
+                        {tables?.map(t => (
+                          <SelectItem key={t.id} value={t.id}>
+                            Mesa {t.table_number} {t.is_occupied ? "(Ocupada)" : "(Livre)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div className="space-y-2">
+                  <Label>Observações</Label>
+                  <Textarea placeholder="Observações do pedido..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[60px]" />
+                </div>
+
+                {/* Payment */}
+                <div className="space-y-2">
+                  <Label>Pagamento</Label>
+                  <Select value={paymentType} onValueChange={setPaymentType}>
+                    <SelectTrigger><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Dinheiro</SelectItem>
+                      <SelectItem value="debit">Débito</SelectItem>
+                      <SelectItem value="credit">Crédito</SelectItem>
+                      <SelectItem value="pix">Pix</SelectItem>
+                      <SelectItem value="meal_voucher">Vale Refeição</SelectItem>
+                      <SelectItem value="mixed">Misto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Cart Summary */}
+                {cart.length > 0 && (
+                  <div className="space-y-2 border-t pt-3">
+                    <h4 className="font-semibold text-sm">Carrinho ({cart.length})</h4>
+                    {cart.map((item, i) => {
+                      const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+                      const itemTotal = (item.price + extrasTotal) * item.quantity;
+                      return (
+                        <div key={i} className="flex items-center justify-between text-sm">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium">{item.quantity}x</span> {item.productName}
+                            {item.extras.length > 0 && (
+                              <span className="text-xs text-muted-foreground ml-1">(+{item.extras.length} extras)</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">R$ {itemTotal.toFixed(2)}</span>
+                            <Button variant="ghost" size="sm" onClick={() => setCart(c => c.filter((_, idx) => idx !== i))} className="h-6 w-6 p-0">
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between font-bold text-sm pt-2 border-t">
+                      <span>Total</span>
+                      <span>R$ {cartSubtotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right: Products */}
+              <div className="p-4 space-y-3 overflow-y-auto max-h-[calc(100vh-180px)]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {filteredProducts.map(product => (
+                    <Card
+                      key={product.id}
+                      className="cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => { setSelectedProduct(product); setIsProductDrawerOpen(true); }}
+                    >
+                      <CardContent className="p-2 space-y-1">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="w-full h-16 object-cover rounded" />
+                        ) : (
+                          <div className="w-full h-16 bg-muted rounded flex items-center justify-center text-lg font-bold text-muted-foreground">
+                            {product.name.charAt(0)}
+                          </div>
+                        )}
+                        <p className="text-xs font-medium truncate">{product.name}</p>
+                        <p className="text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t p-4 flex items-center justify-between">
+            <div className="text-sm">
+              <ShoppingCart className="w-4 h-4 inline mr-1" />
+              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartSubtotal.toFixed(2)}</span>
+            </div>
+            <Button onClick={handleSubmit} disabled={submitting || cart.length === 0}>
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              Criar Pedido
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <PDVProductDrawer
+        product={selectedProduct}
+        open={isProductDrawerOpen}
+        onClose={() => setIsProductDrawerOpen(false)}
+        onAddToCart={handleAddToCart}
+      />
+
+      <CustomerSelectDialog
+        restaurantId={restaurantId}
+        open={isCustomerSelectOpen}
+        onOpenChange={setIsCustomerSelectOpen}
+        onSelect={handleCustomerSelect}
+      />
+    </>
+  );
+};
