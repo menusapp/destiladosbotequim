@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Plus, Truck, ShoppingBag, UtensilsCrossed,
-  Clock, Printer, Users, Check, XCircle
+  Clock, Printer, Users, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay } from "date-fns";
@@ -95,6 +95,18 @@ interface UnifiedOrdersTabProps {
   onOrderOpened: () => void;
 }
 
+const PAYMENT_LABELS: Record<string, { icon: React.ReactNode; label: string }> = {
+  "Dinheiro": { icon: <Banknote className="w-3 h-3" />, label: "Dinheiro" },
+  "PIX": { icon: <Smartphone className="w-3 h-3" />, label: "PIX" },
+  "Cartão de Crédito": { icon: <CreditCard className="w-3 h-3" />, label: "Crédito" },
+  "Cartão de Débito": { icon: <CreditCard className="w-3 h-3" />, label: "Débito" },
+  "credit": { icon: <CreditCard className="w-3 h-3" />, label: "Crédito" },
+  "debit": { icon: <CreditCard className="w-3 h-3" />, label: "Débito" },
+  "cash": { icon: <Banknote className="w-3 h-3" />, label: "Dinheiro" },
+  "pix": { icon: <Smartphone className="w-3 h-3" />, label: "PIX" },
+  "online": { icon: <Smartphone className="w-3 h-3" />, label: "Pago Online" },
+};
+
 const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: UnifiedOrdersTabProps) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -129,7 +141,6 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
   }, [pendingOrderToOpen, orders]);
 
   useEffect(() => {
-    // Load auto-print and bill_request_enabled
     supabase.from('printer_settings').select('auto_print_orders').eq('restaurant_id', restaurantId).maybeSingle()
       .then(({ data }) => { if (data) setAutoPrint(data.auto_print_orders); });
     supabase.from('restaurants').select('bill_request_enabled').eq('id', restaurantId).single()
@@ -223,7 +234,6 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
   const getElapsedMinutes = (createdAt: string) => Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
   const getElapsedColor = (m: number) => m < 5 ? "text-green-600 bg-green-50 border-green-200" : m < 15 ? "text-amber-600 bg-amber-50 border-amber-200" : "text-red-600 bg-red-50 border-red-200";
 
-  // Filter orders based on active tab and search
   const filteredOrders = useMemo(() => {
     let filtered = orders;
     
@@ -234,7 +244,6 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     } else if (activeTab === "local") {
       filtered = filtered.filter(o => o.order_type === "local" || !o.order_type);
     }
-    // "todos" and "mesas" don't filter by type
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -250,12 +259,12 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
   }, [orders, activeTab, searchQuery]);
 
   const filteredBills = useMemo(() => {
-    if (!searchQuery) return bills.filter(b => b.status === "requested" || b.status === "on_the_way");
+    const activeBills = bills.filter(b => b.status === "requested" || b.status === "on_the_way");
+    if (!searchQuery) return activeBills;
     const q = searchQuery.toLowerCase();
-    return bills.filter(b =>
-      (b.status === "requested" || b.status === "on_the_way") &&
-      (b.tables.table_number.toString().includes(searchQuery) ||
-       b.orders.some(o => o.customer_name.toLowerCase().includes(q)))
+    return activeBills.filter(b =>
+      b.tables.table_number.toString().includes(searchQuery) ||
+      b.orders.some(o => o.customer_name.toLowerCase().includes(q))
     );
   }, [bills, searchQuery]);
 
@@ -282,6 +291,17 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     return "Retirada";
   };
 
+  const getPaymentDisplay = (paymentType?: string) => {
+    if (!paymentType || paymentType === "pending") {
+      return { label: "Falta pagamento", className: "text-red-600 bg-red-50 dark:bg-red-950/30", icon: <AlertTriangle className="w-3 h-3" /> };
+    }
+    const info = PAYMENT_LABELS[paymentType];
+    if (info) {
+      return { label: info.label, className: "text-green-700 bg-green-50 dark:bg-green-950/30", icon: info.icon };
+    }
+    return { label: paymentType, className: "text-green-700 bg-green-50 dark:bg-green-950/30", icon: <CreditCard className="w-3 h-3" /> };
+  };
+
   const kanbanColumns = useMemo(() => {
     const isLocal = activeTab === "local";
     const cols = [
@@ -305,9 +325,17 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     toast.success(enabled ? "Conta pelo cardápio ativada" : "Conta pelo cardápio desativada");
   };
 
+  const handleBillStatusChange = async (billId: string, newStatus: string) => {
+    const { error } = await supabase.from("bills").update({ status: newStatus }).eq("id", billId);
+    if (error) { toast.error("Erro ao atualizar conta"); return; }
+    toast.success(newStatus === "on_the_way" ? "Conta a caminho!" : "Status atualizado");
+    fetchBills();
+  };
+
   const renderOrderCard = (order: Order) => {
     const total = calculateTotal(order);
     const elapsed = getElapsedMinutes(order.created_at);
+    const payment = getPaymentDisplay(order.payment_type);
     return (
       <Card
         key={order.id}
@@ -332,11 +360,43 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
             ))}
             {order.order_items.length > 2 && <p>+{order.order_items.length - 2} itens</p>}
           </div>
+          {/* Payment method display */}
+          <div className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${payment.className}`}>
+            {payment.icon}
+            <span>{payment.label}</span>
+          </div>
           <div className="flex items-center justify-between pt-1 border-t border-border/30">
             <span className="text-xs text-muted-foreground">
               {format(new Date(order.created_at), "HH:mm")}
             </span>
             <span className="font-bold text-sm">R$ {total.toFixed(2)}</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderBillCard = (bill: Bill) => {
+    const customerName = bill.orders?.[0]?.customer_name || "Cliente";
+    return (
+      <Card key={bill.id} className="border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
+        <CardContent className="p-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className="text-[10px]">Mesa {bill.tables.table_number}</Badge>
+            <Badge variant={bill.status === "requested" ? "destructive" : "secondary"} className="text-[10px]">
+              {bill.status === "requested" ? "Solicitada" : "A caminho"}
+            </Badge>
+          </div>
+          <p className="text-sm font-semibold truncate">{customerName}</p>
+          <p className="font-bold text-sm">R$ {bill.total_amount.toFixed(2)}</p>
+          <p className="text-[10px] text-muted-foreground">{format(new Date(bill.created_at), "HH:mm")}</p>
+          <div className="flex gap-1 pt-1">
+            {bill.status === "requested" && (
+              <Button size="sm" variant="outline" className="h-6 text-[10px] flex-1" onClick={(e) => { e.stopPropagation(); handleBillStatusChange(bill.id, "on_the_way"); }}>
+                A caminho
+              </Button>
+            )}
+            <p className="text-[9px] text-muted-foreground italic self-center">Pagar via PDV ou Mesas</p>
           </div>
         </CardContent>
       </Card>
@@ -363,6 +423,22 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
           </div>
         );
       })}
+      {/* Bills column for Local tab */}
+      {activeTab === "local" && billRequestEnabled && (
+        <div className="min-w-[260px] flex-shrink-0 flex flex-col">
+          <div className="bg-amber-500 text-white px-3 py-2 rounded-t-lg flex items-center justify-between">
+            <span className="font-semibold text-sm">📋 Contas</span>
+            <Badge variant="secondary" className="bg-white/20 text-white border-0 text-xs">{filteredBills.length}</Badge>
+          </div>
+          <div className="bg-amber-50/30 dark:bg-amber-950/10 border border-t-0 border-amber-200 dark:border-amber-800 rounded-b-lg p-2 space-y-2 min-h-[200px] max-h-[60vh] overflow-y-auto flex-1">
+            {filteredBills.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-8">Nenhuma conta solicitada</p>
+            ) : (
+              filteredBills.map(renderBillCard)
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -395,42 +471,6 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
       })}
     </div>
   );
-
-  const renderBillsSection = () => {
-    if (filteredBills.length === 0) return null;
-    return (
-      <div className="mt-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
-            📋 Comandas Solicitadas ({filteredBills.length})
-          </h3>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="bill-request" className="text-xs text-muted-foreground">Pedir conta pelo cardápio</Label>
-            <Switch id="bill-request" checked={billRequestEnabled} onCheckedChange={handleToggleBillRequest} />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredBills.map(bill => (
-            <Card key={bill.id} className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/10">
-              <CardContent className="p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline">Mesa {bill.tables.table_number}</Badge>
-                  <Badge variant={bill.status === "requested" ? "destructive" : "secondary"} className="text-[10px]">
-                    {bill.status === "requested" ? "Solicitada" : "A caminho"}
-                  </Badge>
-                </div>
-                <p className="font-bold text-sm">R$ {bill.total_amount.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {format(new Date(bill.created_at), "HH:mm")}
-                </p>
-                <p className="text-xs text-muted-foreground italic">Para pagar, use PDV → Mesas / Comandas</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   if (loading) {
     return <div className="flex items-center justify-center h-96 text-muted-foreground">Carregando pedidos...</div>;
@@ -507,8 +547,12 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
         <TabsContent value="delivery">{renderKanban()}</TabsContent>
         <TabsContent value="retirada">{renderKanban()}</TabsContent>
         <TabsContent value="local">
+          {/* Toggle pedir conta - always visible in local tab */}
+          <div className="flex items-center gap-2 mb-3 p-2 rounded-lg border border-border/50 bg-muted/20 w-fit">
+            <Label htmlFor="bill-request-local" className="text-xs text-muted-foreground">Pedir conta pelo cardápio</Label>
+            <Switch id="bill-request-local" checked={billRequestEnabled} onCheckedChange={handleToggleBillRequest} />
+          </div>
           {renderKanban()}
-          {renderBillsSection()}
         </TabsContent>
         <TabsContent value="mesas">{renderTablesGrid()}</TabsContent>
       </Tabs>

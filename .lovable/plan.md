@@ -1,52 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plano: Comandas na Aba Local, Pagamento no Caixa, e Forma de Pagamento nos Cards
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
----
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
-### 1. Toggle "Pedir Conta" + Kanban de Comandas na Aba Local
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
 
-**Situacao atual**: O toggle existe em `renderBillsSection()` mas so aparece se ha bills filtradas. O usuario quer que o toggle fique visivel sempre na aba Local, e que comandas solicitadas aparecam como uma coluna extra do Kanban.
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
 
-**Solucao em `UnifiedOrdersTab.tsx`**:
-- Mover o switch "Pedir conta pelo cardapio" para o header da aba Local (sempre visivel quando `activeTab === "local"`)
-- Quando `billRequestEnabled` estiver ativo, adicionar uma coluna extra ao kanban na aba Local: **"Contas Solicitadas"** com `bg-orange-500` tom diferenciado
-- Essa coluna mostra as bills com status `requested` e `on_the_way` como cards (mesa, cliente, valor, botoes de acao)
-- Acoes nos cards de conta: "A caminho" (muda status para `on_the_way`) e "Para pagar use PDV ou Mesas"
-- Se `billRequestEnabled` for `false`, a coluna de contas nao aparece
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
 
----
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
 
-### 2. Pedidos Locais — So entrar no caixa quando pago
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
 
-**Problema**: O trigger `add_local_order_to_cash_register` insere um `cash_movement` com `payment_method = 'pending'` quando o status muda para `accepted`. Isso faz pedidos locais aparecerem no caixa antes de serem pagos.
+Detalhes técnicos:
+```text
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
+```
 
-**Solucao — Migration SQL**: Alterar a funcao trigger para NAO criar cash_movement ao aceitar pedido local. Em vez disso, criar o cash_movement apenas quando o pagamento for confirmado. Duas opcoes:
-
-**Opcao escolhida**: Modificar o trigger `add_local_order_to_cash_register` para so criar o cash_movement quando `payment_type` for definido (nao nulo e diferente de `pending`). Adicionar uma nova condicao no trigger que detecta quando `payment_type` muda de NULL/pending para um valor real.
-
-Tambem: No `PaymentConfirmationModal`, apos confirmar pagamento, criar o `cash_movement` com o metodo correto se o pedido for local e nao tiver cash_movement ainda. Buscar a sessao de caixa aberta e inserir.
-
----
-
-### 3. Forma de Pagamento nos Cards do Kanban
-
-**Solucao em `UnifiedOrdersTab.tsx` — `renderOrderCard()`**:
-- Adicionar uma linha no card mostrando a forma de pagamento:
-  - Se `order.payment_type` existe e nao e `pending` → mostrar o metodo (ex: "💳 Credito", "💵 Dinheiro") em texto verde/neutro
-  - Se `order.payment_type` e `null` ou `pending` → mostrar **"⚠ Falta pagamento"** em vermelho (`text-red-600 bg-red-50`)
-- Na logica de status do `OrderDetailModal`, bloquear a mudanca para `delivered`/`picked_up` se `payment_type` for nulo:
-  - Nos botoes "Confirmar Entrega", "Entregar na Mesa", "Confirmar Retirada": antes de chamar `updateStatus`, verificar se `order.payment_type` existe
-  - Se nao existir, mostrar `toast.error("Defina a forma de pagamento antes de finalizar o pedido")` e abrir o modal de pagamento
-
----
-
-### Resumo de Arquivos
-
-**Migration SQL**: 1 migration para alterar a funcao `add_local_order_to_cash_register` — so criar cash_movement quando `payment_type` for definido (nao nulo/pending)
-
-**Modificar**:
-- `src/components/admin/UnifiedOrdersTab.tsx` — Coluna kanban de contas na aba Local, toggle sempre visivel, forma de pagamento nos cards
-- `src/components/admin/OrderDetailModal.tsx` — Bloquear finalizacao sem pagamento definido
-- `src/components/admin/PaymentConfirmationModal.tsx` — Criar cash_movement ao confirmar pagamento de pedido local
-
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
