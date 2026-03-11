@@ -157,7 +157,6 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [fiscalBeneficioCode, setFiscalBeneficioCode] = useState("");
   const [fiscalIndiceProducao, setFiscalIndiceProducao] = useState("");
   const [fiscalAliquotaTransparencia, setFiscalAliquotaTransparencia] = useState("");
-  const [productsOpen, setProductsOpen] = useState(false);
 
   useEffect(() => {
     fetchCategories();
