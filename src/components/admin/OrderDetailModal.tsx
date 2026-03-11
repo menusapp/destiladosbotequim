@@ -5,17 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
-  Clock, 
-  User, 
-  Phone, 
-  MapPin, 
-  Printer, 
-  MessageCircle, 
-  XCircle, 
-  Play,
-  Plus,
-  Home,
-  Trash2
+  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Home, Trash2, RefreshCw
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -52,9 +42,7 @@ interface Order {
   notes?: string;
   payment_type?: string;
   table_id?: string;
-  tables?: {
-    table_number: number;
-  };
+  tables?: { table_number: number };
   order_items: OrderItem[];
 }
 
@@ -65,20 +53,14 @@ interface OrderDetailModalProps {
   onStatusUpdate: () => void;
 }
 
-export const OrderDetailModal = ({
-  order,
-  restaurantId,
-  onClose,
-  onStatusUpdate,
-}: OrderDetailModalProps) => {
+export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate }: OrderDetailModalProps) => {
   const navigate = useNavigate();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-
+  const [showChangePaymentModal, setShowChangePaymentModal] = useState(false);
 
   const getElapsedTime = () => {
     const elapsed = Date.now() - new Date(order.created_at).getTime();
     const minutes = Math.floor(elapsed / 60000);
-    
     if (minutes < 5) return { text: `${minutes} min`, color: "text-green-600" };
     if (minutes < 15) return { text: `${minutes} min`, color: "text-yellow-600" };
     return { text: `${minutes} min`, color: "text-red-600" };
@@ -89,225 +71,98 @@ export const OrderDetailModal = ({
   const calculateTotal = () => {
     return order.order_items.reduce((total, item) => {
       const itemTotal = item.price_at_order * item.quantity;
-      const extrasTotal = item.order_item_extras.reduce(
-        (sum, extra) => sum + extra.price_at_order,
-        0
-      ) * item.quantity;
+      const extrasTotal = item.order_item_extras.reduce((sum, extra) => sum + extra.price_at_order, 0) * item.quantity;
       return total + itemTotal + extrasTotal;
     }, 0);
   };
 
-  // Função para enviar notificação WhatsApp automática
   const sendWhatsAppNotification = async (newStatus: string) => {
     try {
-      // Só envia se tiver telefone do cliente
-      if (!order.delivery_phone) {
-        console.log('[WhatsApp][AUTO] Sem telefone para pedido', order.id);
-        return;
-      }
+      if (!order.delivery_phone) return;
+      const { data: config } = await supabase.from('whatsapp_config').select('*').eq('restaurant_id', restaurantId).maybeSingle();
+      if (!config?.enabled || config?.instance_status !== 'connected') return;
 
-      // Buscar config do WhatsApp
-      const { data: config, error: configError } = await supabase
-        .from('whatsapp_config')
-        .select('*')
-        .eq('restaurant_id', restaurantId)
-        .maybeSingle();
-
-      if (configError) {
-        console.error('[WhatsApp][AUTO] Erro ao buscar config:', configError);
-        return;
-      }
-
-      if (!config?.enabled) {
-        console.log('[WhatsApp][AUTO] WhatsApp não habilitado para restaurante');
-        return;
-      }
-
-      if (config?.instance_status !== 'connected') {
-        console.log('[WhatsApp][AUTO] Instância não conectada:', config?.instance_status);
-        return;
-      }
-
-      // Mapear status para template de mensagem
-      // accepted/preparing -> message_accepted
-      // out_for_delivery (delivery) -> message_out_for_delivery
-      // out_for_delivery (pickup) / ready -> message_ready_for_pickup
-      // delivered -> message_delivered
-      // picked_up -> message_picked_up
-      // cancelled -> message_cancelled
       let template: string | null = null;
       let messageType = '';
+      if (newStatus === 'accepted' || newStatus === 'preparing') { template = config.message_accepted; messageType = 'accepted'; }
+      else if (newStatus === 'out_for_delivery') {
+        if (order.delivery_type === 'pickup') { template = config.message_ready_for_pickup; messageType = 'ready_for_pickup'; }
+        else { template = config.message_out_for_delivery; messageType = 'out_for_delivery'; }
+      } else if (newStatus === 'ready') { template = config.message_ready_for_pickup; messageType = 'ready_for_pickup'; }
+      else if (newStatus === 'delivered') { template = config.message_delivered; messageType = 'delivered'; }
+      else if (newStatus === 'picked_up') { template = config.message_picked_up; messageType = 'picked_up'; }
+      else if (newStatus === 'cancelled') { template = config.message_cancelled; messageType = 'cancelled'; }
+      if (!template) return;
 
-      if (newStatus === 'accepted' || newStatus === 'preparing') {
-        template = config.message_accepted;
-        messageType = 'accepted';
-      } else if (newStatus === 'out_for_delivery') {
-        // Se for pedido de retirada, usa o template de "pronto para retirada"
-        if (order.delivery_type === 'pickup') {
-          template = config.message_ready_for_pickup;
-          messageType = 'ready_for_pickup';
-        } else {
-          template = config.message_out_for_delivery;
-          messageType = 'out_for_delivery';
-        }
-      } else if (newStatus === 'ready') {
-        template = config.message_ready_for_pickup;
-        messageType = 'ready_for_pickup';
-      } else if (newStatus === 'delivered') {
-        template = config.message_delivered;
-        messageType = 'delivered';
-      } else if (newStatus === 'picked_up') {
-        template = config.message_picked_up;
-        messageType = 'picked_up';
-      } else if (newStatus === 'cancelled') {
-        template = config.message_cancelled;
-        messageType = 'cancelled';
-      }
-
-      if (!template) {
-        console.log('[WhatsApp][AUTO] Sem template para status:', newStatus);
-        return;
-      }
-
-      // Buscar tempo estimado do restaurante
-      const { data: restaurant } = await supabase
-        .from('restaurants')
-        .select('prep_time_minutes')
-        .eq('id', restaurantId)
-        .single();
-
+      const { data: restaurant } = await supabase.from('restaurants').select('prep_time_minutes').eq('id', restaurantId).single();
       const tempoEstimado = restaurant?.prep_time_minutes?.toString() || '30';
+      const message = template.replace(/{nome}/g, order.customer_name || 'Cliente').replace(/{pedido}/g, order.id.slice(0, 8)).replace(/{tempo}/g, tempoEstimado);
 
-      // Substituir variáveis do template
-      const message = template
-        .replace(/{nome}/g, order.customer_name || 'Cliente')
-        .replace(/{pedido}/g, order.id.slice(0, 8))
-        .replace(/{tempo}/g, tempoEstimado);
-
-      console.log('[WhatsApp][AUTO] Enviando mensagem para pedido', order.id, 'status:', newStatus);
-      console.log('[WhatsApp][AUTO] Telefone:', order.delivery_phone);
-      console.log('[WhatsApp][AUTO] Mensagem:', message);
-
-      // Chamar edge function
-      const { data, error: sendError } = await supabase.functions.invoke('whatsapp-send', {
-        body: {
-          restaurantId,
-          phone: order.delivery_phone,
-          message,
-          orderId: order.id,
-          messageType
-        }
-      });
-
-      if (sendError) {
-        console.error('[WhatsApp][AUTO] Erro ao enviar:', sendError);
-      } else {
-        console.log('[WhatsApp][AUTO] Mensagem enviada com sucesso!', data);
-      }
-    } catch (error) {
-      console.error('[WhatsApp][AUTO] Erro geral:', error);
-      // Não bloquear o fluxo se falhar o WhatsApp
-    }
+      await supabase.functions.invoke('whatsapp-send', { body: { restaurantId, phone: order.delivery_phone, message, orderId: order.id, messageType } });
+    } catch (error) { console.error('[WhatsApp][AUTO] Erro:', error); }
   };
 
   const updateStatus = async (newStatus: string) => {
     try {
-      const { error } = await supabase.rpc("admin_update_order_status", {
-        p_order_id: order.id,
-        p_new_status: newStatus,
-        p_restaurant_id: restaurantId,
-      });
-
+      const { error } = await supabase.rpc("admin_update_order_status", { p_order_id: order.id, p_new_status: newStatus, p_restaurant_id: restaurantId });
       if (error) throw error;
-      
-      // Enviar notificação WhatsApp após sucesso (não bloqueia o fluxo)
       sendWhatsAppNotification(newStatus);
-      
-      // Auto-print ao aceitar pedido (se configurado)
       if (newStatus === 'accepted') {
         try {
-          const { data: printerConfig } = await supabase
-            .from('printer_settings')
-            .select('auto_print_orders')
-            .eq('restaurant_id', restaurantId)
-            .maybeSingle();
-          
-          if (printerConfig?.auto_print_orders) {
-            await printOrder(order, restaurantId);
-          }
-        } catch (printErr) {
-          console.error('Auto-print error:', printErr);
-        }
+          const { data: printerConfig } = await supabase.from('printer_settings').select('auto_print_orders').eq('restaurant_id', restaurantId).maybeSingle();
+          if (printerConfig?.auto_print_orders) await printOrder(order, restaurantId);
+        } catch (printErr) { console.error('Auto-print error:', printErr); }
       }
-      
-      // Disparar gatilho de marketing para campanhas automáticas
       if (newStatus === 'delivered' || newStatus === 'picked_up') {
-        supabase.functions.invoke('marketing-trigger', {
-          body: {
-            orderId: order.id,
-            restaurantId: restaurantId
-          }
-        }).then(({ error: triggerError }) => {
-          if (triggerError) {
-            console.error('[Marketing] Trigger error:', triggerError);
-          } else {
-            console.log('[Marketing] Trigger invoked for order', order.id);
-          }
-        });
+        supabase.functions.invoke('marketing-trigger', { body: { orderId: order.id, restaurantId } });
       }
-      
       toast.success("Status atualizado!");
       onStatusUpdate();
       onClose();
-    } catch (error) {
-      console.error("Erro ao atualizar status:", error);
-      toast.error("Erro ao atualizar status");
-    }
+    } catch (error) { console.error("Erro ao atualizar status:", error); toast.error("Erro ao atualizar status"); }
   };
 
   const handlePrint = async () => {
-    try {
-      await printOrder(order, restaurantId);
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao imprimir");
-    }
+    try { await printOrder(order, restaurantId); } catch (error: any) { toast.error(error.message || "Erro ao imprimir"); }
   };
 
   const handleWhatsApp = () => {
-    if (order.delivery_phone) {
-      const phone = order.delivery_phone.replace(/\D/g, "");
-      window.open(`https://wa.me/55${phone}`, "_blank");
-    } else {
-      toast.error("Telefone não informado");
-    }
+    if (order.delivery_phone) { const phone = order.delivery_phone.replace(/\D/g, ""); window.open(`https://wa.me/55${phone}`, "_blank"); }
+    else { toast.error("Telefone não informado"); }
   };
 
   const handleGoToTable = () => {
+    if (order.table_id) { const slug = localStorage.getItem("restaurant_slug") || ""; navigate(`/${slug}/admin/mesa/${order.table_id}`); }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: "Aguardando confirmação", accepted: "Em preparo", preparing: "Preparando",
+      ready: "Pronto para entrega", out_for_delivery: "Saiu para entrega",
+      delivered: "Entregue", picked_up: "Retirado", cancelled: "Cancelado",
+    };
+    return labels[status] || status;
+  };
+
+  const getOrderOrigin = () => {
+    if (order.order_type === "local") return `Digital - Mesa ${order.tables?.table_number || "?"}`;
+    return order.delivery_type === "delivery" ? "Digital - Delivery" : "Digital - Retirada";
+  };
+
+  const canAddItems = ["pending", "accepted", "preparing"].includes(order.status);
+
+  const handleAddItems = async () => {
+    toast.info("Use o PDV para adicionar itens a este pedido");
     if (order.table_id) {
       const slug = localStorage.getItem("restaurant_slug") || "";
       navigate(`/${slug}/admin/mesa/${order.table_id}`);
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      pending: "Aguardando confirmação",
-      accepted: "Em preparo",
-      preparing: "Preparando",
-      ready: "Pronto para entrega",
-      out_for_delivery: "Saiu para entrega",
-      delivered: "Entregue",
-      picked_up: "Retirado",
-      cancelled: "Cancelado",
-    };
-    return labels[status] || status;
-  };
-
-  const getOrderOrigin = () => {
-    if (order.order_type === "local") {
-      return `Digital - Mesa ${order.tables?.table_number || "?"}`;
-    }
-    return order.delivery_type === "delivery" ? "Digital - Delivery" : "Digital - Retirada";
+  const handleChangePaymentConfirm = async () => {
+    setShowChangePaymentModal(false);
+    onStatusUpdate();
+    toast.success("Forma de pagamento atualizada!");
   };
 
   return (
@@ -317,106 +172,60 @@ export const OrderDetailModal = ({
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div>
-                <DialogTitle className="text-2xl">
-                  Pedido #{order.id.slice(0, 8)}
-                </DialogTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}
-                </p>
+                <DialogTitle className="text-2xl">Pedido #{order.id.slice(0, 8)}</DialogTitle>
+                <p className="text-sm text-muted-foreground mt-1">{format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className={elapsedTime.color}>
-                  <Clock className="w-3 h-3 mr-1" />
-                  Tempo decorrido: {elapsedTime.text}
-                </Badge>
+                <Badge className={elapsedTime.color}><Clock className="w-3 h-3 mr-1" />Tempo: {elapsedTime.text}</Badge>
                 <Badge variant="secondary">{getStatusLabel(order.status)}</Badge>
               </div>
             </div>
           </DialogHeader>
 
-          {/* Ações do Pedido */}
+          {/* Ações */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Ações do Pedido</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Ações do Pedido</CardTitle></CardHeader>
             <CardContent className="flex flex-wrap gap-2">
               {order.status === "pending" && (
-                <Button onClick={() => updateStatus("accepted")} className="gap-2">
-                  <Play className="w-4 h-4" />
-                  Iniciar Preparo
-                </Button>
+                <Button onClick={() => updateStatus("accepted")} className="gap-2"><Play className="w-4 h-4" />Iniciar Preparo</Button>
               )}
-              {(order.status === "accepted" || order.status === "preparing") && 
-                order.order_type === "delivery" && order.delivery_type === "delivery" && (
-                <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2">
-                  <Play className="w-4 h-4" />
-                  Saiu para Entrega
-                </Button>
+              {(order.status === "accepted" || order.status === "preparing") && order.order_type === "delivery" && order.delivery_type === "delivery" && (
+                <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2"><Play className="w-4 h-4" />Saiu para Entrega</Button>
               )}
-              {(order.status === "accepted" || order.status === "preparing") && 
-                order.order_type === "delivery" && order.delivery_type === "pickup" && (
-                <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2">
-                  <Play className="w-4 h-4" />
-                  Pronto para Retirada
-                </Button>
+              {(order.status === "accepted" || order.status === "preparing") && order.order_type === "delivery" && order.delivery_type === "pickup" && (
+                <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2"><Play className="w-4 h-4" />Pronto para Retirada</Button>
               )}
-              {(order.status === "accepted" || order.status === "preparing") && 
-                order.order_type === "local" && (
-                <Button onClick={() => updateStatus("delivered")} className="gap-2">
-                  <Play className="w-4 h-4" />
-                  Entregar na Mesa
-                </Button>
+              {(order.status === "accepted" || order.status === "preparing") && order.order_type === "local" && (
+                <Button onClick={() => updateStatus("delivered")} className="gap-2"><Play className="w-4 h-4" />Entregar na Mesa</Button>
               )}
               {order.status === "out_for_delivery" && order.delivery_type === "delivery" && (
-                <Button onClick={() => updateStatus("delivered")} className="gap-2">
-                  <Play className="w-4 h-4" />
-                  Confirmar Entrega
-                </Button>
+                <Button onClick={() => updateStatus("delivered")} className="gap-2"><Play className="w-4 h-4" />Confirmar Entrega</Button>
               )}
               {order.status === "out_for_delivery" && order.delivery_type === "pickup" && (
-                <Button onClick={() => updateStatus("picked_up")} className="gap-2">
-                  <Play className="w-4 h-4" />
-                  Confirmar Retirada
-                </Button>
+                <Button onClick={() => updateStatus("picked_up")} className="gap-2"><Play className="w-4 h-4" />Confirmar Retirada</Button>
               )}
               
-              <Button variant="destructive" onClick={() => updateStatus("cancelled")} className="gap-2">
-                <XCircle className="w-4 h-4" />
-                Cancelar
-              </Button>
+              <Button variant="destructive" onClick={() => updateStatus("cancelled")} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
               
-              <Button variant="outline" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Adicionar Itens
-              </Button>
+              {canAddItems && (
+                <Button variant="outline" className="gap-2" onClick={handleAddItems}><Plus className="w-4 h-4" />Adicionar Itens</Button>
+              )}
 
               {order.table_id && (
-                <Button variant="outline" onClick={handleGoToTable} className="gap-2">
-                  <Home className="w-4 h-4" />
-                  Mesa {order.tables?.table_number}
-                </Button>
+                <Button variant="outline" onClick={handleGoToTable} className="gap-2"><Home className="w-4 h-4" />Mesa {order.tables?.table_number}</Button>
               )}
               
-              <Button variant="outline" onClick={handlePrint} className="gap-2">
-                <Printer className="w-4 h-4" />
-                Imprimir
-              </Button>
+              <Button variant="outline" onClick={handlePrint} className="gap-2"><Printer className="w-4 h-4" />Imprimir</Button>
               
               {order.delivery_phone && (
-                <Button variant="outline" onClick={handleWhatsApp} className="gap-2">
-                  <MessageCircle className="w-4 h-4" />
-                  WhatsApp
-                </Button>
+                <Button variant="outline" onClick={handleWhatsApp} className="gap-2"><MessageCircle className="w-4 h-4" />WhatsApp</Button>
               )}
-
             </CardContent>
           </Card>
 
-          {/* Itens do Pedido */}
+          {/* Itens */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Itens do Pedido</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Itens do Pedido</CardTitle></CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
@@ -431,61 +240,34 @@ export const OrderDetailModal = ({
                 </TableHeader>
                 <TableBody>
                   {order.order_items.map((item) => {
-                    const extrasTotal = item.order_item_extras.reduce(
-                      (sum, extra) => sum + extra.price_at_order,
-                      0
-                    );
+                    const extrasTotal = item.order_item_extras.reduce((sum, extra) => sum + extra.price_at_order, 0);
                     const itemSubtotal = (item.price_at_order + extrasTotal) * item.quantity;
-
                     return (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">
                           {item.products?.name || "Produto"}
-                          {item.notes && (
-                            <p className="text-xs text-muted-foreground mt-1">Obs: {item.notes}</p>
-                          )}
+                          {item.notes && <p className="text-xs text-muted-foreground mt-1">Obs: {item.notes}</p>}
                         </TableCell>
                         <TableCell className="text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-right">
-                          R$ {item.price_at_order.toFixed(2)}
-                        </TableCell>
+                        <TableCell className="text-right">R$ {item.price_at_order.toFixed(2)}</TableCell>
                         <TableCell>
                           {item.order_item_extras.length > 0 ? (
-                            <div className="text-xs space-y-1">
-                              {item.order_item_extras.map((extra, idx) => (
-                                <div key={idx}>
-                                  + {extra.product_extras?.name} (R$ {extra.price_at_order.toFixed(2)})
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            "—"
-                          )}
+                            <div className="text-xs space-y-1">{item.order_item_extras.map((extra, idx) => (<div key={idx}>+ {extra.product_extras?.name} (R$ {extra.price_at_order.toFixed(2)})</div>))}</div>
+                          ) : "—"}
                         </TableCell>
-                        <TableCell className="text-right font-medium">
-                          R$ {itemSubtotal.toFixed(2)}
-                        </TableCell>
+                        <TableCell className="text-right font-medium">R$ {itemSubtotal.toFixed(2)}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4" /></Button>
                         </TableCell>
                       </TableRow>
                     );
                   })}
                 </TableBody>
               </Table>
-
               <div className="mt-4 space-y-2 text-right">
-                <p className="text-sm text-muted-foreground">
-                  Total de itens: {order.order_items.reduce((sum, item) => sum + item.quantity, 0)}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Subtotal: R$ {calculateTotal().toFixed(2)}
-                </p>
-                <p className="text-2xl font-bold text-red-600">
-                  Total: R$ {calculateTotal().toFixed(2)}
-                </p>
+                <p className="text-sm text-muted-foreground">Total de itens: {order.order_items.reduce((sum, item) => sum + item.quantity, 0)}</p>
+                <p className="text-sm text-muted-foreground">Subtotal: R$ {calculateTotal().toFixed(2)}</p>
+                <p className="text-2xl font-bold text-red-600">Total: R$ {calculateTotal().toFixed(2)}</p>
               </div>
             </CardContent>
           </Card>
@@ -493,64 +275,34 @@ export const OrderDetailModal = ({
           {/* Cliente e Detalhes */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  Cliente
-                </CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><User className="w-5 h-5" />Cliente</CardTitle></CardHeader>
               <CardContent className="space-y-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Nome:</p>
-                  <p className="font-medium">{order.customer_name}</p>
-                </div>
+                <div><p className="text-sm text-muted-foreground">Nome:</p><p className="font-medium">{order.customer_name}</p></div>
                 {order.delivery_phone && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Telefone:</p>
-                    <p className="font-medium flex items-center gap-2">
-                      <Phone className="w-4 h-4" />
-                      {order.delivery_phone}
-                    </p>
-                  </div>
+                  <div><p className="text-sm text-muted-foreground">Telefone:</p><p className="font-medium flex items-center gap-2"><Phone className="w-4 h-4" />{order.delivery_phone}</p></div>
                 )}
                 {order.delivery_address && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Endereço:</p>
-                    <p className="font-medium flex items-start gap-2">
-                      <MapPin className="w-4 h-4 mt-1" />
-                      <span>{order.delivery_address}</span>
-                    </p>
-                  </div>
+                  <div><p className="text-sm text-muted-foreground">Endereço:</p><p className="font-medium flex items-start gap-2"><MapPin className="w-4 h-4 mt-1" /><span>{order.delivery_address}</span></p></div>
                 )}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Detalhes</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-lg">Detalhes</CardTitle></CardHeader>
               <CardContent className="space-y-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Data/Hora:</p>
-                  <p className="font-medium">
-                    {format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Origem:</p>
-                  <p className="font-medium">{getOrderOrigin()}</p>
-                </div>
-                {order.table_id && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Mesa:</p>
-                    <p className="font-medium">{order.tables?.table_number}</p>
-                  </div>
-                )}
+                <div><p className="text-sm text-muted-foreground">Data/Hora:</p><p className="font-medium">{format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}</p></div>
+                <div><p className="text-sm text-muted-foreground">Origem:</p><p className="font-medium">{getOrderOrigin()}</p></div>
+                {order.table_id && (<div><p className="text-sm text-muted-foreground">Mesa:</p><p className="font-medium">{order.tables?.table_number}</p></div>)}
                 <div>
                   <p className="text-sm text-muted-foreground">Pagamento:</p>
-                  <p className="font-medium">
-                    {order.payment_type ? "Pago" : "Não informado"}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{order.payment_type || "Não informado"}</p>
+                    {order.payment_type && (
+                      <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" onClick={() => setShowChangePaymentModal(true)}>
+                        <RefreshCw className="w-3 h-3" /> Alterar
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -559,13 +311,9 @@ export const OrderDetailModal = ({
           {/* Pagamento */}
           {!order.payment_type && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Pagamento</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-lg">Pagamento</CardTitle></CardHeader>
               <CardContent>
-                <Button onClick={() => setShowPaymentModal(true)} className="w-full">
-                  Confirmar Pagamento
-                </Button>
+                <Button onClick={() => setShowPaymentModal(true)} className="w-full">Confirmar Pagamento</Button>
               </CardContent>
             </Card>
           )}
@@ -574,14 +322,17 @@ export const OrderDetailModal = ({
 
       {showPaymentModal && (
         <PaymentConfirmationModal
-          order={order}
-          restaurantId={restaurantId}
+          order={order} restaurantId={restaurantId}
           onClose={() => setShowPaymentModal(false)}
-          onConfirm={() => {
-            setShowPaymentModal(false);
-            onStatusUpdate();
-            onClose();
-          }}
+          onConfirm={() => { setShowPaymentModal(false); onStatusUpdate(); onClose(); }}
+        />
+      )}
+
+      {showChangePaymentModal && (
+        <PaymentConfirmationModal
+          order={order} restaurantId={restaurantId}
+          onClose={() => setShowChangePaymentModal(false)}
+          onConfirm={handleChangePaymentConfirm}
         />
       )}
     </>
