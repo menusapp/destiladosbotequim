@@ -102,7 +102,18 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
     } catch (error) { console.error('[WhatsApp][AUTO] Erro:', error); }
   };
 
+  const requiresPaymentForFinalization = (newStatus: string) => {
+    return ["delivered", "picked_up"].includes(newStatus);
+  };
+
   const updateStatus = async (newStatus: string) => {
+    // Block finalization without payment
+    if (requiresPaymentForFinalization(newStatus) && (!order.payment_type || order.payment_type === "pending")) {
+      toast.error("Defina a forma de pagamento antes de finalizar o pedido");
+      setShowPaymentModal(true);
+      return;
+    }
+
     try {
       const { error } = await supabase.rpc("admin_update_order_status", { p_order_id: order.id, p_new_status: newStatus, p_restaurant_id: restaurantId });
       if (error) throw error;
@@ -296,11 +307,15 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
                 <div>
                   <p className="text-sm text-muted-foreground">Pagamento:</p>
                   <div className="flex items-center gap-2">
-                    <p className="font-medium">{order.payment_type || "Não informado"}</p>
-                    {order.payment_type && (
-                      <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" onClick={() => setShowChangePaymentModal(true)}>
-                        <RefreshCw className="w-3 h-3" /> Alterar
-                      </Button>
+                    {order.payment_type && order.payment_type !== "pending" ? (
+                      <>
+                        <p className="font-medium">{order.payment_type}</p>
+                        <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" onClick={() => setShowChangePaymentModal(true)}>
+                          <RefreshCw className="w-3 h-3" /> Alterar
+                        </Button>
+                      </>
+                    ) : (
+                      <Badge variant="destructive" className="text-xs">⚠ Falta pagamento</Badge>
                     )}
                   </div>
                 </div>
@@ -309,7 +324,7 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
           </div>
 
           {/* Pagamento */}
-          {!order.payment_type && (
+          {(!order.payment_type || order.payment_type === "pending") && (
             <Card>
               <CardHeader><CardTitle className="text-lg">Pagamento</CardTitle></CardHeader>
               <CardContent>
