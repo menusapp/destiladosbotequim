@@ -968,6 +968,23 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setGroupMinSelection("0");
     setGroupMaxSelection("");
     setExtraIsRequired(false);
+    // Reset fiscal
+    setPdvCode("");
+    setFiscalNcm("");
+    setFiscalException("");
+    setFiscalCest("");
+    setFiscalCfop("");
+    setFiscalIcmsCsosn("");
+    setFiscalIcmsOrigin("0");
+    setFiscalPisCst("");
+    setFiscalPisAliquota("");
+    setFiscalCofinsCst("");
+    setFiscalCofinsAliquota("");
+    setFiscalIbsAliquota("");
+    setFiscalCbsAliquota("");
+    setFiscalBeneficioCode("");
+    setFiscalIndiceProducao("");
+    setFiscalAliquotaTransparencia("");
   };
 
   // Cálculo de custo para insumos fixos
