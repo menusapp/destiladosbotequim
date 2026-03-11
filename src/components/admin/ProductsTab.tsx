@@ -1184,7 +1184,7 @@ const handleDelete = async (id: string) => {
                 Novo Produto
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingProduct ? "Editar Produto" : "Novo Produto"}
@@ -1196,6 +1196,12 @@ const handleDelete = async (id: string) => {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+            <Tabs defaultValue="produto">
+              <TabsList className="mb-4">
+                <TabsTrigger value="produto">Produto</TabsTrigger>
+                <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
+              </TabsList>
+              <TabsContent value="produto" className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="product-name">Nome</Label>
                 <Input
