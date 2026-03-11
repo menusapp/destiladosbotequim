@@ -1918,7 +1918,9 @@ export type Database = {
           created_at: string | null
           error_message: string | null
           id: string
+          nfe_key: string | null
           nfe_number: string | null
+          nuvem_fiscal_ref: string | null
           order_id: string
           pdf_url: string | null
           restaurant_id: string
@@ -1930,7 +1932,9 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           id?: string
+          nfe_key?: string | null
           nfe_number?: string | null
+          nuvem_fiscal_ref?: string | null
           order_id: string
           pdf_url?: string | null
           restaurant_id: string
@@ -1942,7 +1946,9 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           id?: string
+          nfe_key?: string | null
           nfe_number?: string | null
+          nuvem_fiscal_ref?: string | null
           order_id?: string
           pdf_url?: string | null
           restaurant_id?: string
