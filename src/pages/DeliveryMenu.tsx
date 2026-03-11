@@ -128,11 +128,7 @@ export default function DeliveryMenu() {
           ...updatedRestaurant
         }));
         
-        if (!updatedRestaurant.is_open) {
-          toast.info("O restaurante acabou de fechar! 🔒");
-        } else {
-          toast.success("O restaurante acabou de abrir! 🎉");
-        }
+        // Silenciado para cliente
       })
       .on('postgres_changes', {
         event: '*',
