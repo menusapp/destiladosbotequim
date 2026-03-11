@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { printOrder } from "@/lib/printOrder";
+import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 
 interface OrderItemExtra {
   price_at_order: number;
