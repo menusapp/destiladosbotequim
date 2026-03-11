@@ -574,11 +574,7 @@ const RestaurantAdmin = () => {
 
   const handleViewBill = () => {
     if (!billNotification) return;
-
-    // Navegar para pedidos locais
-    setActiveSection('pedidos-locais');
-
-    // Fechar notificação
+    setActiveSection('pedidos');
     setBillNotification(null);
   };
 
