@@ -324,7 +324,7 @@ const RestaurantAdmin = () => {
             setNotifiedBills(updated);
             
             // Atualizar badge
-            if (activeSection !== 'pedidos-locais') {
+            if (activeSection !== 'pedidos') {
               setHasNewBills(true);
             }
           }
