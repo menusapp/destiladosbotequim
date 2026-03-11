@@ -86,6 +86,31 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
+  const handleRetry = async (note: FiscalNote) => {
+    setRetrying(prev => new Set(prev).add(note.id));
+    try {
+      const { data, error } = await supabase.functions.invoke("nuvem-fiscal-emit", {
+        body: {
+          order_id: note.order_id,
+          restaurant_id: restaurantId,
+          fiscal_note_id: note.id,
+        },
+      });
+      if (error) {
+        toast.error("Erro ao retentar emissão");
+      } else if (data?.error) {
+        toast.error(`Erro: ${data.error}`);
+      } else {
+        toast.success("Emissão retentada com sucesso!");
+      }
+      fetchNotes();
+    } catch (err) {
+      toast.error("Erro ao retentar emissão");
+    } finally {
+      setRetrying(prev => { const s = new Set(prev); s.delete(note.id); return s; });
+    }
+  };
+
   const calculateOrderTotal = (note: FiscalNote) => {
     if (!note.orders?.order_items) return 0;
     return note.orders.order_items.reduce((total, item) => {
