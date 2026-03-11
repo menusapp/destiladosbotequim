@@ -454,11 +454,7 @@ const Menu = () => {
         
         setRestaurant((prev: any) => ({...prev, ...updatedRestaurant}));
         
-        if (!updatedRestaurant.is_open && restaurant?.is_open) {
-          toast.info("O restaurante acabou de fechar! 🔒");
-        } else if (updatedRestaurant.is_open && !restaurant?.is_open) {
-          toast.success("O restaurante acabou de abrir! 🎉");
-        }
+        // Silenciado para não atrapalhar cliente
       })
       // 🔔 Listener de pedidos com notificações de status (usando refs para evitar stale closures)
       .on('postgres_changes', { 
