@@ -1070,7 +1070,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingProduct ? "Editar Produto" : "Novo Produto"}
@@ -1082,7 +1082,12 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Basic Info */}
+            <Tabs defaultValue="produto">
+              <TabsList className="mb-4">
+                <TabsTrigger value="produto">Produto</TabsTrigger>
+                <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
+              </TabsList>
+              <TabsContent value="produto" className="space-y-6">
             <div className="space-y-4">
               <div>
                 <Label htmlFor="product-name">Nome *</Label>
