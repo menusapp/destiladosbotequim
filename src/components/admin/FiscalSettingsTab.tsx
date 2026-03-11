@@ -197,7 +197,37 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
     }
   };
 
-  if (loading) {
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      await supabase.storage.from("fiscal-certificates").remove([`${restaurantId}/certificate.pfx`]);
+
+      const { error } = await supabase
+        .from("fiscal_configs")
+        .update({
+          nuvem_fiscal_status: "pending",
+          csc_id: "",
+          csc_code: "",
+          certificate_password: "",
+          certificate_file_path: "",
+        })
+        .eq("restaurant_id", restaurantId);
+
+      if (error) throw error;
+
+      setConfig((prev) => ({ ...prev, csc_id: "", csc_code: "", certificate_password: "", certificate_file_path: "" }));
+      setNuvemFiscalStatus("pending");
+      setExistingFileName(null);
+      setSelectedFile(null);
+      toast.success("Desconectado da Nuvem Fiscal");
+    } catch (error: any) {
+      console.error("Erro ao desconectar:", error);
+      toast.error(error?.message || "Erro ao desconectar");
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
