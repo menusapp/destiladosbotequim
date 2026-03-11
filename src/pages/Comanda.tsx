@@ -253,7 +253,7 @@ const Comanda = () => {
             if (bill?.status === "on_the_way") {
               console.log("💳 Conta a caminho!");
               setBillOnTheWay(true);
-              toast.success("A conta está a caminho! 💳");
+              // Silenciado para cliente
             }
             
             if (bill?.status === "paid") {
