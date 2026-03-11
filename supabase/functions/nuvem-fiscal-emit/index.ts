@@ -11,7 +11,7 @@ async function getNuvemFiscalToken(): Promise<string> {
   const clientSecret = Deno.env.get("NUVEM_FISCAL_CLIENT_SECRET");
 
   if (!clientId || !clientSecret) {
-    throw new Error("Credenciais Nuvem Fiscal não configuradas (NUVEM_FISCAL_CLIENT_ID / NUVEM_FISCAL_CLIENT_SECRET)");
+    throw new Error("Credenciais Nuvem Fiscal não configuradas");
   }
 
   const tokenRes = await fetch("https://auth.nuvemfiscal.com.br/oauth/token", {
@@ -34,6 +34,20 @@ async function getNuvemFiscalToken(): Promise<string> {
   return tokenData.access_token;
 }
 
+function jsonResponse(body: any, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function updateNoteStatus(supabase: any, fiscalNoteId: string | undefined, status: string, errorMessage?: string) {
+  if (!fiscalNoteId) return;
+  const data: Record<string, any> = { status };
+  if (errorMessage) data.error_message = errorMessage;
+  await supabase.from("order_fiscal_notes").update(data).eq("id", fiscalNoteId);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -47,10 +61,7 @@ Deno.serve(async (req) => {
     const { order_id, restaurant_id, fiscal_note_id } = await req.json();
 
     if (!order_id || !restaurant_id) {
-      return new Response(
-        JSON.stringify({ error: "order_id e restaurant_id são obrigatórios" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "order_id e restaurant_id são obrigatórios" }, 400);
     }
 
     // 1. Fetch fiscal config
@@ -63,13 +74,13 @@ Deno.serve(async (req) => {
     if (configErr || !config) {
       const errMsg = "Configuração fiscal não encontrada. Configure os dados fiscais primeiro.";
       await updateNoteStatus(supabase, fiscal_note_id, "error", errMsg);
-      return jsonResponse({ error: errMsg }, 200);
+      return jsonResponse({ error: errMsg });
     }
 
     if (!config.cnpj) {
       const errMsg = "CNPJ não configurado nos dados fiscais.";
       await updateNoteStatus(supabase, fiscal_note_id, "error", errMsg);
-      return jsonResponse({ error: errMsg }, 200);
+      return jsonResponse({ error: errMsg });
     }
 
     // 2. Fetch order
@@ -82,7 +93,7 @@ Deno.serve(async (req) => {
     if (orderErr || !order) {
       const errMsg = "Pedido não encontrado.";
       await updateNoteStatus(supabase, fiscal_note_id, "error", errMsg);
-      return jsonResponse({ error: errMsg }, 200);
+      return jsonResponse({ error: errMsg });
     }
 
     // 3. Fetch order items with product fiscal data
@@ -95,16 +106,10 @@ Deno.serve(async (req) => {
       `)
       .eq("order_id", order_id);
 
-    if (itemsErr) {
-      const errMsg = `Erro ao buscar itens: ${itemsErr.message}`;
+    if (itemsErr || !orderItems || orderItems.length === 0) {
+      const errMsg = itemsErr ? `Erro ao buscar itens: ${itemsErr.message}` : "Pedido sem itens.";
       await updateNoteStatus(supabase, fiscal_note_id, "error", errMsg);
-      return jsonResponse({ error: errMsg }, 200);
-    }
-
-    if (!orderItems || orderItems.length === 0) {
-      const errMsg = "Pedido sem itens.";
-      await updateNoteStatus(supabase, fiscal_note_id, "error", errMsg);
-      return jsonResponse({ error: errMsg }, 200);
+      return jsonResponse({ error: errMsg });
     }
 
     // 4. Get OAuth token
@@ -113,40 +118,57 @@ Deno.serve(async (req) => {
       accessToken = await getNuvemFiscalToken();
     } catch (e: any) {
       await updateNoteStatus(supabase, fiscal_note_id, "error", e.message);
-      return jsonResponse({ error: e.message }, 200);
+      return jsonResponse({ error: e.message });
     }
 
-    // 5. Build NFC-e items
+    // 5. Build NFC-e det items (using correct Nuvem Fiscal API field names)
     const ncmDefault = "21069090";
     const cfopDefault = "5102";
     let itemNumber = 1;
-    const nfceItems: any[] = [];
+    const detItems: any[] = [];
 
     for (const item of orderItems) {
       const prod = (item as any).products;
-      // Main product
-      nfceItems.push({
-        numero_item: String(itemNumber++),
-        codigo_produto: prod?.pdv_code || item.product_id || `PROD-${itemNumber}`,
-        descricao: prod?.name || `Item ${itemNumber}`,
-        quantidade: item.quantity,
-        unidade_comercial: "UN",
-        valor_unitario_comercial: Number(item.price_at_order.toFixed(2)),
-        valor_unitario_tributavel: Number(item.price_at_order.toFixed(2)),
-        codigo_ncm: (prod?.fiscal_ncm || ncmDefault).replace(/\./g, ""),
-        cfop: prod?.fiscal_cfop || cfopDefault,
-        unidade_tributavel: "UN",
-        quantidade_tributavel: item.quantity,
-        valor_bruto: Number((item.quantity * item.price_at_order).toFixed(2)),
-        icms: {
-          situacao_tributaria: prod?.fiscal_icms_csosn || "102",
-          origem: Number(prod?.fiscal_icms_origin || "0"),
+      const ncm = (prod?.fiscal_ncm || ncmDefault).replace(/\./g, "");
+      const cfop = prod?.fiscal_cfop || cfopDefault;
+      const csosn = prod?.fiscal_icms_csosn || "102";
+      const orig = Number(prod?.fiscal_icms_origin || "0");
+      const pisCst = prod?.fiscal_pis_cst || "49";
+      const cofinsCst = prod?.fiscal_cofins_cst || "49";
+      const vUnCom = Number(item.price_at_order.toFixed(2));
+      const vProd = Number((item.quantity * item.price_at_order).toFixed(2));
+
+      detItems.push({
+        nItem: itemNumber++,
+        prod: {
+          cProd: prod?.pdv_code || item.product_id || `PROD-${itemNumber}`,
+          xProd: prod?.name || `Item ${itemNumber}`,
+          NCM: ncm,
+          CFOP: cfop,
+          uCom: "UN",
+          qCom: item.quantity,
+          vUnCom: vUnCom,
+          vProd: vProd,
+          cEAN: "SEM GTIN",
+          cEANTrib: "SEM GTIN",
+          uTrib: "UN",
+          qTrib: item.quantity,
+          vUnTrib: vUnCom,
+          indTot: 1,
         },
-        pis: {
-          situacao_tributaria: prod?.fiscal_pis_cst || "49",
-        },
-        cofins: {
-          situacao_tributaria: prod?.fiscal_cofins_cst || "49",
+        imposto: {
+          ICMS: {
+            [`ICMSSN${csosn}`]: {
+              orig: orig,
+              CSOSN: csosn,
+            },
+          },
+          PIS: {
+            PISOutr: { CST: pisCst, vBC: 0, pPIS: 0, vPIS: 0 },
+          },
+          COFINS: {
+            COFINSOutr: { CST: cofinsCst, vBC: 0, pCOFINS: 0, vCOFINS: 0 },
+          },
         },
       });
 
@@ -154,76 +176,142 @@ Deno.serve(async (req) => {
       const extras = (item as any).order_item_extras || [];
       for (const extra of extras) {
         const extraName = extra.product_extras?.name || "Adicional";
-        nfceItems.push({
-          numero_item: String(itemNumber++),
-          codigo_produto: extra.product_extra_id || `EXTRA-${itemNumber}`,
-          descricao: `${extraName} (${prod?.name || "Item"})`,
-          quantidade: item.quantity,
-          unidade_comercial: "UN",
-          valor_unitario_comercial: Number(extra.price_at_order.toFixed(2)),
-          valor_unitario_tributavel: Number(extra.price_at_order.toFixed(2)),
-          codigo_ncm: ncmDefault,
-          cfop: cfopDefault,
-          unidade_tributavel: "UN",
-          quantidade_tributavel: item.quantity,
-          valor_bruto: Number((item.quantity * extra.price_at_order).toFixed(2)),
-          icms: { situacao_tributaria: "102", origem: 0 },
-          pis: { situacao_tributaria: "49" },
-          cofins: { situacao_tributaria: "49" },
+        const vUnExtra = Number(extra.price_at_order.toFixed(2));
+        const vProdExtra = Number((item.quantity * extra.price_at_order).toFixed(2));
+
+        detItems.push({
+          nItem: itemNumber++,
+          prod: {
+            cProd: extra.product_extra_id || `EXTRA-${itemNumber}`,
+            xProd: `${extraName} (${prod?.name || "Item"})`,
+            NCM: ncmDefault,
+            CFOP: cfopDefault,
+            uCom: "UN",
+            qCom: item.quantity,
+            vUnCom: vUnExtra,
+            vProd: vProdExtra,
+            cEAN: "SEM GTIN",
+            cEANTrib: "SEM GTIN",
+            uTrib: "UN",
+            qTrib: item.quantity,
+            vUnTrib: vUnExtra,
+            indTot: 1,
+          },
+          imposto: {
+            ICMS: { ICMSSN102: { orig: 0, CSOSN: "102" } },
+            PIS: { PISOutr: { CST: "49", vBC: 0, pPIS: 0, vPIS: 0 } },
+            COFINS: { COFINSOutr: { CST: "49", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
+          },
         });
       }
     }
 
-    const totalProdutos = nfceItems.reduce((acc, i) => acc + i.valor_bruto, 0);
-
-    // 6. Build NFC-e payload
+    const totalProdutos = detItems.reduce((acc, d) => acc + d.prod.vProd, 0);
     const cpfCnpj = config.cnpj.replace(/\D/g, "");
-    const ref = `nfce-${order_id.substring(0, 8)}-${Date.now()}`;
+    const uf = config.uf || "SP";
 
+    // UF code mapping
+    const ufCodes: Record<string, number> = {
+      AC: 12, AL: 27, AP: 16, AM: 13, BA: 29, CE: 23, DF: 53, ES: 32,
+      GO: 52, MA: 21, MT: 51, MS: 50, MG: 31, PA: 15, PB: 25, PR: 41,
+      PE: 26, PI: 22, RJ: 33, RN: 24, RS: 43, RO: 11, RR: 14, SC: 42,
+      SP: 35, SE: 28, TO: 17,
+    };
+
+    // 6. Build NFC-e payload following Nuvem Fiscal API schema
     const nfcePayload: Record<string, any> = {
-      natureza_operacao: "VENDA AO CONSUMIDOR",
-      tipo_documento: 1,
-      finalidade_emissao: 1,
-      presenca_comprador: 1,
-      consumidor_final: 1,
-      modalidade_frete: 9,
-      informacoes_adicionais_contribuinte: `Pedido: ${order_id}`,
-      emitente: {
-        cpf_cnpj: cpfCnpj,
-        nome_razao_social: config.razao_social || config.nome_fantasia,
-        nome_fantasia: config.nome_fantasia || config.razao_social,
-        inscricao_estadual: config.inscricao_estadual?.replace(/\D/g, "") || "",
-        endereco: {
-          logradouro: config.logradouro || "",
-          numero: config.numero || "S/N",
-          bairro: config.bairro || "",
-          codigo_municipio: config.municipio_codigo || "",
-          nome_municipio: "",
-          uf: config.uf || "SP",
-          cep: config.cep?.replace(/\D/g, "") || "",
+      ambiente: "homologacao",
+      infNFe: {
+        versao: "4.00",
+        ide: {
+          cUF: ufCodes[uf] || 35,
+          natOp: "VENDA",
+          mod: 65,
+          serie: 1,
+          tpNF: 1,
+          idDest: 1,
+          cMunFG: config.municipio_codigo || "",
+          tpImp: 4,
+          tpEmis: 1,
+          tpAmb: 2, // 2 = homologação
+          finNFe: 1,
+          indFinal: 1,
+          indPres: 1,
+          procEmi: 0,
+          verProc: "MenuMesa-1.0",
+        },
+        emit: {
+          CNPJ: cpfCnpj,
+          xNome: config.razao_social || config.nome_fantasia || "",
+          xFant: config.nome_fantasia || config.razao_social || "",
+          IE: config.inscricao_estadual?.replace(/\D/g, "") || "",
+          CRT: 1, // Simples Nacional
+          enderEmit: {
+            xLgr: config.logradouro || "",
+            nro: config.numero || "S/N",
+            xBairro: config.bairro || "",
+            cMun: config.municipio_codigo || "",
+            xMun: "",
+            UF: uf,
+            CEP: config.cep?.replace(/\D/g, "") || "",
+            cPais: 1058,
+            xPais: "BRASIL",
+          },
+        },
+        det: detItems,
+        total: {
+          ICMSTot: {
+            vBC: 0,
+            vICMS: 0,
+            vICMSDeson: 0,
+            vFCP: 0,
+            vBCST: 0,
+            vST: 0,
+            vFCPST: 0,
+            vFCPSTRet: 0,
+            vProd: Number(totalProdutos.toFixed(2)),
+            vFrete: 0,
+            vSeg: 0,
+            vDesc: 0,
+            vII: 0,
+            vIPI: 0,
+            vIPIDevol: 0,
+            vPIS: 0,
+            vCOFINS: 0,
+            vOutro: 0,
+            vNF: Number(totalProdutos.toFixed(2)),
+          },
+        },
+        pag: {
+          detPag: [
+            {
+              tPag: "99",
+              vPag: Number(totalProdutos.toFixed(2)),
+            },
+          ],
+        },
+        transp: {
+          modFrete: 9,
+        },
+        infAdic: {
+          infCpl: `Pedido: ${order_id}`,
         },
       },
-      items: nfceItems,
-      pagamentos: [
-        {
-          forma_pagamento: "99",
-          valor_pagamento: Number(totalProdutos.toFixed(2)),
-        },
-      ],
     };
 
     // Add customer CPF if available
     if (order.customer_cpf) {
       const cpfClean = order.customer_cpf.replace(/\D/g, "");
       if (cpfClean.length === 11) {
-        nfcePayload.destinatario = {
-          cpf_cnpj: cpfClean,
-          nome: order.customer_name || "CONSUMIDOR",
+        nfcePayload.infNFe.dest = {
+          CPF: cpfClean,
+          xNome: order.customer_name || "CONSUMIDOR",
+          indIEDest: 9,
         };
       }
     }
 
-    console.log("[NuvemFiscal] Emitting NFC-e ref:", ref, "CNPJ:", cpfCnpj);
+    console.log("[NuvemFiscal] Emitting NFC-e for order:", order_id, "CNPJ:", cpfCnpj);
 
     // 7. Send to Nuvem Fiscal API
     const baseUrl = "https://api.sandbox.nuvemfiscal.com.br";
@@ -242,18 +330,14 @@ Deno.serve(async (req) => {
     if (!apiResponse.ok && apiResponse.status !== 202) {
       const errMsg = apiResult?.error?.message || apiResult?.message || JSON.stringify(apiResult).substring(0, 300);
       await updateNoteStatus(supabase, fiscal_note_id, "error", `Erro Nuvem Fiscal (${apiResponse.status}): ${errMsg}`);
-      return jsonResponse({ error: errMsg, nuvem_response: apiResult }, 200);
+      return jsonResponse({ error: errMsg, nuvem_response: apiResult });
     }
 
     // 8. Update fiscal note with result
     const nfceStatus = apiResult.status || "processing";
     const mappedStatus = nfceStatus === "autorizada" ? "authorized" : nfceStatus === "rejeitada" ? "error" : "processing";
 
-    const updateData: Record<string, any> = {
-      status: mappedStatus,
-      nuvem_fiscal_ref: ref,
-    };
-
+    const updateData: Record<string, any> = { status: mappedStatus };
     if (apiResult.numero) updateData.nfe_number = String(apiResult.numero);
     if (apiResult.chave) updateData.nfe_key = apiResult.chave;
     if (nfceStatus === "rejeitada") {
@@ -263,13 +347,11 @@ Deno.serve(async (req) => {
     if (fiscal_note_id) {
       await supabase.from("order_fiscal_notes").update(updateData).eq("id", fiscal_note_id);
     } else {
-      // Find by order_id
       await supabase.from("order_fiscal_notes").update(updateData).eq("order_id", order_id).eq("restaurant_id", restaurant_id);
     }
 
     return jsonResponse({
       success: true,
-      ref,
       status: mappedStatus,
       nuvem_response: apiResult,
     });
@@ -278,17 +360,3 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: error.message || "Erro interno" }, 500);
   }
 });
-
-async function updateNoteStatus(supabase: any, fiscalNoteId: string | undefined, status: string, errorMessage?: string) {
-  if (!fiscalNoteId) return;
-  const data: Record<string, any> = { status };
-  if (errorMessage) data.error_message = errorMessage;
-  await supabase.from("order_fiscal_notes").update(data).eq("id", fiscalNoteId);
-}
-
-function jsonResponse(body: any, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
