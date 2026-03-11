@@ -80,10 +80,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch order items with product names
+    // Fetch order items with product names and fiscal data
     const { data: orderItems, error: itemsError } = await supabase
       .from("order_items")
-      .select("quantity, price_at_order, notes, product_id, products(name)")
+      .select("quantity, price_at_order, notes, product_id, products(name, pdv_code, fiscal_ncm, fiscal_cest, fiscal_cfop, fiscal_icms_csosn, fiscal_icms_origin, fiscal_pis_cst, fiscal_cofins_cst)")
       .eq("order_id", order_id);
 
     if (itemsError) {
@@ -103,21 +103,21 @@ Deno.serve(async (req) => {
 
     const nfceItems = (orderItems || []).map((item: any, index: number) => ({
       numero_item: String(index + 1),
-      codigo_produto: item.product_id || `PROD-${index + 1}`,
+      codigo_produto: item.products?.pdv_code || item.product_id || `PROD-${index + 1}`,
       descricao: item.products?.name || `Item ${index + 1}`,
       quantidade: String(item.quantity),
       unidade_comercial: "UN",
       valor_unitario_comercial: item.price_at_order.toFixed(2),
       valor_unitario_tributavel: item.price_at_order.toFixed(2),
-      codigo_ncm: ncmRestaurante.replace(/\./g, ""),
-      cfop,
+      codigo_ncm: (item.products?.fiscal_ncm || ncmRestaurante).replace(/\./g, ""),
+      cfop: item.products?.fiscal_cfop || cfop,
       unidade_tributavel: "UN",
       quantidade_tributavel: String(item.quantity),
       valor_bruto: (item.quantity * item.price_at_order).toFixed(2),
-      icms_situacao_tributaria: "102", // Simples Nacional
-      icms_origem: "0",
-      pis_situacao_tributaria: "49",
-      cofins_situacao_tributaria: "49",
+      icms_situacao_tributaria: item.products?.fiscal_icms_csosn || "102",
+      icms_origem: item.products?.fiscal_icms_origin || "0",
+      pis_situacao_tributaria: item.products?.fiscal_pis_cst || "49",
+      cofins_situacao_tributaria: item.products?.fiscal_cofins_cst || "49",
     }));
 
     // Calculate totals

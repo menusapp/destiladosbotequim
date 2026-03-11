@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Plus } from "lucide-react";
+import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Plus, Printer } from "lucide-react";
 import { format } from "date-fns";
 import NovaEmissaoModal from "./NovaEmissaoModal";
 import { ptBR } from "date-fns/locale";
@@ -270,14 +270,27 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                     <TableCell>
                       <div className="flex items-center justify-center gap-1">
                         {note.pdf_url && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(note.pdf_url!, "_blank")}
-                            title="Baixar PDF/DANFE"
-                          >
-                            <Download className="h-4 w-4 text-red-600" />
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(note.pdf_url!, "_blank")}
+                              title="Baixar PDF/DANFE"
+                            >
+                              <Download className="h-4 w-4 text-red-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const w = window.open(note.pdf_url!, "_blank");
+                                if (w) setTimeout(() => w.print(), 1000);
+                              }}
+                              title="Imprimir Nota"
+                            >
+                              <Printer className="h-4 w-4 text-orange-600" />
+                            </Button>
+                          </>
                         )}
                         {note.xml_url && (
                           <Button

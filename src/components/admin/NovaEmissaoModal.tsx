@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, FileText, Loader2, MapPin, UtensilsCrossed } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { CalendarIcon, FileText, Loader2, MapPin, UtensilsCrossed, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -14,9 +17,11 @@ import { toast } from "sonner";
 interface PendingOrder {
   id: string;
   customer_name: string;
+  customer_cpf: string;
   created_at: string;
   order_type: string | null;
   delivery_type: string | null;
+  delivery_address: string | null;
   table_id: string | null;
   tables: { table_number: number } | null;
   order_items: {
@@ -37,6 +42,10 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
   const [orders, setOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [emitting, setEmitting] = useState<Set<string>>(new Set());
+  // Delivery info state per order
+  const [deliveryChecks, setDeliveryChecks] = useState<Record<string, boolean>>({});
+  const [deliveryCpfs, setDeliveryCpfs] = useState<Record<string, string>>({});
+  const [deliveryAddresses, setDeliveryAddresses] = useState<Record<string, string>>({});
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
     const today = new Date();
     const from = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
@@ -53,7 +62,6 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
   const fetchPendingOrders = async () => {
     setLoading(true);
     try {
-      // Get orders that are completed/paid and don't have an active fiscal note
       const { data: existingNotes } = await supabase
         .from("order_fiscal_notes")
         .select("order_id")
@@ -62,10 +70,10 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
 
       const excludedOrderIds = (existingNotes || []).map(n => n.order_id);
 
-      let query = supabase
+      const { data, error } = await supabase
         .from("orders")
         .select(`
-          id, customer_name, created_at, order_type, delivery_type, table_id,
+          id, customer_name, customer_cpf, created_at, order_type, delivery_type, delivery_address, table_id,
           tables (table_number),
           order_items (
             price_at_order, quantity,
@@ -78,15 +86,27 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
         .lte("created_at", dateRange.to.toISOString())
         .order("created_at", { ascending: false });
 
-      const { data, error } = await query;
       if (error) throw error;
 
-      // Filter out orders that already have fiscal notes
       const filtered = (data || []).filter(
         (o: any) => !excludedOrderIds.includes(o.id)
       );
 
       setOrders(filtered as any);
+
+      // Auto-check delivery orders
+      const checks: Record<string, boolean> = {};
+      const cpfs: Record<string, string> = {};
+      const addrs: Record<string, string> = {};
+      for (const o of filtered as any[]) {
+        const isDelivery = o.delivery_type === "delivery";
+        checks[o.id] = isDelivery;
+        cpfs[o.id] = o.customer_cpf || "";
+        addrs[o.id] = o.delivery_address || "";
+      }
+      setDeliveryChecks(checks);
+      setDeliveryCpfs(cpfs);
+      setDeliveryAddresses(addrs);
     } catch (error) {
       console.error("Erro ao buscar pedidos:", error);
       toast.error("Erro ao carregar pedidos");
@@ -120,15 +140,27 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
   };
 
   const handleEmit = async (orderId: string) => {
+    const isDelivery = deliveryChecks[orderId];
+    const cpf = deliveryCpfs[orderId]?.replace(/\D/g, "") || "";
+    const address = deliveryAddresses[orderId] || "";
+
+    // If marked as delivery, CPF is mandatory
+    if (isDelivery && (!cpf || cpf.length !== 11)) {
+      toast.error("Para nota de entrega, o CPF do cliente é obrigatório e deve ter 11 dígitos.");
+      return;
+    }
+
     setEmitting(prev => new Set(prev).add(orderId));
     try {
+      const insertData: any = {
+        restaurant_id: restaurantId,
+        order_id: orderId,
+        status: "pending",
+      };
+
       const { error } = await supabase
         .from("order_fiscal_notes")
-        .insert({
-          restaurant_id: restaurantId,
-          order_id: orderId,
-          status: "pending",
-        });
+        .insert(insertData);
       if (error) throw error;
       toast.success("Nota fiscal criada como pendente.");
       setOrders(prev => prev.filter(o => o.id !== orderId));
@@ -143,7 +175,7 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <FileText className="h-5 w-5 text-primary" />
@@ -198,30 +230,68 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
             <p className="text-sm">Todos os pedidos concluídos já possuem nota fiscal</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Origem</TableHead>
-                <TableHead>Pedido</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead className="text-right">Valor Total</TableHead>
-                <TableHead className="text-center">Ação</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell>{getOriginBadge(order)}</TableCell>
-                  <TableCell className="font-mono text-sm">#{order.id.slice(0, 8)}</TableCell>
-                  <TableCell className="text-sm">
-                    {format(new Date(order.created_at), "dd/MM/yyyy HH:mm")}
-                  </TableCell>
-                  <TableCell className="text-sm">{order.customer_name || "—"}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    R$ {calculateOrderTotal(order).toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-center">
+          <div className="space-y-3">
+            {orders.map((order) => {
+              const isDeliveryOrder = order.delivery_type === "delivery";
+              const isChecked = deliveryChecks[order.id] || false;
+              return (
+                <div key={order.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {getOriginBadge(order)}
+                      <span className="font-mono text-sm">#{order.id.slice(0, 8)}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {format(new Date(order.created_at), "dd/MM/yyyy HH:mm")}
+                      </span>
+                    </div>
+                    <span className="font-bold">R$ {calculateOrderTotal(order).toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">{order.customer_name || "—"}</span>
+                  </div>
+
+                  {/* Delivery checkbox */}
+                  <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
+                    <Checkbox
+                      id={`delivery-${order.id}`}
+                      checked={isChecked}
+                      onCheckedChange={(checked) => {
+                        setDeliveryChecks(prev => ({ ...prev, [order.id]: !!checked }));
+                      }}
+                    />
+                    <Label htmlFor={`delivery-${order.id}`} className="text-sm flex items-center gap-1.5 cursor-pointer">
+                      <Truck className="w-3.5 h-3.5" />
+                      Este pedido é de entrega (CPF e endereço obrigatórios)
+                    </Label>
+                  </div>
+
+                  {isChecked && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-6">
+                      <div className="space-y-1">
+                        <Label className="text-xs">CPF do Cliente *</Label>
+                        <Input
+                          value={deliveryCpfs[order.id] || ""}
+                          onChange={(e) => setDeliveryCpfs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                          placeholder="000.000.000-00"
+                          className="h-8 text-sm"
+                        />
+                        {(!deliveryCpfs[order.id] || deliveryCpfs[order.id].replace(/\D/g, "").length !== 11) && (
+                          <p className="text-xs text-destructive">CPF é obrigatório para entrega. Desmarque se não tiver.</p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Endereço</Label>
+                        <Input
+                          value={deliveryAddresses[order.id] || ""}
+                          onChange={(e) => setDeliveryAddresses(prev => ({ ...prev, [order.id]: e.target.value }))}
+                          placeholder="Endereço de entrega"
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
                     <Button
                       size="sm"
                       onClick={() => handleEmit(order.id)}
@@ -235,11 +305,11 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
                       )}
                       Emitir
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </DialogContent>
     </Dialog>

@@ -20,6 +20,9 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  table_id?: string;
+  order_type?: string;
+  restaurant_id?: string;
   order_items: OrderItem[];
 }
 
@@ -47,7 +50,6 @@ const METHOD_ICONS: Record<string, any> = {
   meal_voucher: Utensils,
 };
 
-// Bandeiras de cartão de crédito/débito
 const CARD_BRANDS = [
   { code: "visa", name: "Visa", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png" },
   { code: "mastercard", name: "Mastercard", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/200px-Mastercard-logo.svg.png" },
@@ -57,7 +59,6 @@ const CARD_BRANDS = [
   { code: "diners", name: "Diners Club", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Diners_Club_Logo3.svg/200px-Diners_Club_Logo3.svg.png" },
 ];
 
-// Bandeiras de vale-refeição
 const MEAL_VOUCHER_BRANDS = [
   { code: "alelo", name: "Alelo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Alelo_logo.svg/200px-Alelo_logo.svg.png" },
   { code: "sodexo", name: "Sodexo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sodexo_logo.svg/200px-Sodexo_logo.svg.png" },
@@ -123,7 +124,7 @@ export const PaymentConfirmationModal = ({
   const feeAmount = (subtotal * serviceFee) / 100;
   const total = subtotal + feeAmount;
   const paidAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
-  const remaining = total - paidAmount;
+  const remaining = Math.max(0, Math.round((total - paidAmount) * 100) / 100);
 
   const addPayment = (methodName: string) => {
     const amount = parseFloat(currentAmount);
@@ -131,23 +132,29 @@ export const PaymentConfirmationModal = ({
       toast.error("Digite um valor válido");
       return;
     }
-    if (amount > remaining) {
+    if (amount > remaining + 0.01) {
       toast.error("Valor maior que o restante");
       return;
     }
+    const adjustedAmount = Math.min(amount, remaining);
 
-    setSelectedPayments([...selectedPayments, { method: methodName, amount }]);
+    setSelectedPayments([...selectedPayments, { method: methodName, amount: adjustedAmount }]);
     setCurrentAmount("");
   };
 
-  const handleConfirmPayment = async () => {
+  const fillRemaining = () => {
     if (remaining > 0) {
+      setCurrentAmount(remaining.toFixed(2));
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (remaining > 0.01) {
       toast.error("Ainda falta pagar R$ " + remaining.toFixed(2));
       return;
     }
 
     try {
-      // Update order with payment info
       const primaryPayment = selectedPayments[0]?.method || "Dinheiro";
       const { error } = await supabase
         .from("orders")
@@ -155,6 +162,20 @@ export const PaymentConfirmationModal = ({
         .eq("id", order.id);
 
       if (error) throw error;
+
+      // If local order (has table_id), create a paid bill to trigger customer logout via Realtime
+      if (order.table_id) {
+        const { error: billError } = await supabase.from("bills").insert({
+          table_id: order.table_id,
+          subtotal: subtotal,
+          service_fee: feeAmount,
+          total_amount: total,
+          payment_method: primaryPayment,
+          status: "paid",
+          paid_at: new Date().toISOString(),
+        });
+        if (billError) console.error("Erro ao criar conta:", billError);
+      }
 
       toast.success("Pagamento confirmado!");
       onConfirm();
@@ -226,13 +247,19 @@ export const PaymentConfirmationModal = ({
           <div className="space-y-3">
             <div>
               <Label>Valor a adicionar</Label>
-              <Input
-                type="number"
-                value={currentAmount}
-                onChange={(e) => setCurrentAmount(e.target.value)}
-                placeholder="0.00"
-                step="0.01"
-              />
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  value={currentAmount}
+                  onChange={(e) => setCurrentAmount(e.target.value)}
+                  placeholder="0.00"
+                  step="0.01"
+                  className="flex-1"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={fillRemaining} disabled={remaining <= 0}>
+                  Pagar Total
+                </Button>
+              </div>
             </div>
 
             {loading ? (
@@ -255,7 +282,6 @@ export const PaymentConfirmationModal = ({
                         <span className="text-xs font-medium truncate">{method.name}</span>
                       </div>
                       
-                      {/* Bandeiras aceitas - responsivas */}
                       {hasBrands && (
                         <div className="flex flex-wrap gap-1 mt-2 w-full">
                           {method.accepted_brands!.slice(0, 4).map((brandCode) => {
@@ -321,7 +347,7 @@ export const PaymentConfirmationModal = ({
           </Button>
           <Button
             onClick={handleConfirmPayment}
-            disabled={remaining > 0}
+            disabled={remaining > 0.01}
             className="flex-1 gap-2"
           >
             ✓ Confirmar Pagamento

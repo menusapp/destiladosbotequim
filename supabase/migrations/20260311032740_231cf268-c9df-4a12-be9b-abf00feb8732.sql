@@ -1,0 +1,16 @@
+ALTER TABLE products ADD COLUMN IF NOT EXISTS pdv_code text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_ncm text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_exception text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_cest text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_cfop text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_icms_csosn text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_icms_origin text DEFAULT '0';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_pis_cst text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_pis_aliquota numeric;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_cofins_cst text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_cofins_aliquota numeric;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_ibs_aliquota numeric;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_cbs_aliquota numeric;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_beneficio_code text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_indice_producao numeric;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fiscal_aliquota_transparencia numeric;

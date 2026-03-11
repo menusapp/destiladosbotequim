@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, Search, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,22 @@ interface Product {
   category_id: string;
   available: boolean;
   image_url: string | null;
+  pdv_code?: string | null;
+  fiscal_ncm?: string | null;
+  fiscal_exception?: string | null;
+  fiscal_cest?: string | null;
+  fiscal_cfop?: string | null;
+  fiscal_icms_csosn?: string | null;
+  fiscal_icms_origin?: string | null;
+  fiscal_pis_cst?: string | null;
+  fiscal_pis_aliquota?: number | null;
+  fiscal_cofins_cst?: string | null;
+  fiscal_cofins_aliquota?: number | null;
+  fiscal_ibs_aliquota?: number | null;
+  fiscal_cbs_aliquota?: number | null;
+  fiscal_beneficio_code?: string | null;
+  fiscal_indice_producao?: number | null;
+  fiscal_aliquota_transparencia?: number | null;
 }
 
 interface Category {
@@ -122,6 +139,24 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   const [extraCategoriesOpen, setExtraCategoriesOpen] = useState(false);
   const [productCategoriesOpen, setProductCategoriesOpen] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
+
+  // Fiscal fields
+  const [pdvCode, setPdvCode] = useState("");
+  const [fiscalNcm, setFiscalNcm] = useState("");
+  const [fiscalException, setFiscalException] = useState("");
+  const [fiscalCest, setFiscalCest] = useState("");
+  const [fiscalCfop, setFiscalCfop] = useState("");
+  const [fiscalIcmsCsosn, setFiscalIcmsCsosn] = useState("");
+  const [fiscalIcmsOrigin, setFiscalIcmsOrigin] = useState("0");
+  const [fiscalPisCst, setFiscalPisCst] = useState("");
+  const [fiscalPisAliquota, setFiscalPisAliquota] = useState("");
+  const [fiscalCofinsCst, setFiscalCofinsCst] = useState("");
+  const [fiscalCofinsAliquota, setFiscalCofinsAliquota] = useState("");
+  const [fiscalIbsAliquota, setFiscalIbsAliquota] = useState("");
+  const [fiscalCbsAliquota, setFiscalCbsAliquota] = useState("");
+  const [fiscalBeneficioCode, setFiscalBeneficioCode] = useState("");
+  const [fiscalIndiceProducao, setFiscalIndiceProducao] = useState("");
+  const [fiscalAliquotaTransparencia, setFiscalAliquotaTransparencia] = useState("");
 
   useEffect(() => {
     fetchCategories();
@@ -565,13 +600,29 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       imageUrl = publicUrl;
     }
 
-    const productData = {
+    const productData: any = {
       name: productName,
       description: productDescription,
       price: parseFloat(productPrice),
       category_id: productCategoryId,
       prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : 30,
       image_url: imageUrl,
+      pdv_code: pdvCode || null,
+      fiscal_ncm: fiscalNcm || null,
+      fiscal_exception: fiscalException || null,
+      fiscal_cest: fiscalCest || null,
+      fiscal_cfop: fiscalCfop || null,
+      fiscal_icms_csosn: fiscalIcmsCsosn || null,
+      fiscal_icms_origin: fiscalIcmsOrigin || "0",
+      fiscal_pis_cst: fiscalPisCst || null,
+      fiscal_pis_aliquota: fiscalPisAliquota ? parseFloat(fiscalPisAliquota) : null,
+      fiscal_cofins_cst: fiscalCofinsCst || null,
+      fiscal_cofins_aliquota: fiscalCofinsAliquota ? parseFloat(fiscalCofinsAliquota) : null,
+      fiscal_ibs_aliquota: fiscalIbsAliquota ? parseFloat(fiscalIbsAliquota) : null,
+      fiscal_cbs_aliquota: fiscalCbsAliquota ? parseFloat(fiscalCbsAliquota) : null,
+      fiscal_beneficio_code: fiscalBeneficioCode || null,
+      fiscal_indice_producao: fiscalIndiceProducao ? parseFloat(fiscalIndiceProducao) : null,
+      fiscal_aliquota_transparencia: fiscalAliquotaTransparencia ? parseFloat(fiscalAliquotaTransparencia) : null,
     };
 
     if (editingProduct) {
@@ -726,6 +777,24 @@ const handleDelete = async (id: string) => {
     setProductPrepTime((product as any).prep_time_minutes?.toString() || "30");
     setProductImageUrl(product.image_url);
     
+    // Load fiscal fields
+    setPdvCode(product.pdv_code || "");
+    setFiscalNcm(product.fiscal_ncm || "");
+    setFiscalException(product.fiscal_exception || "");
+    setFiscalCest(product.fiscal_cest || "");
+    setFiscalCfop(product.fiscal_cfop || "");
+    setFiscalIcmsCsosn(product.fiscal_icms_csosn || "");
+    setFiscalIcmsOrigin(product.fiscal_icms_origin || "0");
+    setFiscalPisCst(product.fiscal_pis_cst || "");
+    setFiscalPisAliquota(product.fiscal_pis_aliquota?.toString() || "");
+    setFiscalCofinsCst(product.fiscal_cofins_cst || "");
+    setFiscalCofinsAliquota(product.fiscal_cofins_aliquota?.toString() || "");
+    setFiscalIbsAliquota(product.fiscal_ibs_aliquota?.toString() || "");
+    setFiscalCbsAliquota(product.fiscal_cbs_aliquota?.toString() || "");
+    setFiscalBeneficioCode(product.fiscal_beneficio_code || "");
+    setFiscalIndiceProducao(product.fiscal_indice_producao?.toString() || "");
+    setFiscalAliquotaTransparencia(product.fiscal_aliquota_transparencia?.toString() || "");
+    
     // Buscar extras do produto com ingredientes
     const { data: extrasData } = await supabase
       .from("product_extras")
@@ -794,6 +863,23 @@ const handleDelete = async (id: string) => {
     setSelectedStockItem("");
     setIngredientQuantity("");
     setEditingProduct(null);
+    // Reset fiscal
+    setPdvCode("");
+    setFiscalNcm("");
+    setFiscalException("");
+    setFiscalCest("");
+    setFiscalCfop("");
+    setFiscalIcmsCsosn("");
+    setFiscalIcmsOrigin("0");
+    setFiscalPisCst("");
+    setFiscalPisAliquota("");
+    setFiscalCofinsCst("");
+    setFiscalCofinsAliquota("");
+    setFiscalIbsAliquota("");
+    setFiscalCbsAliquota("");
+    setFiscalBeneficioCode("");
+    setFiscalIndiceProducao("");
+    setFiscalAliquotaTransparencia("");
   };
 
   const calculateProductCost = () => {
@@ -1098,7 +1184,7 @@ const handleDelete = async (id: string) => {
                 Novo Produto
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingProduct ? "Editar Produto" : "Novo Produto"}
@@ -1110,6 +1196,12 @@ const handleDelete = async (id: string) => {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+            <Tabs defaultValue="produto">
+              <TabsList className="mb-4">
+                <TabsTrigger value="produto">Produto</TabsTrigger>
+                <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
+              </TabsList>
+              <TabsContent value="produto" className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="product-name">Nome</Label>
                 <Input
@@ -1407,6 +1499,85 @@ const handleDelete = async (id: string) => {
                   </div>
                 )}
               </div>
+              </TabsContent>
+              <TabsContent value="fiscal" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Código PDV</Label>
+                    <Input value={pdvCode} onChange={(e) => setPdvCode(e.target.value)} placeholder="Ex: 001" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>NCM</Label>
+                    <Input value={fiscalNcm} onChange={(e) => setFiscalNcm(e.target.value)} placeholder="Ex: 21069090" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Exceção TIPI</Label>
+                    <Input value={fiscalException} onChange={(e) => setFiscalException(e.target.value)} placeholder="Ex: 01" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CEST</Label>
+                    <Input value={fiscalCest} onChange={(e) => setFiscalCest(e.target.value)} placeholder="Ex: 0300100" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CFOP</Label>
+                    <Input value={fiscalCfop} onChange={(e) => setFiscalCfop(e.target.value)} placeholder="Ex: 5102" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Alíquota Transparência (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalAliquotaTransparencia} onChange={(e) => setFiscalAliquotaTransparencia(e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Código Benefício Fiscal</Label>
+                    <Input value={fiscalBeneficioCode} onChange={(e) => setFiscalBeneficioCode(e.target.value)} placeholder="" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Índice de Produção</Label>
+                    <Input type="number" step="0.01" value={fiscalIndiceProducao} onChange={(e) => setFiscalIndiceProducao(e.target.value)} placeholder="0.00" />
+                  </div>
+                </div>
+                <h4 className="font-semibold text-sm mt-4">ICMS</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Situação Tributária (CSOSN)</Label>
+                    <Input value={fiscalIcmsCsosn} onChange={(e) => setFiscalIcmsCsosn(e.target.value)} placeholder="Ex: 102" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Origem</Label>
+                    <Input value={fiscalIcmsOrigin} onChange={(e) => setFiscalIcmsOrigin(e.target.value)} placeholder="0" />
+                  </div>
+                </div>
+                <h4 className="font-semibold text-sm mt-4">IBS / CBS</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Alíquota IBS (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalIbsAliquota} onChange={(e) => setFiscalIbsAliquota(e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Alíquota CBS (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalCbsAliquota} onChange={(e) => setFiscalCbsAliquota(e.target.value)} placeholder="0.00" />
+                  </div>
+                </div>
+                <h4 className="font-semibold text-sm mt-4">PIS / COFINS</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Situação Tributária PIS</Label>
+                    <Input value={fiscalPisCst} onChange={(e) => setFiscalPisCst(e.target.value)} placeholder="Ex: 49" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Alíquota PIS (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalPisAliquota} onChange={(e) => setFiscalPisAliquota(e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Situação Tributária COFINS</Label>
+                    <Input value={fiscalCofinsCst} onChange={(e) => setFiscalCofinsCst(e.target.value)} placeholder="Ex: 49" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Alíquota COFINS (%)</Label>
+                    <Input type="number" step="0.01" value={fiscalCofinsAliquota} onChange={(e) => setFiscalCofinsAliquota(e.target.value)} placeholder="0.00" />
+                  </div>
+                </div>
+              </TabsContent>
+              </Tabs>
 
               <Button type="submit" className="w-full">
                 {editingProduct ? "Atualizar" : "Criar"}

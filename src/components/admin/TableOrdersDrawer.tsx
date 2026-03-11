@@ -3,10 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Users, Clock, Check, UtensilsCrossed } from "lucide-react";
+import { Users, Clock, UtensilsCrossed } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 interface TableData {
   id: string;
@@ -79,7 +77,8 @@ export const TableOrdersDrawer = ({ restaurantId, table, open, onOpenChange, onV
     }, 0);
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string, paymentType?: string) => {
+    if (status === "delivered" && paymentType) return `Pago - ${paymentType}`;
     const map: Record<string, string> = {
       pending: "Aguardando", accepted: "Em preparo", preparing: "Preparando",
       ready: "Pronto", delivered: "Entregue",
@@ -87,11 +86,12 @@ export const TableOrdersDrawer = ({ restaurantId, table, open, onOpenChange, onV
     return map[status] || status;
   };
 
-  const getStatusColor = (status: string) => {
-    if (status === "pending") return "bg-amber-100 text-amber-800";
-    if (["accepted", "preparing"].includes(status)) return "bg-blue-100 text-blue-800";
-    if (status === "ready") return "bg-purple-100 text-purple-800";
-    return "bg-green-100 text-green-800";
+  const getStatusColor = (status: string, paymentType?: string) => {
+    if (status === "delivered" && paymentType) return "bg-orange-100 text-orange-800";
+    if (status === "pending") return "bg-orange-100 text-orange-700";
+    if (["accepted", "preparing"].includes(status)) return "bg-orange-200 text-orange-800";
+    if (status === "ready") return "bg-orange-300 text-orange-900";
+    return "bg-orange-50 text-orange-600";
   };
 
   const tableTotal = orders.reduce((sum, o) => sum + calculateTotal(o), 0);
@@ -102,7 +102,7 @@ export const TableOrdersDrawer = ({ restaurantId, table, open, onOpenChange, onV
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-              table.is_occupied ? "bg-green-500" : "bg-muted-foreground/40"
+              table.is_occupied ? "bg-orange-500" : "bg-muted-foreground/40"
             }`}>
               {table.table_number}
             </div>
@@ -111,7 +111,6 @@ export const TableOrdersDrawer = ({ restaurantId, table, open, onOpenChange, onV
         </SheetHeader>
 
         <div className="mt-4 space-y-4">
-          {/* Info */}
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <Users className="w-4 h-4" />
@@ -125,7 +124,6 @@ export const TableOrdersDrawer = ({ restaurantId, table, open, onOpenChange, onV
             )}
           </div>
 
-          {/* Comandas */}
           {table.comandas && table.comandas.length > 0 && (
             <div className="space-y-2">
               <h4 className="text-sm font-semibold">Clientes ativos</h4>
@@ -138,7 +136,6 @@ export const TableOrdersDrawer = ({ restaurantId, table, open, onOpenChange, onV
             </div>
           )}
 
-          {/* Orders */}
           <div className="space-y-2">
             <h4 className="text-sm font-semibold">Pedidos ({orders.length})</h4>
             {loading ? (
@@ -153,8 +150,8 @@ export const TableOrdersDrawer = ({ restaurantId, table, open, onOpenChange, onV
                     <CardContent className="p-3 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-mono text-muted-foreground">#{order.id.slice(0, 8)}</span>
-                        <Badge className={`text-[10px] ${getStatusColor(order.status)}`}>
-                          {getStatusLabel(order.status)}
+                        <Badge className={`text-[10px] ${getStatusColor(order.status, order.payment_type)}`}>
+                          {getStatusLabel(order.status, order.payment_type)}
                         </Badge>
                       </div>
                       <p className="text-sm font-medium">{order.customer_name}</p>
@@ -175,7 +172,6 @@ export const TableOrdersDrawer = ({ restaurantId, table, open, onOpenChange, onV
             )}
           </div>
 
-          {/* Total */}
           {orders.length > 0 && (
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg font-bold text-sm">
               <span>Total da mesa</span>
