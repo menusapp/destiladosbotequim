@@ -212,10 +212,36 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
       {/* Status */}
       {nuvemFiscalStatus === "synced" ? (
         <Alert className="border-green-500/30 bg-green-50 dark:bg-green-950/30">
-          <CheckCircle2 className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-700 dark:text-green-400 text-[13px] font-medium ml-2">
-            Empresa sincronizada e ativa na Nuvem Fiscal
-          </AlertDescription>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-700 dark:text-green-400 text-[13px] font-medium ml-2">
+                Empresa sincronizada e ativa na Nuvem Fiscal
+              </AlertDescription>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={isDisconnecting}>
+                  {isDisconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <LogOut className="h-3.5 w-3.5 mr-1.5" />}
+                  Desconectar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Desconectar da Nuvem Fiscal?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Isso vai remover o certificado digital e desconectar sua empresa da Nuvem Fiscal. Você precisará reconfigurar para emitir notas fiscais novamente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDisconnect} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Desconectar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </Alert>
       ) : (
         <Alert className="border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/30">
