@@ -1554,7 +1554,7 @@ const handleDelete = async (id: string) => {
                   </div>
                   <div className="space-y-2">
                     <Label>Alíquota CBS (%)</Label>
-                    <Input type="number" step="0.01" value={fiscalCbsAliquota} onChange={(e) => setCbsAliquota(e.target.value)} placeholder="0.00" />
+                    <Input type="number" step="0.01" value={fiscalCbsAliquota} onChange={(e) => setFiscalCbsAliquota(e.target.value)} placeholder="0.00" />
                   </div>
                 </div>
                 <h4 className="font-semibold text-sm mt-4">PIS / COFINS</h4>
