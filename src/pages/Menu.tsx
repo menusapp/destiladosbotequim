@@ -908,7 +908,7 @@ const Menu = () => {
       }
       return [...prev, { id: crypto.randomUUID(), product, quantity, extras, notes }];
     });
-    toast.success(`${product.name} adicionado${quantity > 1 ? ` (${quantity}x)` : ''}`);
+    // Silenciado - sem toast ao adicionar ao carrinho
   }, []);
 
   const updateQuantity = (itemId: string, delta: number) => {

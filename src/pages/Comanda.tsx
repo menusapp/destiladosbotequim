@@ -355,7 +355,7 @@ const Comanda = () => {
               setHasAcceptedOrder(true);
               const prepTimeMs = (prepTimeMinutes || 30) * 60 * 1000;
               setPrepTimerSeconds(Math.floor(prepTimeMs / 1000));
-              toast.success("Pedido aceito! Preparação iniciada.");
+              // Silenciado para cliente
             }
             
             // Atualiza dados para refletir status

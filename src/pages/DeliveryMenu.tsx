@@ -259,7 +259,6 @@ export default function DeliveryMenu() {
 
   const handleClearCart = () => {
     setCart([]);
-    toast.success("Sacola limpa");
   };
 
   const handleBulkAddToCart = (items: CartItem[]) => {
