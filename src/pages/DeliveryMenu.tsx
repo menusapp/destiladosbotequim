@@ -160,22 +160,7 @@ export default function DeliveryMenu() {
         console.log('Pedido do cliente atualizado:', payload);
         
         const order = payload.new as any;
-        if (payload.eventType === 'INSERT') {
-          toast.success('Pedido enviado com sucesso!');
-        } else if (payload.eventType === 'UPDATE' && order?.status) {
-          const statusMessages: Record<string, string> = {
-            accepted: '✅ Pedido aceito! Está sendo preparado.',
-            out_for_delivery: order.delivery_type === 'pickup' 
-              ? '📦 Pedido pronto para retirada!'
-              : '🚚 Pedido saiu para entrega!',
-            delivered: '🎉 Pedido entregue! Bom apetite!',
-            picked_up: '📦 Pedido retirado! Bom apetite!',
-          };
-          
-          if (statusMessages[order.status]) {
-            toast.success(statusMessages[order.status]);
-          }
-        }
+        // Silenciado - notificações de status removidas do cardápio do cliente
       })
       .subscribe();
 
