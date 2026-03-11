@@ -540,8 +540,6 @@ const Menu = () => {
           if (billBelongsToMe) {
             console.log('💰 Conta PAGA (INSERT direto)! Iniciando avaliação e logout...');
             
-            toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
-            
             setReviewBillId(bill.id);
             setReviewModalOpen(true);
           }
