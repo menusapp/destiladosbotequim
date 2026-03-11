@@ -164,12 +164,8 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
 
   const canAddItems = ["pending", "accepted", "preparing"].includes(order.status);
 
-  const handleAddItems = async () => {
-    toast.info("Use o PDV para adicionar itens a este pedido");
-    if (order.table_id) {
-      const slug = localStorage.getItem("restaurant_slug") || "";
-      navigate(`/${slug}/admin/mesa/${order.table_id}`);
-    }
+  const handleAddItems = () => {
+    setShowAddItems(true);
   };
 
   const handleChangePaymentConfirm = async () => {
