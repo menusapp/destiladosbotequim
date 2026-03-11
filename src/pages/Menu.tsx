@@ -870,7 +870,7 @@ const Menu = () => {
       setShowCustomerDialog(false);
       
       console.log('✅ Cliente logado com sucesso!', { tableId: tableData.id, comandaId });
-      toast.success(`Bem-vindo, ${finalName}!`);
+      // Silenciado - sem toast de boas-vindas
       
       // Carregar dados
       fetchData();
