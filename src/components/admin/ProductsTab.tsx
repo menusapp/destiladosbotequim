@@ -863,6 +863,23 @@ const handleDelete = async (id: string) => {
     setSelectedStockItem("");
     setIngredientQuantity("");
     setEditingProduct(null);
+    // Reset fiscal
+    setPdvCode("");
+    setFiscalNcm("");
+    setFiscalException("");
+    setFiscalCest("");
+    setFiscalCfop("");
+    setFiscalIcmsCsosn("");
+    setFiscalIcmsOrigin("0");
+    setFiscalPisCst("");
+    setFiscalPisAliquota("");
+    setFiscalCofinsCst("");
+    setFiscalCofinsAliquota("");
+    setFiscalIbsAliquota("");
+    setFiscalCbsAliquota("");
+    setFiscalBeneficioCode("");
+    setFiscalIndiceProducao("");
+    setFiscalAliquotaTransparencia("");
   };
 
   const calculateProductCost = () => {
