@@ -2440,10 +2440,26 @@ export type Database = {
           created_at: string | null
           description: string | null
           featured_display_order: number | null
+          fiscal_aliquota_transparencia: number | null
+          fiscal_beneficio_code: string | null
+          fiscal_cbs_aliquota: number | null
+          fiscal_cest: string | null
+          fiscal_cfop: string | null
+          fiscal_cofins_aliquota: number | null
+          fiscal_cofins_cst: string | null
+          fiscal_exception: string | null
+          fiscal_ibs_aliquota: number | null
+          fiscal_icms_csosn: string | null
+          fiscal_icms_origin: string | null
+          fiscal_indice_producao: number | null
+          fiscal_ncm: string | null
+          fiscal_pis_aliquota: number | null
+          fiscal_pis_cst: string | null
           id: string
           image_url: string | null
           is_featured: boolean | null
           name: string
+          pdv_code: string | null
           prep_time_minutes: number | null
           price: number
           promotional_price: number | null
@@ -2455,10 +2471,26 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           featured_display_order?: number | null
+          fiscal_aliquota_transparencia?: number | null
+          fiscal_beneficio_code?: string | null
+          fiscal_cbs_aliquota?: number | null
+          fiscal_cest?: string | null
+          fiscal_cfop?: string | null
+          fiscal_cofins_aliquota?: number | null
+          fiscal_cofins_cst?: string | null
+          fiscal_exception?: string | null
+          fiscal_ibs_aliquota?: number | null
+          fiscal_icms_csosn?: string | null
+          fiscal_icms_origin?: string | null
+          fiscal_indice_producao?: number | null
+          fiscal_ncm?: string | null
+          fiscal_pis_aliquota?: number | null
+          fiscal_pis_cst?: string | null
           id?: string
           image_url?: string | null
           is_featured?: boolean | null
           name: string
+          pdv_code?: string | null
           prep_time_minutes?: number | null
           price: number
           promotional_price?: number | null
@@ -2470,10 +2502,26 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           featured_display_order?: number | null
+          fiscal_aliquota_transparencia?: number | null
+          fiscal_beneficio_code?: string | null
+          fiscal_cbs_aliquota?: number | null
+          fiscal_cest?: string | null
+          fiscal_cfop?: string | null
+          fiscal_cofins_aliquota?: number | null
+          fiscal_cofins_cst?: string | null
+          fiscal_exception?: string | null
+          fiscal_ibs_aliquota?: number | null
+          fiscal_icms_csosn?: string | null
+          fiscal_icms_origin?: string | null
+          fiscal_indice_producao?: number | null
+          fiscal_ncm?: string | null
+          fiscal_pis_aliquota?: number | null
+          fiscal_pis_cst?: string | null
           id?: string
           image_url?: string | null
           is_featured?: boolean | null
           name?: string
+          pdv_code?: string | null
           prep_time_minutes?: number | null
           price?: number
           promotional_price?: number | null
