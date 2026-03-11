@@ -97,10 +97,10 @@ Deno.serve(async (req) => {
             .eq("id", onlinePayment.order_id);
         }
 
-        // 🔥 Trigger NFC-e emission via Focus NFe
+        // 🔥 Trigger NFC-e emission via Nuvem Fiscal
         try {
-          const focusUrl = `${supabaseUrl}/functions/v1/focusnfe-emit`;
-          const focusResponse = await fetch(focusUrl, {
+          const nfceUrl = `${supabaseUrl}/functions/v1/nuvem-fiscal-emit`;
+          const nfceResponse = await fetch(nfceUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -109,13 +109,12 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               order_id: onlinePayment.order_id,
               restaurant_id: onlinePayment.restaurant_id,
-              online_payment_id: onlinePayment.id,
             }),
           });
-          const focusResult = await focusResponse.text();
-          console.log("[MP Webhook] Focus NFe response:", focusResult);
-        } catch (focusError: any) {
-          console.error("[MP Webhook] Focus NFe call failed:", focusError.message);
+          const nfceResult = await nfceResponse.text();
+          console.log("[MP Webhook] Nuvem Fiscal response:", nfceResult);
+        } catch (nfceError: any) {
+          console.error("[MP Webhook] Nuvem Fiscal call failed:", nfceError.message);
           // Don't fail the webhook because of NFC-e errors
         }
       }

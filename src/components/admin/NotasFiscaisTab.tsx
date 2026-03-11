@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Plus, Printer } from "lucide-react";
+import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Plus, Printer, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import NovaEmissaoModal from "./NovaEmissaoModal";
 import { ptBR } from "date-fns/locale";
@@ -37,6 +37,7 @@ interface FiscalNote {
 const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   const [notes, setNotes] = useState<FiscalNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showEmissaoModal, setShowEmissaoModal] = useState(false);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
@@ -82,6 +83,31 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       toast.error("Erro ao carregar notas fiscais");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRetry = async (note: FiscalNote) => {
+    setRetrying(prev => new Set(prev).add(note.id));
+    try {
+      const { data, error } = await supabase.functions.invoke("nuvem-fiscal-emit", {
+        body: {
+          order_id: note.order_id,
+          restaurant_id: restaurantId,
+          fiscal_note_id: note.id,
+        },
+      });
+      if (error) {
+        toast.error("Erro ao retentar emissão");
+      } else if (data?.error) {
+        toast.error(`Erro: ${data.error}`);
+      } else {
+        toast.success("Emissão retentada com sucesso!");
+      }
+      fetchNotes();
+    } catch (err) {
+      toast.error("Erro ao retentar emissão");
+    } finally {
+      setRetrying(prev => { const s = new Set(prev); s.delete(note.id); return s; });
     }
   };
 
@@ -302,7 +328,22 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                             <FileCode className="h-4 w-4 text-blue-600" />
                           </Button>
                         )}
-                        {!note.pdf_url && !note.xml_url && (
+                        {(note.status === "error" || note.status === "pending") && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRetry(note)}
+                            disabled={retrying.has(note.id)}
+                            title="Retentar emissão"
+                          >
+                            {retrying.has(note.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-4 w-4 text-amber-600" />
+                            )}
+                          </Button>
+                        )}
+                        {!note.pdf_url && !note.xml_url && note.status !== "error" && note.status !== "pending" && (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </div>

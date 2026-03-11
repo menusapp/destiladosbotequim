@@ -158,11 +158,32 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
         status: "pending",
       };
 
-      const { error } = await supabase
+      const { data: noteData, error } = await supabase
         .from("order_fiscal_notes")
-        .insert(insertData);
+        .insert(insertData)
+        .select("id")
+        .single();
       if (error) throw error;
-      toast.success("Nota fiscal criada como pendente.");
+
+      // Call nuvem-fiscal-emit edge function
+      toast.info("Enviando nota para emissão...");
+      const { data: emitResult, error: emitError } = await supabase.functions.invoke("nuvem-fiscal-emit", {
+        body: {
+          order_id: orderId,
+          restaurant_id: restaurantId,
+          fiscal_note_id: noteData.id,
+        },
+      });
+
+      if (emitError) {
+        console.error("Erro na edge function:", emitError);
+        toast.error("Nota criada mas houve erro na emissão. Tente retentar na lista.");
+      } else if (emitResult?.error) {
+        toast.error(`Erro na emissão: ${emitResult.error}`);
+      } else {
+        toast.success("Nota fiscal enviada para emissão com sucesso!");
+      }
+
       setOrders(prev => prev.filter(o => o.id !== orderId));
       onEmitted();
     } catch (err) {
