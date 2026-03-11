@@ -72,6 +72,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [existingFileName, setExistingFileName] = useState<string | null>(null);
   const [nuvemFiscalStatus, setNuvemFiscalStatus] = useState<string>("pending");
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   useEffect(() => {
     fetchConfig();
