@@ -24,8 +24,8 @@ verify_jwt = false
 [functions.mercadopago-webhook]
 verify_jwt = false
 
-[functions.focusnfe-emit]
+[functions.nuvem-fiscal-company]
 verify_jwt = false
 
-[functions.nuvem-fiscal-company]
+[functions.nuvem-fiscal-emit]
 verify_jwt = false
