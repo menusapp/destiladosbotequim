@@ -270,14 +270,27 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                     <TableCell>
                       <div className="flex items-center justify-center gap-1">
                         {note.pdf_url && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(note.pdf_url!, "_blank")}
-                            title="Baixar PDF/DANFE"
-                          >
-                            <Download className="h-4 w-4 text-red-600" />
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(note.pdf_url!, "_blank")}
+                              title="Baixar PDF/DANFE"
+                            >
+                              <Download className="h-4 w-4 text-red-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const w = window.open(note.pdf_url!, "_blank");
+                                if (w) setTimeout(() => w.print(), 1000);
+                              }}
+                              title="Imprimir Nota"
+                            >
+                              <Printer className="h-4 w-4 text-orange-600" />
+                            </Button>
+                          </>
                         )}
                         {note.xml_url && (
                           <Button
