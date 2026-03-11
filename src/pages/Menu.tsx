@@ -515,12 +515,8 @@ const Menu = () => {
           if (billBelongsToMe && bill.status === 'paid' && oldBill?.status !== 'paid') {
             console.log('💰 Conta PAGA (UPDATE)! Iniciando avaliação e logout...');
             
-            toast.success("Conta paga! Obrigado pela visita! 🎉", { duration: 5000 });
-            
             setReviewBillId(bill.id);
             setReviewModalOpen(true);
-          } else if (billBelongsToMe && bill.status === 'on_the_way' && oldBill?.status !== 'on_the_way') {
-            toast.info("🏃 Sua conta está a caminho!");
           }
         }
       })
