@@ -371,7 +371,7 @@ const Reservations = () => {
     if (compareDate < today) return true;
     
     // Se segue horário de funcionamento, desabilitar dias fechados
-    if (restaurant?.reservations_follow_business_hours && businessHours.length > 0) {
+    if (businessHours.length > 0) {
       const dayOfWeek = date.getDay();
       const dayHours = businessHours.find(h => h.day_of_week === dayOfWeek);
       if (!dayHours?.is_open) return true;

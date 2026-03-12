@@ -257,7 +257,7 @@ export const ReservationsView = ({
     compareDate.setHours(0, 0, 0, 0);
     if (compareDate < today) return true;
 
-    if (restaurant?.reservations_follow_business_hours && businessHours.length > 0) {
+    if (businessHours.length > 0) {
       const dayOfWeek = date.getDay();
       const dayHours = businessHours.find(h => h.day_of_week === dayOfWeek);
       if (!dayHours?.is_open) return true;

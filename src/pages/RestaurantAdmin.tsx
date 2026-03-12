@@ -564,11 +564,14 @@ const RestaurantAdmin = () => {
 
   const handleViewOrder = () => {
     if (!globalNotification) return;
-    setActiveSection('pedidos');
-    setPendingOrderToOpen(globalNotification.orderId);
-    setGlobalNotification(null);
-
-    // Fechar notificação
+    
+    // Local orders go to PDV, delivery orders go to Pedidos
+    if (globalNotification.orderType === 'local') {
+      setActiveSection('pdv');
+    } else {
+      setActiveSection('pedidos');
+      setPendingOrderToOpen(globalNotification.orderId);
+    }
     setGlobalNotification(null);
   };
 

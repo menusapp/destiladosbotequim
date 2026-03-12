@@ -796,6 +796,11 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                   onCheckedChange={handleToggleFollowBusinessHours}
                 />
               </div>
+
+              {/* Custom reservation hours when not following business hours */}
+              {!followBusinessHours && (
+                <ReservationHoursSettings restaurantId={restaurantId} />
+              )}
             </CardContent>
           </Card>
 
