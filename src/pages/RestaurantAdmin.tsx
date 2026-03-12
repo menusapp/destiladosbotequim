@@ -563,12 +563,22 @@ const RestaurantAdmin = () => {
     );
   }
 
-  const handleViewOrder = () => {
+  const handleViewOrder = async () => {
     if (!globalNotification) return;
     
-    // Local orders go to PDV, delivery orders go to Pedidos
+    // Local orders go to PDV and auto-open the table
     if (globalNotification.orderType === 'local') {
+      // Fetch table_id from the order
+      const { data: orderData } = await supabase
+        .from("orders")
+        .select("table_id")
+        .eq("id", globalNotification.orderId)
+        .single();
+      
       setActiveSection('pdv');
+      if (orderData?.table_id) {
+        setPendingTableToOpen(orderData.table_id);
+      }
     } else {
       setActiveSection('pedidos');
       setPendingOrderToOpen(globalNotification.orderId);
