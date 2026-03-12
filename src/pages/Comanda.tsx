@@ -130,6 +130,7 @@ const Comanda = () => {
   const [orderNotes, setOrderNotes] = useState("");
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [billRequestEnabled, setBillRequestEnabled] = useState(true);
 
   useEffect(() => {
     fetchData();
