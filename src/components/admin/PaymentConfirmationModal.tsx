@@ -181,6 +181,7 @@ export const PaymentConfirmationModal = ({
         } else {
           const { error: billError } = await supabase.from("bills").insert({
             table_id: order.table_id,
+            comanda_id: (order as any)._comanda_id || (order as any).comanda_id || null,
             subtotal: subtotal,
             service_fee: feeAmount,
             total_amount: total,
