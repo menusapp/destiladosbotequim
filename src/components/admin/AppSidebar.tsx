@@ -42,6 +42,7 @@ interface AppSidebarProps {
   hasNewOrders?: boolean;
   hasNewBills?: boolean;
   hasNewDeliveryOrders?: boolean;
+  hasNewLocalOrders?: boolean;
   isSectionAllowed?: (sectionId: string) => boolean;
   hasActiveSubscription?: boolean | null;
   staffRole?: string;
@@ -49,7 +50,7 @@ interface AppSidebarProps {
   primaryColor?: string;
 }
 
-export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, isSectionAllowed, hasActiveSubscription, staffRole, staffAllowedSections, primaryColor = "#FF6B35" }: AppSidebarProps) {
+export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, hasNewLocalOrders, isSectionAllowed, hasActiveSubscription, staffRole, staffAllowedSections, primaryColor = "#FF6B35" }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
@@ -57,7 +58,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   const menuStructure = {
     main: [
       { id: "pedidos", label: "Pedidos", icon: ShoppingBag, hasNotification: (hasNewDeliveryOrders || hasNewOrders || hasNewBills) },
-      { id: "pdv", label: "PDV", icon: CreditCard },
+      { id: "pdv", label: "PDV", icon: CreditCard, hasNotification: !!hasNewLocalOrders },
       { id: "mesas-reservas", label: "Reservas", icon: Users2 },
       { id: "cardapio", label: "Cardápio", icon: Utensils },
       { id: "caixa", label: "Caixa", icon: CircleDollarSign },

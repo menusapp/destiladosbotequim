@@ -57,6 +57,7 @@ const RestaurantAdmin = () => {
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [hasNewBills, setHasNewBills] = useState(false);
   const [hasNewDeliveryOrders, setHasNewDeliveryOrders] = useState(false);
+  const [hasNewLocalOrders, setHasNewLocalOrders] = useState(false);
   const [globalNotification, setGlobalNotification] = useState<{
     orderId: string;
     customerName: string;
@@ -251,8 +252,8 @@ const RestaurantAdmin = () => {
             // Atualizar badges da sidebar
             if (orderType === 'delivery' && activeSection !== 'pedidos') {
               setHasNewDeliveryOrders(true);
-            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos') {
-              setHasNewOrders(true);
+            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pdv') {
+              setHasNewLocalOrders(true);
             }
           }
         }
@@ -428,6 +429,9 @@ const RestaurantAdmin = () => {
       setHasNewOrders(false);
       setHasNewBills(false);
       setHasNewDeliveryOrders(false);
+    }
+    if (activeSection === 'pdv') {
+      setHasNewLocalOrders(false);
     }
   }, [activeSection]);
 
@@ -705,6 +709,7 @@ const RestaurantAdmin = () => {
           hasNewOrders={hasNewOrders}
           hasNewBills={hasNewBills}
           hasNewDeliveryOrders={hasNewDeliveryOrders}
+          hasNewLocalOrders={hasNewLocalOrders}
           isSectionAllowed={isSectionAllowed}
           hasActiveSubscription={hasActiveSubscription}
           staffRole={staffRole}

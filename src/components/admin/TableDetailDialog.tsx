@@ -169,6 +169,24 @@ export const TableDetailDialog = ({
       .eq("table_id", table.id).in("status", ["pending", "accepted", "preparing", "ready"]);
     await supabase.from("bills").update({ status: "cancelled" })
       .eq("table_id", table.id).neq("status", "paid");
+
+    // Create paid bills for each active comanda to trigger customer logout via realtime
+    const { data: activeComandas } = await supabase.from("comandas")
+      .select("id").eq("table_id", table.id).eq("status", "active");
+    if (activeComandas && activeComandas.length > 0) {
+      for (const comanda of activeComandas) {
+        await supabase.from("bills").insert({
+          table_id: table.id,
+          comanda_id: comanda.id,
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          subtotal: 0,
+          service_fee: 0,
+          total_amount: 0,
+        });
+      }
+    }
+
     await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() })
       .eq("table_id", table.id).eq("status", "active");
     await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table.id);

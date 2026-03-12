@@ -99,7 +99,36 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     },
   });
 
-  // Fetch tables
+  // Fetch pending local orders per table
+  const { data: pendingLocalOrders, refetch: refetchPendingOrders } = useQuery({
+    queryKey: ["pdv-pending-local-orders", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("id, table_id, customer_name, order_items(id)")
+        .eq("restaurant_id", restaurantId)
+        .eq("order_type", "local")
+        .eq("status", "pending");
+      return data || [];
+    },
+  });
+
+  // Group pending orders by table_id
+  const pendingByTable = useMemo(() => {
+    const map = new Map<string, { count: number; customerNames: string[]; itemCount: number }>();
+    pendingLocalOrders?.forEach(order => {
+      if (!order.table_id) return;
+      const existing = map.get(order.table_id) || { count: 0, customerNames: [], itemCount: 0 };
+      existing.count++;
+      if (order.customer_name && !existing.customerNames.includes(order.customer_name)) {
+        existing.customerNames.push(order.customer_name);
+      }
+      existing.itemCount += order.order_items?.length || 0;
+      map.set(order.table_id, existing);
+    });
+    return map;
+  }, [pendingLocalOrders]);
+
   const { data: tables, refetch: refetchTables } = useQuery({
     queryKey: ["pdv-tables", restaurantId],
     queryFn: async () => {
@@ -123,14 +152,15 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     },
   });
 
-  // Realtime for tables
+  // Realtime for tables and orders
   useEffect(() => {
     const ch = supabase.channel("pdv-tables-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "tables" }, () => refetchTables())
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => refetchTables())
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => refetchPendingOrders())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [refetchTables]);
+  }, [refetchTables, refetchPendingOrders]);
 
   // Auto-open table from notification
   useEffect(() => {
@@ -337,6 +367,24 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
       .eq("table_id", table.id).in("status", ["pending", "accepted", "preparing", "ready"]);
     await supabase.from("bills").update({ status: "cancelled" })
       .eq("table_id", table.id).neq("status", "paid");
+
+    // Create paid bills for each active comanda to trigger customer logout via realtime
+    const { data: activeComandas } = await supabase.from("comandas")
+      .select("id").eq("table_id", table.id).eq("status", "active");
+    if (activeComandas && activeComandas.length > 0) {
+      for (const comanda of activeComandas) {
+        await supabase.from("bills").insert({
+          table_id: table.id,
+          comanda_id: comanda.id,
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          subtotal: 0,
+          service_fee: 0,
+          total_amount: 0,
+        });
+      }
+    }
+
     await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() })
       .eq("table_id", table.id).eq("status", "active");
     await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table.id);
@@ -381,6 +429,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
               const isOccupied = table.is_occupied;
               const comandaCount = table.comandas?.length || 0;
               const isSelected = selectedTableId === table.id;
+              const pending = pendingByTable.get(table.id);
               return (
                 <Card
                   key={table.id}
@@ -425,9 +474,19 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                       {table.table_number}
                     </div>
                     <p className="text-xs font-medium">{table.table_name || `Mesa ${table.table_number}`}</p>
+                    {pending && pending.count > 0 && (
+                      <Badge variant="destructive" className="text-[10px] animate-pulse">
+                        🔔 Pedido Novo
+                      </Badge>
+                    )}
                     <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">
                       {isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
                     </Badge>
+                    {pending && pending.count > 0 && (
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {pending.customerNames[0]} • {pending.itemCount} ite{pending.itemCount !== 1 ? "ns" : "m"}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -534,7 +593,35 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                     <Card
                       key={product.id}
                       className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => { setSelectedProduct(product); setIsProductDrawerOpen(true); }}
+                      onClick={async () => {
+                        // Fetch complements for this product
+                        const { data: complementGroups } = await supabase
+                          .from("product_complement_groups")
+                          .select("extra_category_id, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
+                          .eq("product_id", product.id);
+
+                        const complementExtras = (complementGroups || []).flatMap((g: any) => {
+                          const cat = g.extra_categories;
+                          if (!cat?.extra_category_items) return [];
+                          return cat.extra_category_items.map((item: any) => ({
+                            id: item.id,
+                            name: item.name,
+                            price: item.price,
+                            is_required: g.is_required,
+                            min_selection: g.min_selection,
+                            max_selection: g.max_selection,
+                            is_complement: true,
+                          }));
+                        });
+
+                        const combinedExtras = [
+                          ...(product.product_extras || []),
+                          ...complementExtras,
+                        ];
+
+                        setSelectedProduct({ ...product, product_extras: combinedExtras });
+                        setIsProductDrawerOpen(true);
+                      }}
                     >
                       <CardContent className="p-1.5 space-y-0.5">
                         {product.image_url ? (
