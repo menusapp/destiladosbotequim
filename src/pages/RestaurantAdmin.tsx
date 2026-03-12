@@ -57,6 +57,7 @@ const RestaurantAdmin = () => {
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [hasNewBills, setHasNewBills] = useState(false);
   const [hasNewDeliveryOrders, setHasNewDeliveryOrders] = useState(false);
+  const [hasNewLocalOrders, setHasNewLocalOrders] = useState(false);
   const [globalNotification, setGlobalNotification] = useState<{
     orderId: string;
     customerName: string;
