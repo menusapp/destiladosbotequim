@@ -1,51 +1,39 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: Gestão de Mesas na seção Mesas dos Pedidos
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### Raciocínio
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+Em sistemas como iFood Gestor, Goomer, Saipos, a gestão de mesas fica junto da operação diária (tela de pedidos/mesas). O operador de caixa não precisa navegar para outra aba para criar ou editar uma mesa. O fluxo mais prático:
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+- **Aba Pedidos > seção Mesas**: grid de mesas + botão "Gerenciar Mesas" (ícone engrenagem)
+- Ao clicar, abre um **drawer/modal** onde o operador pode criar, editar, excluir mesas, definir capacidade, foto, nome
+- A aba **Reservas** apenas consome as mesas já criadas (para vincular reservas a mesas)
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+### O que fazer
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+**Arquivo**: `src/components/admin/UnifiedOrdersTab.tsx` (seção Mesas)
+- Adicionar botão "Gerenciar Mesas" (ícone Settings/Plus) no header da seção Mesas
+- Ao clicar, abrir um novo componente de gestão
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+**Novo arquivo**: `src/components/admin/ManageTablesDrawer.tsx`
+- Sheet lateral com lista de mesas existentes
+- Para cada mesa: nome, número, capacidade min/max, foto (upload para bucket `table-images`), ações editar/excluir
+- Botão "Adicionar Mesa" no topo
+- Formulário inline ou dialog para criar/editar: número, nome opcional, capacidade min/max, foto opcional
+- CRUD direto na tabela `tables` (já tem RLS aberta)
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+**Arquivo**: `src/components/admin/TablesTab.tsx` (aba Reservas)
+- Manter apenas reservas
+- Para vincular mesa a reserva, buscar mesas da tabela `tables` (já existente)
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+### Resumo
+
+| Arquivo | Mudança |
+|---|---|
+| `UnifiedOrdersTab.tsx` | Botão "Gerenciar Mesas" na seção Mesas |
+| `ManageTablesDrawer.tsx` | Novo componente: CRUD de mesas em Sheet lateral |
+| `TablesTab.tsx` | Sem mudança (já foi simplificado para Reservas) |
+
+Nenhuma mudança no banco de dados necessária — a tabela `tables` já tem todos os campos necessários (table_number, table_name, min_capacity, max_capacity, image_url, description).
+
