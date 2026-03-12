@@ -469,6 +469,38 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     </div>
   );
 
+  const getTableMenuUrl = (tableNumber: number) => {
+    const base = window.location.origin;
+    return restaurantSlug ? `${base}/${restaurantSlug}/mesa/${tableNumber}` : null;
+  };
+
+  const handleCopyLink = (table: TableData) => {
+    const url = getTableMenuUrl(table.table_number);
+    if (!url) { toast.error("Slug do restaurante não encontrado"); return; }
+    navigator.clipboard.writeText(url);
+    toast.success(`Link da Mesa ${table.table_number} copiado!`);
+  };
+
+  const handleShowQR = (table: TableData) => {
+    const url = getTableMenuUrl(table.table_number);
+    if (!url) { toast.error("Slug do restaurante não encontrado"); return; }
+    // Open QR code in new tab using a simple QR API
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(url)}`;
+    window.open(qrUrl, "_blank");
+    toast.success(`QR Code da Mesa ${table.table_number} gerado`);
+  };
+
+  const handleClearTable = async (table: TableData) => {
+    if (!confirm(`Limpar Mesa ${table.table_number}? Isso irá fechar comandas ativas e liberar a mesa.`)) return;
+    // Close active comandas
+    await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() })
+      .eq("table_id", table.id).eq("status", "active");
+    // Mark table as free
+    await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table.id);
+    toast.success(`Mesa ${table.table_number} liberada`);
+    fetchTables();
+  };
+
   const renderTablesGrid = () => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
       {tables.map(table => {
@@ -477,11 +509,39 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
         return (
           <Card
             key={table.id}
-            className={`cursor-pointer transition-all hover:shadow-md ${
+            className={`cursor-pointer transition-all hover:shadow-md relative ${
               isOccupied ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-border"
             }`}
             onClick={() => setSelectedTableForDrawer(table)}
           >
+            {/* Three-dot menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-1 right-1 h-6 w-6 z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onClick={() => handleShowQR(table)}>
+                  <QrCode className="w-4 h-4 mr-2" /> QR Code
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleCopyLink(table)}>
+                  <Link2 className="w-4 h-4 mr-2" /> Copiar Link
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleClearTable(table)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Eraser className="w-4 h-4 mr-2" /> Limpar Mesa
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <CardContent className="p-4 text-center space-y-1">
               <div className={`w-10 h-10 rounded-full mx-auto flex items-center justify-center text-white text-sm font-bold ${
                 isOccupied ? "bg-green-500" : "bg-muted-foreground/40"
