@@ -89,6 +89,7 @@ const RestaurantAdmin = () => {
   const billNotificationRef = useRef<typeof billNotification>(null);
   const reservationNotificationRef = useRef<typeof reservationNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
+  const [pendingTableToOpen, setPendingTableToOpen] = useState<string | null>(null);
   
   // Sync refs with state to avoid stale closure in realtime callback
   useEffect(() => {
