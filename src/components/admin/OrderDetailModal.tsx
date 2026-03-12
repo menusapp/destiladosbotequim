@@ -105,14 +105,11 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
   };
 
   const requiresPaymentForFinalization = (newStatus: string) => {
-    // For local orders: allow "delivered" (Na Mesa) without payment, but block final completion
-    if (order.order_type === "local") {
-      // "delivered" = Na Mesa — allowed without payment
+    const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
+    if (isLocal) {
       if (newStatus === "delivered") return false;
-      // Any other terminal status requires payment
       return false;
     }
-    // For delivery orders: block delivered/picked_up without payment
     return ["delivered", "picked_up"].includes(newStatus);
   };
 
@@ -166,7 +163,8 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
   };
 
   const getOrderOrigin = () => {
-    if (order.order_type === "local") return `Digital - Mesa ${order.tables?.table_number || "?"}`;
+    const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
+    if (isLocal) return `Digital - Mesa ${order.tables?.table_number || "?"}`;
     return order.delivery_type === "delivery" ? "Digital - Delivery" : "Digital - Retirada";
   };
 
@@ -212,10 +210,10 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
               {(order.status === "accepted" || order.status === "preparing") && order.order_type === "delivery" && order.delivery_type === "pickup" && (
                 <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2"><Play className="w-4 h-4" />Pronto para Retirada</Button>
               )}
-              {(order.status === "accepted" || order.status === "preparing") && order.order_type === "local" && (
+              {(order.status === "accepted" || order.status === "preparing") && (order.order_type === "local" || (!order.order_type && order.table_id)) && (
                 <Button onClick={() => updateStatus("delivered")} className="gap-2"><Play className="w-4 h-4" />Na Mesa</Button>
               )}
-              {order.status === "delivered" && order.order_type === "local" && (
+              {order.status === "delivered" && (order.order_type === "local" || (!order.order_type && order.table_id)) && (
                 <Button 
                   onClick={() => {
                     if (!order.payment_type || order.payment_type === "pending") {

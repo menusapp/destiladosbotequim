@@ -612,7 +612,10 @@ const Comanda = () => {
     return orders.some(order => order.status === "pending");
   }, [orders]);
 
+  const [submitting, setSubmitting] = useState(false);
+
   const handleSendOrder = async () => {
+    if (submitting) return;
     if (cart.length === 0) {
       toast.error("Carrinho vazio");
       return;
@@ -622,6 +625,8 @@ const Comanda = () => {
       toast.error("Mesa não encontrada");
       return;
     }
+
+    setSubmitting(true);
 
     const customerName = sessionStorage.getItem(`customer_name_${tableNumber}`);
     const rawCustomerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
@@ -694,6 +699,7 @@ const Comanda = () => {
           customer_cpf: customerCPF || "",
           comanda_id: comandaId || null,
           status: "pending",
+          order_type: "local",
           notes: orderNotes || null,
         })
         .select()
@@ -739,10 +745,18 @@ const Comanda = () => {
       sessionStorage.removeItem(`cart_${tableNumber}`);
       
       toast.success("Pedido enviado! Aguarde a confirmação do restaurante");
-      fetchData();
+      
+      // Fetch data in separate try/catch to not trigger error toast
+      try {
+        fetchData();
+      } catch (fetchErr) {
+        console.error("Erro ao atualizar dados após pedido:", fetchErr);
+      }
     } catch (error: any) {
       toast.error("Erro ao enviar pedido");
       console.error(error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -984,10 +998,11 @@ const Comanda = () => {
                 <Button 
                   className="w-full text-white" 
                   onClick={handleSendOrder}
+                  disabled={submitting}
                   style={{ backgroundColor: restaurantColor }}
                 >
                   <ShoppingCart className="h-4 w-4 mr-2" />
-                  Enviar Pedido
+                  {submitting ? "Enviando..." : "Enviar Pedido"}
                 </Button>
               </div>
             </CardContent>
