@@ -610,7 +610,7 @@ const RestaurantAdmin = () => {
       
       // PDV (Balcão + Mesas)
       case "pdv":
-        return <PDVTab restaurantId={restaurant.id} />;
+        return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} />;
       
       // Mesas e Reservas (unified)
       case "mesas-reservas":

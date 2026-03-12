@@ -1,0 +1,441 @@
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User } from "lucide-react";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
+
+interface TableDetailDialogProps {
+  restaurantId: string;
+  table: {
+    id: string;
+    table_number: number;
+    table_name: string | null;
+    is_occupied: boolean;
+    occupied_at: string | null;
+  } | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAddOrder: (tableId: string) => void;
+  onTableCleared: () => void;
+}
+
+export const TableDetailDialog = ({
+  restaurantId,
+  table,
+  open,
+  onOpenChange,
+  onAddOrder,
+  onTableCleared,
+}: TableDetailDialogProps) => {
+  const queryClient = useQueryClient();
+  const [payingComanda, setPayingComanda] = useState<any>(null);
+
+  // Fetch active comandas for the table
+  const { data: comandas, refetch: refetchComandas } = useQuery({
+    queryKey: ["table-detail-comandas", table?.id],
+    queryFn: async () => {
+      if (!table) return [];
+      const { data, error } = await supabase
+        .from("comandas")
+        .select("id, customer_name, customer_cpf, created_at, status")
+        .eq("table_id", table.id)
+        .eq("status", "active")
+        .order("created_at");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!table,
+  });
+
+  // Fetch orders for this table grouped by comanda
+  const { data: orders, refetch: refetchOrders } = useQuery({
+    queryKey: ["table-detail-orders", table?.id],
+    queryFn: async () => {
+      if (!table) return [];
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          id, status, customer_name, customer_cpf, comanda_id, created_at,
+          order_items(
+            id, quantity, price_at_order, notes,
+            products(name),
+            order_item_extras(price_at_order, product_extra_id)
+          )
+        `)
+        .eq("table_id", table.id)
+        .eq("order_type", "local")
+        .in("status", ["pending", "accepted", "preparing", "ready"])
+        .order("created_at");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!table,
+  });
+
+  // Realtime refresh
+  // (parent handles table realtime, orders will update on interaction)
+
+  const getOrderTotal = (order: any) => {
+    return order.order_items?.reduce((sum: number, item: any) => {
+      const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
+      return sum + (item.price_at_order + extrasTotal) * item.quantity;
+    }, 0) || 0;
+  };
+
+  const ordersByComanda = useMemo(() => {
+    if (!orders || !comandas) return new Map<string, any[]>();
+    const map = new Map<string, any[]>();
+    
+    // Initialize with all active comandas
+    comandas.forEach(c => map.set(c.id, []));
+    
+    orders.forEach(order => {
+      const key = order.comanda_id || "sem-comanda";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(order);
+    });
+    return map;
+  }, [orders, comandas]);
+
+  const tableTotal = useMemo(() => {
+    return orders?.reduce((sum, order) => sum + getOrderTotal(order), 0) || 0;
+  }, [orders]);
+
+  const getStatusBadge = (status: string) => {
+    const config: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+      pending: { label: "Aguardando", variant: "destructive" },
+      accepted: { label: "Aceito", variant: "default" },
+      preparing: { label: "Preparando", variant: "default" },
+      ready: { label: "Pronto", variant: "secondary" },
+    };
+    const c = config[status] || { label: status, variant: "outline" as const };
+    return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>;
+  };
+
+  const handleAcceptOrder = async (orderId: string) => {
+    await supabase.from("orders").update({ status: "accepted" }).eq("id", orderId);
+    toast.success("Pedido aceito!");
+    refetchOrders();
+  };
+
+  const handleClearTable = async () => {
+    if (!table) return;
+    await supabase.from("orders").update({ status: "cancelled" })
+      .eq("table_id", table.id).in("status", ["pending", "accepted", "preparing", "ready"]);
+    await supabase.from("bills").update({ status: "cancelled" })
+      .eq("table_id", table.id).neq("status", "paid");
+    await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() })
+      .eq("table_id", table.id).eq("status", "active");
+    await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table.id);
+    toast.success(`Mesa ${table.table_number} liberada`);
+    onTableCleared();
+    onOpenChange(false);
+  };
+
+  const handlePayComanda = (comanda: any) => {
+    // Gather all order items from orders of this comanda
+    const comandaOrders = ordersByComanda.get(comanda.id) || [];
+    if (comandaOrders.length === 0) {
+      toast.error("Nenhum pedido ativo nesta comanda");
+      return;
+    }
+
+    // Merge all order items into a single "virtual order" for payment
+    const allItems = comandaOrders.flatMap((o: any) => o.order_items || []);
+    const virtualOrder = {
+      id: comandaOrders[0].id,
+      table_id: table?.id,
+      order_type: "local",
+      restaurant_id: restaurantId,
+      order_items: allItems,
+      _comanda_id: comanda.id,
+      _comanda_order_ids: comandaOrders.map((o: any) => o.id),
+    };
+    setPayingComanda(virtualOrder);
+  };
+
+  const handlePaymentConfirmed = async () => {
+    if (!payingComanda) return;
+
+    // Mark all orders of this comanda as delivered
+    const orderIds = payingComanda._comanda_order_ids || [payingComanda.id];
+    for (const oid of orderIds) {
+      await supabase.from("orders").update({ status: "delivered" }).eq("id", oid);
+    }
+
+    // Close the comanda
+    const comandaId = payingComanda._comanda_id;
+    if (comandaId) {
+      await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() }).eq("id", comandaId);
+    }
+
+    // Check if table has other active comandas
+    const { data: remaining } = await supabase
+      .from("comandas")
+      .select("id")
+      .eq("table_id", table!.id)
+      .eq("status", "active");
+
+    if (!remaining || remaining.length === 0) {
+      // Free the table
+      await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table!.id);
+    } else {
+      // Update occupied_by count
+      await supabase.from("tables").update({ occupied_by: `${remaining.length} cliente${remaining.length !== 1 ? "s" : ""}` }).eq("id", table!.id);
+    }
+
+    setPayingComanda(null);
+    refetchComandas();
+    refetchOrders();
+    onTableCleared(); // refresh parent tables
+    toast.success("Pagamento registrado!");
+  };
+
+  const occupiedTime = table?.occupied_at
+    ? Math.floor((Date.now() - new Date(table.occupied_at).getTime()) / 60000)
+    : 0;
+
+  if (!table) return null;
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                  table.is_occupied ? "bg-green-500" : "bg-muted-foreground/40"
+                }`}>
+                  {table.table_number}
+                </div>
+                <div>
+                  <span>{table.table_name || `Mesa ${table.table_number}`}</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <Badge variant={table.is_occupied ? "default" : "secondary"}>
+                      {table.is_occupied ? "Ocupada" : "Livre"}
+                    </Badge>
+                    {table.is_occupied && occupiedTime > 0 && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {occupiedTime}min
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </DialogTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { onAddOrder(table.id); onOpenChange(false); }}
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Adicionar Pedido
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={!table.is_occupied}>
+                      <Eraser className="w-4 h-4 mr-1" /> Limpar Mesa
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Limpar Mesa {table.table_number}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Isso irá cancelar pedidos ativos, fechar comandas e liberar a mesa.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClearTable}>Limpar</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-6 pb-4">
+              {/* Clients Section */}
+              {comandas && comandas.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-sm flex items-center gap-2 mb-3">
+                    <Users className="w-4 h-4" /> Clientes Logados ({comandas.length})
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {comandas.map(comanda => (
+                      <Card key={comanda.id} className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <User className="w-4 h-4 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{comanda.customer_name}</p>
+                            <p className="text-[10px] text-muted-foreground font-mono">{comanda.customer_cpf}</p>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Orders by Comanda */}
+              {comandas && comandas.length > 0 ? (
+                comandas.map(comanda => {
+                  const comandaOrders = ordersByComanda.get(comanda.id) || [];
+                  const comandaTotal = comandaOrders.reduce((sum, o) => sum + getOrderTotal(o), 0);
+
+                  return (
+                    <div key={comanda.id}>
+                      <Separator className="mb-4" />
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold text-sm flex items-center gap-2">
+                          <ShoppingBag className="w-4 h-4" />
+                          Pedidos de {comanda.customer_name}
+                          {comandaOrders.length > 0 && (
+                            <Badge variant="outline" className="ml-1 text-[10px]">{comandaOrders.length}</Badge>
+                          )}
+                        </h3>
+                        {comandaOrders.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold">R$ {comandaTotal.toFixed(2)}</span>
+                            <Button size="sm" variant="outline" onClick={() => handlePayComanda(comanda)}>
+                              <CreditCard className="w-3.5 h-3.5 mr-1" /> Pagar
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      {comandaOrders.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Nenhum pedido ativo</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {comandaOrders.map(order => (
+                            <Card key={order.id} className="p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  {getStatusBadge(order.status)}
+                                  <span className="text-xs text-muted-foreground">
+                                    {format(new Date(order.created_at), "HH:mm", { locale: ptBR })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold">R$ {getOrderTotal(order).toFixed(2)}</span>
+                                  {order.status === "pending" && (
+                                    <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleAcceptOrder(order.id)}>
+                                      Aceitar
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-sm space-y-0.5">
+                                {order.order_items?.map((item: any) => (
+                                  <div key={item.id} className="flex justify-between text-xs">
+                                    <span>
+                                      {item.quantity}x {item.products?.name || "Produto"}
+                                      {item.notes && <span className="text-muted-foreground ml-1">({item.notes})</span>}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      R$ {((item.price_at_order + (item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0)) * item.quantity).toFixed(2)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                !table.is_occupied && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p>Mesa livre — nenhum pedido ativo</p>
+                  </div>
+                )
+              )}
+
+              {/* Orders without comanda */}
+              {ordersByComanda.has("sem-comanda") && (ordersByComanda.get("sem-comanda")?.length || 0) > 0 && (
+                <div>
+                  <Separator className="mb-4" />
+                  <h3 className="font-semibold text-sm mb-3">Pedidos sem comanda</h3>
+                  <div className="space-y-2">
+                    {ordersByComanda.get("sem-comanda")!.map(order => (
+                      <Card key={order.id} className="p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(order.status)}
+                            <span className="text-xs">{order.customer_name}</span>
+                          </div>
+                          <span className="text-sm font-bold">R$ {getOrderTotal(order).toFixed(2)}</span>
+                        </div>
+                        <div className="text-xs space-y-0.5">
+                          {order.order_items?.map((item: any) => (
+                            <div key={item.id} className="flex justify-between">
+                              <span>{item.quantity}x {item.products?.name}</span>
+                              <span className="text-muted-foreground">R$ {(item.price_at_order * item.quantity).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Table Total */}
+              {table.is_occupied && tableTotal > 0 && (
+                <>
+                  <Separator />
+                  <div className="flex items-center justify-between py-2">
+                    <span className="font-bold text-lg">Total da Mesa</span>
+                    <span className="font-bold text-lg text-primary">R$ {tableTotal.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Modal */}
+      {payingComanda && (
+        <PaymentConfirmationModal
+          order={payingComanda}
+          restaurantId={restaurantId}
+          onClose={() => setPayingComanda(null)}
+          onConfirm={handlePaymentConfirmed}
+        />
+      )}
+    </>
+  );
+};
