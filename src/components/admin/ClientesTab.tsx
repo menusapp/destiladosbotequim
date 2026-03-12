@@ -460,6 +460,45 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
                 placeholder="email@exemplo.com"
               />
             </div>
+
+            {/* Address Section */}
+            <Separator className="my-2" />
+            <p className="text-sm font-semibold text-muted-foreground">Endereço (opcional)</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">CEP</Label>
+                <Input value={newCep} onChange={(e) => handleCepLookup(e.target.value)} placeholder="00000-000" className="h-8 text-sm" />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Rua</Label>
+                <Input value={newStreet} onChange={(e) => setNewStreet(e.target.value)} placeholder="Rua..." className="h-8 text-sm" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Número</Label>
+                <Input value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="Nº" className="h-8 text-sm" />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Complemento</Label>
+                <Input value={newComplement} onChange={(e) => setNewComplement(e.target.value)} placeholder="Apto, Bloco..." className="h-8 text-sm" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Bairro</Label>
+                <Input value={newNeighborhood} onChange={(e) => setNewNeighborhood(e.target.value)} placeholder="Bairro" className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cidade</Label>
+                <Input value={newCity} onChange={(e) => setNewCity(e.target.value)} placeholder="Cidade" className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Estado</Label>
+                <Input value={newState} onChange={(e) => setNewState(e.target.value)} placeholder="UF" className="h-8 text-sm" />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>Observações</Label>
               <Textarea
