@@ -46,9 +46,11 @@ interface TableData {
 
 interface PDVTabProps {
   restaurantId: string;
+  pendingTableToOpen?: string | null;
+  onTableOpened?: () => void;
 }
 
-const PDVTab = ({ restaurantId }: PDVTabProps) => {
+const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps) => {
   const queryClient = useQueryClient();
 
   // Order creation state
