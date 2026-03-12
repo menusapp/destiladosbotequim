@@ -231,7 +231,7 @@ export const CheckoutDrawer = ({
         for (const extra of item.extras) {
           await supabase.from("order_item_extras").insert({
             order_item_id: orderItem.id,
-            product_extra_id: extra.id,
+            product_extra_id: (extra as any).is_complement ? null : extra.id,
             price_at_order: (item.isRewardItem || item.isCouponFreeItem) ? 0 : extra.price,
           });
         }
