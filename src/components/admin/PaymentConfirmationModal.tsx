@@ -163,33 +163,63 @@ export const PaymentConfirmationModal = ({
     }
 
     try {
-      const primaryPayment = selectedPayments[0]?.method || "Dinheiro";
+      // Build concatenated payment methods string
+      const allMethods = selectedPayments.map(p => p.method);
+      const uniqueMethods = [...new Set(allMethods)];
+      const paymentMethodStr = uniqueMethods.join(", ");
+
       const { error } = await supabase
         .from("orders")
-        .update({ payment_type: primaryPayment })
+        .update({ payment_type: paymentMethodStr })
         .eq("id", order.id);
 
       if (error) throw error;
 
-      // Update existing cash_movements and bills if this is a payment change
+      // Always create a new bill for table orders (triggers customer logout via realtime)
       if (order.table_id) {
-        const { data: existingBills } = await supabase.from("bills").select("id").eq("table_id", order.table_id).eq("status", "paid").order("created_at", { ascending: false }).limit(1);
-        
-        if (existingBills && existingBills.length > 0) {
-          await supabase.from("bills").update({ payment_method: primaryPayment, total_amount: total, subtotal, service_fee: feeAmount }).eq("id", existingBills[0].id);
-          await supabase.from("cash_movements").update({ payment_method: primaryPayment }).eq("bill_id", existingBills[0].id);
-        } else {
-          const { error: billError } = await supabase.from("bills").insert({
-            table_id: order.table_id,
-            comanda_id: (order as any)._comanda_id || (order as any).comanda_id || null,
-            subtotal: subtotal,
-            service_fee: feeAmount,
-            total_amount: total,
-            payment_method: primaryPayment,
-            status: "paid",
-            paid_at: new Date().toISOString(),
+        const comandaId = (order as any)._comanda_id || (order as any).comanda_id || null;
+        const { error: billError } = await supabase.from("bills").insert({
+          table_id: order.table_id,
+          comanda_id: comandaId,
+          subtotal: subtotal,
+          service_fee: feeAmount,
+          total_amount: total,
+          payment_method: paymentMethodStr,
+          status: "paid",
+          paid_at: new Date().toISOString(),
+        });
+        if (billError) console.error("Erro ao criar conta:", billError);
+      }
+
+      // Create individual cash_movements for each split payment
+      const { data: cashSession } = await supabase
+        .from("cash_register_sessions")
+        .select("id")
+        .eq("restaurant_id", order.restaurant_id || restaurantId)
+        .eq("status", "open")
+        .order("opened_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cashSession) {
+        // Delete any existing trigger-created movement for this order to avoid duplicates
+        await supabase.from("cash_movements")
+          .delete()
+          .eq("cash_session_id", cashSession.id)
+          .like("description", `Pedido Local #${order.id}%`);
+
+        // Insert one cash_movement per payment split
+        for (const payment of selectedPayments) {
+          await supabase.from("cash_movements").insert({
+            cash_session_id: cashSession.id,
+            restaurant_id: order.restaurant_id || restaurantId,
+            movement_type: "entrada",
+            amount: payment.amount,
+            payment_method: payment.method,
+            category: "Pedido",
+            description: `Pedido Local #${order.id} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
+            created_by: "Sistema",
           });
-          if (billError) console.error("Erro ao criar conta:", billError);
         }
       }
 

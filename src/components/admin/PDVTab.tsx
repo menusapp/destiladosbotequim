@@ -99,7 +99,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     },
   });
 
-  // Fetch pending local orders per table
+  // Fetch pending local orders per table (for "Pedido Novo" badge)
   const { data: pendingLocalOrders, refetch: refetchPendingOrders } = useQuery({
     queryKey: ["pdv-pending-local-orders", restaurantId],
     queryFn: async () => {
@@ -113,13 +113,36 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     },
   });
 
-  // Group pending orders by table_id
+  // Fetch ALL active local orders per table (for permanent preview)
+  const { data: activeLocalOrders, refetch: refetchActiveOrders } = useQuery({
+    queryKey: ["pdv-active-local-orders", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("id, table_id, customer_name, order_items(id)")
+        .eq("restaurant_id", restaurantId)
+        .eq("order_type", "local")
+        .in("status", ["pending", "accepted", "preparing", "ready"]);
+      return data || [];
+    },
+  });
+
+  // Group pending orders by table_id (for badge only)
   const pendingByTable = useMemo(() => {
-    const map = new Map<string, { count: number; customerNames: string[]; itemCount: number }>();
+    const map = new Map<string, number>();
     pendingLocalOrders?.forEach(order => {
       if (!order.table_id) return;
-      const existing = map.get(order.table_id) || { count: 0, customerNames: [], itemCount: 0 };
-      existing.count++;
+      map.set(order.table_id, (map.get(order.table_id) || 0) + 1);
+    });
+    return map;
+  }, [pendingLocalOrders]);
+
+  // Group ALL active orders by table_id (for permanent preview)
+  const activeByTable = useMemo(() => {
+    const map = new Map<string, { customerNames: string[]; itemCount: number }>();
+    activeLocalOrders?.forEach(order => {
+      if (!order.table_id) return;
+      const existing = map.get(order.table_id) || { customerNames: [], itemCount: 0 };
       if (order.customer_name && !existing.customerNames.includes(order.customer_name)) {
         existing.customerNames.push(order.customer_name);
       }
@@ -127,7 +150,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
       map.set(order.table_id, existing);
     });
     return map;
-  }, [pendingLocalOrders]);
+  }, [activeLocalOrders]);
 
   const { data: tables, refetch: refetchTables } = useQuery({
     queryKey: ["pdv-tables", restaurantId],
@@ -157,10 +180,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     const ch = supabase.channel("pdv-tables-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "tables" }, () => refetchTables())
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => refetchTables())
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => refetchPendingOrders())
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => { refetchPendingOrders(); refetchActiveOrders(); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [refetchTables, refetchPendingOrders]);
+  }, [refetchTables, refetchPendingOrders, refetchActiveOrders]);
 
   // Auto-open table from notification
   useEffect(() => {
@@ -474,7 +497,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                       {table.table_number}
                     </div>
                     <p className="text-xs font-medium">{table.table_name || `Mesa ${table.table_number}`}</p>
-                    {pending && pending.count > 0 && (
+                    {(pendingByTable.get(table.id) || 0) > 0 && (
                       <Badge variant="destructive" className="text-[10px] animate-pulse">
                         🔔 Pedido Novo
                       </Badge>
@@ -482,11 +505,22 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                     <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">
                       {isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
                     </Badge>
-                    {pending && pending.count > 0 && (
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {pending.customerNames[0]} • {pending.itemCount} ite{pending.itemCount !== 1 ? "ns" : "m"}
-                      </p>
+                    {/* Always show customer names from active comandas */}
+                    {isOccupied && table.comandas && table.comandas.length > 0 && (
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {table.comandas.map(c => c.customer_name).join(", ")}
+                      </div>
                     )}
+                    {/* Always show item count from all active orders */}
+                    {(() => {
+                      const active = activeByTable.get(table.id);
+                      if (!active || active.itemCount === 0) return null;
+                      return (
+                        <p className="text-[10px] text-muted-foreground">
+                          📋 {active.itemCount} ite{active.itemCount !== 1 ? "ns" : "m"}
+                        </p>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               );
