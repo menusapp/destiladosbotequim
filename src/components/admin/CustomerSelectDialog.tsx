@@ -17,6 +17,15 @@ interface Customer {
   cpf: string;
   name: string;
   phone: string | null;
+  defaultAddress?: {
+    street: string;
+    number: string;
+    complement: string | null;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zip_code: string;
+  } | null;
 }
 
 interface CustomerSelectDialogProps {

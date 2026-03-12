@@ -132,6 +132,17 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     return () => { supabase.removeChannel(ch); };
   }, [refetchTables]);
 
+  // Auto-open table from notification
+  useEffect(() => {
+    if (pendingTableToOpen && tables) {
+      const table = tables.find(t => t.id === pendingTableToOpen);
+      if (table) {
+        setSelectedTableForDrawer(table);
+        onTableOpened?.();
+      }
+    }
+  }, [pendingTableToOpen, tables]);
+
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     if (!searchTerm) return products;
