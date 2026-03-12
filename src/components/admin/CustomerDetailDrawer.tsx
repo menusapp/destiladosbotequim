@@ -108,7 +108,7 @@ export const CustomerDetailDrawer = ({
   });
 
   // Fetch saved addresses
-  const { data: addresses } = useQuery({
+  const { data: addresses, refetch: refetchAddresses } = useQuery({
     queryKey: ["customer-addresses", customer?.cpf],
     queryFn: async () => {
       if (!customer) return [];
