@@ -1,51 +1,55 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: 3 Correções — Prévia permanente nas mesas, Logout ao pagar, Split payment no caixa
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+---
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+### 1. Mesas sempre mostram nomes de clientes e prévia de pedidos (não só pending)
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+**Problema**: As cards de mesa só mostram nome/prévia quando há pedidos `pending`. Quando o pedido é aceito/preparando, a info desaparece da card.
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+**Correção no PDVTab.tsx**:
+- A query de `tables` já busca comandas ativas com `customer_name` — usar isso para sempre mostrar nomes dos clientes nas cards de mesas ocupadas
+- Adicionar query separada (ou expandir a existente) para buscar contagem de order_items ativos (qualquer status não-final) agrupados por `table_id`
+- Na card da mesa: sempre mostrar nomes das comandas ativas + total de itens, independente do status do pedido
+- Manter o badge "Pedido Novo" apenas para pedidos `pending`
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+**Arquivo**: `PDVTab.tsx` (linhas 470-490, card content + nova query)
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+---
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+### 2. Logout não funciona após pagamento
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**Problema**: No `PaymentConfirmationModal.handleConfirmPayment`, ao buscar bills existentes com `.eq("status", "paid")`, pode encontrar uma bill anterior (de outro pagamento ou do `handleClearTable`), fazendo UPDATE em vez de INSERT de uma nova bill com o `comanda_id` correto. Isso impede o listener do `Comanda.tsx` de detectar a nova bill paga.
+
+**Correção no PaymentConfirmationModal.tsx**:
+- Ao lidar com pagamento de mesa, **sempre criar nova bill** com `comanda_id` e `status: "paid"` (não tentar reutilizar bill existente)
+- Remover a lógica de buscar `existingBills` com status `paid` — essa lógica era para re-edição de pagamento, mas conflita com o fluxo de múltiplas comandas
+- O `handlePaymentConfirmed` no `TableDetailDialog` já fecha a comanda e marca pedidos como delivered — combinado com a nova bill, o realtime vai acionar o logout
+
+**Arquivo**: `PaymentConfirmationModal.tsx` (linhas 175-193)
+
+---
+
+### 3. Split payment: apenas primeiro método entra no caixa
+
+**Problema**: O trigger `add_local_order_to_cash_register` cria UMA entrada no caixa por pedido, usando `orders.payment_type`. Mas `payment_type` recebe apenas `primaryPayment` (primeiro método do split). Os demais métodos e seus valores são ignorados.
+
+**Correção**:
+- No `PaymentConfirmationModal.handleConfirmPayment`, em vez de depender do trigger, criar cash_movements manualmente para cada parcela do split payment
+- Para cada entrada em `selectedPayments`, inserir um `cash_movement` separado com o respectivo método e valor
+- Salvar `orders.payment_type` como string com todos os métodos (ex: "Dinheiro, PIX") para referência
+- Na bill, salvar `payment_method` como string concatenada dos métodos usados
+- Buscar `cash_session_id` ativo para o restaurante e criar as entradas diretamente
+
+**Arquivo**: `PaymentConfirmationModal.tsx` (linhas 159-201)
+
+---
+
+### Resumo de Arquivos
+
+| Arquivo | Mudança |
+|---|---|
+| `PDVTab.tsx` | Cards de mesa sempre mostram nomes das comandas ativas + contagem de itens de todos os pedidos ativos |
+| `PaymentConfirmationModal.tsx` | Sempre inserir nova bill (não reusar); criar cash_movements individuais por método de pagamento do split |
+
