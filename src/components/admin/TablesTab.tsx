@@ -742,18 +742,15 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Mesas e Reservas</h2>
+          <h2 className="text-2xl font-bold">Reservas</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Gerencie mesas, comandas e reservas do restaurante
+            Gerencie as reservas do restaurante
           </p>
         </div>
       </div>
 
-      <Tabs defaultValue="mesas" className="w-full">
-        <TabsList>
-          <TabsTrigger value="mesas">Mesas</TabsTrigger>
-          <TabsTrigger value="reservas" className="relative">
-            Reservas
+      {/* Reservas content directly (no more Mesas/Reservas tabs) */}
+      <div className="space-y-6">
             {pendingReservationsCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
                 {pendingReservationsCount}
