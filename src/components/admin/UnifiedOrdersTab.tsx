@@ -124,6 +124,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
   const [selectedTableForDrawer, setSelectedTableForDrawer] = useState<TableData | null>(null);
   const [isManageTablesOpen, setIsManageTablesOpen] = useState(false);
   const [autoPrint, setAutoPrint] = useState(false);
+  const [restaurantSlug, setRestaurantSlug] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState(() => ({
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
