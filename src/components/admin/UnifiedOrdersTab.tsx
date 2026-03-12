@@ -567,7 +567,16 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
           </div>
           {renderKanban()}
         </TabsContent>
-        <TabsContent value="mesas">{renderTablesGrid()}</TabsContent>
+        <TabsContent value="mesas">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-muted-foreground">{tables.length} mesa{tables.length !== 1 ? "s" : ""} cadastrada{tables.length !== 1 ? "s" : ""}</p>
+            <Button variant="outline" size="sm" onClick={() => setIsManageTablesOpen(true)}>
+              <Settings className="w-4 h-4 mr-1.5" />
+              Gerenciar Mesas
+            </Button>
+          </div>
+          {renderTablesGrid()}
+        </TabsContent>
       </Tabs>
 
       {/* Order Detail Modal */}
