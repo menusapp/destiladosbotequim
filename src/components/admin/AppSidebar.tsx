@@ -42,6 +42,7 @@ interface AppSidebarProps {
   hasNewOrders?: boolean;
   hasNewBills?: boolean;
   hasNewDeliveryOrders?: boolean;
+  hasNewLocalOrders?: boolean;
   isSectionAllowed?: (sectionId: string) => boolean;
   hasActiveSubscription?: boolean | null;
   staffRole?: string;
