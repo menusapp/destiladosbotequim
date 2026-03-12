@@ -430,6 +430,9 @@ const RestaurantAdmin = () => {
       setHasNewBills(false);
       setHasNewDeliveryOrders(false);
     }
+    if (activeSection === 'pdv') {
+      setHasNewLocalOrders(false);
+    }
   }, [activeSection]);
 
   const fetchRestaurant = async (restaurantId: string) => {
