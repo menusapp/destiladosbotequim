@@ -17,6 +17,7 @@ import { ptBR } from "date-fns/locale";
 import { OrderDetailModal } from "./OrderDetailModal";
 import { CreateOrderDrawer } from "./CreateOrderDrawer";
 import { TableOrdersDrawer } from "./TableOrdersDrawer";
+import { ManageTablesDrawer } from "./ManageTablesDrawer";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { printOrder } from "@/lib/printOrder";
