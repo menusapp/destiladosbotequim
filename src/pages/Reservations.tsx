@@ -112,14 +112,22 @@ const Reservations = () => {
 
       setRestaurant(restaurantData);
 
-      // Fetch business hours if following business hours
+      // Fetch hours based on configuration
       if (restaurantData.reservations_follow_business_hours) {
         const { data: hoursData } = await supabase
           .from("business_hours")
           .select("day_of_week, is_open, open_time, close_time")
           .eq("restaurant_id", restaurantData.id);
-        
         setBusinessHours(hoursData || []);
+      } else {
+        // Fetch custom reservation hours
+        const { data: resHours } = await supabase
+          .from("reservation_hours")
+          .select("day_of_week, is_open, open_time, close_time")
+          .eq("restaurant_id", restaurantData.id);
+        if (resHours && resHours.length > 0) {
+          setBusinessHours(resHours);
+        }
       }
 
       // Fetch available tables from unified tables table
