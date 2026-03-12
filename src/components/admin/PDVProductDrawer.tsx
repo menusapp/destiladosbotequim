@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -146,17 +146,10 @@ export const PDVProductDrawer = ({
   };
 
   return (
-    <Drawer open={open} onOpenChange={onClose}>
-      <DrawerContent className="max-h-[90vh]">
+    <Sheet open={open} onOpenChange={onClose}>
+      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
         {/* Header */}
         <div className="relative border-b border-border">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          
           <div className="flex gap-4 p-4">
             {product.image_url ? (
               <img
@@ -195,7 +188,7 @@ export const PDVProductDrawer = ({
           </div>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-4 py-4 max-h-[50vh]">
+        <div className="overflow-y-auto flex-1 px-4 py-4">
           {/* Extras Obrigatórios */}
           {hasRequiredExtras && (
             <div className="mb-6">
@@ -344,7 +337,7 @@ export const PDVProductDrawer = ({
             </Button>
           </div>
         </div>
-      </DrawerContent>
-    </Drawer>
+      </SheetContent>
+    </Sheet>
   );
 };
