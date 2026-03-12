@@ -2606,6 +2606,47 @@ export type Database = {
         }
         Relationships: []
       }
+      reservation_hours: {
+        Row: {
+          close_time: string | null
+          created_at: string | null
+          day_of_week: number
+          id: string
+          is_open: boolean | null
+          open_time: string | null
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          close_time?: string | null
+          created_at?: string | null
+          day_of_week: number
+          id?: string
+          is_open?: boolean | null
+          open_time?: string | null
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          close_time?: string | null
+          created_at?: string | null
+          day_of_week?: number
+          id?: string
+          is_open?: boolean | null
+          open_time?: string | null
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservation_hours_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reservation_tables: {
         Row: {
           created_at: string | null
