@@ -150,8 +150,13 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
   useEffect(() => {
     supabase.from('printer_settings').select('auto_print_orders').eq('restaurant_id', restaurantId).maybeSingle()
       .then(({ data }) => { if (data) setAutoPrint(data.auto_print_orders); });
-    supabase.from('restaurants').select('bill_request_enabled').eq('id', restaurantId).single()
-      .then(({ data }) => { if (data) setBillRequestEnabled(data.bill_request_enabled ?? true); });
+    supabase.from('restaurants').select('bill_request_enabled, slug').eq('id', restaurantId).single()
+      .then(({ data }) => {
+        if (data) {
+          setBillRequestEnabled(data.bill_request_enabled ?? true);
+          setRestaurantSlug(data.slug ?? null);
+        }
+      });
   }, [restaurantId]);
 
   const setupRealtime = () => {
