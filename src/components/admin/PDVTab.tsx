@@ -20,7 +20,7 @@ import {
 import { toast } from "sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
-import { TableOrdersDrawer } from "./TableOrdersDrawer";
+import { TableDetailDialog } from "./TableDetailDialog";
 import { ManageTablesDrawer } from "./ManageTablesDrawer";
 
 interface CartItem {
