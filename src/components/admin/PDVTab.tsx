@@ -606,16 +606,19 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
         onSelect={handleCustomerSelect}
       />
 
-      {/* Table Orders Drawer */}
-      {selectedTableForDrawer && (
-        <TableOrdersDrawer
-          restaurantId={restaurantId}
-          table={selectedTableForDrawer}
-          open={!!selectedTableForDrawer}
-          onOpenChange={(open) => { if (!open) setSelectedTableForDrawer(null); }}
-          onViewOrder={() => {}}
-        />
-      )}
+      {/* Table Detail Dialog */}
+      <TableDetailDialog
+        restaurantId={restaurantId}
+        table={selectedTableForDrawer}
+        open={!!selectedTableForDrawer}
+        onOpenChange={(open) => { if (!open) setSelectedTableForDrawer(null); }}
+        onAddOrder={(tableId) => {
+          setSelectedTableForDrawer(null);
+          setOrderType("mesa");
+          setSelectedTableId(tableId);
+        }}
+        onTableCleared={() => refetchTables()}
+      />
 
       {/* Manage Tables Drawer */}
       <ManageTablesDrawer
