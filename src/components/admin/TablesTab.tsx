@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ReservationHoursSettings from "./settings/ReservationHoursSettings";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -796,6 +797,11 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                   onCheckedChange={handleToggleFollowBusinessHours}
                 />
               </div>
+
+              {/* Custom reservation hours when not following business hours */}
+              {!followBusinessHours && (
+                <ReservationHoursSettings restaurantId={restaurantId} />
+              )}
             </CardContent>
           </Card>
 

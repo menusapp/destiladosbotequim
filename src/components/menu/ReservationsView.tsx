@@ -125,13 +125,21 @@ export const ReservationsView = ({
 
       setTables(tablesData || []);
 
-      // Fetch business hours
+      // Fetch hours based on configuration
       if (restaurant.reservations_follow_business_hours) {
         const { data: hoursData } = await supabase
           .from("business_hours")
           .select("day_of_week, is_open, open_time, close_time")
           .eq("restaurant_id", restaurant.id);
         setBusinessHours(hoursData || []);
+      } else {
+        const { data: resHours } = await supabase
+          .from("reservation_hours")
+          .select("day_of_week, is_open, open_time, close_time")
+          .eq("restaurant_id", restaurant.id);
+        if (resHours && resHours.length > 0) {
+          setBusinessHours(resHours);
+        }
       }
     } catch (error) {
       console.error("Error fetching reservations data:", error);
@@ -196,7 +204,7 @@ export const ReservationsView = ({
     const dayHours = businessHours.find(h => h.day_of_week === dayOfWeek);
     let slots: string[] = [];
 
-    if (restaurant?.reservations_follow_business_hours && dayHours?.is_open && dayHours.open_time && dayHours.close_time) {
+    if (dayHours?.is_open && dayHours.open_time && dayHours.close_time) {
       const openParts = dayHours.open_time.split(':');
       const closeParts = dayHours.close_time.split(':');
       const openHour = parseInt(openParts[0]);
@@ -249,7 +257,7 @@ export const ReservationsView = ({
     compareDate.setHours(0, 0, 0, 0);
     if (compareDate < today) return true;
 
-    if (restaurant?.reservations_follow_business_hours && businessHours.length > 0) {
+    if (businessHours.length > 0) {
       const dayOfWeek = date.getDay();
       const dayHours = businessHours.find(h => h.day_of_week === dayOfWeek);
       if (!dayHours?.is_open) return true;
