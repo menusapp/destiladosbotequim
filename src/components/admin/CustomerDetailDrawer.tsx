@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { User, Phone, Mail, FileText, ShoppingBag, Calendar, Trash2, Save, MapPin } from "lucide-react";
+import { User, Phone, Mail, FileText, ShoppingBag, Calendar, Trash2, Save, MapPin, Plus, Star } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
