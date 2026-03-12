@@ -252,8 +252,8 @@ const RestaurantAdmin = () => {
             // Atualizar badges da sidebar
             if (orderType === 'delivery' && activeSection !== 'pedidos') {
               setHasNewDeliveryOrders(true);
-            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pedidos') {
-              setHasNewOrders(true);
+            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pdv') {
+              setHasNewLocalOrders(true);
             }
           }
         }
