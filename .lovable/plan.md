@@ -1,51 +1,89 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: 3 Melhorias — Auto-abrir mesa, Pop-up de mesa completo, CRM com endereços
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+---
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+### 1. Auto-abrir mesa quando chega pedido local
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+**Situação atual**: Quando chega pedido de mesa, `handleViewOrder` em `RestaurantAdmin.tsx` navega para o PDV mas não abre a mesa específica.
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+**Correção**:
+- Em `RestaurantAdmin.tsx`: quando `globalNotification.orderType === 'local'`, passar o `table_id` do pedido para o PDV via novo state (ex: `pendingTableToOpen`)
+- Alterar `PDVTab` para aceitar prop `pendingTableToOpen?: string` — quando presente, auto-abrir o dialog da mesa correspondente
+- Em `RestaurantAdmin.tsx`, buscar `table_id` do pedido na notificação (já disponível no payload do realtime) e passá-lo junto
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+**Arquivos**: `RestaurantAdmin.tsx`, `PDVTab.tsx`
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+---
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+### 2. Pop-up central da mesa (Dialog em vez de Sheet lateral)
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**Situação atual**: Clicar numa mesa abre `TableOrdersDrawer` (Sheet lateral simples, só lista pedidos).
+
+**Novo componente**: `TableDetailDialog.tsx` — Dialog central completo com:
+
+**Layout do Dialog (max-w-4xl)**:
+- **Header**: Número da mesa, status (ocupada/livre), tempo ocupada, botão Limpar Mesa
+- **Seção "Clientes Logados"**: Lista de comandas ativas com nome e CPF de cada
+- **Seção "Pedidos"**: Agrupados por comanda/cliente, cada pedido mostrando:
+  - Items, quantidades, preços, extras
+  - Status com badge colorido
+  - Botão de pagamento individual por comanda (abre `PaymentConfirmationModal`)
+- **Total da mesa**: Soma de todos os pedidos ativos
+- **Ação "Adicionar Pedido"**: Botão que pre-seleciona a mesa no painel lateral do PDV e fecha o dialog
+- **Ação "Pagar Comanda"**: Para cada comanda, botão que abre `PaymentConfirmationModal` com os pedidos daquela comanda
+
+**Mudanças no PDVTab**:
+- Substituir `TableOrdersDrawer` por novo `TableDetailDialog`
+- `handleTableClick` abre o dialog em vez do drawer
+- Manter o drawer importado caso precise em outros lugares
+
+**Arquivos**: Criar `src/components/admin/TableDetailDialog.tsx`, editar `PDVTab.tsx`
+
+---
+
+### 3. CRM de Clientes com endereços + auto-preenchimento no PDV
+
+**Situação atual**: 
+- `customer_addresses` table já existe no banco com campos completos (street, number, complement, neighborhood, city, state, zip_code, is_default)
+- `CustomerDetailDrawer` já mostra endereços salvos (read-only)
+- `ClientesTab` formulário de novo cliente não tem campos de endereço
+- `CustomerSelectDialog` retorna só `{id, cpf, name, phone}` — sem endereço
+- PDV `handleCustomerSelect` preenche só nome, CPF e telefone
+
+**Correções**:
+
+A) **ClientesTab** — Adicionar campos de endereço no formulário "Novo Cliente":
+- Campos: CEP (com busca ViaCEP), Rua, Número, Complemento, Bairro, Cidade, Estado
+- Ao salvar cliente, inserir também em `customer_addresses` se endereço preenchido, com `is_default: true`
+
+B) **CustomerDetailDrawer** — Permitir adicionar/editar endereços:
+- Botão "Adicionar Endereço" que expande formulário inline
+- Marcar endereço como padrão
+- Editar/excluir endereços existentes
+
+C) **CustomerSelectDialog** — Ao selecionar cliente, buscar endereço padrão:
+- Depois do select, buscar `customer_addresses` where `customer_cpf = cpf AND is_default = true`
+- Retornar endereço junto no callback `onSelect`
+
+D) **PDVTab** — Auto-preencher endereço ao selecionar cliente:
+- `handleCustomerSelect` recebe endereço do callback
+- Se tipo = "delivery" e endereço existe, auto-preencher CEP, Rua, Bairro, Cidade
+- Campos ficam editáveis para o operador alterar se necessário
+
+**Arquivos**: `ClientesTab.tsx`, `CustomerDetailDrawer.tsx`, `CustomerSelectDialog.tsx`, `PDVTab.tsx`
+
+---
+
+### Resumo de Arquivos
+
+| Arquivo | Mudança |
+|---|---|
+| `src/pages/RestaurantAdmin.tsx` | Passar `table_id` do pedido local para PDV via prop |
+| `src/components/admin/PDVTab.tsx` | Receber `pendingTableToOpen`, usar `TableDetailDialog` em vez de `TableOrdersDrawer`, auto-preencher endereço do cliente |
+| `src/components/admin/TableDetailDialog.tsx` | **NOVO** — Dialog central completo da mesa com clientes, pedidos agrupados por comanda, pagamento por comanda, botão adicionar pedido |
+| `src/components/admin/ClientesTab.tsx` | Campos de endereço no form "Novo Cliente" |
+| `src/components/admin/CustomerDetailDrawer.tsx` | CRUD de endereços (adicionar, editar, excluir, marcar padrão) |
+| `src/components/admin/CustomerSelectDialog.tsx` | Buscar e retornar endereço padrão do cliente selecionado |
+
