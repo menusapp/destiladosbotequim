@@ -64,6 +64,14 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  // Address fields
+  const [newCep, setNewCep] = useState("");
+  const [newStreet, setNewStreet] = useState("");
+  const [newNumber, setNewNumber] = useState("");
+  const [newComplement, setNewComplement] = useState("");
+  const [newNeighborhood, setNewNeighborhood] = useState("");
+  const [newCity, setNewCity] = useState("");
+  const [newState, setNewState] = useState("");
 
   // Fetch customers with order stats (including comandas/bills + delivery orders)
   const { data: customers, isLoading, refetch } = useQuery({
