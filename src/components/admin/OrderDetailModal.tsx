@@ -213,7 +213,26 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
                 <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2"><Play className="w-4 h-4" />Pronto para Retirada</Button>
               )}
               {(order.status === "accepted" || order.status === "preparing") && order.order_type === "local" && (
-                <Button onClick={() => updateStatus("delivered")} className="gap-2"><Play className="w-4 h-4" />Entregar na Mesa</Button>
+                <Button onClick={() => updateStatus("delivered")} className="gap-2"><Play className="w-4 h-4" />Na Mesa</Button>
+              )}
+              {order.status === "delivered" && order.order_type === "local" && (
+                <Button 
+                  onClick={() => {
+                    if (!order.payment_type || order.payment_type === "pending") {
+                      toast.error("Defina a forma de pagamento antes de finalizar");
+                      setShowPaymentModal(true);
+                      return;
+                    }
+                    // Mark as finalized - we keep status as delivered but with payment confirmed
+                    toast.success("Pedido finalizado!");
+                    onStatusUpdate();
+                    onClose();
+                  }} 
+                  className="gap-2"
+                  variant={(!order.payment_type || order.payment_type === "pending") ? "outline" : "default"}
+                >
+                  <Play className="w-4 h-4" />Finalizar
+                </Button>
               )}
               {order.status === "out_for_delivery" && order.delivery_type === "delivery" && (
                 <Button onClick={() => updateStatus("delivered")} className="gap-2"><Play className="w-4 h-4" />Confirmar Entrega</Button>
