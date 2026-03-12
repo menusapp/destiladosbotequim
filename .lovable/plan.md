@@ -1,51 +1,46 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: Corrigir 2 Bugs Críticos
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### Bug 1: Pedido de mesa mostra "Erro ao enviar" mas cria duplicado
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+**Causa raiz** em `src/pages/Comanda.tsx` (função `handleSendOrder`, linha 615):
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+1. **Sem guarda de `submitting`**: Não existe estado `submitting` — o botão "Enviar Pedido" fica clicável durante toda a operação async. Se o usuário clica novamente, um segundo pedido é criado (com itens acumulados).
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+2. **`order_type` não é setado**: Na linha 690, o insert em `orders` não inclui `order_type: "local"`. Isso pode causar problemas no fluxo de categorização do UnifiedOrdersTab (que filtra por `order_type === "local"`).
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+3. **O erro toast aparece mesmo com sucesso**: Preciso verificar se `fetchData()` na linha 742 pode estar lançando exceção (o que faria cair no `catch` e mostrar "Erro ao enviar pedido" mesmo depois do pedido já ter sido inserido).
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+**Correções** em `src/pages/Comanda.tsx`:
+- Adicionar estado `const [submitting, setSubmitting] = useState(false)`
+- Envolver `handleSendOrder` com `setSubmitting(true)` no início e `setSubmitting(false)` no finally
+- Desabilitar o botão "Enviar Pedido" quando `submitting === true`
+- Adicionar `order_type: "local"` ao insert do pedido
+- Mover `toast.success` e `setCart([])` para DEPOIS de todos os inserts terem sucesso, e antes de `fetchData()`
+- Envolver `fetchData()` em try/catch separado para não derrubar o fluxo principal
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+---
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+### Bug 2: Página principal do admin não carrega (crash)
+
+Sem logs de console disponíveis, as causas mais prováveis são:
+
+1. **Erro de runtime em algum componente recém-editado** — preciso adicionar error boundaries ou verificar se algum `null` está sendo acessado nos componentes editados recentemente (UnifiedOrdersTab, OrderDetailModal, TablesTab).
+
+2. **Possível crash no `OrderDetailModal`** — as mudanças recentes de lógica de pagamento/status podem causar erro se `order.order_type` for `null` (pedidos de mesa antigos sem `order_type`).
+
+**Correções**:
+- Em `OrderDetailModal.tsx`: Garantir que todas as verificações de `order.order_type` usem fallback (ex: `order.order_type === "local" || !order.order_type` quando tem `table_id`)
+- Adicionar null-safe checks em acessos que podem ser undefined
+- Adicionar console.log no catch de `fetchAll` em UnifiedOrdersTab para debug
+
+---
+
+### Resumo de Arquivos
+
+| Arquivo | Mudança |
+|---|---|
+| `src/pages/Comanda.tsx` | Adicionar `submitting` guard, `order_type: "local"`, proteger `fetchData()` |
+| `src/components/admin/OrderDetailModal.tsx` | Null-safe checks para `order_type` |
+
