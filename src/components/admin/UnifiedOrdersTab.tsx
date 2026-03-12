@@ -113,7 +113,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
   const [tables, setTables] = useState<TableData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("todos");
+  const [activeTab, setActiveTab] = useState("delivery");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [selectedTableForDrawer, setSelectedTableForDrawer] = useState<TableData | null>(null);
@@ -238,9 +238,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     let filtered = orders;
     
     if (activeTab === "delivery") {
-      filtered = filtered.filter(o => o.order_type === "delivery" && o.delivery_type === "delivery");
-    } else if (activeTab === "retirada") {
-      filtered = filtered.filter(o => o.order_type === "delivery" && o.delivery_type === "pickup");
+      // Delivery tab includes delivery + pickup (retirada)
+      filtered = filtered.filter(o => o.order_type === "delivery");
     } else if (activeTab === "local") {
       filtered = filtered.filter(o => o.order_type === "local" || !o.order_type);
     }
@@ -270,10 +269,22 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
 
   const groupedOrders = useMemo(() => {
     const isLocal = activeTab === "local";
+    if (isLocal) {
+      // Local: Aguardando, Preparando, Na Mesa (delivered without finalization distinction visually), Finalizado (delivered+payment), Cancelado
+      const deliveredLocal = filteredOrders.filter(o => ["delivered", "picked_up"].includes(o.status));
+      return {
+        pending: filteredOrders.filter(o => o.status === "pending"),
+        preparing: filteredOrders.filter(o => ["accepted", "preparing"].includes(o.status)),
+        at_table: deliveredLocal.filter(o => !o.payment_type || o.payment_type === "pending"),
+        finished: deliveredLocal.filter(o => o.payment_type && o.payment_type !== "pending"),
+        cancelled: filteredOrders.filter(o => o.status === "cancelled"),
+      };
+    }
+    // Delivery: Aguardando, Preparando, Saiu/Pronto, Entregue/Retirado, Cancelado
     return {
       pending: filteredOrders.filter(o => o.status === "pending"),
       preparing: filteredOrders.filter(o => ["accepted", "preparing"].includes(o.status)),
-      ...(!isLocal ? { out: filteredOrders.filter(o => ["out_for_delivery", "ready"].includes(o.status)) } : {}),
+      out: filteredOrders.filter(o => ["out_for_delivery", "ready"].includes(o.status)),
       delivered: filteredOrders.filter(o => ["delivered", "picked_up"].includes(o.status)),
       cancelled: filteredOrders.filter(o => o.status === "cancelled"),
     };
@@ -304,18 +315,22 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
 
   const kanbanColumns = useMemo(() => {
     const isLocal = activeTab === "local";
-    const cols = [
+    if (isLocal) {
+      return [
+        { key: "pending", title: "Aguardando", color: "bg-orange-400", count: groupedOrders.pending?.length || 0 },
+        { key: "preparing", title: "Preparando", color: "bg-orange-500", count: groupedOrders.preparing?.length || 0 },
+        { key: "at_table", title: "Na Mesa", color: "bg-orange-600", count: groupedOrders.at_table?.length || 0 },
+        { key: "finished", title: "Finalizado", color: "bg-orange-700", count: groupedOrders.finished?.length || 0 },
+        { key: "cancelled", title: "Cancelado", color: "bg-orange-300", count: groupedOrders.cancelled?.length || 0 },
+      ];
+    }
+    return [
       { key: "pending", title: "Aguardando", color: "bg-orange-400", count: groupedOrders.pending?.length || 0 },
       { key: "preparing", title: "Preparando", color: "bg-orange-500", count: groupedOrders.preparing?.length || 0 },
-    ];
-    if (!isLocal) {
-      cols.push({ key: "out", title: "Saiu / Pronto", color: "bg-orange-600", count: groupedOrders.out?.length || 0 });
-    }
-    cols.push(
-      { key: "delivered", title: "Entregue", color: "bg-orange-700", count: groupedOrders.delivered?.length || 0 },
+      { key: "out", title: "Saiu / Pronto", color: "bg-orange-600", count: groupedOrders.out?.length || 0 },
+      { key: "delivered", title: "Entregue / Retirado", color: "bg-orange-700", count: groupedOrders.delivered?.length || 0 },
       { key: "cancelled", title: "Cancelado", color: "bg-orange-300", count: groupedOrders.cancelled?.length || 0 },
-    );
-    return cols;
+    ];
   }, [activeTab, groupedOrders]);
 
   const handleToggleBillRequest = async (enabled: boolean) => {
@@ -536,16 +551,12 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="todos">Todos</TabsTrigger>
           <TabsTrigger value="delivery">Delivery</TabsTrigger>
-          <TabsTrigger value="mesas">Mesas</TabsTrigger>
-          <TabsTrigger value="retirada">Retirada</TabsTrigger>
           <TabsTrigger value="local">Local</TabsTrigger>
+          <TabsTrigger value="mesas">Mesas</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="todos">{renderKanban()}</TabsContent>
         <TabsContent value="delivery">{renderKanban()}</TabsContent>
-        <TabsContent value="retirada">{renderKanban()}</TabsContent>
         <TabsContent value="local">
           {/* Toggle pedir conta - always visible in local tab */}
           <div className="flex items-center gap-2 mb-3 p-2 rounded-lg border border-border/50 bg-muted/20 w-fit">

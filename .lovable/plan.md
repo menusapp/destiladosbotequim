@@ -1,92 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plano: 4 Melhorias na Gestão de Pedidos e Mesas
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
----
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
-### 1. PDVProductDrawer: Abrir como Sheet lateral (não Drawer de baixo)
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
 
-**Problema**: Ao adicionar itens a um pedido via `AddItemsToOrderDrawer`, clicar num produto abre o `PDVProductDrawer` como Drawer (sobe de baixo, toma a tela).
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
 
-**Solução**: Converter `PDVProductDrawer` de `Drawer`/`DrawerContent` para `Sheet`/`SheetContent` com `side="right"`, mantendo toda a lógica interna (extras, quantidade, observações).
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
 
-**Arquivo**: `src/components/admin/PDVProductDrawer.tsx`
-- Trocar imports de `Drawer`/`DrawerContent` para `Sheet`/`SheetContent`
-- Usar `<Sheet open={open} onOpenChange={onClose}>` e `<SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">`
-- Manter todo o conteúdo interno (header com imagem, extras, quantidade, botão adicionar)
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
 
----
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
 
-### 2. Remover campo manual de "Taxa do garçom" no PaymentConfirmationModal
+Detalhes técnicos:
+```text
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
+```
 
-**Problema**: O modal de finalizar atendimento (`PaymentConfirmationModal`) tem um campo onde o usuário digita manualmente a % da taxa. Deveria usar a configuração do restaurante automaticamente.
-
-**Solução**: No `PaymentConfirmationModal`:
-- Buscar `service_fee_enabled` e `service_fee_percentage` do restaurante ao abrir
-- Se `service_fee_enabled === true`: aplicar automaticamente a porcentagem configurada, sem campo editável. Mostrar apenas uma linha informativa "Taxa de serviço (10%): R$ X.XX"
-- Se `service_fee_enabled === false`: taxa = 0, sem exibir nada
-- Remover o `<Card>` inteiro da "Taxa do garçom" com o `<Input>` de porcentagem
-
-**Arquivo**: `src/components/admin/PaymentConfirmationModal.tsx`
-
----
-
-### 3. Separar "Mesas e Reservas" — Mesas ficam nos Pedidos, Reservas ficam na aba separada
-
-**Problema**: Existe duplicação: mesas aparecem tanto em "Pedidos > aba Mesas" quanto em "Mesas e Reservas". 
-
-**Solução**:
-- **Sidebar** (`AppSidebar.tsx`): Renomear "Mesas e Reservas" para "Reservas" (id permanece `mesas-reservas` ou muda para `reservas`)
-- **TablesTab** (`TablesTab.tsx`): Remover toda a parte de gestão de mesas (CRUD, QR code, grid). Manter **apenas** a parte de Reservas. Se reservas desativadas, mostrar tela vazia com botão para ativar
-- **UnifiedOrdersTab** (`UnifiedOrdersTab.tsx`): A aba "Mesas" já existe e mostra o grid. Mantém como está
-
-**Arquivos**: `src/components/admin/AppSidebar.tsx`, `src/components/admin/TablesTab.tsx`, `src/pages/RestaurantAdmin.tsx`
-
----
-
-### 4. Reorganizar abas de Pedidos e colunas do Kanban
-
-**Problema**: Abas atuais são "Todos, Delivery, Mesas, Retirada, Local". Devem ser simplificadas.
-
-**Solução** em `UnifiedOrdersTab.tsx`:
-
-**Abas**: `Delivery` | `Local` (remover "Todos", "Retirada", mover retirada para dentro de Delivery)
-
-**Kanban Delivery** (inclui delivery + retirada):
-- Aguardando (pending)
-- Preparando (accepted/preparing)
-- Saiu / Pronto (out_for_delivery/ready)
-- Entregue / Retirado (delivered/picked_up)
-- Cancelado (cancelled)
-
-**Kanban Local** (mesa/local):
-- Aguardando Confirmação (pending)
-- Preparando (accepted/preparing)
-- Na Mesa (delivered/picked_up) — novo status visual para pedidos locais entregues à mesa
-- Finalizado — pedidos com pagamento confirmado (status delivered + payment_type definido)
-- Cancelado (cancelled)
-
-Manter a aba "Mesas" (grid de mesas) e a coluna de "Contas" na aba Local.
-
-**Regra de pagamento** em `OrderDetailModal.tsx`:
-- **Delivery**: Bloquear "Entregue/Retirado" sem pagamento (já funciona assim)
-- **Local**: Permitir ir até "Na Mesa" sem pagamento. Bloquear "Finalizado" sem pagamento
-  - Ajustar `requiresPaymentForFinalization` para verificar: se `order_type === "local"`, bloquear apenas no status final (finalizado), não no "Na Mesa" (delivered)
-  - Mudar os botões de ação: para pedidos locais, após preparando, botão "Na Mesa" (sem exigir pagamento). Depois de "Na Mesa", botão "Finalizar" (exige pagamento)
-
-**Arquivos**: `src/components/admin/UnifiedOrdersTab.tsx`, `src/components/admin/OrderDetailModal.tsx`
-
----
-
-### Resumo de Arquivos
-
-| Arquivo | Mudança |
-|---|---|
-| `PDVProductDrawer.tsx` | Drawer → Sheet lateral |
-| `PaymentConfirmationModal.tsx` | Remover campo manual de taxa, auto-aplicar config |
-| `AppSidebar.tsx` | Renomear "Mesas e Reservas" → "Reservas" |
-| `TablesTab.tsx` | Manter apenas Reservas, remover gestão de mesas |
-| `RestaurantAdmin.tsx` | Ajustar referências |
-| `UnifiedOrdersTab.tsx` | Abas Delivery/Local, novos Kanbans |
-| `OrderDetailModal.tsx` | Lógica de pagamento diferenciada por tipo |
-
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.

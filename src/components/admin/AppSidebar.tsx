@@ -58,7 +58,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
     main: [
       { id: "pedidos", label: "Pedidos", icon: ShoppingBag, hasNotification: (hasNewDeliveryOrders || hasNewOrders || hasNewBills) },
       { id: "pdv", label: "PDV", icon: CreditCard },
-      { id: "mesas-reservas", label: "Mesas e Reservas", icon: Users2 },
+      { id: "mesas-reservas", label: "Reservas", icon: Users2 },
       { id: "cardapio", label: "Cardápio", icon: Utensils },
       { id: "caixa", label: "Caixa", icon: CircleDollarSign },
       { id: "estoque", label: "Estoque", icon: Warehouse },

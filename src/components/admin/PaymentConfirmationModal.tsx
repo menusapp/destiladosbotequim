@@ -81,7 +81,8 @@ export const PaymentConfirmationModal = ({
   onClose,
   onConfirm,
 }: PaymentConfirmationModalProps) => {
-  const [serviceFee, setServiceFee] = useState(10);
+  const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
+  const [serviceFeePercentage, setServiceFeePercentage] = useState(0);
   const [selectedPayments, setSelectedPayments] = useState<Array<{ method: string; amount: number }>>([]);
   const [currentAmount, setCurrentAmount] = useState("");
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(DEFAULT_METHODS);
@@ -93,20 +94,27 @@ export const PaymentConfirmationModal = ({
   };
 
   useEffect(() => {
-    const fetchPaymentMethods = async () => {
-      const { data, error } = await supabase
-        .from("payment_methods")
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .eq("is_active", true);
+    const fetchData = async () => {
+      // Fetch payment methods and restaurant config in parallel
+      const [methodsRes, restaurantRes] = await Promise.all([
+        supabase.from("payment_methods").select("*").eq("restaurant_id", restaurantId).eq("is_active", true),
+        supabase.from("restaurants").select("service_fee_enabled, service_fee_percentage").eq("id", restaurantId).single(),
+      ]);
 
-      if (!error && data && data.length > 0) {
-        setPaymentMethods(data);
+      if (!methodsRes.error && methodsRes.data && methodsRes.data.length > 0) {
+        setPaymentMethods(methodsRes.data);
       }
+
+      if (!restaurantRes.error && restaurantRes.data) {
+        const enabled = restaurantRes.data.service_fee_enabled ?? false;
+        setServiceFeeEnabled(enabled);
+        setServiceFeePercentage(enabled ? (restaurantRes.data.service_fee_percentage ?? 10) : 0);
+      }
+
       setLoading(false);
     };
 
-    fetchPaymentMethods();
+    fetchData();
   }, [restaurantId]);
 
   const calculateSubtotal = () => {
@@ -121,7 +129,7 @@ export const PaymentConfirmationModal = ({
   };
 
   const subtotal = calculateSubtotal();
-  const feeAmount = (subtotal * serviceFee) / 100;
+  const feeAmount = serviceFeeEnabled ? (subtotal * serviceFeePercentage) / 100 : 0;
   const total = subtotal + feeAmount;
   const paidAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, Math.round((total - paidAmount) * 100) / 100);
@@ -165,16 +173,12 @@ export const PaymentConfirmationModal = ({
 
       // Update existing cash_movements and bills if this is a payment change
       if (order.table_id) {
-        // Update existing bills for this order
         const { data: existingBills } = await supabase.from("bills").select("id").eq("table_id", order.table_id).eq("status", "paid").order("created_at", { ascending: false }).limit(1);
         
         if (existingBills && existingBills.length > 0) {
-          // Update existing bill payment method
           await supabase.from("bills").update({ payment_method: primaryPayment, total_amount: total, subtotal, service_fee: feeAmount }).eq("id", existingBills[0].id);
-          // Update cash_movements linked to this bill
           await supabase.from("cash_movements").update({ payment_method: primaryPayment }).eq("bill_id", existingBills[0].id);
         } else {
-          // Create new bill
           const { error: billError } = await supabase.from("bills").insert({
             table_id: order.table_id,
             subtotal: subtotal,
@@ -225,31 +229,18 @@ export const PaymentConfirmationModal = ({
           </div>
         </Card>
 
-        {/* Taxa de serviço */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Percent className="w-5 h-5" />
-              <span className="font-semibold">Taxa do garçom</span>
+        {/* Taxa de serviço (somente se ativada nas configurações) */}
+        {serviceFeeEnabled && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Percent className="w-5 h-5" />
+                <span className="font-semibold">Taxa de serviço ({serviceFeePercentage}%)</span>
+              </div>
+              <span className="text-lg font-bold">R$ {feeAmount.toFixed(2)}</span>
             </div>
-            <span className="text-lg font-bold">R$ {feeAmount.toFixed(2)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              value={serviceFee}
-              onChange={(e) => setServiceFee(parseFloat(e.target.value) || 0)}
-              className="w-24"
-              min="0"
-              max="100"
-              step="0.1"
-            />
-            <span className="text-sm text-muted-foreground">%</span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Você pode ajustar ou remover a taxa
-          </p>
-        </Card>
+          </Card>
+        )}
 
         {/* Formas de pagamento */}
         <Card className="p-4">

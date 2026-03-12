@@ -742,421 +742,27 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Mesas e Reservas</h2>
+          <h2 className="text-2xl font-bold">Reservas</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Gerencie mesas, comandas e reservas do restaurante
+            Gerencie as reservas do restaurante
           </p>
         </div>
       </div>
 
-      <Tabs defaultValue="mesas" className="w-full">
-        <TabsList>
-          <TabsTrigger value="mesas">Mesas</TabsTrigger>
-          <TabsTrigger value="reservas" className="relative">
-            Reservas
-            {pendingReservationsCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {pendingReservationsCount}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Mesas Tab */}
-        <TabsContent value="mesas" className="mt-6 space-y-6">
-          {/* Header with Add button */}
-          <div className="flex justify-end">
-            <Dialog open={showDialog} onOpenChange={setShowDialog}>
-              <DialogTrigger asChild>
-                <Button onClick={() => openTableDialog()}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Cadastrar Mesa
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{editingTable ? "Editar Mesa" : "Nova Mesa"}</DialogTitle>
-                  <DialogDescription>
-                    Configure os detalhes da mesa
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit}>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="tableNumber">Número da Mesa *</Label>
-                        <Input
-                          id="tableNumber"
-                          type="number"
-                          value={tableForm.table_number}
-                          onChange={(e) => setTableForm({ ...tableForm, table_number: e.target.value })}
-                          placeholder="Ex: 1"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="tableName">Nome da Mesa</Label>
-                        <Input
-                          id="tableName"
-                          value={tableForm.table_name}
-                          onChange={(e) => setTableForm({ ...tableForm, table_name: e.target.value })}
-                          placeholder="Ex: Mesa Romântica"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Descrição</Label>
-                      <Textarea
-                        placeholder="Descreva a mesa, localização, características..."
-                        value={tableForm.description}
-                        onChange={(e) => setTableForm({ ...tableForm, description: e.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Foto da Mesa</Label>
-                      {tableForm.image_url ? (
-                        <div className="relative w-full h-40 rounded-lg overflow-hidden border mt-2">
-                          <img 
-                            src={tableForm.image_url}
-                            alt="Preview"
-                            className="w-full h-full object-cover"
-                          />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-2 right-2"
-                            onClick={() => setTableForm({ ...tableForm, image_url: "" })}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="border-2 border-dashed rounded-lg p-6 text-center mt-2">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageUpload}
-                            className="hidden"
-                            id="table-image-upload"
-                            disabled={uploading}
-                          />
-                          <label 
-                            htmlFor="table-image-upload"
-                            className="cursor-pointer flex flex-col items-center gap-2"
-                          >
-                            {uploading ? (
-                              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                            ) : (
-                              <>
-                                <Upload className="h-8 w-8 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">
-                                  Clique para selecionar uma imagem
-                                </span>
-                              </>
-                            )}
-                          </label>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Mínimo de Pessoas</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={tableForm.min_capacity}
-                          onChange={(e) => setTableForm({ ...tableForm, min_capacity: parseInt(e.target.value) || 1 })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Máximo de Pessoas</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={tableForm.max_capacity}
-                          onChange={(e) => setTableForm({ ...tableForm, max_capacity: parseInt(e.target.value) || 1 })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={tableForm.is_available_for_reservation}
-                        onCheckedChange={(checked) => setTableForm({ ...tableForm, is_available_for_reservation: checked })}
-                      />
-                      <Label>Disponível para reserva online</Label>
-                    </div>
-
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
-                        Cancelar
-                      </Button>
-                      <Button type="submit">
-                        {editingTable ? "Salvar" : "Criar Mesa"}
-                      </Button>
-                    </DialogFooter>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Filters */}
-          <div className="flex gap-4 items-center">
-            <div className="flex gap-2">
-              <Button
-                variant={filter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("all")}
-              >
-                Todas
-              </Button>
-              <Button
-                variant={filter === "occupied" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("occupied")}
-              >
-                Ocupadas
-              </Button>
-              <Button
-                variant={filter === "available" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("available")}
-              >
-                Disponíveis
-              </Button>
-              <Button
-                variant={filter === "reserved" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter("reserved")}
-              >
-                Reservadas
-              </Button>
+      {/* Reservas content */}
+      {!reservationsEnabled ? (
+        <Card>
+          <CardContent className="py-12 text-center space-y-4">
+            <CalendarCheck className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
+            <div>
+              <h3 className="text-lg font-semibold">Reservas desativadas</h3>
+              <p className="text-sm text-muted-foreground mt-1">Ative as reservas para que seus clientes possam reservar mesas pelo cardápio digital</p>
             </div>
-            <Input
-              placeholder="Buscar por nome ou número..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-xs"
-            />
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total</CardTitle>
-                <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.total}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Disponíveis</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{stats.available}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ocupadas</CardTitle>
-                <Users className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{stats.occupied}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Reservadas</CardTitle>
-                <CalendarCheck className="h-4 w-4 text-orange-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-500">{stats.reserved}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Tables Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredTables.map((table) => {
-              const status = getTableStatus(table);
-              const clientCount = table.comandas?.length || 0;
-              const displayName = table.table_name || `Mesa ${table.table_number}`;
-              const activeReservation = getActiveReservation(table);
-              
-              const borderColor = status === "occupied" 
-                ? "border-red-500" 
-                : status === "reserved" 
-                  ? "border-orange-500" 
-                  : "border-green-500";
-              
-              const iconBgColor = status === "occupied"
-                ? "bg-red-100 dark:bg-red-950"
-                : status === "reserved"
-                  ? "bg-orange-100 dark:bg-orange-950"
-                  : "bg-green-100 dark:bg-green-950";
-              
-              const iconColor = status === "occupied"
-                ? "text-red-600"
-                : status === "reserved"
-                  ? "text-orange-600"
-                  : "text-green-600";
-
-              return (
-                <Card
-                  key={table.id}
-                  className={`cursor-pointer transition-all hover:shadow-lg ${borderColor}`}
-                  onClick={() => navigate(`/${restaurantSlug}/admin/mesa/${table.id}`)}
-                >
-                  {table.image_url && (
-                    <img 
-                      src={table.image_url} 
-                      alt={displayName}
-                      className="w-full h-32 object-cover"
-                    />
-                  )}
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${iconBgColor}`}>
-                        {status === "reserved" ? (
-                          <CalendarCheck className={`w-5 h-5 ${iconColor}`} />
-                        ) : (
-                          <Users className={`w-5 h-5 ${iconColor}`} />
-                        )}
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            openTableDialog(table);
-                          }}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Editar Mesa
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            downloadQRCode(table);
-                          }}>
-                            <QrCode className="w-4 h-4 mr-2" />
-                            Baixar QR Code
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => copyTableLink(table, e)}>
-                            <LinkIcon className="w-4 h-4 mr-2" />
-                            Copiar Link
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-orange-600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRequestEmptyTable(table);
-                            }}
-                          >
-                            <XCircle className="w-4 h-4 mr-2" />
-                            Esvaziar Mesa
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            disabled={table.is_occupied}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(table.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-
-                    <h3 className="font-semibold text-lg mb-1">{displayName}</h3>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {table.min_capacity}-{table.max_capacity} pessoas
-                    </p>
-                    
-                    {status === "occupied" && clientCount > 0 ? (
-                      <div className="space-y-2">
-                        <Badge variant="secondary" className="gap-1 bg-red-100 text-red-800">
-                          <Users className="w-3 h-3" />
-                          {clientCount} cliente{clientCount > 1 ? 's' : ''}
-                        </Badge>
-                        <div className="space-y-1">
-                          {table.comandas?.slice(0, 2).map((comanda) => (
-                            <p key={comanda.id} className="text-xs text-muted-foreground truncate">
-                              {comanda.customer_name} - {maskCPF(comanda.customer_cpf)}
-                            </p>
-                          ))}
-                        </div>
-                        {table.occupied_at && (
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(table.occupied_at), {
-                              addSuffix: true,
-                              locale: ptBR,
-                            })}
-                          </p>
-                        )}
-                      </div>
-                    ) : status === "reserved" && activeReservation ? (
-                      <div className="space-y-2">
-                        <Badge variant="secondary" className="gap-1 bg-orange-100 text-orange-800">
-                          <CalendarCheck className="w-3 h-3" />
-                          Reservada
-                        </Badge>
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <p className="truncate">{activeReservation.customer_name}</p>
-                          <p className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {activeReservation.reservation_time.slice(0, 5)}
-                          </p>
-                          <p className="flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            {activeReservation.party_size} pessoas
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          className="w-full mt-2 bg-orange-600 hover:bg-orange-700"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedReservation(activeReservation);
-                            setArrivalDialogOpen(true);
-                          }}
-                        >
-                          <Check className="w-3 h-3 mr-1" />
-                          Cliente Chegou
-                        </Button>
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="text-green-600 border-green-600">
-                        Disponível
-                      </Badge>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </TabsContent>
-
-        {/* Reservas Tab */}
-        <TabsContent value="reservas" className="mt-6 space-y-6">
+            <Button onClick={() => handleToggleReservations(true)}>Ativar Reservas</Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
           {/* Configurações */}
           <Card>
             <CardHeader>
@@ -1177,25 +783,21 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                 />
               </div>
               
-              {reservationsEnabled && (
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <div>
-                    <Label htmlFor="business-hours-toggle" className="font-medium">Seguir Horário de Funcionamento</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Mostrar apenas horários disponíveis conforme configurado em Configurações → Horário de Funcionamento
-                    </p>
-                  </div>
-                  <Switch
-                    id="business-hours-toggle"
-                    checked={followBusinessHours}
-                    onCheckedChange={handleToggleFollowBusinessHours}
-                  />
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div>
+                  <Label htmlFor="business-hours-toggle" className="font-medium">Seguir Horário de Funcionamento</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Mostrar apenas horários disponíveis conforme configurado em Configurações → Horário de Funcionamento
+                  </p>
                 </div>
-              )}
+                <Switch
+                  id="business-hours-toggle"
+                  checked={followBusinessHours}
+                  onCheckedChange={handleToggleFollowBusinessHours}
+                />
+              </div>
             </CardContent>
           </Card>
-
-          
 
           <Tabs defaultValue="today" className="w-full">
             <TabsList className="grid w-full grid-cols-3 max-w-lg">
@@ -1320,21 +922,23 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
               <Card>
                 <CardHeader>
                   <CardTitle>Reservas Pendentes</CardTitle>
-                  <CardDescription>Aguardando confirmação</CardDescription>
+                  <CardDescription>Reservas aguardando confirmação</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-3 pr-4">
                       {reservations.filter(r => r.status === "pending").length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
-                          <CalendarCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
                           <p>Nenhuma reserva pendente</p>
                         </div>
                       ) : (
                         reservations
                           .filter(r => r.status === "pending")
+                          .sort((a, b) => `${a.reservation_date}${a.reservation_time}`.localeCompare(`${b.reservation_date}${b.reservation_time}`))
                           .map((reservation) => {
                             const table = tables.find(t => t.id === reservation.table_id);
+                            const [year, month, day] = reservation.reservation_date.split('-');
                             return (
                               <Card key={reservation.id} className="border-yellow-200">
                                 <CardContent className="p-4">
@@ -1342,56 +946,24 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                                     <div className="space-y-2">
                                       <div className="flex items-center gap-2">
                                         <CalendarIcon className="h-4 w-4 text-primary" />
-                                        <span className="font-medium">
-                                          {format(new Date(reservation.reservation_date), "dd/MM/yyyy", { locale: ptBR })}
-                                        </span>
-                                        <Clock className="h-4 w-4 text-muted-foreground ml-2" />
-                                        <span>{reservation.reservation_time.slice(0, 5)}</span>
+                                        <span className="font-medium">{`${day}/${month}/${year}`}</span>
+                                        <Clock className="h-4 w-4" />
+                                        <span className="font-medium">{reservation.reservation_time.slice(0, 5)}</span>
                                         <Badge variant="outline">{table?.table_name || `Mesa ${table?.table_number}`}</Badge>
                                       </div>
                                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                        <span className="flex items-center gap-1">
-                                          <User className="h-3 w-3" />
-                                          {reservation.customer_name}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                          <Phone className="h-3 w-3" />
-                                          {reservation.customer_phone}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                          <Users className="h-3 w-3" />
-                                          {reservation.party_size} pessoas
-                                        </span>
+                                        <span className="flex items-center gap-1"><User className="h-3 w-3" />{reservation.customer_name}</span>
+                                        <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{reservation.customer_phone}</span>
+                                        <span className="flex items-center gap-1"><Users className="h-3 w-3" />{reservation.party_size} pessoas</span>
                                       </div>
-                                      {reservation.notes && (
-                                        <p className="text-sm text-muted-foreground">
-                                          Obs: {reservation.notes}
-                                        </p>
-                                      )}
+                                      {reservation.notes && <p className="text-xs text-muted-foreground italic">"{reservation.notes}"</p>}
                                     </div>
                                     <div className="flex gap-2">
-                                      <Button
-                                        size="sm"
-                                        className="bg-green-600 hover:bg-green-700"
-                                        onClick={() => {
-                                          setSelectedReservation(reservation);
-                                          setConfirmDialogOpen(true);
-                                        }}
-                                      >
-                                        <Check className="h-4 w-4 mr-1" />
-                                        Confirmar
+                                      <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => { setSelectedReservation(reservation); setConfirmDialogOpen(true); }}>
+                                        <Check className="h-4 w-4 mr-1" />Confirmar
                                       </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-destructive"
-                                        onClick={() => {
-                                          setSelectedReservation(reservation);
-                                          setCancelDialogOpen(true);
-                                        }}
-                                      >
-                                        <X className="h-4 w-4 mr-1" />
-                                        Recusar
+                                      <Button variant="outline" size="sm" className="text-destructive" onClick={() => { setSelectedReservation(reservation); setCancelDialogOpen(true); }}>
+                                        <X className="h-4 w-4 mr-1" />Recusar
                                       </Button>
                                     </div>
                                   </div>
@@ -1410,31 +982,24 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
             <TabsContent value="history" className="mt-6">
               <Card>
                 <CardHeader>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <CardTitle>Histórico de Reservas</CardTitle>
-                      <CardDescription>Todas as reservas realizadas</CardDescription>
+                      <CardDescription>Todas as reservas registradas</CardDescription>
                     </div>
                     <div className="flex gap-2">
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Pesquisar..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10 w-[200px]"
-                        />
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-48" />
                       </div>
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-[150px]">
-                          <SelectValue placeholder="Status" />
-                        </SelectTrigger>
+                        <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Todos</SelectItem>
                           <SelectItem value="pending">Pendentes</SelectItem>
                           <SelectItem value="confirmed">Confirmadas</SelectItem>
-                          <SelectItem value="cancelled">Canceladas</SelectItem>
                           <SelectItem value="completed">Concluídas</SelectItem>
+                          <SelectItem value="cancelled">Canceladas</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1451,6 +1016,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                       ) : (
                         filteredReservations.map((reservation) => {
                           const table = tables.find(t => t.id === reservation.table_id);
+                          const [year, month, day] = reservation.reservation_date.split('-');
                           return (
                             <Card key={reservation.id}>
                               <CardContent className="p-4">
@@ -1458,28 +1024,34 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                                   <div className="space-y-2">
                                     <div className="flex items-center gap-2">
                                       <CalendarIcon className="h-4 w-4 text-primary" />
-                                      <span className="font-medium">
-                                        {format(new Date(reservation.reservation_date), "dd/MM/yyyy", { locale: ptBR })}
-                                      </span>
-                                      <Clock className="h-4 w-4 text-muted-foreground ml-2" />
+                                      <span className="font-medium">{`${day}/${month}/${year}`}</span>
+                                      <Clock className="h-4 w-4" />
                                       <span>{reservation.reservation_time.slice(0, 5)}</span>
                                       <Badge variant="outline">{table?.table_name || `Mesa ${table?.table_number}`}</Badge>
                                       {getStatusBadge(reservation.status)}
                                     </div>
                                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                      <span className="flex items-center gap-1">
-                                        <User className="h-3 w-3" />
-                                        {reservation.customer_name}
-                                      </span>
-                                      <span className="flex items-center gap-1">
-                                        <Phone className="h-3 w-3" />
-                                        {reservation.customer_phone}
-                                      </span>
-                                      <span className="flex items-center gap-1">
-                                        <Users className="h-3 w-3" />
-                                        {reservation.party_size} pessoas
-                                      </span>
+                                      <span className="flex items-center gap-1"><User className="h-3 w-3" />{reservation.customer_name}</span>
+                                      <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{reservation.customer_phone}</span>
+                                      <span className="flex items-center gap-1"><Users className="h-3 w-3" />{reservation.party_size} pessoas</span>
                                     </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {reservation.status === "pending" && (
+                                      <>
+                                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => { setSelectedReservation(reservation); setConfirmDialogOpen(true); }}>
+                                          <Check className="h-4 w-4 mr-1" />Confirmar
+                                        </Button>
+                                        <Button variant="outline" size="sm" className="text-destructive" onClick={() => { setSelectedReservation(reservation); setCancelDialogOpen(true); }}>
+                                          <X className="h-4 w-4 mr-1" />Recusar
+                                        </Button>
+                                      </>
+                                    )}
+                                    {reservation.status === "confirmed" && (
+                                      <Button size="sm" className="bg-orange-600 hover:bg-orange-700" onClick={() => { setSelectedReservation(reservation); setArrivalDialogOpen(true); }}>
+                                        <Check className="h-4 w-4 mr-1" />Cliente Chegou
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
                               </CardContent>
@@ -1493,39 +1065,18 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
               </Card>
             </TabsContent>
           </Tabs>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
 
-      {/* AlertDialog para confirmar esvaziamento */}
-      <AlertDialog open={!!tableToEmpty} onOpenChange={() => setTableToEmpty(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Esvaziar {tableToEmpty?.table_name || `Mesa ${tableToEmpty?.table_number}`}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Todas as comandas ativas serão fechadas e os clientes serão deslogados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-orange-600 hover:bg-orange-700"
-              onClick={() => tableToEmpty && handleEmptyTable(tableToEmpty.id)}
-            >
-              Esvaziar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Dialog para confirmar reserva */}
+      {/* Confirm Dialog */}
       <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Reserva?</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar Reserva</AlertDialogTitle>
             <AlertDialogDescription>
               Confirmar a reserva de {selectedReservation?.customer_name} para{" "}
-              {selectedReservation && format(new Date(selectedReservation.reservation_date), "dd/MM/yyyy", { locale: ptBR })} às{" "}
-              {selectedReservation?.reservation_time.slice(0, 5)}?
+              {selectedReservation?.reservation_date && (() => { const [y,m,d] = selectedReservation.reservation_date.split('-'); return `${d}/${m}/${y}`; })()}{" "}
+              às {selectedReservation?.reservation_time?.slice(0, 5)}?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1537,38 +1088,37 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog para cancelar reserva */}
-      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Recusar Reserva</DialogTitle>
-            <DialogDescription>
-              Informe o motivo da recusa (opcional)
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
+      {/* Cancel Dialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Reserva</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja cancelar a reserva de {selectedReservation?.customer_name}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-6 pb-2">
+            <Label>Motivo (opcional)</Label>
             <Textarea
-              placeholder="Motivo da recusa..."
               value={cancellationReason}
               onChange={(e) => setCancellationReason(e.target.value)}
+              placeholder="Informe o motivo do cancelamento..."
             />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
-              Voltar
-            </Button>
-            <Button variant="destructive" onClick={handleCancelReservation}>
-              Recusar Reserva
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelReservation} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Cancelar Reserva
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {/* Dialog para cliente chegou */}
+      {/* Arrival Dialog */}
       <AlertDialog open={arrivalDialogOpen} onOpenChange={setArrivalDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cliente Chegou?</AlertDialogTitle>
+            <AlertDialogTitle>Registrar Chegada</AlertDialogTitle>
             <AlertDialogDescription>
               Registrar a chegada de {selectedReservation?.customer_name}? 
               Uma comanda será criada automaticamente e a mesa será marcada como ocupada.
