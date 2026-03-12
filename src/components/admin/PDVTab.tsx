@@ -474,9 +474,19 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                       {table.table_number}
                     </div>
                     <p className="text-xs font-medium">{table.table_name || `Mesa ${table.table_number}`}</p>
+                    {pending && pending.count > 0 && (
+                      <Badge variant="destructive" className="text-[10px] animate-pulse">
+                        🔔 Pedido Novo
+                      </Badge>
+                    )}
                     <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">
                       {isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
                     </Badge>
+                    {pending && pending.count > 0 && (
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {pending.customerNames[0]} • {pending.itemCount} ite{pending.itemCount !== 1 ? "ns" : "m"}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               );
