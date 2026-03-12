@@ -1,51 +1,70 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: Reestruturar PDV e Pedidos
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### Resumo
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+**PDV** vira o centro de operações presenciais: grid de mesas + painel lateral sempre visível para criar pedidos (Mesa, Delivery, Retirada, Para Viagem).
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+**Pedidos** fica simplificado: apenas abas Todos, Delivery e Retirada com Kanban.
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+---
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+### 1. Reescrever `PDVTab.tsx`
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+**Layout**: Split horizontal — esquerda (mesas grid) + direita (painel lateral fixo de criação de pedido).
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+**Lado Esquerdo — Grid de Mesas**:
+- Stats (Total, Ocupadas, Livres) no topo
+- Grid de mesas com cards idênticos ao `renderTablesGrid` do UnifiedOrdersTab
+- Cada card com dropdown de 3 pontinhos (QR Code, Copiar Link, Limpar Mesa) — reutilizar lógica existente
+- Clicar numa mesa abre `TableOrdersDrawer` (ver pedidos, comandas, pagar)
+- Botão "Gerenciar Mesas" abre `ManageTablesDrawer`
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**Lado Direito — Painel de Criação (sempre visível, não é Sheet)**:
+- Idêntico ao conteúdo do `CreateOrderDrawer`, mas renderizado inline (sem Sheet wrapper)
+- 4 tipos de pedido via Tabs: **Mesa**, **Delivery**, **Retirada**, **Para Viagem**
+  - **Mesa**: seleciona mesa, cliente, CPF, produtos → cria order `order_type: "local"` com comanda
+  - **Delivery**: cliente, telefone, CEP/endereço, produtos → cria order `order_type: "delivery"`, `delivery_type: "delivery"`
+  - **Retirada**: cliente, CPF, produtos → cria order `order_type: "delivery"`, `delivery_type: "pickup"`
+  - **Para Viagem** (NOVO): cliente (opcional), produtos, pagamento → cria order `order_type: "delivery"`, `delivery_type: "takeaway"` (sem mesa, sem endereço)
+- Grid de produtos com busca no painel
+- Carrinho com resumo e botão "Criar Pedido"
+- Ao clicar numa mesa no grid, o tab "Mesa" é auto-selecionado e a mesa é pré-preenchida
+
+**Componentes reutilizados**: `PDVProductDrawer`, `CustomerSelectDialog`, `TableOrdersDrawer`, `ManageTablesDrawer`
+
+O PDV antigo (BalcaoTab, Dialog de detalhes da mesa, Dialog de pagamento) permanece funcional pois a lógica de pagamento continua via `TableOrdersDrawer` e PDV mesas.
+
+---
+
+### 2. Modificar `UnifiedOrdersTab.tsx`
+
+**Remover**: aba "Local" e aba "Mesas" (grid de mesas, TableOrdersDrawer, ManageTablesDrawer)
+
+**Manter**: 
+- Aba **Todos** (novo): mostra todos os pedidos em Kanban genérico
+- Aba **Delivery**: filtro `order_type === "delivery" && delivery_type === "delivery"`
+- Aba **Retirada**: filtro `order_type === "delivery" && delivery_type === "pickup"`
+
+**Ajustes**:
+- Remover `CreateOrderDrawer` (criação de pedidos fica só no PDV)
+- Remover botão "Criar Pedido" do header
+- Remover `ManageTablesDrawer` e lógica de mesas
+- Kanban columns: Aguardando, Preparando, Saiu/Pronto, Entregue/Retirado, Cancelado
+
+---
+
+### 3. Arquivos afetados
+
+| Arquivo | Mudança |
+|---|---|
+| `src/components/admin/PDVTab.tsx` | Reescrita completa: grid de mesas + painel lateral inline de criação |
+| `src/components/admin/UnifiedOrdersTab.tsx` | Remover abas Local/Mesas, adicionar aba Todos, remover CreateOrderDrawer |
+
+### Notas técnicas
+- O painel lateral do PDV será um componente inline (div com border-left), não um Sheet/Drawer
+- A lógica de criação de pedido será extraída do `CreateOrderDrawer` e adaptada para renderização inline
+- "Para Viagem" usa `delivery_type: "takeaway"` para diferenciar de pickup
+- O PDV antigo com BalcaoTab será removido, substituído pela nova estrutura
+
