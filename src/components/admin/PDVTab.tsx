@@ -152,14 +152,15 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     },
   });
 
-  // Realtime for tables
+  // Realtime for tables and orders
   useEffect(() => {
     const ch = supabase.channel("pdv-tables-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "tables" }, () => refetchTables())
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => refetchTables())
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => refetchPendingOrders())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [refetchTables]);
+  }, [refetchTables, refetchPendingOrders]);
 
   // Auto-open table from notification
   useEffect(() => {
