@@ -607,6 +607,14 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
           onViewOrder={(order) => { setSelectedTableForDrawer(null); setSelectedOrder(order); }}
         />
       )}
+
+      {/* Manage Tables Drawer */}
+      <ManageTablesDrawer
+        restaurantId={restaurantId}
+        open={isManageTablesOpen}
+        onOpenChange={setIsManageTablesOpen}
+        onTablesChanged={fetchTables}
+      />
     </div>
   );
 };
