@@ -741,6 +741,16 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       (r.status === "confirmed" || r.status === "pending");
   });
 
+  const handleToggleBillRequest = async (enabled: boolean) => {
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ bill_request_enabled: enabled })
+      .eq("id", restaurantId);
+    if (error) { toast.error("Erro ao atualizar configuração"); return; }
+    setBillRequestEnabled(enabled);
+    toast.success(enabled ? "Pedir conta ativado!" : "Pedir conta desativado");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -751,6 +761,25 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
           </p>
         </div>
       </div>
+
+      {/* Bill Request Toggle */}
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="bill-request-toggle" className="font-medium">Permitir clientes pedirem conta</Label>
+              <p className="text-sm text-muted-foreground">
+                Exibe o botão "Pedir Conta" no cardápio digital dos clientes nas mesas
+              </p>
+            </div>
+            <Switch
+              id="bill-request-toggle"
+              checked={billRequestEnabled}
+              onCheckedChange={handleToggleBillRequest}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Reservas content */}
       {!reservationsEnabled ? (

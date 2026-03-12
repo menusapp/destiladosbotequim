@@ -1102,7 +1102,7 @@ const Comanda = () => {
         </Card>
 
         {/* Botão Pedir Conta */}
-        {!billRequested && (orders.length > 0 || cart.length > 0) && cart.length === 0 && (
+        {billRequestEnabled && !billRequested && (orders.length > 0 || cart.length > 0) && cart.length === 0 && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button 
