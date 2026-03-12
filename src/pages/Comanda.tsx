@@ -426,6 +426,7 @@ const Comanda = () => {
       setPrepTimeMinutes(restData.prep_time_minutes || 30);
       setRestaurantColor(restData.primary_color || "#FF6B35");
       setRestaurantId(restData.id);
+      setBillRequestEnabled(restData.bill_request_enabled ?? true);
 
       // Buscar mesa DO RESTAURANTE ESPECÍFICO
       const tableResult = await supabase
