@@ -709,6 +709,7 @@ const RestaurantAdmin = () => {
           hasNewOrders={hasNewOrders}
           hasNewBills={hasNewBills}
           hasNewDeliveryOrders={hasNewDeliveryOrders}
+          hasNewLocalOrders={hasNewLocalOrders}
           isSectionAllowed={isSectionAllowed}
           hasActiveSubscription={hasActiveSubscription}
           staffRole={staffRole}
