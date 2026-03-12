@@ -1,0 +1,181 @@
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Clock } from "lucide-react";
+
+interface DayHours {
+  id?: string;
+  day_of_week: number;
+  is_open: boolean;
+  open_time: string;
+  close_time: string;
+}
+
+const DAYS_OF_WEEK = [
+  { value: 0, label: "Domingo" },
+  { value: 1, label: "Segunda-feira" },
+  { value: 2, label: "Terça-feira" },
+  { value: 3, label: "Quarta-feira" },
+  { value: 4, label: "Quinta-feira" },
+  { value: 5, label: "Sexta-feira" },
+  { value: 6, label: "Sábado" },
+];
+
+const ReservationHoursSettings = ({ restaurantId }: { restaurantId: string }) => {
+  const [hours, setHours] = useState<DayHours[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchHours();
+  }, [restaurantId]);
+
+  const fetchHours = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("reservation_hours")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .order("day_of_week");
+
+      if (error) throw error;
+
+      const allDays: DayHours[] = DAYS_OF_WEEK.map(day => {
+        const existing = data?.find((d: any) => d.day_of_week === day.value);
+        if (existing) {
+          return {
+            id: existing.id,
+            day_of_week: existing.day_of_week,
+            is_open: existing.is_open ?? true,
+            open_time: existing.open_time || "11:00",
+            close_time: existing.close_time || "22:00",
+          };
+        }
+        return {
+          day_of_week: day.value,
+          is_open: day.value !== 0,
+          open_time: "11:00",
+          close_time: "22:00",
+        };
+      });
+
+      setHours(allDays);
+    } catch (error) {
+      toast.error("Erro ao carregar horários de reserva");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDayChange = (dayIndex: number, field: keyof DayHours, value: any) => {
+    setHours(prev => prev.map(h =>
+      h.day_of_week === dayIndex ? { ...h, [field]: value } : h
+    ));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      for (const day of hours) {
+        if (day.id) {
+          await supabase
+            .from("reservation_hours")
+            .update({
+              is_open: day.is_open,
+              open_time: day.open_time,
+              close_time: day.close_time,
+            })
+            .eq("id", day.id);
+        } else {
+          await supabase
+            .from("reservation_hours")
+            .insert({
+              restaurant_id: restaurantId,
+              day_of_week: day.day_of_week,
+              is_open: day.is_open,
+              open_time: day.open_time,
+              close_time: day.close_time,
+            });
+        }
+      }
+
+      toast.success("Horários de reserva salvos!");
+      await fetchHours();
+    } catch (error) {
+      toast.error("Erro ao salvar horários de reserva");
+      console.error(error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground py-4">Carregando horários...</p>;
+  }
+
+  return (
+    <div className="pt-4 border-t space-y-4">
+      <div className="flex items-center gap-2">
+        <Clock className="h-4 w-4 text-muted-foreground" />
+        <div>
+          <Label className="font-medium">Horários Específicos para Reservas</Label>
+          <p className="text-sm text-muted-foreground">
+            Configure os dias e horários em que as reservas estarão disponíveis
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {hours.map((day) => (
+          <div
+            key={day.day_of_week}
+            className={`flex items-center justify-between p-3 rounded-lg border ${
+              day.is_open ? "bg-background" : "bg-muted/50"
+            }`}
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <Switch
+                checked={day.is_open}
+                onCheckedChange={(checked) => handleDayChange(day.day_of_week, "is_open", checked)}
+              />
+              <span className="font-medium text-sm w-28">
+                {DAYS_OF_WEEK.find(d => d.value === day.day_of_week)?.label}
+              </span>
+            </div>
+
+            {day.is_open ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="time"
+                  value={day.open_time}
+                  onChange={(e) => handleDayChange(day.day_of_week, "open_time", e.target.value)}
+                  className="w-24 h-8 text-sm"
+                />
+                <span className="text-muted-foreground text-sm">às</span>
+                <Input
+                  type="time"
+                  value={day.close_time}
+                  onChange={(e) => handleDayChange(day.day_of_week, "close_time", e.target.value)}
+                  className="w-24 h-8 text-sm"
+                />
+              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground">Sem reservas</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <Button onClick={handleSave} disabled={saving} size="sm" className="w-full">
+        {saving ? "Salvando..." : "Salvar Horários de Reserva"}
+      </Button>
+    </div>
+  );
+};
+
+export default ReservationHoursSettings;
