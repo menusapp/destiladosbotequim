@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User } from "lucide-react";
+import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -97,8 +97,22 @@ export const TableDetailDialog = ({
     enabled: open && !!table,
   });
 
-  // Realtime refresh
-  // (parent handles table realtime, orders will update on interaction)
+  // Fetch requested/on_the_way bills for this table
+  const { data: requestedBills, refetch: refetchBills } = useQuery({
+    queryKey: ["table-detail-bills", table?.id],
+    queryFn: async () => {
+      if (!table) return [];
+      const { data, error } = await supabase
+        .from("bills")
+        .select("id, comanda_id, status, total_amount, payment_method")
+        .eq("table_id", table.id)
+        .in("status", ["requested", "on_the_way"])
+        .order("created_at");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!table,
+  });
 
   const getOrderTotal = (order: any) => {
     return order.order_items?.reduce((sum: number, item: any) => {
@@ -110,10 +124,7 @@ export const TableDetailDialog = ({
   const ordersByComanda = useMemo(() => {
     if (!orders || !comandas) return new Map<string, any[]>();
     const map = new Map<string, any[]>();
-    
-    // Initialize with all active comandas
     comandas.forEach(c => map.set(c.id, []));
-    
     orders.forEach(order => {
       const key = order.comanda_id || "sem-comanda";
       if (!map.has(key)) map.set(key, []);
@@ -125,6 +136,15 @@ export const TableDetailDialog = ({
   const tableTotal = useMemo(() => {
     return orders?.reduce((sum, order) => sum + getOrderTotal(order), 0) || 0;
   }, [orders]);
+
+  // Bill by comanda_id lookup
+  const billByComanda = useMemo(() => {
+    const map = new Map<string, any>();
+    requestedBills?.forEach(bill => {
+      if (bill.comanda_id) map.set(bill.comanda_id, bill);
+    });
+    return map;
+  }, [requestedBills]);
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
@@ -157,15 +177,18 @@ export const TableDetailDialog = ({
     onOpenChange(false);
   };
 
+  const handleMarkBillOnTheWay = async (billId: string) => {
+    await supabase.from("bills").update({ status: "on_the_way" }).eq("id", billId);
+    toast.success("Conta marcada como 'a caminho'!");
+    refetchBills();
+  };
+
   const handlePayComanda = (comanda: any) => {
-    // Gather all order items from orders of this comanda
     const comandaOrders = ordersByComanda.get(comanda.id) || [];
     if (comandaOrders.length === 0) {
       toast.error("Nenhum pedido ativo nesta comanda");
       return;
     }
-
-    // Merge all order items into a single "virtual order" for payment
     const allItems = comandaOrders.flatMap((o: any) => o.order_items || []);
     const virtualOrder = {
       id: comandaOrders[0].id,
@@ -182,37 +205,33 @@ export const TableDetailDialog = ({
   const handlePaymentConfirmed = async () => {
     if (!payingComanda) return;
 
-    // Mark all orders of this comanda as delivered
     const orderIds = payingComanda._comanda_order_ids || [payingComanda.id];
     for (const oid of orderIds) {
       await supabase.from("orders").update({ status: "delivered" }).eq("id", oid);
     }
 
-    // Close the comanda
     const comandaId = payingComanda._comanda_id;
     if (comandaId) {
       await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() }).eq("id", comandaId);
+      // Also close any requested bills for this comanda (they are now paid via PaymentConfirmationModal)
+      await supabase.from("bills").update({ status: "paid", paid_at: new Date().toISOString() })
+        .eq("comanda_id", comandaId).in("status", ["requested", "on_the_way"]);
     }
 
-    // Check if table has other active comandas
     const { data: remaining } = await supabase
-      .from("comandas")
-      .select("id")
-      .eq("table_id", table!.id)
-      .eq("status", "active");
+      .from("comandas").select("id").eq("table_id", table!.id).eq("status", "active");
 
     if (!remaining || remaining.length === 0) {
-      // Free the table
       await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table!.id);
     } else {
-      // Update occupied_by count
       await supabase.from("tables").update({ occupied_by: `${remaining.length} cliente${remaining.length !== 1 ? "s" : ""}` }).eq("id", table!.id);
     }
 
     setPayingComanda(null);
     refetchComandas();
     refetchOrders();
-    onTableCleared(); // refresh parent tables
+    refetchBills();
+    onTableCleared();
     toast.success("Pagamento registrado!");
   };
 
@@ -288,19 +307,40 @@ export const TableDetailDialog = ({
                     <Users className="w-4 h-4" /> Clientes Logados ({comandas.length})
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {comandas.map(comanda => (
-                      <Card key={comanda.id} className="p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <User className="w-4 h-4 text-primary" />
+                    {comandas.map(comanda => {
+                      const bill = billByComanda.get(comanda.id);
+                      return (
+                        <Card key={comanda.id} className={`p-3 ${bill ? "border-amber-400" : ""}`}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                              <User className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{comanda.customer_name}</p>
+                              <p className="text-[10px] text-muted-foreground font-mono">{comanda.customer_cpf}</p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{comanda.customer_name}</p>
-                            <p className="text-[10px] text-muted-foreground font-mono">{comanda.customer_cpf}</p>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
+                          {bill && (
+                            <div className="mt-2 flex items-center gap-1.5">
+                              {bill.status === "requested" ? (
+                                <>
+                                  <Badge variant="warning" className="text-[10px] gap-0.5">
+                                    <Receipt className="w-3 h-3" /> Conta Solicitada
+                                  </Badge>
+                                  <Button size="sm" variant="outline" className="h-6 text-[10px] ml-auto" onClick={() => handleMarkBillOnTheWay(bill.id)}>
+                                    <Truck className="w-3 h-3 mr-0.5" /> A Caminho
+                                  </Button>
+                                </>
+                              ) : (
+                                <Badge variant="default" className="text-[10px] gap-0.5">
+                                  <Truck className="w-3 h-3" /> Conta a Caminho
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -439,3 +479,5 @@ export const TableDetailDialog = ({
     </>
   );
 };
+
+export default TableDetailDialog;

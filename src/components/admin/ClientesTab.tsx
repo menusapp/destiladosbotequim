@@ -3,18 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -30,9 +22,11 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Users, UserPlus, TrendingUp, ArrowUpDown } from "lucide-react";
+import { Search, Users, UserPlus, TrendingUp, ArrowUpDown, Phone, Mail, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { CustomerDetailDrawer } from "./CustomerDetailDrawer";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface ClientesTabProps {
   restaurantId: string;
@@ -74,11 +68,10 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
   const [newCity, setNewCity] = useState("");
   const [newState, setNewState] = useState("");
 
-  // Fetch customers with order stats (including comandas/bills + delivery orders)
+  // Fetch customers with order stats
   const { data: customers, isLoading, refetch } = useQuery({
     queryKey: ["customers", restaurantId],
     queryFn: async () => {
-      // Fetch customers
       const { data: customersData, error } = await supabase
         .from("customers")
         .select("*")
@@ -87,16 +80,11 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
 
       if (error) throw error;
 
-      // Fetch order stats for each customer (delivery orders + comandas/bills)
       const customersWithStats = await Promise.all(
         (customersData || []).map(async (customer) => {
-          // 1. Fetch delivery orders stats
           const { data: ordersData } = await supabase
             .from("orders")
-            .select(`
-              id,
-              order_items(price_at_order, quantity, order_item_extras(price_at_order))
-            `)
+            .select(`id, order_items(price_at_order, quantity, order_item_extras(price_at_order))`)
             .eq("restaurant_id", restaurantId)
             .eq("customer_cpf", customer.cpf);
 
@@ -108,23 +96,16 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
             }, 0) || 0);
           }, 0) || 0;
 
-          // 2. Fetch comandas/bills stats (local orders at tables)
           const { data: comandasData } = await supabase
             .from("comandas")
-            .select(`
-              id,
-              bills(total_amount, status)
-            `)
+            .select(`id, bills(total_amount, status)`)
             .eq("restaurant_id", restaurantId)
             .eq("customer_cpf", customer.cpf);
 
           const comandasCount = comandasData?.length || 0;
           const comandasSpent = comandasData?.reduce((sum, comanda) => {
-            // Only count paid bills
             const billTotal = comanda.bills?.reduce((billSum: number, bill: any) => {
-              if (bill.status === 'paid') {
-                return billSum + (bill.total_amount || 0);
-              }
+              if (bill.status === 'paid') return billSum + (bill.total_amount || 0);
               return billSum;
             }, 0) || 0;
             return sum + billTotal;
@@ -142,58 +123,33 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
     },
   });
 
-  // Calculate stats
   const stats = useMemo(() => {
     if (!customers) return { total: 0, newLast30: 0, activeLast30: 0 };
-    
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
-    const newLast30 = customers.filter(c => new Date(c.created_at) >= thirtyDaysAgo).length;
-    const activeLast30 = customers.filter(c => (c.total_orders || 0) > 0).length;
-    
     return {
       total: customers.length,
-      newLast30,
-      activeLast30,
+      newLast30: customers.filter(c => new Date(c.created_at) >= thirtyDaysAgo).length,
+      activeLast30: customers.filter(c => (c.total_orders || 0) > 0).length,
     };
   }, [customers]);
 
-  // Filter and sort customers
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
-    
     let result = [...customers];
-    
-    // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(c => 
-        c.name.toLowerCase().includes(term) || 
-        c.cpf.includes(term) ||
-        c.phone?.includes(term)
+        c.name.toLowerCase().includes(term) || c.cpf.includes(term) || c.phone?.includes(term)
       );
     }
-    
-    // Apply sorting
     switch (sortBy) {
-      case 'most_spent':
-        result.sort((a, b) => (b.total_spent || 0) - (a.total_spent || 0));
-        break;
-      case 'least_spent':
-        result.sort((a, b) => (a.total_spent || 0) - (b.total_spent || 0));
-        break;
-      case 'recent':
-        result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        break;
-      case 'oldest':
-        result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        break;
-      case 'alphabetical':
-        result.sort((a, b) => a.name.localeCompare(b.name));
-        break;
+      case 'most_spent': result.sort((a, b) => (b.total_spent || 0) - (a.total_spent || 0)); break;
+      case 'least_spent': result.sort((a, b) => (a.total_spent || 0) - (b.total_spent || 0)); break;
+      case 'recent': result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
+      case 'oldest': result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); break;
+      case 'alphabetical': result.sort((a, b) => a.name.localeCompare(b.name)); break;
     }
-    
     return result;
   }, [customers, searchTerm, sortBy]);
 
@@ -203,6 +159,10 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
       return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
     }
     return cpf;
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
   };
 
   const handleOpenDetail = (customer: Customer) => {
@@ -231,46 +191,24 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
       toast.error("Nome e CPF são obrigatórios");
       return;
     }
-
     const cpfClean = newCpf.replace(/\D/g, "");
-
-    const { error } = await supabase
-      .from("customers")
-      .insert({
-        restaurant_id: restaurantId,
-        name: newName,
-        cpf: cpfClean,
-        phone: newPhone || null,
-        email: newEmail || null,
-        notes: newNotes || null,
-      });
-
+    const { error } = await supabase.from("customers").insert({
+      restaurant_id: restaurantId, name: newName, cpf: cpfClean,
+      phone: newPhone || null, email: newEmail || null, notes: newNotes || null,
+    });
     if (error) {
-      if (error.code === "23505") {
-        toast.error("Cliente com este CPF já existe");
-      } else {
-        toast.error("Erro ao criar cliente");
-      }
+      if (error.code === "23505") toast.error("Cliente com este CPF já existe");
+      else toast.error("Erro ao criar cliente");
       return;
     }
-
-    // Save address if provided
     if (newStreet && newNumber) {
       await supabase.from("customer_addresses").insert({
-        customer_cpf: cpfClean,
-        customer_name: newName,
-        customer_phone: newPhone || "",
-        street: newStreet,
-        number: newNumber,
-        complement: newComplement || null,
-        neighborhood: newNeighborhood,
-        city: newCity,
-        state: newState,
-        zip_code: newCep.replace(/\D/g, ""),
-        is_default: true,
+        customer_cpf: cpfClean, customer_name: newName, customer_phone: newPhone || "",
+        street: newStreet, number: newNumber, complement: newComplement || null,
+        neighborhood: newNeighborhood, city: newCity, state: newState,
+        zip_code: newCep.replace(/\D/g, ""), is_default: true,
       });
     }
-
     toast.success("Cliente cadastrado com sucesso!");
     setIsNewCustomerOpen(false);
     setNewName(""); setNewCpf(""); setNewPhone(""); setNewEmail(""); setNewNotes("");
@@ -361,59 +299,58 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
         </Select>
       </div>
 
-      {/* Customers table */}
-      <Card>
-        <CardContent className="p-0">
-          <ScrollArea className="h-[500px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>CPF</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead className="text-center">Pedidos</TableHead>
-                  <TableHead className="text-right">Total Gasto</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      Carregando...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredCustomers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      {searchTerm ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredCustomers.map((customer) => (
-                    <TableRow
-                      key={customer.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleOpenDetail(customer)}
-                    >
-                      <TableCell className="font-medium">{customer.name}</TableCell>
-                      <TableCell className="font-mono text-sm">{formatCpf(customer.cpf)}</TableCell>
-                      <TableCell>{customer.phone || "-"}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary">{customer.total_orders || 0}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        R$ {(customer.total_spent || 0).toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+      {/* Customers Grid */}
+      <ScrollArea className="h-[600px]">
+        {isLoading ? (
+          <div className="text-center py-12 text-muted-foreground">Carregando...</div>
+        ) : filteredCustomers.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            {searchTerm ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredCustomers.map((customer) => (
+              <Card
+                key={customer.id}
+                className="cursor-pointer hover:shadow-md hover:border-primary/30 transition-all"
+                onClick={() => handleOpenDetail(customer)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    {/* Avatar */}
+                    <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-bold text-primary">{getInitials(customer.name)}</span>
+                    </div>
+                    {/* Info */}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm truncate">{customer.name}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{formatCpf(customer.cpf)}</p>
+                      {customer.phone && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Phone className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{customer.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Stats row */}
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                    <Badge variant="secondary" className="text-[10px]">
+                      <ShoppingBag className="w-3 h-3 mr-1" />
+                      {customer.total_orders || 0} pedidos
+                    </Badge>
+                    <span className="text-xs font-semibold text-primary ml-auto">
+                      R$ {(customer.total_spent || 0).toFixed(0)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </ScrollArea>
 
-      {/* Customer Detail Drawer */}
+      {/* Customer Detail */}
       <CustomerDetailDrawer
         customer={selectedCustomer}
         restaurantId={restaurantId}
@@ -431,38 +368,21 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Nome *</Label>
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Nome completo"
-              />
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome completo" />
             </div>
             <div className="space-y-2">
               <Label>CPF *</Label>
-              <Input
-                value={newCpf}
-                onChange={(e) => setNewCpf(e.target.value)}
-                placeholder="000.000.000-00"
-              />
+              <Input value={newCpf} onChange={(e) => setNewCpf(e.target.value)} placeholder="000.000.000-00" />
             </div>
             <div className="space-y-2">
               <Label>Telefone</Label>
-              <Input
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                placeholder="(00) 00000-0000"
-              />
+              <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="(00) 00000-0000" />
             </div>
             <div className="space-y-2">
               <Label>E-mail</Label>
-              <Input
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="email@exemplo.com"
-              />
+              <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="email@exemplo.com" />
             </div>
 
-            {/* Address Section */}
             <Separator className="my-2" />
             <p className="text-sm font-semibold text-muted-foreground">Endereço (opcional)</p>
             <div className="grid grid-cols-3 gap-2">
@@ -502,19 +422,11 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
 
             <div className="space-y-2">
               <Label>Observações</Label>
-              <Textarea
-                value={newNotes}
-                onChange={(e) => setNewNotes(e.target.value)}
-                placeholder="Notas sobre o cliente..."
-              />
+              <Textarea value={newNotes} onChange={(e) => setNewNotes(e.target.value)} placeholder="Notas sobre o cliente..." />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsNewCustomerOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreateCustomer}>
-                Cadastrar
-              </Button>
+              <Button variant="outline" onClick={() => setIsNewCustomerOpen(false)}>Cancelar</Button>
+              <Button onClick={handleCreateCustomer}>Cadastrar</Button>
             </div>
           </div>
         </DialogContent>

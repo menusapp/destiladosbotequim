@@ -130,6 +130,7 @@ const Comanda = () => {
   const [orderNotes, setOrderNotes] = useState("");
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [billRequestEnabled, setBillRequestEnabled] = useState(true);
 
   useEffect(() => {
     fetchData();
@@ -408,7 +409,7 @@ const Comanda = () => {
       
       const restResult = await supabase
         .from("restaurants")
-        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color")
+        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled")
         .eq("slug", restaurantSlug)
         .maybeSingle();
 
@@ -425,6 +426,7 @@ const Comanda = () => {
       setPrepTimeMinutes(restData.prep_time_minutes || 30);
       setRestaurantColor(restData.primary_color || "#FF6B35");
       setRestaurantId(restData.id);
+      setBillRequestEnabled(restData.bill_request_enabled ?? true);
 
       // Buscar mesa DO RESTAURANTE ESPECÍFICO
       const tableResult = await supabase
@@ -1100,7 +1102,7 @@ const Comanda = () => {
         </Card>
 
         {/* Botão Pedir Conta */}
-        {!billRequested && (orders.length > 0 || cart.length > 0) && cart.length === 0 && (
+        {billRequestEnabled && !billRequested && (orders.length > 0 || cart.length > 0) && cart.length === 0 && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button 

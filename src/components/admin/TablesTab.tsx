@@ -117,6 +117,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [reservationsEnabled, setReservationsEnabled] = useState(false);
   const [followBusinessHours, setFollowBusinessHours] = useState(true);
+  const [billRequestEnabled, setBillRequestEnabled] = useState(true);
   const [restaurantSlug, setRestaurantSlug] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
@@ -176,7 +177,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const fetchRestaurantData = async () => {
     const { data } = await supabase
       .from("restaurants")
-      .select("slug, reservations_enabled, reservations_follow_business_hours")
+      .select("slug, reservations_enabled, reservations_follow_business_hours, bill_request_enabled")
       .eq("id", restaurantId)
       .single();
 
@@ -184,6 +185,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       setRestaurantSlug(data.slug);
       setReservationsEnabled(data.reservations_enabled || false);
       setFollowBusinessHours(data.reservations_follow_business_hours ?? true);
+      setBillRequestEnabled(data.bill_request_enabled ?? true);
     }
   };
 
@@ -739,6 +741,16 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       (r.status === "confirmed" || r.status === "pending");
   });
 
+  const handleToggleBillRequest = async (enabled: boolean) => {
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ bill_request_enabled: enabled })
+      .eq("id", restaurantId);
+    if (error) { toast.error("Erro ao atualizar configuração"); return; }
+    setBillRequestEnabled(enabled);
+    toast.success(enabled ? "Pedir conta ativado!" : "Pedir conta desativado");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -749,6 +761,25 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
           </p>
         </div>
       </div>
+
+      {/* Bill Request Toggle */}
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="bill-request-toggle" className="font-medium">Permitir clientes pedirem conta</Label>
+              <p className="text-sm text-muted-foreground">
+                Exibe o botão "Pedir Conta" no cardápio digital dos clientes nas mesas
+              </p>
+            </div>
+            <Switch
+              id="bill-request-toggle"
+              checked={billRequestEnabled}
+              onCheckedChange={handleToggleBillRequest}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Reservas content */}
       {!reservationsEnabled ? (

@@ -586,9 +586,20 @@ const RestaurantAdmin = () => {
     setGlobalNotification(null);
   };
 
-  const handleViewBill = () => {
+  const handleViewBill = async () => {
     if (!billNotification) return;
-    setActiveSection('pedidos');
+    // Route to PDV and open the table that requested the bill
+    const { data: tableData } = await supabase
+      .from("tables")
+      .select("id")
+      .eq("table_number", billNotification.tableNumber)
+      .eq("restaurant_id", restaurant!.id)
+      .single();
+    
+    setActiveSection('pdv');
+    if (tableData?.id) {
+      setPendingTableToOpen(tableData.id);
+    }
     setBillNotification(null);
   };
 
