@@ -57,11 +57,22 @@ export const CustomerDetailDrawer = ({
   onOpenChange,
   onUpdate,
 }: CustomerDetailDrawerProps) => {
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  
+  // Address form
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [addrCep, setAddrCep] = useState("");
+  const [addrStreet, setAddrStreet] = useState("");
+  const [addrNumber, setAddrNumber] = useState("");
+  const [addrComplement, setAddrComplement] = useState("");
+  const [addrNeighborhood, setAddrNeighborhood] = useState("");
+  const [addrCity, setAddrCity] = useState("");
+  const [addrState, setAddrState] = useState("");
 
   // Fetch order history for customer
   const { data: orders } = useQuery({
