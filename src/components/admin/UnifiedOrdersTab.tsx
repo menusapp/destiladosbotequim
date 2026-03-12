@@ -269,10 +269,22 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
 
   const groupedOrders = useMemo(() => {
     const isLocal = activeTab === "local";
+    if (isLocal) {
+      // Local: Aguardando, Preparando, Na Mesa (delivered without finalization distinction visually), Finalizado (delivered+payment), Cancelado
+      const deliveredLocal = filteredOrders.filter(o => ["delivered", "picked_up"].includes(o.status));
+      return {
+        pending: filteredOrders.filter(o => o.status === "pending"),
+        preparing: filteredOrders.filter(o => ["accepted", "preparing"].includes(o.status)),
+        at_table: deliveredLocal.filter(o => !o.payment_type || o.payment_type === "pending"),
+        finished: deliveredLocal.filter(o => o.payment_type && o.payment_type !== "pending"),
+        cancelled: filteredOrders.filter(o => o.status === "cancelled"),
+      };
+    }
+    // Delivery: Aguardando, Preparando, Saiu/Pronto, Entregue/Retirado, Cancelado
     return {
       pending: filteredOrders.filter(o => o.status === "pending"),
       preparing: filteredOrders.filter(o => ["accepted", "preparing"].includes(o.status)),
-      ...(!isLocal ? { out: filteredOrders.filter(o => ["out_for_delivery", "ready"].includes(o.status)) } : {}),
+      out: filteredOrders.filter(o => ["out_for_delivery", "ready"].includes(o.status)),
       delivered: filteredOrders.filter(o => ["delivered", "picked_up"].includes(o.status)),
       cancelled: filteredOrders.filter(o => o.status === "cancelled"),
     };
