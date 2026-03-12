@@ -315,18 +315,22 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
 
   const kanbanColumns = useMemo(() => {
     const isLocal = activeTab === "local";
-    const cols = [
+    if (isLocal) {
+      return [
+        { key: "pending", title: "Aguardando", color: "bg-orange-400", count: groupedOrders.pending?.length || 0 },
+        { key: "preparing", title: "Preparando", color: "bg-orange-500", count: groupedOrders.preparing?.length || 0 },
+        { key: "at_table", title: "Na Mesa", color: "bg-orange-600", count: groupedOrders.at_table?.length || 0 },
+        { key: "finished", title: "Finalizado", color: "bg-orange-700", count: groupedOrders.finished?.length || 0 },
+        { key: "cancelled", title: "Cancelado", color: "bg-orange-300", count: groupedOrders.cancelled?.length || 0 },
+      ];
+    }
+    return [
       { key: "pending", title: "Aguardando", color: "bg-orange-400", count: groupedOrders.pending?.length || 0 },
       { key: "preparing", title: "Preparando", color: "bg-orange-500", count: groupedOrders.preparing?.length || 0 },
-    ];
-    if (!isLocal) {
-      cols.push({ key: "out", title: "Saiu / Pronto", color: "bg-orange-600", count: groupedOrders.out?.length || 0 });
-    }
-    cols.push(
-      { key: "delivered", title: "Entregue", color: "bg-orange-700", count: groupedOrders.delivered?.length || 0 },
+      { key: "out", title: "Saiu / Pronto", color: "bg-orange-600", count: groupedOrders.out?.length || 0 },
+      { key: "delivered", title: "Entregue / Retirado", color: "bg-orange-700", count: groupedOrders.delivered?.length || 0 },
       { key: "cancelled", title: "Cancelado", color: "bg-orange-300", count: groupedOrders.cancelled?.length || 0 },
-    );
-    return cols;
+    ];
   }, [activeTab, groupedOrders]);
 
   const handleToggleBillRequest = async (enabled: boolean) => {
