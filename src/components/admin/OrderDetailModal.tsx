@@ -105,14 +105,11 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
   };
 
   const requiresPaymentForFinalization = (newStatus: string) => {
-    // For local orders: allow "delivered" (Na Mesa) without payment, but block final completion
-    if (order.order_type === "local") {
-      // "delivered" = Na Mesa — allowed without payment
+    const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
+    if (isLocal) {
       if (newStatus === "delivered") return false;
-      // Any other terminal status requires payment
       return false;
     }
-    // For delivery orders: block delivered/picked_up without payment
     return ["delivered", "picked_up"].includes(newStatus);
   };
 
