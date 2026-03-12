@@ -1,51 +1,72 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: 3 Melhorias — CRM Layout, Logout ao pagar, Toggle "Pedir Conta"
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+---
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+### 1. Melhorar Layout do CRM de Clientes
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+**ClientesTab.tsx** — Redesign visual:
+- Cards de clientes em grid ao invés de tabela (mobile-friendly)
+- Cada card com avatar/iniciais, nome, CPF, telefone, badges de pedidos e total gasto
+- Manter busca e ordenacao
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+**CustomerDetailDrawer.tsx** — Transformar em Dialog central (`max-w-3xl`) com layout otimizado:
+- Header com avatar grande, nome, CPF formatado, badges de stats (pedidos, total gasto, cliente desde)
+- Tabs internas: **Dados** (info editavel + observacoes), **Enderecos** (CRUD completo com visual melhor), **Historico** (pedidos com timeline visual)
+- Enderecos em cards com icone de estrela para padrao, botoes de acao mais visiveis
+- Historico com timeline, tipo do pedido, status colorido, total
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+**Arquivos**: `ClientesTab.tsx`, `CustomerDetailDrawer.tsx`
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+---
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+### 2. Deslogar cliente ao pagar comanda
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**Situacao atual**: `handlePaymentConfirmed` no `TableDetailDialog.tsx` fecha a comanda e marca pedidos como delivered, mas o Comanda.tsx so detecta logout via bill com `status='paid'` e `comanda_id` correspondente.
+
+**Verificacao**: O `PaymentConfirmationModal` ja cria um bill com `status='paid'` e inclui `comanda_id`. O listener em `Comanda.tsx` (linhas ~250-290) ja detecta bills pagas por `comanda_id` e dispara logout. Preciso confirmar que o `comanda_id` esta sendo passado corretamente no `PaymentConfirmationModal` quando chamado pelo `TableDetailDialog`.
+
+**Correcao**: No `TableDetailDialog.handlePaymentConfirmed`, garantir que o `virtualOrder` passado ao `PaymentConfirmationModal` inclua `comanda_id` (nao `_comanda_id`). Atualmente usa `_comanda_id` como campo custom — verificar se o `PaymentConfirmationModal` repassa isso ao criar o bill.
+
+**Arquivos**: `TableDetailDialog.tsx`, possivelmente `PaymentConfirmationModal.tsx`
+
+---
+
+### 3. Toggle "Pedir Conta" com status "A Caminho"
+
+**Situacao atual**: `restaurants.bill_request_enabled` existe na tabela (default `true`) mas NAO e usado no codigo. O botao "Pedir Conta" sempre aparece no Comanda.tsx.
+
+**A) Toggle no painel admin** — `TablesTab.tsx` ou `SettingsTab.tsx`:
+- Switch "Permitir clientes solicitarem conta pelo cardapio"
+- Salva em `restaurants.bill_request_enabled`
+
+**B) Respeitar config no Comanda.tsx**:
+- Buscar `bill_request_enabled` do restaurante no `fetchData`
+- Condicionar exibicao do botao "Pedir Conta" a este flag
+
+**C) Notificacao de conta leva ate a mesa**:
+- `handleViewBill` em `RestaurantAdmin.tsx` atualmente vai para 'pedidos' — mudar para ir para 'pdv' e abrir o `TableDetailDialog` da mesa correspondente (similar ao auto-abrir mesa por pedido local)
+- Passar `billNotification.tableId` para PDVTab
+
+**D) Botao "A Caminho" dentro do TableDetailDialog**:
+- Quando existe bill com status `requested` para uma comanda, mostrar badge "Conta Solicitada" e botao "Marcar A Caminho"
+- Ao clicar, atualizar bill status para `on_the_way`
+- O Comanda.tsx ja detecta `on_the_way` via realtime e mostra ao cliente
+
+**Arquivos**: `Comanda.tsx`, `RestaurantAdmin.tsx`, `TablesTab.tsx`, `TableDetailDialog.tsx`
+
+---
+
+### Resumo de Arquivos
+
+| Arquivo | Mudanca |
+|---|---|
+| `ClientesTab.tsx` | Redesign visual com cards em grid |
+| `CustomerDetailDrawer.tsx` | Transformar em Dialog com tabs (Dados, Enderecos, Historico) |
+| `TableDetailDialog.tsx` | Garantir `comanda_id` no pagamento; adicionar badge "Conta Solicitada" + botao "A Caminho" |
+| `PaymentConfirmationModal.tsx` | Verificar passagem de `comanda_id` ao criar bill |
+| `Comanda.tsx` | Condicionar botao "Pedir Conta" a `bill_request_enabled` |
+| `RestaurantAdmin.tsx` | `handleViewBill` redireciona para PDV e abre mesa |
+| `TablesTab.tsx` | Switch para ativar/desativar "Pedir Conta" |
+
