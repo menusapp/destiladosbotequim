@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Plus, Truck, ShoppingBag, UtensilsCrossed,
-  Clock, Printer, Users, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone
+  Clock, Printer, Users, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, Settings
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay } from "date-fns";
@@ -17,6 +17,7 @@ import { ptBR } from "date-fns/locale";
 import { OrderDetailModal } from "./OrderDetailModal";
 import { CreateOrderDrawer } from "./CreateOrderDrawer";
 import { TableOrdersDrawer } from "./TableOrdersDrawer";
+import { ManageTablesDrawer } from "./ManageTablesDrawer";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { printOrder } from "@/lib/printOrder";
@@ -117,6 +118,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [selectedTableForDrawer, setSelectedTableForDrawer] = useState<TableData | null>(null);
+  const [isManageTablesOpen, setIsManageTablesOpen] = useState(false);
   const [autoPrint, setAutoPrint] = useState(false);
   const [dateRange, setDateRange] = useState(() => ({
     from: startOfDay(new Date()),
@@ -565,7 +567,16 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
           </div>
           {renderKanban()}
         </TabsContent>
-        <TabsContent value="mesas">{renderTablesGrid()}</TabsContent>
+        <TabsContent value="mesas">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-muted-foreground">{tables.length} mesa{tables.length !== 1 ? "s" : ""} cadastrada{tables.length !== 1 ? "s" : ""}</p>
+            <Button variant="outline" size="sm" onClick={() => setIsManageTablesOpen(true)}>
+              <Settings className="w-4 h-4 mr-1.5" />
+              Gerenciar Mesas
+            </Button>
+          </div>
+          {renderTablesGrid()}
+        </TabsContent>
       </Tabs>
 
       {/* Order Detail Modal */}
@@ -596,6 +607,14 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
           onViewOrder={(order) => { setSelectedTableForDrawer(null); setSelectedOrder(order); }}
         />
       )}
+
+      {/* Manage Tables Drawer */}
+      <ManageTablesDrawer
+        restaurantId={restaurantId}
+        open={isManageTablesOpen}
+        onOpenChange={setIsManageTablesOpen}
+        onTablesChanged={fetchTables}
+      />
     </div>
   );
 };
