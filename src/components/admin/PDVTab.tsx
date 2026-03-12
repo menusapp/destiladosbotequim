@@ -429,6 +429,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
               const isOccupied = table.is_occupied;
               const comandaCount = table.comandas?.length || 0;
               const isSelected = selectedTableId === table.id;
+              const pending = pendingByTable.get(table.id);
               return (
                 <Card
                   key={table.id}
