@@ -177,7 +177,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const fetchRestaurantData = async () => {
     const { data } = await supabase
       .from("restaurants")
-      .select("slug, reservations_enabled, reservations_follow_business_hours")
+      .select("slug, reservations_enabled, reservations_follow_business_hours, bill_request_enabled")
       .eq("id", restaurantId)
       .single();
 
@@ -185,6 +185,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       setRestaurantSlug(data.slug);
       setReservationsEnabled(data.reservations_enabled || false);
       setFollowBusinessHours(data.reservations_follow_business_hours ?? true);
+      setBillRequestEnabled(data.bill_request_enabled ?? true);
     }
   };
 
