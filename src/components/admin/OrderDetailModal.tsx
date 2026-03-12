@@ -163,7 +163,8 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
   };
 
   const getOrderOrigin = () => {
-    if (order.order_type === "local") return `Digital - Mesa ${order.tables?.table_number || "?"}`;
+    const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
+    if (isLocal) return `Digital - Mesa ${order.tables?.table_number || "?"}`;
     return order.delivery_type === "delivery" ? "Digital - Delivery" : "Digital - Retirada";
   };
 
