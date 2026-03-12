@@ -89,6 +89,7 @@ const RestaurantAdmin = () => {
   const billNotificationRef = useRef<typeof billNotification>(null);
   const reservationNotificationRef = useRef<typeof reservationNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
+  const [pendingTableToOpen, setPendingTableToOpen] = useState<string | null>(null);
   
   // Sync refs with state to avoid stale closure in realtime callback
   useEffect(() => {
@@ -562,12 +563,22 @@ const RestaurantAdmin = () => {
     );
   }
 
-  const handleViewOrder = () => {
+  const handleViewOrder = async () => {
     if (!globalNotification) return;
     
-    // Local orders go to PDV, delivery orders go to Pedidos
+    // Local orders go to PDV and auto-open the table
     if (globalNotification.orderType === 'local') {
+      // Fetch table_id from the order
+      const { data: orderData } = await supabase
+        .from("orders")
+        .select("table_id")
+        .eq("id", globalNotification.orderId)
+        .single();
+      
       setActiveSection('pdv');
+      if (orderData?.table_id) {
+        setPendingTableToOpen(orderData.table_id);
+      }
     } else {
       setActiveSection('pedidos');
       setPendingOrderToOpen(globalNotification.orderId);
@@ -599,7 +610,7 @@ const RestaurantAdmin = () => {
       
       // PDV (Balcão + Mesas)
       case "pdv":
-        return <PDVTab restaurantId={restaurant.id} />;
+        return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} />;
       
       // Mesas e Reservas (unified)
       case "mesas-reservas":

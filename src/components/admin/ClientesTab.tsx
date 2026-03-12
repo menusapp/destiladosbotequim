@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
@@ -64,6 +65,14 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  // Address fields
+  const [newCep, setNewCep] = useState("");
+  const [newStreet, setNewStreet] = useState("");
+  const [newNumber, setNewNumber] = useState("");
+  const [newComplement, setNewComplement] = useState("");
+  const [newNeighborhood, setNewNeighborhood] = useState("");
+  const [newCity, setNewCity] = useState("");
+  const [newState, setNewState] = useState("");
 
   // Fetch customers with order stats (including comandas/bills + delivery orders)
   const { data: customers, isLoading, refetch } = useQuery({
@@ -201,18 +210,36 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
     setIsDetailOpen(true);
   };
 
+  const handleCepLookup = async (cep: string) => {
+    setNewCep(cep);
+    const clean = cep.replace(/\D/g, "");
+    if (clean.length !== 8) return;
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setNewStreet(data.logradouro || "");
+        setNewNeighborhood(data.bairro || "");
+        setNewCity(data.localidade || "");
+        setNewState(data.uf || "");
+      }
+    } catch { /* ignore */ }
+  };
+
   const handleCreateCustomer = async () => {
     if (!newName || !newCpf) {
       toast.error("Nome e CPF são obrigatórios");
       return;
     }
 
+    const cpfClean = newCpf.replace(/\D/g, "");
+
     const { error } = await supabase
       .from("customers")
       .insert({
         restaurant_id: restaurantId,
         name: newName,
-        cpf: newCpf.replace(/\D/g, ""),
+        cpf: cpfClean,
         phone: newPhone || null,
         email: newEmail || null,
         notes: newNotes || null,
@@ -227,13 +254,27 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
       return;
     }
 
+    // Save address if provided
+    if (newStreet && newNumber) {
+      await supabase.from("customer_addresses").insert({
+        customer_cpf: cpfClean,
+        customer_name: newName,
+        customer_phone: newPhone || "",
+        street: newStreet,
+        number: newNumber,
+        complement: newComplement || null,
+        neighborhood: newNeighborhood,
+        city: newCity,
+        state: newState,
+        zip_code: newCep.replace(/\D/g, ""),
+        is_default: true,
+      });
+    }
+
     toast.success("Cliente cadastrado com sucesso!");
     setIsNewCustomerOpen(false);
-    setNewName("");
-    setNewCpf("");
-    setNewPhone("");
-    setNewEmail("");
-    setNewNotes("");
+    setNewName(""); setNewCpf(""); setNewPhone(""); setNewEmail(""); setNewNotes("");
+    setNewCep(""); setNewStreet(""); setNewNumber(""); setNewComplement(""); setNewNeighborhood(""); setNewCity(""); setNewState("");
     refetch();
   };
 
@@ -420,6 +461,45 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
                 placeholder="email@exemplo.com"
               />
             </div>
+
+            {/* Address Section */}
+            <Separator className="my-2" />
+            <p className="text-sm font-semibold text-muted-foreground">Endereço (opcional)</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">CEP</Label>
+                <Input value={newCep} onChange={(e) => handleCepLookup(e.target.value)} placeholder="00000-000" className="h-8 text-sm" />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Rua</Label>
+                <Input value={newStreet} onChange={(e) => setNewStreet(e.target.value)} placeholder="Rua..." className="h-8 text-sm" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Número</Label>
+                <Input value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="Nº" className="h-8 text-sm" />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Complemento</Label>
+                <Input value={newComplement} onChange={(e) => setNewComplement(e.target.value)} placeholder="Apto, Bloco..." className="h-8 text-sm" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Bairro</Label>
+                <Input value={newNeighborhood} onChange={(e) => setNewNeighborhood(e.target.value)} placeholder="Bairro" className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cidade</Label>
+                <Input value={newCity} onChange={(e) => setNewCity(e.target.value)} placeholder="Cidade" className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Estado</Label>
+                <Input value={newState} onChange={(e) => setNewState(e.target.value)} placeholder="UF" className="h-8 text-sm" />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>Observações</Label>
               <Textarea

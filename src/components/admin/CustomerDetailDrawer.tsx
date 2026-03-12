@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { User, Phone, Mail, FileText, ShoppingBag, Calendar, Trash2, Save, MapPin } from "lucide-react";
+import { User, Phone, Mail, FileText, ShoppingBag, Calendar, Trash2, Save, MapPin, Plus, Star } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -57,11 +57,22 @@ export const CustomerDetailDrawer = ({
   onOpenChange,
   onUpdate,
 }: CustomerDetailDrawerProps) => {
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  
+  // Address form
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [addrCep, setAddrCep] = useState("");
+  const [addrStreet, setAddrStreet] = useState("");
+  const [addrNumber, setAddrNumber] = useState("");
+  const [addrComplement, setAddrComplement] = useState("");
+  const [addrNeighborhood, setAddrNeighborhood] = useState("");
+  const [addrCity, setAddrCity] = useState("");
+  const [addrState, setAddrState] = useState("");
 
   // Fetch order history for customer
   const { data: orders } = useQuery({
@@ -97,7 +108,7 @@ export const CustomerDetailDrawer = ({
   });
 
   // Fetch saved addresses
-  const { data: addresses } = useQuery({
+  const { data: addresses, refetch: refetchAddresses } = useQuery({
     queryKey: ["customer-addresses", customer?.cpf],
     queryFn: async () => {
       if (!customer) return [];
@@ -329,22 +340,101 @@ export const CustomerDetailDrawer = ({
               </div>
 
               {/* Saved Addresses */}
-              {addresses && addresses.length > 0 && (
-                <div className="pt-4">
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
+              <div className="pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
-                    Endereços Salvos
+                    Endereços ({addresses?.length || 0})
                   </h4>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowAddressForm(!showAddressForm)}>
+                    <Plus className="w-3 h-3 mr-1" /> Adicionar
+                  </Button>
+                </div>
+
+                {showAddressForm && (
+                  <div className="space-y-2 p-3 border rounded-lg mb-3 bg-muted/30">
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input placeholder="CEP" value={addrCep} onChange={(e) => {
+                        setAddrCep(e.target.value);
+                        const clean = e.target.value.replace(/\D/g, "");
+                        if (clean.length === 8) {
+                          fetch(`https://viacep.com.br/ws/${clean}/json/`)
+                            .then(r => r.json())
+                            .then(d => { if (!d.erro) { setAddrStreet(d.logradouro || ""); setAddrNeighborhood(d.bairro || ""); setAddrCity(d.localidade || ""); setAddrState(d.uf || ""); } })
+                            .catch(() => {});
+                        }
+                      }} className="h-7 text-xs" />
+                      <Input placeholder="Rua" value={addrStreet} onChange={(e) => setAddrStreet(e.target.value)} className="h-7 text-xs col-span-2" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input placeholder="Nº" value={addrNumber} onChange={(e) => setAddrNumber(e.target.value)} className="h-7 text-xs" />
+                      <Input placeholder="Complemento" value={addrComplement} onChange={(e) => setAddrComplement(e.target.value)} className="h-7 text-xs col-span-2" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input placeholder="Bairro" value={addrNeighborhood} onChange={(e) => setAddrNeighborhood(e.target.value)} className="h-7 text-xs" />
+                      <Input placeholder="Cidade" value={addrCity} onChange={(e) => setAddrCity(e.target.value)} className="h-7 text-xs" />
+                      <Input placeholder="UF" value={addrState} onChange={(e) => setAddrState(e.target.value)} className="h-7 text-xs" />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setShowAddressForm(false); setAddrCep(""); setAddrStreet(""); setAddrNumber(""); setAddrComplement(""); setAddrNeighborhood(""); setAddrCity(""); setAddrState(""); }}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" className="h-7 text-xs" onClick={async () => {
+                        if (!addrStreet || !addrNumber || !customer) return toast.error("Rua e número são obrigatórios");
+                        const isFirst = !addresses || addresses.length === 0;
+                        await supabase.from("customer_addresses").insert({
+                          customer_cpf: customer.cpf, customer_name: customer.name, customer_phone: customer.phone || "",
+                          street: addrStreet, number: addrNumber, complement: addrComplement || null,
+                          neighborhood: addrNeighborhood, city: addrCity, state: addrState,
+                          zip_code: addrCep.replace(/\D/g, ""), is_default: isFirst,
+                        });
+                        toast.success("Endereço adicionado!");
+                        setShowAddressForm(false);
+                        setAddrCep(""); setAddrStreet(""); setAddrNumber(""); setAddrComplement(""); setAddrNeighborhood(""); setAddrCity(""); setAddrState("");
+                        refetchAddresses();
+                      }}>
+                        Salvar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {addresses && addresses.length > 0 && (
                   <div className="space-y-2">
                     {addresses.map((addr) => (
-                      <div key={addr.id} className="text-sm p-2 bg-muted/30 rounded">
-                        <p>{addr.street}, {addr.number}</p>
-                        <p className="text-muted-foreground">{addr.neighborhood} - {addr.city}</p>
+                      <div key={addr.id} className="text-sm p-2 bg-muted/30 rounded flex items-start justify-between group">
+                        <div>
+                          <p className="flex items-center gap-1">
+                            {addr.street}, {addr.number}
+                            {addr.is_default && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
+                          </p>
+                          <p className="text-muted-foreground">{addr.neighborhood} - {addr.city}/{addr.state}</p>
+                        </div>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {!addr.is_default && (
+                            <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={async () => {
+                              // Remove default from all, set this one
+                              await supabase.from("customer_addresses").update({ is_default: false }).eq("customer_cpf", customer!.cpf);
+                              await supabase.from("customer_addresses").update({ is_default: true }).eq("id", addr.id);
+                              toast.success("Endereço padrão atualizado");
+                              refetchAddresses();
+                            }}>
+                              Padrão
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive" onClick={async () => {
+                            await supabase.from("customer_addresses").delete().eq("id", addr.id);
+                            toast.success("Endereço removido");
+                            refetchAddresses();
+                          }}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Order History */}

@@ -17,6 +17,15 @@ interface Customer {
   cpf: string;
   name: string;
   phone: string | null;
+  defaultAddress?: {
+    street: string;
+    number: string;
+    complement: string | null;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zip_code: string;
+  } | null;
 }
 
 interface CustomerSelectDialogProps {
@@ -72,8 +81,19 @@ export const CustomerSelectDialog = ({
     return cpf;
   };
 
-  const handleSelect = (customer: Customer) => {
-    onSelect(customer);
+  const handleSelect = async (customer: { id: string; cpf: string; name: string; phone: string | null }) => {
+    // Fetch default address
+    const { data: addrData } = await supabase
+      .from("customer_addresses")
+      .select("street, number, complement, neighborhood, city, state, zip_code")
+      .eq("customer_cpf", customer.cpf)
+      .eq("is_default", true)
+      .maybeSingle();
+
+    onSelect({
+      ...customer,
+      defaultAddress: addrData || null,
+    });
     onOpenChange(false);
     setSearchTerm("");
   };

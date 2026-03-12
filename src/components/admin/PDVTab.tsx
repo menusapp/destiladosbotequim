@@ -20,7 +20,7 @@ import {
 import { toast } from "sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
-import { TableOrdersDrawer } from "./TableOrdersDrawer";
+import { TableDetailDialog } from "./TableDetailDialog";
 import { ManageTablesDrawer } from "./ManageTablesDrawer";
 
 interface CartItem {
@@ -46,9 +46,11 @@ interface TableData {
 
 interface PDVTabProps {
   restaurantId: string;
+  pendingTableToOpen?: string | null;
+  onTableOpened?: () => void;
 }
 
-const PDVTab = ({ restaurantId }: PDVTabProps) => {
+const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps) => {
   const queryClient = useQueryClient();
 
   // Order creation state
@@ -130,6 +132,17 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
     return () => { supabase.removeChannel(ch); };
   }, [refetchTables]);
 
+  // Auto-open table from notification
+  useEffect(() => {
+    if (pendingTableToOpen && tables) {
+      const table = tables.find(t => t.id === pendingTableToOpen);
+      if (table) {
+        setSelectedTableForDrawer(table);
+        onTableOpened?.();
+      }
+    }
+  }, [pendingTableToOpen, tables]);
+
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     if (!searchTerm) return products;
@@ -148,10 +161,17 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
     toast.success(`${item.productName} adicionado!`);
   };
 
-  const handleCustomerSelect = (customer: { id: string; cpf: string; name: string; phone: string | null }) => {
+  const handleCustomerSelect = (customer: { id: string; cpf: string; name: string; phone: string | null; defaultAddress?: any }) => {
     setCustomerName(customer.name);
     setCustomerCpf(customer.cpf);
     setCustomerPhone(customer.phone || "");
+    // Auto-fill address if delivery and address available
+    if (customer.defaultAddress && orderType === "delivery") {
+      setDeliveryAddress(customer.defaultAddress.street + (customer.defaultAddress.number ? `, ${customer.defaultAddress.number}` : ""));
+      setDeliveryCep(customer.defaultAddress.zip_code || "");
+      setDeliveryNeighborhood(customer.defaultAddress.neighborhood || "");
+      setDeliveryCity(`${customer.defaultAddress.city} - ${customer.defaultAddress.state}`);
+    }
   };
 
   const handleCepLookup = async (cep: string) => {
@@ -597,16 +617,19 @@ const PDVTab = ({ restaurantId }: PDVTabProps) => {
         onSelect={handleCustomerSelect}
       />
 
-      {/* Table Orders Drawer */}
-      {selectedTableForDrawer && (
-        <TableOrdersDrawer
-          restaurantId={restaurantId}
-          table={selectedTableForDrawer}
-          open={!!selectedTableForDrawer}
-          onOpenChange={(open) => { if (!open) setSelectedTableForDrawer(null); }}
-          onViewOrder={() => {}}
-        />
-      )}
+      {/* Table Detail Dialog */}
+      <TableDetailDialog
+        restaurantId={restaurantId}
+        table={selectedTableForDrawer}
+        open={!!selectedTableForDrawer}
+        onOpenChange={(open) => { if (!open) setSelectedTableForDrawer(null); }}
+        onAddOrder={(tableId) => {
+          setSelectedTableForDrawer(null);
+          setOrderType("mesa");
+          setSelectedTableId(tableId);
+        }}
+        onTableCleared={() => refetchTables()}
+      />
 
       {/* Manage Tables Drawer */}
       <ManageTablesDrawer
