@@ -9,8 +9,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Plus, Truck, ShoppingBag, UtensilsCrossed,
-  Clock, Printer, Users, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, Settings
+  Clock, Printer, Users, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, Settings,
+  MoreVertical, QrCode, Link2, Eraser
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
