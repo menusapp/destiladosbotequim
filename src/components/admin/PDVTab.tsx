@@ -99,7 +99,36 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     },
   });
 
-  // Fetch tables
+  // Fetch pending local orders per table
+  const { data: pendingLocalOrders, refetch: refetchPendingOrders } = useQuery({
+    queryKey: ["pdv-pending-local-orders", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("id, table_id, customer_name, order_items(id)")
+        .eq("restaurant_id", restaurantId)
+        .eq("order_type", "local")
+        .eq("status", "pending");
+      return data || [];
+    },
+  });
+
+  // Group pending orders by table_id
+  const pendingByTable = useMemo(() => {
+    const map = new Map<string, { count: number; customerNames: string[]; itemCount: number }>();
+    pendingLocalOrders?.forEach(order => {
+      if (!order.table_id) return;
+      const existing = map.get(order.table_id) || { count: 0, customerNames: [], itemCount: 0 };
+      existing.count++;
+      if (order.customer_name && !existing.customerNames.includes(order.customer_name)) {
+        existing.customerNames.push(order.customer_name);
+      }
+      existing.itemCount += order.order_items?.length || 0;
+      map.set(order.table_id, existing);
+    });
+    return map;
+  }, [pendingLocalOrders]);
+
   const { data: tables, refetch: refetchTables } = useQuery({
     queryKey: ["pdv-tables", restaurantId],
     queryFn: async () => {
