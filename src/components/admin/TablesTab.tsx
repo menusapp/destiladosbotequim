@@ -117,6 +117,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [reservationsEnabled, setReservationsEnabled] = useState(false);
   const [followBusinessHours, setFollowBusinessHours] = useState(true);
+  const [billRequestEnabled, setBillRequestEnabled] = useState(true);
   const [restaurantSlug, setRestaurantSlug] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
