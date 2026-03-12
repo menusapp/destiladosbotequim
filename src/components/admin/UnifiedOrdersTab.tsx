@@ -551,16 +551,12 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="todos">Todos</TabsTrigger>
           <TabsTrigger value="delivery">Delivery</TabsTrigger>
-          <TabsTrigger value="mesas">Mesas</TabsTrigger>
-          <TabsTrigger value="retirada">Retirada</TabsTrigger>
           <TabsTrigger value="local">Local</TabsTrigger>
+          <TabsTrigger value="mesas">Mesas</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="todos">{renderKanban()}</TabsContent>
         <TabsContent value="delivery">{renderKanban()}</TabsContent>
-        <TabsContent value="retirada">{renderKanban()}</TabsContent>
         <TabsContent value="local">
           {/* Toggle pedir conta - always visible in local tab */}
           <div className="flex items-center gap-2 mb-3 p-2 rounded-lg border border-border/50 bg-muted/20 w-fit">
