@@ -297,7 +297,7 @@ const Reservations = () => {
     const dayHours = businessHours.find(h => h.day_of_week === dayOfWeek);
     
     // Se segue horário de funcionamento e o dia está definido
-    if (restaurant?.reservations_follow_business_hours && dayHours?.is_open && dayHours.open_time && dayHours.close_time) {
+    if (dayHours?.is_open && dayHours.open_time && dayHours.close_time) {
       const openParts = dayHours.open_time.split(':');
       const closeParts = dayHours.close_time.split(':');
       const openHour = parseInt(openParts[0]);
