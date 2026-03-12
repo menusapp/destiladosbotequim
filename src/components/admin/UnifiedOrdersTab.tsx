@@ -238,9 +238,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     let filtered = orders;
     
     if (activeTab === "delivery") {
-      filtered = filtered.filter(o => o.order_type === "delivery" && o.delivery_type === "delivery");
-    } else if (activeTab === "retirada") {
-      filtered = filtered.filter(o => o.order_type === "delivery" && o.delivery_type === "pickup");
+      // Delivery tab includes delivery + pickup (retirada)
+      filtered = filtered.filter(o => o.order_type === "delivery");
     } else if (activeTab === "local") {
       filtered = filtered.filter(o => o.order_type === "local" || !o.order_type);
     }
