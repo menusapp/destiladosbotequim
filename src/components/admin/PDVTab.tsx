@@ -534,7 +534,35 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                     <Card
                       key={product.id}
                       className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => { setSelectedProduct(product); setIsProductDrawerOpen(true); }}
+                      onClick={async () => {
+                        // Fetch complements for this product
+                        const { data: complementGroups } = await supabase
+                          .from("product_complement_groups")
+                          .select("extra_category_id, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
+                          .eq("product_id", product.id);
+
+                        const complementExtras = (complementGroups || []).flatMap((g: any) => {
+                          const cat = g.extra_categories;
+                          if (!cat?.extra_category_items) return [];
+                          return cat.extra_category_items.map((item: any) => ({
+                            id: item.id,
+                            name: item.name,
+                            price: item.price,
+                            is_required: g.is_required,
+                            min_selection: g.min_selection,
+                            max_selection: g.max_selection,
+                            is_complement: true,
+                          }));
+                        });
+
+                        const combinedExtras = [
+                          ...(product.product_extras || []),
+                          ...complementExtras,
+                        ];
+
+                        setSelectedProduct({ ...product, product_extras: combinedExtras });
+                        setIsProductDrawerOpen(true);
+                      }}
                     >
                       <CardContent className="p-1.5 space-y-0.5">
                         {product.image_url ? (
