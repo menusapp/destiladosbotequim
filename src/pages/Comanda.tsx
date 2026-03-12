@@ -998,10 +998,11 @@ const Comanda = () => {
                 <Button 
                   className="w-full text-white" 
                   onClick={handleSendOrder}
+                  disabled={submitting}
                   style={{ backgroundColor: restaurantColor }}
                 >
                   <ShoppingCart className="h-4 w-4 mr-2" />
-                  Enviar Pedido
+                  {submitting ? "Enviando..." : "Enviar Pedido"}
                 </Button>
               </div>
             </CardContent>
