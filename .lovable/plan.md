@@ -1,38 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plano: Corrigir 2 bugs
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
-### Bug 1: "Erro ao enviar pedido" — FK violation nos complementos
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
-**Causa raiz**: A correção anterior de complementos (em `Menu.tsx` e `DeliveryMenu.tsx`) mapeia `extra_category_items.id` como o `id` do extra. Quando o pedido é enviado, esse ID é inserido como `product_extra_id` em `order_item_extras`, que tem FK para `product_extras` — não para `extra_category_items`. Resultado: violação de FK → erro.
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
 
-**Correção**: Em `Comanda.tsx` (e possivelmente em `Menu.tsx`/`DeliveryMenu.tsx` no checkout), ao inserir `order_item_extras`, setar `product_extra_id: null` quando o extra vem de um complement group (não é um product_extra real). Alternativa mais robusta: na hora de mapear complementos, marcar com um flag `is_complement: true` e na inserção de extras do pedido, usar `product_extra_id: null` para esses.
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
 
-**Arquivos**:
-- `src/pages/Menu.tsx` — adicionar flag `is_complement` ao mapear extras de complementos
-- `src/pages/DeliveryMenu.tsx` — idem
-- `src/pages/Comanda.tsx` — ao inserir `order_item_extras`, usar `product_extra_id: null` quando `is_complement === true`
-- Verificar também o fluxo de checkout em `CheckoutDrawer.tsx` ou onde o delivery faz insert de order_item_extras
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
 
-### Bug 2: "Limpar Mesa" não desloga clientes nem zera contas
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
 
-**Situação atual**: `handleClearTable` apenas fecha comandas e marca mesa como livre. Falta:
-1. Fechar/cancelar bills pendentes (`status != 'paid'`)
-2. Cancelar pedidos ativos (`pending`, `preparing`, `ready`)
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
 
-**Correção** em `UnifiedOrdersTab.tsx` → `handleClearTable`:
-- Cancelar pedidos ativos: `UPDATE orders SET status = 'cancelled' WHERE table_id = X AND status IN ('pending','accepted','preparing','ready')`
-- Fechar bills não pagas: `UPDATE bills SET status = 'cancelled' WHERE table_id = X AND status != 'paid'`
-- Já fecha comandas e libera mesa (existente)
+Detalhes técnicos:
+```text
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
+```
 
-O logout dos clientes acontece automaticamente: quando a mesa fica `is_occupied = false` e comandas ficam `closed`, o Menu.tsx detecta isso via realtime e redireciona.
-
-### Resumo
-
-| Arquivo | Mudança |
-|---|---|
-| `src/pages/Menu.tsx` | Adicionar `is_complement: true` no mapeamento de complement extras |
-| `src/pages/DeliveryMenu.tsx` | Idem |
-| `src/pages/Comanda.tsx` | Usar `product_extra_id: null` para extras com `is_complement` |
-| `src/components/admin/UnifiedOrdersTab.tsx` | Cancelar pedidos ativos e bills pendentes ao limpar mesa |
-
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.

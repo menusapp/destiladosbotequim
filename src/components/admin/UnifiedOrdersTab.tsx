@@ -491,7 +491,17 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
   };
 
   const handleClearTable = async (table: TableData) => {
-    if (!confirm(`Limpar Mesa ${table.table_number}? Isso irá fechar comandas ativas e liberar a mesa.`)) return;
+    if (!confirm(`Limpar Mesa ${table.table_number}? Isso irá cancelar pedidos ativos, fechar comandas e liberar a mesa.`)) return;
+    // Cancel active orders
+    await supabase.from("orders")
+      .update({ status: "cancelled" })
+      .eq("table_id", table.id)
+      .in("status", ["pending", "accepted", "preparing", "ready"]);
+    // Cancel unpaid bills
+    await supabase.from("bills")
+      .update({ status: "cancelled" })
+      .eq("table_id", table.id)
+      .neq("status", "paid");
     // Close active comandas
     await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() })
       .eq("table_id", table.id).eq("status", "active");

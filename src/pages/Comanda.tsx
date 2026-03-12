@@ -725,9 +725,9 @@ const Comanda = () => {
 
         // Inserir extras do item
         if (item.extras.length > 0) {
-          const orderItemExtras = item.extras.map((extra) => ({
+          const orderItemExtras = item.extras.map((extra: any) => ({
             order_item_id: orderItem.id,
-            product_extra_id: extra.id,
+            product_extra_id: extra.is_complement ? null : extra.id,
             price_at_order: extra.price,
           }));
 

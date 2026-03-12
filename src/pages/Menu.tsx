@@ -911,6 +911,7 @@ const Menu = () => {
         min_selection: group.min_selection || 0,
         max_selection: group.max_selection || undefined,
         extra_category_id: group.extra_category_id,
+        is_complement: true,
       }));
     });
 
