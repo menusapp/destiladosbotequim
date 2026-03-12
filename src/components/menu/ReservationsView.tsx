@@ -125,13 +125,21 @@ export const ReservationsView = ({
 
       setTables(tablesData || []);
 
-      // Fetch business hours
+      // Fetch hours based on configuration
       if (restaurant.reservations_follow_business_hours) {
         const { data: hoursData } = await supabase
           .from("business_hours")
           .select("day_of_week, is_open, open_time, close_time")
           .eq("restaurant_id", restaurant.id);
         setBusinessHours(hoursData || []);
+      } else {
+        const { data: resHours } = await supabase
+          .from("reservation_hours")
+          .select("day_of_week, is_open, open_time, close_time")
+          .eq("restaurant_id", restaurant.id);
+        if (resHours && resHours.length > 0) {
+          setBusinessHours(resHours);
+        }
       }
     } catch (error) {
       console.error("Error fetching reservations data:", error);
