@@ -212,7 +212,7 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
               {(order.status === "accepted" || order.status === "preparing") && (order.order_type === "local" || (!order.order_type && order.table_id)) && (
                 <Button onClick={() => updateStatus("delivered")} className="gap-2"><Play className="w-4 h-4" />Na Mesa</Button>
               )}
-              {order.status === "delivered" && order.order_type === "local" && (
+              {order.status === "delivered" && (order.order_type === "local" || (!order.order_type && order.table_id)) && (
                 <Button 
                   onClick={() => {
                     if (!order.payment_type || order.payment_type === "pending") {
