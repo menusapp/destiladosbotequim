@@ -694,6 +694,9 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                           🕐 Reservado {reservationByTable.get(table.id)!.time}
                         </Badge>
                       )}
+                      <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">
+                        {isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
+                      </Badge>
                       {isOccupied && occupiedSince && (
                         <p className="text-[10px] text-muted-foreground">Desde {occupiedSince}</p>
                       )}
