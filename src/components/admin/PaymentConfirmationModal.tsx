@@ -134,7 +134,7 @@ export const PaymentConfirmationModal = ({
   const paidAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, Math.round((total - paidAmount) * 100) / 100);
 
-  const addPayment = (methodName: string) => {
+  const addPayment = (methodName: string, methodType: string) => {
     const amount = parseFloat(currentAmount);
     if (isNaN(amount) || amount <= 0) {
       toast.error("Digite um valor válido");
@@ -146,7 +146,7 @@ export const PaymentConfirmationModal = ({
     }
     const adjustedAmount = Math.min(amount, remaining);
 
-    setSelectedPayments([...selectedPayments, { method: methodName, amount: adjustedAmount }]);
+    setSelectedPayments([...selectedPayments, { method: methodName, methodType, amount: adjustedAmount }]);
     setCurrentAmount("");
   };
 
