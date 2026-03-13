@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -222,6 +223,35 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
       })) as TableData[];
     },
   });
+
+  // Fetch today's confirmed reservations for table badges
+  const { data: todayReservations } = useQuery({
+    queryKey: ["pdv-today-reservations", restaurantId],
+    queryFn: async () => {
+      const today = format(new Date(), "yyyy-MM-dd");
+      const { data } = await supabase
+        .from("reservations")
+        .select("id, table_id, reservation_time, customer_name, status")
+        .eq("restaurant_id", restaurantId)
+        .eq("reservation_date", today)
+        .eq("status", "confirmed");
+      return data || [];
+    },
+  });
+
+  // Map table_id → reservation info for today
+  const reservationByTable = useMemo(() => {
+    const map = new Map<string, { time: string; customerName: string }>();
+    todayReservations?.forEach(r => {
+      if (r.table_id) {
+        map.set(r.table_id, { 
+          time: r.reservation_time?.slice(0, 5) || "", 
+          customerName: r.customer_name 
+        });
+      }
+    });
+    return map;
+  }, [todayReservations]);
 
   // Realtime for tables and orders
   useEffect(() => {
@@ -656,6 +686,12 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                       {(pendingByTable.get(table.id) || 0) > 0 && (
                         <Badge variant="destructive" className="text-[10px] animate-pulse">
                           🔔 Pedido Novo
+                        </Badge>
+                      )}
+                      {/* Reservation badge for non-occupied tables */}
+                      {!isOccupied && reservationByTable.has(table.id) && (
+                        <Badge className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100">
+                          🕐 Reservado {reservationByTable.get(table.id)!.time}
                         </Badge>
                       )}
                       <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">

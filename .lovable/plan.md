@@ -1,100 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plano: Reestruturação de múltiplas abas + reservas nas mesas + configurações gerais
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
-### 1. Renomear "Dados da Empresa" → "Configurações Gerais" e adicionar sub-aba "Cardápio"
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
-**Arquivos**: `AppSidebar.tsx`, `CompanyDataSettings.tsx`
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
 
-- No sidebar, renomear `config-dados` label de "Dados da Empresa" para "Configurações Gerais"
-- No `CompanyDataSettings.tsx`, adicionar 4a tab "Cardápio" com:
-  - Toggle "Permitir clientes pedirem conta" (`bill_request_enabled`) — movido da aba Reservas (`TablesTab.tsx`)
-  - Remover esse toggle de `TablesTab.tsx`
-- Atualizar título do header para "Configurações Gerais"
-- Fetch/save `bill_request_enabled` junto com as outras settings
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
 
-### 2. Mostrar "Reservado para XX horas" nas mesas do PDV
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
 
-**Arquivo**: `PDVTab.tsx`
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
 
-- Adicionar query para buscar reservas confirmadas do dia (`status = 'confirmed'`, `reservation_date = today`)
-- Criar `useMemo` mapeando `table_id → reservation_time`
-- No card da mesa (quando não ocupada), exibir badge "Reservado XX:XX" em amarelo/amber se houver reserva confirmada para aquela mesa no dia
-- Quando admin clicar "Limpar Mesa" ou "O cliente chegou" (no fluxo existente), a reserva é consumida normalmente
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
 
-### 3. Compactar "Horário de Funcionamento"
+Detalhes técnicos:
+```text
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
+```
 
-**Arquivo**: `BusinessHoursSettings.tsx`
-
-- Remover cards separados, unificar em layout compacto
-- Toggle de automação inline no header (não em card separado)
-- Dias da semana em formato de tabela compacta (não cards grandes com padding p-4)
-- Reduzir para linhas de ~40px com switch + nome abreviado (Seg, Ter...) + inputs de horário inline
-- Botão salvar compacto no header
-
-### 4. Melhorar "Módulos"
-
-**Arquivo**: `ModulosTab.tsx`
-
-- Adicionar ícones nos features de cada plano
-- Melhorar header com descrição mais rica
-- Adicionar visual de "comparação" — destacar features extras de planos superiores
-- Badge "Popular" mais destacado com gradiente
-
-### 5. Melhorar "Marketing"
-
-**Arquivo**: `MarketingTab.tsx`
-
-- Adicionar cards de métricas resumo no topo (total campanhas ativas, mensagens enviadas, etc.)
-- Melhorar header com ícone decorativo
-- Visual mais polido nos tabs
-
-### 6. Melhorar "Fidelidade"
-
-**Arquivo**: `FidelityTab.tsx`
-
-- Adicionar header mais rico com descrição e ícone
-- Cards de resumo rápido (programas ativos, clientes fidelizados, cupons ativos)
-
-### 7. Melhorar "Relatórios"
-
-**Arquivo**: `ReportsTab.tsx`
-
-- Melhorar header com tracking/font refinado
-- Cards de métricas com visual mais limpo (remover gradientes pesados, usar borders sutis)
-- DRE com visual mais profissional (alternating rows, melhor tipografia)
-
-### 8. Melhorar "Margens"
-
-**Arquivo**: `MargensTab.tsx`
-
-- Header profissional com tracking
-- CMV Desejado como inline no header (não card separado)
-- Cards de resumo mais compactos e alinhados
-- Lista de produtos com visual de tabela mais clean
-
-### 9. Melhorar "Caixa"
-
-**Arquivo**: `CashRegisterTab.tsx`
-
-- Header com tracking profissional
-- Cards de resumo mais compactos
-- Tabs com visual padrão (remover bg-orange-100 hardcoded, usar design system)
-- Formulários mais organizados
-
-### Resumo de arquivos
-
-| Arquivo | Mudança |
-|---|---|
-| `AppSidebar.tsx` | Renomear label "Dados da Empresa" → "Configurações Gerais" |
-| `CompanyDataSettings.tsx` | Adicionar tab "Cardápio" com toggle bill_request_enabled, renomear título |
-| `TablesTab.tsx` | Remover toggle bill_request_enabled |
-| `PDVTab.tsx` | Buscar reservas do dia, mostrar "Reservado XX:XX" nas mesas |
-| `BusinessHoursSettings.tsx` | Layout compacto tipo tabela |
-| `ModulosTab.tsx` | Visual mais rico com ícones e comparação |
-| `MarketingTab.tsx` | Cards de métricas, visual polido |
-| `FidelityTab.tsx` | Header e resumo melhorados |
-| `ReportsTab.tsx` | Visual profissional, tipografia refinada |
-| `MargensTab.tsx` | CMV inline, layout compacto |
-| `CashRegisterTab.tsx` | Design system consistente |
-
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.

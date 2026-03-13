@@ -552,8 +552,8 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold text-foreground">Relatórios</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-2xl font-semibold tracking-[-0.025em]">Relatórios</h2>
+        <p className="text-muted-foreground font-light">
           Visualize métricas e análises do seu negócio
         </p>
       </div>
@@ -592,69 +592,65 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       </div>
 
       {/* Cards de Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Vendas */}
-        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-300 shadow-card hover:shadow-hover transition-shadow">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-5 border">
           <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-orange-700">Vendas</p>
-              <p className="text-3xl font-bold text-orange-900">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Vendas</p>
+              <p className="text-2xl font-bold">
                 R$ {stats.salesToday.toFixed(2).replace(".", ",")}
               </p>
-              <p className="text-xs text-orange-600">{stats.ordersCount} pedidos</p>
+              <p className="text-xs text-muted-foreground">{stats.ordersCount} pedidos</p>
             </div>
-            <div className="p-3 bg-orange-600 rounded-xl">
-              <DollarSign className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <DollarSign className="h-5 w-5 text-primary" />
             </div>
           </div>
         </Card>
 
-        {/* Ticket Médio */}
-        <Card className="p-6 bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-300 shadow-card hover:shadow-hover transition-shadow">
+        <Card className="p-5 border">
           <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-amber-700">Ticket Médio</p>
-              <p className="text-3xl font-bold text-amber-900">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Ticket Médio</p>
+              <p className="text-2xl font-bold">
                 R$ {stats.averageTicket.toFixed(2).replace(".", ",")}
               </p>
-              <p className="text-xs text-amber-600">Por pedido pago</p>
+              <p className="text-xs text-muted-foreground">Por pedido pago</p>
             </div>
-            <div className="p-3 bg-amber-500 rounded-xl">
-              <TrendingUp className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <TrendingUp className="h-5 w-5 text-primary" />
             </div>
           </div>
         </Card>
 
-        {/* Mesas Atendidas */}
-        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
+        <Card className="p-5 border">
           <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-orange-700">Mesas Atendidas</p>
-              <p className="text-3xl font-bold text-orange-900">{stats.mesasAtendidas}</p>
-              <p className="text-xs text-orange-600">Comandas no período</p>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Mesas Atendidas</p>
+              <p className="text-2xl font-bold">{stats.mesasAtendidas}</p>
+              <p className="text-xs text-muted-foreground">Comandas no período</p>
             </div>
-            <div className="p-3 bg-orange-500 rounded-xl">
-              <Users className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
             </div>
           </div>
         </Card>
 
-        {/* Formas de Pagamento */}
-        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
+        <Card className="p-5 border">
           <div className="flex items-start justify-between mb-3">
-            <p className="text-sm font-medium text-orange-700">Formas de Pagamento</p>
-            <div className="p-2 bg-orange-400 rounded-xl">
-              <CreditCard className="h-5 w-5 text-white" />
+            <p className="text-sm font-medium text-muted-foreground">Formas de Pagamento</p>
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <CreditCard className="h-5 w-5 text-primary" />
             </div>
           </div>
           {stats.paymentsByMethod.length === 0 ? (
-            <p className="text-xs text-orange-600">Nenhuma forma cadastrada</p>
+            <p className="text-xs text-muted-foreground">Nenhuma forma cadastrada</p>
           ) : (
             <div className="space-y-1">
               {stats.paymentsByMethod.map(pm => (
                 <div key={pm.method_name} className="flex justify-between items-center text-sm">
-                  <span className="text-orange-800 truncate">{pm.method_name}</span>
-                  <span className="font-semibold text-orange-900">R$ {pm.total.toFixed(2).replace(".", ",")}</span>
+                  <span className="text-muted-foreground truncate">{pm.method_name}</span>
+                  <span className="font-semibold">R$ {pm.total.toFixed(2).replace(".", ",")}</span>
                 </div>
               ))}
             </div>
@@ -675,18 +671,18 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           <div className="space-y-2">
             <div className="flex justify-between items-center border-b pb-2">
               <span className="font-semibold text-lg">Receita Bruta</span>
-              <span className="font-bold text-lg text-orange-600">R$ {dreValues.grossRevenue.toFixed(2)}</span>
+              <span className="font-bold text-lg text-primary">R$ {dreValues.grossRevenue.toFixed(2)}</span>
             </div>
           </div>
 
           <div className="space-y-2 pl-4">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">(-) CMV dos Produtos</span>
-              <span className="font-semibold text-orange-800">R$ {dreValues.cmv.toFixed(2)}</span>
+              <span className="font-semibold">R$ {dreValues.cmv.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center border-b pb-2">
               <span className="font-semibold">Lucro Bruto</span>
-              <span className="font-bold text-orange-600">R$ {dreValues.grossProfit.toFixed(2)}</span>
+              <span className="font-bold text-primary">R$ {dreValues.grossProfit.toFixed(2)}</span>
             </div>
           </div>
 
@@ -694,26 +690,26 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
             <h3 className="font-semibold text-sm text-muted-foreground mb-2">Despesas Operacionais:</h3>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">Despesas Registradas (Saídas do Caixa)</span>
-              <span className="text-sm text-orange-800">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
+              <span className="text-sm font-medium">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">Custo Fixo (proporcional)</span>
-              <span className="text-sm text-orange-800">R$ {dreValues.fixedCost.toFixed(2)}</span>
+              <span className="text-sm font-medium">R$ {dreValues.fixedCost.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">Custo Variável</span>
-              <span className="text-sm text-orange-800">R$ {dreValues.variableCost.toFixed(2)}</span>
+              <span className="text-sm font-medium">R$ {dreValues.variableCost.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">CMO - Custo de Mão de Obra (proporcional)</span>
-              <span className="text-sm text-orange-800">R$ {dreValues.laborCost.toFixed(2)}</span>
+              <span className="text-sm font-medium">R$ {dreValues.laborCost.toFixed(2)}</span>
             </div>
           </div>
 
           <div className="space-y-2 border-t-2 pt-4">
-            <div className="flex justify-between items-center bg-orange-50 p-4 rounded-lg">
+            <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg">
               <span className="font-bold text-lg">Lucro Operacional Final</span>
-              <span className={`font-bold text-2xl ${dreValues.operationalProfit >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
+              <span className={`font-bold text-2xl ${dreValues.operationalProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
                 R$ {dreValues.operationalProfit.toFixed(2)}
               </span>
             </div>

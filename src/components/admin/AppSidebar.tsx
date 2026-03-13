@@ -90,7 +90,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
 
   const menuStructure = {
     configSubItems: [
-      { id: "config-dados", label: "Dados da Empresa", icon: Building2 },
+      { id: "config-dados", label: "Configurações Gerais", icon: Building2 },
       { id: "config-horario", label: "Horário de Funcionamento", icon: Clock },
       { id: "config-regioes", label: "Regiões de Entrega", icon: MapPin },
       { id: "config-pagamentos", label: "Formas de Pagamento", icon: CreditCard },
