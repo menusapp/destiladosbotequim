@@ -45,7 +45,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, bill_request_enabled, featured_section_enabled, featured_section_title")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, bill_request_enabled")
         .eq("id", restaurantId)
         .maybeSingle();
 
