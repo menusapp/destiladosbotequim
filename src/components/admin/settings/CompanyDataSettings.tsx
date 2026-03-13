@@ -62,7 +62,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           login_require_name: data.login_require_name ?? true,
           login_require_phone: data.login_require_phone ?? false,
           bill_request_enabled: data.bill_request_enabled ?? true,
-          featured_section_title: data.featured_section_title || "Destaques",
+          
         });
       }
     } catch (error) {
