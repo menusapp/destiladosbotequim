@@ -55,24 +55,40 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   const collapsed = state === "collapsed";
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
 
-  const menuStructure = {
-    main: [
+  const menuGroups = [
+    // Vendas & Operação
+    [
       { id: "pedidos", label: "Pedidos", icon: ShoppingBag, hasNotification: (hasNewDeliveryOrders || hasNewOrders || hasNewBills) },
       { id: "pdv", label: "PDV", icon: CreditCard, hasNotification: !!hasNewLocalOrders },
       { id: "mesas-reservas", label: "Reservas", icon: Users2 },
+    ],
+    // Cardápio & Estoque
+    [
       { id: "cardapio", label: "Cardápio", icon: Utensils },
-      { id: "caixa", label: "Caixa", icon: CircleDollarSign },
       { id: "estoque", label: "Estoque", icon: Warehouse },
+    ],
+    // Financeiro
+    [
+      { id: "caixa", label: "Caixa", icon: CircleDollarSign },
       { id: "custos", label: "Custos", icon: CircleDollarSign },
       { id: "margens", label: "Margens", icon: TrendingUp },
       { id: "relatorios", label: "Relatórios", icon: BarChart3 },
+    ],
+    // Clientes & Engajamento
+    [
       { id: "clientes", label: "Clientes", icon: Users },
       { id: "fidelidade", label: "Fidelidade", icon: Gift },
       { id: "marketing", label: "Marketing", icon: Megaphone },
-      { id: "fiscal", label: "Fiscal", icon: FileText },
-      { id: "modulos", label: "Módulos", icon: Construction },
-      ...(staffRole === "admin" ? [{ id: "contas", label: "Contas", icon: Users }] : []),
     ],
+    // Administrativo
+    [
+      { id: "fiscal", label: "Fiscal", icon: FileText },
+      ...(staffRole === "admin" ? [{ id: "contas", label: "Contas", icon: Users }] : []),
+      { id: "modulos", label: "Módulos", icon: Construction },
+    ],
+  ];
+
+  const menuStructure = {
     configSubItems: [
       { id: "config-dados", label: "Dados da Empresa", icon: Building2 },
       { id: "config-horario", label: "Horário de Funcionamento", icon: Clock },
