@@ -167,8 +167,9 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             Cadastro de Clientes
           </TabsTrigger>
           <TabsTrigger value="cardapio" className="gap-2">
-            <Utensils className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
             Cardápio
+          </TabsTrigger>
           </TabsTrigger>
         </TabsList>
 
