@@ -992,7 +992,7 @@ const Comanda = () => {
                   );
                 })}
               </div>
-              <div className="mt-4 space-y-3">
+              <div className="mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="order-notes">Observações do Pedido (opcional)</Label>
                   <Textarea
@@ -1003,15 +1003,6 @@ const Comanda = () => {
                     rows={2}
                   />
                 </div>
-                <Button 
-                  className="w-full text-white" 
-                  onClick={handleSendOrder}
-                  disabled={submitting}
-                  style={{ backgroundColor: restaurantColor }}
-                >
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  {submitting ? "Enviando..." : "Enviar Pedido"}
-                </Button>
               </div>
             </CardContent>
           </Card>
