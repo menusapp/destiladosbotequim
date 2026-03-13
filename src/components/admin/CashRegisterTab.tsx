@@ -642,7 +642,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                               placeholder="0"
                               className="text-center h-9 text-sm"
                             />
-                            <p className="text-xs text-primary mt-1 font-medium">
+                <p className="text-xs text-muted-foreground mt-1">
                               {((coinCounts[coin.key as keyof typeof coinCounts] || 0) * coin.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </p>
                           </div>
