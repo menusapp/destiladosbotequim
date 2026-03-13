@@ -1,51 +1,41 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: Search Bar de Pedidos Locais no PDV
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### O que será feito
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+Adicionar uma barra de busca acima do grid de mesas no PDV que permite pesquisar pedidos locais/mesa por **nome do cliente**, **CPF** ou **nome do item pedido**. Os resultados aparecem em um dropdown/lista abaixo da barra, mostrando cada pedido correspondente com: nome do cliente, itens resumidos, status e **qual mesa** está associada. Clicar num resultado abre o `TableDetailDialog` daquela mesa.
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+### Correção no PDVTab.tsx
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+1. **Novo state**: `orderSearchTerm` (string) para a busca de pedidos (separado do `searchTerm` já existente que é para busca de produtos)
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+2. **Nova query**: Buscar pedidos locais ativos com dados completos para pesquisa:
+   ```
+   orders: id, status, customer_name, customer_cpf, table_id, created_at,
+     order_items(id, quantity, products(name)),
+     tables(table_number, table_name)
+   where restaurant_id = X, order_type = 'local',
+     status in ['pending','accepted','preparing','ready','delivered']
+   ```
+   - Reutilizar o realtime já existente para refetch
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+3. **Filtro client-side** (useMemo): Quando `orderSearchTerm` tiver 2+ caracteres, filtrar pedidos onde:
+   - `customer_name` contém o termo (case-insensitive)
+   - `customer_cpf` contém o termo
+   - Algum `order_items.products.name` contém o termo
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+4. **UI**: Entre o header do PDV e o grid de mesas, adicionar:
+   - Input com ícone Search e placeholder "Buscar pedido por nome, CPF ou item..."
+   - Quando há resultados filtrados, mostrar lista de cards compactos abaixo do input:
+     - Cada card: `Mesa X • Nome do Cliente • "2x Hambúrguer, 1x Coca..." • Badge status`
+     - Click no card → abre `TableDetailDialog` da mesa correspondente
+   - Quando busca ativa sem resultados: mensagem "Nenhum pedido encontrado"
+   - Quando input vazio: não mostra nada, grid normal
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+### Arquivo
+
+| Arquivo | Mudança |
+|---|---|
+| `PDVTab.tsx` | Nova query de pedidos com items/products, state de busca, filtro useMemo, UI da search bar + resultados |
+
