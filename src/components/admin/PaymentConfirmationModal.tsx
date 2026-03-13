@@ -83,7 +83,7 @@ export const PaymentConfirmationModal = ({
 }: PaymentConfirmationModalProps) => {
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
   const [serviceFeePercentage, setServiceFeePercentage] = useState(0);
-  const [selectedPayments, setSelectedPayments] = useState<Array<{ method: string; amount: number }>>([]);
+  const [selectedPayments, setSelectedPayments] = useState<Array<{ method: string; methodType: string; amount: number }>>([]);
   const [currentAmount, setCurrentAmount] = useState("");
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(DEFAULT_METHODS);
   const [loading, setLoading] = useState(true);
@@ -134,7 +134,7 @@ export const PaymentConfirmationModal = ({
   const paidAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, Math.round((total - paidAmount) * 100) / 100);
 
-  const addPayment = (methodName: string) => {
+  const addPayment = (methodName: string, methodType: string) => {
     const amount = parseFloat(currentAmount);
     if (isNaN(amount) || amount <= 0) {
       toast.error("Digite um valor válido");
@@ -146,7 +146,7 @@ export const PaymentConfirmationModal = ({
     }
     const adjustedAmount = Math.min(amount, remaining);
 
-    setSelectedPayments([...selectedPayments, { method: methodName, amount: adjustedAmount }]);
+    setSelectedPayments([...selectedPayments, { method: methodName, methodType, amount: adjustedAmount }]);
     setCurrentAmount("");
   };
 
@@ -163,14 +163,19 @@ export const PaymentConfirmationModal = ({
     }
 
     try {
-      // Build concatenated payment methods string
-      const allMethods = selectedPayments.map(p => p.method);
-      const uniqueMethods = [...new Set(allMethods)];
-      const paymentMethodStr = uniqueMethods.join(", ");
+      // Build display string for orders.payment_type (no constraint)
+      const allMethodNames = selectedPayments.map(p => p.method);
+      const uniqueNames = [...new Set(allMethodNames)];
+      const paymentDisplayStr = uniqueNames.join(", ");
+
+      // For bills.payment_method (has check constraint: pix, card, credit, debit, cash, meal_voucher, NULL)
+      const allMethodTypes = selectedPayments.map(p => p.methodType);
+      const uniqueTypes = [...new Set(allMethodTypes)];
+      const billPaymentMethod = uniqueTypes.length === 1 ? uniqueTypes[0] : null;
 
       const { error } = await supabase
         .from("orders")
-        .update({ payment_type: paymentMethodStr })
+        .update({ payment_type: paymentDisplayStr })
         .eq("id", order.id);
 
       if (error) throw error;
@@ -184,7 +189,7 @@ export const PaymentConfirmationModal = ({
           subtotal: subtotal,
           service_fee: feeAmount,
           total_amount: total,
-          payment_method: paymentMethodStr,
+          payment_method: billPaymentMethod,
           status: "paid",
           paid_at: new Date().toISOString(),
         });
@@ -215,7 +220,7 @@ export const PaymentConfirmationModal = ({
             restaurant_id: order.restaurant_id || restaurantId,
             movement_type: "entrada",
             amount: payment.amount,
-            payment_method: payment.method,
+            payment_method: payment.methodType,
             category: "Pedido",
             description: `Pedido Local #${order.id} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
             created_by: "Sistema",
@@ -307,7 +312,7 @@ export const PaymentConfirmationModal = ({
                     <Button
                       key={method.id}
                       variant="outline"
-                      onClick={() => addPayment(method.name)}
+                      onClick={() => addPayment(method.name, method.method_type)}
                       className="h-auto p-3 flex-col items-start text-left"
                     >
                       <div className="flex items-center gap-2 w-full">
