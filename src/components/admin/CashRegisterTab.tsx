@@ -968,90 +968,76 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  Receitas
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Receitas</CardTitle>
+                  <span className="text-lg font-bold tabular-nums">
+                    R$ {closedSessions
+                      .filter(filterSessionsByDate)
+                      .reduce((total, session) => {
+                        const sessionEntries = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "entrada");
+                        return total + sessionEntries.reduce((sum, m) => sum + m.amount, 0);
+                      }, 0)
+                      .toFixed(2)}
+                  </span>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-primary/5 rounded-lg border border-primary/10">
-                    <span className="font-medium text-sm">Total de Receitas</span>
-                    <span className="text-xl font-bold text-primary tabular-nums">
-                      R$ {closedSessions
-                        .filter(filterSessionsByDate)
-                        .reduce((total, session) => {
-                          const sessionEntries = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "entrada");
-                          return total + sessionEntries.reduce((sum, m) => sum + m.amount, 0);
-                        }, 0)
-                        .toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Por categoria</p>
-                    {Array.from(new Set(
-                      allMovements.filter(m => m.movement_type === "entrada").map(m => m.category || "Sem categoria")
-                    )).map(category => {
-                      const total = closedSessions
-                        .filter(filterSessionsByDate)
-                        .reduce((sum, session) => {
-                          const categoryMovements = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "entrada" && (m.category || "Sem categoria") === category);
-                          return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
-                        }, 0);
-                      if (total === 0) return null;
-                      return (
-                        <div key={category} className="flex justify-between p-2 border-l-2 border-primary/30 pl-3 text-sm">
-                          <span className="text-muted-foreground">{category}</span>
-                          <span className="font-medium tabular-nums">R$ {total.toFixed(2)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="border rounded-lg overflow-hidden divide-y">
+                  {Array.from(new Set(
+                    allMovements.filter(m => m.movement_type === "entrada").map(m => m.category || "Sem categoria")
+                  )).map(category => {
+                    const total = closedSessions
+                      .filter(filterSessionsByDate)
+                      .reduce((sum, session) => {
+                        const categoryMovements = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "entrada" && (m.category || "Sem categoria") === category);
+                        return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
+                      }, 0);
+                    if (total === 0) return null;
+                    return (
+                      <div key={category} className="flex justify-between px-4 py-2 text-sm">
+                        <span className="text-muted-foreground">{category}</span>
+                        <span className="font-medium tabular-nums">R$ {total.toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingDown className="h-4 w-4 text-destructive" />
-                  Despesas
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Despesas</CardTitle>
+                  <span className="text-lg font-bold tabular-nums">
+                    R$ {closedSessions
+                      .filter(filterSessionsByDate)
+                      .reduce((total, session) => {
+                        const sessionExits = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "saida");
+                        return total + sessionExits.reduce((sum, m) => sum + m.amount, 0);
+                      }, 0)
+                      .toFixed(2)}
+                  </span>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-destructive/5 rounded-lg border border-destructive/10">
-                    <span className="font-medium text-sm">Total de Despesas</span>
-                    <span className="text-xl font-bold text-destructive tabular-nums">
-                      R$ {closedSessions
-                        .filter(filterSessionsByDate)
-                        .reduce((total, session) => {
-                          const sessionExits = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "saida");
-                          return total + sessionExits.reduce((sum, m) => sum + m.amount, 0);
-                        }, 0)
-                        .toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Por categoria</p>
-                    {Array.from(new Set(
-                      allMovements.filter(m => m.movement_type === "saida").map(m => m.category || "Sem categoria")
-                    )).map(category => {
-                      const total = closedSessions
-                        .filter(filterSessionsByDate)
-                        .reduce((sum, session) => {
-                          const categoryMovements = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "saida" && (m.category || "Sem categoria") === category);
-                          return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
-                        }, 0);
-                      if (total === 0) return null;
-                      return (
-                        <div key={category} className="flex justify-between p-2 border-l-2 border-destructive/30 pl-3 text-sm">
-                          <span className="text-muted-foreground">{category}</span>
-                          <span className="font-medium tabular-nums">R$ {total.toFixed(2)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="border rounded-lg overflow-hidden divide-y">
+                  {Array.from(new Set(
+                    allMovements.filter(m => m.movement_type === "saida").map(m => m.category || "Sem categoria")
+                  )).map(category => {
+                    const total = closedSessions
+                      .filter(filterSessionsByDate)
+                      .reduce((sum, session) => {
+                        const categoryMovements = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "saida" && (m.category || "Sem categoria") === category);
+                        return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
+                      }, 0);
+                    if (total === 0) return null;
+                    return (
+                      <div key={category} className="flex justify-between px-4 py-2 text-sm">
+                        <span className="text-muted-foreground">{category}</span>
+                        <span className="font-medium tabular-nums">R$ {total.toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
