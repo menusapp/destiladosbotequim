@@ -762,8 +762,8 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         </div>
       </div>
 
-      {/* Bill Request Toggle */}
-      <Card>
+      {/* Bill Request Toggle moved to Configurações Gerais > Cardápio */}
+      <Card className="hidden">
         <CardContent className="py-4">
           <div className="flex items-center justify-between">
             <div>
