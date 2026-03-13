@@ -671,7 +671,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           <div className="space-y-2">
             <div className="flex justify-between items-center border-b pb-2">
               <span className="font-semibold text-lg">Receita Bruta</span>
-              <span className="font-bold text-lg text-orange-600">R$ {dreValues.grossRevenue.toFixed(2)}</span>
+              <span className="font-bold text-lg text-primary">R$ {dreValues.grossRevenue.toFixed(2)}</span>
             </div>
           </div>
 
