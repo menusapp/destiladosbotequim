@@ -252,9 +252,9 @@ const RestaurantAdmin = () => {
             }
 
             // Atualizar badges da sidebar
-            if (orderType === 'delivery' && activeSection !== 'pedidos') {
+            if (orderType === 'delivery' && activeSectionRef.current !== 'pedidos') {
               setHasNewDeliveryOrders(true);
-            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pdv') {
+            } else if ((orderType === 'local' || !orderType) && activeSectionRef.current !== 'pdv') {
               setHasNewLocalOrders(true);
             }
           }

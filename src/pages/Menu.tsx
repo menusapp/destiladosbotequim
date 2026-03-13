@@ -324,15 +324,13 @@ const Menu = () => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        // Scrolling down - esconder barra
+      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
         setShowComandaBar(false);
-      } else if (currentScrollY < lastScrollY) {
-        // Scrolling up - mostrar barra
+      } else if (currentScrollY < lastScrollY.current) {
         setShowComandaBar(true);
       }
       
-      setLastScrollY(currentScrollY);
+      lastScrollY.current = currentScrollY;
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -340,7 +338,7 @@ const Menu = () => {
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
-  }, [lastScrollY]);
+  }, []);
 
   // Atualizar total da comanda sempre que o cart ou tableId mudar
   useEffect(() => {
