@@ -10,13 +10,18 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import {
   Search, Users, ShoppingCart, UserPlus, X, Loader2, Settings,
-  MoreVertical, QrCode, Link2, Eraser, CheckCircle, Package
+  MoreVertical, QrCode, Link2, Eraser, CheckCircle, Package, CalendarIcon
 } from "lucide-react";
+import { format, startOfDay, endOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
@@ -61,6 +66,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
   const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [orderSearchTerm, setOrderSearchTerm] = useState("");
+  const [orderSearchDate, setOrderSearchDate] = useState<Date | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
 
   // Customer fields
@@ -130,14 +136,25 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
 
   // Fetch searchable orders with items and table info
   const { data: searchableOrders } = useQuery({
-    queryKey: ["pdv-searchable-orders", restaurantId],
+    queryKey: ["pdv-searchable-orders", restaurantId, orderSearchDate?.toISOString()],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("orders")
         .select("id, status, customer_name, customer_cpf, table_id, created_at, order_items(id, quantity, products(name)), tables(table_number, table_name)")
         .eq("restaurant_id", restaurantId)
-        .eq("order_type", "local")
-        .in("status", ["pending", "accepted", "preparing", "ready", "delivered"]);
+        .eq("order_type", "local");
+
+      if (orderSearchDate) {
+        // When date is selected, show all orders from that day (any status)
+        query = query
+          .gte("created_at", startOfDay(orderSearchDate).toISOString())
+          .lte("created_at", endOfDay(orderSearchDate).toISOString());
+      } else {
+        // Default: only active orders
+        query = query.in("status", ["pending", "accepted", "preparing", "ready", "delivered"]);
+      }
+
+      const { data } = await query;
       return data || [];
     },
   });
@@ -167,9 +184,13 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     return map;
   }, [activeLocalOrders]);
 
-  // Filter searchable orders based on search term
+  // Filter searchable orders based on search term and/or date
   const filteredOrders = useMemo(() => {
-    if (!searchableOrders || orderSearchTerm.length < 2) return [];
+    if (!searchableOrders) return [];
+    // If date is selected but no search term, show all orders for that day
+    if (orderSearchDate && orderSearchTerm.length < 2) return searchableOrders;
+    // If no date and no search term, show nothing
+    if (orderSearchTerm.length < 2) return [];
     const term = orderSearchTerm.toLowerCase();
     return searchableOrders.filter((order: any) => {
       if (order.customer_name?.toLowerCase().includes(term)) return true;
@@ -177,7 +198,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
       if (order.order_items?.some((item: any) => item.products?.name?.toLowerCase().includes(term))) return true;
       return false;
     });
-  }, [searchableOrders, orderSearchTerm]);
+  }, [searchableOrders, orderSearchTerm, orderSearchDate]);
 
   const { data: tables, refetch: refetchTables } = useQuery({
     queryKey: ["pdv-tables", restaurantId],
@@ -455,173 +476,215 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
   const availableTables = tables?.filter(t => !t.is_occupied).length || 0;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <div>
           <h2 className="text-2xl font-bold">PDV</h2>
           <p className="text-sm text-muted-foreground">
             {tables?.length || 0} mesas • {occupiedTables} ocupadas • {availableTables} livres
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setIsManageTablesOpen(true)}>
-          <Settings className="w-4 h-4 mr-1.5" />
-          Gerenciar Mesas
-        </Button>
       </div>
 
       {/* Main content: tables grid + order panel */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
         {/* Left: Tables Grid */}
-        <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-          {/* Order Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar pedido por nome, CPF ou item..."
-              value={orderSearchTerm}
-              onChange={e => setOrderSearchTerm(e.target.value)}
-              className="pl-9 h-9 text-sm"
-            />
-            {orderSearchTerm && (
-              <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-                onClick={() => setOrderSearchTerm("")}>
-                <X className="w-3.5 h-3.5" />
-              </Button>
-            )}
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Order Search Bar + Date Filter */}
+          <div className="flex gap-2 mb-2 flex-shrink-0">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar pedido por nome, CPF ou item..."
+                value={orderSearchTerm}
+                onChange={e => setOrderSearchTerm(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+              {orderSearchTerm && (
+                <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                  onClick={() => setOrderSearchTerm("")}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              )}
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("h-9 px-3 text-xs whitespace-nowrap", orderSearchDate && "text-primary border-primary")}>
+                  <CalendarIcon className="w-3.5 h-3.5 mr-1.5" />
+                  {orderSearchDate ? format(orderSearchDate, "dd/MM/yyyy") : "Data"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={orderSearchDate}
+                  onSelect={setOrderSearchDate}
+                  locale={ptBR}
+                  className={cn("p-3 pointer-events-auto")}
+                />
+                {orderSearchDate && (
+                  <div className="p-2 border-t">
+                    <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setOrderSearchDate(undefined)}>
+                      Limpar data
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
           </div>
 
-          {/* Search Results */}
-          {orderSearchTerm.length >= 2 && (
-            <div className="space-y-2">
-              {filteredOrders.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido encontrado</p>
-              ) : (
-                <>
+          {/* Search Results (scrollable) */}
+          {(orderSearchTerm.length >= 2 || orderSearchDate) && (
+            <div className="mb-2 flex-shrink-0">
+              {filteredOrders.length === 0 && orderSearchTerm.length >= 2 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">Nenhum pedido encontrado</p>
+              ) : filteredOrders.length > 0 ? (
+                <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">{filteredOrders.length} pedido{filteredOrders.length !== 1 ? "s" : ""} encontrado{filteredOrders.length !== 1 ? "s" : ""}</p>
-                  {filteredOrders.map((order: any) => {
-                    const statusMap: Record<string, { label: string; variant: "default" | "warning" | "success" | "secondary" }> = {
-                      pending: { label: "Pendente", variant: "warning" },
-                      accepted: { label: "Aceito", variant: "default" },
-                      preparing: { label: "Preparando", variant: "default" },
-                      ready: { label: "Pronto", variant: "success" },
-                      delivered: { label: "Entregue", variant: "secondary" },
-                    };
-                    const status = statusMap[order.status] || { label: order.status, variant: "secondary" as const };
-                    const itemsSummary = order.order_items?.map((i: any) => `${i.quantity}x ${i.products?.name || "?"}`).join(", ") || "";
-                    const tableInfo = order.tables;
-                    const tableLabel = tableInfo ? (tableInfo.table_name || `Mesa ${tableInfo.table_number}`) : "—";
+                  <div className="max-h-[260px] overflow-y-auto space-y-1.5 pr-1">
+                    {filteredOrders.map((order: any) => {
+                      const statusMap: Record<string, { label: string; variant: "default" | "warning" | "success" | "secondary" | "destructive" }> = {
+                        pending: { label: "Pendente", variant: "warning" },
+                        accepted: { label: "Aceito", variant: "default" },
+                        preparing: { label: "Preparando", variant: "default" },
+                        ready: { label: "Pronto", variant: "success" },
+                        delivered: { label: "Entregue", variant: "secondary" },
+                        cancelled: { label: "Cancelado", variant: "destructive" },
+                        paid: { label: "Pago", variant: "success" },
+                      };
+                      const status = statusMap[order.status] || { label: order.status, variant: "secondary" as const };
+                      const itemsSummary = order.order_items?.map((i: any) => `${i.quantity}x ${i.products?.name || "?"}`).join(", ") || "";
+                      const tableInfo = order.tables;
+                      const tableLabel = tableInfo ? (tableInfo.table_name || `Mesa ${tableInfo.table_number}`) : "—";
+                      const orderTime = order.created_at ? format(new Date(order.created_at), "HH:mm") : "";
 
-                    return (
-                      <Card
-                        key={order.id}
-                        className="cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => {
-                          if (order.table_id && tables) {
-                            const t = tables.find(tb => tb.id === order.table_id);
-                            if (t) { setSelectedTableForDrawer(t); setOrderSearchTerm(""); }
-                          }
-                        }}
-                      >
-                        <CardContent className="p-3 flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {tableInfo?.table_number || "?"}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium truncate">{order.customer_name}</span>
-                              <Badge variant={status.variant} className="text-[10px] flex-shrink-0">{status.label}</Badge>
+                      return (
+                        <Card
+                          key={order.id}
+                          className="cursor-pointer hover:shadow-md transition-shadow"
+                          onClick={() => {
+                            if (order.table_id && tables) {
+                              const t = tables.find(tb => tb.id === order.table_id);
+                              if (t) { setSelectedTableForDrawer(t); setOrderSearchTerm(""); }
+                            }
+                          }}
+                        >
+                          <CardContent className="p-2.5 flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {tableInfo?.table_number || "?"}
                             </div>
-                            <p className="text-[11px] text-muted-foreground truncate">{tableLabel} • {itemsSummary}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </>
-              )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium truncate">{order.customer_name}</span>
+                                <Badge variant={status.variant} className="text-[10px] flex-shrink-0">{status.label}</Badge>
+                                <span className="text-[10px] text-muted-foreground flex-shrink-0">{orderTime}</span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground truncate">{tableLabel} • {itemsSummary}</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 
-          {/* Tables Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {tables?.map(table => {
-              const isOccupied = table.is_occupied;
-              const comandaCount = table.comandas?.length || 0;
-              const isSelected = selectedTableId === table.id;
-              const pending = pendingByTable.get(table.id);
-              return (
-                <Card
-                  key={table.id}
-                  className={`cursor-pointer transition-all hover:shadow-md relative ${
-                    isSelected ? "ring-2 ring-primary border-primary" :
-                    isOccupied ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-border"
-                  }`}
-                  onClick={() => handleTableClick(table)}
-                  onDoubleClick={() => handleTableSelect(table)}
-                >
-                  {/* Three-dot menu */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 z-10"
-                        onClick={(e) => e.stopPropagation()}>
-                        <MoreVertical className="w-3.5 h-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenuItem onClick={() => handleShowQR(table)}>
-                        <QrCode className="w-4 h-4 mr-2" /> QR Code
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleCopyLink(table)}>
-                        <Link2 className="w-4 h-4 mr-2" /> Copiar Link
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleTableSelect(table)}>
-                        <ShoppingCart className="w-4 h-4 mr-2" /> Criar Pedido
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleClearTable(table)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Eraser className="w-4 h-4 mr-2" /> Limpar Mesa
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+          {/* Gerenciar Mesas button */}
+          <div className="flex items-center justify-between mb-2 flex-shrink-0">
+            <Button variant="outline" size="sm" onClick={() => setIsManageTablesOpen(true)} className="text-xs h-7">
+              <Settings className="w-3.5 h-3.5 mr-1" />
+              Gerenciar Mesas
+            </Button>
+          </div>
 
-                  <CardContent className="p-4 text-center space-y-1">
-                    <div className={`w-10 h-10 rounded-full mx-auto flex items-center justify-center text-white text-sm font-bold ${
-                      isOccupied ? "bg-green-500" : "bg-muted-foreground/40"
-                    }`}>
-                      {table.table_number}
-                    </div>
-                    <p className="text-xs font-medium">{table.table_name || `Mesa ${table.table_number}`}</p>
-                    {(pendingByTable.get(table.id) || 0) > 0 && (
-                      <Badge variant="destructive" className="text-[10px] animate-pulse">
-                        🔔 Pedido Novo
-                      </Badge>
-                    )}
-                    <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">
-                      {isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
-                    </Badge>
-                    {/* Always show customer names from active comandas */}
-                    {isOccupied && table.comandas && table.comandas.length > 0 && (
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {table.comandas.map(c => c.customer_name).join(", ")}
+          {/* Tables Grid (scrollable) */}
+          <div className="flex-1 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {tables?.map(table => {
+                const isOccupied = table.is_occupied;
+                const comandaCount = table.comandas?.length || 0;
+                const isSelected = selectedTableId === table.id;
+                const pending = pendingByTable.get(table.id);
+                const occupiedSince = table.occupied_at ? format(new Date(table.occupied_at), "HH:mm") : null;
+                return (
+                  <Card
+                    key={table.id}
+                    className={`cursor-pointer transition-all hover:shadow-md relative ${
+                      isSelected ? "ring-2 ring-primary border-primary" :
+                      isOccupied ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-border"
+                    }`}
+                    onClick={() => handleTableClick(table)}
+                    onDoubleClick={() => handleTableSelect(table)}
+                  >
+                    {/* Three-dot menu */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 z-10"
+                          onClick={(e) => e.stopPropagation()}>
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem onClick={() => handleShowQR(table)}>
+                          <QrCode className="w-4 h-4 mr-2" /> QR Code
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleCopyLink(table)}>
+                          <Link2 className="w-4 h-4 mr-2" /> Copiar Link
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleTableSelect(table)}>
+                          <ShoppingCart className="w-4 h-4 mr-2" /> Criar Pedido
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleClearTable(table)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Eraser className="w-4 h-4 mr-2" /> Limpar Mesa
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <CardContent className="p-4 text-center space-y-1">
+                      <div className={`w-10 h-10 rounded-full mx-auto flex items-center justify-center text-white text-sm font-bold ${
+                        isOccupied ? "bg-green-500" : "bg-muted-foreground/40"
+                      }`}>
+                        {table.table_number}
                       </div>
-                    )}
-                    {/* Always show item count from all active orders */}
-                    {(() => {
-                      const active = activeByTable.get(table.id);
-                      if (!active || active.itemCount === 0) return null;
-                      return (
-                        <p className="text-[10px] text-muted-foreground">
-                          📋 {active.itemCount} ite{active.itemCount !== 1 ? "ns" : "m"}
-                        </p>
-                      );
-                    })()}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                      <p className="text-xs font-medium">{table.table_name || `Mesa ${table.table_number}`}</p>
+                      {(pendingByTable.get(table.id) || 0) > 0 && (
+                        <Badge variant="destructive" className="text-[10px] animate-pulse">
+                          🔔 Pedido Novo
+                        </Badge>
+                      )}
+                      <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">
+                        {isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
+                      </Badge>
+                      {isOccupied && occupiedSince && (
+                        <p className="text-[10px] text-muted-foreground">Desde {occupiedSince}</p>
+                      )}
+                      {/* Always show customer names from active comandas */}
+                      {isOccupied && table.comandas && table.comandas.length > 0 && (
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {table.comandas.map(c => c.customer_name).join(", ")}
+                        </div>
+                      )}
+                      {/* Always show item count from all active orders */}
+                      {(() => {
+                        const active = activeByTable.get(table.id);
+                        if (!active || active.itemCount === 0) return null;
+                        return (
+                          <p className="text-[10px] text-muted-foreground">
+                            📋 {active.itemCount} ite{active.itemCount !== 1 ? "ns" : "m"}
+                          </p>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
         </div>
 
