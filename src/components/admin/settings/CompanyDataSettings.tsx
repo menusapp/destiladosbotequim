@@ -32,8 +32,6 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     login_require_name: true,
     login_require_phone: false,
     bill_request_enabled: true,
-    featured_section_enabled: true,
-    featured_section_title: "Destaques",
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
