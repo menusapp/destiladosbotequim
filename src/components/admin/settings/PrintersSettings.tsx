@@ -180,6 +180,9 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           paperSize: data.paper_size || '80mm',
           autoPrintOrders: Boolean(data.auto_print_orders),
           autoPrintReceipts: Boolean(data.auto_print_receipts),
+          fontFamily: (data as any).font_family || 'Arial Black',
+          fontSize: (data as any).font_size || 12,
+          fontBold: (data as any).font_bold !== undefined ? Boolean((data as any).font_bold) : true,
         });
       }
     } catch (error) {
