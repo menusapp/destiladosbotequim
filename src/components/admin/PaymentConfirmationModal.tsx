@@ -220,7 +220,7 @@ export const PaymentConfirmationModal = ({
             restaurant_id: order.restaurant_id || restaurantId,
             movement_type: "entrada",
             amount: payment.amount,
-            payment_method: payment.method,
+            payment_method: payment.methodType,
             category: "Pedido",
             description: `Pedido Local #${order.id} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
             created_by: "Sistema",
