@@ -690,19 +690,19 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
             <h3 className="font-semibold text-sm text-muted-foreground mb-2">Despesas Operacionais:</h3>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">Despesas Registradas (Saídas do Caixa)</span>
-              <span className="text-sm text-orange-800">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
+              <span className="text-sm font-medium">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">Custo Fixo (proporcional)</span>
-              <span className="text-sm text-orange-800">R$ {dreValues.fixedCost.toFixed(2)}</span>
+              <span className="text-sm font-medium">R$ {dreValues.fixedCost.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">Custo Variável</span>
-              <span className="text-sm text-orange-800">R$ {dreValues.variableCost.toFixed(2)}</span>
+              <span className="text-sm font-medium">R$ {dreValues.variableCost.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pl-4">
               <span className="text-sm">CMO - Custo de Mão de Obra (proporcional)</span>
-              <span className="text-sm text-orange-800">R$ {dreValues.laborCost.toFixed(2)}</span>
+              <span className="text-sm font-medium">R$ {dreValues.laborCost.toFixed(2)}</span>
             </div>
           </div>
 
