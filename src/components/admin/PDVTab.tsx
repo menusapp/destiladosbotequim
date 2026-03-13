@@ -224,6 +224,37 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     },
   });
 
+  // Fetch today's confirmed reservations for table badges
+  const { data: todayReservations } = useQuery({
+    queryKey: ["pdv-today-reservations", restaurantId],
+    queryFn: async () => {
+      const today = format(new Date(), "yyyy-MM-dd");
+      const { data } = await supabase
+        .from("reservations")
+        .select("id, table_id, reservation_time, customer_name, status")
+        .eq("restaurant_id", restaurantId)
+        .eq("reservation_date", today)
+        .eq("status", "confirmed");
+      return data || [];
+    },
+  });
+
+  // Map table_id → reservation info for today
+  const reservationByTable = useMemo(() => {
+    const map = new Map<string, { time: string; customerName: string }>();
+    todayReservations?.forEach(r => {
+      if (r.table_id) {
+        map.set(r.table_id, { 
+          time: r.reservation_time?.slice(0, 5) || "", 
+          customerName: r.customer_name 
+        });
+      }
+    });
+    return map;
+  }, [todayReservations]);
+    },
+  });
+
   // Realtime for tables and orders
   useEffect(() => {
     const ch = supabase.channel("pdv-tables-rt")
