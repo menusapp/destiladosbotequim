@@ -307,7 +307,7 @@ export const PaymentConfirmationModal = ({
                     <Button
                       key={method.id}
                       variant="outline"
-                      onClick={() => addPayment(method.name)}
+                      onClick={() => addPayment(method.name, method.method_type)}
                       className="h-auto p-3 flex-col items-start text-left"
                     >
                       <div className="flex items-center gap-2 w-full">
