@@ -678,7 +678,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           <div className="space-y-2 pl-4">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">(-) CMV dos Produtos</span>
-              <span className="font-semibold text-orange-800">R$ {dreValues.cmv.toFixed(2)}</span>
+              <span className="font-semibold">R$ {dreValues.cmv.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center border-b pb-2">
               <span className="font-semibold">Lucro Bruto</span>
