@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, Utensils, FileText } from "lucide-react";
+import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText } from "lucide-react";
 
 interface Settings {
   logo_url: string | null;
@@ -19,8 +19,6 @@ interface Settings {
   login_require_name: boolean;
   login_require_phone: boolean;
   bill_request_enabled: boolean;
-  featured_section_enabled: boolean;
-  featured_section_title: string;
 }
 
 const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
@@ -34,8 +32,6 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     login_require_name: true,
     login_require_phone: false,
     bill_request_enabled: true,
-    featured_section_enabled: true,
-    featured_section_title: "Destaques",
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -49,7 +45,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, bill_request_enabled, featured_section_enabled, featured_section_title")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, bill_request_enabled")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -66,8 +62,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           login_require_name: data.login_require_name ?? true,
           login_require_phone: data.login_require_phone ?? false,
           bill_request_enabled: data.bill_request_enabled ?? true,
-          featured_section_enabled: data.featured_section_enabled ?? true,
-          featured_section_title: data.featured_section_title || "Destaques",
+          
         });
       }
     } catch (error) {
@@ -132,8 +127,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           login_require_name: settings.login_require_name,
           login_require_phone: settings.login_require_phone,
           bill_request_enabled: settings.bill_request_enabled,
-          featured_section_enabled: settings.featured_section_enabled,
-          featured_section_title: settings.featured_section_title,
+          
         })
         .eq('id', restaurantId);
       if (error) throw error;
@@ -173,7 +167,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             Cadastro de Clientes
           </TabsTrigger>
           <TabsTrigger value="cardapio" className="gap-2">
-            <Utensils className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
             Cardápio
           </TabsTrigger>
         </TabsList>
@@ -439,35 +433,6 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                   />
                 </div>
 
-                {/* Seção de Destaques */}
-                <div className="flex items-center justify-between py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
-                      <Utensils className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Seção de Destaques</p>
-                      <p className="text-xs text-muted-foreground">Exibir carrossel de produtos em destaque no cardápio</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={settings.featured_section_enabled}
-                    onCheckedChange={(checked) => setSettings({ ...settings, featured_section_enabled: checked })}
-                  />
-                </div>
-
-                {/* Título da Seção de Destaques */}
-                {settings.featured_section_enabled && (
-                  <div className="py-4">
-                    <Label className="text-sm font-medium mb-2 block">Título da Seção de Destaques</Label>
-                    <Input
-                      value={settings.featured_section_title}
-                      onChange={(e) => setSettings({ ...settings, featured_section_title: e.target.value })}
-                      placeholder="Destaques"
-                      className="max-w-xs"
-                    />
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
