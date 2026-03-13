@@ -200,8 +200,11 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           paper_size: webConfig.paperSize,
           auto_print_orders: webConfig.autoPrintOrders,
           auto_print_receipts: webConfig.autoPrintReceipts,
+          font_family: webConfig.fontFamily,
+          font_size: webConfig.fontSize,
+          font_bold: webConfig.fontBold,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'restaurant_id' });
+        } as any, { onConflict: 'restaurant_id' });
       if (error) throw error;
       toast.success('Configurações salvas!');
     } catch (error) {
