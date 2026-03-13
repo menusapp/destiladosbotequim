@@ -614,7 +614,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                               placeholder="0"
                               className="text-center h-9 text-sm"
                             />
-                            <p className="text-xs text-primary mt-1 font-medium">
+                <p className="text-xs text-muted-foreground mt-1">
                               {((billCounts[bill.key as keyof typeof billCounts] || 0) * bill.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </p>
                           </div>
@@ -642,7 +642,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                               placeholder="0"
                               className="text-center h-9 text-sm"
                             />
-                            <p className="text-xs text-primary mt-1 font-medium">
+                <p className="text-xs text-muted-foreground mt-1">
                               {((coinCounts[coin.key as keyof typeof coinCounts] || 0) * coin.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </p>
                           </div>
@@ -650,10 +650,10 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       </div>
                     </div>
 
-                    <div className="bg-primary/10 p-4 rounded-lg border border-primary/20">
+                <div className="bg-muted/50 p-4 rounded-lg border">
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-sm">Valor de Abertura:</span>
-                        <span className="text-2xl font-bold text-primary">
+                        <span className="text-2xl font-bold">
                           {calculateCashCountTotal().toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
                       </div>
@@ -728,82 +728,54 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
       {/* Cards de resumo do caixa atual */}
       {currentSession && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <DollarSign className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Caixa Atual</CardTitle>
-                <CardDescription className="text-xs">
-                  Aberto por {currentSession.opened_by} em {format(new Date(currentSession.opened_at), "dd/MM/yyyy 'às' HH:mm")}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-muted/50 p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Inicial</p>
-                <p className="text-xl font-bold mt-1">R$ {currentSession.opening_balance.toFixed(2)}</p>
-              </div>
-              <div className="bg-primary/5 p-3 rounded-lg border border-primary/10">
-                <p className="text-xs text-muted-foreground">Entradas</p>
-                <p className="text-xl font-bold text-primary mt-1">R$ {calculateTotalSales().toFixed(2)}</p>
-              </div>
-              <div className="bg-destructive/5 p-3 rounded-lg border border-destructive/10">
-                <p className="text-xs text-muted-foreground">Saídas</p>
-                <p className="text-xl font-bold text-destructive mt-1">R$ {calculateTotalExpenses().toFixed(2)}</p>
-              </div>
-              <div className="bg-muted/80 p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Esperado</p>
-                <p className="text-xl font-bold mt-1">R$ {calculateExpectedBalance().toFixed(2)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-3 rounded-lg border bg-card">
+            <p className="text-xs text-muted-foreground">Saldo Inicial</p>
+            <p className="text-lg font-bold mt-1 tabular-nums">R$ {currentSession.opening_balance.toFixed(2)}</p>
+          </div>
+          <div className="p-3 rounded-lg border bg-card">
+            <p className="text-xs text-muted-foreground">Entradas</p>
+            <p className="text-lg font-bold mt-1 tabular-nums">R$ {calculateTotalSales().toFixed(2)}</p>
+          </div>
+          <div className="p-3 rounded-lg border bg-card">
+            <p className="text-xs text-muted-foreground">Saídas</p>
+            <p className="text-lg font-bold mt-1 tabular-nums">R$ {calculateTotalExpenses().toFixed(2)}</p>
+          </div>
+          <div className="p-3 rounded-lg border bg-card">
+            <p className="text-xs text-muted-foreground">Saldo Esperado</p>
+            <p className="text-lg font-bold mt-1 tabular-nums">R$ {calculateExpectedBalance().toFixed(2)}</p>
+          </div>
+          <p className="col-span-full text-xs text-muted-foreground">
+            Aberto por {currentSession.opened_by} em {format(new Date(currentSession.opened_at), "dd/MM/yyyy 'às' HH:mm")}
+          </p>
+        </div>
       )}
 
       {/* Último caixa fechado */}
       {!currentSession && lastClosedSession && (
-        <Card className="bg-muted/20">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Último Caixa Fechado</CardTitle>
-                <CardDescription className="text-xs">
-                  Fechado em {format(new Date(lastClosedSession.closed_at!), "dd/MM/yyyy 'às' HH:mm")}
-                </CardDescription>
-              </div>
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">Último caixa fechado — {format(new Date(lastClosedSession.closed_at!), "dd/MM/yyyy 'às' HH:mm")}</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg border bg-card">
+              <p className="text-xs text-muted-foreground">Saldo Inicial</p>
+              <p className="text-lg font-bold mt-1 tabular-nums">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-background p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Inicial</p>
-                <p className="text-xl font-bold mt-1">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
-              </div>
-              <div className="bg-background p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Esperado</p>
-                <p className="text-xl font-bold mt-1">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
-              </div>
-              <div className="bg-background p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Final</p>
-                <p className="text-xl font-bold mt-1">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
-              </div>
-              <div className="bg-background p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Diferença</p>
-                <p className={cn("text-xl font-bold mt-1", (lastClosedSession.difference || 0) >= 0 ? 'text-primary' : 'text-destructive')}>
-                  R$ {(lastClosedSession.difference || 0).toFixed(2)}
-                </p>
-              </div>
+            <div className="p-3 rounded-lg border bg-card">
+              <p className="text-xs text-muted-foreground">Saldo Esperado</p>
+              <p className="text-lg font-bold mt-1 tabular-nums">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="p-3 rounded-lg border bg-card">
+              <p className="text-xs text-muted-foreground">Saldo Final</p>
+              <p className="text-lg font-bold mt-1 tabular-nums">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
+            </div>
+            <div className="p-3 rounded-lg border bg-card">
+              <p className="text-xs text-muted-foreground">Diferença</p>
+              <p className={cn("text-lg font-bold mt-1 tabular-nums", (lastClosedSession.difference || 0) >= 0 ? 'text-foreground' : 'text-destructive')}>
+                R$ {(lastClosedSession.difference || 0).toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Tabs */}
@@ -915,30 +887,30 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
               {movements.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma movimentação registrada</p>
               ) : (
-                <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                <div className="border rounded-lg overflow-hidden divide-y max-h-[400px] overflow-y-auto">
                   {movements.map((mov) => (
-                    <div
-                      key={mov.id}
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-lg border",
-                        mov.movement_type === "entrada" ? "bg-primary/5 border-primary/10" : "bg-destructive/5 border-destructive/10"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        {mov.movement_type === "entrada" ? (
-                          <TrendingUp className="h-4 w-4 text-primary shrink-0" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4 text-destructive shrink-0" />
-                        )}
-                        <div>
-                          <p className="font-medium text-sm">{mov.description}</p>
+                    <div key={mov.id} className="flex items-center justify-between px-4 py-2.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={cn("h-6 w-6 rounded-full flex items-center justify-center shrink-0",
+                          mov.movement_type === "entrada" ? "bg-muted" : "bg-muted"
+                        )}>
+                          {mov.movement_type === "entrada" ? (
+                            <TrendingUp className="h-3.5 w-3.5 text-foreground" />
+                          ) : (
+                            <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{mov.description}</p>
                           <p className="text-xs text-muted-foreground">
                             {mov.category && `${mov.category} · `}
                             {mov.payment_method} · {mov.created_by} · {format(new Date(mov.created_at), "HH:mm")}
                           </p>
                         </div>
                       </div>
-                      <span className={cn("font-bold text-sm tabular-nums", mov.movement_type === "entrada" ? "text-primary" : "text-destructive")}>
+                      <span className={cn("font-semibold text-sm tabular-nums shrink-0 ml-3",
+                        mov.movement_type === "entrada" ? "text-foreground" : "text-muted-foreground"
+                      )}>
                         {mov.movement_type === "entrada" ? "+" : "-"}R$ {mov.amount.toFixed(2)}
                       </span>
                     </div>
@@ -996,90 +968,76 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  Receitas
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Receitas</CardTitle>
+                  <span className="text-lg font-bold tabular-nums">
+                    R$ {closedSessions
+                      .filter(filterSessionsByDate)
+                      .reduce((total, session) => {
+                        const sessionEntries = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "entrada");
+                        return total + sessionEntries.reduce((sum, m) => sum + m.amount, 0);
+                      }, 0)
+                      .toFixed(2)}
+                  </span>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-primary/5 rounded-lg border border-primary/10">
-                    <span className="font-medium text-sm">Total de Receitas</span>
-                    <span className="text-xl font-bold text-primary tabular-nums">
-                      R$ {closedSessions
-                        .filter(filterSessionsByDate)
-                        .reduce((total, session) => {
-                          const sessionEntries = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "entrada");
-                          return total + sessionEntries.reduce((sum, m) => sum + m.amount, 0);
-                        }, 0)
-                        .toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Por categoria</p>
-                    {Array.from(new Set(
-                      allMovements.filter(m => m.movement_type === "entrada").map(m => m.category || "Sem categoria")
-                    )).map(category => {
-                      const total = closedSessions
-                        .filter(filterSessionsByDate)
-                        .reduce((sum, session) => {
-                          const categoryMovements = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "entrada" && (m.category || "Sem categoria") === category);
-                          return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
-                        }, 0);
-                      if (total === 0) return null;
-                      return (
-                        <div key={category} className="flex justify-between p-2 border-l-2 border-primary/30 pl-3 text-sm">
-                          <span className="text-muted-foreground">{category}</span>
-                          <span className="font-medium tabular-nums">R$ {total.toFixed(2)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="border rounded-lg overflow-hidden divide-y">
+                  {Array.from(new Set(
+                    allMovements.filter(m => m.movement_type === "entrada").map(m => m.category || "Sem categoria")
+                  )).map(category => {
+                    const total = closedSessions
+                      .filter(filterSessionsByDate)
+                      .reduce((sum, session) => {
+                        const categoryMovements = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "entrada" && (m.category || "Sem categoria") === category);
+                        return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
+                      }, 0);
+                    if (total === 0) return null;
+                    return (
+                      <div key={category} className="flex justify-between px-4 py-2 text-sm">
+                        <span className="text-muted-foreground">{category}</span>
+                        <span className="font-medium tabular-nums">R$ {total.toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingDown className="h-4 w-4 text-destructive" />
-                  Despesas
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Despesas</CardTitle>
+                  <span className="text-lg font-bold tabular-nums">
+                    R$ {closedSessions
+                      .filter(filterSessionsByDate)
+                      .reduce((total, session) => {
+                        const sessionExits = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "saida");
+                        return total + sessionExits.reduce((sum, m) => sum + m.amount, 0);
+                      }, 0)
+                      .toFixed(2)}
+                  </span>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-destructive/5 rounded-lg border border-destructive/10">
-                    <span className="font-medium text-sm">Total de Despesas</span>
-                    <span className="text-xl font-bold text-destructive tabular-nums">
-                      R$ {closedSessions
-                        .filter(filterSessionsByDate)
-                        .reduce((total, session) => {
-                          const sessionExits = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "saida");
-                          return total + sessionExits.reduce((sum, m) => sum + m.amount, 0);
-                        }, 0)
-                        .toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Por categoria</p>
-                    {Array.from(new Set(
-                      allMovements.filter(m => m.movement_type === "saida").map(m => m.category || "Sem categoria")
-                    )).map(category => {
-                      const total = closedSessions
-                        .filter(filterSessionsByDate)
-                        .reduce((sum, session) => {
-                          const categoryMovements = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "saida" && (m.category || "Sem categoria") === category);
-                          return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
-                        }, 0);
-                      if (total === 0) return null;
-                      return (
-                        <div key={category} className="flex justify-between p-2 border-l-2 border-destructive/30 pl-3 text-sm">
-                          <span className="text-muted-foreground">{category}</span>
-                          <span className="font-medium tabular-nums">R$ {total.toFixed(2)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="border rounded-lg overflow-hidden divide-y">
+                  {Array.from(new Set(
+                    allMovements.filter(m => m.movement_type === "saida").map(m => m.category || "Sem categoria")
+                  )).map(category => {
+                    const total = closedSessions
+                      .filter(filterSessionsByDate)
+                      .reduce((sum, session) => {
+                        const categoryMovements = allMovements.filter(m => m.cash_session_id === session.id && m.movement_type === "saida" && (m.category || "Sem categoria") === category);
+                        return sum + categoryMovements.reduce((t, m) => t + m.amount, 0);
+                      }, 0);
+                    if (total === 0) return null;
+                    return (
+                      <div key={category} className="flex justify-between px-4 py-2 text-sm">
+                        <span className="text-muted-foreground">{category}</span>
+                        <span className="font-medium tabular-nums">R$ {total.toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -1132,10 +1090,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
           {/* DRE */}
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FileText className="h-4 w-4 text-primary" />
-                </div>
+              <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base">DRE - Demonstração de Resultados</CardTitle>
                   <CardDescription className="text-xs">
@@ -1148,63 +1103,46 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
               </div>
             </CardHeader>
             <CardContent>
-              <div className="rounded-lg border overflow-hidden">
-                {/* Receita Bruta */}
-                <div className="flex justify-between items-center px-4 py-3 bg-muted/30 border-b font-semibold">
+              <div className="rounded-lg border overflow-hidden divide-y">
+                <div className="flex justify-between items-center px-4 py-3 bg-muted/40 font-semibold text-sm">
                   <span>Receita Bruta</span>
-                  <span className="text-primary tabular-nums">R$ {dreData.salesTotal.toFixed(2)}</span>
+                  <span className="tabular-nums">R$ {dreData.salesTotal.toFixed(2)}</span>
                 </div>
-
-                {/* CMV */}
-                <div className="flex justify-between items-center px-4 py-2.5 border-b text-sm pl-8">
+                <div className="flex justify-between items-center px-4 py-2.5 text-sm pl-8">
                   <span className="text-muted-foreground">(-) CMV</span>
                   <span className="tabular-nums">R$ {dreData.cmv.toFixed(2)}</span>
                 </div>
-
-                {/* Lucro Bruto */}
-                <div className="flex justify-between items-center px-4 py-2.5 border-b bg-muted/20 font-medium text-sm">
+                <div className="flex justify-between items-center px-4 py-2.5 bg-muted/20 font-medium text-sm">
                   <div className="flex items-center gap-2">
                     <span>(=) Lucro Bruto</span>
-                    <span className="text-xs text-muted-foreground">Margem: {dreData.grossMargin.toFixed(1)}%</span>
+                    <span className="text-xs text-muted-foreground">{dreData.grossMargin.toFixed(1)}%</span>
                   </div>
-                  <span className="text-primary tabular-nums">R$ {dreData.grossProfit.toFixed(2)}</span>
+                  <span className="tabular-nums">R$ {dreData.grossProfit.toFixed(2)}</span>
                 </div>
-
-                {/* Despesas */}
-                <div className="flex justify-between items-center px-4 py-2.5 border-b text-sm pl-8">
+                <div className="flex justify-between items-center px-4 py-2.5 text-sm pl-8">
                   <span className="text-muted-foreground">(-) Despesas Operacionais</span>
                   <span className="tabular-nums">R$ {dreData.operationalExpenses.toFixed(2)}</span>
                 </div>
-
-                {/* Total Despesas */}
-                <div className="flex justify-between items-center px-4 py-2.5 border-b bg-muted/20 text-sm font-medium">
+                <div className="flex justify-between items-center px-4 py-2.5 bg-muted/20 text-sm font-medium">
                   <span>Total de Despesas</span>
                   <span className="tabular-nums">R$ {dreData.totalExpenses.toFixed(2)}</span>
                 </div>
-
-                {/* Lucro Líquido */}
-                <div className={cn(
-                  "flex justify-between items-center px-4 py-4 font-bold text-lg",
-                  dreData.netProfit >= 0 ? "bg-primary/5" : "bg-destructive/5"
-                )}>
+                <div className="flex justify-between items-center px-4 py-3 font-bold">
                   <span>Lucro Líquido</span>
-                  <span className={cn("tabular-nums", dreData.netProfit >= 0 ? "text-primary" : "text-destructive")}>
+                  <span className={cn("tabular-nums", dreData.netProfit < 0 && "text-destructive")}>
                     R$ {dreData.netProfit.toFixed(2)}
                   </span>
                 </div>
               </div>
 
-              {/* Margens */}
               <div className="grid grid-cols-2 gap-3 mt-3">
-                <div className="flex flex-col p-3 bg-muted/30 rounded-lg border">
+                <div className="flex flex-col p-3 rounded-lg border bg-card">
                   <span className="text-xs text-muted-foreground">Margem Bruta</span>
                   <span className="font-bold text-lg tabular-nums">{dreData.grossMargin.toFixed(1)}%</span>
                 </div>
-                <div className={cn("flex flex-col p-3 rounded-lg border",
-                  dreData.netMargin >= 0 ? "bg-primary/5 border-primary/10" : "bg-destructive/5 border-destructive/10"
-                )}>
+                <div className="flex flex-col p-3 rounded-lg border bg-card">
                   <span className="text-xs text-muted-foreground">Margem Líquida</span>
-                  <span className={cn("font-bold text-lg tabular-nums", dreData.netMargin >= 0 ? "text-primary" : "text-destructive")}>
+                  <span className={cn("font-bold text-lg tabular-nums", dreData.netMargin < 0 && "text-destructive")}>
                     {dreData.netMargin.toFixed(1)}%
                   </span>
                 </div>
