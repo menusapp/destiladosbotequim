@@ -728,82 +728,54 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
 
       {/* Cards de resumo do caixa atual */}
       {currentSession && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <DollarSign className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Caixa Atual</CardTitle>
-                <CardDescription className="text-xs">
-                  Aberto por {currentSession.opened_by} em {format(new Date(currentSession.opened_at), "dd/MM/yyyy 'às' HH:mm")}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-muted/50 p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Inicial</p>
-                <p className="text-xl font-bold mt-1">R$ {currentSession.opening_balance.toFixed(2)}</p>
-              </div>
-              <div className="bg-primary/5 p-3 rounded-lg border border-primary/10">
-                <p className="text-xs text-muted-foreground">Entradas</p>
-                <p className="text-xl font-bold text-primary mt-1">R$ {calculateTotalSales().toFixed(2)}</p>
-              </div>
-              <div className="bg-destructive/5 p-3 rounded-lg border border-destructive/10">
-                <p className="text-xs text-muted-foreground">Saídas</p>
-                <p className="text-xl font-bold text-destructive mt-1">R$ {calculateTotalExpenses().toFixed(2)}</p>
-              </div>
-              <div className="bg-muted/80 p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Esperado</p>
-                <p className="text-xl font-bold mt-1">R$ {calculateExpectedBalance().toFixed(2)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-3 rounded-lg border bg-card">
+            <p className="text-xs text-muted-foreground">Saldo Inicial</p>
+            <p className="text-lg font-bold mt-1 tabular-nums">R$ {currentSession.opening_balance.toFixed(2)}</p>
+          </div>
+          <div className="p-3 rounded-lg border bg-card">
+            <p className="text-xs text-muted-foreground">Entradas</p>
+            <p className="text-lg font-bold mt-1 tabular-nums">R$ {calculateTotalSales().toFixed(2)}</p>
+          </div>
+          <div className="p-3 rounded-lg border bg-card">
+            <p className="text-xs text-muted-foreground">Saídas</p>
+            <p className="text-lg font-bold mt-1 tabular-nums">R$ {calculateTotalExpenses().toFixed(2)}</p>
+          </div>
+          <div className="p-3 rounded-lg border bg-card">
+            <p className="text-xs text-muted-foreground">Saldo Esperado</p>
+            <p className="text-lg font-bold mt-1 tabular-nums">R$ {calculateExpectedBalance().toFixed(2)}</p>
+          </div>
+          <p className="col-span-full text-xs text-muted-foreground">
+            Aberto por {currentSession.opened_by} em {format(new Date(currentSession.opened_at), "dd/MM/yyyy 'às' HH:mm")}
+          </p>
+        </div>
       )}
 
       {/* Último caixa fechado */}
       {!currentSession && lastClosedSession && (
-        <Card className="bg-muted/20">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Último Caixa Fechado</CardTitle>
-                <CardDescription className="text-xs">
-                  Fechado em {format(new Date(lastClosedSession.closed_at!), "dd/MM/yyyy 'às' HH:mm")}
-                </CardDescription>
-              </div>
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">Último caixa fechado — {format(new Date(lastClosedSession.closed_at!), "dd/MM/yyyy 'às' HH:mm")}</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg border bg-card">
+              <p className="text-xs text-muted-foreground">Saldo Inicial</p>
+              <p className="text-lg font-bold mt-1 tabular-nums">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-background p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Inicial</p>
-                <p className="text-xl font-bold mt-1">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
-              </div>
-              <div className="bg-background p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Esperado</p>
-                <p className="text-xl font-bold mt-1">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
-              </div>
-              <div className="bg-background p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Saldo Final</p>
-                <p className="text-xl font-bold mt-1">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
-              </div>
-              <div className="bg-background p-3 rounded-lg border">
-                <p className="text-xs text-muted-foreground">Diferença</p>
-                <p className={cn("text-xl font-bold mt-1", (lastClosedSession.difference || 0) >= 0 ? 'text-primary' : 'text-destructive')}>
-                  R$ {(lastClosedSession.difference || 0).toFixed(2)}
-                </p>
-              </div>
+            <div className="p-3 rounded-lg border bg-card">
+              <p className="text-xs text-muted-foreground">Saldo Esperado</p>
+              <p className="text-lg font-bold mt-1 tabular-nums">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
             </div>
-          </CardContent>
-        </Card>
+            <div className="p-3 rounded-lg border bg-card">
+              <p className="text-xs text-muted-foreground">Saldo Final</p>
+              <p className="text-lg font-bold mt-1 tabular-nums">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
+            </div>
+            <div className="p-3 rounded-lg border bg-card">
+              <p className="text-xs text-muted-foreground">Diferença</p>
+              <p className={cn("text-lg font-bold mt-1 tabular-nums", (lastClosedSession.difference || 0) >= 0 ? 'text-foreground' : 'text-destructive')}>
+                R$ {(lastClosedSession.difference || 0).toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Tabs */}
