@@ -688,9 +688,12 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                           🔔 Pedido Novo
                         </Badge>
                       )}
-                      <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">
-                        {isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
-                      </Badge>
+                      {/* Reservation badge for non-occupied tables */}
+                      {!isOccupied && reservationByTable.has(table.id) && (
+                        <Badge className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100">
+                          🕐 Reservado {reservationByTable.get(table.id)!.time}
+                        </Badge>
+                      )}
                       {isOccupied && occupiedSince && (
                         <p className="text-[10px] text-muted-foreground">Desde {occupiedSince}</p>
                       )}
