@@ -74,6 +74,9 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     paperSize: '80mm',
     autoPrintOrders: false,
     autoPrintReceipts: false,
+    fontFamily: 'Arial Black',
+    fontSize: 12,
+    fontBold: true,
   });
 
   useEffect(() => {
