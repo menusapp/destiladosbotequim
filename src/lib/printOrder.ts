@@ -51,15 +51,21 @@ export const printOrder = async (
   },
   restaurantId: string
 ) => {
-  // Fetch paper size setting
+  // Fetch printer settings
   let paperSize = "80mm";
+  let fontFamily = "Arial Black";
+  let fontSize = 12;
+  let fontBold = true;
   try {
     const { data } = await supabase
       .from("printer_settings")
-      .select("paper_size")
+      .select("*")
       .eq("restaurant_id", restaurantId)
       .maybeSingle();
     if (data?.paper_size) paperSize = data.paper_size;
+    if ((data as any)?.font_family) fontFamily = (data as any).font_family;
+    if ((data as any)?.font_size) fontSize = (data as any).font_size;
+    if ((data as any)?.font_bold !== undefined) fontBold = Boolean((data as any).font_bold);
   } catch {}
 
   // Fetch restaurant name
