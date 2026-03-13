@@ -650,10 +650,10 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
                       </div>
                     </div>
 
-                    <div className="bg-primary/10 p-4 rounded-lg border border-primary/20">
+                <div className="bg-muted/50 p-4 rounded-lg border">
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-sm">Valor de Abertura:</span>
-                        <span className="text-2xl font-bold text-primary">
+                        <span className="text-2xl font-bold">
                           {calculateCashCountTotal().toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
                       </div>
