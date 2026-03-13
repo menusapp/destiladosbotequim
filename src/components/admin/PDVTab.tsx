@@ -60,6 +60,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
   const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [orderSearchTerm, setOrderSearchTerm] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // Customer fields
