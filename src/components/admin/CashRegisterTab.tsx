@@ -1090,10 +1090,7 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
           {/* DRE */}
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FileText className="h-4 w-4 text-primary" />
-                </div>
+              <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base">DRE - Demonstração de Resultados</CardTitle>
                   <CardDescription className="text-xs">
@@ -1106,63 +1103,46 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
               </div>
             </CardHeader>
             <CardContent>
-              <div className="rounded-lg border overflow-hidden">
-                {/* Receita Bruta */}
-                <div className="flex justify-between items-center px-4 py-3 bg-muted/30 border-b font-semibold">
+              <div className="rounded-lg border overflow-hidden divide-y">
+                <div className="flex justify-between items-center px-4 py-3 bg-muted/40 font-semibold text-sm">
                   <span>Receita Bruta</span>
-                  <span className="text-primary tabular-nums">R$ {dreData.salesTotal.toFixed(2)}</span>
+                  <span className="tabular-nums">R$ {dreData.salesTotal.toFixed(2)}</span>
                 </div>
-
-                {/* CMV */}
-                <div className="flex justify-between items-center px-4 py-2.5 border-b text-sm pl-8">
+                <div className="flex justify-between items-center px-4 py-2.5 text-sm pl-8">
                   <span className="text-muted-foreground">(-) CMV</span>
                   <span className="tabular-nums">R$ {dreData.cmv.toFixed(2)}</span>
                 </div>
-
-                {/* Lucro Bruto */}
-                <div className="flex justify-between items-center px-4 py-2.5 border-b bg-muted/20 font-medium text-sm">
+                <div className="flex justify-between items-center px-4 py-2.5 bg-muted/20 font-medium text-sm">
                   <div className="flex items-center gap-2">
                     <span>(=) Lucro Bruto</span>
-                    <span className="text-xs text-muted-foreground">Margem: {dreData.grossMargin.toFixed(1)}%</span>
+                    <span className="text-xs text-muted-foreground">{dreData.grossMargin.toFixed(1)}%</span>
                   </div>
-                  <span className="text-primary tabular-nums">R$ {dreData.grossProfit.toFixed(2)}</span>
+                  <span className="tabular-nums">R$ {dreData.grossProfit.toFixed(2)}</span>
                 </div>
-
-                {/* Despesas */}
-                <div className="flex justify-between items-center px-4 py-2.5 border-b text-sm pl-8">
+                <div className="flex justify-between items-center px-4 py-2.5 text-sm pl-8">
                   <span className="text-muted-foreground">(-) Despesas Operacionais</span>
                   <span className="tabular-nums">R$ {dreData.operationalExpenses.toFixed(2)}</span>
                 </div>
-
-                {/* Total Despesas */}
-                <div className="flex justify-between items-center px-4 py-2.5 border-b bg-muted/20 text-sm font-medium">
+                <div className="flex justify-between items-center px-4 py-2.5 bg-muted/20 text-sm font-medium">
                   <span>Total de Despesas</span>
                   <span className="tabular-nums">R$ {dreData.totalExpenses.toFixed(2)}</span>
                 </div>
-
-                {/* Lucro Líquido */}
-                <div className={cn(
-                  "flex justify-between items-center px-4 py-4 font-bold text-lg",
-                  dreData.netProfit >= 0 ? "bg-primary/5" : "bg-destructive/5"
-                )}>
+                <div className="flex justify-between items-center px-4 py-3 font-bold">
                   <span>Lucro Líquido</span>
-                  <span className={cn("tabular-nums", dreData.netProfit >= 0 ? "text-primary" : "text-destructive")}>
+                  <span className={cn("tabular-nums", dreData.netProfit < 0 && "text-destructive")}>
                     R$ {dreData.netProfit.toFixed(2)}
                   </span>
                 </div>
               </div>
 
-              {/* Margens */}
               <div className="grid grid-cols-2 gap-3 mt-3">
-                <div className="flex flex-col p-3 bg-muted/30 rounded-lg border">
+                <div className="flex flex-col p-3 rounded-lg border bg-card">
                   <span className="text-xs text-muted-foreground">Margem Bruta</span>
                   <span className="font-bold text-lg tabular-nums">{dreData.grossMargin.toFixed(1)}%</span>
                 </div>
-                <div className={cn("flex flex-col p-3 rounded-lg border",
-                  dreData.netMargin >= 0 ? "bg-primary/5 border-primary/10" : "bg-destructive/5 border-destructive/10"
-                )}>
+                <div className="flex flex-col p-3 rounded-lg border bg-card">
                   <span className="text-xs text-muted-foreground">Margem Líquida</span>
-                  <span className={cn("font-bold text-lg tabular-nums", dreData.netMargin >= 0 ? "text-primary" : "text-destructive")}>
+                  <span className={cn("font-bold text-lg tabular-nums", dreData.netMargin < 0 && "text-destructive")}>
                     {dreData.netMargin.toFixed(1)}%
                   </span>
                 </div>
