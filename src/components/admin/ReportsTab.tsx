@@ -592,69 +592,65 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       </div>
 
       {/* Cards de Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Vendas */}
-        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-300 shadow-card hover:shadow-hover transition-shadow">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-5 border">
           <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-orange-700">Vendas</p>
-              <p className="text-3xl font-bold text-orange-900">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Vendas</p>
+              <p className="text-2xl font-bold">
                 R$ {stats.salesToday.toFixed(2).replace(".", ",")}
               </p>
-              <p className="text-xs text-orange-600">{stats.ordersCount} pedidos</p>
+              <p className="text-xs text-muted-foreground">{stats.ordersCount} pedidos</p>
             </div>
-            <div className="p-3 bg-orange-600 rounded-xl">
-              <DollarSign className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <DollarSign className="h-5 w-5 text-primary" />
             </div>
           </div>
         </Card>
 
-        {/* Ticket Médio */}
-        <Card className="p-6 bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-300 shadow-card hover:shadow-hover transition-shadow">
+        <Card className="p-5 border">
           <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-amber-700">Ticket Médio</p>
-              <p className="text-3xl font-bold text-amber-900">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Ticket Médio</p>
+              <p className="text-2xl font-bold">
                 R$ {stats.averageTicket.toFixed(2).replace(".", ",")}
               </p>
-              <p className="text-xs text-amber-600">Por pedido pago</p>
+              <p className="text-xs text-muted-foreground">Por pedido pago</p>
             </div>
-            <div className="p-3 bg-amber-500 rounded-xl">
-              <TrendingUp className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <TrendingUp className="h-5 w-5 text-primary" />
             </div>
           </div>
         </Card>
 
-        {/* Mesas Atendidas */}
-        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
+        <Card className="p-5 border">
           <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-orange-700">Mesas Atendidas</p>
-              <p className="text-3xl font-bold text-orange-900">{stats.mesasAtendidas}</p>
-              <p className="text-xs text-orange-600">Comandas no período</p>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Mesas Atendidas</p>
+              <p className="text-2xl font-bold">{stats.mesasAtendidas}</p>
+              <p className="text-xs text-muted-foreground">Comandas no período</p>
             </div>
-            <div className="p-3 bg-orange-500 rounded-xl">
-              <Users className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
             </div>
           </div>
         </Card>
 
-        {/* Formas de Pagamento */}
-        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-card hover:shadow-hover transition-shadow">
+        <Card className="p-5 border">
           <div className="flex items-start justify-between mb-3">
-            <p className="text-sm font-medium text-orange-700">Formas de Pagamento</p>
-            <div className="p-2 bg-orange-400 rounded-xl">
-              <CreditCard className="h-5 w-5 text-white" />
+            <p className="text-sm font-medium text-muted-foreground">Formas de Pagamento</p>
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <CreditCard className="h-5 w-5 text-primary" />
             </div>
           </div>
           {stats.paymentsByMethod.length === 0 ? (
-            <p className="text-xs text-orange-600">Nenhuma forma cadastrada</p>
+            <p className="text-xs text-muted-foreground">Nenhuma forma cadastrada</p>
           ) : (
             <div className="space-y-1">
               {stats.paymentsByMethod.map(pm => (
                 <div key={pm.method_name} className="flex justify-between items-center text-sm">
-                  <span className="text-orange-800 truncate">{pm.method_name}</span>
-                  <span className="font-semibold text-orange-900">R$ {pm.total.toFixed(2).replace(".", ",")}</span>
+                  <span className="text-muted-foreground truncate">{pm.method_name}</span>
+                  <span className="font-semibold">R$ {pm.total.toFixed(2).replace(".", ",")}</span>
                 </div>
               ))}
             </div>
