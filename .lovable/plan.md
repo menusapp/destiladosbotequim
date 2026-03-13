@@ -1,51 +1,44 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: Ajustes de layout e funcionalidades do PDV
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### 1. Sem rolagem da página — tudo cabe na tela
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+**Problema**: A página tem `overflow-y-auto` no lado esquerdo, causando scroll da página inteira.
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+**Correção**: Fazer o container principal usar `h-[calc(100vh-...)]` ou `overflow-hidden` no nível da página, e mover toda rolagem para dentro de áreas internas (grid de mesas com `overflow-y-auto` e painel direito já usa `ScrollArea`). O wrapper de mesas vai ganhar `overflow-y-auto` delimitado, sem afetar a página.
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+### 2. Botão "Gerenciar Mesas" no canto superior esquerdo, acima das mesas
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+**Correção**: Mover o botão de "Gerenciar Mesas" do header geral para logo acima do grid de mesas, alinhado à esquerda. O header mantém só o título e stats.
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+### 3. Resultados do search bar com rolagem interna (max-height)
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+**Problema**: Resultados de busca esticam a tela quando há muitos pedidos.
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**Correção**: Envolver os resultados num container com `max-h-[300px] overflow-y-auto` para scroll interno.
+
+### 4. Horário de ocupação da mesa nos pedidos
+
+**Correção**:
+- Usar `tables.occupied_at` (já existe no schema) como hora de entrada
+- Quando a mesa é liberada, o `occupied_at` volta a `null` — então não dá para mostrar horário de saída em mesas ativas, mas sim nas que já foram finalizadas
+- Nos cards de mesa ocupada: mostrar "Desde HH:mm" usando `occupied_at`
+- Na busca de pedidos, incluir `created_at` do pedido para referência de horário
+- Para histórico completo (entrada/saída), a informação de saída estaria na `bill.paid_at` ou `comanda.closed_at`
+
+### 5. Filtro de data no search bar
+
+**Correção**:
+- Adicionar um `DatePicker` (Popover + Calendar) no final da barra de busca
+- State `orderSearchDate` (Date | undefined)
+- Quando selecionada uma data, filtrar `searchableOrders` por `created_at` naquele dia
+- A query de searchable orders passa a não filtrar só ativos — quando há data selecionada, busca todos os pedidos locais daquele dia (incluindo `delivered`, `cancelled`, `paid`)
+- Isso permite pesquisar pedidos passados por dia
+
+### Arquivo
+
+| Arquivo | Mudança |
+|---|---|
+| `PDVTab.tsx` | Layout `overflow-hidden` na página, scroll interno nas mesas e resultados; botão Gerenciar Mesas reposicionado; DatePicker com filtro de data; horário de ocupação nos cards |
+
