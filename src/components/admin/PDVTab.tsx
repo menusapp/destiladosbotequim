@@ -252,8 +252,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     });
     return map;
   }, [todayReservations]);
-    },
-  });
 
   // Realtime for tables and orders
   useEffect(() => {
