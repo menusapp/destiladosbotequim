@@ -439,35 +439,6 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                   />
                 </div>
 
-                {/* Seção de Destaques */}
-                <div className="flex items-center justify-between py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
-                      <Utensils className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Seção de Destaques</p>
-                      <p className="text-xs text-muted-foreground">Exibir carrossel de produtos em destaque no cardápio</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={settings.featured_section_enabled}
-                    onCheckedChange={(checked) => setSettings({ ...settings, featured_section_enabled: checked })}
-                  />
-                </div>
-
-                {/* Título da Seção de Destaques */}
-                {settings.featured_section_enabled && (
-                  <div className="py-4">
-                    <Label className="text-sm font-medium mb-2 block">Título da Seção de Destaques</Label>
-                    <Input
-                      value={settings.featured_section_title}
-                      onChange={(e) => setSettings({ ...settings, featured_section_title: e.target.value })}
-                      placeholder="Destaques"
-                      className="max-w-xs"
-                    />
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
