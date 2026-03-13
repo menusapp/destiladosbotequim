@@ -550,23 +550,27 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-semibold tracking-[-0.025em]">Relatórios</h2>
-        <p className="text-muted-foreground font-light">
-          Visualize métricas e análises do seu negócio
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-[-0.025em]">Relatórios</h2>
+          <p className="text-sm text-muted-foreground font-light">Visualize métricas e análises do seu negócio</p>
+        </div>
       </div>
 
-      {/* Filtros de Data */}
-      <div className="flex flex-wrap gap-2">
-        <Button variant={dateFilter === "today" ? "default" : "outline"} onClick={() => setDateFilter("today")}>Hoje</Button>
-        <Button variant={dateFilter === "yesterday" ? "default" : "outline"} onClick={() => setDateFilter("yesterday")}>Ontem</Button>
-        <Button variant={dateFilter === "7days" ? "default" : "outline"} onClick={() => setDateFilter("7days")}>7 Dias</Button>
-        <Button variant={dateFilter === "30days" ? "default" : "outline"} onClick={() => setDateFilter("30days")}>30 Dias</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          { key: "today", label: "Hoje" },
+          { key: "yesterday", label: "Ontem" },
+          { key: "7days", label: "7 Dias" },
+          { key: "30days", label: "30 Dias" },
+        ].map((f) => (
+          <Button key={f.key} variant={dateFilter === f.key ? "default" : "outline"} size="sm" onClick={() => setDateFilter(f.key)}>
+            {f.label}
+          </Button>
+        ))}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant={dateFilter === "custom" ? "default" : "outline"} className={cn("justify-start text-left font-normal")}>
+            <Button variant={dateFilter === "custom" ? "default" : "outline"} size="sm" className="justify-start text-left font-normal">
               <CalendarIcon className="mr-2 h-4 w-4" />
               {dateFilter === "custom" && customDateRange?.from
                 ? customDateRange.to
@@ -579,10 +583,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
             <CalendarComponent
               mode="range"
               selected={customDateRange}
-              onSelect={(range) => {
-                setCustomDateRange(range);
-                if (range?.from) setDateFilter("custom");
-              }}
+              onSelect={(range) => { setCustomDateRange(range); if (range?.from) setDateFilter("custom"); }}
               locale={ptBR}
               numberOfMonths={2}
               className="pointer-events-auto"
@@ -591,132 +592,118 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         </Popover>
       </div>
 
-      {/* Cards de Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5 border">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Vendas</p>
-              <p className="text-2xl font-bold">
-                R$ {stats.salesToday.toFixed(2).replace(".", ",")}
-              </p>
-              <p className="text-xs text-muted-foreground">{stats.ordersCount} pedidos</p>
-            </div>
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <DollarSign className="h-5 w-5 text-primary" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-primary" />
             </div>
           </div>
+          <p className="text-2xl font-bold tracking-tight">R$ {stats.salesToday.toFixed(2).replace(".", ",")}</p>
+          <p className="text-xs text-muted-foreground mt-1">Vendas · {stats.ordersCount} pedidos</p>
         </Card>
 
-        <Card className="p-5 border">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Ticket Médio</p>
-              <p className="text-2xl font-bold">
-                R$ {stats.averageTicket.toFixed(2).replace(".", ",")}
-              </p>
-              <p className="text-xs text-muted-foreground">Por pedido pago</p>
-            </div>
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-primary" />
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-primary" />
             </div>
           </div>
+          <p className="text-2xl font-bold tracking-tight">R$ {stats.averageTicket.toFixed(2).replace(".", ",")}</p>
+          <p className="text-xs text-muted-foreground mt-1">Ticket Médio</p>
         </Card>
 
-        <Card className="p-5 border">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Mesas Atendidas</p>
-              <p className="text-2xl font-bold">{stats.mesasAtendidas}</p>
-              <p className="text-xs text-muted-foreground">Comandas no período</p>
-            </div>
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Users className="h-5 w-5 text-primary" />
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Users className="h-4 w-4 text-primary" />
             </div>
           </div>
+          <p className="text-2xl font-bold tracking-tight">{stats.mesasAtendidas}</p>
+          <p className="text-xs text-muted-foreground mt-1">Mesas Atendidas</p>
         </Card>
 
-        <Card className="p-5 border">
-          <div className="flex items-start justify-between mb-3">
-            <p className="text-sm font-medium text-muted-foreground">Formas de Pagamento</p>
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <CreditCard className="h-5 w-5 text-primary" />
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <CreditCard className="h-4 w-4 text-primary" />
             </div>
           </div>
           {stats.paymentsByMethod.length === 0 ? (
             <p className="text-xs text-muted-foreground">Nenhuma forma cadastrada</p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {stats.paymentsByMethod.map(pm => (
-                <div key={pm.method_name} className="flex justify-between items-center text-sm">
+                <div key={pm.method_name} className="flex justify-between items-center text-xs">
                   <span className="text-muted-foreground truncate">{pm.method_name}</span>
-                  <span className="font-semibold">R$ {pm.total.toFixed(2).replace(".", ",")}</span>
+                  <span className="font-semibold tabular-nums">R$ {pm.total.toFixed(2).replace(".", ",")}</span>
                 </div>
               ))}
             </div>
           )}
+          <p className="text-xs text-muted-foreground mt-1">Formas de Pagamento</p>
         </Card>
       </div>
 
-      {/* DRE */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Demonstrativo de Resultados (DRE)
-          </CardTitle>
-          <CardDescription>Análise financeira completa do período selecionado</CardDescription>
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FileText className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Demonstrativo de Resultados (DRE)</CardTitle>
+              <CardDescription className="text-xs">Análise financeira do período selecionado</CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex justify-between items-center border-b pb-2">
-              <span className="font-semibold text-lg">Receita Bruta</span>
-              <span className="font-bold text-lg text-primary">R$ {dreValues.grossRevenue.toFixed(2)}</span>
+        <CardContent>
+          <div className="rounded-lg border overflow-hidden">
+            <div className="flex justify-between items-center px-4 py-3 bg-muted/30 border-b font-semibold">
+              <span>Receita Bruta</span>
+              <span className="text-primary tabular-nums">R$ {dreValues.grossRevenue.toFixed(2)}</span>
             </div>
-          </div>
-
-          <div className="space-y-2 pl-4">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center px-4 py-2.5 border-b text-sm pl-8">
               <span className="text-muted-foreground">(-) CMV dos Produtos</span>
-              <span className="font-semibold">R$ {dreValues.cmv.toFixed(2)}</span>
+              <span className="tabular-nums">R$ {dreValues.cmv.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center border-b pb-2">
-              <span className="font-semibold">Lucro Bruto</span>
-              <span className="font-bold text-primary">R$ {dreValues.grossProfit.toFixed(2)}</span>
+            <div className="flex justify-between items-center px-4 py-2.5 border-b bg-muted/20 font-medium text-sm">
+              <span>Lucro Bruto</span>
+              <span className="text-primary tabular-nums">R$ {dreValues.grossProfit.toFixed(2)}</span>
             </div>
-          </div>
-
-          <div className="space-y-2 pl-4">
-            <h3 className="font-semibold text-sm text-muted-foreground mb-2">Despesas Operacionais:</h3>
-            <div className="flex justify-between items-center pl-4">
-              <span className="text-sm">Despesas Registradas (Saídas do Caixa)</span>
-              <span className="text-sm font-medium">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
+            <div className="flex justify-between items-center px-4 py-2 border-b text-sm pl-8">
+              <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Despesas Operacionais</span>
+              <span></span>
             </div>
-            <div className="flex justify-between items-center pl-4">
-              <span className="text-sm">Custo Fixo (proporcional)</span>
-              <span className="text-sm font-medium">R$ {dreValues.fixedCost.toFixed(2)}</span>
+            <div className="flex justify-between items-center px-4 py-2 border-b text-sm pl-12">
+              <span className="text-muted-foreground">Saídas do Caixa</span>
+              <span className="tabular-nums">R$ {dreValues.operationalExpenses.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center pl-4">
-              <span className="text-sm">Custo Variável</span>
-              <span className="text-sm font-medium">R$ {dreValues.variableCost.toFixed(2)}</span>
+            <div className="flex justify-between items-center px-4 py-2 border-b text-sm pl-12">
+              <span className="text-muted-foreground">Custo Fixo (proporcional)</span>
+              <span className="tabular-nums">R$ {dreValues.fixedCost.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center pl-4">
-              <span className="text-sm">CMO - Custo de Mão de Obra (proporcional)</span>
-              <span className="text-sm font-medium">R$ {dreValues.laborCost.toFixed(2)}</span>
+            <div className="flex justify-between items-center px-4 py-2 border-b text-sm pl-12">
+              <span className="text-muted-foreground">Custo Variável</span>
+              <span className="tabular-nums">R$ {dreValues.variableCost.toFixed(2)}</span>
             </div>
-          </div>
-
-          <div className="space-y-2 border-t-2 pt-4">
-            <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg">
-              <span className="font-bold text-lg">Lucro Operacional Final</span>
-              <span className={`font-bold text-2xl ${dreValues.operationalProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+            <div className="flex justify-between items-center px-4 py-2 border-b text-sm pl-12">
+              <span className="text-muted-foreground">CMO - Mão de Obra (proporcional)</span>
+              <span className="tabular-nums">R$ {dreValues.laborCost.toFixed(2)}</span>
+            </div>
+            <div className={cn(
+              "flex justify-between items-center px-4 py-4 font-bold text-lg",
+              dreValues.operationalProfit >= 0 ? "bg-primary/5" : "bg-destructive/5"
+            )}>
+              <span>Lucro Operacional</span>
+              <span className={cn("tabular-nums", dreValues.operationalProfit >= 0 ? "text-primary" : "text-destructive")}>
                 R$ {dreValues.operationalProfit.toFixed(2)}
               </span>
             </div>
             {dreValues.grossRevenue > 0 && (
-              <div className="flex justify-between items-center text-sm text-muted-foreground">
+              <div className="flex justify-between items-center px-4 py-2 text-xs text-muted-foreground border-t">
                 <span>Margem Operacional</span>
-                <span className="font-semibold">{((dreValues.operationalProfit / dreValues.grossRevenue) * 100).toFixed(2)}%</span>
+                <span className="font-semibold tabular-nums">{((dreValues.operationalProfit / dreValues.grossRevenue) * 100).toFixed(1)}%</span>
               </div>
             )}
           </div>
