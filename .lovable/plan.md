@@ -1,51 +1,38 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: Reestruturar "Dados da Empresa" com layout profissional
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### Problema atual
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+O `CompanyDataSettings.tsx` é uma pilha vertical de Cards sem organização — Banner, Logo, Cor, Taxa de Serviço, Campos de Cadastro, tudo empilhado. Parece amador, sem hierarquia visual.
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+### Solução
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+Reorganizar usando **Tabs internas** (como o `SettingsTab.tsx` já faz) para separar em seções lógicas, com layout em grid side-by-side onde couber na tela larga (2105px viewport).
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+### Estrutura proposta
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+**3 Tabs:**
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+1. **"Identidade Visual"** — Banner + Logo lado a lado (grid 2 colunas em desktop) + Cor principal inline
+2. **"Operacional"** — Taxa de serviço + Tempo de preparo, layout compacto com grid 2 colunas
+3. **"Cadastro de Clientes"** — Campos de cadastro (CPF, nome, telefone) com visual de lista organizada
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+### Detalhes de layout
+
+- Header da página com título + descrição (sem `h2` solto, usar `tracking-[-0.025em]` conforme design system)
+- Tabs horizontais no topo
+- Dentro de cada tab: grid `lg:grid-cols-2` para agrupar cards lado a lado em desktop
+- Banner e Logo como cards separados lado a lado em vez de empilhados
+- Cor principal integrada no card de Logo (preview inline com o color picker)
+- Taxa de serviço e Tempo de preparo em cards compactos lado a lado
+- Cadastro com visual de lista com separadores e ícones já existentes
+- Botão "Salvar" sticky no fundo de cada tab
+- Remover duplicação de dados entre `CompanyDataSettings` e `SettingsTab` — o `SettingsTab.tsx` parece ser código legado não usado, manter apenas `CompanyDataSettings`
+
+### Arquivo
+
+| Arquivo | Mudança |
+|---|---|
+| `CompanyDataSettings.tsx` | Reescrever layout com Tabs internas, grid 2 colunas, visual profissional SaaS |
+
