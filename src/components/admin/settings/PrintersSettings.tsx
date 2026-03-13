@@ -224,16 +224,19 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
       setTesting(null);
       return;
     }
+    const fontW = webConfig.fontBold ? 'bold' : 'normal';
+    const fontF = webConfig.fontFamily;
+    const fontS = webConfig.fontSize;
     printWindow.document.write(`
       <html>
       <head>
         <title>Teste de Impressão</title>
         <style>
           @page { margin: 0; size: ${width} auto; }
-          body { font-family: monospace; width: ${width}; margin: 0 auto; padding: 8px; font-size: 12px; }
+          body { font-family: '${fontF}', monospace; width: ${width}; margin: 0 auto; padding: 8px; font-size: ${fontS}px; font-weight: ${fontW}; }
           .center { text-align: center; }
           .line { border-top: 1px dashed #000; margin: 8px 0; }
-          h2 { margin: 4px 0; font-size: 14px; }
+          h2 { margin: 4px 0; font-size: ${fontS + 2}px; }
         </style>
       </head>
       <body>
