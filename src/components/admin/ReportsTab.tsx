@@ -552,8 +552,8 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold text-foreground">Relatórios</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-2xl font-semibold tracking-[-0.025em]">Relatórios</h2>
+        <p className="text-muted-foreground font-light">
           Visualize métricas e análises do seu negócio
         </p>
       </div>
