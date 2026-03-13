@@ -184,9 +184,13 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     return map;
   }, [activeLocalOrders]);
 
-  // Filter searchable orders based on search term
+  // Filter searchable orders based on search term and/or date
   const filteredOrders = useMemo(() => {
-    if (!searchableOrders || orderSearchTerm.length < 2) return [];
+    if (!searchableOrders) return [];
+    // If date is selected but no search term, show all orders for that day
+    if (orderSearchDate && orderSearchTerm.length < 2) return searchableOrders;
+    // If no date and no search term, show nothing
+    if (orderSearchTerm.length < 2) return [];
     const term = orderSearchTerm.toLowerCase();
     return searchableOrders.filter((order: any) => {
       if (order.customer_name?.toLowerCase().includes(term)) return true;
@@ -194,7 +198,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
       if (order.order_items?.some((item: any) => item.products?.name?.toLowerCase().includes(term))) return true;
       return false;
     });
-  }, [searchableOrders, orderSearchTerm]);
+  }, [searchableOrders, orderSearchTerm, orderSearchDate]);
 
   const { data: tables, refetch: refetchTables } = useQuery({
     queryKey: ["pdv-tables", restaurantId],
