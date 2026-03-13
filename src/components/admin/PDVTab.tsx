@@ -473,7 +473,77 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
       {/* Main content: tables grid + order panel */}
       <div className="flex-1 flex gap-4 min-h-0">
         {/* Left: Tables Grid */}
-        <div className="flex-1 overflow-y-auto pr-2">
+        <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+          {/* Order Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar pedido por nome, CPF ou item..."
+              value={orderSearchTerm}
+              onChange={e => setOrderSearchTerm(e.target.value)}
+              className="pl-9 h-9 text-sm"
+            />
+            {orderSearchTerm && (
+              <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                onClick={() => setOrderSearchTerm("")}>
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+
+          {/* Search Results */}
+          {orderSearchTerm.length >= 2 && (
+            <div className="space-y-2">
+              {filteredOrders.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido encontrado</p>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">{filteredOrders.length} pedido{filteredOrders.length !== 1 ? "s" : ""} encontrado{filteredOrders.length !== 1 ? "s" : ""}</p>
+                  {filteredOrders.map((order: any) => {
+                    const statusMap: Record<string, { label: string; variant: "default" | "warning" | "success" | "secondary" }> = {
+                      pending: { label: "Pendente", variant: "warning" },
+                      accepted: { label: "Aceito", variant: "default" },
+                      preparing: { label: "Preparando", variant: "default" },
+                      ready: { label: "Pronto", variant: "success" },
+                      delivered: { label: "Entregue", variant: "secondary" },
+                    };
+                    const status = statusMap[order.status] || { label: order.status, variant: "secondary" as const };
+                    const itemsSummary = order.order_items?.map((i: any) => `${i.quantity}x ${i.products?.name || "?"}`).join(", ") || "";
+                    const tableInfo = order.tables;
+                    const tableLabel = tableInfo ? (tableInfo.table_name || `Mesa ${tableInfo.table_number}`) : "—";
+
+                    return (
+                      <Card
+                        key={order.id}
+                        className="cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => {
+                          if (order.table_id && tables) {
+                            const t = tables.find(tb => tb.id === order.table_id);
+                            if (t) { setSelectedTableForDrawer(t); setOrderSearchTerm(""); }
+                          }
+                        }}
+                      >
+                        <CardContent className="p-3 flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {tableInfo?.table_number || "?"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium truncate">{order.customer_name}</span>
+                              <Badge variant={status.variant} className="text-[10px] flex-shrink-0">{status.label}</Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground truncate">{tableLabel} • {itemsSummary}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Tables Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {tables?.map(table => {
               const isOccupied = table.is_occupied;
