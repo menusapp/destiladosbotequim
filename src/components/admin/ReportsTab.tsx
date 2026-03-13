@@ -682,7 +682,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
             </div>
             <div className="flex justify-between items-center border-b pb-2">
               <span className="font-semibold">Lucro Bruto</span>
-              <span className="font-bold text-orange-600">R$ {dreValues.grossProfit.toFixed(2)}</span>
+              <span className="font-bold text-primary">R$ {dreValues.grossProfit.toFixed(2)}</span>
             </div>
           </div>
 
