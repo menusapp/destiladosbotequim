@@ -128,6 +128,20 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     },
   });
 
+  // Fetch searchable orders with items and table info
+  const { data: searchableOrders } = useQuery({
+    queryKey: ["pdv-searchable-orders", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("id, status, customer_name, customer_cpf, table_id, created_at, order_items(id, quantity, products(name)), tables(table_number, table_name)")
+        .eq("restaurant_id", restaurantId)
+        .eq("order_type", "local")
+        .in("status", ["pending", "accepted", "preparing", "ready", "delivered"]);
+      return data || [];
+    },
+  });
+
   // Group pending orders by table_id (for badge only)
   const pendingByTable = useMemo(() => {
     const map = new Map<string, number>();
@@ -152,6 +166,18 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     });
     return map;
   }, [activeLocalOrders]);
+
+  // Filter searchable orders based on search term
+  const filteredOrders = useMemo(() => {
+    if (!searchableOrders || orderSearchTerm.length < 2) return [];
+    const term = orderSearchTerm.toLowerCase();
+    return searchableOrders.filter((order: any) => {
+      if (order.customer_name?.toLowerCase().includes(term)) return true;
+      if (order.customer_cpf?.includes(term)) return true;
+      if (order.order_items?.some((item: any) => item.products?.name?.toLowerCase().includes(term))) return true;
+      return false;
+    });
+  }, [searchableOrders, orderSearchTerm]);
 
   const { data: tables, refetch: refetchTables } = useQuery({
     queryKey: ["pdv-tables", restaurantId],
