@@ -187,11 +187,12 @@ export const printOrder = async (
         @page { margin: 0; size: ${paperSize} auto; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-          font-family: 'Courier New', monospace;
+          font-family: '${fontFamily}', 'Courier New', monospace;
           width: ${paperSize};
           margin: 0 auto;
           padding: 6px;
-          font-size: 12px;
+          font-size: ${fontSize}px;
+          font-weight: ${fontBold ? "bold" : "normal"};
           line-height: 1.4;
           color: #000;
         }

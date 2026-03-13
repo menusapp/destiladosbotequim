@@ -373,6 +373,83 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           </CardContent>
         </Card>
 
+        {/* Tipografia */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="text-lg font-bold">A</span>
+              Tipografia da Impressão
+            </CardTitle>
+            <CardDescription>
+              Configure a fonte, tamanho e estilo do texto impresso
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Fonte</Label>
+                <Select
+                  value={webConfig.fontFamily}
+                  onValueChange={(value) => setWebConfig(prev => ({ ...prev, fontFamily: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_OPTIONS.map((f) => (
+                      <SelectItem key={f.value} value={f.value}>
+                        <span style={{ fontFamily: f.value }}>{f.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tamanho (px)</Label>
+                <Select
+                  value={String(webConfig.fontSize)}
+                  onValueChange={(value) => setWebConfig(prev => ({ ...prev, fontSize: parseInt(value) }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_SIZE_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={String(s)}>{s}px</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-end pb-1">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={webConfig.fontBold}
+                    onCheckedChange={(checked) => setWebConfig(prev => ({ ...prev, fontBold: checked }))}
+                  />
+                  <Label>Negrito</Label>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3 bg-muted/50">
+              <p className="text-xs text-muted-foreground mb-2">Pré-visualização:</p>
+              <div
+                style={{
+                  fontFamily: webConfig.fontFamily,
+                  fontSize: `${webConfig.fontSize}px`,
+                  fontWeight: webConfig.fontBold ? 'bold' : 'normal',
+                }}
+              >
+                <p>1x X-Burger ............. R$ 25,90</p>
+                <p>2x Refrigerante ......... R$ 12,00</p>
+                <p style={{ marginTop: 4 }}>TOTAL: R$ 37,90</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Save */}
         <div className="flex justify-end">
           <Button onClick={saveWebConfig} disabled={saving}>
