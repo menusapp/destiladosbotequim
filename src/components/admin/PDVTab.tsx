@@ -10,13 +10,18 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import {
   Search, Users, ShoppingCart, UserPlus, X, Loader2, Settings,
-  MoreVertical, QrCode, Link2, Eraser, CheckCircle, Package
+  MoreVertical, QrCode, Link2, Eraser, CheckCircle, Package, CalendarIcon
 } from "lucide-react";
+import { format, startOfDay, endOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
