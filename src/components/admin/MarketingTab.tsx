@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Megaphone, Clock, History, Settings } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { AlertTriangle, Megaphone, Clock, History, Settings, Send, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CampaignsList } from "./marketing/CampaignsList";
 import { ScheduledMessages } from "./marketing/ScheduledMessages";
@@ -17,9 +18,11 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
   const [whatsappEnabled, setWhatsappEnabled] = useState<boolean | null>(null);
   const [whatsappConnected, setWhatsappConnected] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ campaigns: 0, scheduled: 0, sent: 0 });
 
   useEffect(() => {
     checkWhatsAppStatus();
+    fetchStats();
   }, [restaurantId]);
 
   const checkWhatsAppStatus = async () => {
@@ -46,6 +49,21 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
     }
   };
 
+  const fetchStats = async () => {
+    try {
+      const [campaignsRes, scheduledRes, sentRes] = await Promise.all([
+        supabase.from("marketing_campaigns").select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId).eq("is_active", true),
+        supabase.from("marketing_scheduled_messages").select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId).eq("status", "pending"),
+        supabase.from("marketing_scheduled_messages").select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId).eq("status", "sent"),
+      ]);
+      setStats({
+        campaigns: campaignsRes.count || 0,
+        scheduled: scheduledRes.count || 0,
+        sent: sentRes.count || 0,
+      });
+    } catch (e) { console.error(e); }
+  };
+
   const isWhatsAppReady = whatsappEnabled && whatsappConnected;
 
   if (loading) {
@@ -59,13 +77,50 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Marketing</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-semibold tracking-[-0.025em]">Marketing</h1>
+        <p className="text-muted-foreground font-light">
           Crie campanhas automatizadas para engajar seus clientes via WhatsApp
         </p>
       </div>
 
-      {/* Aviso de dependência do WhatsApp */}
+      {/* Metric cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Megaphone className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.campaigns}</p>
+              <p className="text-xs text-muted-foreground">Campanhas ativas</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Clock className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.scheduled}</p>
+              <p className="text-xs text-muted-foreground">Agendadas</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Send className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.sent}</p>
+              <p className="text-xs text-muted-foreground">Enviadas</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* WhatsApp warning */}
       {!isWhatsAppReady && (
         <Alert variant="destructive" className="bg-destructive/10 border-destructive/20">
           <AlertTriangle className="h-4 w-4" />
@@ -99,7 +154,7 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
           </TabsTrigger>
           <TabsTrigger value="scheduled" className="gap-2">
             <Clock className="h-4 w-4" />
-            Mensagens Agendadas
+            Agendadas
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-2">
             <History className="h-4 w-4" />
