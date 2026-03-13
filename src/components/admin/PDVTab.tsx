@@ -207,10 +207,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
     const ch = supabase.channel("pdv-tables-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "tables" }, () => refetchTables())
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => refetchTables())
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => { refetchPendingOrders(); refetchActiveOrders(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => { refetchPendingOrders(); refetchActiveOrders(); queryClient.invalidateQueries({ queryKey: ["pdv-searchable-orders"] }); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [refetchTables, refetchPendingOrders, refetchActiveOrders]);
+  }, [refetchTables, refetchPendingOrders, refetchActiveOrders, queryClient]);
 
   // Auto-open table from notification
   useEffect(() => {
