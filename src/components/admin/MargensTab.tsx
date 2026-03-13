@@ -294,176 +294,152 @@ export default function MargensTab({ restaurantId }: MargensTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* CMV Desejado */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            CMV Desejado
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <Label>Percentual Alvo de CMV (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={targetCMV}
-                onChange={(e) => setTargetCMV(parseFloat(e.target.value) || 0)}
-                placeholder="30"
-              />
-            </div>
-            <Button onClick={handleSaveTargetCMV}>Salvar</Button>
+      {/* Header com CMV Desejado inline */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-[-0.025em]">Margens</h2>
+          <p className="text-sm text-muted-foreground font-light">Análise de custos e margens por produto</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
+            <Target className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Meta CMV:</span>
+            <Input
+              type="number"
+              step="0.1"
+              value={targetCMV}
+              onChange={(e) => setTargetCMV(parseFloat(e.target.value) || 0)}
+              className="w-16 h-7 text-xs text-center p-1"
+            />
+            <span className="text-xs text-muted-foreground">%</span>
           </div>
-        </CardContent>
-      </Card>
+          <Button size="sm" variant="outline" onClick={handleSaveTargetCMV}>Salvar</Button>
+        </div>
+      </div>
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">CMV Médio</CardTitle>
-            {averageCMV > targetCMV ? (
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center", averageCMV > targetCMV ? "bg-destructive/10" : "bg-primary/10")}>
+              {averageCMV > targetCMV ? (
+                <TrendingDown className="h-4 w-4 text-destructive" />
+              ) : (
+                <TrendingUp className="h-4 w-4 text-primary" />
+              )}
+            </div>
+          </div>
+          <p className="text-2xl font-bold tracking-tight">{averageCMV.toFixed(1)}%</p>
+          <p className="text-xs text-muted-foreground mt-1">CMV Médio · Meta: {targetCMV}%</p>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Package className="h-4 w-4 text-primary" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold tracking-tight">{products.length}</p>
+          <p className="text-xs text-muted-foreground mt-1">Produtos Cadastrados</p>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-9 w-9 rounded-lg bg-destructive/10 flex items-center justify-center">
               <TrendingDown className="h-4 w-4 text-destructive" />
-            ) : (
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {averageCMV.toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground">
-              Meta: {targetCMV}%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Produtos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{products.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Produtos cadastrados
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">CMV Acima da Meta</CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              {getHighCMVCount()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Precisam de atenção
-            </p>
-          </CardContent>
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-destructive">{getHighCMVCount()}</p>
+          <p className="text-xs text-muted-foreground mt-1">CMV Acima da Meta</p>
         </Card>
       </div>
 
       {/* Lista de Produtos */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-4">
-            <CardTitle>Análise de Margens por Produto</CardTitle>
+            <CardTitle className="text-base">Análise por Produto</CardTitle>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   placeholder="Buscar produto..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 w-64"
+                  className="pl-8 h-8 w-56 text-sm"
                 />
               </div>
-              <Button variant="outline" size="sm" onClick={toggleSortOrder}>
-                <ArrowUpDown className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={toggleSortOrder} className="h-8 text-xs">
+                <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
                 Margem {sortOrder === 'desc' ? '↓' : '↑'}
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="max-h-[500px] overflow-y-auto space-y-2">
+        <CardContent className="p-0">
+          {/* Table Header */}
+          <div className="grid grid-cols-[1fr_100px_100px_100px_90px] items-center gap-2 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/40 border-y">
+            <span>Produto</span>
+            <span className="text-right">Custo</span>
+            <span className="text-right">Preço</span>
+            <span className="text-right">Margem</span>
+            <span className="text-right">CMV</span>
+          </div>
+
+          <div className="max-h-[500px] overflow-y-auto divide-y">
             {filteredAndSortedProducts.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">Nenhum produto encontrado</p>
+              <p className="text-center text-muted-foreground py-8 text-sm">Nenhum produto encontrado</p>
             ) : (
               filteredAndSortedProducts.map((product) => (
-                <div key={product.id} className="bg-secondary/30 rounded overflow-hidden">
+                <div key={product.id}>
                   {product.hasVariations && product.variations ? (
-                    // Produto com variações - expandível
-                    <div>
+                    <>
                       <div
-                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-secondary/50 transition-colors"
+                        className="grid grid-cols-[1fr_100px_100px_100px_90px] items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-muted/20 transition-colors"
                         onClick={() => toggleExpanded(product.id)}
                       >
-                        <div className="flex items-center gap-2 flex-1">
+                        <div className="flex items-center gap-2">
                           {expandedProducts.has(product.id) ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           )}
-                          <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {product.variations.length} variações
-                            </p>
+                          <span className="font-medium text-sm truncate">{product.name}</span>
+                          <Badge variant="outline" className="text-[10px] shrink-0">{product.variations.length} var.</Badge>
+                        </div>
+                        <span className="text-right text-sm tabular-nums text-muted-foreground">—</span>
+                        <span className="text-right text-sm tabular-nums text-muted-foreground">—</span>
+                        <span className="text-right text-sm tabular-nums text-muted-foreground">—</span>
+                        <span className="text-right text-sm tabular-nums text-muted-foreground">—</span>
+                      </div>
+                      {expandedProducts.has(product.id) && product.variations.map((variation, idx) => (
+                        <div
+                          key={idx}
+                          className="grid grid-cols-[1fr_100px_100px_100px_90px] items-center gap-2 px-4 py-2 pl-10 bg-muted/10 border-t border-dashed"
+                        >
+                          <span className="text-sm text-muted-foreground truncate">• {variation.name}</span>
+                          <span className="text-right text-sm tabular-nums">R$ {variation.cost.toFixed(2)}</span>
+                          <span className="text-right text-sm tabular-nums">R$ {variation.price.toFixed(2)}</span>
+                          <span className="text-right text-sm tabular-nums font-medium">R$ {variation.margin.toFixed(2)}</span>
+                          <div className="flex justify-end">
+                            <Badge variant={variation.cmv_percentage > targetCMV ? "destructive" : "default"} className="text-[10px]">
+                              {variation.cmv_percentage.toFixed(1)}%
+                            </Badge>
                           </div>
                         </div>
-                        <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
-                          Variável
+                      ))}
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-[1fr_100px_100px_100px_90px] items-center gap-2 px-4 py-2.5 hover:bg-muted/20 transition-colors">
+                      <span className="font-medium text-sm truncate">{product.name}</span>
+                      <span className="text-right text-sm tabular-nums">R$ {product.cost.toFixed(2)}</span>
+                      <span className="text-right text-sm tabular-nums">R$ {product.price.toFixed(2)}</span>
+                      <span className="text-right text-sm tabular-nums font-medium">R$ {product.margin.toFixed(2)}</span>
+                      <div className="flex justify-end">
+                        <Badge variant={product.cmv_percentage > targetCMV ? "destructive" : "default"} className="text-[10px]">
+                          {product.cmv_percentage.toFixed(1)}%
                         </Badge>
                       </div>
-                      
-                      {expandedProducts.has(product.id) && (
-                        <div className="border-t border-border/50 bg-background/50">
-                          {product.variations.map((variation, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between p-3 pl-10 border-b border-border/30 last:border-b-0"
-                            >
-                              <div className="flex-1">
-                                <p className="font-medium text-sm">• {variation.name}</p>
-                                <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                                  <span>Custo: R$ {variation.cost.toFixed(2)}</span>
-                                  <span>Preço: R$ {variation.price.toFixed(2)}</span>
-                                  <span className="font-semibold text-foreground">
-                                    Margem: R$ {variation.margin.toFixed(2)}
-                                  </span>
-                                </div>
-                              </div>
-                              <Badge variant={variation.cmv_percentage > targetCMV ? "destructive" : "default"}>
-                                CMV: {variation.cmv_percentage.toFixed(1)}%
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    // Produto sem variações - linha única
-                    <div className="flex items-center justify-between p-3">
-                      <div className="flex-1">
-                        <p className="font-medium">{product.name}</p>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                          <span>Custo: R$ {product.cost.toFixed(2)}</span>
-                          <span>Preço: R$ {product.price.toFixed(2)}</span>
-                          <span className="font-semibold text-foreground">
-                            Margem: R$ {product.margin.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                      <Badge variant={product.cmv_percentage > targetCMV ? "destructive" : "default"}>
-                        CMV: {product.cmv_percentage.toFixed(1)}%
-                      </Badge>
                     </div>
                   )}
                 </div>
