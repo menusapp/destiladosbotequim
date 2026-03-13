@@ -136,14 +136,25 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
 
   // Fetch searchable orders with items and table info
   const { data: searchableOrders } = useQuery({
-    queryKey: ["pdv-searchable-orders", restaurantId],
+    queryKey: ["pdv-searchable-orders", restaurantId, orderSearchDate?.toISOString()],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("orders")
         .select("id, status, customer_name, customer_cpf, table_id, created_at, order_items(id, quantity, products(name)), tables(table_number, table_name)")
         .eq("restaurant_id", restaurantId)
-        .eq("order_type", "local")
-        .in("status", ["pending", "accepted", "preparing", "ready", "delivered"]);
+        .eq("order_type", "local");
+
+      if (orderSearchDate) {
+        // When date is selected, show all orders from that day (any status)
+        query = query
+          .gte("created_at", startOfDay(orderSearchDate).toISOString())
+          .lte("created_at", endOfDay(orderSearchDate).toISOString());
+      } else {
+        // Default: only active orders
+        query = query.in("status", ["pending", "accepted", "preparing", "ready", "delivered"]);
+      }
+
+      const { data } = await query;
       return data || [];
     },
   });
