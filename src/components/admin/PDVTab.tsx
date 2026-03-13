@@ -476,7 +476,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
   const availableTables = tables?.filter(t => !t.is_occupied).length || 0;
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-[calc(100vh-7rem)] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <div>
