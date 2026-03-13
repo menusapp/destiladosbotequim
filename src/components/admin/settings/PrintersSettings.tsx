@@ -38,7 +38,23 @@ interface WebPrinterConfig {
   paperSize: string;
   autoPrintOrders: boolean;
   autoPrintReceipts: boolean;
+  fontFamily: string;
+  fontSize: number;
+  fontBold: boolean;
 }
+
+const FONT_OPTIONS = [
+  { value: 'Arial Black', label: 'Arial Black' },
+  { value: 'Courier New', label: 'Courier New' },
+  { value: 'Arial', label: 'Arial' },
+  { value: 'Verdana', label: 'Verdana' },
+  { value: 'Tahoma', label: 'Tahoma' },
+  { value: 'Impact', label: 'Impact' },
+  { value: 'Lucida Console', label: 'Lucida Console' },
+  { value: 'monospace', label: 'Monospace' },
+];
+
+const FONT_SIZE_OPTIONS = [8, 9, 10, 11, 12, 13, 14, 16, 18];
 
 const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
@@ -58,6 +74,9 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     paperSize: '80mm',
     autoPrintOrders: false,
     autoPrintReceipts: false,
+    fontFamily: 'Arial Black',
+    fontSize: 12,
+    fontBold: true,
   });
 
   useEffect(() => {
@@ -161,6 +180,9 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           paperSize: data.paper_size || '80mm',
           autoPrintOrders: Boolean(data.auto_print_orders),
           autoPrintReceipts: Boolean(data.auto_print_receipts),
+          fontFamily: (data as any).font_family || 'Arial Black',
+          fontSize: (data as any).font_size || 12,
+          fontBold: (data as any).font_bold !== undefined ? Boolean((data as any).font_bold) : true,
         });
       }
     } catch (error) {
@@ -178,8 +200,11 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           paper_size: webConfig.paperSize,
           auto_print_orders: webConfig.autoPrintOrders,
           auto_print_receipts: webConfig.autoPrintReceipts,
+          font_family: webConfig.fontFamily,
+          font_size: webConfig.fontSize,
+          font_bold: webConfig.fontBold,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'restaurant_id' });
+        } as any, { onConflict: 'restaurant_id' });
       if (error) throw error;
       toast.success('Configurações salvas!');
     } catch (error) {
@@ -199,16 +224,19 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
       setTesting(null);
       return;
     }
+    const fontW = webConfig.fontBold ? 'bold' : 'normal';
+    const fontF = webConfig.fontFamily;
+    const fontS = webConfig.fontSize;
     printWindow.document.write(`
       <html>
       <head>
         <title>Teste de Impressão</title>
         <style>
           @page { margin: 0; size: ${width} auto; }
-          body { font-family: monospace; width: ${width}; margin: 0 auto; padding: 8px; font-size: 12px; }
+          body { font-family: '${fontF}', monospace; width: ${width}; margin: 0 auto; padding: 8px; font-size: ${fontS}px; font-weight: ${fontW}; }
           .center { text-align: center; }
           .line { border-top: 1px dashed #000; margin: 8px 0; }
-          h2 { margin: 4px 0; font-size: 14px; }
+          h2 { margin: 4px 0; font-size: ${fontS + 2}px; }
         </style>
       </head>
       <body>
@@ -342,6 +370,83 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
               <Printer className="h-4 w-4 mr-2" />
               {testing === 'web' ? 'Abrindo...' : 'Testar Impressão'}
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Tipografia */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="text-lg font-bold">A</span>
+              Tipografia da Impressão
+            </CardTitle>
+            <CardDescription>
+              Configure a fonte, tamanho e estilo do texto impresso
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Fonte</Label>
+                <Select
+                  value={webConfig.fontFamily}
+                  onValueChange={(value) => setWebConfig(prev => ({ ...prev, fontFamily: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_OPTIONS.map((f) => (
+                      <SelectItem key={f.value} value={f.value}>
+                        <span style={{ fontFamily: f.value }}>{f.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tamanho (px)</Label>
+                <Select
+                  value={String(webConfig.fontSize)}
+                  onValueChange={(value) => setWebConfig(prev => ({ ...prev, fontSize: parseInt(value) }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_SIZE_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={String(s)}>{s}px</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-end pb-1">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={webConfig.fontBold}
+                    onCheckedChange={(checked) => setWebConfig(prev => ({ ...prev, fontBold: checked }))}
+                  />
+                  <Label>Negrito</Label>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3 bg-muted/50">
+              <p className="text-xs text-muted-foreground mb-2">Pré-visualização:</p>
+              <div
+                style={{
+                  fontFamily: webConfig.fontFamily,
+                  fontSize: `${webConfig.fontSize}px`,
+                  fontWeight: webConfig.fontBold ? 'bold' : 'normal',
+                }}
+              >
+                <p>1x X-Burger ............. R$ 25,90</p>
+                <p>2x Refrigerante ......... R$ 12,00</p>
+                <p style={{ marginTop: 4 }}>TOTAL: R$ 37,90</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

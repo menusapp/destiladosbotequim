@@ -2226,6 +2226,9 @@ export type Database = {
           auto_print_orders: boolean
           auto_print_receipts: boolean
           created_at: string | null
+          font_bold: boolean
+          font_family: string
+          font_size: number
           id: string
           paper_size: string
           restaurant_id: string
@@ -2235,6 +2238,9 @@ export type Database = {
           auto_print_orders?: boolean
           auto_print_receipts?: boolean
           created_at?: string | null
+          font_bold?: boolean
+          font_family?: string
+          font_size?: number
           id?: string
           paper_size?: string
           restaurant_id: string
@@ -2244,6 +2250,9 @@ export type Database = {
           auto_print_orders?: boolean
           auto_print_receipts?: boolean
           created_at?: string | null
+          font_bold?: boolean
+          font_family?: string
+          font_size?: number
           id?: string
           paper_size?: string
           restaurant_id?: string

@@ -51,15 +51,21 @@ export const printOrder = async (
   },
   restaurantId: string
 ) => {
-  // Fetch paper size setting
+  // Fetch printer settings
   let paperSize = "80mm";
+  let fontFamily = "Arial Black";
+  let fontSize = 12;
+  let fontBold = true;
   try {
     const { data } = await supabase
       .from("printer_settings")
-      .select("paper_size")
+      .select("*")
       .eq("restaurant_id", restaurantId)
       .maybeSingle();
     if (data?.paper_size) paperSize = data.paper_size;
+    if ((data as any)?.font_family) fontFamily = (data as any).font_family;
+    if ((data as any)?.font_size) fontSize = (data as any).font_size;
+    if ((data as any)?.font_bold !== undefined) fontBold = Boolean((data as any).font_bold);
   } catch {}
 
   // Fetch restaurant name
@@ -181,11 +187,12 @@ export const printOrder = async (
         @page { margin: 0; size: ${paperSize} auto; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-          font-family: 'Courier New', monospace;
+          font-family: '${fontFamily}', 'Courier New', monospace;
           width: ${paperSize};
           margin: 0 auto;
           padding: 6px;
-          font-size: 12px;
+          font-size: ${fontSize}px;
+          font-weight: ${fontBold ? "bold" : "normal"};
           line-height: 1.4;
           color: #000;
         }
