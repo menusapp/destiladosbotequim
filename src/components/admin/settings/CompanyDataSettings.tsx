@@ -19,8 +19,6 @@ interface Settings {
   login_require_name: boolean;
   login_require_phone: boolean;
   bill_request_enabled: boolean;
-  featured_section_enabled: boolean;
-  featured_section_title: string;
 }
 
 const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
