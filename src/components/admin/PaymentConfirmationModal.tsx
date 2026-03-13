@@ -163,14 +163,19 @@ export const PaymentConfirmationModal = ({
     }
 
     try {
-      // Build concatenated payment methods string
-      const allMethods = selectedPayments.map(p => p.method);
-      const uniqueMethods = [...new Set(allMethods)];
-      const paymentMethodStr = uniqueMethods.join(", ");
+      // Build display string for orders.payment_type (no constraint)
+      const allMethodNames = selectedPayments.map(p => p.method);
+      const uniqueNames = [...new Set(allMethodNames)];
+      const paymentDisplayStr = uniqueNames.join(", ");
+
+      // For bills.payment_method (has check constraint: pix, card, credit, debit, cash, meal_voucher, NULL)
+      const allMethodTypes = selectedPayments.map(p => p.methodType);
+      const uniqueTypes = [...new Set(allMethodTypes)];
+      const billPaymentMethod = uniqueTypes.length === 1 ? uniqueTypes[0] : null;
 
       const { error } = await supabase
         .from("orders")
-        .update({ payment_type: paymentMethodStr })
+        .update({ payment_type: paymentDisplayStr })
         .eq("id", order.id);
 
       if (error) throw error;
@@ -184,7 +189,7 @@ export const PaymentConfirmationModal = ({
           subtotal: subtotal,
           service_fee: feeAmount,
           total_amount: total,
-          payment_method: paymentMethodStr,
+          payment_method: billPaymentMethod,
           status: "paid",
           paid_at: new Date().toISOString(),
         });
