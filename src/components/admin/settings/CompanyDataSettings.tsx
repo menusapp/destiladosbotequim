@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Palette, User, Phone, CreditCard } from "lucide-react";
+import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save } from "lucide-react";
 
 interface Settings {
   logo_url: string | null;
@@ -71,101 +72,43 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Por favor, selecione uma imagem");
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("A imagem deve ter no máximo 2MB");
-      return;
-    }
-
+    if (!file.type.startsWith("image/")) { toast.error("Por favor, selecione uma imagem"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("A imagem deve ter no máximo 2MB"); return; }
     setUploading(true);
-
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${restaurantId}-${Date.now()}.${fileExt}`;
       const filePath = `logos/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("product-images")
-        .upload(filePath, file);
-
+      const { error: uploadError } = await supabase.storage.from("product-images").upload(filePath, file);
       if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from("product-images")
-        .getPublicUrl(filePath);
-
+      const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(filePath);
       const logoUrl = urlData.publicUrl;
-
-      const { error: updateError } = await supabase
-        .from("restaurants")
-        .update({ logo_url: logoUrl })
-        .eq("id", restaurantId);
-
+      const { error: updateError } = await supabase.from("restaurants").update({ logo_url: logoUrl }).eq("id", restaurantId);
       if (updateError) throw updateError;
-
       setSettings({ ...settings, logo_url: logoUrl });
       toast.success("Logo atualizada!");
-    } catch (error) {
-      toast.error("Erro ao fazer upload da logo");
-      console.error(error);
-    } finally {
-      setUploading(false);
-    }
+    } catch (error) { toast.error("Erro ao fazer upload da logo"); console.error(error); } finally { setUploading(false); }
   };
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Por favor, selecione uma imagem");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("A imagem deve ter no máximo 5MB");
-      return;
-    }
-
+    if (!file.type.startsWith("image/")) { toast.error("Por favor, selecione uma imagem"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("A imagem deve ter no máximo 5MB"); return; }
     setUploadingBanner(true);
-
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${restaurantId}-banner-${Date.now()}.${fileExt}`;
       const filePath = `banners/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("product-images")
-        .upload(filePath, file);
-
+      const { error: uploadError } = await supabase.storage.from("product-images").upload(filePath, file);
       if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from("product-images")
-        .getPublicUrl(filePath);
-
+      const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(filePath);
       const bannerUrl = urlData.publicUrl;
-
-      const { error: updateError } = await supabase
-        .from("restaurants")
-        .update({ banner_url: bannerUrl })
-        .eq("id", restaurantId);
-
+      const { error: updateError } = await supabase.from("restaurants").update({ banner_url: bannerUrl }).eq("id", restaurantId);
       if (updateError) throw updateError;
-
       setSettings({ ...settings, banner_url: bannerUrl });
       toast.success("Banner atualizado!");
-    } catch (error) {
-      toast.error("Erro ao fazer upload do banner");
-      console.error(error);
-    } finally {
-      setUploadingBanner(false);
-    }
+    } catch (error) { toast.error("Erro ao fazer upload do banner"); console.error(error); } finally { setUploadingBanner(false); }
   };
 
   const handleSaveSettings = async () => {
@@ -181,15 +124,10 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           login_require_phone: settings.login_require_phone,
         })
         .eq('id', restaurantId);
-
       if (error) throw error;
-
       toast.success("Configurações salvas!");
       await fetchSettings();
-    } catch (error) {
-      toast.error("Erro ao salvar configurações");
-      console.error(error);
-    }
+    } catch (error) { toast.error("Erro ao salvar configurações"); console.error(error); }
   };
 
   if (loading) {
@@ -202,222 +140,263 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold">Dados da Empresa</h2>
-        <p className="text-muted-foreground">Configure a aparência e informações do seu cardápio digital</p>
+        <h2 className="text-2xl font-semibold tracking-[-0.025em]">Dados da Empresa</h2>
+        <p className="text-muted-foreground font-light">Personalize a aparência e comportamento do seu cardápio digital</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Banner e Logo</CardTitle>
-          <CardDescription>
-            Configure as imagens que aparecerão no seu cardápio digital
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Banner */}
-          <div className="space-y-4">
-            <div>
-              <Label className="text-base font-semibold">Banner do Cardápio</Label>
-              <p className="text-sm text-muted-foreground">
-                Imagem de fundo que aparece no topo do cardápio
-              </p>
-            </div>
-            {settings.banner_url && (
-              <div className="relative w-full max-h-48 rounded-lg overflow-hidden border">
-                <img 
-                  src={settings.banner_url} 
-                  alt="Banner atual" 
-                  className="w-full h-full object-cover"
-                />
+      <Tabs defaultValue="visual" className="space-y-6">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="visual" className="gap-2">
+            <Image className="h-4 w-4" />
+            Identidade Visual
+          </TabsTrigger>
+          <TabsTrigger value="operational" className="gap-2">
+            <Clock className="h-4 w-4" />
+            Operacional
+          </TabsTrigger>
+          <TabsTrigger value="registration" className="gap-2">
+            <User className="h-4 w-4" />
+            Cadastro de Clientes
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Tab 1: Identidade Visual */}
+        <TabsContent value="visual" className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Banner Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Banner do Cardápio</CardTitle>
+                <CardDescription>Imagem de fundo exibida no topo do cardápio</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="relative w-full h-36 rounded-lg overflow-hidden border bg-muted flex items-center justify-center">
+                  {settings.banner_url ? (
+                    <img src={settings.banner_url} alt="Banner atual" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-muted-foreground text-sm flex flex-col items-center gap-1">
+                      <Image className="h-8 w-8 opacity-40" />
+                      <span>Nenhum banner</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Input
+                    id="banner-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBannerUpload}
+                    disabled={uploadingBanner}
+                    className="cursor-pointer"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">16:9, mínimo 1600×900px, máx 5MB</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Logo + Cor Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Logo & Cor Principal</CardTitle>
+                <CardDescription>Identidade visual exibida no cardápio</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="flex items-start gap-5">
+                  {/* Logo preview */}
+                  <div className="shrink-0">
+                    <div className="w-24 h-24 rounded-full border-4 border-border bg-muted flex items-center justify-center overflow-hidden">
+                      {settings.logo_url ? (
+                        <img src={settings.logo_url} alt="Logo" className="w-full h-full object-cover" />
+                      ) : (
+                        <Image className="h-8 w-8 text-muted-foreground opacity-40" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="logo-upload" className="text-xs text-muted-foreground">Quadrada, mín 512×512px, máx 2MB</Label>
+                    <Input
+                      id="logo-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={uploading}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <Label className="flex items-center gap-2 mb-2">
+                    <Palette className="h-4 w-4 text-muted-foreground" />
+                    Cor Principal
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="color"
+                      value={settings.primary_color}
+                      onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                      className="w-12 h-9 p-1 cursor-pointer"
+                    />
+                    <Input
+                      type="text"
+                      value={settings.primary_color}
+                      onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                      className="w-28 font-mono text-sm"
+                    />
+                    <div className="h-9 flex-1 rounded-md" style={{ backgroundColor: settings.primary_color }} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Button onClick={handleSaveSettings} className="w-full sm:w-auto gap-2">
+            <Save className="h-4 w-4" />
+            Salvar Identidade Visual
+          </Button>
+        </TabsContent>
+
+        {/* Tab 2: Operacional */}
+        <TabsContent value="operational" className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Taxa de Serviço */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Percent className="h-5 w-5" />
+                  Taxa de Serviço
+                </CardTitle>
+                <CardDescription>Configure a cobrança de taxa de serviço nos pedidos</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <Label htmlFor="service-fee-enabled" className="font-medium cursor-pointer">Cobrar Taxa de Serviço</Label>
+                  <Switch
+                    id="service-fee-enabled"
+                    checked={settings.service_fee_enabled}
+                    onCheckedChange={(checked) => setSettings({ ...settings, service_fee_enabled: checked })}
+                  />
+                </div>
+                {settings.service_fee_enabled && (
+                  <div className="space-y-2">
+                    <Label htmlFor="service-fee-percentage">Porcentagem (%)</Label>
+                    <Input
+                      id="service-fee-percentage"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={settings.service_fee_percentage}
+                      onChange={(e) => setSettings({ ...settings, service_fee_percentage: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tempo de Preparo */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Tempo de Preparo
+                </CardTitle>
+                <CardDescription>Tempo estimado exibido ao cliente após o pedido</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="prep-time">Minutos estimados</Label>
+                  <Input
+                    id="prep-time"
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={settings.prep_time_minutes}
+                    onChange={(e) => setSettings({ ...settings, prep_time_minutes: parseInt(e.target.value) || 30 })}
+                  />
+                  <p className="text-xs text-muted-foreground">Tempo médio exibido na confirmação do pedido</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Button onClick={handleSaveSettings} className="w-full sm:w-auto gap-2">
+            <Save className="h-4 w-4" />
+            Salvar Configurações Operacionais
+          </Button>
+        </TabsContent>
+
+        {/* Tab 3: Cadastro de Clientes */}
+        <TabsContent value="registration" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Campos de Cadastro</CardTitle>
+              <CardDescription>Defina quais informações são solicitadas ao cliente no login do cardápio</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y">
+                {/* CPF - Always required */}
+                <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">CPF</p>
+                      <p className="text-xs text-muted-foreground">Identificação única do cliente</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Obrigatório</span>
+                    <Switch checked disabled />
+                  </div>
+                </div>
+
+                {/* Nome */}
+                <div className="flex items-center justify-between py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Nome do Cliente</p>
+                      <p className="text-xs text-muted-foreground">Solicitar nome no cadastro</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.login_require_name}
+                    onCheckedChange={(checked) => setSettings({ ...settings, login_require_name: checked })}
+                  />
+                </div>
+
+                {/* Telefone */}
+                <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Telefone</p>
+                      <p className="text-xs text-muted-foreground">Solicitar número de telefone</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.login_require_phone}
+                    onCheckedChange={(checked) => setSettings({ ...settings, login_require_phone: checked })}
+                  />
+                </div>
               </div>
-            )}
-            <div>
-              <Label htmlFor="banner-upload">Selecionar Banner</Label>
-              <Input
-                id="banner-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleBannerUpload}
-                disabled={uploadingBanner}
-                className="cursor-pointer"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Recomendado: imagem horizontal 16:9, mínimo 1600x900px, máximo 5MB
-              </p>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="border-t pt-6" />
-
-          {/* Logo */}
-          <div className="space-y-4">
-            <div>
-              <Label className="text-base font-semibold">Logo Principal</Label>
-              <p className="text-sm text-muted-foreground">
-                Logo que aparece no centro do cardápio (formato circular)
-              </p>
-            </div>
-            {settings.logo_url && (
-              <div className="flex justify-center">
-                <img 
-                  src={settings.logo_url} 
-                  alt="Logo atual" 
-                  className="w-32 h-32 object-cover rounded-full border-4 border-border"
-                />
-              </div>
-            )}
-            <div>
-              <Label htmlFor="logo-upload">Selecionar Logo</Label>
-              <Input
-                id="logo-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-                disabled={uploading}
-                className="cursor-pointer"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Recomendado: imagem quadrada, mínimo 512x512px, máximo 2MB
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Cor Principal
-          </CardTitle>
-          <CardDescription>
-            Personalize a cor principal do seu cardápio
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="primary-color">Cor Principal</Label>
-            <div className="flex gap-2">
-              <Input
-                id="primary-color"
-                type="color"
-                value={settings.primary_color}
-                onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
-                className="w-20 h-10"
-              />
-              <Input
-                type="text"
-                value={settings.primary_color}
-                onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
-                className="flex-1"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Taxa de Serviço</CardTitle>
-          <CardDescription>
-            Configure se deseja cobrar taxa de serviço
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="service-fee-enabled">Cobrar Taxa de Serviço</Label>
-            <Switch
-              id="service-fee-enabled"
-              checked={settings.service_fee_enabled}
-              onCheckedChange={(checked) =>
-                setSettings({ ...settings, service_fee_enabled: checked })
-              }
-            />
-          </div>
-          {settings.service_fee_enabled && (
-            <div className="space-y-2">
-              <Label htmlFor="service-fee-percentage">Porcentagem (%)</Label>
-              <Input
-                id="service-fee-percentage"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={settings.service_fee_percentage}
-                onChange={(e) =>
-                  setSettings({ ...settings, service_fee_percentage: parseFloat(e.target.value) || 0 })
-                }
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Campos de Cadastro
-          </CardTitle>
-          <CardDescription>
-            Configure quais informações solicitar ao cliente no login
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <Label className="font-medium">CPF</Label>
-                <p className="text-sm text-muted-foreground">Identificação única do cliente</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Obrigatório</span>
-              <Switch checked disabled />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <User className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <Label htmlFor="require-name" className="font-medium">Nome do Cliente</Label>
-                <p className="text-sm text-muted-foreground">Solicitar nome no cadastro</p>
-              </div>
-            </div>
-            <Switch
-              id="require-name"
-              checked={settings.login_require_name}
-              onCheckedChange={(checked) =>
-                setSettings({ ...settings, login_require_name: checked })
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Phone className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <Label htmlFor="require-phone" className="font-medium">Telefone</Label>
-                <p className="text-sm text-muted-foreground">Solicitar número de telefone</p>
-              </div>
-            </div>
-            <Switch
-              id="require-phone"
-              checked={settings.login_require_phone}
-              onCheckedChange={(checked) =>
-                setSettings({ ...settings, login_require_phone: checked })
-              }
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Button onClick={handleSaveSettings} className="w-full">
-        Salvar Configurações
-      </Button>
+          <Button onClick={handleSaveSettings} className="w-full sm:w-auto gap-2">
+            <Save className="h-4 w-4" />
+            Salvar Campos de Cadastro
+          </Button>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
