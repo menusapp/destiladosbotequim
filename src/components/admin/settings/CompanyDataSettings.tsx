@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, Utensils, FileText } from "lucide-react";
+import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText } from "lucide-react";
 
 interface Settings {
   logo_url: string | null;
