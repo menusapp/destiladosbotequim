@@ -846,11 +846,15 @@ const Comanda = () => {
     );
   }
 
+  // Check if we should show "Pedir a Conta" button in footer
+  const showBillButton = billRequestEnabled && !billRequested && orders.length > 0 && cart.length === 0;
+  const showSendOrderButton = cart.length > 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
-      {/* Header */}
+    <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-background via-secondary/20 to-background">
+      {/* Header - shrink-0 */}
       <div 
-        className="text-white p-6 shadow-lg"
+        className="shrink-0 text-white p-6 shadow-lg"
         style={{ backgroundColor: restaurantColor }}
       >
         <Button
@@ -868,7 +872,9 @@ const Comanda = () => {
         </h1>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Status: Conta a caminho, Timer de preparo, Aguardando aceitação ou Conta solicitada */}
         {billOnTheWay && orders.length > 0 ? (
           <Card className="border" style={{ borderColor: restaurantColor }}>

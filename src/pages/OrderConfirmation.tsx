@@ -317,187 +317,194 @@ export default function OrderConfirmation() {
   const StatusIcon = statusInfo.icon;
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          {restaurant.logo_url && (
-            <img
-              src={restaurant.logo_url}
-              alt={restaurant.name}
-              className="w-20 h-20 rounded-full mx-auto mb-4 object-cover"
-            />
-          )}
-          <h1 className="text-3xl font-bold">Pedido Confirmado!</h1>
-          <p className="text-muted-foreground">
-            Pedido #{order.id.slice(0, 8).toUpperCase()}
-          </p>
-        </div>
-
-        {/* Status atual */}
-        <Card className="mb-6">
-          <CardContent className="p-6 text-center">
-            <div className={`w-16 h-16 rounded-full ${statusInfo.color} flex items-center justify-center mx-auto mb-4`}>
-              <StatusIcon className="w-8 h-8 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">{statusInfo.label}</h2>
-            <p className="text-muted-foreground">{statusInfo.description}</p>
-          </CardContent>
-        </Card>
-
-        {/* Timeline de status */}
-        <Card className="mb-6">
-          <CardContent className="p-6 space-y-4">
-            {order.status === "cancelled" ? (
-              <>
-                <StatusStep
-                  completed={true}
-                  label="Pedido recebido"
-                  time={format(new Date(order.created_at), "HH:mm")}
-                />
-                <StatusStep
-                  completed={true}
-                  label="Pedido Cancelado"
-                />
-              </>
-            ) : (
-              <>
-                <StatusStep
-                  completed={true}
-                  label="Pedido recebido"
-                  time={format(new Date(order.created_at), "HH:mm")}
-                />
-                <StatusStep
-                  completed={["accepted", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
-                  label="Em Preparo"
-                />
-                {order.delivery_type === "pickup" ? (
-                  <StatusStep
-                    completed={["out_for_delivery", "picked_up"].includes(order.status)}
-                    label="Pronto para Retirada"
-                  />
-                ) : (
-                  <StatusStep
-                    completed={["out_for_delivery", "delivered"].includes(order.status)}
-                    label="Saiu para Entrega"
-                  />
-                )}
-                <StatusStep 
-                  completed={["delivered", "picked_up"].includes(order.status)} 
-                  label={order.delivery_type === "pickup" ? "Retirado" : "Entregue"} 
-                />
-              </>
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto min-h-0 p-4">
+        <div className="max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            {restaurant.logo_url && (
+              <img
+                src={restaurant.logo_url}
+                alt={restaurant.name}
+                className="w-20 h-20 rounded-full mx-auto mb-4 object-cover"
+              />
             )}
-          </CardContent>
-        </Card>
+            <h1 className="text-3xl font-bold">Pedido Confirmado!</h1>
+            <p className="text-muted-foreground">
+              Pedido #{order.id.slice(0, 8).toUpperCase()}
+            </p>
+          </div>
 
-        {/* Detalhes do pedido */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Detalhes do Pedido</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(order.order_items ?? []).map((item) => (
-              <div key={item.id} className="flex justify-between mb-2">
-                <span>
-                  {item.quantity}x {item.products?.name}
-                </span>
-                <span>R$ {(item.price_at_order * item.quantity).toFixed(2)}</span>
-              </div>
-            ))}
-            <Separator className="my-4" />
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>R$ {calculateSubtotal().toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Taxa de entrega</span>
-                <span>R$ {order.delivery_fee.toFixed(2)}</span>
-              </div>
-              {restaurant.service_fee_enabled && (
-                <div className="flex justify-between">
-                  <span>Taxa de serviço ({restaurant.service_fee_percentage}%)</span>
-                  <span>R$ {calculateServiceFee().toFixed(2)}</span>
-                </div>
-              )}
-              {order.coupon_discount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Desconto ({order.coupon_code})</span>
-                  <span>-R$ {order.coupon_discount.toFixed(2)}</span>
-                </div>
-              )}
-              <Separator />
-              <div className="flex justify-between font-bold text-lg">
-                <span>Total</span>
-                <span>R$ {calculateTotal().toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Endereço de entrega/retirada */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="w-5 h-5" />
-              {order.delivery_type === "pickup" ? "Local de Retirada" : "Endereço de Entrega"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {order.delivery_type === "pickup" ? (
-              <>
-                <p className="mb-2">{restaurant.store_address || "Retirar na loja"}</p>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
-                  {order.delivery_phone}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="mb-2">{order.delivery_address}</p>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
-                  {order.delivery_phone}
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Tempo estimado */}
-        {["pending", "accepted", "preparing"].includes(order.status) && (
+          {/* Status atual */}
           <Card className="mb-6">
             <CardContent className="p-6 text-center">
-              <Clock className="w-8 h-8 mx-auto mb-2 text-primary" />
-              <p className="text-lg font-medium">
-                Tempo estimado: {restaurant.prep_time_minutes || 30}-{(restaurant.prep_time_minutes || 30) + 15} minutos
-              </p>
+              <div className={`w-16 h-16 rounded-full ${statusInfo.color} flex items-center justify-center mx-auto mb-4`}>
+                <StatusIcon className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">{statusInfo.label}</h2>
+              <p className="text-muted-foreground">{statusInfo.description}</p>
             </CardContent>
           </Card>
-        )}
 
-        {/* Botão voltar */}
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={() => navigate(`/${restaurantSlug}`)}
-        >
-          Fazer Novo Pedido
-        </Button>
-        
-        {/* Review Modal */}
-        <ReviewModal
-          open={showReview}
-          onClose={() => {
-            setShowReview(false);
-            setHasReviewed(true);
-          }}
-          restaurantId={restaurant.id}
-          restaurantName={restaurant.name}
-          orderId={order.id}
-        />
+          {/* Timeline de status */}
+          <Card className="mb-6">
+            <CardContent className="p-6 space-y-4">
+              {order.status === "cancelled" ? (
+                <>
+                  <StatusStep
+                    completed={true}
+                    label="Pedido recebido"
+                    time={format(new Date(order.created_at), "HH:mm")}
+                  />
+                  <StatusStep
+                    completed={true}
+                    label="Pedido Cancelado"
+                  />
+                </>
+              ) : (
+                <>
+                  <StatusStep
+                    completed={true}
+                    label="Pedido recebido"
+                    time={format(new Date(order.created_at), "HH:mm")}
+                  />
+                  <StatusStep
+                    completed={["accepted", "out_for_delivery", "delivered", "picked_up"].includes(order.status)}
+                    label="Em Preparo"
+                  />
+                  {order.delivery_type === "pickup" ? (
+                    <StatusStep
+                      completed={["out_for_delivery", "picked_up"].includes(order.status)}
+                      label="Pronto para Retirada"
+                    />
+                  ) : (
+                    <StatusStep
+                      completed={["out_for_delivery", "delivered"].includes(order.status)}
+                      label="Saiu para Entrega"
+                    />
+                  )}
+                  <StatusStep 
+                    completed={["delivered", "picked_up"].includes(order.status)} 
+                    label={order.delivery_type === "pickup" ? "Retirado" : "Entregue"} 
+                  />
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Detalhes do pedido */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Detalhes do Pedido</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(order.order_items ?? []).map((item) => (
+                <div key={item.id} className="flex justify-between mb-2">
+                  <span>
+                    {item.quantity}x {item.products?.name}
+                  </span>
+                  <span>R$ {(item.price_at_order * item.quantity).toFixed(2)}</span>
+                </div>
+              ))}
+              <Separator className="my-4" />
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>R$ {calculateSubtotal().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Taxa de entrega</span>
+                  <span>R$ {order.delivery_fee.toFixed(2)}</span>
+                </div>
+                {restaurant.service_fee_enabled && (
+                  <div className="flex justify-between">
+                    <span>Taxa de serviço ({restaurant.service_fee_percentage}%)</span>
+                    <span>R$ {calculateServiceFee().toFixed(2)}</span>
+                  </div>
+                )}
+                {order.coupon_discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Desconto ({order.coupon_code})</span>
+                    <span>-R$ {order.coupon_discount.toFixed(2)}</span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total</span>
+                  <span>R$ {calculateTotal().toFixed(2)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Endereço de entrega/retirada */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                {order.delivery_type === "pickup" ? "Local de Retirada" : "Endereço de Entrega"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {order.delivery_type === "pickup" ? (
+                <>
+                  <p className="mb-2">{restaurant.store_address || "Retirar na loja"}</p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    {order.delivery_phone}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mb-2">{order.delivery_address}</p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    {order.delivery_phone}
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tempo estimado */}
+          {["pending", "accepted", "preparing"].includes(order.status) && (
+            <Card className="mb-6">
+              <CardContent className="p-6 text-center">
+                <Clock className="w-8 h-8 mx-auto mb-2 text-primary" />
+                <p className="text-lg font-medium">
+                  Tempo estimado: {restaurant.prep_time_minutes || 30}-{(restaurant.prep_time_minutes || 30) + 15} minutos
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
+
+      {/* Botão fixo no rodapé */}
+      <div className="shrink-0 p-4 border-t bg-background">
+        <div className="max-w-2xl mx-auto">
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={() => navigate(`/${restaurantSlug}`)}
+          >
+            Fazer Novo Pedido
+          </Button>
+        </div>
+      </div>
+      
+      {/* Review Modal */}
+      <ReviewModal
+        open={showReview}
+        onClose={() => {
+          setShowReview(false);
+          setHasReviewed(true);
+        }}
+        restaurantId={restaurant.id}
+        restaurantName={restaurant.name}
+        orderId={order.id}
+      />
     </div>
   );
 }
