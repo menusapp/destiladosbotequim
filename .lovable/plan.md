@@ -1,46 +1,51 @@
 
+Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-## Plano: Eliminar rolagem de página nos cardápios — layout fixo com scroll interno
+Diagnóstico confirmado (com evidência):
+- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
+- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
+- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
+- Esse fallback é rejeitado, porque não corresponde a um test user válido.
+- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
 
-### Problema identificado
+Plano de correção (implementação):
+1) Remover a dependência de criação automática de test user no runtime
+- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
 
-Várias páginas do cardápio usam `min-h-screen` e empilham conteúdo verticalmente, empurrando botões de ação (como "Fazer Novo Pedido", "Pedir a Conta", "Enviar Pedido") para fora da viewport. O usuário precisa rolar a página inteira para encontrar esses botões.
+2) Adicionar email de teste fixo e válido por restaurante
+- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
+- Esse campo guardará um email de test user real (válido no ambiente de teste).
 
-### Páginas afetadas e correções
+3) Expor esse campo nas configurações de pagamento
+- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
+- Salvar esse email na configuração.
 
-#### 1. `OrderConfirmation.tsx` — Botão "Fazer Novo Pedido" escondido
+4) Regras finais de email no `mercadopago-charge`
+- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
+- Se produção: usar email do cliente normalmente (com fallback atual).
 
-**Problema**: Status, timeline, detalhes do pedido, endereço e tempo estimado empilhados. O botão "Fazer Novo Pedido" fica na última posição.
+5) Ajuste de bug secundário no mesmo arquivo
+- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
 
-**Correção**:
-- Container principal: `h-screen flex flex-col overflow-hidden`
-- Conteúdo central (cards): `flex-1 overflow-y-auto` com scroll interno
-- Botão "Fazer Novo Pedido": fixo no rodapé, fora do scroll (`shrink-0 p-4`)
-- Remover `mb-6` dos cards finais e usar `pb-4` no scroll area
+Resultado esperado:
+- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
+- Em produção: segue fluxo normal com email real do cliente.
+- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
 
-#### 2. `Comanda.tsx` — Botões "Enviar Pedido" e "Pedir a Conta" escondidos
+Detalhes técnicos:
+```text
+Checkout (cliente)
+   -> mercadopago-charge
+      -> lê online_payment_config
+         -> token TEST- ?
+            -> usa mp_sandbox_payer_email (válido)
+            -> cria pagamento
+         -> token produção ?
+            -> usa customer_email
+            -> cria pagamento
+```
 
-**Problema**: Header + status + carrinho + pedidos + resumo + botão pedir conta — tudo empilhado. Com muitos itens, o botão de ação fica muito abaixo.
-
-**Correção**:
-- Container principal: `h-screen flex flex-col overflow-hidden` (em vez de `min-h-screen`)
-- Header colorido: `shrink-0`
-- Área de conteúdo (`.container`): `flex-1 overflow-y-auto min-h-0`
-- Rodapé sticky com os botões de ação ("Enviar Pedido" ou "Pedir a Conta"): `shrink-0` fixo no fundo, sempre visível
-- Os botões são extraídos dos cards e colocados como barra fixa inferior
-
-#### 3. `Menu.tsx` e `DeliveryMenu.tsx` — Cardápios de navegação
-
-Estes são cardápios de browsing onde rolar categorias é esperado. A `ComandaBottomBar` e `CartBottomBar` já são fixas no fundo. O problema aqui é menor, mas vou garantir que:
-- `Menu.tsx`: Manter `pb-32` para não esconder conteúdo atrás da barra
-- `DeliveryMenu.tsx`: Manter `pb-14` para a bottom nav
-
-Estes dois **não precisam de mudança estrutural** — o scroll de categorias é o comportamento correto para cardápios.
-
-### Resumo de mudanças
-
-| Arquivo | Mudança |
-|---|---|
-| `OrderConfirmation.tsx` | Layout `h-screen flex flex-col`, conteúdo com scroll interno, botão "Fazer Novo Pedido" fixo no rodapé |
-| `Comanda.tsx` | Layout `h-screen flex flex-col`, conteúdo com scroll interno, barra de ação fixa no rodapé com "Enviar Pedido" ou "Pedir a Conta" |
-
+Observações de segurança e dados:
+- Sem mudança de permissões/RLS para este ajuste específico.
+- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
+- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.

@@ -846,11 +846,15 @@ const Comanda = () => {
     );
   }
 
+  // Check if we should show "Pedir a Conta" button in footer
+  const showBillButton = billRequestEnabled && !billRequested && orders.length > 0 && cart.length === 0;
+  const showSendOrderButton = cart.length > 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
-      {/* Header */}
+    <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-background via-secondary/20 to-background">
+      {/* Header - shrink-0 */}
       <div 
-        className="text-white p-6 shadow-lg"
+        className="shrink-0 text-white p-6 shadow-lg"
         style={{ backgroundColor: restaurantColor }}
       >
         <Button
@@ -868,7 +872,9 @@ const Comanda = () => {
         </h1>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Status: Conta a caminho, Timer de preparo, Aguardando aceitação ou Conta solicitada */}
         {billOnTheWay && orders.length > 0 ? (
           <Card className="border" style={{ borderColor: restaurantColor }}>
@@ -986,7 +992,7 @@ const Comanda = () => {
                   );
                 })}
               </div>
-              <div className="mt-4 space-y-3">
+              <div className="mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="order-notes">Observações do Pedido (opcional)</Label>
                   <Textarea
@@ -997,15 +1003,6 @@ const Comanda = () => {
                     rows={2}
                   />
                 </div>
-                <Button 
-                  className="w-full text-white" 
-                  onClick={handleSendOrder}
-                  disabled={submitting}
-                  style={{ backgroundColor: restaurantColor }}
-                >
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  {submitting ? "Enviando..." : "Enviar Pedido"}
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1100,195 +1097,207 @@ const Comanda = () => {
             </div>
           </CardContent>
         </Card>
+        </div>
+      </div>
 
-        {/* Botão Pedir Conta */}
-        {billRequestEnabled && !billRequested && (orders.length > 0 || cart.length > 0) && cart.length === 0 && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
+      {/* Footer fixo com botão de ação */}
+      {(showSendOrderButton || showBillButton) && (
+        <div className="shrink-0 border-t bg-background p-4">
+          <div className="container mx-auto">
+            {showSendOrderButton && (
               <Button 
-                className="w-full text-white hover:opacity-90"
-                variant="ghost"
+                className="w-full text-white" 
                 size="lg"
-                style={{ 
-                  backgroundColor: restaurantColor,
-                  borderColor: restaurantColor
-                }}
+                onClick={handleSendOrder}
+                disabled={submitting}
+                style={{ backgroundColor: restaurantColor }}
               >
-                <Receipt className="h-5 w-5 mr-2" />
-                Pedir a Conta
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                {submitting ? "Enviando..." : `Enviar Pedido · R$ ${totals.subtotal.toFixed(2)}`}
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Forma de Pagamento</DialogTitle>
-                <DialogDescription>
-                  Selecione como deseja pagar a conta
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-                <RadioGroup value={paymentMethod} onValueChange={(value) => {
-                  setPaymentMethod(value);
-                  const selected = paymentMethods.find(m => m.name === value);
-                  if (selected) setSelectedPaymentMethodType(selected.method_type);
-                }}>
-                  {paymentMethods.length > 0 ? (
-                    paymentMethods.map((method) => {
-                      const Icon = METHOD_ICONS[method.method_type] || CreditCard;
-                      const brands = method.accepted_brands || [];
-                      const isSelected = paymentMethod === method.name;
-                      const maxPreviewBrands = 3;
-                      
-                      return (
-                        <div 
-                          key={method.id} 
-                          className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                            isSelected ? "border-primary bg-primary/5" : "hover:border-primary/50"
-                          }`}
-                          onClick={() => {
-                            setPaymentMethod(method.name);
-                            setSelectedPaymentMethodType(method.method_type);
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            {/* Lado esquerdo: Radio + Icon + Nome */}
-                            <div className="flex items-center space-x-2 min-w-0">
-                              <RadioGroupItem value={method.name} id={method.id} />
-                              <Label htmlFor={method.id} className="flex items-center gap-2 cursor-pointer">
-                                <Icon className="h-4 w-4 shrink-0" />
-                                <span className="truncate">{method.name}</span>
-                              </Label>
-                            </div>
-                            
-                            {/* Lado direito: Preview das bandeiras (P&B) quando NÃO selecionado */}
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {!isSelected && brands.length > 0 && (
-                                <div className="flex items-center gap-1">
-                                  {brands.slice(0, maxPreviewBrands).map((brandCode: string) => {
-                                    const brand = getBrandInfo(brandCode);
-                                    if (!brand) return null;
-                                    return (
-                                      <img 
-                                        key={brandCode}
-                                        src={brand.logo} 
-                                        alt={brand.name}
-                                        className="h-3 w-auto object-contain grayscale opacity-50"
-                                        title={brand.name}
-                                      />
-                                    );
-                                  })}
-                                  {brands.length > maxPreviewBrands && (
-                                    <span className="text-[10px] text-muted-foreground">+{brands.length - maxPreviewBrands}</span>
+            )}
+            {showBillButton && (
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    className="w-full text-white hover:opacity-90"
+                    variant="ghost"
+                    size="lg"
+                    style={{ 
+                      backgroundColor: restaurantColor,
+                      borderColor: restaurantColor
+                    }}
+                  >
+                    <Receipt className="h-5 w-5 mr-2" />
+                    Pedir a Conta · R$ {totals.total.toFixed(2)}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Forma de Pagamento</DialogTitle>
+                    <DialogDescription>
+                      Selecione como deseja pagar a conta
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                    <RadioGroup value={paymentMethod} onValueChange={(value) => {
+                      setPaymentMethod(value);
+                      const selected = paymentMethods.find(m => m.name === value);
+                      if (selected) setSelectedPaymentMethodType(selected.method_type);
+                    }}>
+                      {paymentMethods.length > 0 ? (
+                        paymentMethods.map((method) => {
+                          const Icon = METHOD_ICONS[method.method_type] || CreditCard;
+                          const brands = method.accepted_brands || [];
+                          const isSelected = paymentMethod === method.name;
+                          const maxPreviewBrands = 3;
+                          
+                          return (
+                            <div 
+                              key={method.id} 
+                              className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                                isSelected ? "border-primary bg-primary/5" : "hover:border-primary/50"
+                              }`}
+                              onClick={() => {
+                                setPaymentMethod(method.name);
+                                setSelectedPaymentMethodType(method.method_type);
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2 min-w-0">
+                                  <RadioGroupItem value={method.name} id={method.id} />
+                                  <Label htmlFor={method.id} className="flex items-center gap-2 cursor-pointer">
+                                    <Icon className="h-4 w-4 shrink-0" />
+                                    <span className="truncate">{method.name}</span>
+                                  </Label>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {!isSelected && brands.length > 0 && (
+                                    <div className="flex items-center gap-1">
+                                      {brands.slice(0, maxPreviewBrands).map((brandCode: string) => {
+                                        const brand = getBrandInfo(brandCode);
+                                        if (!brand) return null;
+                                        return (
+                                          <img 
+                                            key={brandCode}
+                                            src={brand.logo} 
+                                            alt={brand.name}
+                                            className="h-3 w-auto object-contain grayscale opacity-50"
+                                            title={brand.name}
+                                          />
+                                        );
+                                      })}
+                                      {brands.length > maxPreviewBrands && (
+                                        <span className="text-[10px] text-muted-foreground">+{brands.length - maxPreviewBrands}</span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {brands.length > 0 && (
+                                    isSelected ? (
+                                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                    )
                                   )}
                                 </div>
+                              </div>
+                              {isSelected && brands.length > 0 && (
+                                <div className="mt-3 pt-3 border-t animate-in fade-in slide-in-from-top-1 duration-200">
+                                  <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {brands.map((brandCode: string) => {
+                                      const brand = getBrandInfo(brandCode);
+                                      if (!brand) return null;
+                                      return (
+                                        <div 
+                                          key={brandCode} 
+                                          className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
+                                        >
+                                          <img 
+                                            src={brand.logo} 
+                                            alt={brand.name}
+                                            className="h-4 w-auto object-contain"
+                                          />
+                                          <span className="text-xs font-medium">{brand.name}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
                               )}
-                              {brands.length > 0 && (
-                                isSelected ? (
-                                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                                ) : (
-                                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                )
-                              )}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <>
+                          <div 
+                            className={`p-3 border rounded-lg cursor-pointer transition-all ${paymentMethod === "PIX" ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
+                            onClick={() => { setPaymentMethod("PIX"); setSelectedPaymentMethodType("pix"); }}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="PIX" id="pix" />
+                              <Label htmlFor="pix" className="flex items-center gap-2 cursor-pointer">
+                                <Smartphone className="h-4 w-4" />
+                                PIX
+                              </Label>
                             </div>
                           </div>
-                          
-                          {/* Gavetinha expandida: Bandeiras coloridas quando SELECIONADO */}
-                          {isSelected && brands.length > 0 && (
-                            <div className="mt-3 pt-3 border-t animate-in fade-in slide-in-from-top-1 duration-200">
-                              <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
-                              <div className="flex flex-wrap gap-2">
-                                {brands.map((brandCode: string) => {
-                                  const brand = getBrandInfo(brandCode);
-                                  if (!brand) return null;
-                                  return (
-                                    <div 
-                                      key={brandCode} 
-                                      className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
-                                    >
-                                      <img 
-                                        src={brand.logo} 
-                                        alt={brand.name}
-                                        className="h-4 w-auto object-contain"
-                                      />
-                                      <span className="text-xs font-medium">{brand.name}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                          <div 
+                            className={`p-3 border rounded-lg cursor-pointer transition-all ${paymentMethod === "Cartão" ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
+                            onClick={() => { setPaymentMethod("Cartão"); setSelectedPaymentMethodType("credit"); }}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="Cartão" id="card" />
+                              <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer">
+                                <CreditCard className="h-4 w-4" />
+                                Cartão
+                              </Label>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    // Fallback para caso não haja métodos cadastrados
-                    <>
-                      <div 
-                        className={`p-3 border rounded-lg cursor-pointer transition-all ${paymentMethod === "PIX" ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
-                        onClick={() => { setPaymentMethod("PIX"); setSelectedPaymentMethodType("pix"); }}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="PIX" id="pix" />
-                          <Label htmlFor="pix" className="flex items-center gap-2 cursor-pointer">
-                            <Smartphone className="h-4 w-4" />
-                            PIX
-                          </Label>
-                        </div>
-                      </div>
-                      <div 
-                        className={`p-3 border rounded-lg cursor-pointer transition-all ${paymentMethod === "Cartão" ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
-                        onClick={() => { setPaymentMethod("Cartão"); setSelectedPaymentMethodType("credit"); }}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Cartão" id="card" />
-                          <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer">
-                            <CreditCard className="h-4 w-4" />
-                            Cartão
-                          </Label>
-                        </div>
-                      </div>
-                      <div 
-                        className={`p-3 border rounded-lg cursor-pointer transition-all ${paymentMethod === "Dinheiro" ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
-                        onClick={() => { setPaymentMethod("Dinheiro"); setSelectedPaymentMethodType("cash"); }}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Dinheiro" id="cash" />
-                          <Label htmlFor="cash" className="flex items-center gap-2 cursor-pointer">
-                            <Banknote className="h-4 w-4" />
-                            Dinheiro
-                          </Label>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </RadioGroup>
+                          </div>
+                          <div 
+                            className={`p-3 border rounded-lg cursor-pointer transition-all ${paymentMethod === "Dinheiro" ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
+                            onClick={() => { setPaymentMethod("Dinheiro"); setSelectedPaymentMethodType("cash"); }}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="Dinheiro" id="cash" />
+                              <Label htmlFor="cash" className="flex items-center gap-2 cursor-pointer">
+                                <Banknote className="h-4 w-4" />
+                                Dinheiro
+                              </Label>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </RadioGroup>
 
-                {/* Mostrar campo de troco apenas para métodos do tipo cash */}
-                {selectedPaymentMethodType === "cash" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="change">Troco para quanto? (Opcional)</Label>
-                    <Input
-                      id="change"
-                      type="number"
-                      step="0.01"
-                      value={changeAmount}
-                      onChange={(e) => setChangeAmount(e.target.value)}
-                      placeholder="Ex: 100.00"
-                    />
+                    {selectedPaymentMethodType === "cash" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="change">Troco para quanto? (Opcional)</Label>
+                        <Input
+                          id="change"
+                          type="number"
+                          step="0.01"
+                          value={changeAmount}
+                          onChange={(e) => setChangeAmount(e.target.value)}
+                          placeholder="Ex: 100.00"
+                        />
+                      </div>
+                    )}
+
+                    <Button 
+                      onClick={handleRequestBill} 
+                      className="w-full text-white"
+                      style={{ backgroundColor: restaurantColor }}
+                    >
+                      Confirmar e Pedir Conta
+                    </Button>
                   </div>
-                )}
-
-                <Button 
-                  onClick={handleRequestBill} 
-                  className="w-full text-white"
-                  style={{ backgroundColor: restaurantColor }}
-                >
-                  Confirmar e Pedir Conta
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
