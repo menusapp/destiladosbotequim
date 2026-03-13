@@ -707,7 +707,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           </div>
 
           <div className="space-y-2 border-t-2 pt-4">
-            <div className="flex justify-between items-center bg-orange-50 p-4 rounded-lg">
+            <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg">
               <span className="font-bold text-lg">Lucro Operacional Final</span>
               <span className={`font-bold text-2xl ${dreValues.operationalProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
                 R$ {dreValues.operationalProfit.toFixed(2)}
