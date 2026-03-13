@@ -54,6 +54,8 @@ const RestaurantAdmin = () => {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("dashboard");
+  const activeSectionRef = useRef(activeSection);
+  useEffect(() => { activeSectionRef.current = activeSection; }, [activeSection]);
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [hasNewBills, setHasNewBills] = useState(false);
   const [hasNewDeliveryOrders, setHasNewDeliveryOrders] = useState(false);
@@ -250,9 +252,9 @@ const RestaurantAdmin = () => {
             }
 
             // Atualizar badges da sidebar
-            if (orderType === 'delivery' && activeSection !== 'pedidos') {
+            if (orderType === 'delivery' && activeSectionRef.current !== 'pedidos') {
               setHasNewDeliveryOrders(true);
-            } else if ((orderType === 'local' || !orderType) && activeSection !== 'pdv') {
+            } else if ((orderType === 'local' || !orderType) && activeSectionRef.current !== 'pdv') {
               setHasNewLocalOrders(true);
             }
           }
