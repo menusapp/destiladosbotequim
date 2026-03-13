@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import {
   ShoppingBag,
   CreditCard,
@@ -55,24 +55,40 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   const collapsed = state === "collapsed";
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
 
-  const menuStructure = {
-    main: [
+  const menuGroups = [
+    // Vendas & Operação
+    [
       { id: "pedidos", label: "Pedidos", icon: ShoppingBag, hasNotification: (hasNewDeliveryOrders || hasNewOrders || hasNewBills) },
       { id: "pdv", label: "PDV", icon: CreditCard, hasNotification: !!hasNewLocalOrders },
       { id: "mesas-reservas", label: "Reservas", icon: Users2 },
+    ],
+    // Cardápio & Estoque
+    [
       { id: "cardapio", label: "Cardápio", icon: Utensils },
-      { id: "caixa", label: "Caixa", icon: CircleDollarSign },
       { id: "estoque", label: "Estoque", icon: Warehouse },
+    ],
+    // Financeiro
+    [
+      { id: "caixa", label: "Caixa", icon: CircleDollarSign },
       { id: "custos", label: "Custos", icon: CircleDollarSign },
       { id: "margens", label: "Margens", icon: TrendingUp },
       { id: "relatorios", label: "Relatórios", icon: BarChart3 },
+    ],
+    // Clientes & Engajamento
+    [
       { id: "clientes", label: "Clientes", icon: Users },
       { id: "fidelidade", label: "Fidelidade", icon: Gift },
       { id: "marketing", label: "Marketing", icon: Megaphone },
-      { id: "fiscal", label: "Fiscal", icon: FileText },
-      { id: "modulos", label: "Módulos", icon: Construction },
-      ...(staffRole === "admin" ? [{ id: "contas", label: "Contas", icon: Users }] : []),
     ],
+    // Administrativo
+    [
+      { id: "fiscal", label: "Fiscal", icon: FileText },
+      ...(staffRole === "admin" ? [{ id: "contas", label: "Contas", icon: Users }] : []),
+      { id: "modulos", label: "Módulos", icon: Construction },
+    ],
+  ];
+
+  const menuStructure = {
     configSubItems: [
       { id: "config-dados", label: "Dados da Empresa", icon: Building2 },
       { id: "config-horario", label: "Horário de Funcionamento", icon: Clock },
@@ -95,9 +111,12 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   };
 
   const noSubscription = hasActiveSubscription === false;
-  const filteredMain = noSubscription 
-    ? menuStructure.main.filter(item => item.id === "modulos")
-    : menuStructure.main.filter(item => checkAllowed(item.id) && isStaffAllowed(item.id));
+  const filteredGroups = menuGroups.map(group => {
+    const filtered = noSubscription
+      ? group.filter(item => item.id === "modulos")
+      : group.filter(item => checkAllowed(item.id) && isStaffAllowed(item.id));
+    return filtered;
+  }).filter(group => group.length > 0);
   const filteredConfig = noSubscription ? [] : menuStructure.configSubItems.filter(item => checkAllowed(item.id) && isStaffAllowed(item.id));
 
   return (
@@ -106,29 +125,38 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-0.5 px-2 pt-3">
-              {filteredMain.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    onClick={() => onSectionChange(item.id)}
-                    isActive={activeSection === item.id}
-                    tooltip={item.label}
-                    className={`relative h-9 px-3 rounded-button text-[13px] transition-colors ${
-                      activeSection === item.id 
-                        ? "font-medium" 
-                        : "text-sidebar-foreground hover:bg-muted"
-                    }`}
-                    style={activeSection === item.id ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {!collapsed && <span>{item.label}</span>}
-                    {item.hasNotification && !collapsed && (
-                      <span className="absolute right-2 h-1.5 w-1.5 bg-primary rounded-full"></span>
-                    )}
-                    {item.hasNotification && collapsed && (
-                      <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-primary rounded-full"></span>
-                    )}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+              {filteredGroups.map((group, groupIndex) => (
+                <Fragment key={groupIndex}>
+                  {groupIndex > 0 && (
+                    <div className="py-1.5 px-3">
+                      <div className="h-px bg-sidebar-border" />
+                    </div>
+                  )}
+                  {group.map((item) => (
+                    <SidebarMenuItem key={item.id}>
+                      <SidebarMenuButton
+                        onClick={() => onSectionChange(item.id)}
+                        isActive={activeSection === item.id}
+                        tooltip={item.label}
+                        className={`relative h-9 px-3 rounded-button text-[13px] transition-colors ${
+                          activeSection === item.id 
+                            ? "font-medium" 
+                            : "text-sidebar-foreground hover:bg-muted"
+                        }`}
+                        style={activeSection === item.id ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.label}</span>}
+                        {item.hasNotification && !collapsed && (
+                          <span className="absolute right-2 h-1.5 w-1.5 bg-primary rounded-full"></span>
+                        )}
+                        {item.hasNotification && collapsed && (
+                          <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-primary rounded-full"></span>
+                        )}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </Fragment>
               ))}
               
               {/* Configurações */}
