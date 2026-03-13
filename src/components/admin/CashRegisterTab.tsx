@@ -887,30 +887,30 @@ export default function CashRegisterTab({ restaurantId }: CashRegisterTabProps) 
               {movements.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma movimentação registrada</p>
               ) : (
-                <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                <div className="border rounded-lg overflow-hidden divide-y max-h-[400px] overflow-y-auto">
                   {movements.map((mov) => (
-                    <div
-                      key={mov.id}
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-lg border",
-                        mov.movement_type === "entrada" ? "bg-primary/5 border-primary/10" : "bg-destructive/5 border-destructive/10"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        {mov.movement_type === "entrada" ? (
-                          <TrendingUp className="h-4 w-4 text-primary shrink-0" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4 text-destructive shrink-0" />
-                        )}
-                        <div>
-                          <p className="font-medium text-sm">{mov.description}</p>
+                    <div key={mov.id} className="flex items-center justify-between px-4 py-2.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={cn("h-6 w-6 rounded-full flex items-center justify-center shrink-0",
+                          mov.movement_type === "entrada" ? "bg-muted" : "bg-muted"
+                        )}>
+                          {mov.movement_type === "entrada" ? (
+                            <TrendingUp className="h-3.5 w-3.5 text-foreground" />
+                          ) : (
+                            <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{mov.description}</p>
                           <p className="text-xs text-muted-foreground">
                             {mov.category && `${mov.category} · `}
                             {mov.payment_method} · {mov.created_by} · {format(new Date(mov.created_at), "HH:mm")}
                           </p>
                         </div>
                       </div>
-                      <span className={cn("font-bold text-sm tabular-nums", mov.movement_type === "entrada" ? "text-primary" : "text-destructive")}>
+                      <span className={cn("font-semibold text-sm tabular-nums shrink-0 ml-3",
+                        mov.movement_type === "entrada" ? "text-foreground" : "text-muted-foreground"
+                      )}>
                         {mov.movement_type === "entrada" ? "+" : "-"}R$ {mov.amount.toFixed(2)}
                       </span>
                     </div>
