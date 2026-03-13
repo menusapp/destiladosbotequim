@@ -127,7 +127,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           login_require_name: settings.login_require_name,
           login_require_phone: settings.login_require_phone,
           bill_request_enabled: settings.bill_request_enabled,
-          featured_section_title: settings.featured_section_title,
+          
         })
         .eq('id', restaurantId);
       if (error) throw error;
