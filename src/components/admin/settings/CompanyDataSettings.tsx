@@ -170,7 +170,6 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             <FileText className="h-4 w-4" />
             Cardápio
           </TabsTrigger>
-          </TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Identidade Visual */}
