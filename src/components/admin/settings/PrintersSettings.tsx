@@ -38,7 +38,23 @@ interface WebPrinterConfig {
   paperSize: string;
   autoPrintOrders: boolean;
   autoPrintReceipts: boolean;
+  fontFamily: string;
+  fontSize: number;
+  fontBold: boolean;
 }
+
+const FONT_OPTIONS = [
+  { value: 'Arial Black', label: 'Arial Black' },
+  { value: 'Courier New', label: 'Courier New' },
+  { value: 'Arial', label: 'Arial' },
+  { value: 'Verdana', label: 'Verdana' },
+  { value: 'Tahoma', label: 'Tahoma' },
+  { value: 'Impact', label: 'Impact' },
+  { value: 'Lucida Console', label: 'Lucida Console' },
+  { value: 'monospace', label: 'Monospace' },
+];
+
+const FONT_SIZE_OPTIONS = [8, 9, 10, 11, 12, 13, 14, 16, 18];
 
 const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
