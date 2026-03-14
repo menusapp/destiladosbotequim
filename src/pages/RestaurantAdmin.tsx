@@ -623,6 +623,8 @@ const RestaurantAdmin = () => {
 
   const renderContent = () => {
     switch (activeSection) {
+      case "visao-geral":
+        return <OverviewTab restaurantId={restaurant.id} />;
       // Pedidos (unified)
       case "pedidos":
         return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
