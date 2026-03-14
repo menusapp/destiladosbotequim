@@ -97,6 +97,23 @@ export const TableDetailDialog = ({
     enabled: open && !!table,
   });
 
+  // Realtime subscription for table data
+  useEffect(() => {
+    if (!open || !table) return;
+    const ch = supabase.channel(`table-detail-${table.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        refetchOrders();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, () => {
+        refetchBills();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => {
+        refetchComandas();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [open, table?.id]);
+
   // Fetch requested/on_the_way bills for this table
   const { data: requestedBills, refetch: refetchBills } = useQuery({
     queryKey: ["table-detail-bills", table?.id],
