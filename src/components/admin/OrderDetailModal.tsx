@@ -351,7 +351,7 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
                         </Button>
                       </>
                     ) : (
-                      <Badge variant="destructive" className="text-xs">⚠ Falta pagamento</Badge>
+                      <Badge variant="destructive" className="text-xs">Falta pagamento</Badge>
                     )}
                   </div>
                 </div>

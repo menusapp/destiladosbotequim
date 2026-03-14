@@ -56,6 +56,10 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
 
   const menuGroups = [
+    // Visão Geral
+    [
+      { id: "visao-geral", label: "Visão Geral", icon: BarChart3 },
+    ],
     // Vendas & Operação
     [
       { id: "pedidos", label: "Pedidos", icon: ShoppingBag, hasNotification: (hasNewDeliveryOrders || hasNewOrders || hasNewBills) },

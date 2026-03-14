@@ -778,6 +778,7 @@ const RestaurantAdmin = () => {
             onDismiss={() => setReservationNotification(null)}
           />
         )}
+        <SupportChatWidget />
       </div>
     </SidebarProvider>
   );
