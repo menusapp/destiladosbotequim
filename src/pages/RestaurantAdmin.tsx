@@ -37,6 +37,8 @@ import WhatsAppSettings from "@/components/admin/settings/WhatsAppSettings";
 import OnlinePaymentsSettings from "@/components/admin/settings/OnlinePaymentsSettings";
 import FiscalTab from "@/components/admin/FiscalTab";
 import ContasTab from "@/components/admin/ContasTab";
+import OverviewTab from "@/components/admin/OverviewTab";
+import { SupportChatWidget } from "@/components/admin/SupportChatWidget";
 
 interface Restaurant {
   id: string;
@@ -496,7 +498,7 @@ const RestaurantAdmin = () => {
 
         if (!updateError) {
           setRestaurant(prev => prev ? { ...prev, is_open: shouldBeOpen } : null);
-          console.log(`🕐 Status automático: ${shouldBeOpen ? 'Aberto' : 'Fechado'}`);
+          console.log(`Status automatico: ${shouldBeOpen ? 'Aberto' : 'Fechado'}`);
         }
       }
     } catch (error) {
@@ -525,7 +527,7 @@ const RestaurantAdmin = () => {
   };
 
   const handleToggleRestaurant = async (isOpen: boolean) => {
-    console.log('🏪 Mudando status do restaurante:', { isOpen, restaurantId: restaurant!.id });
+    console.log('Mudando status do restaurante:', { isOpen, restaurantId: restaurant!.id });
     
     const { error } = await supabase
       .from("restaurants")
@@ -533,14 +535,14 @@ const RestaurantAdmin = () => {
       .eq("id", restaurant!.id);
 
     if (error) {
-      console.error('❌ Erro ao atualizar:', error);
+      console.error('Erro ao atualizar:', error);
       toast.error("Erro ao atualizar status do restaurante");
       return;
     }
 
-    console.log('✅ Status do restaurante atualizado com sucesso!');
+    console.log('Status do restaurante atualizado com sucesso!');
     setRestaurant({ ...restaurant!, is_open: isOpen });
-    toast.success(isOpen ? "Restaurante aberto! 🎉" : "Restaurante fechado! 🔒");
+    toast.success(isOpen ? "Restaurante aberto!" : "Restaurante fechado!");
   };
 
   if (loading) {
@@ -621,6 +623,8 @@ const RestaurantAdmin = () => {
 
   const renderContent = () => {
     switch (activeSection) {
+      case "visao-geral":
+        return <OverviewTab restaurantId={restaurant.id} />;
       // Pedidos (unified)
       case "pedidos":
         return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
@@ -698,7 +702,7 @@ const RestaurantAdmin = () => {
         return <WhatsAppSettings restaurantId={restaurant.id} />;
       
       default:
-        return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
+        return <OverviewTab restaurantId={restaurant.id} />;
     }
   };
 
@@ -774,6 +778,7 @@ const RestaurantAdmin = () => {
             onDismiss={() => setReservationNotification(null)}
           />
         )}
+        <SupportChatWidget />
       </div>
     </SidebarProvider>
   );

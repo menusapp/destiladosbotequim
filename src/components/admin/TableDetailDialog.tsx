@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -84,7 +84,7 @@ export const TableDetailDialog = ({
           order_items(
             id, quantity, price_at_order, notes,
             products(name),
-            order_item_extras(price_at_order, product_extra_id)
+            order_item_extras(price_at_order, product_extra_id, product_extras(name))
           )
         `)
         .eq("table_id", table.id)
@@ -96,6 +96,23 @@ export const TableDetailDialog = ({
     },
     enabled: open && !!table,
   });
+
+  // Realtime subscription for table data
+  useEffect(() => {
+    if (!open || !table) return;
+    const ch = supabase.channel(`table-detail-${table.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        refetchOrders();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, () => {
+        refetchBills();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => {
+        refetchComandas();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [open, table?.id]);
 
   // Fetch requested/on_the_way bills for this table
   const { data: requestedBills, refetch: refetchBills } = useQuery({
@@ -414,14 +431,29 @@ export const TableDetailDialog = ({
                               </div>
                               <div className="text-sm space-y-0.5">
                                 {order.order_items?.map((item: any) => (
-                                  <div key={item.id} className="flex justify-between text-xs">
-                                    <span>
-                                      {item.quantity}x {item.products?.name || "Produto"}
-                                      {item.notes && <span className="text-muted-foreground ml-1">({item.notes})</span>}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                      R$ {((item.price_at_order + (item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0)) * item.quantity).toFixed(2)}
-                                    </span>
+                                  <div key={item.id}>
+                                    <div className="flex justify-between text-xs">
+                                      <span>
+                                       {item.quantity}x {item.products?.name || "Produto"}
+                                        {item.notes && <span className="text-muted-foreground ml-1">({item.notes})</span>}
+                                      </span>
+                                      <span className="text-muted-foreground">
+                                        R$ {((item.price_at_order + (item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0)) * item.quantity).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    {item.order_item_extras?.length > 0 && (
+                                      <div className="ml-4 space-y-0.5">
+                                        {item.order_item_extras.map((extra: any, idx: number) => {
+                                          const extraName = extra.product_extras?.name || extra.extra_category_items?.name || "Adicional";
+                                          return (
+                                            <div key={idx} className="text-[11px] text-muted-foreground flex justify-between">
+                                              <span>+ {extraName}</span>
+                                              <span>R$ {extra.price_at_order.toFixed(2)}</span>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>

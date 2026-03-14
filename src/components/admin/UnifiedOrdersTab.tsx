@@ -48,6 +48,9 @@ interface Order {
   table_id?: string;
   tables?: { table_number: number };
   order_items: OrderItem[];
+  delivery_fee?: number;
+  coupon_discount?: number;
+  loyalty_points_used?: number;
 }
 
 interface UnifiedOrdersTabProps {
@@ -112,7 +115,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
       .eq("restaurant_id", restaurantId)
       .neq("order_type", "local")
       .gte("created_at", dateRange.from.toISOString())
@@ -230,11 +233,16 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
             {payment.icon}
             <span>{payment.label}</span>
           </div>
+          {(order.delivery_fee ?? 0) > 0 && (
+            <div className="text-[10px] text-muted-foreground">
+              Taxa entrega: R$ {order.delivery_fee!.toFixed(2)}
+            </div>
+          )}
           <div className="flex items-center justify-between pt-1 border-t border-border/30">
             <span className="text-xs text-muted-foreground">
               {format(new Date(order.created_at), "HH:mm")}
             </span>
-            <span className="font-bold text-sm">R$ {total.toFixed(2)}</span>
+            <span className="font-bold text-sm">R$ {(total + (order.delivery_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0)).toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>
