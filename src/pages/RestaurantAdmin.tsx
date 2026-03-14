@@ -702,7 +702,7 @@ const RestaurantAdmin = () => {
         return <WhatsAppSettings restaurantId={restaurant.id} />;
       
       default:
-        return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
+        return <OverviewTab restaurantId={restaurant.id} />;
     }
   };
 
