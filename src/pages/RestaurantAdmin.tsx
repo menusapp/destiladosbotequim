@@ -538,9 +538,9 @@ const RestaurantAdmin = () => {
       return;
     }
 
-    console.log('✅ Status do restaurante atualizado com sucesso!');
+    console.log('Status do restaurante atualizado com sucesso!');
     setRestaurant({ ...restaurant!, is_open: isOpen });
-    toast.success(isOpen ? "Restaurante aberto! 🎉" : "Restaurante fechado! 🔒");
+    toast.success(isOpen ? "Restaurante aberto!" : "Restaurante fechado!");
   };
 
   if (loading) {
