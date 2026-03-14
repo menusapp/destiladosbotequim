@@ -533,7 +533,7 @@ const RestaurantAdmin = () => {
       .eq("id", restaurant!.id);
 
     if (error) {
-      console.error('❌ Erro ao atualizar:', error);
+      console.error('Erro ao atualizar:', error);
       toast.error("Erro ao atualizar status do restaurante");
       return;
     }
