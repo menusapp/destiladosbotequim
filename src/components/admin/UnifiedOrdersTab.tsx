@@ -48,6 +48,9 @@ interface Order {
   table_id?: string;
   tables?: { table_number: number };
   order_items: OrderItem[];
+  delivery_fee?: number;
+  coupon_discount?: number;
+  loyalty_points_used?: number;
 }
 
 interface UnifiedOrdersTabProps {
