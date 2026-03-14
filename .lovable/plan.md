@@ -1,51 +1,108 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano: 7 Arrumacoes
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+### 1. Realtime entre multiplos usuarios no admin
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+**Problema:** `UnifiedOrdersTab` e `TableDetailDialog` usam `useQuery` com `staleTime` de 5min (configurado no QueryClient). Quando um usuario aceita um pedido, o outro nao ve a mudanca ate atualizar.
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+**Solucao:**
+- **UnifiedOrdersTab**: Ja tem realtime (`setupRealtime`) que chama `fetchOrders()` — isso funciona. Mas o `queryClient` global com `staleTime: 300000` pode impedir refetch. Precisamos garantir que o `fetchOrders` force a atualizacao.
+- **TableDetailDialog**: Usa `useQuery` mas **nao tem realtime subscription**. Precisa adicionar listener para `orders`, `bills` e `comandas` com filtro `table_id` que chama `queryClient.invalidateQueries()`.
+- **PDVTab**: Precisa ouvir mudancas em `tables`, `orders` e `comandas` para atualizar o mapa de mesas em tempo real.
+- **FluxoCaixaTab**: Precisa ouvir `cash_movements` para atualizar em realtime.
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+**Arquivos**: `TableDetailDialog.tsx`, `PDVTab.tsx`, `FluxoCaixaTab.tsx`
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+---
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+### 2. Mostrar adicionais/complementos nos pedidos dentro do pop-up das mesas
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
-```
+**Problema:** Query em `TableDetailDialog.tsx` linha 87 busca `order_item_extras(price_at_order, product_extra_id)` mas **nao faz JOIN com `product_extras(name)` nem `extra_category_items`**, entao o nome do extra nao aparece.
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**Solucao:**
+- Alterar query para: `order_item_extras(price_at_order, product_extras(name), extra_category_items(name))`
+- No render (linhas 416-426), mostrar nome do extra/complemento abaixo de cada item
+
+**Arquivo**: `TableDetailDialog.tsx`
+
+---
+
+### 3. Tirar emojis do maximo de texto
+
+**Problema:** Emojis espalhados em labels, badges, toasts e textos por todo o admin.
+
+**Solucao:** Buscar e remover emojis de:
+- `RestaurantAdmin.tsx` (ex: linha 499 `🕐`, 528 `🏪`, 541 `❌`, 543 `🎉 🔒`)
+- `OrderDetailModal.tsx` (badge `⚠`)  
+- `AppSidebar.tsx`, `FluxoCaixaTab.tsx`, `ReportsTab.tsx` e demais componentes admin
+- Manter emojis apenas no menu do cliente (UX do consumidor final)
+
+**Arquivos**: Multiplos componentes admin
+
+---
+
+### 4. Mostrar valor de entrega nos pedidos delivery
+
+**Problema:** `OrderDetailModal` e `UnifiedOrdersTab` nao buscam nem exibem `delivery_fee`, `coupon_discount` ou `loyalty_points_used` do pedido.
+
+**Solucao:**
+- Adicionar `delivery_fee`, `coupon_discount`, `loyalty_points_used` na interface `Order` e na query de ambos componentes
+- No `OrderDetailModal`, mostrar breakdown: Subtotal + Taxa de Entrega - Desconto = Total
+- No card do kanban (`UnifiedOrdersTab`), mostrar taxa de entrega quando existir
+
+**Arquivos**: `OrderDetailModal.tsx`, `UnifiedOrdersTab.tsx`
+
+---
+
+### 5. Tudo funcionar em realtime (coberto pelo item 1)
+
+Mesma solucao: adicionar subscriptions realtime nos componentes que faltam.
+
+---
+
+### 6. Pop-up de suporte (robozinho)
+
+**Solucao:** Criar componente `SupportChatWidget.tsx` — botao flutuante no canto inferior direito do admin com icone de headset/chat. Ao clicar, abre pop-up com opcoes:
+- "Falar com suporte via WhatsApp" (abre link wa.me)
+- "Enviar email" (abre mailto)
+- "Central de ajuda" (link externo)
+
+Design: bolha flutuante, sem IA, apenas redirecionamento para canais de suporte.
+
+**Arquivo novo**: `src/components/admin/SupportChatWidget.tsx`
+**Editar**: `RestaurantAdmin.tsx` (adicionar o widget)
+
+---
+
+### 7. Nova aba "Visao Geral" como primeira aba
+
+**Solucao:** Criar componente `OverviewTab.tsx` — dashboard com cards de resumo:
+- Vendas do dia (total e quantidade de pedidos)
+- Pedidos pendentes / em preparo
+- Faturamento do mes
+- Ticket medio
+- Mesas ocupadas vs total
+- Graficos simples de vendas por hora (hoje)
+
+Sera a aba padrao ao abrir o admin (substituir o `default` no `renderContent()`).
+
+**Arquivo novo**: `src/components/admin/OverviewTab.tsx`
+**Editar**: `AppSidebar.tsx` (adicionar item "Visao Geral" no topo), `RestaurantAdmin.tsx` (case "visao-geral", mudar default)
+
+---
+
+### Resumo de arquivos
+
+| Acao | Arquivo |
+|---|---|
+| Criar | `src/components/admin/OverviewTab.tsx` |
+| Criar | `src/components/admin/SupportChatWidget.tsx` |
+| Editar | `src/components/admin/TableDetailDialog.tsx` |
+| Editar | `src/components/admin/UnifiedOrdersTab.tsx` |
+| Editar | `src/components/admin/OrderDetailModal.tsx` |
+| Editar | `src/components/admin/PDVTab.tsx` |
+| Editar | `src/components/admin/AppSidebar.tsx` |
+| Editar | `src/pages/RestaurantAdmin.tsx` |
+| Editar | Multiplos arquivos admin (remocao de emojis) |
+
