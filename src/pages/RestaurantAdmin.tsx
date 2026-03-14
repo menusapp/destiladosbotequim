@@ -525,7 +525,7 @@ const RestaurantAdmin = () => {
   };
 
   const handleToggleRestaurant = async (isOpen: boolean) => {
-    console.log('🏪 Mudando status do restaurante:', { isOpen, restaurantId: restaurant!.id });
+    console.log('Mudando status do restaurante:', { isOpen, restaurantId: restaurant!.id });
     
     const { error } = await supabase
       .from("restaurants")
