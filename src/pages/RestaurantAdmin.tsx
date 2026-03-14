@@ -496,7 +496,7 @@ const RestaurantAdmin = () => {
 
         if (!updateError) {
           setRestaurant(prev => prev ? { ...prev, is_open: shouldBeOpen } : null);
-          console.log(`🕐 Status automático: ${shouldBeOpen ? 'Aberto' : 'Fechado'}`);
+          console.log(`Status automatico: ${shouldBeOpen ? 'Aberto' : 'Fechado'}`);
         }
       }
     } catch (error) {
