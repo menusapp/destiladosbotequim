@@ -301,10 +301,20 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
                   })}
                 </TableBody>
               </Table>
-              <div className="mt-4 space-y-2 text-right">
-                <p className="text-sm text-muted-foreground">Total de itens: {order.order_items.reduce((sum, item) => sum + item.quantity, 0)}</p>
-                <p className="text-sm text-muted-foreground">Subtotal: R$ {calculateTotal().toFixed(2)}</p>
-                <p className="text-2xl font-bold text-red-600">Total: R$ {calculateTotal().toFixed(2)}</p>
+              <div className="mt-4 space-y-1 text-right">
+                <p className="text-sm text-muted-foreground">Subtotal itens: R$ {calculateTotal().toFixed(2)}</p>
+                {(order.delivery_fee ?? 0) > 0 && (
+                  <p className="text-sm text-muted-foreground">Taxa de entrega: R$ {order.delivery_fee!.toFixed(2)}</p>
+                )}
+                {(order.coupon_discount ?? 0) > 0 && (
+                  <p className="text-sm text-green-600">Desconto cupom: -R$ {order.coupon_discount!.toFixed(2)}</p>
+                )}
+                {(order.loyalty_points_used ?? 0) > 0 && (
+                  <p className="text-sm text-green-600">Pontos fidelidade: -R$ {order.loyalty_points_used!.toFixed(2)}</p>
+                )}
+                <p className="text-2xl font-bold">
+                  Total: R$ {(calculateTotal() + (order.delivery_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0)).toFixed(2)}
+                </p>
               </div>
             </CardContent>
           </Card>
