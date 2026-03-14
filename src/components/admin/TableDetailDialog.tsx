@@ -84,7 +84,7 @@ export const TableDetailDialog = ({
           order_items(
             id, quantity, price_at_order, notes,
             products(name),
-            order_item_extras(price_at_order, product_extra_id, product_extras(name), extra_category_items:extra_category_items!order_item_extras_product_extra_id_fkey(name))
+            order_item_extras(price_at_order, product_extra_id, product_extras(name))
           )
         `)
         .eq("table_id", table.id)

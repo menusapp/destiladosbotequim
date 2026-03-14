@@ -90,6 +90,16 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   useEffect(() => {
     fetchCurrentSession();
     fetchClosedSessions();
+    const ch = supabase.channel(`cash-rt-${restaurantId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements" }, () => {
+        if (currentSession) fetchMovements();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "cash_register_sessions" }, () => {
+        fetchCurrentSession();
+        fetchClosedSessions();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, [restaurantId]);
 
   useEffect(() => {
