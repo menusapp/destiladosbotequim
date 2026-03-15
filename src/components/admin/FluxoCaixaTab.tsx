@@ -446,10 +446,10 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
 
                     {/* Moedas */}
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-orange-600">
-                        <Coins className="h-4 w-4" />
-                        <Label className="text-base font-semibold">Moedas</Label>
-                      </div>
+                       <div className="flex items-center gap-2 text-muted-foreground">
+                         <Coins className="h-4 w-4" />
+                         <Label className="text-base font-semibold">Moedas</Label>
+                       </div>
                       <div className="grid grid-cols-5 gap-2">
                         {COIN_DENOMINATIONS.map((denom) => (
                           <div key={denom} className="text-center">
