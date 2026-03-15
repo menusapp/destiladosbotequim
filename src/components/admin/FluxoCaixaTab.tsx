@@ -729,9 +729,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
             </Collapsible>
           )}
 
-          <Card className="border-orange-200">
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-700">
+              <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Histórico de Movimentações
               </CardTitle>
@@ -755,28 +755,28 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                       <div
                         key={mov.id}
                         onClick={() => { setSelectedMovement(mov); setDetailSheetOpen(true); }}
-                        className="flex items-center justify-between p-4 border border-orange-100 rounded-lg hover:bg-orange-50/50 transition-colors cursor-pointer"
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-4">
                           {mov.movement_type === "entrada" ? (
-                            <TrendingUp className="h-5 w-5 text-orange-600" />
+                            <TrendingUp className="h-5 w-5 text-green-600" />
                           ) : (
-                            <TrendingDown className="h-5 w-5 text-orange-800" />
+                            <TrendingDown className="h-5 w-5 text-red-600" />
                           )}
                           <div>
                             <p className="font-medium">{mov.description}</p>
                             <p className="text-sm text-muted-foreground">
-                              {mov.movement_type} • {mov.payment_method} • {mov.created_by}
+                              {mov.movement_type === "entrada" ? "Entrada" : "Saída"} • {formatPaymentMethod(mov.payment_method)} • {mov.created_by}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(mov.created_at), "dd/MM/yyyy 'às' HH:mm")}
                             </p>
                           </div>
                         </div>
-                        <div className={`text-lg font-bold ${
+                        <div className={`text-lg font-bold font-mono ${
                           mov.movement_type === "entrada"
-                            ? "text-orange-600"
-                            : "text-orange-800"
+                            ? "text-green-600"
+                            : "text-red-600"
                         }`}>
                           {mov.movement_type === "entrada" ? "+" : "-"}
                           R$ {mov.amount.toFixed(2)}
@@ -792,9 +792,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
 
         {/* Tab: Histórico de Caixa */}
         <TabsContent value="historico" className="mt-0">
-          <Card className="border-orange-200">
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-700">
+              <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Histórico de Caixa
               </CardTitle>
