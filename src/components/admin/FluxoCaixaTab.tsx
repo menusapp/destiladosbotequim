@@ -715,7 +715,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                         />
                       </div>
                     </div>
-                    <Button onClick={handleAddMovement} className="w-full mt-4 bg-orange-500 hover:bg-orange-600 text-white">
+                    <Button onClick={handleAddMovement} className="w-full mt-4">
                       {movementType === "entrada" ? (
                         <PlusCircle className="h-4 w-4 mr-2" />
                       ) : (
