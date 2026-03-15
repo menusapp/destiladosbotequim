@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, CreditCard, User, Package, FileText, Store, Truck, Monitor } from "lucide-react";
 import { format } from "date-fns";
+import { formatPaymentMethod } from "@/lib/utils";
 
 interface CashMovement {
   id: string;
