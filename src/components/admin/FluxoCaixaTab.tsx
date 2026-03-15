@@ -502,16 +502,16 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                     <DialogTitle>Fechar Caixa</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-4">
-                    <div className="bg-orange-50 p-4 rounded-lg space-y-2 border border-orange-200">
-                      <div className="flex justify-between">
-                        <span>Saldo inicial:</span>
-                        <span className="font-bold">R$ {currentSession.opening_balance.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Saldo esperado:</span>
-                        <span className="font-bold text-orange-600">R$ {calculateExpectedBalance().toFixed(2)}</span>
-                      </div>
-                    </div>
+                     <div className="bg-muted/30 p-4 rounded-lg space-y-2 border">
+                       <div className="flex justify-between">
+                         <span>Saldo inicial:</span>
+                         <span className="font-bold font-mono">R$ {currentSession.opening_balance.toFixed(2)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span>Saldo esperado:</span>
+                         <span className="font-bold font-mono">R$ {calculateExpectedBalance().toFixed(2)}</span>
+                       </div>
+                     </div>
                     <div>
                       <Label>Responsável pelo fechamento</Label>
                       <Input
