@@ -304,7 +304,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
           {(orderDetail.payment_method || orderDetail.payment_type) && (
             <div className="flex items-center gap-2 text-sm">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{orderDetail.payment_method || orderDetail.payment_type}</span>
+              <span className="text-muted-foreground">{formatPaymentMethod(orderDetail.payment_method || orderDetail.payment_type)}</span>
             </div>
           )}
         </div>
