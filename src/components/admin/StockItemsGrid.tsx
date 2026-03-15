@@ -251,7 +251,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 overflow-y-auto max-h-[calc(100vh-300px)]">
           {filteredItems.map((item) => (
             <StockCard 
               key={item.id} 

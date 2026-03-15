@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle, ChevronDown, Receipt, Coins, Search, Calendar as CalendarIcon } from "lucide-react";
+import { formatPaymentMethod } from "@/lib/utils";
 import { format, isToday, isYesterday, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import CashMovementDetailSheet from "./CashMovementDetailSheet";
@@ -396,7 +397,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
             {!currentSession ? (
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button size="lg" className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
+                  <Button size="lg" className="gap-2">
                     <Wallet className="h-5 w-5" />
                     Abrir Caixa
                   </Button>
@@ -417,10 +418,10 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
 
                     {/* Cédulas */}
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-orange-600">
-                        <DollarSign className="h-4 w-4" />
-                        <Label className="text-base font-semibold">Cédulas</Label>
-                      </div>
+                     <div className="flex items-center gap-2 text-muted-foreground">
+                         <DollarSign className="h-4 w-4" />
+                         <Label className="text-base font-semibold">Cédulas</Label>
+                       </div>
                       <div className="grid grid-cols-7 gap-2">
                         {BILL_DENOMINATIONS.map((denom) => (
                           <div key={denom} className="text-center">
@@ -435,9 +436,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                                 [denom]: parseInt(e.target.value) || 0
                               }))}
                             />
-                            <p className="text-xs text-orange-600 mt-1">
-                              R${(denom * (billCounts[denom] || 0)).toFixed(2)}
-                            </p>
+                             <p className="text-xs text-muted-foreground mt-1">
+                               R${(denom * (billCounts[denom] || 0)).toFixed(2)}
+                             </p>
                           </div>
                         ))}
                       </div>
@@ -445,10 +446,10 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
 
                     {/* Moedas */}
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-orange-600">
-                        <Coins className="h-4 w-4" />
-                        <Label className="text-base font-semibold">Moedas</Label>
-                      </div>
+                       <div className="flex items-center gap-2 text-muted-foreground">
+                         <Coins className="h-4 w-4" />
+                         <Label className="text-base font-semibold">Moedas</Label>
+                       </div>
                       <div className="grid grid-cols-5 gap-2">
                         {COIN_DENOMINATIONS.map((denom) => (
                           <div key={denom} className="text-center">
@@ -463,25 +464,25 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                                 [denom]: parseInt(e.target.value) || 0
                               }))}
                             />
-                            <p className="text-xs text-orange-600 mt-1">
-                              R${(denom * (coinCounts[denom] || 0)).toFixed(2)}
-                            </p>
+                             <p className="text-xs text-muted-foreground mt-1">
+                               R${(denom * (coinCounts[denom] || 0)).toFixed(2)}
+                             </p>
                           </div>
                         ))}
                       </div>
                     </div>
 
                     {/* Total */}
-                    <div className="bg-orange-100 p-4 rounded-lg border-2 border-orange-300">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold text-orange-800">Valor de Abertura:</span>
-                        <span className="text-2xl font-bold text-orange-600">
-                          R$ {calculateOpeningBalance().toFixed(2)}
-                        </span>
+                     <div className="bg-muted/50 p-4 rounded-lg border">
+                       <div className="flex justify-between items-center">
+                         <span className="text-lg font-semibold">Valor de Abertura:</span>
+                         <span className="text-2xl font-bold font-mono">
+                           R$ {calculateOpeningBalance().toFixed(2)}
+                         </span>
                       </div>
                     </div>
 
-                    <Button onClick={handleOpenCashRegister} className="w-full bg-orange-500 hover:bg-orange-600 text-white">
+                    <Button onClick={handleOpenCashRegister} className="w-full">
                       <Wallet className="h-4 w-4 mr-2" />
                       Abrir Caixa
                     </Button>
@@ -501,16 +502,16 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                     <DialogTitle>Fechar Caixa</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-4">
-                    <div className="bg-orange-50 p-4 rounded-lg space-y-2 border border-orange-200">
-                      <div className="flex justify-between">
-                        <span>Saldo inicial:</span>
-                        <span className="font-bold">R$ {currentSession.opening_balance.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Saldo esperado:</span>
-                        <span className="font-bold text-orange-600">R$ {calculateExpectedBalance().toFixed(2)}</span>
-                      </div>
-                    </div>
+                     <div className="bg-muted/30 p-4 rounded-lg space-y-2 border">
+                       <div className="flex justify-between">
+                         <span>Saldo inicial:</span>
+                         <span className="font-bold font-mono">R$ {currentSession.opening_balance.toFixed(2)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span>Saldo esperado:</span>
+                         <span className="font-bold font-mono">R$ {calculateExpectedBalance().toFixed(2)}</span>
+                       </div>
+                     </div>
                     <div>
                       <Label>Responsável pelo fechamento</Label>
                       <Input
@@ -559,9 +560,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
         {/* Tab: Fluxo de Caixa */}
         <TabsContent value="fluxo" className="space-y-6 mt-0">
           {currentSession && (
-            <Card className="border-orange-200">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-700">
+                <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />
                   Caixa Atual
                 </CardTitle>
@@ -571,21 +572,21 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-orange-100 p-4 rounded-lg">
+                  <div className="bg-muted/30 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                    <p className="text-2xl font-bold text-orange-700">R$ {currentSession.opening_balance.toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {currentSession.opening_balance.toFixed(2)}</p>
                   </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
+                  <div className="bg-muted/20 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Entradas</p>
-                    <p className="text-2xl font-bold text-orange-600">R$ {calculateTotalSales().toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-green-600 font-mono">R$ {calculateTotalSales().toFixed(2)}</p>
                   </div>
-                  <div className="bg-amber-50 p-4 rounded-lg">
+                  <div className="bg-muted/20 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saídas</p>
-                    <p className="text-2xl font-bold text-orange-800">R$ {calculateTotalExpenses().toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-red-600 font-mono">R$ {calculateTotalExpenses().toFixed(2)}</p>
                   </div>
-                  <div className="bg-orange-200 p-4 rounded-lg">
+                  <div className="bg-muted/30 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                    <p className="text-2xl font-bold text-orange-700">R$ {calculateExpectedBalance().toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {calculateExpectedBalance().toFixed(2)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -593,9 +594,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           )}
 
           {!currentSession && lastClosedSession && (
-            <Card className="bg-secondary/20 border-2 border-orange-200">
+            <Card className="bg-secondary/20">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-700">
+                <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
                   Último Caixa Fechado
                 </CardTitle>
@@ -605,21 +606,21 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-orange-100 p-4 rounded-lg">
+                  <div className="bg-muted/30 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                    <p className="text-2xl font-bold text-orange-700">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
                   </div>
-                  <div className="bg-orange-200 p-4 rounded-lg">
+                  <div className="bg-muted/20 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                    <p className="text-2xl font-bold text-orange-700">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
                   </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
+                  <div className="bg-muted/20 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Final</p>
-                    <p className="text-2xl font-bold text-orange-600">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
                   </div>
-                  <div className="bg-amber-50 p-4 rounded-lg">
+                  <div className={`p-4 rounded-lg border ${(lastClosedSession.difference || 0) >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
                     <p className="text-sm text-muted-foreground">Diferença</p>
-                    <p className={`text-2xl font-bold ${(lastClosedSession.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`text-2xl font-bold font-mono ${(lastClosedSession.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       R$ {(lastClosedSession.difference || 0).toFixed(2)}
                     </p>
                   </div>
@@ -629,7 +630,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           )}
 
           {!currentSession && !lastClosedSession && (
-            <Card className="border-orange-200">
+            <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 Nenhum caixa aberto. Abra um caixa para registrar movimentações.
               </CardContent>
@@ -638,17 +639,17 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           
           {currentSession && (
             <Collapsible open={movementDrawerOpen} onOpenChange={setMovementDrawerOpen}>
-              <Card className="border-orange-200">
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-orange-50/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-orange-700">
-                        <Receipt className="h-5 w-5" />
-                        Registrar Movimentação
-                      </CardTitle>
-                      <ChevronDown className={`h-5 w-5 text-orange-600 transition-transform ${movementDrawerOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                  </CardHeader>
+               <Card>
+                 <CollapsibleTrigger asChild>
+                   <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                     <div className="flex items-center justify-between">
+                       <CardTitle className="flex items-center gap-2">
+                         <Receipt className="h-5 w-5" />
+                         Registrar Movimentação
+                       </CardTitle>
+                       <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${movementDrawerOpen ? 'rotate-180' : ''}`} />
+                     </div>
+                   </CardHeader>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent>
@@ -714,7 +715,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                         />
                       </div>
                     </div>
-                    <Button onClick={handleAddMovement} className="w-full mt-4 bg-orange-500 hover:bg-orange-600 text-white">
+                    <Button onClick={handleAddMovement} className="w-full mt-4">
                       {movementType === "entrada" ? (
                         <PlusCircle className="h-4 w-4 mr-2" />
                       ) : (
@@ -728,9 +729,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
             </Collapsible>
           )}
 
-          <Card className="border-orange-200">
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-700">
+              <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Histórico de Movimentações
               </CardTitle>
@@ -754,28 +755,28 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                       <div
                         key={mov.id}
                         onClick={() => { setSelectedMovement(mov); setDetailSheetOpen(true); }}
-                        className="flex items-center justify-between p-4 border border-orange-100 rounded-lg hover:bg-orange-50/50 transition-colors cursor-pointer"
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-4">
                           {mov.movement_type === "entrada" ? (
-                            <TrendingUp className="h-5 w-5 text-orange-600" />
+                            <TrendingUp className="h-5 w-5 text-green-600" />
                           ) : (
-                            <TrendingDown className="h-5 w-5 text-orange-800" />
+                            <TrendingDown className="h-5 w-5 text-red-600" />
                           )}
                           <div>
                             <p className="font-medium">{mov.description}</p>
                             <p className="text-sm text-muted-foreground">
-                              {mov.movement_type} • {mov.payment_method} • {mov.created_by}
+                              {mov.movement_type === "entrada" ? "Entrada" : "Saída"} • {formatPaymentMethod(mov.payment_method)} • {mov.created_by}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(mov.created_at), "dd/MM/yyyy 'às' HH:mm")}
                             </p>
                           </div>
                         </div>
-                        <div className={`text-lg font-bold ${
+                        <div className={`text-lg font-bold font-mono ${
                           mov.movement_type === "entrada"
-                            ? "text-orange-600"
-                            : "text-orange-800"
+                            ? "text-green-600"
+                            : "text-red-600"
                         }`}>
                           {mov.movement_type === "entrada" ? "+" : "-"}
                           R$ {mov.amount.toFixed(2)}
@@ -791,9 +792,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
 
         {/* Tab: Histórico de Caixa */}
         <TabsContent value="historico" className="mt-0">
-          <Card className="border-orange-200">
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-700">
+              <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Histórico de Caixa
               </CardTitle>
@@ -845,7 +846,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                       <div
                         key={session.id}
                         onClick={() => handleSelectSession(session)}
-                        className="p-4 border border-orange-100 rounded-lg hover:bg-orange-50 cursor-pointer transition-colors"
+                        className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-2 text-sm">
                           <Wallet className="h-4 w-4 text-green-600" />
@@ -860,8 +861,8 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                           <span>{session.closed_at ? format(new Date(session.closed_at), "dd/MM/yyyy 'às' HH:mm") : "—"}</span>
                         </div>
                         <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
-                          <span>Saldo: <strong className="text-orange-700">R$ {(session.closing_balance || 0).toFixed(2)}</strong></span>
-                          <span>Diferença: <strong className={`${(session.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>R$ {(session.difference || 0).toFixed(2)}</strong></span>
+                          <span>Saldo: <strong className="text-foreground font-mono">R$ {(session.closing_balance || 0).toFixed(2)}</strong></span>
+                          <span>Diferença: <strong className={`font-mono ${(session.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>R$ {(session.difference || 0).toFixed(2)}</strong></span>
                         </div>
                       </div>
                     ))
@@ -878,7 +879,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
         <DialogContent className="max-w-2xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-orange-600" />
+              <Wallet className="h-5 w-5" />
               Caixa - {selectedSession && format(new Date(selectedSession.opened_at), "dd/MM/yyyy")}
             </DialogTitle>
           </DialogHeader>
@@ -887,21 +888,21 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
             <div className="space-y-4">
               {/* Resumo */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-orange-100 p-3 rounded-lg">
+                <div className="bg-muted/30 p-3 rounded-lg border">
                   <p className="text-xs text-muted-foreground">Saldo Inicial</p>
-                  <p className="text-lg font-bold text-orange-700">R$ {selectedSession.opening_balance.toFixed(2)}</p>
+                  <p className="text-lg font-bold font-mono">R$ {selectedSession.opening_balance.toFixed(2)}</p>
                 </div>
-                <div className="bg-orange-50 p-3 rounded-lg">
+                <div className="bg-muted/20 p-3 rounded-lg border">
                   <p className="text-xs text-muted-foreground">Saldo Esperado</p>
-                  <p className="text-lg font-bold text-orange-600">R$ {(selectedSession.expected_balance || 0).toFixed(2)}</p>
+                  <p className="text-lg font-bold font-mono">R$ {(selectedSession.expected_balance || 0).toFixed(2)}</p>
                 </div>
-                <div className="bg-orange-200 p-3 rounded-lg">
+                <div className="bg-muted/20 p-3 rounded-lg border">
                   <p className="text-xs text-muted-foreground">Saldo Final</p>
-                  <p className="text-lg font-bold text-orange-700">R$ {(selectedSession.closing_balance || 0).toFixed(2)}</p>
+                  <p className="text-lg font-bold font-mono">R$ {(selectedSession.closing_balance || 0).toFixed(2)}</p>
                 </div>
-                <div className={`p-3 rounded-lg ${(selectedSession.difference || 0) >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                <div className={`p-3 rounded-lg border ${(selectedSession.difference || 0) >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
                   <p className="text-xs text-muted-foreground">Diferença</p>
-                  <p className={`text-lg font-bold ${(selectedSession.difference || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  <p className={`text-lg font-bold font-mono ${(selectedSession.difference || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                     R$ {(selectedSession.difference || 0).toFixed(2)}
                   </p>
                 </div>
@@ -962,7 +963,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                             <div>
                               <p className="font-medium text-sm">{mov.description}</p>
                               <p className="text-xs text-muted-foreground">
-                                {mov.payment_method} • {mov.created_by} • {format(new Date(mov.created_at), "HH:mm")}
+                                {formatPaymentMethod(mov.payment_method)} • {mov.created_by} • {format(new Date(mov.created_at), "HH:mm")}
                               </p>
                             </div>
                           </div>

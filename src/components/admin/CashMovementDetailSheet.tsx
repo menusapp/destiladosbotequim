@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, CreditCard, User, Package, FileText, Store, Truck, Monitor } from "lucide-react";
 import { format } from "date-fns";
+import { formatPaymentMethod } from "@/lib/utils";
 
 interface CashMovement {
   id: string;
@@ -256,7 +257,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
             <div className="flex items-center gap-2 text-sm">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Pagamento:</span>
-              <span className="font-medium">{movement.payment_method}</span>
+              <span className="font-medium">{formatPaymentMethod(movement.payment_method)}</span>
             </div>
           )}
         </div>
@@ -303,7 +304,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
           {(orderDetail.payment_method || orderDetail.payment_type) && (
             <div className="flex items-center gap-2 text-sm">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{orderDetail.payment_method || orderDetail.payment_type}</span>
+              <span className="text-muted-foreground">{formatPaymentMethod(orderDetail.payment_method || orderDetail.payment_type)}</span>
             </div>
           )}
         </div>
@@ -361,7 +362,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
           {counterDetail.payment_method && (
             <div className="flex items-center gap-2 text-sm">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{counterDetail.payment_method}</span>
+              <span className="text-muted-foreground">{formatPaymentMethod(counterDetail.payment_method)}</span>
             </div>
           )}
         </div>

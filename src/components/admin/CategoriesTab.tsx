@@ -176,7 +176,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
           <p className="text-muted-foreground">Nenhuma categoria criada ainda</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-300px)]">
           {categories.map((category) => (
             <div
               key={category.id}
