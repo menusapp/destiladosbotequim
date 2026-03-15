@@ -879,7 +879,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
         <DialogContent className="max-w-2xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-orange-600" />
+              <Wallet className="h-5 w-5" />
               Caixa - {selectedSession && format(new Date(selectedSession.opened_at), "dd/MM/yyyy")}
             </DialogTitle>
           </DialogHeader>
@@ -888,21 +888,21 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
             <div className="space-y-4">
               {/* Resumo */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-orange-100 p-3 rounded-lg">
+                <div className="bg-muted/30 p-3 rounded-lg border">
                   <p className="text-xs text-muted-foreground">Saldo Inicial</p>
-                  <p className="text-lg font-bold text-orange-700">R$ {selectedSession.opening_balance.toFixed(2)}</p>
+                  <p className="text-lg font-bold font-mono">R$ {selectedSession.opening_balance.toFixed(2)}</p>
                 </div>
-                <div className="bg-orange-50 p-3 rounded-lg">
+                <div className="bg-muted/20 p-3 rounded-lg border">
                   <p className="text-xs text-muted-foreground">Saldo Esperado</p>
-                  <p className="text-lg font-bold text-orange-600">R$ {(selectedSession.expected_balance || 0).toFixed(2)}</p>
+                  <p className="text-lg font-bold font-mono">R$ {(selectedSession.expected_balance || 0).toFixed(2)}</p>
                 </div>
-                <div className="bg-orange-200 p-3 rounded-lg">
+                <div className="bg-muted/20 p-3 rounded-lg border">
                   <p className="text-xs text-muted-foreground">Saldo Final</p>
-                  <p className="text-lg font-bold text-orange-700">R$ {(selectedSession.closing_balance || 0).toFixed(2)}</p>
+                  <p className="text-lg font-bold font-mono">R$ {(selectedSession.closing_balance || 0).toFixed(2)}</p>
                 </div>
-                <div className={`p-3 rounded-lg ${(selectedSession.difference || 0) >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                <div className={`p-3 rounded-lg border ${(selectedSession.difference || 0) >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
                   <p className="text-xs text-muted-foreground">Diferença</p>
-                  <p className={`text-lg font-bold ${(selectedSession.difference || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  <p className={`text-lg font-bold font-mono ${(selectedSession.difference || 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                     R$ {(selectedSession.difference || 0).toFixed(2)}
                   </p>
                 </div>
