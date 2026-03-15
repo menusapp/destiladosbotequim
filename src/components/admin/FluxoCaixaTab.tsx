@@ -560,9 +560,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
         {/* Tab: Fluxo de Caixa */}
         <TabsContent value="fluxo" className="space-y-6 mt-0">
           {currentSession && (
-            <Card className="border-orange-200">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-700">
+                <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />
                   Caixa Atual
                 </CardTitle>
@@ -572,21 +572,21 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-orange-100 p-4 rounded-lg">
+                  <div className="bg-muted/30 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                    <p className="text-2xl font-bold text-orange-700">R$ {currentSession.opening_balance.toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {currentSession.opening_balance.toFixed(2)}</p>
                   </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
+                  <div className="bg-muted/20 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Entradas</p>
-                    <p className="text-2xl font-bold text-orange-600">R$ {calculateTotalSales().toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-green-600 font-mono">R$ {calculateTotalSales().toFixed(2)}</p>
                   </div>
-                  <div className="bg-amber-50 p-4 rounded-lg">
+                  <div className="bg-muted/20 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saídas</p>
-                    <p className="text-2xl font-bold text-orange-800">R$ {calculateTotalExpenses().toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-red-600 font-mono">R$ {calculateTotalExpenses().toFixed(2)}</p>
                   </div>
-                  <div className="bg-orange-200 p-4 rounded-lg">
+                  <div className="bg-muted/30 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                    <p className="text-2xl font-bold text-orange-700">R$ {calculateExpectedBalance().toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {calculateExpectedBalance().toFixed(2)}</p>
                   </div>
                 </div>
               </CardContent>
