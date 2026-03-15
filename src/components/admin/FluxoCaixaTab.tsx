@@ -482,7 +482,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                       </div>
                     </div>
 
-                    <Button onClick={handleOpenCashRegister} className="w-full bg-orange-500 hover:bg-orange-600 text-white">
+                    <Button onClick={handleOpenCashRegister} className="w-full">
                       <Wallet className="h-4 w-4 mr-2" />
                       Abrir Caixa
                     </Button>
