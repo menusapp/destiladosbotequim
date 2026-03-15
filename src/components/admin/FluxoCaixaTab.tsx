@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle, ChevronDown, Receipt, Coins, Search, Calendar as CalendarIcon } from "lucide-react";
 import { format, isToday, isYesterday, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import CashMovementDetailSheet from "./CashMovementDetailSheet";
 
 interface FluxoCaixaTabProps {
   restaurantId: string;
