@@ -202,13 +202,6 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                   </Badge>
                 </div>
               )}
-              {isRecommended && !isCurrent && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-3 py-0.5 shadow-sm">
-                    <Sparkles className="h-3 w-3" /> Recomendado
-                  </Badge>
-                </div>
-              )}
 
               {/* Plan Info */}
               <div className="pt-2 space-y-4">
