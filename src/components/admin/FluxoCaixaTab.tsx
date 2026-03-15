@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle, ChevronDown, Receipt, Coins, Search, Calendar as CalendarIcon } from "lucide-react";
 import { format, isToday, isYesterday, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import CashMovementDetailSheet from "./CashMovementDetailSheet";
 
 interface FluxoCaixaTabProps {
   restaurantId: string;
@@ -80,6 +81,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   const [movementPaymentMethod, setMovementPaymentMethod] = useState("dinheiro");
   const [movementCreatedBy, setMovementCreatedBy] = useState("");
   const [movementDrawerOpen, setMovementDrawerOpen] = useState(false);
+  const [selectedMovement, setSelectedMovement] = useState<CashMovement | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [historyMovementSearch, setHistoryMovementSearch] = useState("");
 
   const calculateOpeningBalance = () => {
     const billTotal = BILL_DENOMINATIONS.reduce((sum, d) => sum + d * (billCounts[d] || 0), 0);
@@ -747,7 +751,11 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                     </p>
                   ) : (
                     movements.map((mov) => (
-                      <div key={mov.id} className="flex items-center justify-between p-4 border border-orange-100 rounded-lg hover:bg-orange-50/50 transition-colors">
+                      <div
+                        key={mov.id}
+                        onClick={() => { setSelectedMovement(mov); setDetailSheetOpen(true); }}
+                        className="flex items-center justify-between p-4 border border-orange-100 rounded-lg hover:bg-orange-50/50 transition-colors cursor-pointer"
+                      >
                         <div className="flex items-center gap-4">
                           {mov.movement_type === "entrada" ? (
                             <TrendingUp className="h-5 w-5 text-orange-600" />
@@ -916,6 +924,16 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                   <Receipt className="h-4 w-4" />
                   Movimentações ({selectedSessionMovements.length})
                 </h4>
+                {/* Searchbar no historico */}
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por cliente ou descricao..."
+                    value={historyMovementSearch}
+                    onChange={(e) => setHistoryMovementSearch(e.target.value)}
+                    className="pl-9 h-8 text-sm"
+                  />
+                </div>
                 <ScrollArea className="h-[300px] border rounded-lg">
                   <div className="p-3 space-y-2">
                     {selectedSessionMovements.length === 0 ? (
@@ -923,8 +941,18 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                         Nenhuma movimentação registrada
                       </p>
                     ) : (
-                      selectedSessionMovements.map((mov) => (
-                        <div key={mov.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      selectedSessionMovements
+                        .filter(mov => {
+                          if (!historyMovementSearch) return true;
+                          const q = historyMovementSearch.toLowerCase();
+                          return mov.description.toLowerCase().includes(q) || mov.created_by.toLowerCase().includes(q);
+                        })
+                        .map((mov) => (
+                        <div
+                          key={mov.id}
+                          onClick={() => { setSelectedMovement(mov); setDetailSheetOpen(true); }}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                        >
                           <div className="flex items-center gap-3">
                             {mov.movement_type === "entrada" ? (
                               <TrendingUp className="h-4 w-4 text-green-600" />
@@ -951,6 +979,13 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Detail Sheet for movement drill-down */}
+      <CashMovementDetailSheet
+        movement={selectedMovement}
+        open={detailSheetOpen}
+        onOpenChange={(open) => { setDetailSheetOpen(open); if (!open) setSelectedMovement(null); }}
+      />
     </div>
   );
 }

@@ -164,8 +164,6 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
   }
 
   // Find the "recommended" plan (middle one, or most expensive if only 2)
-  const recommendedIndex = plans.length <= 2 ? plans.length - 1 : 1;
-
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}
@@ -180,9 +178,8 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
 
       {/* Plans Grid */}
       <div className="grid gap-5 md:grid-cols-3 items-start">
-        {plans.map((plan, index) => {
+        {plans.map((plan) => {
           const isCurrent = activeSub?.plan_id === plan.id;
-          const isRecommended = index === recommendedIndex && !isCurrent;
           const isUpgrade = activeSub ? plan.price > activeSub.plan_price : false;
           const isDowngrade = activeSub ? plan.price < activeSub.plan_price : false;
 
@@ -193,9 +190,7 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                 relative rounded-2xl border bg-card p-6 transition-all duration-200
                 ${isCurrent
                   ? "border-primary/60 ring-2 ring-primary/15 shadow-md"
-                  : isRecommended
-                    ? "border-primary/30 shadow-lg scale-[1.02]"
-                    : "border-border hover:border-primary/20 hover:shadow-sm"
+                  : "border-border hover:border-primary/20 hover:shadow-sm"
                 }
               `}
             >
@@ -204,13 +199,6 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-3 py-0.5 shadow-sm">
                     <Crown className="h-3 w-3" /> Atual
-                  </Badge>
-                </div>
-              )}
-              {isRecommended && !isCurrent && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-3 py-0.5 shadow-sm">
-                    <Sparkles className="h-3 w-3" /> Recomendado
                   </Badge>
                 </div>
               )}

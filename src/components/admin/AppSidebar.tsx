@@ -88,7 +88,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
     [
       { id: "fiscal", label: "Fiscal", icon: FileText },
       ...(staffRole === "admin" ? [{ id: "contas", label: "Contas", icon: Users }] : []),
-      { id: "modulos", label: "Módulos", icon: Construction },
+      { id: "modulos", label: "Planos", icon: Construction },
     ],
   ];
 
