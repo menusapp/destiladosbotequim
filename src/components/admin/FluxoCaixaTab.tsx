@@ -963,7 +963,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                             <div>
                               <p className="font-medium text-sm">{mov.description}</p>
                               <p className="text-xs text-muted-foreground">
-                                {mov.payment_method} • {mov.created_by} • {format(new Date(mov.created_at), "HH:mm")}
+                                {formatPaymentMethod(mov.payment_method)} • {mov.created_by} • {format(new Date(mov.created_at), "HH:mm")}
                               </p>
                             </div>
                           </div>
