@@ -594,9 +594,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           )}
 
           {!currentSession && lastClosedSession && (
-            <Card className="bg-secondary/20 border-2 border-orange-200">
+            <Card className="bg-secondary/20">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-700">
+                <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
                   Último Caixa Fechado
                 </CardTitle>
@@ -606,21 +606,21 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="bg-orange-100 p-4 rounded-lg">
+                  <div className="bg-muted/30 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                    <p className="text-2xl font-bold text-orange-700">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {lastClosedSession.opening_balance.toFixed(2)}</p>
                   </div>
-                  <div className="bg-orange-200 p-4 rounded-lg">
+                  <div className="bg-muted/20 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Esperado</p>
-                    <p className="text-2xl font-bold text-orange-700">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {(lastClosedSession.expected_balance || 0).toFixed(2)}</p>
                   </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
+                  <div className="bg-muted/20 p-4 rounded-lg border">
                     <p className="text-sm text-muted-foreground">Saldo Final</p>
-                    <p className="text-2xl font-bold text-orange-600">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-bold font-mono">R$ {(lastClosedSession.closing_balance || 0).toFixed(2)}</p>
                   </div>
-                  <div className="bg-amber-50 p-4 rounded-lg">
+                  <div className={`p-4 rounded-lg border ${(lastClosedSession.difference || 0) >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
                     <p className="text-sm text-muted-foreground">Diferença</p>
-                    <p className={`text-2xl font-bold ${(lastClosedSession.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`text-2xl font-bold font-mono ${(lastClosedSession.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       R$ {(lastClosedSession.difference || 0).toFixed(2)}
                     </p>
                   </div>
