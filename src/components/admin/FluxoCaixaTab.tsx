@@ -473,12 +473,12 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                     </div>
 
                     {/* Total */}
-                    <div className="bg-orange-100 p-4 rounded-lg border-2 border-orange-300">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold text-orange-800">Valor de Abertura:</span>
-                        <span className="text-2xl font-bold text-orange-600">
-                          R$ {calculateOpeningBalance().toFixed(2)}
-                        </span>
+                     <div className="bg-muted/50 p-4 rounded-lg border">
+                       <div className="flex justify-between items-center">
+                         <span className="text-lg font-semibold">Valor de Abertura:</span>
+                         <span className="text-2xl font-bold font-mono">
+                           R$ {calculateOpeningBalance().toFixed(2)}
+                         </span>
                       </div>
                     </div>
 
