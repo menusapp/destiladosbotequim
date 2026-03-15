@@ -751,7 +751,11 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                     </p>
                   ) : (
                     movements.map((mov) => (
-                      <div key={mov.id} className="flex items-center justify-between p-4 border border-orange-100 rounded-lg hover:bg-orange-50/50 transition-colors">
+                      <div
+                        key={mov.id}
+                        onClick={() => { setSelectedMovement(mov); setDetailSheetOpen(true); }}
+                        className="flex items-center justify-between p-4 border border-orange-100 rounded-lg hover:bg-orange-50/50 transition-colors cursor-pointer"
+                      >
                         <div className="flex items-center gap-4">
                           {mov.movement_type === "entrada" ? (
                             <TrendingUp className="h-5 w-5 text-orange-600" />
