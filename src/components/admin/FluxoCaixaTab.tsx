@@ -397,7 +397,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
             {!currentSession ? (
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button size="lg" className="gap-2 bg-orange-500 hover:bg-orange-600 text-white">
+                  <Button size="lg" className="gap-2">
                     <Wallet className="h-5 w-5" />
                     Abrir Caixa
                   </Button>
