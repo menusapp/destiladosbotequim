@@ -924,6 +924,16 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                   <Receipt className="h-4 w-4" />
                   Movimentações ({selectedSessionMovements.length})
                 </h4>
+                {/* Searchbar no historico */}
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por cliente ou descricao..."
+                    value={historyMovementSearch}
+                    onChange={(e) => setHistoryMovementSearch(e.target.value)}
+                    className="pl-9 h-8 text-sm"
+                  />
+                </div>
                 <ScrollArea className="h-[300px] border rounded-lg">
                   <div className="p-3 space-y-2">
                     {selectedSessionMovements.length === 0 ? (
@@ -931,8 +941,18 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                         Nenhuma movimentação registrada
                       </p>
                     ) : (
-                      selectedSessionMovements.map((mov) => (
-                        <div key={mov.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      selectedSessionMovements
+                        .filter(mov => {
+                          if (!historyMovementSearch) return true;
+                          const q = historyMovementSearch.toLowerCase();
+                          return mov.description.toLowerCase().includes(q) || mov.created_by.toLowerCase().includes(q);
+                        })
+                        .map((mov) => (
+                        <div
+                          key={mov.id}
+                          onClick={() => { setSelectedMovement(mov); setDetailSheetOpen(true); }}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                        >
                           <div className="flex items-center gap-3">
                             {mov.movement_type === "entrada" ? (
                               <TrendingUp className="h-4 w-4 text-green-600" />
