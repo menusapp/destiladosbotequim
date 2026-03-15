@@ -24,74 +24,63 @@ const StockCard = memo(({ item, onEdit, onDelete }: StockCardProps) => {
   const isLowStock = item.current_quantity <= item.minimum_quantity;
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <CardContent className="p-6">
-        <div className="space-y-4">
-          {/* Header com nome e categoria */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground">{item.name}</h3>
-            {item.stock_categories && (
-              <p className="text-sm text-muted-foreground">{item.stock_categories.name}</p>
-            )}
-          </div>
-
-          {/* Valor total em destaque */}
-          <div className="flex items-baseline justify-between">
-            <p className="text-3xl font-bold text-primary">
-              R$ {totalValue.toFixed(2)}
-            </p>
+    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+      <CardContent className="p-3">
+        <div className="space-y-2">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-1">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-foreground truncate">{item.name}</h3>
+              {item.stock_categories && (
+                <p className="text-[11px] text-muted-foreground truncate">{item.stock_categories.name}</p>
+              )}
+            </div>
             {isLowStock && (
-              <Badge variant="destructive" className="text-xs">
-                Estoque baixo
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 shrink-0">
+                Baixo
               </Badge>
             )}
           </div>
 
-          {/* Separador */}
-          <div className="border-t border-border" />
+          {/* Valor total */}
+          <p className="text-xl font-bold text-primary">
+            R$ {totalValue.toFixed(2)}
+          </p>
 
-          {/* Métricas em grid */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          {/* Metricas */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
-              <span className="text-muted-foreground block">Estoque Atual:</span>
+              <span className="text-muted-foreground">Estoque:</span>
               <p className="font-medium text-foreground">
                 {item.current_quantity.toFixed(2)} {item.unit}
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground block">Mínimo:</span>
+              <span className="text-muted-foreground">Minimo:</span>
               <p className="font-medium text-foreground">
                 {item.minimum_quantity.toFixed(2)} {item.unit}
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground block">Custo Unitário:</span>
+              <span className="text-muted-foreground">Custo Unit.:</span>
               <p className="font-medium text-foreground">
                 R$ {item.price_per_unit.toFixed(2)}
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground block">Unidade:</span>
+              <span className="text-muted-foreground">Unidade:</span>
               <p className="font-medium text-foreground uppercase">{item.unit}</p>
             </div>
           </div>
 
-          {/* Botões Atualizar e Excluir */}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => onEdit(item)}
-            >
-              <Pencil className="h-4 w-4 mr-2" />
+          {/* Botoes */}
+          <div className="flex gap-1.5 pt-1">
+            <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => onEdit(item)}>
+              <Pencil className="h-3 w-3 mr-1" />
               Atualizar
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => onDelete(item)}
-            >
-              <Trash2 className="h-4 w-4 text-destructive" />
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onDelete(item)}>
+              <Trash2 className="h-3 w-3 text-destructive" />
             </Button>
           </div>
         </div>
