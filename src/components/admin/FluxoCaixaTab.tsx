@@ -81,6 +81,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   const [movementPaymentMethod, setMovementPaymentMethod] = useState("dinheiro");
   const [movementCreatedBy, setMovementCreatedBy] = useState("");
   const [movementDrawerOpen, setMovementDrawerOpen] = useState(false);
+  const [selectedMovement, setSelectedMovement] = useState<CashMovement | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [historyMovementSearch, setHistoryMovementSearch] = useState("");
 
   const calculateOpeningBalance = () => {
     const billTotal = BILL_DENOMINATIONS.reduce((sum, d) => sum + d * (billCounts[d] || 0), 0);
