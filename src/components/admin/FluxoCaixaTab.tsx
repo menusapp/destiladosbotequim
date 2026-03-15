@@ -846,7 +846,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                       <div
                         key={session.id}
                         onClick={() => handleSelectSession(session)}
-                        className="p-4 border border-orange-100 rounded-lg hover:bg-orange-50 cursor-pointer transition-colors"
+                        className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-2 text-sm">
                           <Wallet className="h-4 w-4 text-green-600" />
@@ -861,8 +861,8 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                           <span>{session.closed_at ? format(new Date(session.closed_at), "dd/MM/yyyy 'às' HH:mm") : "—"}</span>
                         </div>
                         <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
-                          <span>Saldo: <strong className="text-orange-700">R$ {(session.closing_balance || 0).toFixed(2)}</strong></span>
-                          <span>Diferença: <strong className={`${(session.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>R$ {(session.difference || 0).toFixed(2)}</strong></span>
+                          <span>Saldo: <strong className="text-foreground font-mono">R$ {(session.closing_balance || 0).toFixed(2)}</strong></span>
+                          <span>Diferença: <strong className={`font-mono ${(session.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>R$ {(session.difference || 0).toFixed(2)}</strong></span>
                         </div>
                       </div>
                     ))
