@@ -418,10 +418,10 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
 
                     {/* Cédulas */}
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-orange-600">
-                        <DollarSign className="h-4 w-4" />
-                        <Label className="text-base font-semibold">Cédulas</Label>
-                      </div>
+                     <div className="flex items-center gap-2 text-muted-foreground">
+                         <DollarSign className="h-4 w-4" />
+                         <Label className="text-base font-semibold">Cédulas</Label>
+                       </div>
                       <div className="grid grid-cols-7 gap-2">
                         {BILL_DENOMINATIONS.map((denom) => (
                           <div key={denom} className="text-center">
