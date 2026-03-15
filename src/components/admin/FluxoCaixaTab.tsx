@@ -630,7 +630,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           )}
 
           {!currentSession && !lastClosedSession && (
-            <Card className="border-orange-200">
+            <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 Nenhum caixa aberto. Abra um caixa para registrar movimentações.
               </CardContent>
