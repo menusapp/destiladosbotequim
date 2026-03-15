@@ -464,9 +464,9 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                                 [denom]: parseInt(e.target.value) || 0
                               }))}
                             />
-                            <p className="text-xs text-orange-600 mt-1">
-                              R${(denom * (coinCounts[denom] || 0)).toFixed(2)}
-                            </p>
+                             <p className="text-xs text-muted-foreground mt-1">
+                               R${(denom * (coinCounts[denom] || 0)).toFixed(2)}
+                             </p>
                           </div>
                         ))}
                       </div>
