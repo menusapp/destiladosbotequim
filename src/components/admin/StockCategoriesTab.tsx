@@ -3,10 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, FolderOpen } from "lucide-react";
+import { Plus, Pencil, Trash2, FolderOpen } from "lucide-react";
 
 interface StockCategory {
   id: string;
@@ -106,57 +105,49 @@ const StockCategoriesTab = ({ restaurantId }: StockCategoriesTabProps) => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Botão criar nova categoria */}
-      <div className="flex justify-end">
-        <Button onClick={() => {
-          resetForm();
-          setCategoryDialogOpen(true);
-        }}>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">Categorias do Estoque</h3>
+        <Button onClick={() => { resetForm(); setCategoryDialogOpen(true); }}>
           <Plus className="h-4 w-4 mr-2" />
           Nova Categoria
         </Button>
       </div>
 
-      {/* Grid de categorias */}
       {categories.length === 0 ? (
-        <Card className="p-12 text-center">
+        <div className="text-center py-12 border rounded-lg bg-secondary/20">
           <FolderOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">Nenhuma categoria cadastrada</p>
-        </Card>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="overflow-y-auto max-h-[calc(100vh-300px)] space-y-2">
           {categories.map((category) => (
-            <Card key={category.id} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{category.name}</h3>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditDialog(category)}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteCategory(category.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div
+              key={category.id}
+              className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
+            >
+              <p className="font-medium">{category.name}</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openEditDialog(category)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleDeleteCategory(category.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           ))}
         </div>
       )}
 
-      {/* Dialog de criação/edição */}
       <Dialog open={categoryDialogOpen} onOpenChange={(open) => {
         if (!open) resetForm();
         setCategoryDialogOpen(open);

@@ -209,21 +209,6 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Suporte */}
-        <SidebarGroup className="mt-auto border-t border-sidebar-border pt-2">
-          <SidebarMenu className="px-2">
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => window.open("https://wa.me/5511999999999", "_blank")}
-                tooltip="Falar com Suporte"
-                className="text-green-600 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 h-9 px-3 rounded-button text-[13px]"
-              >
-                <MessageCircle className="h-4 w-4" />
-                {!collapsed && <span>Falar com Suporte</span>}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
       </SidebarContent>
     </Sidebar>
   );
