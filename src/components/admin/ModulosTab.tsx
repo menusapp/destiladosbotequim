@@ -178,9 +178,8 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
 
       {/* Plans Grid */}
       <div className="grid gap-5 md:grid-cols-3 items-start">
-        {plans.map((plan, index) => {
+        {plans.map((plan) => {
           const isCurrent = activeSub?.plan_id === plan.id;
-          const isRecommended = index === recommendedIndex && !isCurrent;
           const isUpgrade = activeSub ? plan.price > activeSub.plan_price : false;
           const isDowngrade = activeSub ? plan.price < activeSub.plan_price : false;
 
@@ -191,9 +190,7 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                 relative rounded-2xl border bg-card p-6 transition-all duration-200
                 ${isCurrent
                   ? "border-primary/60 ring-2 ring-primary/15 shadow-md"
-                  : isRecommended
-                    ? "border-primary/30 shadow-lg scale-[1.02]"
-                    : "border-border hover:border-primary/20 hover:shadow-sm"
+                  : "border-border hover:border-primary/20 hover:shadow-sm"
                 }
               `}
             >
