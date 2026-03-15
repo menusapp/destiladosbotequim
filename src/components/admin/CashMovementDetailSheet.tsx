@@ -257,7 +257,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
             <div className="flex items-center gap-2 text-sm">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Pagamento:</span>
-              <span className="font-medium">{movement.payment_method}</span>
+              <span className="font-medium">{formatPaymentMethod(movement.payment_method)}</span>
             </div>
           )}
         </div>
