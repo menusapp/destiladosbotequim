@@ -979,6 +979,13 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Detail Sheet for movement drill-down */}
+      <CashMovementDetailSheet
+        movement={selectedMovement}
+        open={detailSheetOpen}
+        onOpenChange={(open) => { setDetailSheetOpen(open); if (!open) setSelectedMovement(null); }}
+      />
     </div>
   );
 }
