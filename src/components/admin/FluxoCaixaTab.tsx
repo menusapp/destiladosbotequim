@@ -639,17 +639,17 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           
           {currentSession && (
             <Collapsible open={movementDrawerOpen} onOpenChange={setMovementDrawerOpen}>
-              <Card className="border-orange-200">
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-orange-50/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-orange-700">
-                        <Receipt className="h-5 w-5" />
-                        Registrar Movimentação
-                      </CardTitle>
-                      <ChevronDown className={`h-5 w-5 text-orange-600 transition-transform ${movementDrawerOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                  </CardHeader>
+               <Card>
+                 <CollapsibleTrigger asChild>
+                   <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                     <div className="flex items-center justify-between">
+                       <CardTitle className="flex items-center gap-2">
+                         <Receipt className="h-5 w-5" />
+                         Registrar Movimentação
+                       </CardTitle>
+                       <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${movementDrawerOpen ? 'rotate-180' : ''}`} />
+                     </div>
+                   </CardHeader>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent>
