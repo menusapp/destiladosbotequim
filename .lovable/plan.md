@@ -1,51 +1,106 @@
 
-Objetivo: explicar por que “antes funcionava” e definir a correção estável para continuar em modo teste sem erro `Payer email forbidden`.
 
-Diagnóstico confirmado (com evidência):
-- O backend está em modo teste hoje (`mp_access_token` com prefixo `TEST-` em `online_payment_config`).
-- O erro atual não é mais genérico: é `403 / 4390 Payer email forbidden`.
-- O fluxo atual tenta criar test user automaticamente (`POST /users/test_user`), mas essa chamada está sendo bloqueada (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`), então cai no fallback `test_user_{timestamp}@testuser.com`.
-- Esse fallback é rejeitado, porque não corresponde a um test user válido.
-- Por isso “agora dá erro”: o projeto está operando em contexto de validação sandbox mais rígida (e a criação automática de test user não está autorizada com as credenciais atuais). Antes provavelmente estava em outro contexto de credencial/comportamento e não batia nessa regra.
+## Plano de Execucao: Refatoracao de 4 Modulos
 
-Plano de correção (implementação):
-1) Remover a dependência de criação automática de test user no runtime
-- Em `supabase/functions/mercadopago-charge/index.ts`, retirar o fallback que inventa `@testuser.com` e parar de depender de `POST /users/test_user` para cada cobrança.
+---
 
-2) Adicionar email de teste fixo e válido por restaurante
-- Criar coluna nova em `online_payment_config` (ex.: `mp_sandbox_payer_email`).
-- Esse campo guardará um email de test user real (válido no ambiente de teste).
+### 1. Visao Geral (Dashboard) — `OverviewTab.tsx`
 
-3) Expor esse campo nas configurações de pagamento
-- Em `src/components/admin/settings/OnlinePaymentsSettings.tsx`, mostrar input “Email de teste (sandbox)” quando token for `TEST-`.
-- Salvar esse email na configuração.
+**Filtro Global de Datas:**
+- Adicionar `Select` no topo com options: Hoje, Ultimos 7 dias, Ultimos 30 dias, Este mes, Mes passado, Ultimos 60 dias, Anual
+- Estado `dateRange` controla o calculo de `startDate` e `endDate`
+- Todas as queries Supabase usam `.gte("created_at", startDate)` e `.lte("created_at", endDate)` em vez do `todayStart`/`monthStart` fixos
 
-4) Regras finais de email no `mercadopago-charge`
-- Se token `TEST-`: usar `mp_sandbox_payer_email` (obrigatório); se ausente, retornar erro claro para o admin configurar.
-- Se produção: usar email do cliente normalmente (com fallback atual).
+**Remocoes:**
+- Deletar card "Status das Mesas" (grid de mesas, linhas 279-308)
+- Deletar card "Contas Abertas" (debtors, linhas 313-343)
+- Remover interfaces `TableData`, `DebtorData` e campos relacionados do state/fetch
 
-5) Ajuste de bug secundário no mesmo arquivo
-- Corrigir referência residual `safePayer(...)` no bloco de “salvar cartão” (hoje ficou inconsistente após refactor), para evitar erro futuro nesse caminho.
+**Adicoes — 2 novos cards:**
+- **Vendas no Caixa (PDV/Local):** Query `orders` com `order_type = 'local'` + query `counter_orders` com status `paid` no range de datas. Somar totais.
+- **Vendas no Delivery:** Query `orders` com `order_type = 'delivery'` nos mesmos filtros de status validos e range de datas.
+- Ambos aparecem como MetricCards na grid do topo (substituindo "Clientes Hoje" e "Faturamento Mensal" ou adicionando na linha)
 
-Resultado esperado:
-- Em teste: pagamentos deixam de falhar por `Payer email forbidden`.
-- Em produção: segue fluxo normal com email real do cliente.
-- Mensagem de erro passa a ser acionável quando faltar configuração de sandbox.
+**Reatividade:** O `fetchData` recebe o range de datas calculado. O `useEffect` re-executa quando `dateRange` muda. O grafico de vendas por hora so aparece quando filtro = "Hoje".
 
-Detalhes técnicos:
-```text
-Checkout (cliente)
-   -> mercadopago-charge
-      -> lê online_payment_config
-         -> token TEST- ?
-            -> usa mp_sandbox_payer_email (válido)
-            -> cria pagamento
-         -> token produção ?
-            -> usa customer_email
-            -> cria pagamento
+---
+
+### 2. Estoque — `StockCard.tsx` + `StockItemsGrid.tsx`
+
+**StockCard.tsx:**
+- Reduzir `p-6` para `p-3`
+- Nome: `text-lg` → `text-sm font-semibold`
+- Valor total: `text-3xl` → `text-xl`
+- Grid de metricas: `gap-4` → `gap-2`, `text-sm` → `text-xs`
+- Botoes: `h-9` com `text-xs`
+- Remover separador visual (border-t)
+
+**StockItemsGrid.tsx:**
+- Grid: manter `grid-cols-2 md:grid-cols-3 lg:grid-cols-4` mas reduzir gap de `gap-4` para `gap-2`
+
+Resultado: ~40% mais itens visiveis na mesma tela.
+
+---
+
+### 3. Planos (ex-Modulos) — `ModulosTab.tsx` + `AppSidebar.tsx` + `RestaurantAdmin.tsx`
+
+**Nomenclatura:**
+- `AppSidebar.tsx`: label `"Módulos"` → `"Planos"`
+- `RestaurantAdmin.tsx`: manter o `id: "modulos"` internamente (evita quebrar routing), mas alterar titulo renderizado
+- `ModulosTab.tsx`: header "Escolha seu plano" ja esta correto. Verificar textos internos.
+
+**UI — Remover badge "Recomendado":**
+- Deletar linhas 210-216 em `ModulosTab.tsx` (bloco `isRecommended && !isCurrent`)
+- Remover variavel `recommendedIndex` e `isRecommended`
+- Remover classe `scale-[1.02]` e `border-primary/30 shadow-lg` do card recomendado
+
+---
+
+### 4. Caixa e Historico — `FluxoCaixaTab.tsx` (o mais critico)
+
+**4a. Drill-down nos pedidos (caixa aberto):**
+- As linhas de movimentacoes (linhas 749-776) tornam-se clicaveis
+- Ao clicar numa movimentacao que tem `bill_id`, buscar o pedido associado via: `orders` WHERE `id` IN (SELECT `order_id` FROM `bill_orders` — ou diretamente `bills.orders`)
+- Abrir um Dialog/Sheet "Espelho do Pedido" com:
+  - Cliente (`customer_name`, `customer_cpf`)
+  - Origem: derivada de `order_type` + `table_id` (ex: "Mesa 05 via QR Code", "Delivery", "Balcao PDV")
+  - Endereco (se delivery: `delivery_address`)
+  - Forma de pagamento (`payment_method` ou `payment_type`)
+  - Produtos com adicionais: `order_items` JOIN `products(name)` + `order_item_extras` JOIN `product_extras(name)`
+  - Observacoes (`notes`)
+  - Descontos (`coupon_discount`, `loyalty_points_used`, `delivery_fee`)
+
+- Para movimentacoes SEM `bill_id` (manuais), o clique mostra apenas os dados da movimentacao (descricao, valor, responsavel).
+
+- Para movimentacoes com `bill_id`, query:
+```sql
+SELECT bills.*, 
+  orders(*, order_items(*, products(name), order_item_extras(*, product_extras(name))))
+FROM bills WHERE id = bill_id
 ```
 
-Observações de segurança e dados:
-- Sem mudança de permissões/RLS para este ajuste específico.
-- Mudança de banco restrita a tabela pública existente (`online_payment_config`), sem tocar schemas reservados.
-- Mantém rastreabilidade por restaurante e evita lógica frágil de criação dinâmica de test user em cada transação.
+**4b. Historico de caixa — mesma funcionalidade:**
+- No dialog de caixa fechado (linhas 868-953), as movimentacoes listadas tambem sao clicaveis com o mesmo drill-down
+
+**4c. Searchbar no historico de caixa fechado:**
+- Dentro do dialog de detalhes do caixa fechado (linhas 913-948), adicionar um `Input` de busca acima da lista de movimentacoes
+- Filtrar `selectedSessionMovements` por `description` ou `created_by` (texto livre)
+
+**Componente novo:** Criar `CashMovementDetailSheet.tsx` — Sheet lateral reutilizavel que recebe `bill_id` ou `movement` e renderiza o espelho do pedido.
+
+---
+
+### Resumo de arquivos
+
+| Acao | Arquivo |
+|---|---|
+| Editar | `src/components/admin/OverviewTab.tsx` |
+| Editar | `src/components/admin/StockCard.tsx` |
+| Editar | `src/components/admin/StockItemsGrid.tsx` |
+| Editar | `src/components/admin/ModulosTab.tsx` |
+| Editar | `src/components/admin/AppSidebar.tsx` |
+| Editar | `src/components/admin/FluxoCaixaTab.tsx` |
+| Criar | `src/components/admin/CashMovementDetailSheet.tsx` |
+
+Nenhuma migracao de banco necessaria — todos os campos ja existem nas tabelas `orders`, `bills`, `counter_orders`.
+
