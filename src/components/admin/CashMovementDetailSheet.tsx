@@ -362,7 +362,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
           {counterDetail.payment_method && (
             <div className="flex items-center gap-2 text-sm">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{counterDetail.payment_method}</span>
+              <span className="text-muted-foreground">{formatPaymentMethod(counterDetail.payment_method)}</span>
             </div>
           )}
         </div>

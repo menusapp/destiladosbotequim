@@ -795,6 +795,25 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         </Card>
       ) : (
         <div className="space-y-6">
+          {/* Link Público de Reservas */}
+          <Card>
+            <CardContent className="py-4">
+              <Label className="font-medium mb-2 block">Link Público de Reservas</Label>
+              <p className="text-sm text-muted-foreground mb-3">Envie este link aos clientes para que façam reservas online.</p>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={`${window.location.origin}/${restaurantSlug}/reservas`}
+                  className="bg-muted/50 font-mono text-sm"
+                />
+                <Button variant="outline" size="sm" onClick={handleCopyReservationLink} className="gap-1.5 shrink-0">
+                  <Copy className="h-4 w-4" />
+                  Copiar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Configurações */}
           <Card>
             <CardHeader>

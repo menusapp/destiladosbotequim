@@ -290,17 +290,17 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
             <SelectValue placeholder="Ordenar por..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="most_spent">💰 Mais gasto</SelectItem>
-            <SelectItem value="least_spent">📉 Menos gasto</SelectItem>
-            <SelectItem value="recent">🆕 Recentes</SelectItem>
-            <SelectItem value="oldest">📅 Mais antigos</SelectItem>
-            <SelectItem value="alphabetical">🔤 A-Z</SelectItem>
+            <SelectItem value="most_spent">Mais gasto</SelectItem>
+            <SelectItem value="least_spent">Menos gasto</SelectItem>
+            <SelectItem value="recent">Recentes</SelectItem>
+            <SelectItem value="oldest">Mais antigos</SelectItem>
+            <SelectItem value="alphabetical">A-Z</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {/* Customers Grid */}
-      <ScrollArea className="h-[600px]">
+      <ScrollArea className="max-h-[calc(100vh-280px)]">
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Carregando...</div>
         ) : filteredCustomers.length === 0 ? (
