@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
         client_id: clientId,
         client_secret: clientSecret,
         scope: "empresa cep cnpj nfce",
-        audience: "https://api.sandbox.nuvemfiscal.com.br/",
+        audience: "https://api.nuvemfiscal.com.br/",
       }),
     });
 
@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
     console.log("Creating company in Nuvem Fiscal:", JSON.stringify(payload));
 
     // 5. POST to Nuvem Fiscal API
-    const companyRes = await fetch("https://api.sandbox.nuvemfiscal.com.br/empresas", {
+    const companyRes = await fetch("https://api.nuvemfiscal.com.br/empresas", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
