@@ -314,7 +314,7 @@ Deno.serve(async (req) => {
     console.log("[NuvemFiscal] Emitting NFC-e for order:", order_id, "CNPJ:", cpfCnpj);
 
     // 7. Send to Nuvem Fiscal API
-    const baseUrl = "https://api.sandbox.nuvemfiscal.com.br";
+    const baseUrl = "https://api.nuvemfiscal.com.br";
     const apiResponse = await fetch(`${baseUrl}/nfce`, {
       method: "POST",
       headers: {
