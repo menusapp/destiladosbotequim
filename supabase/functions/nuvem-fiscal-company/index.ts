@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
         client_id: clientId,
         client_secret: clientSecret,
         scope: "empresa cep cnpj nfce",
-        audience: "https://api.sandbox.nuvemfiscal.com.br/",
+        audience: "https://api.nuvemfiscal.com.br/",
       }),
     });
 
