@@ -14,6 +14,14 @@ export default defineConfig(({ mode }) => ({
     outDir: "dist",
     emptyOutDir: true,
     sourcemap: mode === "development",
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: mode === "production",
+        drop_debugger: mode === "production",
+        pure_funcs: mode === "production" ? ["console.log", "console.debug"] : [],
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks: {
