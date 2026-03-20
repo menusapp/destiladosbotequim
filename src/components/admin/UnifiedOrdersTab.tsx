@@ -106,6 +106,40 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
       .then(({ data }) => { if (data) setAutoPrint(data.auto_print_orders); });
   }, [restaurantId]);
 
+  // iFood polling every 30 seconds
+  useEffect(() => {
+    const SUPABASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+    let active = true;
+
+    const pollIfood = async () => {
+      if (!active) return;
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-polling`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ restaurant_id: restaurantId }),
+        });
+        if (res.status === 401) {
+          // Try refresh
+          await fetch(`${SUPABASE_URL}/functions/v1/ifood-refresh-token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ restaurant_id: restaurantId }),
+          });
+        } else if (res.ok) {
+          const data = await res.json();
+          if (data.new_orders > 0) {
+            fetchOrders();
+            toast.info(`${data.new_orders} novo(s) pedido(s) do iFood!`);
+          }
+        }
+      } catch (_) { /* silent fail */ }
+    };
+
+    const interval = setInterval(pollIfood, 30000);
+    return () => { active = false; clearInterval(interval); };
+  }, [restaurantId]);
+
   const setupRealtime = () => {
     const ch = supabase.channel(`unified-orders-${restaurantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => fetchOrders())
