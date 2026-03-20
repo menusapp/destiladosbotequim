@@ -21,6 +21,7 @@ const SECTION_TO_MODULE: Record<string, string> = {
   "config-whatsapp": "whatsapp",
   "config-pagamentos-online": "pagamentos_online",
   "config-regioes": "delivery",
+  "integracoes": "delivery",
 };
 
 // Sections that are always available (basic config)

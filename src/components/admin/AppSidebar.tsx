@@ -87,6 +87,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
     ],
     // Administrativo
     [
+      { id: "integracoes", label: "Integrações", icon: Plug },
       { id: "fiscal", label: "Fiscal", icon: FileText },
       ...(staffRole === "admin" ? [{ id: "contas", label: "Contas", icon: Users }] : []),
       { id: "modulos", label: "Planos", icon: Construction },

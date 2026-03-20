@@ -35,3 +35,15 @@ verify_jwt = false
 
 [functions.verify-password]
 verify_jwt = false
+
+[functions.ifood-auth]
+verify_jwt = false
+
+[functions.ifood-refresh-token]
+verify_jwt = false
+
+[functions.ifood-polling]
+verify_jwt = false
+
+[functions.ifood-order-action]
+verify_jwt = false

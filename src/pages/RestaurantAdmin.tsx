@@ -678,6 +678,10 @@ const RestaurantAdmin = () => {
       case "fiscal":
         return <FiscalTab restaurantId={restaurant.id} />;
       
+      // Integrações
+      case "integracoes":
+        return <IntegrationsTab restaurantId={restaurant.id} />;
+      
       // Módulos
       case "modulos":
         return <ModulosTab restaurantId={restaurant.id} />;
