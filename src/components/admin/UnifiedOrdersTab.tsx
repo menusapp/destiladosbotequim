@@ -51,6 +51,8 @@ interface Order {
   delivery_fee?: number;
   coupon_discount?: number;
   loyalty_points_used?: number;
+  ifood_source?: boolean;
+  ifood_order_id?: string;
 }
 
 interface UnifiedOrdersTabProps {
