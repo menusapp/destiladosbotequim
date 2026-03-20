@@ -23,6 +23,7 @@ import {
   Gift,
   Smartphone,
   FileText,
+  Plug,
 } from "lucide-react";
 import {
   Sidebar,
