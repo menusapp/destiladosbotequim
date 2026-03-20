@@ -1208,6 +1208,56 @@ export type Database = {
           },
         ]
       }
+      ifood_config: {
+        Row: {
+          access_token: string | null
+          authorization_code_verifier: string | null
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          last_polling_at: string | null
+          merchant_id: string | null
+          refresh_token: string | null
+          restaurant_id: string
+          token_expires_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          authorization_code_verifier?: string | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          last_polling_at?: string | null
+          merchant_id?: string | null
+          refresh_token?: string | null
+          restaurant_id: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          authorization_code_verifier?: string | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          last_polling_at?: string | null
+          merchant_id?: string | null
+          refresh_token?: string | null
+          restaurant_id?: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_config_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       labor_costs: {
         Row: {
           created_at: string | null
@@ -2072,6 +2122,8 @@ export type Database = {
           delivery_phone: string | null
           delivery_type: string | null
           id: string
+          ifood_order_id: string | null
+          ifood_source: boolean | null
           loyalty_points_earned: number | null
           loyalty_points_used: number | null
           notes: string | null
@@ -2100,6 +2152,8 @@ export type Database = {
           delivery_phone?: string | null
           delivery_type?: string | null
           id?: string
+          ifood_order_id?: string | null
+          ifood_source?: boolean | null
           loyalty_points_earned?: number | null
           loyalty_points_used?: number | null
           notes?: string | null
@@ -2128,6 +2182,8 @@ export type Database = {
           delivery_phone?: string | null
           delivery_type?: string | null
           id?: string
+          ifood_order_id?: string | null
+          ifood_source?: boolean | null
           loyalty_points_earned?: number | null
           loyalty_points_used?: number | null
           notes?: string | null
