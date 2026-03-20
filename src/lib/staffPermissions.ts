@@ -22,6 +22,7 @@ export const ALL_SECTIONS = [
   { id: "config-pagamentos-online", label: "Pagamentos Online" },
   { id: "config-impressoras", label: "Impressoras" },
   { id: "config-whatsapp", label: "Automação WhatsApp" },
+  { id: "integracoes", label: "Integrações" },
 ] as const;
 
 export type StaffRole = "admin" | "gerente" | "caixa" | "garcom" | "cozinha" | "atendente";

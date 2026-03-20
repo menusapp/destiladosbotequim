@@ -51,6 +51,8 @@ interface Order {
   delivery_fee?: number;
   coupon_discount?: number;
   loyalty_points_used?: number;
+  ifood_source?: boolean;
+  ifood_order_id?: string;
 }
 
 interface UnifiedOrdersTabProps {
@@ -104,6 +106,40 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
       .then(({ data }) => { if (data) setAutoPrint(data.auto_print_orders); });
   }, [restaurantId]);
 
+  // iFood polling every 30 seconds
+  useEffect(() => {
+    const SUPABASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+    let active = true;
+
+    const pollIfood = async () => {
+      if (!active) return;
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-polling`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ restaurant_id: restaurantId }),
+        });
+        if (res.status === 401) {
+          // Try refresh
+          await fetch(`${SUPABASE_URL}/functions/v1/ifood-refresh-token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ restaurant_id: restaurantId }),
+          });
+        } else if (res.ok) {
+          const data = await res.json();
+          if (data.new_orders > 0) {
+            fetchOrders();
+            toast.info(`${data.new_orders} novo(s) pedido(s) do iFood!`);
+          }
+        }
+      } catch (_) { /* silent fail */ }
+    };
+
+    const interval = setInterval(pollIfood, 30000);
+    return () => { active = false; clearInterval(interval); };
+  }, [restaurantId]);
+
   const setupRealtime = () => {
     const ch = supabase.channel(`unified-orders-${restaurantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => fetchOrders())
@@ -115,7 +151,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
       .eq("restaurant_id", restaurantId)
       .neq("order_type", "local")
       .gte("created_at", dateRange.from.toISOString())
@@ -218,10 +254,13 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
               {elapsed}min
             </Badge>
           </div>
-          <div className="flex items-center gap-1.5">
-            {getOrderTypeIcon(order)}
-            <span className="text-xs font-medium">{getOrderTypeLabel(order)}</span>
-          </div>
+           <div className="flex items-center gap-1.5">
+             {getOrderTypeIcon(order)}
+             <span className="text-xs font-medium">{getOrderTypeLabel(order)}</span>
+             {(order as any).ifood_source && (
+               <Badge className="bg-[#EA1D2C] text-white text-[10px] px-1.5 py-0 border-0">iFood</Badge>
+             )}
+           </div>
           <p className="text-sm font-semibold truncate">{order.customer_name}</p>
           <div className="text-xs text-muted-foreground">
             {order.order_items.slice(0, 2).map((item, i) => (

@@ -39,6 +39,7 @@ import FiscalTab from "@/components/admin/FiscalTab";
 import ContasTab from "@/components/admin/ContasTab";
 import OverviewTab from "@/components/admin/OverviewTab";
 import { SupportChatWidget } from "@/components/admin/SupportChatWidget";
+import IntegrationsTab from "@/components/admin/IntegrationsTab";
 
 interface Restaurant {
   id: string;
@@ -676,6 +677,10 @@ const RestaurantAdmin = () => {
       // Fiscal (unified: settings + invoices)
       case "fiscal":
         return <FiscalTab restaurantId={restaurant.id} />;
+      
+      // Integrações
+      case "integracoes":
+        return <IntegrationsTab restaurantId={restaurant.id} />;
       
       // Módulos
       case "modulos":
