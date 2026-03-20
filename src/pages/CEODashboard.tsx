@@ -143,8 +143,15 @@ const CEODashboard = () => {
           .select().single();
         if (error) throw error;
         if (formUsername && formPassword) {
+          // Hash password before storing
+          const { data: hashData, error: hashError } = await supabase.functions.invoke("hash-password", {
+            body: { password: formPassword },
+          });
+          if (hashError || !hashData?.hash) throw new Error("Erro ao criar hash da senha");
+          const hashedPassword = hashData.hash;
+
           const { error: credError } = await supabase.from("restaurant_credentials" as any)
-            .insert({ restaurant_id: restaurant.id, username: formUsername, password_hash: formPassword } as any);
+            .insert({ restaurant_id: restaurant.id, username: formUsername, password_hash: hashedPassword } as any);
           if (credError) throw credError;
 
           const allSections = [
@@ -157,7 +164,7 @@ const CEODashboard = () => {
             .insert({
               restaurant_id: restaurant.id,
               username: formUsername,
-              password_hash: formPassword,
+              password_hash: hashedPassword,
               display_name: "Administrador",
               role: "admin",
               allowed_sections: allSections,

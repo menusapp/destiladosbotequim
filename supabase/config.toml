@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.nuvem-fiscal-emit]
 verify_jwt = false
+
+[functions.hash-password]
+verify_jwt = false
+
+[functions.verify-password]
+verify_jwt = false
