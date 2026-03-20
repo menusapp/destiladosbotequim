@@ -47,11 +47,11 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   const fetchConfig = async () => {
     setLoading(true);
     const { data } = await supabase
-      .from("ifood_config")
+      .from("ifood_config" as any)
       .select("id, restaurant_id, enabled, merchant_id, token_expires_at, access_token")
       .eq("restaurant_id", restaurantId)
       .maybeSingle();
-    setConfig(data as IfoodConfig | null);
+    setConfig(data as unknown as IfoodConfig | null);
     setLoading(false);
   };
 
