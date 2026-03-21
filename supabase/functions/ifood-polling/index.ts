@@ -164,21 +164,74 @@ Deno.serve(async (req) => {
 
           if (!dummyTable) continue;
 
-          // Calculate total
-          const totalPrice = orderData.total?.orderAmount || orderData.totalPrice || 0;
-          const deliveryFee = orderData.total?.deliveryFee || orderData.deliveryFee || 0;
+          // Calculate total from items (not from orderData.total.orderAmount)
+          let calculatedTotal = 0;
+          const orderItems: any[] = [];
+
+          if (orderData.items && orderData.items.length > 0) {
+            for (const item of orderData.items) {
+              const itemUnitPrice = item.unitPrice || item.price || 0;
+              const itemQty = item.quantity || 1;
+              let itemTotal = itemUnitPrice * itemQty;
+
+              // Process garnish/options/subitems
+              const complementNames: string[] = [];
+              const subItems = item.subItems || item.garnishItems || item.options || [];
+              if (Array.isArray(subItems)) {
+                for (const sub of subItems) {
+                  const subPrice = sub.unitPrice || sub.price || 0;
+                  const subQty = sub.quantity || 1;
+                  itemTotal += subPrice * subQty;
+                  if (sub.name) complementNames.push(sub.name);
+                }
+              }
+
+              calculatedTotal += itemTotal;
+
+              // Build notes with item name + complements
+              let itemNotes = item.name || "Item iFood";
+              if (complementNames.length > 0) {
+                itemNotes += " — " + complementNames.join(", ");
+              }
+
+              orderItems.push({
+                quantity: itemQty,
+                price_at_order: itemUnitPrice,
+                notes: itemNotes,
+              });
+            }
+          }
+
+          // Delivery fee
+          const deliveryFee = orderData.deliveryFee?.value
+            ?? orderData.total?.deliveryFee
+            ?? orderData.deliveryFee
+            ?? 0;
+          // Use number only
+          const deliveryFeeNum = typeof deliveryFee === 'object' ? (deliveryFee?.value || 0) : (deliveryFee || 0);
 
           // Map payment type
           let paymentType = "pending";
           if (orderData.payments && orderData.payments.length > 0) {
             const p = orderData.payments[0];
-            const method = (p.method || p.name || "").toLowerCase();
-            if (method.includes("credit") || method.includes("crédito")) paymentType = "credit";
-            else if (method.includes("debit") || method.includes("débito")) paymentType = "debit";
-            else if (method.includes("pix")) paymentType = "pix";
-            else if (method.includes("cash") || method.includes("dinheiro")) paymentType = "cash";
-            else if (method.includes("meal") || method.includes("voucher") || method.includes("vale")) paymentType = "meal_voucher";
-            else paymentType = p.method || "other";
+            const method = (p.method || p.name || "").toUpperCase();
+            const isPrepaid = p.prepaid === true;
+
+            if (method === "ONLINE" || isPrepaid) {
+              paymentType = "Pago pelo iFood";
+            } else if (method.includes("CREDIT") || method.includes("CRÉDITO")) {
+              paymentType = "credit";
+            } else if (method.includes("DEBIT") || method.includes("DÉBITO")) {
+              paymentType = "debit";
+            } else if (method.includes("PIX")) {
+              paymentType = "pix";
+            } else if (method.includes("CASH") || method.includes("DINHEIRO")) {
+              paymentType = "cash";
+            } else if (method.includes("MEAL") || method.includes("VOUCHER") || method.includes("VALE")) {
+              paymentType = "meal_voucher";
+            } else {
+              paymentType = p.method || "other";
+            }
           }
 
           // Insert order
@@ -194,7 +247,7 @@ Deno.serve(async (req) => {
               delivery_type: "delivery",
               delivery_address: deliveryAddress,
               delivery_phone: customerPhone,
-              delivery_fee: deliveryFee,
+              delivery_fee: deliveryFeeNum,
               payment_type: paymentType,
               ifood_order_id: orderId,
               ifood_source: true,
@@ -209,17 +262,17 @@ Deno.serve(async (req) => {
           if (!insertError && insertedOrder) {
             newOrdersCount++;
 
-            // Insert order items from iFood data
-            if (orderData.items && orderData.items.length > 0) {
-              const orderItems = orderData.items.map((item: any) => ({
+            // Insert order items
+            if (orderItems.length > 0) {
+              const dbItems = orderItems.map((item) => ({
                 order_id: insertedOrder.id,
                 product_id: null,
-                quantity: item.quantity || 1,
-                price_at_order: item.unitPrice || item.price || 0,
-                notes: item.name || "Item iFood",
+                quantity: item.quantity,
+                price_at_order: item.price_at_order,
+                notes: item.notes,
               }));
 
-              await supabase.from("order_items").insert(orderItems);
+              await supabase.from("order_items").insert(dbItems);
             }
           }
         } catch (e) {

@@ -71,6 +71,7 @@ const PAYMENT_LABELS: Record<string, { icon: React.ReactNode; label: string }> =
   "cash": { icon: <Banknote className="w-3 h-3" />, label: "Dinheiro" },
   "pix": { icon: <Smartphone className="w-3 h-3" />, label: "PIX" },
   "online": { icon: <Smartphone className="w-3 h-3" />, label: "Pago Online" },
+  "Pago pelo iFood": { icon: <Smartphone className="w-3 h-3" />, label: "Pago pelo iFood" },
 };
 
 const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: UnifiedOrdersTabProps) => {

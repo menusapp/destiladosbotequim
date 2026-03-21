@@ -110,6 +110,9 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
   };
 
   const requiresPaymentForFinalization = (newStatus: string) => {
+    // iFood orders paid via app don't need payment confirmation
+    if (order.ifood_source && order.payment_type === "Pago pelo iFood") return false;
+
     const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
     if (isLocal) {
       if (newStatus === "delivered") return false;
