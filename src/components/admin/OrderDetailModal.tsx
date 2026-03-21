@@ -250,18 +250,18 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
               {order.status === "delivered" && (order.order_type === "local" || (!order.order_type && order.table_id)) && (
                 <Button 
                   onClick={() => {
-                    if (!order.payment_type || order.payment_type === "pending") {
+                    const isIfoodPaid = order.ifood_source && order.payment_type === "Pago pelo iFood";
+                    if (!isIfoodPaid && (!order.payment_type || order.payment_type === "pending")) {
                       toast.error("Defina a forma de pagamento antes de finalizar");
                       setShowPaymentModal(true);
                       return;
                     }
-                    // Mark as finalized - we keep status as delivered but with payment confirmed
                     toast.success("Pedido finalizado!");
                     onStatusUpdate();
                     onClose();
                   }} 
                   className="gap-2"
-                  variant={(!order.payment_type || order.payment_type === "pending") ? "outline" : "default"}
+                  variant={(!order.payment_type || order.payment_type === "pending") && !(order.ifood_source && order.payment_type === "Pago pelo iFood") ? "outline" : "default"}
                 >
                   <Play className="w-4 h-4" />Finalizar
                 </Button>
