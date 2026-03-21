@@ -164,48 +164,36 @@ Deno.serve(async (req) => {
 
           if (!dummyTable) continue;
 
-          // Recursive function to sum garnish prices and collect names
-          const processGarnishes = (garnishes: any[]): { total: number; names: string[] } => {
-            let total = 0;
-            const names: string[] = [];
-            if (!Array.isArray(garnishes)) return { total, names };
-            for (const g of garnishes) {
-              const gPrice = g.unitPrice || g.price || 0;
-              const gQty = g.quantity || 1;
-              total += gPrice * gQty;
-              if (g.name) names.push(g.name);
-              // Recurse into nested garnishItems
-              if (g.garnishItems && Array.isArray(g.garnishItems)) {
-                const nested = processGarnishes(g.garnishItems);
-                total += nested.total;
-                names.push(...nested.names);
-              }
-            }
-            return { total, names };
-          };
-
-          // Calculate total from items (not from orderData.total.orderAmount)
+          // Use totalPrice from iFood (includes item + all complements)
           let calculatedTotal = 0;
           const orderItems: any[] = [];
 
           if (orderData.items && orderData.items.length > 0) {
             for (const item of orderData.items) {
-              const itemUnitPrice = item.unitPrice || item.price || 0;
               const itemQty = item.quantity || 1;
+              // totalPrice already includes item + options + customizations
+              const pricePerUnit = item.totalPrice != null
+                ? item.totalPrice / itemQty
+                : (item.unitPrice || item.price || 0);
+              calculatedTotal += (item.totalPrice != null ? item.totalPrice : pricePerUnit * itemQty);
 
-              // Sum all garnish/complement prices recursively
-              const allGarnishes = item.garnishItems || item.subItems || item.options || [];
-              const { total: garnishTotal, names: complementNames } = processGarnishes(allGarnishes);
-
-              // price_at_order = unit price + all complements (per single unit)
-              const pricePerUnit = itemUnitPrice + garnishTotal;
-              const itemTotal = pricePerUnit * itemQty;
-              calculatedTotal += itemTotal;
-
-              // Build notes with item name + complements
+              // Build notes: item name + options + customizations
               let itemNotes = item.name || "Item iFood";
-              if (complementNames.length > 0) {
-                itemNotes += " — " + complementNames.join(", ");
+              const optionNames: string[] = [];
+              if (Array.isArray(item.options)) {
+                for (const opt of item.options) {
+                  let optLabel = opt.name || "";
+                  if (Array.isArray(opt.customization) && opt.customization.length > 0) {
+                    const custNames = opt.customization.map((c: any) => c.name).filter(Boolean);
+                    if (custNames.length > 0) {
+                      optLabel += ` (${custNames.join(", ")})`;
+                    }
+                  }
+                  if (optLabel) optionNames.push(optLabel);
+                }
+              }
+              if (optionNames.length > 0) {
+                itemNotes += " — " + optionNames.join(", ");
               }
 
               orderItems.push({
@@ -221,32 +209,34 @@ Deno.serve(async (req) => {
             ?? orderData.total?.deliveryFee
             ?? orderData.deliveryFee
             ?? 0;
-          // Use number only
           const deliveryFeeNum = typeof deliveryFee === 'object' ? (deliveryFee?.value || 0) : (deliveryFee || 0);
 
-          // Map payment type
-          let paymentType = "pending";
-          if (orderData.payments && orderData.payments.length > 0) {
-            const p = orderData.payments[0];
-            const method = (p.method || p.name || "").toUpperCase();
+          // Map payment type — iFood uses payments.methods[]
+          let paymentType = "Pago pelo iFood";
+          const paymentsObj = orderData.payments;
+          if (paymentsObj && Array.isArray(paymentsObj.methods) && paymentsObj.methods.length > 0) {
+            const p = paymentsObj.methods[0];
+            const pType = (p.type || "").toUpperCase();
+            const pMethod = (p.method || p.name || "").toUpperCase();
             const isPrepaid = p.prepaid === true;
 
-            if (method === "ONLINE" || isPrepaid) {
+            if (pType === "ONLINE" || isPrepaid) {
               paymentType = "Pago pelo iFood";
-            } else if (method.includes("CREDIT") || method.includes("CRÉDITO")) {
-              paymentType = "credit";
-            } else if (method.includes("DEBIT") || method.includes("DÉBITO")) {
-              paymentType = "debit";
-            } else if (method.includes("PIX")) {
-              paymentType = "pix";
-            } else if (method.includes("CASH") || method.includes("DINHEIRO")) {
-              paymentType = "cash";
-            } else if (method.includes("MEAL") || method.includes("VOUCHER") || method.includes("VALE")) {
-              paymentType = "meal_voucher";
+            } else if (pMethod.includes("CREDIT")) {
+              paymentType = "Cartão de Crédito";
+            } else if (pMethod.includes("DEBIT")) {
+              paymentType = "Cartão de Débito";
+            } else if (pMethod.includes("PIX")) {
+              paymentType = "PIX";
+            } else if (pMethod.includes("CASH")) {
+              paymentType = "Dinheiro";
             } else {
-              paymentType = p.method || "other";
+              paymentType = "Pago pelo iFood";
             }
           }
+
+          // Customer CPF
+          const customerCpf = orderData.customer?.documentNumber || "Não informado";
 
           // Insert order
           const { data: insertedOrder, error: insertError } = await supabase
@@ -255,7 +245,7 @@ Deno.serve(async (req) => {
               restaurant_id,
               table_id: dummyTable.id,
               customer_name: customerName,
-              customer_cpf: "000.000.000-00",
+              customer_cpf: customerCpf,
               status: "pending",
               order_type: "delivery",
               delivery_type: "delivery",
