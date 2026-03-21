@@ -43,6 +43,9 @@ Deno.serve(async (req) => {
       );
     }
 
+    console.log("[ifood-refresh] Calling iFood token endpoint for restaurant:", restaurant_id);
+    console.log("[ifood-refresh] Using refresh_token (first 10 chars):", config.refresh_token.substring(0, 10));
+
     const response = await fetch(`${IFOOD_API}/authentication/v1.0/oauth/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -54,19 +57,33 @@ Deno.serve(async (req) => {
       }),
     });
 
+    console.log("[ifood-refresh] iFood response status:", response.status);
+
+    const responseText = await response.text();
+    console.log("[ifood-refresh] iFood response body:", responseText);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("iFood refresh failed:", errorText);
+      console.error("[ifood-refresh] Refresh FAILED:", responseText);
       return new Response(
-        JSON.stringify({ error: "Refresh failed. Restaurant needs to reconnect.", details: errorText }),
+        JSON.stringify({ error: "Refresh failed. Restaurant needs to reconnect.", details: responseText }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const tokenData = await response.json();
-    const expiresAt = new Date(Date.now() + tokenData.expiresIn * 1000).toISOString();
+    const tokenData = responseText ? JSON.parse(responseText) : null;
+    if (!tokenData || !tokenData.accessToken) {
+      console.error("[ifood-refresh] No accessToken in response");
+      return new Response(
+        JSON.stringify({ error: "Invalid token response from iFood" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    await supabase
+    const expiresAt = new Date(Date.now() + tokenData.expiresIn * 1000).toISOString();
+    console.log("[ifood-refresh] New token expires at:", expiresAt);
+
+    console.log("[ifood-refresh] Saving new tokens to DB for restaurant:", restaurant_id);
+    const { error: updateError } = await supabase
       .from("ifood_config")
       .update({
         access_token: tokenData.accessToken,
@@ -75,6 +92,12 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       })
       .eq("restaurant_id", restaurant_id);
+
+    if (updateError) {
+      console.error("[ifood-refresh] DB update error:", updateError);
+    } else {
+      console.log("[ifood-refresh] Tokens saved successfully");
+    }
 
     return new Response(
       JSON.stringify({ success: true }),

@@ -132,9 +132,14 @@ Deno.serve(async (req) => {
             headers: { Authorization: `Bearer ${config.access_token}` },
           });
 
-          if (!orderRes.ok) continue;
+          if (!orderRes.ok) {
+            await orderRes.text();
+            continue;
+          }
 
-          const orderData = await orderRes.json();
+          const orderText = await orderRes.text();
+          if (!orderText) continue;
+          const orderData = JSON.parse(orderText);
 
           const customerName = orderData.customer?.name || "Cliente iFood";
           const customerPhone = orderData.customer?.phone?.number || "";
