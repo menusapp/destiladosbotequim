@@ -92,7 +92,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    const events = await eventsRes.json();
+    const eventsText = await eventsRes.text();
+    const events = eventsText ? JSON.parse(eventsText) : [];
+
+    if (!Array.isArray(events) || events.length === 0) {
+      // No events — update polling time and return
+      await supabase
+        .from("ifood_config")
+        .update({ last_polling_at: new Date().toISOString() })
+        .eq("restaurant_id", restaurant_id);
+
+      return new Response(
+        JSON.stringify({ success: true, new_orders: 0, events_processed: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     let newOrdersCount = 0;
     const eventIds: { id: string }[] = [];
 
