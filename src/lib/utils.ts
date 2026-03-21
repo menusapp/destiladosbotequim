@@ -15,6 +15,8 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   dinheiro: "Dinheiro",
   credito: "Crédito",
   debito: "Débito",
+  ifood_online: "iFood Online",
+  "Pago pelo iFood": "iFood Online",
   Outros: "Outros",
 };
 
