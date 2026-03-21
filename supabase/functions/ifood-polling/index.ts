@@ -130,6 +130,7 @@ Deno.serve(async (req) => {
           .eq("ifood_order_id", orderId)
           .maybeSingle();
 
+        console.log("Pedido PLACED - existing:", existing, "orderId:", orderId);
         if (existing) continue;
 
         // Get order details
