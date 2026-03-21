@@ -41,8 +41,13 @@ Deno.serve(async (req) => {
         const jwtParts = config.access_token.split(".");
         if (jwtParts.length >= 2) {
           const payload = JSON.parse(atob(jwtParts[1]));
-          merchantId = payload.merchant_id || payload.merchantId || payload.sub || null;
-          // Save it back so we don't decode every time
+          const merchantScope = payload.merchant_scope;
+          if (Array.isArray(merchantScope) && merchantScope.length > 0) {
+            merchantId = merchantScope[0].split(":")[0];
+          }
+          if (!merchantId) {
+            merchantId = payload.merchant_id || payload.merchantId || null;
+          }
           if (merchantId) {
             await supabase
               .from("ifood_config")

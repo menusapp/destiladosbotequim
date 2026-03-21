@@ -134,7 +134,13 @@ Deno.serve(async (req) => {
         const jwtParts = tokenData.accessToken.split(".");
         if (jwtParts.length >= 2) {
           const payload = JSON.parse(atob(jwtParts[1]));
-          merchantId = payload.merchant_id || payload.merchantId || payload.sub || null;
+          const merchantScope = payload.merchant_scope;
+          if (Array.isArray(merchantScope) && merchantScope.length > 0) {
+            merchantId = merchantScope[0].split(":")[0];
+          }
+          if (!merchantId) {
+            merchantId = payload.merchant_id || payload.merchantId || null;
+          }
         }
       } catch (_) { /* JWT decode failed */ }
 
