@@ -120,6 +120,7 @@ Deno.serve(async (req) => {
       eventIds.push({ id: event.id });
       const eventCode = event.code || event.fullCode || "";
       const orderId = event.orderId;
+      console.log("Evento recebido:", JSON.stringify({ id: event.id, code: event.code, fullCode: event.fullCode, orderId: event.orderId }));
 
       if (eventCode === "PLACED") {
         // Check if order already exists to avoid duplicate insert errors
