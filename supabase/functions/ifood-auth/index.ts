@@ -45,18 +45,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === "generate_code") {
-      // Generate a random authorizationCodeVerifier
-      const verifier = crypto.randomUUID() + crypto.randomUUID();
-
-      // Save verifier to DB
-      await supabase
-        .from("ifood_config")
-        .upsert({
-          restaurant_id,
-          authorization_code_verifier: verifier,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "restaurant_id" });
-
       // Request userCode from iFood
       const response = await fetch(`${IFOOD_API}/authentication/v1.0/oauth/userCode`, {
         method: "POST",
@@ -74,12 +62,21 @@ Deno.serve(async (req) => {
 
       const data = await response.json();
 
+      // Save the verifier returned by iFood (not a locally generated one)
+      await supabase
+        .from("ifood_config")
+        .upsert({
+          restaurant_id,
+          authorization_code_verifier: data.authorizationCodeVerifier,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "restaurant_id" });
+
       return new Response(
         JSON.stringify({
           userCode: data.userCode,
           verificationUrl: data.verificationUrl,
           verificationUrlComplete: data.verificationUrlComplete,
-          authorizationCodeVerifier: verifier,
+          authorizationCodeVerifier: data.authorizationCodeVerifier,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
