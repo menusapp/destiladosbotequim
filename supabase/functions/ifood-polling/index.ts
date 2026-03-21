@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
             .from("orders")
             .insert({
               restaurant_id,
-              table_id: dummyTable.id,
+              table_id: null,
               customer_name: customerName,
               customer_cpf: customerCpf,
               status: "pending",
