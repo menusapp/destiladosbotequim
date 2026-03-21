@@ -82,7 +82,8 @@ Deno.serve(async (req) => {
     const expiresAt = new Date(Date.now() + tokenData.expiresIn * 1000).toISOString();
     console.log("[ifood-refresh] New token expires at:", expiresAt);
 
-    await supabase
+    console.log("[ifood-refresh] Saving new tokens to DB for restaurant:", restaurant_id);
+    const { error: updateError } = await supabase
       .from("ifood_config")
       .update({
         access_token: tokenData.accessToken,
@@ -91,6 +92,12 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       })
       .eq("restaurant_id", restaurant_id);
+
+    if (updateError) {
+      console.error("[ifood-refresh] DB update error:", updateError);
+    } else {
+      console.log("[ifood-refresh] Tokens saved successfully");
+    }
 
     return new Response(
       JSON.stringify({ success: true }),
