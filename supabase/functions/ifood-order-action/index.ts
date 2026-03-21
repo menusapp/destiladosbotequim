@@ -13,7 +13,7 @@ const ACTION_MAP: Record<string, { method: string; path: string; newStatus?: str
   start_preparation: { method: "POST", path: "startPreparation", newStatus: "preparing" },
   ready_to_pickup: { method: "POST", path: "readyToPickup", newStatus: "ready" },
   dispatch: { method: "POST", path: "dispatch", newStatus: "out_for_delivery" },
-  cancel: { method: "POST", path: "cancelRequest", newStatus: "cancelled" },
+  cancel: { method: "POST", path: "requestCancellation", newStatus: "cancelled" },
   get_cancellation_reasons: { method: "GET", path: "cancellationReasons" },
 };
 

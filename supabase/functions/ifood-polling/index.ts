@@ -72,9 +72,18 @@ Deno.serve(async (req) => {
 
     for (const event of events) {
       eventIds.push({ id: event.id });
+      const eventCode = event.code || event.fullCode || "";
+      const orderId = event.orderId;
 
-      if (event.code === "PLACED" || event.fullCode === "PLACED") {
-        const orderId = event.orderId;
+      if (eventCode === "PLACED") {
+        // Check if order already exists to avoid duplicate insert errors
+        const { data: existing } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("ifood_order_id", orderId)
+          .maybeSingle();
+
+        if (existing) continue;
 
         // Get order details
         try {
@@ -86,7 +95,6 @@ Deno.serve(async (req) => {
 
           const orderData = await orderRes.json();
 
-          // Map items
           const customerName = orderData.customer?.name || "Cliente iFood";
           const customerPhone = orderData.customer?.phone?.number || "";
           const deliveryAddress = orderData.delivery?.deliveryAddress
@@ -107,8 +115,21 @@ Deno.serve(async (req) => {
           const totalPrice = orderData.total?.orderAmount || orderData.totalPrice || 0;
           const deliveryFee = orderData.total?.deliveryFee || orderData.deliveryFee || 0;
 
+          // Map payment type
+          let paymentType = "pending";
+          if (orderData.payments && orderData.payments.length > 0) {
+            const p = orderData.payments[0];
+            const method = (p.method || p.name || "").toLowerCase();
+            if (method.includes("credit") || method.includes("crédito")) paymentType = "credit";
+            else if (method.includes("debit") || method.includes("débito")) paymentType = "debit";
+            else if (method.includes("pix")) paymentType = "pix";
+            else if (method.includes("cash") || method.includes("dinheiro")) paymentType = "cash";
+            else if (method.includes("meal") || method.includes("voucher") || method.includes("vale")) paymentType = "meal_voucher";
+            else paymentType = p.method || "other";
+          }
+
           // Insert order
-          const { error: insertError } = await supabase
+          const { data: insertedOrder, error: insertError } = await supabase
             .from("orders")
             .insert({
               restaurant_id,
@@ -121,6 +142,7 @@ Deno.serve(async (req) => {
               delivery_address: deliveryAddress,
               delivery_phone: customerPhone,
               delivery_fee: deliveryFee,
+              payment_type: paymentType,
               ifood_order_id: orderId,
               ifood_source: true,
               notes: `Pedido iFood #${orderId.slice(0, 8)}`,
@@ -128,12 +150,46 @@ Deno.serve(async (req) => {
             .select("id")
             .single();
 
-          if (!insertError) {
+          if (!insertError && insertedOrder) {
             newOrdersCount++;
+
+            // Insert order items from iFood data
+            if (orderData.items && orderData.items.length > 0) {
+              const orderItems = orderData.items.map((item: any) => ({
+                order_id: insertedOrder.id,
+                product_id: null,
+                quantity: item.quantity || 1,
+                price_at_order: item.unitPrice || item.price || 0,
+                notes: item.name || "Item iFood",
+              }));
+
+              await supabase.from("order_items").insert(orderItems);
+            }
           }
         } catch (e) {
           console.error("Error processing iFood order:", e);
         }
+      } else if (eventCode === "CONFIRMED") {
+        // Update order status to accepted
+        await supabase
+          .from("orders")
+          .update({ status: "accepted" })
+          .eq("ifood_order_id", orderId)
+          .eq("restaurant_id", restaurant_id);
+      } else if (eventCode === "CANCELLED" || eventCode === "CANCELLATION_REQUESTED") {
+        // Update order status to cancelled
+        await supabase
+          .from("orders")
+          .update({ status: "cancelled" })
+          .eq("ifood_order_id", orderId)
+          .eq("restaurant_id", restaurant_id);
+      } else if (eventCode === "CONCLUSION") {
+        // Update order status to delivered
+        await supabase
+          .from("orders")
+          .update({ status: "delivered" })
+          .eq("ifood_order_id", orderId)
+          .eq("restaurant_id", restaurant_id);
       }
     }
 
