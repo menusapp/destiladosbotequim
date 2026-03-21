@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
 
     for (const event of events) {
       eventIds.push({ id: event.id });
-      const eventCode = event.code || event.fullCode || "";
+      const eventCode = event.fullCode || event.code || "";
       const orderId = event.orderId;
       console.log("Evento recebido:", JSON.stringify({ id: event.id, code: event.code, fullCode: event.fullCode, orderId: event.orderId }));
 
