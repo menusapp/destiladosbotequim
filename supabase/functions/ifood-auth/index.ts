@@ -128,17 +128,28 @@ Deno.serve(async (req) => {
       const tokenData = await response.json();
       const expiresAt = new Date(Date.now() + tokenData.expiresIn * 1000).toISOString();
 
-      // Get merchant info
+      // Extract merchant_id from JWT payload (works even when /merchants endpoint fails)
       let merchantId = null;
       try {
-        const merchantRes = await fetch(`${IFOOD_API}/merchant/v1.0/merchants`, {
-          headers: { Authorization: `Bearer ${tokenData.accessToken}` },
-        });
-        if (merchantRes.ok) {
-          const merchants = await merchantRes.json();
-          if (merchants.length > 0) merchantId = merchants[0].id;
+        const jwtParts = tokenData.accessToken.split(".");
+        if (jwtParts.length >= 2) {
+          const payload = JSON.parse(atob(jwtParts[1]));
+          merchantId = payload.merchant_id || payload.merchantId || payload.sub || null;
         }
-      } catch (_) { /* merchant fetch is optional */ }
+      } catch (_) { /* JWT decode failed */ }
+
+      // Fallback: try /merchants endpoint
+      if (!merchantId) {
+        try {
+          const merchantRes = await fetch(`${IFOOD_API}/merchant/v1.0/merchants`, {
+            headers: { Authorization: `Bearer ${tokenData.accessToken}` },
+          });
+          if (merchantRes.ok) {
+            const merchants = await merchantRes.json();
+            if (merchants.length > 0) merchantId = merchants[0].id;
+          }
+        } catch (_) { /* merchant fetch is optional */ }
+      }
 
       // Save tokens
       await supabase

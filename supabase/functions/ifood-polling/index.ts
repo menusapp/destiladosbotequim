@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       method: "GET",
       headers: {
         Authorization: `Bearer ${config.access_token}`,
-        "X-Polling-Merchants": config.merchant_id,
+        "X-Polling-Merchants": merchantId,
       },
     });
 
