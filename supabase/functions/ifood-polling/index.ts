@@ -164,6 +164,26 @@ Deno.serve(async (req) => {
 
           if (!dummyTable) continue;
 
+          // Recursive function to sum garnish prices and collect names
+          const processGarnishes = (garnishes: any[]): { total: number; names: string[] } => {
+            let total = 0;
+            const names: string[] = [];
+            if (!Array.isArray(garnishes)) return { total, names };
+            for (const g of garnishes) {
+              const gPrice = g.unitPrice || g.price || 0;
+              const gQty = g.quantity || 1;
+              total += gPrice * gQty;
+              if (g.name) names.push(g.name);
+              // Recurse into nested garnishItems
+              if (g.garnishItems && Array.isArray(g.garnishItems)) {
+                const nested = processGarnishes(g.garnishItems);
+                total += nested.total;
+                names.push(...nested.names);
+              }
+            }
+            return { total, names };
+          };
+
           // Calculate total from items (not from orderData.total.orderAmount)
           let calculatedTotal = 0;
           const orderItems: any[] = [];
@@ -172,20 +192,14 @@ Deno.serve(async (req) => {
             for (const item of orderData.items) {
               const itemUnitPrice = item.unitPrice || item.price || 0;
               const itemQty = item.quantity || 1;
-              let itemTotal = itemUnitPrice * itemQty;
 
-              // Process garnish/options/subitems
-              const complementNames: string[] = [];
-              const subItems = item.subItems || item.garnishItems || item.options || [];
-              if (Array.isArray(subItems)) {
-                for (const sub of subItems) {
-                  const subPrice = sub.unitPrice || sub.price || 0;
-                  const subQty = sub.quantity || 1;
-                  itemTotal += subPrice * subQty;
-                  if (sub.name) complementNames.push(sub.name);
-                }
-              }
+              // Sum all garnish/complement prices recursively
+              const allGarnishes = item.garnishItems || item.subItems || item.options || [];
+              const { total: garnishTotal, names: complementNames } = processGarnishes(allGarnishes);
 
+              // price_at_order = unit price + all complements (per single unit)
+              const pricePerUnit = itemUnitPrice + garnishTotal;
+              const itemTotal = pricePerUnit * itemQty;
               calculatedTotal += itemTotal;
 
               // Build notes with item name + complements
@@ -196,7 +210,7 @@ Deno.serve(async (req) => {
 
               orderItems.push({
                 quantity: itemQty,
-                price_at_order: itemUnitPrice,
+                price_at_order: pricePerUnit,
                 notes: itemNotes,
               });
             }
