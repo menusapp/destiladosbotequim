@@ -127,6 +127,32 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
     }
 
     try {
+      // If this is an iFood order, sync status with iFood first
+      if (order.ifood_source && order.ifood_order_id) {
+        const statusToAction: Record<string, string> = {
+          accepted: "confirm",
+          preparing: "start_preparation",
+          ready: "ready_to_pickup",
+          out_for_delivery: "dispatch",
+          cancelled: "cancel",
+        };
+        const ifoodAction = statusToAction[newStatus];
+        if (ifoodAction) {
+          const { data: ifoodResult, error: ifoodError } = await supabase.functions.invoke("ifood-order-action", {
+            body: {
+              restaurant_id: restaurantId,
+              ifood_order_id: order.ifood_order_id,
+              order_id: order.id,
+              action: ifoodAction,
+            },
+          });
+          if (ifoodError) {
+            console.error("iFood action error:", ifoodError);
+            toast.error("Erro ao sincronizar com iFood, mas o status local será atualizado");
+          }
+        }
+      }
+
       const { error } = await supabase.rpc("admin_update_order_status", { p_order_id: order.id, p_new_status: newStatus, p_restaurant_id: restaurantId });
       if (error) throw error;
       sendWhatsAppNotification(newStatus);
