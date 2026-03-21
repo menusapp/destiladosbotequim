@@ -165,7 +165,8 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       // --- Revenue by payment method ---
       const normalizeMethod = (method: string | null | undefined): string | null => {
         if (!method) return null;
-        const validTypes = ["cash", "credit", "debit", "pix", "meal_voucher"];
+        if (method === "Pago pelo iFood") return "ifood_online";
+        const validTypes = ["cash", "credit", "debit", "pix", "meal_voucher", "ifood_online"];
         if (validTypes.includes(method)) return method;
         if (method === "card") return "credit";
         const byId = paymentMethods.find(p => p.id === method);

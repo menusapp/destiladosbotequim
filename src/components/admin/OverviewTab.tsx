@@ -18,7 +18,7 @@ const dateRangeLabels: Record<DateRange, string> = {
 
 const methodColors: Record<string, string> = {
   pix: "bg-emerald-500", credit: "bg-blue-500", debit: "bg-amber-500",
-  cash: "bg-green-600", meal_voucher: "bg-purple-500", Outros: "bg-muted-foreground",
+  cash: "bg-green-600", meal_voucher: "bg-purple-500", ifood_online: "bg-red-500", Outros: "bg-muted-foreground",
 };
 
 const OverviewTab = ({ restaurantId }: OverviewTabProps) => {

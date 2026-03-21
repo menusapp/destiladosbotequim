@@ -154,15 +154,7 @@ Deno.serve(async (req) => {
             ? `${orderData.delivery.deliveryAddress.streetName}, ${orderData.delivery.deliveryAddress.streetNumber} - ${orderData.delivery.deliveryAddress.neighborhood}, ${orderData.delivery.deliveryAddress.city}`
             : null;
 
-          // Get a dummy table for delivery orders (table_id is required)
-          const { data: dummyTable } = await supabase
-            .from("tables")
-            .select("id")
-            .eq("restaurant_id", restaurant_id)
-            .limit(1)
-            .single();
-
-          if (!dummyTable) continue;
+          // table_id is nullable — iFood orders don't use tables
 
           // Use totalPrice from iFood (includes item + all complements)
           let calculatedTotal = 0;
@@ -243,7 +235,7 @@ Deno.serve(async (req) => {
             .from("orders")
             .insert({
               restaurant_id,
-              table_id: dummyTable.id,
+              table_id: null,
               customer_name: customerName,
               customer_cpf: customerCpf,
               status: "pending",
