@@ -203,6 +203,9 @@ Deno.serve(async (req) => {
             .select("id")
             .single();
 
+          console.log("Insert error:", insertError);
+          console.log("Insert result:", insertedOrder);
+
           if (!insertError && insertedOrder) {
             newOrdersCount++;
 
