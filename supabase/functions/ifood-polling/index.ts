@@ -27,9 +27,35 @@ Deno.serve(async (req) => {
       .eq("restaurant_id", restaurant_id)
       .single();
 
-    if (!config || !config.enabled || !config.access_token || !config.merchant_id) {
+    if (!config || !config.enabled || !config.access_token) {
       return new Response(
         JSON.stringify({ error: "iFood not configured or disabled", new_orders: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Resolve merchant_id: from DB or extract from JWT
+    let merchantId = config.merchant_id;
+    if (!merchantId && config.access_token) {
+      try {
+        const jwtParts = config.access_token.split(".");
+        if (jwtParts.length >= 2) {
+          const payload = JSON.parse(atob(jwtParts[1]));
+          merchantId = payload.merchant_id || payload.merchantId || payload.sub || null;
+          // Save it back so we don't decode every time
+          if (merchantId) {
+            await supabase
+              .from("ifood_config")
+              .update({ merchant_id: merchantId })
+              .eq("restaurant_id", restaurant_id);
+          }
+        }
+      } catch (_) { /* JWT decode failed */ }
+    }
+
+    if (!merchantId) {
+      return new Response(
+        JSON.stringify({ error: "No merchant_id available", new_orders: 0 }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -49,7 +75,7 @@ Deno.serve(async (req) => {
       method: "GET",
       headers: {
         Authorization: `Bearer ${config.access_token}`,
-        "X-Polling-Merchants": config.merchant_id,
+        "X-Polling-Merchants": merchantId,
       },
     });
 

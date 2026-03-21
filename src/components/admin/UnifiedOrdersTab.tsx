@@ -136,6 +136,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
       } catch (_) { /* silent fail */ }
     };
 
+    pollIfood(); // Run immediately on mount
     const interval = setInterval(pollIfood, 30000);
     return () => { active = false; clearInterval(interval); };
   }, [restaurantId]);
