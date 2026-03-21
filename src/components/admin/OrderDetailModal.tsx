@@ -391,7 +391,7 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
           </div>
 
           {/* Pagamento */}
-          {(!order.payment_type || order.payment_type === "pending") && (
+          {(!order.payment_type || order.payment_type === "pending") && !(order.ifood_source && order.payment_type === "Pago pelo iFood") && (
             <Card>
               <CardHeader><CardTitle className="text-lg">Pagamento</CardTitle></CardHeader>
               <CardContent>

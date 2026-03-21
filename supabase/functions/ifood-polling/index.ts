@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
               restaurant_id,
               table_id: dummyTable.id,
               customer_name: customerName,
-              customer_cpf: "000.000.000-00",
+              customer_cpf: customerCpf,
               status: "pending",
               order_type: "delivery",
               delivery_type: "delivery",
