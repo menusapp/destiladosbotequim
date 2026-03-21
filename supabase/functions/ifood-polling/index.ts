@@ -120,6 +120,7 @@ Deno.serve(async (req) => {
       eventIds.push({ id: event.id });
       const eventCode = event.code || event.fullCode || "";
       const orderId = event.orderId;
+      console.log("Evento recebido:", JSON.stringify({ id: event.id, code: event.code, fullCode: event.fullCode, orderId: event.orderId }));
 
       if (eventCode === "PLACED") {
         // Check if order already exists to avoid duplicate insert errors
@@ -129,6 +130,7 @@ Deno.serve(async (req) => {
           .eq("ifood_order_id", orderId)
           .maybeSingle();
 
+        console.log("Pedido PLACED - existing:", existing, "orderId:", orderId);
         if (existing) continue;
 
         // Get order details
@@ -200,6 +202,9 @@ Deno.serve(async (req) => {
             })
             .select("id")
             .single();
+
+          console.log("Insert error:", insertError);
+          console.log("Insert result:", insertedOrder);
 
           if (!insertError && insertedOrder) {
             newOrdersCount++;
