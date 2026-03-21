@@ -1,130 +1,92 @@
 
 
-## Plano de Execucao: Integracao iFood
+# Plano: Correcao Completa do Ciclo de Vida iFood
 
-### Pre-requisito: Secrets
-
-Antes de qualquer codigo, preciso solicitar dois secrets:
-- `IFOOD_CLIENT_ID`
-- `IFOOD_CLIENT_SECRET`
+Apos analise do codigo, identifiquei 5 problemas concretos que impedem o funcionamento correto.
 
 ---
 
-### 1. Banco de Dados (Migration)
+## Problema 1: Polling so trata evento PLACED — ignora todos os outros
 
-**Nova tabela `ifood_config`:**
-```sql
-CREATE TABLE public.ifood_config (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  restaurant_id uuid NOT NULL,
-  enabled boolean DEFAULT false,
-  access_token text,
-  refresh_token text,
-  token_expires_at timestamptz,
-  merchant_id text,
-  authorization_code_verifier text,
-  last_polling_at timestamptz,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
-ALTER TABLE public.ifood_config ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all operations on ifood_config" ON public.ifood_config FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-```
+**Arquivo:** `supabase/functions/ifood-polling/index.ts` linha 76
 
-**Campos novos na tabela `orders`:**
-```sql
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS ifood_order_id text;
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS ifood_source boolean DEFAULT false;
-CREATE UNIQUE INDEX IF NOT EXISTS orders_ifood_order_id_unique ON public.orders (ifood_order_id) WHERE ifood_order_id IS NOT NULL;
-```
+O polling atual so processa `event.code === "PLACED"`. Eventos `CONFIRMED`, `CANCELLED`, `CANCELLATION_REQUESTED` e `CONCLUSION` sao ignorados — apenas adicionados ao acknowledgment sem atualizar o banco.
 
-**Risco de regressao:** ZERO. Nova tabela isolada + campos novos nullable com default. Nenhum campo existente alterado.
+**Correcao:** Adicionar tratamento para cada tipo de evento:
+- `CONFIRMED` → atualizar status para `accepted` via `ifood_order_id`
+- `CANCELLED` / `CANCELLATION_REQUESTED` → atualizar para `cancelled`
+- `CONCLUSION` → atualizar para `delivered`
+
+Impacto: ZERO em pedidos normais. Os updates filtram por `ifood_order_id` que so existe em pedidos iFood.
 
 ---
 
-### 2. Edge Functions (4 novas)
+## Problema 2: Insert sem ON CONFLICT — duplicatas causam erro silencioso
 
-Todas seguem o padrao exato do `whatsapp-send` (corsHeaders com ALLOWED_ORIGIN, createClient com service role, try/catch, JSON responses). Nenhuma funcao existente sera alterada.
+**Arquivo:** `supabase/functions/ifood-polling/index.ts` linha 111
 
-**`ifood-auth`** — POST com `action`:
-- `generate_code`: gera `authorizationCodeVerifier` (random string), salva na `ifood_config`, chama `POST /authentication/v1.0/oauth/userCode` com `clientId` do env, retorna `userCode` + `verificationUrl` + `verificationUrlComplete` para o frontend exibir
-- `exchange_token`: recebe `authorizationCode` do usuario, busca `authorizationCodeVerifier` do banco, chama `POST /authentication/v1.0/oauth/token` com `grant_type=authorization_code`, salva `access_token`, `refresh_token`, `token_expires_at` na `ifood_config`
+O `.insert()` nao usa `ON CONFLICT`. O unique index em `ifood_order_id` faz o insert falhar, mas o erro e engolido silenciosamente e o `newOrdersCount` nao incrementa.
 
-**`ifood-refresh-token`** — POST com `restaurant_id`:
-- Busca `refresh_token` da `ifood_config`, chama `POST /authentication/v1.0/oauth/token` com `grant_type=refresh_token`, atualiza tokens no banco. Se falhar, retorna erro 401 indicando reconexao necessaria.
+**Correcao:** Antes do insert, verificar se ja existe: `SELECT id FROM orders WHERE ifood_order_id = orderId`. Se existir, pular. Se nao, inserir normalmente.
 
-**`ifood-polling`** — POST com `restaurant_id`:
-- Busca token da `ifood_config`, verifica validade (>30min). Chama `GET /events/v1.0/events:polling` com header `X-Polling-Merchants: {merchant_id}`. Para eventos tipo `PLACED`, busca detalhes do pedido em `GET /order/v1.0/orders/{orderId}` e insere na tabela `orders` com `ifood_source=true`, `ifood_order_id`, `order_type='delivery'`, `delivery_type='delivery'`. Usa `ON CONFLICT (ifood_order_id) DO NOTHING` para evitar duplicatas. Apos processar, chama `POST /events/v1.0/events/acknowledgment` com os IDs dos eventos.
-
-**`ifood-order-action`** — POST com `restaurant_id`, `ifood_order_id`, `order_id`, `action`:
-- Busca token, chama endpoint da API iFood correspondente a acao. Mapeamento: `confirm` → POST `/order/v1.0/orders/{id}/confirm`, `start_preparation` → POST `/order/v1.0/orders/{id}/startPreparation`, `ready_to_pickup` → POST `/order/v1.0/orders/{id}/readyToPickup`, `dispatch` → POST `/order/v1.0/orders/{id}/dispatch`, `cancel` → POST `/order/v1.0/orders/{id}/cancelRequest`, `get_cancellation_reasons` → GET `/order/v1.0/orders/{id}/cancellationReasons`. Apos sucesso, atualiza status na tabela `orders`.
-
-**`supabase/config.toml`** — Adicionar blocos `verify_jwt = false` para as 4 funcoes.
-
-**Risco de regressao:** ZERO. Funcoes novas independentes.
+Impacto: ZERO.
 
 ---
 
-### 3. Tela de Integracoes
+## Problema 3: Endpoint de cancelamento errado na Edge Function
 
-**Novo componente `src/components/admin/IntegrationsTab.tsx`:**
-- Grid com 2 cards: iFood (funcional) e Delivery Direto (badge "Em breve", desabilitado)
-- Card iFood ao clicar abre Sheet lateral (padrao do projeto)
-- Estado nao conectado: 3 passos de instrucao, botao "Gerar Codigo", campo para colar `authorizationCode`, botao "Conectar"
-- Estado conectado: badge verde, merchant ID mascarado, Switch habilitar/desabilitar, botao "Desconectar"
-- Segue estrutura visual do `WhatsAppSettings.tsx`
+**Arquivo:** `supabase/functions/ifood-order-action/index.ts` linha 16
 
-**Risco de regressao:** ZERO. Componente novo isolado.
+O `cancel` action usa path `cancelRequest`, mas conforme a documentacao do iFood o endpoint correto e `requestCancellation`.
 
----
+**Correcao:** Alterar `cancel: { method: "POST", path: "cancelRequest" }` para `cancel: { method: "POST", path: "requestCancellation" }`.
 
-### 4. Alteracoes no UnifiedOrdersTab.tsx
-
-Duas mudancas cirurgicas:
-
-1. **Query** (linha 118): adicionar `ifood_source, ifood_order_id` ao select existente
-2. **Interface Order** (linhas 36-55): adicionar `ifood_source?: boolean` e `ifood_order_id?: string`
-3. **Badge iFood** no `renderOrderCard`: se `order.ifood_source`, exibir `<Badge className="bg-[#EA1D2C] text-white text-[10px]">iFood</Badge>`
-4. **Polling useEffect**: intervalo de 30s chamando `ifood-polling`. Se 401, chama `ifood-refresh-token` e retenta. Cleanup no return.
-
-**Risco de regressao:** MUITO BAIXO. Adicionar campos ao select nao afeta campos existentes. O badge e condicional. O polling e um useEffect independente. A interface aceita campos opcionais.
-
-**Unica precaucao:** A tabela `orders` e tipada pelo Supabase types auto-gerado (`src/integrations/supabase/types.ts`). Apos a migration, os novos campos aparecerao no tipo. Ate la, usarei type assertion localizada para os 2 campos novos, sem alterar o types.ts.
+Impacto: ZERO. So afeta acoes sobre pedidos iFood.
 
 ---
 
-### 5. Registro no Sistema
+## Problema 4: OrderDetailModal NAO chama iFood ao mudar status de pedido iFood
 
-**`staffPermissions.ts`** (linha 24): adicionar `{ id: "integracoes", label: "Integracoes" }` ao final do array. Adicionar `"integracoes"` nos arrays de `admin` e `gerente` em `ROLE_DEFAULT_SECTIONS`.
+**Arquivo:** `src/components/admin/OrderDetailModal.tsx` linha 119-143
 
-**`useRestaurantModules.ts`** (linha 23): adicionar `"integracoes": "delivery"` ao mapeamento.
+Quando o operador clica "Aceitar", "Preparar", etc., a funcao `updateStatus()` so chama `admin_update_order_status` no banco local. Para pedidos iFood, precisa TAMBEM chamar `ifood-order-action` para sincronizar com o iFood.
 
-**`AppSidebar.tsx`** (linha 87-92): adicionar `{ id: "integracoes", label: "Integracoes", icon: Plug }` no grupo Administrativo.
+**Correcao:** Na funcao `updateStatus`, verificar se `(order as any).ifood_source && (order as any).ifood_order_id`. Se sim, chamar a Edge Function `ifood-order-action` com a acao correspondente ANTES de atualizar localmente. Mapeamento:
+- `accepted` → action `confirm`
+- `preparing` → action `start_preparation`
+- `ready` → action `ready_to_pickup`
+- `out_for_delivery` → action `dispatch`
+- `cancelled` → action `cancel`
 
-**`RestaurantAdmin.tsx`**: importar `IntegrationsTab`, adicionar `case "integracoes": return <IntegrationsTab restaurantId={restaurant.id} />;` no switch (entre fiscal e modulos).
+A interface `Order` do modal precisa adicionar `ifood_source?: boolean` e `ifood_order_id?: string`.
 
-**Risco de regressao:** MUITO BAIXO. Apenas adicoes a arrays/switch existentes. Nenhum codigo existente modificado.
+Impacto: MUITO BAIXO. O if condicional so executa para pedidos com `ifood_source=true`. Pedidos normais seguem exatamente o fluxo atual.
 
 ---
 
-### Resumo de Arquivos
+## Problema 5: Dados do pedido iFood incompletos (payment_type nao mapeado)
 
-| Acao | Arquivo |
-|---|---|
-| Migration | Nova tabela `ifood_config` + 2 campos em `orders` |
-| Criar | `supabase/functions/ifood-auth/index.ts` |
-| Criar | `supabase/functions/ifood-refresh-token/index.ts` |
-| Criar | `supabase/functions/ifood-polling/index.ts` |
-| Criar | `supabase/functions/ifood-order-action/index.ts` |
-| Criar | `src/components/admin/IntegrationsTab.tsx` |
-| Editar | `supabase/config.toml` (4 blocos novos) |
-| Editar | `src/components/admin/UnifiedOrdersTab.tsx` (query + badge + polling) |
-| Editar | `src/components/admin/AppSidebar.tsx` (1 item novo) |
-| Editar | `src/pages/RestaurantAdmin.tsx` (1 import + 1 case) |
-| Editar | `src/lib/staffPermissions.ts` (1 item + 2 arrays) |
-| Editar | `src/hooks/useRestaurantModules.ts` (1 mapeamento) |
+**Arquivo:** `supabase/functions/ifood-polling/index.ts` linhas 110-128
 
-### Funcionalidades existentes afetadas: NENHUMA
+O insert do pedido nao mapeia `payment_type` dos dados do iFood. Tambem nao popula os `order_items` — o pedido entra sem itens, entao o card mostra vazio.
 
-Todas as mudancas sao aditivas. Nenhum campo, query, componente ou logica existente sera modificado ou removido.
+**Correcao:**
+- Mapear `orderData.payments[0].name` ou `orderData.payments[0].method` para `payment_type`
+- Apos inserir o pedido, inserir os itens em `order_items` mapeando `orderData.items[]` com `quantity`, `price` (como `price_at_order`), e buscando o `product_id` por nome (ou null se nao encontrar correspondencia local)
+
+Nota: Os itens do iFood podem nao ter correspondencia exata com produtos locais. A solucao segura e inserir com `product_id = null` e guardar o nome do produto nas `notes` do item, ou criar um produto generico "Item iFood".
+
+Impacto: ZERO. Apenas afeta inserts de pedidos novos do iFood.
+
+---
+
+## Resumo de Arquivos
+
+| Acao | Arquivo | Risco |
+|---|---|---|
+| Editar | `supabase/functions/ifood-polling/index.ts` | ZERO |
+| Editar | `supabase/functions/ifood-order-action/index.ts` | ZERO |
+| Editar | `src/components/admin/OrderDetailModal.tsx` | MUITO BAIXO |
+
+Nenhuma funcionalidade existente sera alterada. Todas as mudancas sao condicionais a `ifood_source=true` ou restritas as Edge Functions do iFood.
 
