@@ -839,6 +839,56 @@ export type Database = {
           },
         ]
       }
+      customer_sessions: {
+        Row: {
+          abandoned_at: string | null
+          cart_items: Json | null
+          cart_value: number | null
+          created_at: string | null
+          id: string
+          last_activity: string | null
+          name: string | null
+          phone: string | null
+          restaurant_id: string
+          session_token: string
+          status: string | null
+        }
+        Insert: {
+          abandoned_at?: string | null
+          cart_items?: Json | null
+          cart_value?: number | null
+          created_at?: string | null
+          id?: string
+          last_activity?: string | null
+          name?: string | null
+          phone?: string | null
+          restaurant_id: string
+          session_token: string
+          status?: string | null
+        }
+        Update: {
+          abandoned_at?: string | null
+          cart_items?: Json | null
+          cart_value?: number | null
+          created_at?: string | null
+          id?: string
+          last_activity?: string | null
+          name?: string | null
+          phone?: string | null
+          restaurant_id?: string
+          session_token?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_sessions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           cpf: string
@@ -2810,6 +2860,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      remarketing_lists: {
+        Row: {
+          created_at: string | null
+          customer_count: number | null
+          filters: Json | null
+          id: string
+          name: string
+          restaurant_id: string
+          type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_count?: number | null
+          filters?: Json | null
+          id?: string
+          name: string
+          restaurant_id: string
+          type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_count?: number | null
+          filters?: Json | null
+          id?: string
+          name?: string
+          restaurant_id?: string
+          type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remarketing_lists_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       remote_configs: {
         Row: {
