@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.ifood-order-action]
 verify_jwt = false
+
+[functions.parse-nfe]
+verify_jwt = false
