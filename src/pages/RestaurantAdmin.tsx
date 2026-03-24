@@ -574,15 +574,16 @@ const RestaurantAdmin = () => {
   }
 
   const handleViewOrder = async () => {
-    if (!globalNotification) return;
+    const currentNotification = notificationQueue[0];
+    if (!currentNotification) return;
     
     // Local orders go to PDV and auto-open the table
-    if (globalNotification.orderType === 'local') {
+    if (currentNotification.orderType === 'local') {
       // Fetch table_id from the order
       const { data: orderData } = await supabase
         .from("orders")
         .select("table_id")
-        .eq("id", globalNotification.orderId)
+        .eq("id", currentNotification.orderId)
         .single();
       
       setActiveSection('pdv');
@@ -591,9 +592,9 @@ const RestaurantAdmin = () => {
       }
     } else {
       setActiveSection('pedidos');
-      setPendingOrderToOpen(globalNotification.orderId);
+      setPendingOrderToOpen(currentNotification.orderId);
     }
-    setGlobalNotification(null);
+    setNotificationQueue(prev => prev.slice(1));
   };
 
   const handleViewBill = async () => {
@@ -745,19 +746,23 @@ const RestaurantAdmin = () => {
           </main>
         </SidebarInset>
 
-        {/* Global Order Notification */}
-        {globalNotification && (
-          <NewOrderNotification
-            orderId={globalNotification.orderId}
-            customerName={globalNotification.customerName}
-            total={globalNotification.total}
-            orderType={globalNotification.orderType}
-            tableNumber={globalNotification.tableNumber}
-            deliveryType={globalNotification.deliveryType}
-            onView={handleViewOrder}
-            onDismiss={() => setGlobalNotification(null)}
-          />
-        )}
+        {/* Global Order Notifications - stacked queue */}
+        {notificationQueue.map((notification, index) => (
+          <div key={notification.orderId} style={{ top: `${16 + index * 220}px`, position: 'fixed', right: '16px', zIndex: 100 - index }}>
+            <NewOrderNotification
+              orderId={notification.orderId}
+              customerName={notification.customerName}
+              total={notification.total}
+              orderType={notification.orderType}
+              tableNumber={notification.tableNumber}
+              deliveryType={notification.deliveryType}
+              onView={index === 0 ? handleViewOrder : () => {
+                setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId));
+              }}
+              onDismiss={() => setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId))}
+            />
+          </div>
+        ))}
         
         {/* Global Bill Notification */}
         {billNotification && (
