@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -23,11 +24,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck } from "lucide-react";
+import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
+import { SplitPaymentDialog } from "./SplitPaymentDialog";
+import { SplitPaymentSelect } from "./SplitPaymentSelect";
 
 interface TableDetailDialogProps {
   restaurantId: string;
@@ -44,6 +47,18 @@ interface TableDetailDialogProps {
   onTableCleared: () => void;
 }
 
+interface Split {
+  id: string;
+  order_item_id: string;
+  order_id: string;
+  split_number: number;
+  total_splits: number;
+  value: number;
+  status: string;
+  paid_at: string | null;
+  payment_type: string | null;
+}
+
 export const TableDetailDialog = ({
   restaurantId,
   table,
@@ -54,6 +69,9 @@ export const TableDetailDialog = ({
 }: TableDetailDialogProps) => {
   const queryClient = useQueryClient();
   const [payingComanda, setPayingComanda] = useState<any>(null);
+  const [splittingItem, setSplittingItem] = useState<any>(null);
+  const [splittingOrderId, setSplittingOrderId] = useState<string>("");
+  const [payingSplit, setPayingSplit] = useState<Split | null>(null);
 
   // Fetch active comandas for the table
   const { data: comandas, refetch: refetchComandas } = useQuery({
@@ -97,6 +115,34 @@ export const TableDetailDialog = ({
     enabled: open && !!table,
   });
 
+  // Fetch splits for all orders in this table
+  const { data: allSplits, refetch: refetchSplits } = useQuery({
+    queryKey: ["table-detail-splits", table?.id],
+    queryFn: async () => {
+      if (!table || !orders || orders.length === 0) return [];
+      const orderIds = orders.map(o => o.id);
+      const { data, error } = await supabase
+        .from("order_item_splits" as any)
+        .select("*")
+        .in("order_id", orderIds);
+      if (error) throw error;
+      return (data || []) as unknown as Split[];
+    },
+    enabled: open && !!table && !!orders && orders.length > 0,
+  });
+
+  // Build a map: order_item_id -> Split[]
+  const splitsByItem = useMemo(() => {
+    const map = new Map<string, Split[]>();
+    allSplits?.forEach(s => {
+      if (!map.has(s.order_item_id)) map.set(s.order_item_id, []);
+      map.get(s.order_item_id)!.push(s);
+    });
+    // Sort each array by split_number
+    map.forEach((arr) => arr.sort((a, b) => a.split_number - b.split_number));
+    return map;
+  }, [allSplits]);
+
   // Realtime subscription for table data
   useEffect(() => {
     if (!open || !table) return;
@@ -109,6 +155,9 @@ export const TableDetailDialog = ({
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => {
         refetchComandas();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_item_splits" }, () => {
+        refetchSplits();
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -138,6 +187,11 @@ export const TableDetailDialog = ({
     }, 0) || 0;
   };
 
+  const getItemTotal = (item: any) => {
+    const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
+    return (item.price_at_order + extrasTotal) * item.quantity;
+  };
+
   const ordersByComanda = useMemo(() => {
     if (!orders || !comandas) return new Map<string, any[]>();
     const map = new Map<string, any[]>();
@@ -153,6 +207,11 @@ export const TableDetailDialog = ({
   const tableTotal = useMemo(() => {
     return orders?.reduce((sum, order) => sum + getOrderTotal(order), 0) || 0;
   }, [orders]);
+
+  // Calculate paid total from splits
+  const totalPaidViaSplits = useMemo(() => {
+    return allSplits?.filter(s => s.status === "paid").reduce((sum, s) => sum + s.value, 0) || 0;
+  }, [allSplits]);
 
   // Bill by comanda_id lookup
   const billByComanda = useMemo(() => {
@@ -187,7 +246,6 @@ export const TableDetailDialog = ({
     await supabase.from("bills").update({ status: "cancelled" })
       .eq("table_id", table.id).neq("status", "paid");
 
-    // Create paid bills for each active comanda to trigger customer logout via realtime
     const { data: activeComandas } = await supabase.from("comandas")
       .select("id").eq("table_id", table.id).eq("status", "active");
     if (activeComandas && activeComandas.length > 0) {
@@ -248,7 +306,6 @@ export const TableDetailDialog = ({
     const comandaId = payingComanda._comanda_id;
     if (comandaId) {
       await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() }).eq("id", comandaId);
-      // Also close any requested bills for this comanda (they are now paid via PaymentConfirmationModal)
       await supabase.from("bills").update({ status: "paid", paid_at: new Date().toISOString() })
         .eq("comanda_id", comandaId).in("status", ["requested", "on_the_way"]);
     }
@@ -270,9 +327,110 @@ export const TableDetailDialog = ({
     toast.success("Pagamento registrado!");
   };
 
+  const handleSplitItem = (item: any, orderId: string) => {
+    setSplittingItem(item);
+    setSplittingOrderId(orderId);
+  };
+
+  const handleSplitCreated = () => {
+    setSplittingItem(null);
+    refetchSplits();
+  };
+
+  const handleSplitPaid = () => {
+    setPayingSplit(null);
+    refetchSplits();
+  };
+
   const occupiedTime = table?.occupied_at
     ? Math.floor((Date.now() - new Date(table.occupied_at).getTime()) / 60000)
     : 0;
+
+  // Render item with splits
+  const renderItem = (item: any, orderId: string) => {
+    const splits = splitsByItem.get(item.id);
+    const hasSplits = splits && splits.length > 0;
+    const allSplitsPaid = hasSplits && splits.every(s => s.status === "paid");
+    const itemTotal = getItemTotal(item);
+
+    return (
+      <div key={item.id} className={allSplitsPaid ? "opacity-60" : ""}>
+        <div className="flex justify-between text-xs items-start">
+          <span className="flex-1">
+            {item.quantity}x {item.products?.name || "Produto"}
+            {item.notes && <span className="text-muted-foreground ml-1">({item.notes})</span>}
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
+              R$ {itemTotal.toFixed(2)}
+            </span>
+            {!hasSplits && !allSplitsPaid && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                title="Dividir pagamento"
+                onClick={() => handleSplitItem(item, orderId)}
+              >
+                <Scissors className="h-3 w-3 text-muted-foreground" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Extras */}
+        {item.order_item_extras?.length > 0 && (
+          <div className="ml-4 space-y-0.5">
+            {item.order_item_extras.map((extra: any, idx: number) => {
+              const extraName = extra.product_extras?.name || extra.extra_category_items?.name || "Adicional";
+              return (
+                <div key={idx} className="text-[11px] text-muted-foreground flex justify-between">
+                  <span>+ {extraName}</span>
+                  <span>R$ {extra.price_at_order.toFixed(2)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Splits */}
+        {hasSplits && (
+          <div className="ml-4 mt-1 space-y-1">
+            {splits.map((split) => (
+              <div
+                key={split.id}
+                className={`flex items-center justify-between text-[11px] rounded px-2 py-1 ${
+                  split.status === "paid"
+                    ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+                    : "bg-muted"
+                }`}
+              >
+                <span>
+                  Parte {split.split_number}/{split.total_splits} — R$ {split.value.toFixed(2)}
+                </span>
+                {split.status === "paid" ? (
+                  <Badge variant="outline" className="text-[9px] h-4 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border-green-300">
+                    <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
+                    {split.payment_type}
+                  </Badge>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-5 text-[10px] px-2"
+                    onClick={() => setPayingSplit(split)}
+                  >
+                    <CreditCard className="w-2.5 h-2.5 mr-0.5" />
+                    Pagar
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (!table) return null;
 
@@ -386,6 +544,24 @@ export const TableDetailDialog = ({
                   const comandaOrders = ordersByComanda.get(comanda.id) || [];
                   const comandaTotal = comandaOrders.reduce((sum, o) => sum + getOrderTotal(o), 0);
 
+                  // Calculate splits totals for this comanda
+                  const comandaOrderIds = new Set(comandaOrders.map(o => o.id));
+                  const comandaSplits = allSplits?.filter(s => comandaOrderIds.has(s.order_id)) || [];
+                  const comandaPaidSplits = comandaSplits.filter(s => s.status === "paid");
+                  const comandaPaidTotal = comandaPaidSplits.reduce((sum, s) => sum + s.value, 0);
+                  const hasSplits = comandaSplits.length > 0;
+
+                  // Get paid items (all splits paid)
+                  const allItems = comandaOrders.flatMap(o => (o.order_items || []).map((item: any) => ({ ...item, _orderId: o.id })));
+                  const paidItems = allItems.filter(item => {
+                    const splits = splitsByItem.get(item.id);
+                    return splits && splits.length > 0 && splits.every(s => s.status === "paid");
+                  });
+                  const pendingItems = allItems.filter(item => {
+                    const splits = splitsByItem.get(item.id);
+                    return !splits || splits.length === 0 || !splits.every(s => s.status === "paid");
+                  });
+
                   return (
                     <div key={comanda.id}>
                       <Separator className="mb-4" />
@@ -430,35 +606,55 @@ export const TableDetailDialog = ({
                                 </div>
                               </div>
                               <div className="text-sm space-y-0.5">
-                                {order.order_items?.map((item: any) => (
-                                  <div key={item.id}>
-                                    <div className="flex justify-between text-xs">
-                                      <span>
-                                       {item.quantity}x {item.products?.name || "Produto"}
-                                        {item.notes && <span className="text-muted-foreground ml-1">({item.notes})</span>}
-                                      </span>
-                                      <span className="text-muted-foreground">
-                                        R$ {((item.price_at_order + (item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0)) * item.quantity).toFixed(2)}
-                                      </span>
-                                    </div>
-                                    {item.order_item_extras?.length > 0 && (
-                                      <div className="ml-4 space-y-0.5">
-                                        {item.order_item_extras.map((extra: any, idx: number) => {
-                                          const extraName = extra.product_extras?.name || extra.extra_category_items?.name || "Adicional";
-                                          return (
-                                            <div key={idx} className="text-[11px] text-muted-foreground flex justify-between">
-                                              <span>+ {extraName}</span>
-                                              <span>R$ {extra.price_at_order.toFixed(2)}</span>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
+                                {order.order_items?.map((item: any) => renderItem(item, order.id))}
                               </div>
                             </Card>
                           ))}
+
+                          {/* Paid items section */}
+                          {paidItems.length > 0 && (
+                            <Collapsible>
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="w-full justify-between text-xs text-green-600 hover:text-green-700 h-7">
+                                  <span className="flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    {paidItems.length} item(ns) totalmente pago(s)
+                                  </span>
+                                  <ChevronDown className="w-3 h-3" />
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="mt-1">
+                                <Card className="p-2 bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
+                                  <div className="text-sm space-y-0.5">
+                                    {paidItems.map((item: any) => (
+                                      <div key={item.id} className="flex justify-between text-xs text-green-700 dark:text-green-400 line-through">
+                                        <span>{item.quantity}x {item.products?.name || "Produto"}</span>
+                                        <span>R$ {getItemTotal(item).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </Card>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          )}
+
+                          {/* Financial summary for this comanda when splits exist */}
+                          {hasSplits && (
+                            <div className="bg-muted/50 rounded-lg p-3 text-xs space-y-1">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Total da comanda:</span>
+                                <span className="font-medium">R$ {comandaTotal.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-green-600">
+                                <span>Já pago (divisões):</span>
+                                <span className="font-medium">R$ {comandaPaidTotal.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between font-bold">
+                                <span>Pendente:</span>
+                                <span>R$ {(comandaTotal - comandaPaidTotal).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -489,12 +685,7 @@ export const TableDetailDialog = ({
                           <span className="text-sm font-bold">R$ {getOrderTotal(order).toFixed(2)}</span>
                         </div>
                         <div className="text-xs space-y-0.5">
-                          {order.order_items?.map((item: any) => (
-                            <div key={item.id} className="flex justify-between">
-                              <span>{item.quantity}x {item.products?.name}</span>
-                              <span className="text-muted-foreground">R$ {(item.price_at_order * item.quantity).toFixed(2)}</span>
-                            </div>
-                          ))}
+                          {order.order_items?.map((item: any) => renderItem(item, order.id))}
                         </div>
                       </Card>
                     ))}
@@ -502,13 +693,27 @@ export const TableDetailDialog = ({
                 </div>
               )}
 
-              {/* Table Total */}
+              {/* Table Total + Splits Summary */}
               {table.is_occupied && tableTotal > 0 && (
                 <>
                   <Separator />
-                  <div className="flex items-center justify-between py-2">
-                    <span className="font-bold text-lg">Total da Mesa</span>
-                    <span className="font-bold text-lg text-primary">R$ {tableTotal.toFixed(2)}</span>
+                  <div className="space-y-1 py-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-lg">Total da Mesa</span>
+                      <span className="font-bold text-lg text-primary">R$ {tableTotal.toFixed(2)}</span>
+                    </div>
+                    {totalPaidViaSplits > 0 && (
+                      <>
+                        <div className="flex items-center justify-between text-sm text-green-600">
+                          <span>Pago (divisões)</span>
+                          <span>R$ {totalPaidViaSplits.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm font-bold">
+                          <span>Pendente</span>
+                          <span>R$ {(tableTotal - totalPaidViaSplits).toFixed(2)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </>
               )}
@@ -524,6 +729,30 @@ export const TableDetailDialog = ({
           restaurantId={restaurantId}
           onClose={() => setPayingComanda(null)}
           onConfirm={handlePaymentConfirmed}
+        />
+      )}
+
+      {/* Split Payment Dialog */}
+      {splittingItem && (
+        <SplitPaymentDialog
+          open={!!splittingItem}
+          onOpenChange={(o) => { if (!o) setSplittingItem(null); }}
+          item={splittingItem}
+          orderId={splittingOrderId}
+          restaurantId={restaurantId}
+          onSplitCreated={handleSplitCreated}
+        />
+      )}
+
+      {/* Split Payment Select */}
+      {payingSplit && (
+        <SplitPaymentSelect
+          open={!!payingSplit}
+          onOpenChange={(o) => { if (!o) setPayingSplit(null); }}
+          splitId={payingSplit.id}
+          splitValue={payingSplit.value}
+          restaurantId={restaurantId}
+          onPaid={handleSplitPaid}
         />
       )}
     </>
