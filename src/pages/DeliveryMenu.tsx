@@ -287,6 +287,7 @@ export default function DeliveryMenu() {
 
   const handleClearCart = () => {
     setCart([]);
+    trackCompleted();
   };
 
   const handleBulkAddToCart = (items: CartItem[]) => {
