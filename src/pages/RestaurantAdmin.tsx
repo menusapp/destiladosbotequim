@@ -63,14 +63,15 @@ const RestaurantAdmin = () => {
   const [hasNewBills, setHasNewBills] = useState(false);
   const [hasNewDeliveryOrders, setHasNewDeliveryOrders] = useState(false);
   const [hasNewLocalOrders, setHasNewLocalOrders] = useState(false);
-  const [globalNotification, setGlobalNotification] = useState<{
+  const [notificationQueue, setNotificationQueue] = useState<Array<{
     orderId: string;
     customerName: string;
     total: number;
     orderType: 'local' | 'delivery';
     tableNumber?: number;
     deliveryType?: 'delivery' | 'pickup';
-  } | null>(null);
+  }>>([]);
+  const notificationQueueRef = useRef<typeof notificationQueue>([]);
   const [billNotification, setBillNotification] = useState<{
     billId: string;
     tableNumber: number;
@@ -91,7 +92,6 @@ const RestaurantAdmin = () => {
   const notifiedOrdersRef = useRef<Set<string>>(new Set());
   const notifiedBillsRef = useRef<Set<string>>(new Set());
   const notifiedReservationsRef = useRef<Set<string>>(new Set());
-  const globalNotificationRef = useRef<typeof globalNotification>(null);
   const billNotificationRef = useRef<typeof billNotification>(null);
   const reservationNotificationRef = useRef<typeof reservationNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
@@ -111,8 +111,8 @@ const RestaurantAdmin = () => {
   }, [notifiedReservations]);
   
   useEffect(() => {
-    globalNotificationRef.current = globalNotification;
-  }, [globalNotification]);
+    notificationQueueRef.current = notificationQueue;
+  }, [notificationQueue]);
   
   useEffect(() => {
     billNotificationRef.current = billNotification;
@@ -236,15 +236,16 @@ const RestaurantAdmin = () => {
                 tableNumber = tableData?.table_number;
               }
 
-              // Mostrar notificação global
-              setGlobalNotification({
+              // Add to notification queue
+              const newNotification = {
                 orderId: orderId,
                 customerName: order.customer_name,
                 total,
-                orderType: orderType === 'delivery' ? 'delivery' : 'local',
+                orderType: (orderType === 'delivery' ? 'delivery' : 'local') as 'local' | 'delivery',
                 tableNumber,
                 deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
-              });
+              };
+              setNotificationQueue(prev => [...prev, newNotification]);
 
               // Marcar como notificado (atualizar ref e state)
               const updated = new Set(notifiedOrdersRef.current);
@@ -275,9 +276,9 @@ const RestaurantAdmin = () => {
           const orderId = order.id;
           const status = order.status;
           
-          // Se o pedido foi aceito/mudou de status, fechar notificação (usar ref para evitar stale closure)
-          if (globalNotificationRef.current && globalNotificationRef.current.orderId === orderId && status !== 'pending') {
-            setGlobalNotification(null);
+          // Se o pedido foi aceito/mudou de status, remover da fila de notificações
+          if (status !== 'pending') {
+            setNotificationQueue(prev => prev.filter(n => n.orderId !== orderId));
           }
         }
       )

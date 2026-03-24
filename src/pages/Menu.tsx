@@ -319,25 +319,9 @@ const Menu = () => {
     }
   }, [tableNumber]);
 
-  // Detectar direção do scroll para esconder/mostrar barra
+  // Bottom bar always visible - no scroll hiding
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      
-      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-        setShowComandaBar(false);
-      } else if (currentScrollY < lastScrollY.current) {
-        setShowComandaBar(true);
-      }
-      
-      lastScrollY.current = currentScrollY;
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    setShowComandaBar(true);
   }, []);
 
   // Atualizar total da comanda sempre que o cart ou tableId mudar
