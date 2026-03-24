@@ -418,12 +418,12 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
         } else {
           await supabase.from("tables").update({
             is_occupied: true, occupied_at: new Date().toISOString(),
-            occupied_by: customerName || "PDV",
+            occupied_by: currentCustomerName,
           }).eq("id", tableId);
           const { data: nc } = await supabase.from("comandas").insert({
             restaurant_id: restaurantId, table_id: tableId,
-            customer_name: customerName || "Cliente PDV",
-            customer_cpf: customerCpf || "000.000.000-00", status: "active",
+            customer_name: currentCustomerName,
+            customer_cpf: currentCustomerCpf, status: "active",
           }).select().single();
           comandaId = nc?.id || null;
         }
@@ -431,8 +431,8 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "local", table_id: tableId,
           comanda_id: comandaId, status: "pending",
-          customer_name: customerName || "Cliente PDV",
-          customer_cpf: customerCpf || "000.000.000-00",
+          customer_name: currentCustomerName,
+          customer_cpf: currentCustomerCpf,
           notes: notes || null, payment_type: paymentType || null,
         }).select().single();
         if (error) throw error;
