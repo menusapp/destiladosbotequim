@@ -2162,6 +2162,70 @@ export type Database = {
           },
         ]
       }
+      order_item_splits: {
+        Row: {
+          created_at: string | null
+          id: string
+          order_id: string
+          order_item_id: string
+          paid_at: string | null
+          payment_type: string | null
+          restaurant_id: string
+          split_number: number
+          status: string
+          total_splits: number
+          value: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          order_id: string
+          order_item_id: string
+          paid_at?: string | null
+          payment_type?: string | null
+          restaurant_id: string
+          split_number: number
+          status?: string
+          total_splits: number
+          value: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          order_item_id?: string
+          paid_at?: string | null
+          payment_type?: string | null
+          restaurant_id?: string
+          split_number?: number
+          status?: string
+          total_splits?: number
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_splits_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_splits_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_splits_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string | null
