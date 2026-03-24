@@ -16,6 +16,11 @@ interface StockCategory {
   name: string;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+}
+
 interface StockItem {
   id: string;
   name: string;
@@ -24,7 +29,9 @@ interface StockItem {
   current_quantity: number;
   minimum_quantity: number;
   category_id: string | null;
+  supplier_id: string | null;
   stock_categories?: { name: string } | null;
+  suppliers?: { name: string } | null;
 }
 
 interface StockItemsGridProps {
@@ -33,6 +40,7 @@ interface StockItemsGridProps {
 
 const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
   const [categories, setCategories] = useState<StockCategory[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
@@ -47,12 +55,14 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
     current_quantity: "",
     minimum_quantity: "",
     category_id: "",
+    supplier_id: "",
   });
 
   const { toast } = useToast();
 
   useEffect(() => {
     fetchCategories();
+    fetchSuppliers();
     fetchStockItems();
   }, [restaurantId]);
 
@@ -70,10 +80,19 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
     setCategories(data || []);
   };
 
+  const fetchSuppliers = async () => {
+    const { data, error } = await supabase
+      .from("suppliers")
+      .select("id, name")
+      .eq("restaurant_id", restaurantId)
+      .order("name");
+    if (!error) setSuppliers(data || []);
+  };
+
   const fetchStockItems = async () => {
     const { data, error } = await supabase
       .from("stock_items")
-      .select("*, stock_categories(name)")
+      .select("*, stock_categories(name), suppliers(name)")
       .eq("restaurant_id", restaurantId)
       .order("name");
     
@@ -105,6 +124,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
         price_per_unit: parseFloat(itemForm.price_per_unit),
         minimum_quantity: parseFloat(itemForm.minimum_quantity || "0"),
         category_id: itemForm.category_id || null,
+        supplier_id: itemForm.supplier_id || null,
       };
 
       const { error } = await supabase
@@ -126,6 +146,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
         current_quantity: parseFloat(itemForm.current_quantity),
         minimum_quantity: parseFloat(itemForm.minimum_quantity || "0"),
         category_id: itemForm.category_id || null,
+        supplier_id: itemForm.supplier_id || null,
         restaurant_id: restaurantId,
       };
 
@@ -180,6 +201,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
       current_quantity: item.current_quantity.toString(),
       minimum_quantity: item.minimum_quantity.toString(),
       category_id: item.category_id || "",
+      supplier_id: item.supplier_id || "",
     });
     setItemDialogOpen(true);
   };
@@ -193,6 +215,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
       current_quantity: "",
       minimum_quantity: "",
       category_id: "",
+      supplier_id: "",
     });
   };
 
@@ -353,6 +376,26 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label>Fornecedor</Label>
+              {suppliers.length > 0 ? (
+                <Select value={itemForm.supplier_id} onValueChange={(v) => setItemForm({ ...itemForm, supplier_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((sup) => (
+                      <SelectItem key={sup.id} value={sup.id}>
+                        {sup.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">Cadastre um fornecedor na aba Fornecedores</p>
+              )}
             </div>
 
             <Button onClick={handleSaveItem} className="w-full">

@@ -3300,6 +3300,7 @@ export type Database = {
           name: string
           price_per_unit: number
           restaurant_id: string
+          supplier_id: string | null
           unit: string
           updated_at: string | null
         }
@@ -3312,6 +3313,7 @@ export type Database = {
           name: string
           price_per_unit?: number
           restaurant_id: string
+          supplier_id?: string | null
           unit: string
           updated_at?: string | null
         }
@@ -3324,6 +3326,7 @@ export type Database = {
           name?: string
           price_per_unit?: number
           restaurant_id?: string
+          supplier_id?: string | null
           unit?: string
           updated_at?: string | null
         }
@@ -3340,6 +3343,13 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -3469,6 +3479,53 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      suppliers: {
+        Row: {
+          cnpj: string | null
+          contact_name: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cnpj?: string | null
+          contact_name?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          cnpj?: string | null
+          contact_name?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tables: {
         Row: {

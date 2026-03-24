@@ -13,7 +13,9 @@ interface StockCardProps {
     current_quantity: number;
     minimum_quantity: number;
     category_id: string | null;
+    supplier_id?: string | null;
     stock_categories?: { name: string } | null;
+    suppliers?: { name: string } | null;
   };
   onEdit: (item: any) => void;
   onDelete: (item: any) => void;
@@ -31,6 +33,9 @@ const StockCard = memo(({ item, onEdit, onDelete }: StockCardProps) => {
           <div className="flex items-start justify-between gap-1">
             <div className="min-w-0">
               <h3 className="text-sm font-semibold text-foreground truncate">{item.name}</h3>
+              {item.suppliers && (
+                <p className="text-[11px] text-muted-foreground truncate">{item.suppliers.name}</p>
+              )}
               {item.stock_categories && (
                 <p className="text-[11px] text-muted-foreground truncate">{item.stock_categories.name}</p>
               )}

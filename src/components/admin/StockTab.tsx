@@ -5,6 +5,7 @@ import { FileText } from "lucide-react";
 import StockItemsGrid from "./StockItemsGrid";
 import StockCategoriesTab from "./StockCategoriesTab";
 import StockMovementsTab from "./StockMovementsTab";
+import SuppliersTab from "./SuppliersTab";
 import ImportNfeDialog from "./ImportNfeDialog";
 
 interface StockTabProps {
@@ -51,6 +52,12 @@ export default function StockTab({ restaurantId }: StockTabProps) {
           >
             Movimentações
           </TabsTrigger>
+          <TabsTrigger 
+            value="fornecedores"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
+          >
+            Fornecedores
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="insumos" className="mt-6">
@@ -63,6 +70,10 @@ export default function StockTab({ restaurantId }: StockTabProps) {
 
         <TabsContent value="movimentacoes" className="mt-6">
           <StockMovementsTab restaurantId={restaurantId} />
+        </TabsContent>
+
+        <TabsContent value="fornecedores" className="mt-6">
+          <SuppliersTab restaurantId={restaurantId} />
         </TabsContent>
       </Tabs>
 
