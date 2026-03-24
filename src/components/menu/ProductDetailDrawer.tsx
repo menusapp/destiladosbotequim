@@ -6,6 +6,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Minus, Plus, ChevronDown } from "lucide-react";
+import { useRef } from "react";
 import { Product, ProductExtra } from "@/types/menu";
 import { toast } from "sonner";
 
@@ -37,6 +38,7 @@ export const ProductDetailDrawer = ({
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const notesRef = useRef<HTMLTextAreaElement>(null);
 
   // Separar extras obrigatórios dos opcionais
   const { requiredExtras, optionalExtras } = useMemo(() => {
@@ -305,8 +307,14 @@ export const ProductDetailDrawer = ({
               <span className="ml-auto text-xs">0/140</span>
             </Label>
             <Textarea
+              ref={notesRef}
               value={notes}
               onChange={(e) => setNotes(e.target.value.slice(0, 140))}
+              onFocus={() => {
+                setTimeout(() => {
+                  notesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+              }}
               placeholder="Ex: Sem cebola, ponto da carne..."
               className="resize-none min-h-[80px]"
               maxLength={140}

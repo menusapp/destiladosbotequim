@@ -604,6 +604,8 @@ const Comanda = () => {
     
     return {
       subtotal,
+      cartSubtotal,
+      ordersSubtotal,
       serviceFee,
       total: subtotal + serviceFee,
     };
@@ -1113,7 +1115,7 @@ const Comanda = () => {
                 style={{ backgroundColor: restaurantColor }}
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
-                {submitting ? "Enviando..." : `Enviar Pedido · R$ ${totals.subtotal.toFixed(2)}`}
+                {submitting ? "Enviando..." : `Enviar Pedido · R$ ${totals.cartSubtotal.toFixed(2)}`}
               </Button>
             )}
             {showBillButton && (

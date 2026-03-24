@@ -162,6 +162,23 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => fetchTables())
       .subscribe();
 
+    // Listen for new local orders to update table state immediately
+    const ordersChannel = supabase
+      .channel("orders-tables-changes")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
+        const order = payload.new as any;
+        if (order.order_type === "local" && order.restaurant_id === restaurantId) {
+          fetchTables();
+        }
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
+        const order = payload.new as any;
+        if (order.order_type === "local" && order.restaurant_id === restaurantId) {
+          fetchTables();
+        }
+      })
+      .subscribe();
+
     const reservationsChannel = supabase
       .channel("reservations-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, () => fetchReservations())
@@ -170,6 +187,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     return () => {
       supabase.removeChannel(tablesChannel);
       supabase.removeChannel(comandasChannel);
+      supabase.removeChannel(ordersChannel);
       supabase.removeChannel(reservationsChannel);
     };
   }, [restaurantId]);

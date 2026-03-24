@@ -120,7 +120,7 @@ export const NewOrderNotification = ({
   };
 
   return (
-    <div className="fixed top-4 right-4 z-[100] w-96 animate-in slide-in-from-top-5">
+    <div className="w-96 animate-in slide-in-from-top-5">
       <Card className="bg-orange-50 border-orange-200 shadow-2xl">
         <div className="p-6 space-y-4">
           <div className="flex items-start justify-between">
