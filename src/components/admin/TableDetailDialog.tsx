@@ -143,12 +143,21 @@ export const TableDetailDialog = ({
     return map;
   }, [allSplits]);
 
+  // Force refetch when dialog opens to avoid stale cached data
+  useEffect(() => {
+    if (open && table) {
+      refetchComandas();
+      refetchOrders();
+    }
+  }, [open, table?.id]);
+
   // Realtime subscription for table data
   useEffect(() => {
     if (!open || !table) return;
     const ch = supabase.channel(`table-detail-${table.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
         refetchOrders();
+        refetchComandas();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, () => {
         refetchBills();
