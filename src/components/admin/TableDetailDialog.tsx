@@ -50,6 +50,7 @@ interface TableDetailDialogProps {
 interface Split {
   id: string;
   order_item_id: string;
+  order_id: string;
   split_number: number;
   total_splits: number;
   value: number;
