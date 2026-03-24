@@ -1823,6 +1823,50 @@ export type Database = {
           },
         ]
       }
+      nfe_imports: {
+        Row: {
+          arquivo_xml: string | null
+          cnpj_fornecedor: string | null
+          created_at: string | null
+          data_emissao: string | null
+          id: string
+          nome_fornecedor: string | null
+          numero_nota: string
+          restaurant_id: string
+          valor_total: number | null
+        }
+        Insert: {
+          arquivo_xml?: string | null
+          cnpj_fornecedor?: string | null
+          created_at?: string | null
+          data_emissao?: string | null
+          id?: string
+          nome_fornecedor?: string | null
+          numero_nota: string
+          restaurant_id: string
+          valor_total?: number | null
+        }
+        Update: {
+          arquivo_xml?: string | null
+          cnpj_fornecedor?: string | null
+          created_at?: string | null
+          data_emissao?: string | null
+          id?: string
+          nome_fornecedor?: string | null
+          numero_nota?: string
+          restaurant_id?: string
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfe_imports_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       online_payment_config: {
         Row: {
           accept_card: boolean | null
