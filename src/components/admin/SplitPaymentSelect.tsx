@@ -54,7 +54,7 @@ export function SplitPaymentSelect({
 
   const handleSelect = async (methodName: string) => {
     const { error } = await supabase
-      .from("order_item_splits")
+      .from("order_item_splits" as any)
       .update({
         status: "paid",
         paid_at: new Date().toISOString(),

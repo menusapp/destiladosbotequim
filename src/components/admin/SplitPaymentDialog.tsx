@@ -53,7 +53,7 @@ export function SplitPaymentDialog({
     const sumSoFar = splits.slice(0, -1).reduce((s, sp) => s + sp.value, 0);
     splits[splits.length - 1].value = Math.round((itemTotal - sumSoFar) * 100) / 100;
 
-    const { error } = await supabase.from("order_item_splits").insert(splits);
+    const { error } = await supabase.from("order_item_splits" as any).insert(splits);
     if (error) {
       toast.error("Erro ao dividir item");
       return;
@@ -92,7 +92,7 @@ export function SplitPaymentDialog({
       },
     ];
 
-    const { error } = await supabase.from("order_item_splits").insert(splits);
+    const { error } = await supabase.from("order_item_splits" as any).insert(splits);
     if (error) {
       toast.error("Erro ao dividir item");
       return;
