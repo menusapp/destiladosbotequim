@@ -986,62 +986,6 @@ export type Database = {
           },
         ]
       }
-      deliverydireto_config: {
-        Row: {
-          access_token: string | null
-          client_id: string | null
-          created_at: string | null
-          enabled: boolean | null
-          id: string
-          password_hash: string | null
-          refresh_token: string | null
-          restaurant_id: string
-          store_id: string | null
-          token_expires_at: string | null
-          updated_at: string | null
-          username: string | null
-          webhook_url: string | null
-        }
-        Insert: {
-          access_token?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          enabled?: boolean | null
-          id?: string
-          password_hash?: string | null
-          refresh_token?: string | null
-          restaurant_id: string
-          store_id?: string | null
-          token_expires_at?: string | null
-          updated_at?: string | null
-          username?: string | null
-          webhook_url?: string | null
-        }
-        Update: {
-          access_token?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          enabled?: boolean | null
-          id?: string
-          password_hash?: string | null
-          refresh_token?: string | null
-          restaurant_id?: string
-          store_id?: string | null
-          token_expires_at?: string | null
-          updated_at?: string | null
-          username?: string | null
-          webhook_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "deliverydireto_config_restaurant_id_fkey"
-            columns: ["restaurant_id"]
-            isOneToOne: true
-            referencedRelation: "restaurants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       extra_categories: {
         Row: {
           created_at: string | null
@@ -2171,8 +2115,6 @@ export type Database = {
           created_at: string | null
           customer_cpf: string
           customer_name: string
-          dd_order_id: string | null
-          dd_source: boolean | null
           delivery_address: string | null
           delivery_city: string | null
           delivery_fee: number | null
@@ -2203,8 +2145,6 @@ export type Database = {
           created_at?: string | null
           customer_cpf: string
           customer_name: string
-          dd_order_id?: string | null
-          dd_source?: boolean | null
           delivery_address?: string | null
           delivery_city?: string | null
           delivery_fee?: number | null
@@ -2235,8 +2175,6 @@ export type Database = {
           created_at?: string | null
           customer_cpf?: string
           customer_name?: string
-          dd_order_id?: string | null
-          dd_source?: boolean | null
           delivery_address?: string | null
           delivery_city?: string | null
           delivery_fee?: number | null
