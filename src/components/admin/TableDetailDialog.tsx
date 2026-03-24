@@ -276,13 +276,23 @@ export const TableDetailDialog = ({
     refetchBills();
   };
 
-  const handlePayComanda = (comanda: any) => {
+  const handlePayComanda = async (comanda: any) => {
     const comandaOrders = ordersByComanda.get(comanda.id) || [];
     if (comandaOrders.length === 0) {
       toast.error("Nenhum pedido ativo nesta comanda");
       return;
     }
     const allItems = comandaOrders.flatMap((o: any) => o.order_items || []);
+    const orderIds = comandaOrders.map((o: any) => o.id);
+
+    // Calculate total already paid via splits
+    let splitsPaidTotal = 0;
+    if (allSplits && allSplits.length > 0) {
+      splitsPaidTotal = allSplits
+        .filter((s: Split) => s.status === "paid" && orderIds.includes(s.order_id))
+        .reduce((sum: number, s: Split) => sum + Number(s.value), 0);
+    }
+
     const virtualOrder = {
       id: comandaOrders[0].id,
       table_id: table?.id,
@@ -290,7 +300,8 @@ export const TableDetailDialog = ({
       restaurant_id: restaurantId,
       order_items: allItems,
       _comanda_id: comanda.id,
-      _comanda_order_ids: comandaOrders.map((o: any) => o.id),
+      _comanda_order_ids: orderIds,
+      _splits_paid_total: splitsPaidTotal,
     };
     setPayingComanda(virtualOrder);
   };

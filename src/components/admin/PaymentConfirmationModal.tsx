@@ -128,9 +128,11 @@ export const PaymentConfirmationModal = ({
     }, 0);
   };
 
+  const splitsPaidTotal = (order as any)._splits_paid_total || 0;
   const subtotal = calculateSubtotal();
   const feeAmount = serviceFeeEnabled ? (subtotal * serviceFeePercentage) / 100 : 0;
-  const total = subtotal + feeAmount;
+  const grossTotal = subtotal + feeAmount;
+  const total = Math.max(0, Math.round((grossTotal - splitsPaidTotal) * 100) / 100);
   const paidAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, Math.round((total - paidAmount) * 100) / 100);
 
@@ -188,7 +190,7 @@ export const PaymentConfirmationModal = ({
           comanda_id: comandaId,
           subtotal: subtotal,
           service_fee: feeAmount,
-          total_amount: total,
+          total_amount: grossTotal,
           payment_method: billPaymentMethod,
           status: "paid",
           paid_at: new Date().toISOString(),
@@ -262,6 +264,24 @@ export const PaymentConfirmationModal = ({
               <span>Subtotal dos produtos:</span>
               <span>R$ {subtotal.toFixed(2)}</span>
             </div>
+            {splitsPaidTotal > 0 && (
+              <>
+                {serviceFeeEnabled && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Taxa de serviço ({serviceFeePercentage}%):</span>
+                    <span>R$ {feeAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span>Já pago via divisões:</span>
+                  <span>- R$ {splitsPaidTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-base border-t pt-1">
+                  <span>Valor restante a pagar:</span>
+                  <span>R$ {total.toFixed(2)}</span>
+                </div>
+              </>
+            )}
           </div>
         </Card>
 
