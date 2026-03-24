@@ -54,7 +54,7 @@ export default function StockTab({ restaurantId }: StockTabProps) {
         </TabsList>
 
         <TabsContent value="insumos" className="mt-6">
-          <StockItemsGrid restaurantId={restaurantId} />
+          <StockItemsGrid key={refreshKey} restaurantId={restaurantId} />
         </TabsContent>
 
         <TabsContent value="categorias" className="mt-6">
