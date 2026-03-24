@@ -122,11 +122,11 @@ export const TableDetailDialog = ({
       if (!table || !orders || orders.length === 0) return [];
       const orderIds = orders.map(o => o.id);
       const { data, error } = await supabase
-        .from("order_item_splits")
+        .from("order_item_splits" as any)
         .select("*")
         .in("order_id", orderIds);
       if (error) throw error;
-      return (data || []) as Split[];
+      return (data || []) as unknown as Split[];
     },
     enabled: open && !!table && !!orders && orders.length > 0,
   });
