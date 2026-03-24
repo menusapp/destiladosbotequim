@@ -448,7 +448,7 @@ export default function DeliveryMenu() {
               itemCount={cart.length}
               total={calculateTotal()}
               primaryColor={primaryColor}
-              onViewCart={() => setCheckoutOpen(true)}
+              onViewCart={() => { setCheckoutOpen(true); trackCheckoutStarted(); }}
               label="Ver Sacola"
             />
           )}
