@@ -16,6 +16,7 @@ import { ProfileView } from "@/components/menu/ProfileView";
 import { ReservationsView } from "@/components/menu/ReservationsView";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "sonner";
+import { useSessionTracking } from "@/hooks/useSessionTracking";
 
 export default function DeliveryMenu() {
   const { slug: restaurantSlug } = useParams<{ slug: string }>();
@@ -34,6 +35,7 @@ export default function DeliveryMenu() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "reservas" | "perfil">("menu");
+  const { trackCartUpdate, trackCheckoutStarted, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id);
 
   const fetchRestaurantData = useCallback(async () => {
     try {
@@ -106,6 +108,7 @@ export default function DeliveryMenu() {
 
   useEffect(() => {
     saveCartToStorage();
+    if (cart.length > 0) trackCartUpdate(cart);
   }, [cart]);
 
   // Realtime subscription para mudanças no restaurante e produtos
