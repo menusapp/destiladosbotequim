@@ -287,8 +287,8 @@ export const TableDetailDialog = ({
 
     // Calculate total already paid via splits
     let splitsPaidTotal = 0;
-    if (splits && splits.length > 0) {
-      splitsPaidTotal = splits
+    if (allSplits && allSplits.length > 0) {
+      splitsPaidTotal = allSplits
         .filter((s: Split) => s.status === "paid" && orderIds.includes(s.order_id))
         .reduce((sum: number, s: Split) => sum + Number(s.value), 0);
     }
