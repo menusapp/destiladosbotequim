@@ -135,14 +135,18 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
       for (const c of customers.slice(0, 200)) {
         const { data: orders } = await supabase
           .from("orders")
-          .select("id, created_at, total_amount")
+          .select("id, created_at, order_items(price_at_order, quantity)")
           .eq("restaurant_id", restaurantId)
           .eq("customer_cpf", c.cpf)
           .order("created_at", { ascending: false });
 
         if (orders && orders.length > 0) {
-          const lastOrder = orders[0];
+          const lastOrder = orders[0] as any;
           if (lastOrder.created_at && lastOrder.created_at < thirtyDaysAgo) {
+            const totalSpent = (orders as any[]).reduce((s, o) => {
+              const items = o.order_items || [];
+              return s + items.reduce((is: number, i: any) => is + (Number(i.price_at_order) || 0) * (i.quantity || 1), 0);
+            }, 0);
             inactive.push({
               id: c.id,
               name: c.name,
@@ -150,7 +154,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
               cpf: c.cpf,
               last_order_date: lastOrder.created_at,
               total_orders: orders.length,
-              total_spent: orders.reduce((s: number, o: any) => s + (Number(o.total_amount) || 0), 0),
+              total_spent: totalSpent,
             });
           }
         }
@@ -236,8 +240,8 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-orange-500/10 flex items-center justify-center">
-              <TrendingDown className="h-4 w-4 text-orange-500" />
+            <div className="h-9 w-9 rounded-lg bg-destructive/10 flex items-center justify-center">
+              <TrendingDown className="h-4 w-4 text-destructive" />
             </div>
             <div>
               <p className="text-2xl font-bold">{metrics.rate}%</p>
