@@ -378,6 +378,26 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
               </Select>
             </div>
 
+            <div>
+              <Label>Fornecedor</Label>
+              {suppliers.length > 0 ? (
+                <Select value={itemForm.supplier_id} onValueChange={(v) => setItemForm({ ...itemForm, supplier_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((sup) => (
+                      <SelectItem key={sup.id} value={sup.id}>
+                        {sup.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">Cadastre um fornecedor na aba Fornecedores</p>
+              )}
+            </div>
+
             <Button onClick={handleSaveItem} className="w-full">
               {editingItem ? "Salvar Alterações" : "Criar Insumo"}
             </Button>
