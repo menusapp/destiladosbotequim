@@ -128,9 +128,11 @@ export const PaymentConfirmationModal = ({
     }, 0);
   };
 
+  const splitsPaidTotal = (order as any)._splits_paid_total || 0;
   const subtotal = calculateSubtotal();
   const feeAmount = serviceFeeEnabled ? (subtotal * serviceFeePercentage) / 100 : 0;
-  const total = subtotal + feeAmount;
+  const grossTotal = subtotal + feeAmount;
+  const total = Math.max(0, Math.round((grossTotal - splitsPaidTotal) * 100) / 100);
   const paidAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, Math.round((total - paidAmount) * 100) / 100);
 
