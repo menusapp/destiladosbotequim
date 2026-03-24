@@ -201,12 +201,14 @@ export default function DeliveryMenu() {
       sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, finalName);
       sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
       if (finalPhone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, finalPhone);
+      trackCustomerInfo(finalPhone || undefined, finalName);
     } else {
       setCustomerName(name);
       setCustomerCPF(sanitizedCPF);
       sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
       sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
       if (phone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, phone);
+      trackCustomerInfo(phone || undefined, name);
     }
     
     setShowCustomerDialog(false);
