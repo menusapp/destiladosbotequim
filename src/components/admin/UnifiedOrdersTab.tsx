@@ -115,24 +115,36 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     const pollIfood = async () => {
       if (!active) return;
       try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-polling`, {
+        let res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-polling`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ restaurant_id: restaurantId }),
         });
         if (res.status === 401) {
-          // Try refresh
-          await fetch(`${SUPABASE_URL}/functions/v1/ifood-refresh-token`, {
+          await res.text(); // consume body
+          // Try refresh then retry polling
+          const refreshRes = await fetch(`${SUPABASE_URL}/functions/v1/ifood-refresh-token`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ restaurant_id: restaurantId }),
           });
-        } else if (res.ok) {
+          await refreshRes.text();
+          if (refreshRes.ok) {
+            res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-polling`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ restaurant_id: restaurantId }),
+            });
+          }
+        }
+        if (res.ok) {
           const data = await res.json();
           if (data.new_orders > 0) {
             fetchOrders();
             toast.info(`${data.new_orders} novo(s) pedido(s) do iFood!`);
           }
+        } else {
+          await res.text(); // consume body
         }
       } catch (_) { /* silent fail */ }
     };
