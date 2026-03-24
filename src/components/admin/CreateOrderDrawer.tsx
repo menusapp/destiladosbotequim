@@ -203,8 +203,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "local", table_id: tableId,
           comanda_id: comandaId, status: "pending",
-          customer_name: customerName || "Cliente PDV",
-          customer_cpf: customerCpf || "000.000.000-00",
+          customer_name: currentCustomerName,
+          customer_cpf: currentCustomerCpf,
           notes: notes || null, payment_type: paymentType || null,
         }).select().single();
         if (error) throw error;
