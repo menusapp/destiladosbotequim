@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.parse-nfe]
 verify_jwt = false
+
+[functions.process-abandoned-carts]
+verify_jwt = false

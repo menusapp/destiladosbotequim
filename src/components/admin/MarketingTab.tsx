@@ -3,11 +3,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, Megaphone, Clock, History, Settings, Send, BarChart3 } from "lucide-react";
+import { AlertTriangle, Megaphone, Clock, History, Settings, Send, BarChart3, Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CampaignsList } from "./marketing/CampaignsList";
 import { ScheduledMessages } from "./marketing/ScheduledMessages";
 import { MessageHistory } from "./marketing/MessageHistory";
+import { TrackingTab } from "./marketing/TrackingTab";
 
 interface MarketingTabProps {
   restaurantId: string;
@@ -160,6 +161,10 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
             <History className="h-4 w-4" />
             Histórico
           </TabsTrigger>
+          <TabsTrigger value="tracking" className="gap-2">
+            <Target className="h-4 w-4" />
+            Rastreamento
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="campaigns">
@@ -172,6 +177,10 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
 
         <TabsContent value="history">
           <MessageHistory restaurantId={restaurantId} />
+        </TabsContent>
+
+        <TabsContent value="tracking">
+          <TrackingTab restaurantId={restaurantId} />
         </TabsContent>
       </Tabs>
     </div>

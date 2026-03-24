@@ -16,6 +16,7 @@ import { ProfileView } from "@/components/menu/ProfileView";
 import { ReservationsView } from "@/components/menu/ReservationsView";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "sonner";
+import { useSessionTracking } from "@/hooks/useSessionTracking";
 
 export default function DeliveryMenu() {
   const { slug: restaurantSlug } = useParams<{ slug: string }>();
@@ -34,6 +35,7 @@ export default function DeliveryMenu() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "reservas" | "perfil">("menu");
+  const { trackCartUpdate, trackCheckoutStarted, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id);
 
   const fetchRestaurantData = useCallback(async () => {
     try {
@@ -106,6 +108,7 @@ export default function DeliveryMenu() {
 
   useEffect(() => {
     saveCartToStorage();
+    if (cart.length > 0) trackCartUpdate(cart);
   }, [cart]);
 
   // Realtime subscription para mudanças no restaurante e produtos
@@ -198,12 +201,14 @@ export default function DeliveryMenu() {
       sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, finalName);
       sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
       if (finalPhone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, finalPhone);
+      trackCustomerInfo(finalPhone || undefined, finalName);
     } else {
       setCustomerName(name);
       setCustomerCPF(sanitizedCPF);
       sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
       sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
       if (phone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, phone);
+      trackCustomerInfo(phone || undefined, name);
     }
     
     setShowCustomerDialog(false);
@@ -282,6 +287,7 @@ export default function DeliveryMenu() {
 
   const handleClearCart = () => {
     setCart([]);
+    trackCompleted();
   };
 
   const handleBulkAddToCart = (items: CartItem[]) => {
@@ -443,7 +449,7 @@ export default function DeliveryMenu() {
               itemCount={cart.length}
               total={calculateTotal()}
               primaryColor={primaryColor}
-              onViewCart={() => setCheckoutOpen(true)}
+              onViewCart={() => { setCheckoutOpen(true); trackCheckoutStarted(); }}
               label="Ver Sacola"
             />
           )}
