@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { FileText } from "lucide-react";
 import StockItemsGrid from "./StockItemsGrid";
 import StockCategoriesTab from "./StockCategoriesTab";
 import StockMovementsTab from "./StockMovementsTab";
+import ImportNfeDialog from "./ImportNfeDialog";
 
 interface StockTabProps {
   restaurantId: string;
@@ -10,13 +13,21 @@ interface StockTabProps {
 
 export default function StockTab({ restaurantId }: StockTabProps) {
   const [activeTab, setActiveTab] = useState("insumos");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-[32px] font-bold text-foreground leading-tight">Estoque</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gerencie insumos, categorias e movimentações</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[32px] font-bold text-foreground leading-tight">Estoque</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gerencie insumos, categorias e movimentações</p>
+        </div>
+        <Button onClick={() => setImportDialogOpen(true)} className="gap-2">
+          <FileText className="h-4 w-4" />
+          Importar Nota Fiscal
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -54,6 +65,13 @@ export default function StockTab({ restaurantId }: StockTabProps) {
           <StockMovementsTab restaurantId={restaurantId} />
         </TabsContent>
       </Tabs>
+
+      <ImportNfeDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        restaurantId={restaurantId}
+        onImported={() => setRefreshKey((k) => k + 1)}
+      />
     </div>
   );
 }
