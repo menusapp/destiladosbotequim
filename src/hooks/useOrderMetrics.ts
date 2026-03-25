@@ -40,6 +40,7 @@ export interface OrderMetrics {
   localSales: number;
   deliverySales: number;
   hourlySales: { hour: string; total: number }[];
+  dailySales: { day: string; total: number }[];
   revenueByMethod: { method: string; total: number }[];
   /** IDs for CMV calculations */
   deliveryOrderIds: string[];
@@ -71,7 +72,7 @@ function calcDeliveryOrderTotal(order: any): number {
 export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
   const [metrics, setMetrics] = useState<OrderMetrics>({
     totalSales: 0, ordersCount: 0, averageTicket: 0,
-    localSales: 0, deliverySales: 0, hourlySales: [], revenueByMethod: [],
+    localSales: 0, deliverySales: 0, hourlySales: [], dailySales: [], revenueByMethod: [],
     deliveryOrderIds: [], localOrderIds: [], counterOrderIds: [],
   });
   const [loading, setLoading] = useState(true);
@@ -138,9 +139,12 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length;
       const averageTicket = totalCount > 0 ? totalSales / totalCount : 0;
 
-      // --- Hourly sales (only today) ---
+      // --- Hourly or daily sales ---
       let hourlySales: { hour: string; total: number }[] = [];
-      if (dateRange === "today") {
+      let dailySales: { day: string; total: number }[] = [];
+      const isSingleDay = dateRange === "today" || dateRange === "yesterday";
+
+      if (isSingleDay) {
         const hourlyMap = new Map<string, number>();
         for (let h = 6; h <= 23; h++) hourlyMap.set(h.toString().padStart(2, "0") + ":00", 0);
         deliveryOrders.forEach(o => {
@@ -160,6 +164,32 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
           }
         });
         hourlySales = Array.from(hourlyMap.entries()).map(([hour, total]) => ({ hour, total })).sort((a, b) => a.hour.localeCompare(b.hour));
+      } else {
+        // Multi-day: aggregate by date
+        const dailyMap = new Map<string, number>();
+        // Initialize all days in range
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          dailyMap.set(d.toISOString().slice(0, 10), 0);
+        }
+        deliveryOrders.forEach(o => {
+          const d = new Date(o.created_at).toISOString().slice(0, 10);
+          dailyMap.set(d, (dailyMap.get(d) || 0) + calcDeliveryOrderTotal(o));
+        });
+        counterOrders.forEach(co => {
+          if (co.finalized_at) {
+            const d = new Date(co.finalized_at).toISOString().slice(0, 10);
+            dailyMap.set(d, (dailyMap.get(d) || 0) + (co.total_amount || 0));
+          }
+        });
+        paidBills.forEach(b => {
+          if (b.paid_at) {
+            const d = new Date(b.paid_at).toISOString().slice(0, 10);
+            dailyMap.set(d, (dailyMap.get(d) || 0) + Number(b.total_amount || 0));
+          }
+        });
+        dailySales = Array.from(dailyMap.entries()).map(([day, total]) => ({ day, total })).sort((a, b) => a.day.localeCompare(b.day));
       }
 
       // --- Revenue by payment method ---
@@ -196,7 +226,7 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
 
       setMetrics({
         totalSales, ordersCount: totalCount, averageTicket,
-        localSales, deliverySales, hourlySales, revenueByMethod,
+        localSales, deliverySales, hourlySales, dailySales, revenueByMethod,
         deliveryOrderIds, localOrderIds, counterOrderIds,
       });
     } catch (err) {
