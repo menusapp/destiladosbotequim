@@ -77,7 +77,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "caixa", label: "Caixa", icon: CircleDollarSign },
       { id: "custos", label: "Custos", icon: CircleDollarSign },
       { id: "margens", label: "Margens", icon: TrendingUp },
-      { id: "relatorios", label: "Relatórios", icon: BarChart3 },
+      { id: "relatorios", label: "Relatório DRE", icon: BarChart3 },
     ],
     // Clientes & Engajamento
     [

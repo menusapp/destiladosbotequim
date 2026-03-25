@@ -552,7 +552,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-[-0.025em]">Relatórios</h2>
+          <h2 className="text-2xl font-semibold tracking-[-0.025em]">Relatório DRE</h2>
           <p className="text-sm text-muted-foreground font-light">Visualize métricas e análises do seu negócio</p>
         </div>
       </div>

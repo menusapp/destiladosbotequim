@@ -9,7 +9,7 @@ export const ALL_SECTIONS = [
   { id: "estoque", label: "Estoque" },
   { id: "custos", label: "Custos" },
   { id: "margens", label: "Margens" },
-  { id: "relatorios", label: "Relatórios" },
+  { id: "relatorios", label: "Relatório DRE" },
   { id: "clientes", label: "Clientes" },
   { id: "fidelidade", label: "Fidelidade" },
   { id: "marketing", label: "Marketing" },

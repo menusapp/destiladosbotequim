@@ -53,7 +53,7 @@ const segments = [
   { icon: ChefHat, name: "E muito mais!" },
 ];
 
-/* ── Plans (reordered: Básico, Premium, Avançado) ── */
+/* ── Plans (Básico, Intermediário, Avançado) ── */
 const plans = [
   {
     name: "Básico", price: "99", daily: "R$ 3,30/dia", description: "Para começar a digitalizar", highlighted: false,
@@ -61,13 +61,13 @@ const plans = [
     cta: "Começar Agora",
   },
   {
-    name: "Premium", price: "349", daily: "R$ 11,63/dia", description: "Solução completa", highlighted: true,
-    features: ["Tudo do Avançado", "Marketing WhatsApp", "Remarketing automático", "Nota fiscal eletrônica", "Fluxo de caixa & DRE", "Reservas online", "Usuários ilimitados", "Suporte VIP"],
-    cta: "Escolher Premium",
+    name: "Intermediário", price: "199", daily: "R$ 6,63/dia", description: "Para crescer com eficiência", highlighted: true,
+    features: ["Tudo do Básico", "Delivery completo", "Gestão de estoque & CMV", "Relatórios e DRE", "Programa de fidelidade", "Até 5 usuários", "Suporte prioritário"],
+    cta: "Escolher Intermediário",
   },
   {
-    name: "Avançado", price: "199", daily: "R$ 6,63/dia", description: "Para crescer com eficiência", highlighted: false,
-    features: ["Tudo do Básico", "Delivery completo", "Gestão de estoque & CMV", "Relatórios e DRE", "Programa de fidelidade", "Até 5 usuários", "Suporte prioritário"],
+    name: "Avançado", price: "349", daily: "R$ 11,63/dia", description: "Solução completa", highlighted: false,
+    features: ["Tudo do Intermediário", "Marketing WhatsApp", "Remarketing automático", "Nota fiscal eletrônica", "Fluxo de caixa & DRE", "Reservas online", "Usuários ilimitados", "Suporte VIP"],
     cta: "Escolher Avançado",
   },
 ];
@@ -84,7 +84,7 @@ const faqs = [
   { q: "Preciso instalar algum aplicativo?", a: "Não! O Menu's funciona 100% no navegador. Seus clientes acessam o cardápio pelo QR Code sem baixar nada. Você gerencia tudo pelo painel web." },
   { q: "Posso cancelar a qualquer momento?", a: "Sim, sem fidelidade e sem multa. Você pode fazer upgrade, downgrade ou cancelar quando quiser." },
   { q: "Como funciona o delivery?", a: "Você tem seu próprio sistema de delivery com zonas de entrega, taxas configuráveis e acompanhamento de pedidos. Zero comissão de marketplace." },
-  { q: "O sistema emite nota fiscal?", a: "Sim! No plano Premium você tem emissão de NFC-e integrada diretamente ao sistema, com envio automático ao SEFAZ." },
+  { q: "O sistema emite nota fiscal?", a: "Sim! No plano Avançado você tem emissão de NFC-e integrada diretamente ao sistema, com envio automático ao SEFAZ." },
   { q: "Como funciona o marketing por WhatsApp?", a: "Você configura campanhas automáticas que disparam mensagens via WhatsApp baseadas em comportamento do cliente: inatividade, compras específicas, aniversário e mais." },
   { q: "Preciso de equipamentos especiais?", a: "Não. Qualquer computador, tablet ou celular com navegador funciona. Para impressão, qualquer impressora térmica USB ou de rede é compatível." },
   { q: "Quanto tempo leva para configurar?", a: "Menos de 2 minutos para criar a conta. O cardápio básico pode estar no ar no mesmo dia." },
