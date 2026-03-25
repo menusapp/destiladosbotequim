@@ -155,10 +155,14 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
   }, [restaurantId]);
 
   const setupRealtime = () => {
+    let debounceTimer: ReturnType<typeof setTimeout>;
     const ch = supabase.channel(`unified-orders-${restaurantId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => fetchOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchOrders, 400);
+      })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
   };
 
   const fetchOrders = async () => {
