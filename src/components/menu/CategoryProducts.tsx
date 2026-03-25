@@ -29,7 +29,7 @@ export const CategoryProducts = memo(({
       {/* Horizontal scrolling category nav */}
       {categories.length > 0 && (
         <div
-          className="sticky top-0 z-30 bg-background border-b border-border px-4 py-2 flex gap-2 overflow-x-auto"
+          className="sticky top-0 z-30 bg-background border-b border-border px-4 py-2 flex gap-2 overflow-x-auto category-scroll-bar"
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
