@@ -119,6 +119,7 @@ export const CategoryProducts = memo(({
             ))}
           </div>
         </div>
+      ))}
       </div>
     </div>
   );
