@@ -111,31 +111,40 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
     try {
       const { startDate, endDate } = getDateRange();
 
-      // Fetch costs
-      const [fixedData, variableData, laborData] = await Promise.all([
+      // Fetch ALL data in parallel — single Promise.all instead of serial waterfall
+      const [
+        fixedData, variableData, laborData,
+        { data: paidBills },
+        { data: deliveryOrders },
+        { data: counterOrders },
+        { data: comandasData },
+        { data: paymentMethods },
+        { data: cashMovements },
+      ] = await Promise.all([
         supabase.from("fixed_costs").select("name, amount").eq("restaurant_id", restaurantId),
         supabase.from("variable_costs").select("name, type, amount, percentage").eq("restaurant_id", restaurantId),
         supabase.from("labor_costs").select("employee_name, salary").eq("restaurant_id", restaurantId),
+        supabase.from("bills").select(`id, total_amount, table_id, payment_method, tables!inner(restaurant_id)`)
+          .eq("tables.restaurant_id", restaurantId).eq("status", "paid")
+          .gte("paid_at", startDate.toISOString()).lte("paid_at", endDate.toISOString()),
+        supabase.from("orders").select(`id, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(quantity, price_at_order, order_item_extras(price_at_order))`)
+          .eq("restaurant_id", restaurantId).eq("order_type", "delivery")
+          .in("status", ["delivered", "picked_up"])
+          .gte("updated_at", startDate.toISOString()).lte("updated_at", endDate.toISOString()),
+        supabase.from("counter_orders").select("id, total_amount, payment_method")
+          .eq("restaurant_id", restaurantId).eq("status", "paid")
+          .gte("finalized_at", startDate.toISOString()).lte("finalized_at", endDate.toISOString()),
+        supabase.from("comandas").select("id").eq("restaurant_id", restaurantId)
+          .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+        supabase.from("payment_methods").select("id, name, method_type").eq("restaurant_id", restaurantId),
+        supabase.from("cash_movements").select("amount")
+          .eq("restaurant_id", restaurantId).eq("movement_type", "saida")
+          .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
       ]);
 
       setFixedCosts(fixedData.data || []);
       setVariableCosts(variableData.data || []);
       setLaborCosts(laborData.data || []);
-
-      // Buscar bills pagas no período (pedidos locais) - incluir payment_method
-      const { data: paidBills } = await supabase
-        .from("bills")
-        .select(`
-          id,
-          total_amount,
-          table_id,
-          payment_method,
-          tables!inner(restaurant_id)
-        `)
-        .eq("tables.restaurant_id", restaurantId)
-        .eq("status", "paid")
-        .gte("paid_at", startDate.toISOString())
-        .lte("paid_at", endDate.toISOString());
 
       let billsTotal = 0;
       let billsCount = 0;
@@ -146,38 +155,12 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         billsCount = paidBills.length;
         
         const tableIds = paidBills.map(b => b.table_id);
-        // Buscar apenas pedidos locais do período selecionado
         const { data: localOrders } = await supabase
-          .from("orders")
-          .select("id")
-          .in("table_id", tableIds)
+          .from("orders").select("id").in("table_id", tableIds)
           .eq("order_type", "local")
-          .gte("created_at", startDate.toISOString())
-          .lte("created_at", endDate.toISOString());
-        
+          .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString());
         localOrderIds = (localOrders || []).map(o => o.id);
       }
-
-      // Buscar pedidos delivery finalizados - incluir taxas
-      const { data: deliveryOrders } = await supabase
-        .from("orders")
-        .select(`
-          id,
-          delivery_fee,
-          coupon_discount,
-          loyalty_points_used,
-          payment_type,
-          order_items (
-            quantity,
-            price_at_order,
-            order_item_extras (price_at_order)
-          )
-        `)
-        .eq("restaurant_id", restaurantId)
-        .eq("order_type", "delivery")
-        .in("status", ["delivered", "picked_up"])
-        .gte("updated_at", startDate.toISOString())
-        .lte("updated_at", endDate.toISOString());
 
       let deliveryTotal = 0;
       const deliveryOrderIds = (deliveryOrders || []).map(o => o.id);
@@ -187,36 +170,14 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         order.order_items?.forEach((item: any) => {
           const itemTotal = item.price_at_order * item.quantity;
           const extrasTotal = (item.order_item_extras || []).reduce(
-            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0),
-            0
-          );
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0), 0);
           orderSubtotal += itemTotal + extrasTotal;
         });
-        // Adicionar taxa de entrega e descontar cupom/fidelidade
         const deliveryFee = Number(order.delivery_fee || 0);
         const couponDiscount = Number(order.coupon_discount || 0);
         const loyaltyDiscount = Number(order.loyalty_points_used || 0) * 0.01;
         deliveryTotal += orderSubtotal + deliveryFee - couponDiscount - loyaltyDiscount;
       });
-
-      // Buscar configuração de taxa de serviço
-      const { data: restaurant } = await supabase
-        .from("restaurants")
-        .select("service_fee_enabled, service_fee_percentage")
-        .eq("id", restaurantId)
-        .single();
-
-      // Remover aplicação duplicada de taxa de serviço nos delivery (já está no subtotal do pedido)
-      // A taxa de serviço é calculada no checkout e incluída no valor dos itens
-
-      // Buscar pedidos de balcão finalizados - incluir payment_method
-      const { data: counterOrders } = await supabase
-        .from("counter_orders")
-        .select("id, total_amount, payment_method")
-        .eq("restaurant_id", restaurantId)
-        .eq("status", "paid")
-        .gte("finalized_at", startDate.toISOString())
-        .lte("finalized_at", endDate.toISOString());
 
       const counterTotal = (counterOrders || []).reduce((sum, order) => sum + Number(order.total_amount), 0);
       const counterOrderIds = (counterOrders || []).map(o => o.id);
@@ -227,17 +188,12 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
 
       setTotalRevenue(salesTotal);
 
-      // Contar comandas criadas no período (Mesas Atendidas)
-      const { data: comandasData } = await supabase
-        .from("comandas")
-        .select("id")
-        .eq("restaurant_id", restaurantId)
-        .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString());
-
       const mesasAtendidas = comandasData?.length || 0;
 
-      // Labels fixos para cada method_type
+      // Operational expenses from cash_movements (already fetched in parallel)
+      const opExpenses = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+      setOperationalExpenses(opExpenses);
+
       const METHOD_TYPE_LABELS: Record<string, string> = {
         cash: "Dinheiro",
         credit: "Cartão de Crédito",
@@ -245,12 +201,6 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         pix: "PIX",
         meal_voucher: "Vale Refeição",
       };
-
-      // Buscar formas de pagamento cadastradas para resolver UUIDs e nomes
-      const { data: paymentMethods } = await supabase
-        .from("payment_methods")
-        .select("id, name, method_type")
-        .eq("restaurant_id", restaurantId);
 
       // Agregar valores diretamente por method_type
       const paymentTotals: Record<string, number> = {
@@ -337,9 +287,8 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         paymentsByMethod,
       });
 
-      // Calcular CMV e despesas operacionais
+      // Calcular CMV (operational expenses already computed above)
       await calculateCMV([...localOrderIds, ...deliveryOrderIds], counterOrderIds);
-      await calculateOperationalExpenses(startDate, endDate);
 
     } catch (error: any) {
       toast.error("Erro ao carregar dados: " + error.message);

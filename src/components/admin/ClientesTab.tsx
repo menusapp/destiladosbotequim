@@ -80,44 +80,54 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
 
       if (error) throw error;
 
-      const customersWithStats = await Promise.all(
-        (customersData || []).map(async (customer) => {
-          const { data: ordersData } = await supabase
-            .from("orders")
-            .select(`id, order_items(price_at_order, quantity, order_item_extras(price_at_order))`)
-            .eq("restaurant_id", restaurantId)
-            .eq("customer_cpf", customer.cpf);
+      // Batch: fetch ALL orders and comandas for the restaurant in 2 queries instead of N*2
+      const [{ data: allOrders }, { data: allComandas }] = await Promise.all([
+        supabase
+          .from("orders")
+          .select(`id, customer_cpf, order_items(price_at_order, quantity, order_item_extras(price_at_order))`)
+          .eq("restaurant_id", restaurantId),
+        supabase
+          .from("comandas")
+          .select(`id, customer_cpf, bills(total_amount, status)`)
+          .eq("restaurant_id", restaurantId),
+      ]);
 
-          const deliveryOrdersCount = ordersData?.length || 0;
-          const deliverySpent = ordersData?.reduce((sum, order) => {
-            return sum + (order.order_items?.reduce((itemSum: number, item: any) => {
-              const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
-              return itemSum + (item.price_at_order + extrasTotal) * item.quantity;
-            }, 0) || 0);
-          }, 0) || 0;
+      // Aggregate client-side by cpf
+      const ordersByCpf = new Map<string, { count: number; spent: number }>();
+      (allOrders || []).forEach((order: any) => {
+        const cpf = order.customer_cpf;
+        const existing = ordersByCpf.get(cpf) || { count: 0, spent: 0 };
+        existing.count += 1;
+        const orderSpent = (order.order_items || []).reduce((itemSum: number, item: any) => {
+          const extrasTotal = (item.order_item_extras || []).reduce((s: number, e: any) => s + e.price_at_order, 0);
+          return itemSum + (item.price_at_order + extrasTotal) * item.quantity;
+        }, 0);
+        existing.spent += orderSpent;
+        ordersByCpf.set(cpf, existing);
+      });
 
-          const { data: comandasData } = await supabase
-            .from("comandas")
-            .select(`id, bills(total_amount, status)`)
-            .eq("restaurant_id", restaurantId)
-            .eq("customer_cpf", customer.cpf);
+      const comandasByCpf = new Map<string, { count: number; spent: number }>();
+      (allComandas || []).forEach((comanda: any) => {
+        const cpf = comanda.customer_cpf;
+        const existing = comandasByCpf.get(cpf) || { count: 0, spent: 0 };
+        existing.count += 1;
+        const billTotal = (comanda.bills || []).reduce((billSum: number, bill: any) => {
+          if (bill.status === 'paid') return billSum + (bill.total_amount || 0);
+          return billSum;
+        }, 0);
+        existing.spent += billTotal;
+        comandasByCpf.set(cpf, existing);
+      });
 
-          const comandasCount = comandasData?.length || 0;
-          const comandasSpent = comandasData?.reduce((sum, comanda) => {
-            const billTotal = comanda.bills?.reduce((billSum: number, bill: any) => {
-              if (bill.status === 'paid') return billSum + (bill.total_amount || 0);
-              return billSum;
-            }, 0) || 0;
-            return sum + billTotal;
-          }, 0) || 0;
-
-          return {
-            ...customer,
-            total_orders: deliveryOrdersCount + comandasCount,
-            total_spent: deliverySpent + comandasSpent,
-          };
-        })
-      );
+      const customersWithStats = (customersData || []).map(customer => {
+        const orderStats = ordersByCpf.get(customer.cpf) || { count: 0, spent: 0 };
+        const comandaStats = comandasByCpf.get(customer.cpf) || { count: 0, spent: 0 };
+        return {
+          ...customer,
+          total_orders: orderStats.count + comandaStats.count,
+          total_spent: orderStats.spent + comandaStats.spent,
+        };
+      });
 
       return customersWithStats;
     },

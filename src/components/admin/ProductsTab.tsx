@@ -164,24 +164,18 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     fetchExtraCategories();
     fetchStockItems();
 
-    // Configurar realtime para atualizações de produtos
+    // Debounced realtime for products
+    let debounceTimer: ReturnType<typeof setTimeout>;
     const channel = supabase
-      .channel('products-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'products',
-        },
-        () => {
-          // Para qualquer mudança, apenas refetch
-          fetchProducts();
-        }
-      )
+      .channel('products-tab-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchProducts, 500);
+      })
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [restaurantId]);
@@ -206,30 +200,19 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
   const fetchProducts = async () => {
-    // Buscar primeiro as categorias do restaurante
-    const { data: restaurantCategories } = await supabase
-      .from("categories")
-      .select("id")
-      .eq("restaurant_id", restaurantId);
-
-    if (!restaurantCategories || restaurantCategories.length === 0) {
-      setProducts([]);
+    // Use already-fetched categories instead of duplicating the query
+    const catIds = categories.length > 0 ? categories.map(c => c.id) : null;
+    if (!catIds) {
+      const { data: restaurantCategories } = await supabase
+        .from("categories").select("id").eq("restaurant_id", restaurantId);
+      if (!restaurantCategories || restaurantCategories.length === 0) { setProducts([]); return; }
+      const { data, error } = await supabase.from("products").select("*").in("category_id", restaurantCategories.map(c => c.id));
+      if (error) { toast.error("Erro ao carregar produtos"); return; }
+      setProducts(data || []);
       return;
     }
-
-    const categoryIds = restaurantCategories.map(c => c.id);
-
-    // Buscar produtos dessas categorias
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .in("category_id", categoryIds);
-
-    if (error) {
-      toast.error("Erro ao carregar produtos");
-      return;
-    }
-
+    const { data, error } = await supabase.from("products").select("*").in("category_id", catIds);
+    if (error) { toast.error("Erro ao carregar produtos"); return; }
     setProducts(data || []);
   };
 

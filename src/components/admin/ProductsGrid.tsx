@@ -188,12 +188,16 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     fetchStockItems();
     fetchComplementCategories();
 
+    let debounceTimer: ReturnType<typeof setTimeout>;
     const channel = supabase
       .channel('products-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchProducts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchProducts, 500);
+      })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearTimeout(debounceTimer); supabase.removeChannel(channel); };
   }, [restaurantId]);
 
   const fetchStockItems = async () => {
@@ -217,38 +221,59 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
     const categoryIds = restaurantCategories.map(c => c.id);
     const { data } = await supabase.from("products").select("*").in("category_id", categoryIds);
+    if (!data || data.length === 0) { setProducts([]); return; }
 
-    const productsWithMetrics = await Promise.all(
-      (data || []).map(async (product) => {
-        const { data: ingredientsData } = await supabase.from("product_ingredients").select("quantity, stock_items(price_per_unit)").eq("product_id", product.id);
-        const fixedCost = ingredientsData?.reduce((sum, ing: any) => sum + (ing.quantity * (ing.stock_items?.price_per_unit || 0)), 0) || 0;
+    const productIds = data.map(p => p.id);
 
-        const { data: extrasData } = await supabase.from("product_extras").select("id, name, price, is_required, product_extra_ingredients(quantity, stock_items(price_per_unit))").eq("product_id", product.id);
+    // Batch: fetch ALL ingredients and extras in 2 queries instead of N*2
+    const [{ data: allIngredients }, { data: allExtras }] = await Promise.all([
+      supabase.from("product_ingredients").select("product_id, quantity, stock_items(price_per_unit)").in("product_id", productIds),
+      supabase.from("product_extras").select("id, product_id, name, price, is_required, product_extra_ingredients(quantity, stock_items(price_per_unit))").in("product_id", productIds),
+    ]);
 
-        const variableCosts: VariableCostInfo[] = (extrasData || [])
-          .filter((e: any) => e.is_required)
-          .map((extra: any) => {
-            const extraCost = extra.product_extra_ingredients?.reduce((sum: number, ing: any) => sum + (ing.quantity * (ing.stock_items?.price_per_unit || 0)), 0) || 0;
-            const effectiveBasePrice = product.promotional_price || product.price;
-            const totalPrice = effectiveBasePrice + extra.price;
-            const margin = totalPrice > 0 ? ((totalPrice - extraCost) / totalPrice) * 100 : 0;
-            return { name: extra.name, price: extra.price, cost: extraCost, margin };
-          });
+    // Group by product_id client-side
+    const ingredientsByProduct = new Map<string, any[]>();
+    (allIngredients || []).forEach(ing => {
+      const list = ingredientsByProduct.get(ing.product_id) || [];
+      list.push(ing);
+      ingredientsByProduct.set(ing.product_id, list);
+    });
 
-        const cost = fixedCost;
-        const effectivePrice = product.promotional_price || product.price;
-        const margin = effectivePrice > 0 ? ((effectivePrice - cost) / effectivePrice) * 100 : 0;
+    const extrasByProduct = new Map<string, any[]>();
+    (allExtras || []).forEach(ext => {
+      const list = extrasByProduct.get(ext.product_id) || [];
+      list.push(ext);
+      extrasByProduct.set(ext.product_id, list);
+    });
 
-        return {
-          ...product,
-          promotional_price: product.promotional_price,
-          cost, margin,
-          prep_time: product.prep_time_minutes || 30,
-          sku: product.name.substring(0, 3).toUpperCase() + String(product.id).substring(0, 4).toUpperCase(),
-          variableCosts: variableCosts.length > 0 ? variableCosts : undefined
-        };
-      })
-    );
+    const productsWithMetrics = data.map((product) => {
+      const productIngredients = ingredientsByProduct.get(product.id) || [];
+      const fixedCost = productIngredients.reduce((sum: number, ing: any) => sum + (ing.quantity * (ing.stock_items?.price_per_unit || 0)), 0);
+
+      const productExtras = extrasByProduct.get(product.id) || [];
+      const variableCosts: VariableCostInfo[] = productExtras
+        .filter((e: any) => e.is_required)
+        .map((extra: any) => {
+          const extraCost = extra.product_extra_ingredients?.reduce((sum: number, ing: any) => sum + (ing.quantity * (ing.stock_items?.price_per_unit || 0)), 0) || 0;
+          const effectiveBasePrice = product.promotional_price || product.price;
+          const totalPrice = effectiveBasePrice + extra.price;
+          const margin = totalPrice > 0 ? ((totalPrice - extraCost) / totalPrice) * 100 : 0;
+          return { name: extra.name, price: extra.price, cost: extraCost, margin };
+        });
+
+      const cost = fixedCost;
+      const effectivePrice = product.promotional_price || product.price;
+      const margin = effectivePrice > 0 ? ((effectivePrice - cost) / effectivePrice) * 100 : 0;
+
+      return {
+        ...product,
+        promotional_price: product.promotional_price,
+        cost, margin,
+        prep_time: product.prep_time_minutes || 30,
+        sku: product.name.substring(0, 3).toUpperCase() + String(product.id).substring(0, 4).toUpperCase(),
+        variableCosts: variableCosts.length > 0 ? variableCosts : undefined
+      };
+    });
     setProducts(productsWithMetrics);
   };
 
