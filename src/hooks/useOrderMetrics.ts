@@ -90,11 +90,12 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
           .eq("order_type", "delivery")
           .in("status", FINALIZED_ORDER_STATUSES)
           .gte("created_at", start).lte("created_at", end),
-        // Local bills paid
+        // Local bills paid (exclude zero-amount bills)
         supabase.from("bills")
           .select("id, total_amount, payment_method, paid_at, table_id, tables!inner(restaurant_id)")
           .eq("tables.restaurant_id", restaurantId)
           .eq("status", "paid")
+          .gt("total_amount", 0)
           .gte("paid_at", start).lte("paid_at", end),
         // Counter orders paid
         supabase.from("counter_orders")
@@ -198,7 +199,9 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
         if (method === "Pago pelo iFood") return "ifood_online";
         const validTypes = ["cash", "credit", "debit", "pix", "meal_voucher", "ifood_online"];
         if (validTypes.includes(method)) return method;
-        if (method === "card") return "credit";
+        // Online payment method aliases
+        if (method === "card" || method === "credit_card_online") return "credit";
+        if (method === "pix_online") return "pix";
         const byId = paymentMethods.find(p => p.id === method);
         if (byId) return byId.method_type;
         const byName = paymentMethods.find(p => p.name.toLowerCase() === method.toLowerCase());
