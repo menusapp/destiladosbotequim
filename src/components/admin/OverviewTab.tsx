@@ -40,16 +40,23 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
 
   const totalMethodRevenue = data.revenueByMethod.reduce((s, r) => s + r.total, 0);
 
+  // Determine if single-day or multi-day
+  const isSingleDay = dateRange === "today" || dateRange === "yesterday";
+  const chartData = isSingleDay ? data.hourlySales : data.dailySales;
+  const chartLabel = isSingleDay ? "Vendas por Hora" : "Vendas por Dia";
+  const chartSubLabel = isSingleDay ? dateRangeLabels[dateRange] : dateRangeLabels[dateRange];
+
   // SVG Chart
-  const maxHourlySale = Math.max(...data.hourlySales.map(h => h.total), 1);
+  const maxChartValue = Math.max(...chartData.map(h => 'total' in h ? h.total : 0), 1);
   const chartPadding = { top: 10, right: 10, bottom: 25, left: 50 };
   const chartW = 600, chartH = 200;
   const innerW = chartW - chartPadding.left - chartPadding.right;
   const innerH = chartH - chartPadding.top - chartPadding.bottom;
-  const points = data.hourlySales.map((h, i) => ({
-    x: chartPadding.left + (i / Math.max(data.hourlySales.length - 1, 1)) * innerW,
-    y: chartPadding.top + innerH - (h.total / maxHourlySale) * innerH,
-    label: h.hour, value: h.total,
+  const points = chartData.map((h, i) => ({
+    x: chartPadding.left + (i / Math.max(chartData.length - 1, 1)) * innerW,
+    y: chartPadding.top + innerH - ((h as any).total / maxChartValue) * innerH,
+    label: isSingleDay ? (h as any).hour : (h as any).day,
+    value: (h as any).total,
   }));
   const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
   const areaPath = linePath + ` L ${points[points.length - 1]?.x ?? 0} ${chartPadding.top + innerH} L ${points[0]?.x ?? 0} ${chartPadding.top + innerH} Z`;
@@ -84,13 +91,13 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
 
       {/* CHART + REVENUE BY METHOD */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {dateRange === "today" && (
+        {chartData.length > 0 && (
           <Card className="lg:col-span-2">
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-semibold text-sm">Vendas por Hora</h3>
-                  <p className="text-xs text-muted-foreground">Hoje</p>
+                  <h3 className="font-semibold text-sm">{chartLabel}</h3>
+                  <p className="text-xs text-muted-foreground">{chartSubLabel}</p>
                 </div>
                 <span className="text-lg font-bold">R$ {data.totalSales.toFixed(2)}</span>
               </div>
@@ -102,7 +109,7 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
                       <g key={pct}>
                         <line x1={chartPadding.left} y1={y} x2={chartW - chartPadding.right} y2={y} stroke="hsl(var(--border))" strokeWidth={0.5} strokeDasharray="4,4" />
                         <text x={chartPadding.left - 5} y={y + 3} textAnchor="end" className="fill-muted-foreground" fontSize={9}>
-                          {(maxHourlySale * pct).toFixed(0)}
+                          {(maxChartValue * pct).toFixed(0)}
                         </text>
                       </g>
                     );
@@ -116,9 +123,13 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
                   {points.map((p, i) => (
                     <circle key={i} cx={p.x} cy={p.y} r={3} fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth={1.5} />
                   ))}
-                  {points.filter((_, i) => i % 2 === 0).map((p, i) => (
+                  {points.filter((_, i) => {
+                    // Show fewer labels for large datasets
+                    const step = Math.max(1, Math.floor(points.length / 15));
+                    return i % step === 0;
+                  }).map((p, i) => (
                     <text key={i} x={p.x} y={chartH - 5} textAnchor="middle" className="fill-muted-foreground" fontSize={9}>
-                      {p.label.slice(0, 2)}h
+                      {isSingleDay ? p.label.slice(0, 2) + "h" : p.label.slice(5)}
                     </text>
                   ))}
                 </svg>
@@ -127,7 +138,7 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
           </Card>
         )}
 
-        <Card className={dateRange !== "today" ? "lg:col-span-3" : ""}>
+        <Card className={chartData.length === 0 ? "lg:col-span-3" : ""}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-sm">Receita por Método</h3>
