@@ -202,8 +202,26 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
   const handleDisconnect = async () => {
     setIsDisconnecting(true);
     try {
+      // 1. Call edge function to delete company from Nuvem Fiscal
+      toast.info("Removendo empresa da Nuvem Fiscal...");
+      try {
+        const { data: nfData, error: nfError } = await supabase.functions.invoke(
+          "nuvem-fiscal-company",
+          { body: { restaurantId, action: "disconnect" } }
+        );
+        if (nfError) {
+          console.error("Edge function error on disconnect:", nfError);
+        } else if (nfData && !nfData.success) {
+          console.error("Disconnect failed:", nfData.error);
+        }
+      } catch (invokeErr) {
+        console.error("Exception calling disconnect:", invokeErr);
+      }
+
+      // 2. Remove certificate from storage
       await supabase.storage.from("fiscal-certificates").remove([`${restaurantId}/certificate.pfx`]);
 
+      // 3. Clear local config
       const { error } = await supabase
         .from("fiscal_configs")
         .update({
