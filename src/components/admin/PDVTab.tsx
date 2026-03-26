@@ -450,6 +450,37 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
       }
 
       toast.success("Pedido criado com sucesso!");
+
+      // Auto-print if enabled
+      if (autoPrint) {
+        const printItems = cart.map(item => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          notes: item.notes,
+          extras: item.extras.map(e => ({ name: e.name, price: e.price })),
+        }));
+        const printOT = orderType === "mesa" ? "local" as const : "delivery" as const;
+        const deliveryTypeMap: Record<string, "delivery" | "pickup"> = { delivery: "delivery", retirada: "pickup", viagem: "pickup" };
+        const table = orderType === "mesa" ? tables?.find(t => t.id === selectedTableId) : undefined;
+        try {
+          await printOrder({
+            orderId: "PDV",
+            createdAt: new Date().toISOString(),
+            customerName: customerName || "Cliente PDV",
+            orderType: printOT,
+            deliveryType: deliveryTypeMap[orderType],
+            tableNumber: table?.table_number,
+            items: printItems,
+            subtotal: cartSubtotal,
+            deliveryAddress: deliveryAddress || undefined,
+            deliveryPhone: customerPhone || undefined,
+            paymentType: paymentType || undefined,
+            notes: notes || undefined,
+          }, restaurantId);
+        } catch { /* ignore print errors */ }
+      }
+
       clearForm();
       refetchTables();
       queryClient.invalidateQueries({ queryKey: ["unified-orders"] });
