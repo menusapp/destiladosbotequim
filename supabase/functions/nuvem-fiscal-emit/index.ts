@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
           uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnCom, indTot: 1,
         },
         imposto: {
-          ICMS: { ICMS00: { orig, CST: "00", modBC: 3, vBC: 0, pICMS: 0, vICMS: 0 } },
+          ICMS: { ICMSSN400: { orig, CSOSN: "400" } },
           PIS: { PISOutr: { CST: "07", vBC: 0, pPIS: 0, vPIS: 0 } },
           COFINS: { COFINSOutr: { CST: "07", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
         },
@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
             uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnExtra, indTot: 1,
           },
           imposto: {
-            ICMS: { ICMS00: { orig: 0, CST: "00", modBC: 3, vBC: 0, pICMS: 0, vICMS: 0 } },
+            ICMS: { ICMSSN400: { orig: 0, CSOSN: "400" } },
             PIS: { PISOutr: { CST: "07", vBC: 0, pPIS: 0, vPIS: 0 } },
             COFINS: { COFINSOutr: { CST: "07", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
           },
@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
           xNome: config.razao_social || config.nome_fantasia || "",
           xFant: config.nome_fantasia || config.razao_social || "",
           IE: config.inscricao_estadual?.replace(/\D/g, "") || "",
-          CRT: 3,
+          CRT: 1,
           enderEmit: {
             xLgr: config.logradouro || "",
             nro: config.numero || "S/N",
