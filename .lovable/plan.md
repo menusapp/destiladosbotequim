@@ -1,44 +1,33 @@
 
 
-## Plan: Two Parts
+## Plan: Fix NFC-e Emission — 3 Missing Fields + Production Mode
 
-### Part 1: Replace SVG Chart with Recharts BarChart in OverviewTab
+### Problem (from logs)
+The Nuvem Fiscal API returns 400 with 3 validation errors:
+1. **`infNFe.ide.nNF`** — invoice number is missing (required sequential number)
+2. **`infNFe.ide.dhEmi`** — emission date/time is missing
+3. **`infNFe.emit.enderEmit.xMun`** — municipality name is empty string (hardcoded as `""`)
+4. **Bonus**: `ambiente` is hardcoded to `"homologacao"` but you're using production credentials
 
-**Current**: OverviewTab uses a hand-coded SVG line/area chart with no hover tooltips.
-**Target**: Replace with Recharts `BarChart` (same style as CEO RestaurantDashboardTab) with interactive tooltip on hover showing date/hour + value.
+### Changes
 
-**File: `src/components/admin/OverviewTab.tsx`**
+**1. Database migration** — Add 2 columns to `fiscal_configs`:
+- `municipio_nome TEXT` — store municipality name (e.g. "ASSIS")
+- `nfce_serie INTEGER DEFAULT 1` — NFC-e series number
+- `nfce_numero INTEGER DEFAULT 1` — auto-incrementing invoice number (nNF)
 
-Changes:
-- Add imports: `BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer` from `recharts`
-- Remove all SVG chart calculation code (lines 49-62: `maxChartValue`, `chartPadding`, `chartW`, `chartH`, `innerW`, `innerH`, `points`, `linePath`, `areaPath`)
-- Replace the `<svg>` block (lines 104-135) with a `ResponsiveContainer` + `BarChart` using the existing `chartData` array
-- Tooltip shows `R$ {value}` on hover with date/hour label
-- Keep the same card layout, header, and total display
-- No new data fetching — reuse existing `data.hourlySales` and `data.dailySales` from `useOrderMetrics`
+**2. Edge function `nuvem-fiscal-emit/index.ts`** — Fix the 3 missing fields:
+- Add `nNF: config.nfce_numero` to `ide` block
+- Add `dhEmi: new Date().toISOString()` (formatted as required: `YYYY-MM-DDThh:mm:ss-03:00`)
+- Replace `xMun: ""` with `xMun: config.municipio_nome || ""`
+- Change `ambiente: "producao"` and `tpAmb: 1` for production
+- After successful emission, increment `nfce_numero` in the database
 
-Lightweight: Recharts is already bundled (used in CEO dashboard + chart.tsx). No new dependencies.
+**3. FiscalSettingsTab.tsx** — Add municipality name input field so admins can fill it when configuring fiscal data (alongside the existing `municipio_codigo` field)
 
----
-
-### Part 2: Dead Code Cleanup & Optimization
-
-**Dead files to delete:**
-1. `src/lib/localDB.ts` — ~500 lines of Electron SQLite adapter. Only imported by PrintersSettings (one `isElectronApp` call that always returns false in cloud)
-2. `src/vite-env.d.ts` — ~290 lines of Electron type declarations. Replace with minimal Vite env types only
-3. `src/components/admin/DevelopmentPlaceholder.tsx` — imported in RestaurantAdmin but never used in render
-
-**Dead code in existing files:**
-4. `src/pages/RestaurantAdmin.tsx` — remove unused `DevelopmentPlaceholder` import, remove unused `Card/CardContent/CardHeader/CardTitle` imports (not used in render)
-5. `src/components/admin/settings/PrintersSettings.tsx` — remove `isElectronApp` import and all Electron-related branches/variables (lines referencing `getElectronPrinter`, `getElectronDB`, `isElectronApp`). Since cloud-only, simplify to always show cloud printer UI
-
-**Optimization approach:**
-- Focus only on removing dead imports and dead files
-- No logic or functionality changes
-- No query changes (queries are already optimized with Promise.all)
-
-**Latency report**: Will provide a before/after summary of:
-- Files removed and lines saved
-- Dead imports removed per file
-- No query count changes (queries are already minimal)
+### Technical details
+- `nNF` must be sequential per series. We store and auto-increment it in `fiscal_configs.nfce_numero`
+- `dhEmi` format for NFC-e: `2026-03-26T15:30:00-03:00` (ISO with timezone offset)
+- `xMun` must match the IBGE municipality name (min 2 chars)
+- No new dependencies needed
 
