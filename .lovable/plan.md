@@ -1,39 +1,58 @@
 
 
-## Plan: Fix Certificate Upload to Nuvem Fiscal + Delete Company on Disconnect
+## Fix: Certificate Upload Format + Add Inscrição Municipal
 
-### Root Cause
-The logs show `CertificateNotFound` because the `.pfx` file is only uploaded to your storage — it's never sent to Nuvem Fiscal. The Nuvem Fiscal API requires a separate `PUT /empresas/{cpf_cnpj}/certificado` call with the `.pfx` binary + password via `multipart/form-data`.
+### Problem
+Two issues:
+1. **Certificate upload fails (415)**: The Nuvem Fiscal API expects `application/json` with the certificate as **base64**, NOT `multipart/form-data`. The correct format per their docs:
+```json
+PUT /empresas/{cpf_cnpj}/certificado
+Content-Type: application/json
+{
+    "certificado": "base64_encoded_pfx_content",
+    "password": "senha123"
+}
+```
 
-Similarly, the "Desconectar" button only clears local data — it never calls `DELETE /empresas/{cpf_cnpj}` on Nuvem Fiscal.
+2. **Missing `inscricao_municipal`**: The company payload doesn't include municipal inscription, which is needed for NFC-e.
 
 ### Changes
 
-**1. Edge function `nuvem-fiscal-company/index.ts`** — Add 2 operations:
+**1. Edge function `nuvem-fiscal-company/index.ts`**:
+- Replace `FormData` certificate upload with JSON body containing base64-encoded `.pfx` file + password
+- Add `inscricao_municipal` field to the company creation payload (from `fiscal_configs`)
 
-After creating/updating the company, automatically:
-- Download the `.pfx` from Supabase Storage (`fiscal-certificates/{restaurantId}/certificate.pfx`)
-- Upload it to Nuvem Fiscal via `PUT /empresas/{cpf_cnpj}/certificado` with `multipart/form-data` (fields: `file` = binary, `password` = certificate password from `fiscal_configs`)
-- Only mark as `synced` if certificate upload also succeeds
+**2. Database migration**: Add `inscricao_municipal TEXT` column to `fiscal_configs`
 
-Add a new action `disconnect`:
-- Call `DELETE /empresas/{cpf_cnpj}` on Nuvem Fiscal to remove the company
-- Then delete the certificate via `DELETE /empresas/{cpf_cnpj}/certificado`
+**3. `FiscalSettingsTab.tsx`**: Add input field for "Inscrição Municipal" in the fiscal settings form
 
-**2. Frontend `FiscalSettingsTab.tsx`** — Update disconnect handler:
+### Technical detail
+```typescript
+// BEFORE (broken — 415 error)
+const formData = new FormData();
+formData.append("file", new Blob([...]), "certificate.pfx");
+formData.append("password", certPassword);
+// Content-Type: multipart/form-data ← REJECTED
 
-- Call `nuvem-fiscal-company` with `{ restaurantId, action: "disconnect" }` before clearing local data
-- Show appropriate toast on success/failure
+// AFTER (correct per Nuvem Fiscal docs)
+const certBytes = new Uint8Array(await fileData.arrayBuffer());
+const certBase64 = btoa(String.fromCharCode(...certBytes));
 
-**3. Edge function `nuvem-fiscal-company/index.ts`** — Handle `EmpresaAlreadyExists`:
+await fetch(`.../${cpfCnpj}/certificado`, {
+  method: "PUT",
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    certificado: certBase64,
+    password: certPassword,
+  }),
+});
+```
 
-- When company creation returns `EmpresaAlreadyExists`, treat it as success (company exists, proceed to certificate upload)
-- This prevents the error you saw in logs when re-syncing
-
-### Technical details
-- Nuvem Fiscal certificate endpoint: `PUT https://api.nuvemfiscal.com.br/empresas/{cpf_cnpj}/certificado`
-- Content-Type: `multipart/form-data` with `file` (binary) and `password` (string)
-- Delete company endpoint: `DELETE https://api.nuvemfiscal.com.br/empresas/{cpf_cnpj}`
-- Certificate must be in `.pfx` or `.p12` format
-- The `certificate_password` field already exists in `fiscal_configs` — we just need to send it along
+### Files to modify
+- `supabase/functions/nuvem-fiscal-company/index.ts` — fix certificate upload format + add inscricao_municipal
+- `src/components/admin/FiscalSettingsTab.tsx` — add Inscrição Municipal input
+- Database migration — add `inscricao_municipal` column
 
