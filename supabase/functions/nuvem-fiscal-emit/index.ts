@@ -10,10 +10,7 @@ const corsHeaders = {
 async function getNuvemFiscalToken(): Promise<string> {
   const clientId = Deno.env.get("NUVEM_FISCAL_CLIENT_ID");
   const clientSecret = Deno.env.get("NUVEM_FISCAL_CLIENT_SECRET");
-
-  if (!clientId || !clientSecret) {
-    throw new Error("Credenciais Nuvem Fiscal não configuradas");
-  }
+  if (!clientId || !clientSecret) throw new Error("Credenciais Nuvem Fiscal não configuradas");
 
   const tokenRes = await fetch("https://auth.nuvemfiscal.com.br/oauth/token", {
     method: "POST",
@@ -31,7 +28,6 @@ async function getNuvemFiscalToken(): Promise<string> {
   if (!tokenRes.ok || !tokenData.access_token) {
     throw new Error(`OAuth falhou (${tokenRes.status}): ${tokenData.error_description || tokenData.error || "desconhecido"}`);
   }
-
   return tokenData.access_token;
 }
 
@@ -48,6 +44,21 @@ async function updateNoteStatus(supabase: any, fiscalNoteId: string | undefined,
   if (errorMessage) data.error_message = errorMessage;
   await supabase.from("order_fiscal_notes").update(data).eq("id", fiscalNoteId);
 }
+
+function formatDateBRT(): string {
+  const now = new Date();
+  const offset = -3;
+  const local = new Date(now.getTime() + offset * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}T${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}-03:00`;
+}
+
+const ufCodes: Record<string, number> = {
+  AC: 12, AL: 27, AP: 16, AM: 13, BA: 29, CE: 23, DF: 53, ES: 32,
+  GO: 52, MA: 21, MT: 51, MS: 50, MG: 31, PA: 15, PB: 25, PR: 41,
+  PE: 26, PI: 22, RJ: 33, RN: 24, RS: 43, RO: 11, RR: 14, SC: 42,
+  SP: 35, SE: 28, TO: 17,
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -73,7 +84,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (configErr || !config) {
-      const errMsg = "Configuração fiscal não encontrada. Configure os dados fiscais primeiro.";
+      const errMsg = "Configuração fiscal não encontrada.";
       await updateNoteStatus(supabase, fiscal_note_id, "error", errMsg);
       return jsonResponse({ error: errMsg });
     }
@@ -97,7 +108,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: errMsg });
     }
 
-    // 3. Fetch order items with product fiscal data
+    // 3. Fetch order items
     const { data: orderItems, error: itemsErr } = await supabase
       .from("order_items")
       .select(`
@@ -122,7 +133,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: e.message });
     }
 
-    // 5. Build NFC-e det items (using correct Nuvem Fiscal API field names)
+    // 5. Build NFC-e det items
     const ncmDefault = "21069090";
     const cfopDefault = "5102";
     let itemNumber = 1;
@@ -144,36 +155,17 @@ Deno.serve(async (req) => {
         prod: {
           cProd: prod?.pdv_code || item.product_id || `PROD-${itemNumber}`,
           xProd: prod?.name || `Item ${itemNumber}`,
-          NCM: ncm,
-          CFOP: cfop,
-          uCom: "UN",
-          qCom: item.quantity,
-          vUnCom: vUnCom,
-          vProd: vProd,
-          cEAN: "SEM GTIN",
-          cEANTrib: "SEM GTIN",
-          uTrib: "UN",
-          qTrib: item.quantity,
-          vUnTrib: vUnCom,
-          indTot: 1,
+          NCM: ncm, CFOP: cfop, uCom: "UN", qCom: item.quantity,
+          vUnCom, vProd, cEAN: "SEM GTIN", cEANTrib: "SEM GTIN",
+          uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnCom, indTot: 1,
         },
         imposto: {
-          ICMS: {
-            [`ICMSSN${csosn}`]: {
-              orig: orig,
-              CSOSN: csosn,
-            },
-          },
-          PIS: {
-            PISOutr: { CST: pisCst, vBC: 0, pPIS: 0, vPIS: 0 },
-          },
-          COFINS: {
-            COFINSOutr: { CST: cofinsCst, vBC: 0, pCOFINS: 0, vCOFINS: 0 },
-          },
+          ICMS: { [`ICMSSN${csosn}`]: { orig, CSOSN: csosn } },
+          PIS: { PISOutr: { CST: pisCst, vBC: 0, pPIS: 0, vPIS: 0 } },
+          COFINS: { COFINSOutr: { CST: cofinsCst, vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
         },
       });
 
-      // Extras as separate items
       const extras = (item as any).order_item_extras || [];
       for (const extra of extras) {
         const extraName = extra.product_extras?.name || "Adicional";
@@ -185,18 +177,9 @@ Deno.serve(async (req) => {
           prod: {
             cProd: extra.product_extra_id || `EXTRA-${itemNumber}`,
             xProd: `${extraName} (${prod?.name || "Item"})`,
-            NCM: ncmDefault,
-            CFOP: cfopDefault,
-            uCom: "UN",
-            qCom: item.quantity,
-            vUnCom: vUnExtra,
-            vProd: vProdExtra,
-            cEAN: "SEM GTIN",
-            cEANTrib: "SEM GTIN",
-            uTrib: "UN",
-            qTrib: item.quantity,
-            vUnTrib: vUnExtra,
-            indTot: 1,
+            NCM: ncmDefault, CFOP: cfopDefault, uCom: "UN", qCom: item.quantity,
+            vUnCom: vUnExtra, vProd: vProdExtra, cEAN: "SEM GTIN", cEANTrib: "SEM GTIN",
+            uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnExtra, indTot: 1,
           },
           imposto: {
             ICMS: { ICMSSN102: { orig: 0, CSOSN: "102" } },
@@ -210,31 +193,27 @@ Deno.serve(async (req) => {
     const totalProdutos = detItems.reduce((acc, d) => acc + d.prod.vProd, 0);
     const cpfCnpj = config.cnpj.replace(/\D/g, "");
     const uf = config.uf || "SP";
+    const nfceNumero = config.nfce_numero || 1;
+    const nfceSerie = config.nfce_serie || 1;
 
-    // UF code mapping
-    const ufCodes: Record<string, number> = {
-      AC: 12, AL: 27, AP: 16, AM: 13, BA: 29, CE: 23, DF: 53, ES: 32,
-      GO: 52, MA: 21, MT: 51, MS: 50, MG: 31, PA: 15, PB: 25, PR: 41,
-      PE: 26, PI: 22, RJ: 33, RN: 24, RS: 43, RO: 11, RR: 14, SC: 42,
-      SP: 35, SE: 28, TO: 17,
-    };
-
-    // 6. Build NFC-e payload following Nuvem Fiscal API schema
+    // 6. Build NFC-e payload — PRODUCTION
     const nfcePayload: Record<string, any> = {
-      ambiente: "homologacao",
+      ambiente: "producao",
       infNFe: {
         versao: "4.00",
         ide: {
           cUF: ufCodes[uf] || 35,
           natOp: "VENDA",
           mod: 65,
-          serie: 1,
+          serie: nfceSerie,
+          nNF: nfceNumero,
+          dhEmi: formatDateBRT(),
           tpNF: 1,
           idDest: 1,
           cMunFG: config.municipio_codigo || "",
           tpImp: 4,
           tpEmis: 1,
-          tpAmb: 2, // 2 = homologação
+          tpAmb: 1,
           finNFe: 1,
           indFinal: 1,
           indPres: 1,
@@ -246,13 +225,13 @@ Deno.serve(async (req) => {
           xNome: config.razao_social || config.nome_fantasia || "",
           xFant: config.nome_fantasia || config.razao_social || "",
           IE: config.inscricao_estadual?.replace(/\D/g, "") || "",
-          CRT: 1, // Simples Nacional
+          CRT: 1,
           enderEmit: {
             xLgr: config.logradouro || "",
             nro: config.numero || "S/N",
             xBairro: config.bairro || "",
             cMun: config.municipio_codigo || "",
-            xMun: "",
+            xMun: config.municipio_nome || "",
             UF: uf,
             CEP: config.cep?.replace(/\D/g, "") || "",
             cPais: 1058,
@@ -262,41 +241,17 @@ Deno.serve(async (req) => {
         det: detItems,
         total: {
           ICMSTot: {
-            vBC: 0,
-            vICMS: 0,
-            vICMSDeson: 0,
-            vFCP: 0,
-            vBCST: 0,
-            vST: 0,
-            vFCPST: 0,
-            vFCPSTRet: 0,
-            vProd: Number(totalProdutos.toFixed(2)),
-            vFrete: 0,
-            vSeg: 0,
-            vDesc: 0,
-            vII: 0,
-            vIPI: 0,
-            vIPIDevol: 0,
-            vPIS: 0,
-            vCOFINS: 0,
-            vOutro: 0,
-            vNF: Number(totalProdutos.toFixed(2)),
+            vBC: 0, vICMS: 0, vICMSDeson: 0, vFCP: 0, vBCST: 0, vST: 0,
+            vFCPST: 0, vFCPSTRet: 0, vProd: Number(totalProdutos.toFixed(2)),
+            vFrete: 0, vSeg: 0, vDesc: 0, vII: 0, vIPI: 0, vIPIDevol: 0,
+            vPIS: 0, vCOFINS: 0, vOutro: 0, vNF: Number(totalProdutos.toFixed(2)),
           },
         },
         pag: {
-          detPag: [
-            {
-              tPag: "99",
-              vPag: Number(totalProdutos.toFixed(2)),
-            },
-          ],
+          detPag: [{ tPag: "99", vPag: Number(totalProdutos.toFixed(2)) }],
         },
-        transp: {
-          modFrete: 9,
-        },
-        infAdic: {
-          infCpl: `Pedido: ${order_id}`,
-        },
+        transp: { modFrete: 9 },
+        infAdic: { infCpl: `Pedido: ${order_id}` },
       },
     };
 
@@ -312,11 +267,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log("[NuvemFiscal] Emitting NFC-e for order:", order_id, "CNPJ:", cpfCnpj);
+    console.log("[NuvemFiscal] Emitting NFC-e for order:", order_id, "nNF:", nfceNumero, "serie:", nfceSerie);
 
     // 7. Send to Nuvem Fiscal API
-    const baseUrl = "https://api.nuvemfiscal.com.br";
-    const apiResponse = await fetch(`${baseUrl}/nfce`, {
+    const apiResponse = await fetch("https://api.nuvemfiscal.com.br/nfce", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -334,7 +288,13 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: errMsg, nuvem_response: apiResult });
     }
 
-    // 8. Update fiscal note with result
+    // 8. Increment nfce_numero for next emission
+    await supabase
+      .from("fiscal_configs")
+      .update({ nfce_numero: nfceNumero + 1 })
+      .eq("restaurant_id", restaurant_id);
+
+    // 9. Update fiscal note with result
     const nfceStatus = apiResult.status || "processing";
     const mappedStatus = nfceStatus === "autorizada" ? "authorized" : nfceStatus === "rejeitada" ? "error" : "processing";
 
@@ -351,11 +311,7 @@ Deno.serve(async (req) => {
       await supabase.from("order_fiscal_notes").update(updateData).eq("order_id", order_id).eq("restaurant_id", restaurant_id);
     }
 
-    return jsonResponse({
-      success: true,
-      status: mappedStatus,
-      nuvem_response: apiResult,
-    });
+    return jsonResponse({ success: true, status: mappedStatus, nuvem_response: apiResult });
   } catch (error: any) {
     console.error("[NuvemFiscal] Error:", error);
     return jsonResponse({ error: error.message || "Erro interno" }, 500);

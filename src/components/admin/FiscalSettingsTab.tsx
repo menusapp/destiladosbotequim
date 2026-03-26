@@ -29,6 +29,7 @@ interface FiscalConfig {
   complemento: string;
   bairro: string;
   municipio_codigo: string;
+  municipio_nome: string;
   uf: string;
   csc_id: string;
   csc_code: string;
