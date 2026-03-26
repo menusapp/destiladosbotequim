@@ -453,31 +453,32 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
 
       // Auto-print if enabled
       if (autoPrint) {
-        const printItems = cart.map(item => ({
-          name: item.productName,
-          quantity: item.quantity,
-          price: item.price,
-          notes: item.notes,
-          extras: item.extras.map(e => ({ name: e.name, price: e.price })),
-        }));
-        const printOT = orderType === "mesa" ? "local" as const : "delivery" as const;
-        const deliveryTypeMap: Record<string, "delivery" | "pickup"> = { delivery: "delivery", retirada: "pickup", viagem: "pickup" };
         const table = orderType === "mesa" ? tables?.find(t => t.id === selectedTableId) : undefined;
+        const printOrderObj = {
+          id: "PDV-" + Date.now(),
+          created_at: new Date().toISOString(),
+          customer_name: customerName || "Cliente PDV",
+          order_type: orderType === "mesa" ? "local" : "delivery",
+          delivery_type: orderType === "delivery" ? "delivery" : orderType === "retirada" ? "pickup" : orderType === "viagem" ? "takeaway" : undefined,
+          tables: table ? { table_number: table.table_number } : null,
+          delivery_address: deliveryAddress || undefined,
+          delivery_phone: customerPhone || undefined,
+          payment_type: paymentType || undefined,
+          notes: notes || undefined,
+          order_items: cart.map((item, i) => ({
+            id: `item-${i}`,
+            quantity: item.quantity,
+            price_at_order: item.price,
+            notes: item.notes || undefined,
+            products: { name: item.productName },
+            order_item_extras: item.extras.map(e => ({
+              price_at_order: e.price,
+              product_extras: { name: e.name },
+            })),
+          })),
+        };
         try {
-          await printOrder({
-            orderId: "PDV",
-            createdAt: new Date().toISOString(),
-            customerName: customerName || "Cliente PDV",
-            orderType: printOT,
-            deliveryType: deliveryTypeMap[orderType],
-            tableNumber: table?.table_number,
-            items: printItems,
-            subtotal: cartSubtotal,
-            deliveryAddress: deliveryAddress || undefined,
-            deliveryPhone: customerPhone || undefined,
-            paymentType: paymentType || undefined,
-            notes: notes || undefined,
-          }, restaurantId);
+          await printOrder(printOrderObj, restaurantId);
         } catch { /* ignore print errors */ }
       }
 
