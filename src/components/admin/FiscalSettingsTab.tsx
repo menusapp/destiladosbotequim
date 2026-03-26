@@ -348,10 +348,14 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
               <Label className="text-[13px]">Bairro</Label>
               <Input placeholder="Bairro" value={config.bairro} onChange={(e) => handleChange("bairro", e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Código Município (IBGE)</Label>
                 <Input placeholder="Ex: 3550308" value={config.municipio_codigo} onChange={(e) => handleChange("municipio_codigo", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Nome do Município</Label>
+                <Input placeholder="Ex: ASSIS" value={config.municipio_nome} onChange={(e) => handleChange("municipio_nome", e.target.value.toUpperCase())} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">UF</Label>
