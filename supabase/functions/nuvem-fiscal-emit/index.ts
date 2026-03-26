@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
           uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnCom, indTot: 1,
         },
         imposto: {
-          ICMS: { ICMSSN400: { orig, CSOSN: "400" } },
+          ICMS: { ICMSSN102: { orig, CSOSN: "400" } },
           PIS: { PISOutr: { CST: "07", vBC: 0, pPIS: 0, vPIS: 0 } },
           COFINS: { COFINSOutr: { CST: "07", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
         },
@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
             uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnExtra, indTot: 1,
           },
           imposto: {
-            ICMS: { ICMSSN400: { orig: 0, CSOSN: "400" } },
+            ICMS: { ICMSSN102: { orig: 0, CSOSN: "400" } },
             PIS: { PISOutr: { CST: "07", vBC: 0, pPIS: 0, vPIS: 0 } },
             COFINS: { COFINSOutr: { CST: "07", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
           },
