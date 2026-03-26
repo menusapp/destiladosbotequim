@@ -7,7 +7,7 @@ import { ProductSuggestions } from "./ProductSuggestions";
 import { CouponInput, CouponInputRef } from "./CouponInput";
 import { LoyaltyPointsDisplay } from "./LoyaltyPointsDisplay";
 import { LoyaltyRewardNotification, DiscountReward } from "./LoyaltyRewardNotification";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface Reward {
   id: string;

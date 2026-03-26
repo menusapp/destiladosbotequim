@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, Copy, CheckCircle2, AlertCircle, CreditCard, Smartphone, Clock, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CartItemForPayment {

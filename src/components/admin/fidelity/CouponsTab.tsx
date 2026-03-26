@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Ticket, Plus, Pencil, Trash2, Gift, Truck, ChevronRight } from "lucide-react";
 import { format } from "date-fns";

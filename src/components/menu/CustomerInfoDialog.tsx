@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { validateCPF } from "@/lib/cpfValidator";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Loader2, UserCheck } from "lucide-react";
 
 interface CustomerInfoDialogProps {

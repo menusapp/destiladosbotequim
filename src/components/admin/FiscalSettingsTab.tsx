@@ -9,7 +9,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Upload, Check, Loader2, X, CheckCircle2, AlertTriangle, LogOut } from "lucide-react";
 
 interface FiscalSettingsTabProps {

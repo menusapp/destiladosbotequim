@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import useEmblaCarousel from "embla-carousel-react";
 
 interface ProductExtra {

@@ -11,7 +11,7 @@ import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package,
   Clock, Printer, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { OrderDetailModal } from "./OrderDetailModal";

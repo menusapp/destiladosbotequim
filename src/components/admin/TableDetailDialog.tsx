@@ -25,7 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";

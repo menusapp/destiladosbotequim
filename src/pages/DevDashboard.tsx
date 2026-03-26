@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LogOut, Code, Monitor, Store, Loader2, Tag, Layers, Settings } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { VersionsTab } from "@/components/dev/VersionsTab";
 import { RemoteConfigsTab } from "@/components/dev/RemoteConfigsTab";
 

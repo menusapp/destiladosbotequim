@@ -241,10 +241,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
             instance_status: 'pending' 
           } : null);
           
-          toast({
-            title: "QR Code gerado",
-            description: "Escaneie o código com seu WhatsApp para conectar"
-          });
+          
         } else {
           throw new Error('Falha ao gerar imagem do QR code');
         }
@@ -287,10 +284,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       pollIntervalRef.current = setInterval(async () => {
         const status = await checkStatus();
         if (status?.status === 'connected') {
-          toast({
-            title: "Conectado!",
-            description: "WhatsApp conectado com sucesso"
-          });
+          
         }
       }, 3000);
 
@@ -343,10 +337,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
         setConnectFlowActive(false);
         stopAllPolling();
         
-        toast({
-          title: "Desconectado",
-          description: "WhatsApp desconectado com sucesso"
-        });
+        
       }
     } catch (error) {
       console.error('Error disconnecting:', error);
@@ -381,10 +372,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
       if (error) throw error;
 
-      toast({
-        title: "Salvo",
-        description: "Configurações salvas com sucesso"
-      });
+      
       
       await fetchConfig();
     } catch (error) {
@@ -422,10 +410,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       const data = await response.json();
       
       if (data.success) {
-        toast({
-          title: "Enviado!",
-          description: `Mensagem de teste enviada para ${phone}`
-        });
+        
       } else {
         throw new Error(data.error);
       }

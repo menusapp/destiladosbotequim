@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { Clock, Phone, CheckCircle2, Package, Truck, MapPin, XCircle } from "lucide-react";
 import { ReviewModal } from "@/components/menu/ReviewModal";
