@@ -87,7 +87,7 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="font-semibold text-sm">{chartLabel}</h3>
-                  <p className="text-xs text-muted-foreground">{chartSubLabel}</p>
+                  <p className="text-xs text-muted-foreground">{dateRangeLabels[dateRange]}</p>
                 </div>
                 <span className="text-lg font-bold">R$ {data.totalSales.toFixed(2)}</span>
               </div>
