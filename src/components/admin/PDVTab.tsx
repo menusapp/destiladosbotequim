@@ -565,6 +565,19 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
             {tables?.length || 0} mesas • {occupiedTables} ocupadas • {availableTables} livres
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Printer className="h-4 w-4 text-muted-foreground" />
+          <label htmlFor="auto-print-toggle" className="text-xs text-muted-foreground cursor-pointer">Auto-print</label>
+          <Switch
+            id="auto-print-toggle"
+            checked={autoPrint}
+            onCheckedChange={(checked) => {
+              setAutoPrint(checked);
+              localStorage.setItem("pdv_auto_print", String(checked));
+              toast.success(checked ? "Impressão automática ativada" : "Impressão automática desativada");
+            }}
+          />
+        </div>
       </div>
 
       {/* Main content: tables grid + order panel */}
