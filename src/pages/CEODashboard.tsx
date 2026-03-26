@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut, Plus, Store, Trash2, Edit, CreditCard, Package, BarChart3, Loader2, TrendingUp, AlertTriangle, CalendarPlus } from "lucide-react";
+import { LogOut, Plus, Store, Trash2, Edit, CreditCard, Package, BarChart3, Loader2, UserCog } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -14,6 +14,7 @@ import {
 import { SubscriptionPlansTab } from "@/components/ceo/SubscriptionPlansTab";
 import { SubscriptionsTab } from "@/components/ceo/SubscriptionsTab";
 import { CEOReportsTab } from "@/components/ceo/CEOReportsTab";
+import { CEOCredentialsTab } from "@/components/ceo/CEOCredentialsTab";
 
 interface Restaurant {
   id: string;
@@ -46,19 +47,16 @@ const CEODashboard = () => {
   const [formUsername, setFormUsername] = useState("");
   const [formPassword, setFormPassword] = useState("");
 
-  useEffect(() => { checkAccess(); }, []);
+  const ceoUserId = localStorage.getItem("ceo_user_id");
+  const ceoDisplayName = localStorage.getItem("ceo_display_name");
 
-  const checkAccess = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { navigate("/admin-panel", { replace: true }); return; }
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id);
-    if (!roles?.some(r => r.role === "ceo")) {
-      toast.error("Acesso negado");
-      navigate("/admin-panel", { replace: true });
+  useEffect(() => {
+    if (!ceoUserId) {
+      navigate("/login", { replace: true });
       return;
     }
     fetchData();
-  };
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -74,7 +72,6 @@ const CEODashboard = () => {
       const planMap: Record<string, { name: string; price: number }> = {};
       (plans || []).forEach((p: any) => { planMap[p.id] = { name: p.name, price: p.price }; });
 
-      // Group by restaurant, keep only the most recent subscription
       const latestByRestaurant: Record<string, any> = {};
       ((subs as any[]) || []).forEach((s: any) => {
         const existing = latestByRestaurant[s.restaurant_id];
@@ -113,7 +110,12 @@ const CEODashboard = () => {
     }
   };
 
-  const handleLogout = async () => { await supabase.auth.signOut(); navigate("/admin-panel"); };
+  const handleLogout = () => {
+    localStorage.removeItem("ceo_user_id");
+    localStorage.removeItem("ceo_display_name");
+    localStorage.removeItem("ceo_access");
+    navigate("/login");
+  };
 
   const handleOpenDialog = (restaurant?: Restaurant) => {
     if (restaurant) {
@@ -143,7 +145,6 @@ const CEODashboard = () => {
           .select().single();
         if (error) throw error;
         if (formUsername && formPassword) {
-          // Hash password before storing
           const { data: hashData, error: hashError } = await supabase.functions.invoke("hash-password", {
             body: { password: formPassword },
           });
@@ -208,7 +209,7 @@ const CEODashboard = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Painel CEO — Menu's</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Gerencie restaurantes, planos e assinaturas</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Bem-vindo, {ceoDisplayName || "CEO"}</p>
           </div>
           <Button onClick={handleLogout} variant="outline" size="sm"><LogOut className="h-4 w-4 mr-2" /> Sair</Button>
         </div>
@@ -238,6 +239,7 @@ const CEODashboard = () => {
             <TabsTrigger value="plans"><Package className="h-4 w-4 mr-2" /> Planos</TabsTrigger>
             <TabsTrigger value="subscriptions"><CreditCard className="h-4 w-4 mr-2" /> Assinaturas</TabsTrigger>
             <TabsTrigger value="reports"><BarChart3 className="h-4 w-4 mr-2" /> Relatórios</TabsTrigger>
+            <TabsTrigger value="credentials"><UserCog className="h-4 w-4 mr-2" /> Credenciais</TabsTrigger>
           </TabsList>
 
           <TabsContent value="restaurants">
@@ -311,6 +313,7 @@ const CEODashboard = () => {
           <TabsContent value="plans"><SubscriptionPlansTab /></TabsContent>
           <TabsContent value="subscriptions"><SubscriptionsTab /></TabsContent>
           <TabsContent value="reports"><CEOReportsTab /></TabsContent>
+          <TabsContent value="credentials"><CEOCredentialsTab /></TabsContent>
         </Tabs>
       </div>
     </div>
