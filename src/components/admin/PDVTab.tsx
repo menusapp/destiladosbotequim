@@ -85,6 +85,9 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
   const [paymentType, setPaymentType] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
 
+  // Auto-print toggle
+  const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem("pdv_auto_print") === "true");
+
   // Table management state
   const [selectedTableForDrawer, setSelectedTableForDrawer] = useState<TableData | null>(null);
   const [isManageTablesOpen, setIsManageTablesOpen] = useState(false);
