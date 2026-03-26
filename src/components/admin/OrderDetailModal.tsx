@@ -1,14 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
-  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Home, Trash2, RefreshCw
+  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Home, Trash2, RefreshCw, Loader2
 } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
@@ -59,11 +58,38 @@ interface OrderDetailModalProps {
   onStatusUpdate: () => void;
 }
 
-export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate }: OrderDetailModalProps) => {
+export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, onStatusUpdate }: OrderDetailModalProps) => {
   const navigate = useNavigate();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showChangePaymentModal, setShowChangePaymentModal] = useState(false);
   const [showAddItems, setShowAddItems] = useState(false);
+  const [removingItemId, setRemovingItemId] = useState<string | null>(null);
+  const [order, setOrder] = useState<Order>(initialOrder);
+
+  // Realtime: refresh order data when order_items or orders change
+  const refreshOrder = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("orders")
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
+      .eq("id", order.id)
+      .single();
+    if (!error && data) {
+      setOrder(data as Order);
+    }
+  }, [order.id]);
+
+  useEffect(() => {
+    // Listen for changes to order_items for this order
+    const ch = supabase.channel(`order-detail-${order.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `order_id=eq.${order.id}` }, () => {
+        refreshOrder();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` }, () => {
+        refreshOrder();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [order.id, refreshOrder]);
 
   const getElapsedTime = () => {
     const elapsed = Date.now() - new Date(order.created_at).getTime();
@@ -110,19 +136,16 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
   };
 
   const requiresPaymentForFinalization = (newStatus: string) => {
-    // iFood orders paid via app don't need payment confirmation
     if (order.ifood_source && order.payment_type === "Pago pelo iFood") return false;
 
     const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
-    if (isLocal) {
-      if (newStatus === "delivered") return false;
-      return false;
-    }
+    if (isLocal) return false;
     return ["delivered", "picked_up"].includes(newStatus);
   };
 
+  const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
+
   const updateStatus = async (newStatus: string) => {
-    // Block finalization without payment
     if (requiresPaymentForFinalization(newStatus) && (!order.payment_type || order.payment_type === "pending")) {
       toast.error("Defina a forma de pagamento antes de finalizar o pedido");
       setShowPaymentModal(true);
@@ -130,7 +153,6 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
     }
 
     try {
-      // If this is an iFood order, sync status with iFood first
       if (order.ifood_source && order.ifood_order_id) {
         const statusToAction: Record<string, string> = {
           accepted: "confirm",
@@ -141,7 +163,7 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
         };
         const ifoodAction = statusToAction[newStatus];
         if (ifoodAction) {
-          const { data: ifoodResult, error: ifoodError } = await supabase.functions.invoke("ifood-order-action", {
+          const { error: ifoodError } = await supabase.functions.invoke("ifood-order-action", {
             body: {
               restaurant_id: restaurantId,
               ifood_order_id: order.ifood_order_id,
@@ -174,6 +196,29 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
     } catch (error) { console.error("Erro ao atualizar status:", error); toast.error("Erro ao atualizar status"); }
   };
 
+  const handleRemoveItem = async (itemId: string) => {
+    if (order.order_items.length <= 1) {
+      toast.error("Não é possível remover o último item. Cancele o pedido se necessário.");
+      return;
+    }
+    setRemovingItemId(itemId);
+    try {
+      const { error } = await supabase.rpc("restore_stock_for_order_item", {
+        p_order_item_id: itemId,
+        p_restaurant_id: restaurantId,
+      });
+      if (error) throw error;
+      toast.success("Item removido e estoque restaurado!");
+      await refreshOrder();
+      onStatusUpdate();
+    } catch (error: any) {
+      console.error("Erro ao remover item:", error);
+      toast.error("Erro ao remover item do pedido");
+    } finally {
+      setRemovingItemId(null);
+    }
+  };
+
   const handlePrint = async () => {
     try { await printOrder(order, restaurantId); } catch (error: any) { toast.error(error.message || "Erro ao imprimir"); }
   };
@@ -199,10 +244,12 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
   const getOrderOrigin = () => {
     const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
     if (isLocal) return `Digital - Mesa ${order.tables?.table_number || "?"}`;
+    if (order.delivery_type === "takeaway") return "PDV - Para Viagem";
     return order.delivery_type === "delivery" ? "Digital - Delivery" : "Digital - Retirada";
   };
 
   const canAddItems = ["pending", "accepted", "preparing"].includes(order.status);
+  const canRemoveItems = ["pending", "accepted", "preparing"].includes(order.status);
 
   const handleAddItems = () => {
     setShowAddItems(true);
@@ -243,6 +290,10 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
               )}
               {(order.status === "accepted" || order.status === "preparing") && order.order_type === "delivery" && order.delivery_type === "pickup" && (
                 <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2"><Play className="w-4 h-4" />Pronto para Retirada</Button>
+              )}
+              {/* Takeaway: go directly from preparing to picked_up */}
+              {(order.status === "accepted" || order.status === "preparing") && isTakeaway && (
+                <Button onClick={() => updateStatus("picked_up")} className="gap-2"><Play className="w-4 h-4" />Finalizar (Retirado)</Button>
               )}
               {(order.status === "accepted" || order.status === "preparing") && (order.order_type === "local" || (!order.order_type && order.table_id)) && (
                 <Button onClick={() => updateStatus("delivered")} className="gap-2"><Play className="w-4 h-4" />Na Mesa</Button>
@@ -303,7 +354,7 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
                     <TableHead className="text-right">Base</TableHead>
                     <TableHead>Complementos</TableHead>
                     <TableHead className="text-right">Subtotal</TableHead>
-                    <TableHead></TableHead>
+                    {canRemoveItems && <TableHead></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -324,9 +375,19 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
                           ) : "—"}
                         </TableCell>
                         <TableCell className="text-right font-medium">R$ {itemSubtotal.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700"><Trash2 className="w-4 h-4" /></Button>
-                        </TableCell>
+                        {canRemoveItems && (
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleRemoveItem(item.id)}
+                              disabled={removingItemId === item.id || order.order_items.length <= 1}
+                            >
+                              {removingItemId === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -425,6 +486,7 @@ export const OrderDetailModal = ({ order, restaurantId, onClose, onStatusUpdate 
         restaurantId={restaurantId}
         onItemsAdded={() => {
           setShowAddItems(false);
+          refreshOrder();
           onStatusUpdate();
         }}
       />

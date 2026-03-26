@@ -154,6 +154,9 @@ export const AddItemsToOrderDrawer = ({
         if (extrasError) throw extrasError;
       }
 
+      // Deduct stock for the newly added item
+      await supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: orderItem.id });
+
       toast.success(`${item.productName} adicionado ao pedido!`);
       setShowProductDrawer(false);
       setSelectedProduct(null);
