@@ -4016,6 +4016,10 @@ export type Database = {
         Returns: boolean
       }
       cleanup_abandoned_tables: { Args: never; Returns: undefined }
+      deduct_stock_for_order_item: {
+        Args: { p_order_item_id: string }
+        Returns: undefined
+      }
       get_restaurant_rating_stats: {
         Args: { p_restaurant_id: string }
         Returns: {
@@ -4037,6 +4041,10 @@ export type Database = {
       is_restaurant_closed_by_order_item: {
         Args: { _order_item_id: string }
         Returns: boolean
+      }
+      restore_stock_for_order_item: {
+        Args: { p_order_item_id: string; p_restaurant_id: string }
+        Returns: undefined
       }
       validate_ceo_credentials: {
         Args: { p_password: string; p_username: string }
