@@ -1,0 +1,1 @@
+ALTER TABLE public.fiscal_configs ADD COLUMN IF NOT EXISTS inscricao_municipal TEXT;

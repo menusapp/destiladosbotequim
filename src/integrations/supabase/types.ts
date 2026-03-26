@@ -1237,6 +1237,7 @@ export type Database = {
           email: string | null
           id: string
           inscricao_estadual: string | null
+          inscricao_municipal: string | null
           logradouro: string | null
           municipio_codigo: string | null
           municipio_nome: string | null
@@ -1264,6 +1265,7 @@ export type Database = {
           email?: string | null
           id?: string
           inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
           logradouro?: string | null
           municipio_codigo?: string | null
           municipio_nome?: string | null
@@ -1291,6 +1293,7 @@ export type Database = {
           email?: string | null
           id?: string
           inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
           logradouro?: string | null
           municipio_codigo?: string | null
           municipio_nome?: string | null
