@@ -270,6 +270,54 @@ Deno.serve(async (req) => {
       );
     }
 
+    // 4. Configure NFC-e settings (CSC) on Nuvem Fiscal
+    const cscId = config.csc_id;
+    const cscCode = config.csc_code;
+
+    if (cscId && cscCode) {
+      console.log(`Configuring NFC-e for CNPJ: ${cpfCnpj}`);
+      const nfceConfigRes = await fetch(`https://api.nuvemfiscal.com.br/empresas/${cpfCnpj}/nfce`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          csc_producao: {
+            id: Number(cscId),
+            codigo: cscCode,
+          },
+        }),
+      });
+
+      const nfceConfigText = await nfceConfigRes.text();
+      console.log(`NFC-e config response: ${nfceConfigRes.status} ${nfceConfigText.substring(0, 300)}`);
+
+      if (!nfceConfigRes.ok) {
+        let nfceError = nfceConfigText;
+        try {
+          const parsed = JSON.parse(nfceConfigText);
+          nfceError = parsed?.error?.message || parsed?.message || nfceConfigText;
+        } catch { /* ignore */ }
+
+        return new Response(
+          JSON.stringify({ success: false, error: `Empresa e certificado sincronizados, mas erro ao configurar NFC-e: ${nfceError}` }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      // No CSC configured — warn user
+      await supabase
+        .from("fiscal_configs")
+        .update({ nuvem_fiscal_status: "synced" })
+        .eq("restaurant_id", restaurantId);
+
+      return new Response(
+        JSON.stringify({ success: true, data: companyData, warning: "Empresa e certificado sincronizados, mas CSC (Código de Segurança do Contribuinte) não configurado. Preencha o ID e Código CSC para emitir NFC-e." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // All good — mark as synced
     await supabase
       .from("fiscal_configs")
