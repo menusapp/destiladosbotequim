@@ -1,33 +1,39 @@
 
 
-## Plan: Fix NFC-e Emission — 3 Missing Fields + Production Mode
+## Plan: Fix Certificate Upload to Nuvem Fiscal + Delete Company on Disconnect
 
-### Problem (from logs)
-The Nuvem Fiscal API returns 400 with 3 validation errors:
-1. **`infNFe.ide.nNF`** — invoice number is missing (required sequential number)
-2. **`infNFe.ide.dhEmi`** — emission date/time is missing
-3. **`infNFe.emit.enderEmit.xMun`** — municipality name is empty string (hardcoded as `""`)
-4. **Bonus**: `ambiente` is hardcoded to `"homologacao"` but you're using production credentials
+### Root Cause
+The logs show `CertificateNotFound` because the `.pfx` file is only uploaded to your storage — it's never sent to Nuvem Fiscal. The Nuvem Fiscal API requires a separate `PUT /empresas/{cpf_cnpj}/certificado` call with the `.pfx` binary + password via `multipart/form-data`.
+
+Similarly, the "Desconectar" button only clears local data — it never calls `DELETE /empresas/{cpf_cnpj}` on Nuvem Fiscal.
 
 ### Changes
 
-**1. Database migration** — Add 2 columns to `fiscal_configs`:
-- `municipio_nome TEXT` — store municipality name (e.g. "ASSIS")
-- `nfce_serie INTEGER DEFAULT 1` — NFC-e series number
-- `nfce_numero INTEGER DEFAULT 1` — auto-incrementing invoice number (nNF)
+**1. Edge function `nuvem-fiscal-company/index.ts`** — Add 2 operations:
 
-**2. Edge function `nuvem-fiscal-emit/index.ts`** — Fix the 3 missing fields:
-- Add `nNF: config.nfce_numero` to `ide` block
-- Add `dhEmi: new Date().toISOString()` (formatted as required: `YYYY-MM-DDThh:mm:ss-03:00`)
-- Replace `xMun: ""` with `xMun: config.municipio_nome || ""`
-- Change `ambiente: "producao"` and `tpAmb: 1` for production
-- After successful emission, increment `nfce_numero` in the database
+After creating/updating the company, automatically:
+- Download the `.pfx` from Supabase Storage (`fiscal-certificates/{restaurantId}/certificate.pfx`)
+- Upload it to Nuvem Fiscal via `PUT /empresas/{cpf_cnpj}/certificado` with `multipart/form-data` (fields: `file` = binary, `password` = certificate password from `fiscal_configs`)
+- Only mark as `synced` if certificate upload also succeeds
 
-**3. FiscalSettingsTab.tsx** — Add municipality name input field so admins can fill it when configuring fiscal data (alongside the existing `municipio_codigo` field)
+Add a new action `disconnect`:
+- Call `DELETE /empresas/{cpf_cnpj}` on Nuvem Fiscal to remove the company
+- Then delete the certificate via `DELETE /empresas/{cpf_cnpj}/certificado`
+
+**2. Frontend `FiscalSettingsTab.tsx`** — Update disconnect handler:
+
+- Call `nuvem-fiscal-company` with `{ restaurantId, action: "disconnect" }` before clearing local data
+- Show appropriate toast on success/failure
+
+**3. Edge function `nuvem-fiscal-company/index.ts`** — Handle `EmpresaAlreadyExists`:
+
+- When company creation returns `EmpresaAlreadyExists`, treat it as success (company exists, proceed to certificate upload)
+- This prevents the error you saw in logs when re-syncing
 
 ### Technical details
-- `nNF` must be sequential per series. We store and auto-increment it in `fiscal_configs.nfce_numero`
-- `dhEmi` format for NFC-e: `2026-03-26T15:30:00-03:00` (ISO with timezone offset)
-- `xMun` must match the IBGE municipality name (min 2 chars)
-- No new dependencies needed
+- Nuvem Fiscal certificate endpoint: `PUT https://api.nuvemfiscal.com.br/empresas/{cpf_cnpj}/certificado`
+- Content-Type: `multipart/form-data` with `file` (binary) and `password` (string)
+- Delete company endpoint: `DELETE https://api.nuvemfiscal.com.br/empresas/{cpf_cnpj}`
+- Certificate must be in `.pfx` or `.p12` format
+- The `certificate_password` field already exists in `fiscal_configs` — we just need to send it along
 
