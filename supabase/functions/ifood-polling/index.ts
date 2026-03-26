@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
         // Get order details
         try {
           const orderRes = await fetch(`${IFOOD_API}/order/v1.0/orders/${orderId}`, {
-            headers: { Authorization: `Bearer ${config.access_token}` },
+            headers: { Authorization: `Bearer ${accessToken}` },
           });
 
           if (!orderRes.ok) {
@@ -352,7 +352,7 @@ Deno.serve(async (req) => {
         await fetch(`${IFOOD_API}/events/v1.0/events/acknowledgment`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${config.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(eventIds),
