@@ -161,6 +161,10 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(fetchOrders, 400);
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchOrders, 400);
+      })
       .subscribe();
     return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
   };
