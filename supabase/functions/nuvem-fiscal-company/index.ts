@@ -284,6 +284,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           ambiente: "producao",
+          CRT: 1,
           sefaz: {
             id_csc: Number(cscId),
             csc: cscCode,
