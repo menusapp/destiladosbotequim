@@ -94,6 +94,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
         setConfig({
           cnpj: data.cnpj || "", razao_social: data.razao_social || "",
           nome_fantasia: data.nome_fantasia || "", inscricao_estadual: data.inscricao_estadual || "",
+          inscricao_municipal: (data as any).inscricao_municipal || "",
           email: data.email || "", telefone: data.telefone || "",
           cep: data.cep || "", logradouro: data.logradouro || "",
           numero: data.numero || "", complemento: data.complemento || "",
