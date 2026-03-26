@@ -376,6 +376,36 @@ export type Database = {
           },
         ]
       }
+      ceo_users: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          password_hash: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          password_hash: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          password_hash?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
       comandas: {
         Row: {
           closed_at: string | null
@@ -3995,6 +4025,13 @@ export type Database = {
       is_restaurant_closed_by_order_item: {
         Args: { _order_item_id: string }
         Returns: boolean
+      }
+      validate_ceo_credentials: {
+        Args: { p_password: string; p_username: string }
+        Returns: {
+          ceo_user_id: string
+          display_name: string
+        }[]
       }
       validate_restaurant_credentials: {
         Args: { p_password: string; p_username: string }

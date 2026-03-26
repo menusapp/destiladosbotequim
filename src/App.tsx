@@ -7,10 +7,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import LandingPage from "./pages/LandingPage";
 import RestaurantLogin from "./pages/RestaurantLogin";
+import CEOLogin from "./pages/CEOLogin";
 
-import AdminPanel from "./pages/AdminPanel";
 import CEODashboard from "./pages/CEODashboard";
-import DevDashboard from "./pages/DevDashboard";
 import RestaurantAdmin from "./pages/RestaurantAdmin";
 import Menu from "./pages/Menu";
 import Comanda from "./pages/Comanda";
@@ -46,19 +45,10 @@ const App = () => (
             {/* Auth routes */}
             <Route path="/login" element={<RestaurantLogin />} />
             <Route path="/login/staff" element={<StaffLogin />} />
+            <Route path="/login/ceo" element={<CEOLogin />} />
 
-            {/* Admin Panel - Dev/CEO Login */}
-            <Route path="/admin-panel" element={<AdminPanel />} />
-            <Route path="/admin-panel/ceo" element={
-              <ProtectedRoute>
-                <CEODashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin-panel/dev" element={
-              <ProtectedRoute>
-                <DevDashboard />
-              </ProtectedRoute>
-            } />
+            {/* CEO Dashboard */}
+            <Route path="/ceo" element={<CEODashboard />} />
 
             {/* MercadoPago callback */}
             <Route path="/admin/mercadopago/callback" element={<MercadoPagoCallback />} />

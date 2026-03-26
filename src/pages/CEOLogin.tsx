@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import menusLogo from "@/assets/menus-logo.png";
+import { Crown } from "lucide-react";
 
-const Landing = () => {
+const CEOLogin = () => {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -19,29 +20,19 @@ const Landing = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await (supabase as any)
-        .rpc('validate_restaurant_credentials', {
-          p_username: username,
-          p_password: password
-        });
+      const { data, error } = await (supabase as any).rpc("validate_ceo_credentials", {
+        p_username: username.trim(),
+        p_password: password,
+      });
 
       if (error) throw error;
 
       if (data && Array.isArray(data) && data.length > 0) {
-        const { restaurant_id, restaurant_name } = data[0];
-        localStorage.setItem('restaurant_id', restaurant_id);
-        localStorage.setItem('restaurant_name', restaurant_name);
-        // Also store slug for route navigation
-        const slugData = await supabase.from('restaurants').select('slug').eq('id', restaurant_id).single();
-        if (slugData.data?.slug) {
-          localStorage.setItem('restaurant_slug', slugData.data.slug);
-        }
-        toast.success(`Bem-vindo ao ${restaurant_name}!`);
-        navigate('/login/staff');
-      } else if (username.trim().toUpperCase() === "CEO" && password === "CEO123") {
-        // CEO master access - redirect to CEO user login
-        localStorage.setItem('ceo_access', 'true');
-        navigate('/login/ceo');
+        const ceoUser = data[0];
+        localStorage.setItem("ceo_user_id", ceoUser.ceo_user_id);
+        localStorage.setItem("ceo_display_name", ceoUser.display_name);
+        toast.success(`Bem-vindo, ${ceoUser.display_name}!`);
+        navigate("/ceo");
       } else {
         toast.error("Credenciais inválidas");
       }
@@ -52,27 +43,38 @@ const Landing = () => {
     }
   };
 
+  const handleBack = () => {
+    localStorage.removeItem("ceo_access");
+    navigate("/login");
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-lg border-border/50">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-32 h-32 flex items-center justify-center">
-            <img src={menusLogo} alt="Menu's" className="w-full h-full object-contain" />
+          <div className="mx-auto w-24 h-24 flex items-center justify-center">
+            <img src={menusLogo} alt="Menu's" className="w-full h-full object-contain rounded-lg" />
           </div>
-          <CardDescription className="text-base">
-            Sistema de Gestão de Cardápios Digitais
+          <div className="flex items-center justify-center gap-2">
+            <Crown className="h-5 w-5 text-amber-500" />
+            <h2 className="text-xl font-bold text-foreground">Painel CEO</h2>
+          </div>
+          <CardDescription className="text-base mt-1">
+            Faça login com sua conta CEO
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Usuário do Restaurante</Label>
+              <Label htmlFor="username">Usuário</Label>
               <Input
                 id="username"
                 type="text"
-                placeholder="Digite o usuário"
+                placeholder="Digite seu usuário"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                autoCapitalize="off"
+                autoCorrect="off"
                 required
               />
             </div>
@@ -88,19 +90,21 @@ const Landing = () => {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Entrando..." : "Entrar no Painel"}
+              {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-          </div>
+          <Button
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            onClick={handleBack}
+          >
+            ← Voltar
+          </Button>
         </CardContent>
       </Card>
     </div>
   );
 };
 
-export default Landing;
+export default CEOLogin;
