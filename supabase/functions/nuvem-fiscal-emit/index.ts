@@ -53,6 +53,43 @@ function formatDateBRT(): string {
   return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}T${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}-03:00`;
 }
 
+// Valid CSTs for PISOutr/COFINSOutr
+const validOutrCSTs = new Set(["49","50","51","52","53","54","55","56","60","61","62","63","64","65","66","67","70","71","72","73","74","75","98","99"]);
+
+function safeOutrCST(cst: string | null | undefined): string {
+  if (cst && validOutrCSTs.has(cst)) return cst;
+  return "49"; // Outras operações de saída - fallback seguro para Simples Nacional
+}
+
+function mapNuvemFiscalStatus(apiResult: any): { dbStatus: string; errorMessage?: string } {
+  // If API returned an error object, it's always an error
+  if (apiResult.error) {
+    const messages: string[] = [];
+    if (apiResult.error.message) messages.push(apiResult.error.message);
+    if (Array.isArray(apiResult.error.errors)) {
+      for (const e of apiResult.error.errors) {
+        if (e.message) messages.push(e.message);
+      }
+    }
+    return { dbStatus: "error", errorMessage: messages.join(" | ") || "Erro de validação" };
+  }
+
+  const raw = (apiResult.status || "").toLowerCase().trim();
+
+  if (["autorizada", "autorizado"].includes(raw)) {
+    return { dbStatus: "authorized" };
+  }
+  if (["rejeitada", "rejeitado", "denegada", "denegado"].includes(raw)) {
+    return { dbStatus: "error", errorMessage: apiResult.motivo_status || "Nota rejeitada pela SEFAZ" };
+  }
+  if (["cancelada", "cancelado"].includes(raw)) {
+    return { dbStatus: "canceled", errorMessage: apiResult.motivo_status };
+  }
+
+  // processando, em_processamento, etc → processing
+  return { dbStatus: "processing" };
+}
+
 const ufCodes: Record<string, number> = {
   AC: 12, AL: 27, AP: 16, AM: 13, BA: 29, CE: 23, DF: 53, ES: 32,
   GO: 52, MA: 21, MT: 51, MS: 50, MG: 31, PA: 15, PB: 25, PR: 41,
@@ -143,10 +180,9 @@ Deno.serve(async (req) => {
       const prod = (item as any).products;
       const ncm = (prod?.fiscal_ncm || ncmDefault).replace(/\./g, "");
       const cfop = prod?.fiscal_cfop || cfopDefault;
-      const csosn = prod?.fiscal_icms_csosn || "102";
       const orig = Number(prod?.fiscal_icms_origin || "0");
-      const pisCst = prod?.fiscal_pis_cst || "49";
-      const cofinsCst = prod?.fiscal_cofins_cst || "49";
+      const pisCst = safeOutrCST(prod?.fiscal_pis_cst);
+      const cofinsCst = safeOutrCST(prod?.fiscal_cofins_cst);
       const vUnCom = Number(item.price_at_order.toFixed(2));
       const vProd = Number((item.quantity * item.price_at_order).toFixed(2));
 
@@ -161,8 +197,8 @@ Deno.serve(async (req) => {
         },
         imposto: {
           ICMS: { ICMSSN102: { orig, CSOSN: "400" } },
-          PIS: { PISOutr: { CST: "07", vBC: 0, pPIS: 0, vPIS: 0 } },
-          COFINS: { COFINSOutr: { CST: "07", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
+          PIS: { PISOutr: { CST: pisCst, vBC: 0, pPIS: 0, vPIS: 0 } },
+          COFINS: { COFINSOutr: { CST: cofinsCst, vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
         },
       });
 
@@ -183,8 +219,8 @@ Deno.serve(async (req) => {
           },
           imposto: {
             ICMS: { ICMSSN102: { orig: 0, CSOSN: "400" } },
-            PIS: { PISOutr: { CST: "07", vBC: 0, pPIS: 0, vPIS: 0 } },
-            COFINS: { COFINSOutr: { CST: "07", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
+            PIS: { PISOutr: { CST: pisCst, vBC: 0, pPIS: 0, vPIS: 0 } },
+            COFINS: { COFINSOutr: { CST: cofinsCst, vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
           },
         });
       }
@@ -281,33 +317,27 @@ Deno.serve(async (req) => {
 
     const apiResult = await apiResponse.json();
     console.log("[NuvemFiscal] Full response:", JSON.stringify(apiResult));
-    if (apiResult.status === "rejeitado") {
-      console.log("[NuvemFiscal] Motivo rejeição:", JSON.stringify(apiResult.autorizacao));
-      console.log("[NuvemFiscal] Status motivo:", apiResult.motivo_status);
-    }
+
+    // 8. Use robust status mapping
+    const { dbStatus, errorMessage } = mapNuvemFiscalStatus(apiResult);
 
     if (!apiResponse.ok && apiResponse.status !== 202) {
-      const errMsg = apiResult?.error?.message || apiResult?.message || JSON.stringify(apiResult).substring(0, 300);
-      await updateNoteStatus(supabase, fiscal_note_id, "error", `Erro Nuvem Fiscal (${apiResponse.status}): ${errMsg}`);
-      return jsonResponse({ error: errMsg, nuvem_response: apiResult });
+      const fullErr = errorMessage || apiResult?.message || JSON.stringify(apiResult).substring(0, 500);
+      await updateNoteStatus(supabase, fiscal_note_id, "error", `Erro Nuvem Fiscal (${apiResponse.status}): ${fullErr}`);
+      return jsonResponse({ error: fullErr, nuvem_response: apiResult });
     }
 
-    // 8. Increment nfce_numero for next emission
+    // 9. Increment nfce_numero for next emission
     await supabase
       .from("fiscal_configs")
       .update({ nfce_numero: nfceNumero + 1 })
       .eq("restaurant_id", restaurant_id);
 
-    // 9. Update fiscal note with result
-    const nfceStatus = apiResult.status || "processing";
-    const mappedStatus = nfceStatus === "autorizada" ? "authorized" : nfceStatus === "rejeitada" ? "error" : "processing";
-
-    const updateData: Record<string, any> = { status: mappedStatus };
+    // 10. Update fiscal note with result
+    const updateData: Record<string, any> = { status: dbStatus };
     if (apiResult.numero) updateData.nfe_number = String(apiResult.numero);
     if (apiResult.chave) updateData.nfe_key = apiResult.chave;
-    if (nfceStatus === "rejeitada") {
-      updateData.error_message = apiResult.motivo_status || "Nota rejeitada pela SEFAZ";
-    }
+    if (errorMessage) updateData.error_message = errorMessage;
 
     if (fiscal_note_id) {
       await supabase.from("order_fiscal_notes").update(updateData).eq("id", fiscal_note_id);
@@ -315,7 +345,7 @@ Deno.serve(async (req) => {
       await supabase.from("order_fiscal_notes").update(updateData).eq("order_id", order_id).eq("restaurant_id", restaurant_id);
     }
 
-    return jsonResponse({ success: true, status: mappedStatus, nuvem_response: apiResult });
+    return jsonResponse({ success: true, status: dbStatus, nuvem_response: apiResult });
   } catch (error: any) {
     console.error("[NuvemFiscal] Error:", error);
     return jsonResponse({ error: error.message || "Erro interno" }, 500);

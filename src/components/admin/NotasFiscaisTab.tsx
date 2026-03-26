@@ -128,7 +128,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300"><Clock className="w-3 h-3 mr-1" /> Pendente</Badge>;
       case "error":
-        return <Badge className="bg-red-100 text-red-800 border-red-300"><AlertCircle className="w-3 h-3 mr-1" /> Erro</Badge>;
+        return <Badge className="bg-red-100 text-red-800 border-red-300"><AlertCircle className="w-3 h-3 mr-1" /> Rejeitada</Badge>;
       case "canceled":
         return <Badge className="bg-gray-100 text-gray-800 border-gray-300"><XCircle className="w-3 h-3 mr-1" /> Cancelada</Badge>;
       default:
@@ -288,7 +288,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                     <TableCell>
                       {getStatusBadge(note.status)}
                       {note.status === "error" && note.error_message && (
-                        <p className="text-xs text-red-500 mt-1 max-w-[200px] truncate" title={note.error_message}>
+                        <p className="text-xs text-red-500 mt-1 max-w-[300px] break-words" title={note.error_message}>
                           {note.error_message}
                         </p>
                       )}
@@ -328,7 +328,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                             <FileCode className="h-4 w-4 text-blue-600" />
                           </Button>
                         )}
-                        {(note.status === "error" || note.status === "pending") && (
+                        {(note.status === "error" || note.status === "pending" || note.status === "processing") && (
                           <Button
                             variant="ghost"
                             size="sm"
