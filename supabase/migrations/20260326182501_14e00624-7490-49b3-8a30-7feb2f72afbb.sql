@@ -1,0 +1,4 @@
+ALTER TABLE public.fiscal_configs 
+  ADD COLUMN IF NOT EXISTS municipio_nome TEXT,
+  ADD COLUMN IF NOT EXISTS nfce_serie INTEGER DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS nfce_numero INTEGER DEFAULT 1;
