@@ -136,7 +136,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
         toast({ title: "Erro ao atualizar insumo", variant: "destructive" });
         return;
       }
-      toast({ title: "Insumo atualizado com sucesso" });
+      
     } else {
       // Criação: inclui current_quantity
       const itemData = {
@@ -158,7 +158,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
         toast({ title: "Erro ao criar insumo", variant: "destructive" });
         return;
       }
-      toast({ title: "Insumo criado com sucesso" });
+      
     }
 
     resetForms();
@@ -186,7 +186,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
       return;
     }
 
-    toast({ title: "Insumo excluído com sucesso" });
+    
     setDeleteDialogOpen(false);
     setItemToDelete(null);
     fetchStockItems();

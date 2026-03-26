@@ -72,11 +72,9 @@ export default function SuppliersTab({ restaurantId }: SuppliersTabProps) {
     if (editing) {
       const { error } = await supabase.from("suppliers").update(payload).eq("id", editing.id);
       if (error) { toast({ title: "Erro ao atualizar fornecedor", variant: "destructive" }); return; }
-      toast({ title: "Fornecedor atualizado" });
     } else {
       const { error } = await supabase.from("suppliers").insert({ ...payload, restaurant_id: restaurantId });
       if (error) { toast({ title: "Erro ao criar fornecedor", variant: "destructive" }); return; }
-      toast({ title: "Fornecedor criado" });
     }
 
     resetForm();
@@ -88,7 +86,6 @@ export default function SuppliersTab({ restaurantId }: SuppliersTabProps) {
     if (!toDelete) return;
     const { error } = await supabase.from("suppliers").delete().eq("id", toDelete.id);
     if (error) { toast({ title: "Erro ao excluir fornecedor", description: error.message, variant: "destructive" }); }
-    else { toast({ title: "Fornecedor excluído" }); }
     setDeleteDialogOpen(false);
     setToDelete(null);
     fetchSuppliers();

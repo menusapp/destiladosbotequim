@@ -58,7 +58,6 @@ const StockCategoriesTab = ({ restaurantId }: StockCategoriesTabProps) => {
         toast({ title: "Erro ao atualizar categoria", variant: "destructive" });
         return;
       }
-      toast({ title: "Categoria atualizada com sucesso" });
     } else {
       const { error } = await supabase
         .from("stock_categories")
@@ -68,7 +67,6 @@ const StockCategoriesTab = ({ restaurantId }: StockCategoriesTabProps) => {
         toast({ title: "Erro ao criar categoria", variant: "destructive" });
         return;
       }
-      toast({ title: "Categoria criada com sucesso" });
     }
 
     resetForm();
@@ -88,7 +86,6 @@ const StockCategoriesTab = ({ restaurantId }: StockCategoriesTabProps) => {
       return;
     }
 
-    toast({ title: "Categoria deletada" });
     fetchCategories();
   };
 
