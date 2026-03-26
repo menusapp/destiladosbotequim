@@ -1239,6 +1239,9 @@ export type Database = {
           inscricao_estadual: string | null
           logradouro: string | null
           municipio_codigo: string | null
+          municipio_nome: string | null
+          nfce_numero: number | null
+          nfce_serie: number | null
           nome_fantasia: string | null
           numero: string | null
           nuvem_fiscal_status: string | null
@@ -1263,6 +1266,9 @@ export type Database = {
           inscricao_estadual?: string | null
           logradouro?: string | null
           municipio_codigo?: string | null
+          municipio_nome?: string | null
+          nfce_numero?: number | null
+          nfce_serie?: number | null
           nome_fantasia?: string | null
           numero?: string | null
           nuvem_fiscal_status?: string | null
@@ -1287,6 +1293,9 @@ export type Database = {
           inscricao_estadual?: string | null
           logradouro?: string | null
           municipio_codigo?: string | null
+          municipio_nome?: string | null
+          nfce_numero?: number | null
+          nfce_serie?: number | null
           nome_fantasia?: string | null
           numero?: string | null
           nuvem_fiscal_status?: string | null
