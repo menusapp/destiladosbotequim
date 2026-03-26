@@ -7,7 +7,7 @@ const Toaster = () => <SonnerToaster position="top-right" richColors closeButton
 const toast = Object.assign(
   (...args: Parameters<typeof sonnerToast>) => sonnerToast(...args),
   {
-    success: (() => {}) as typeof sonnerToast.success,
+    success: ((() => {}) as unknown as typeof sonnerToast.success),
     error: sonnerToast.error,
     warning: sonnerToast.warning,
     info: sonnerToast.info,
