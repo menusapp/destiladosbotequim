@@ -40,7 +40,7 @@ interface FiscalConfig {
 const emptyConfig: FiscalConfig = {
   cnpj: "", razao_social: "", nome_fantasia: "", inscricao_estadual: "",
   email: "", telefone: "", cep: "", logradouro: "", numero: "",
-  complemento: "", bairro: "", municipio_codigo: "", uf: "SP",
+  complemento: "", bairro: "", municipio_codigo: "", municipio_nome: "", uf: "SP",
   csc_id: "", csc_code: "", certificate_password: "", certificate_file_path: "",
 };
 
@@ -97,6 +97,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
           cep: data.cep || "", logradouro: data.logradouro || "",
           numero: data.numero || "", complemento: data.complemento || "",
           bairro: data.bairro || "", municipio_codigo: data.municipio_codigo || "",
+          municipio_nome: (data as any).municipio_nome || "",
           uf: data.uf || "SP", csc_id: data.csc_id || "",
           csc_code: data.csc_code || "", certificate_password: data.certificate_password || "",
           certificate_file_path: data.certificate_file_path || "",
