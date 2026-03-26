@@ -1,65 +1,35 @@
 
 
-## Plan: 7 Improvements
+## Plan: Split CEO Reports into Two Sub-Tabs
 
-### 1. Move Categorias and Destaques tabs to Configuracoes Gerais > Cardapio sub-tab
+### Overview
+Refactor `CEOReportsTab` into two sub-tabs using inner `Tabs`:
+1. **Plataforma Menu's** — Platform-level metrics (MRR, subscription revenue, subscriptions sold, partner restaurants, platform avg ticket, charts)
+2. **Dashboard Restaurantes** — Per-restaurant sales dashboard with date + restaurant filters, showing faturamento total, pedidos, ticket medio, charts
 
-**Current**: CardapioTab has 4 sub-tabs (Produtos, Categorias, Complementos, Destaques).
-**Change**: Remove Categorias and Destaques tabs from CardapioTab (keep only Produtos and Complementos). Add them as sections inside the existing "Cardapio" sub-tab in CompanyDataSettings, below the existing "Pedir Conta" toggle.
+### Changes
 
-**Files**: `src/components/admin/CardapioTab.tsx`, `src/components/admin/settings/CompanyDataSettings.tsx`
+**File: `src/components/ceo/CEOReportsTab.tsx`** — Full rewrite
 
----
+Split the existing single view into two sub-tabs:
 
-### 2. Fix Planos page alignment
+**Sub-tab 1: "Plataforma Menu's"**
+- KPI cards: MRR, Faturamento Total (subscription payments), Assinaturas Vendidas (count of payments), Restaurantes Parceiros, Ticket Médio (avg subscription price)
+- Bar chart: MRR evolution by month (using Recharts BarChart from existing chart infrastructure)
+- Table: Subscription payments per restaurant (existing `summaries` section)
 
-**Current**: `max-w-5xl mx-auto px-4 py-8` — cards float in center with excess whitespace.
-**Change**: Remove `max-w-5xl mx-auto` and reduce padding. Use `w-full` so the plans grid fills the content area naturally, matching other admin tabs.
+**Sub-tab 2: "Dashboard Restaurantes"**
+- Filters bar: Date range pickers (start/end) + Restaurant select (all or specific) — reuse existing filter logic
+- KPI cards: Faturamento Total, Total de Pedidos, Ticket Médio, Total Clientes
+- Bar chart: Daily sales aggregation using Recharts (BarChart with daily totals)
+- Revenue breakdown by channel (Delivery / Balcão / Local) as horizontal bar or pie chart
+- Per-restaurant breakdown cards (existing `filteredStats` section)
+- Top 10 Products table (existing)
 
-**File**: `src/components/admin/ModulosTab.tsx`
-
----
-
-### 3. Suppress PDV order notifications
-
-**Current**: Every new order INSERT triggers a popup notification via realtime channel.
-**Change**: Add a `pdv_source` boolean column to the `orders` table (default false). When PDVTab or CreateOrderDrawer creates an order, set `pdv_source: true`. In the notification handler in RestaurantAdmin, skip notification if `order.pdv_source === true`.
-
-**Files**: DB migration (add `pdv_source`), `src/components/admin/PDVTab.tsx`, `src/components/admin/CreateOrderDrawer.tsx`, `src/pages/RestaurantAdmin.tsx`
-
----
-
-### 4. PDV orders (Delivery/Retirada/Viagem) start as "Preparando"
-
-**Current**: All PDV orders are created with `status: "pending"`.
-**Change**: In PDVTab, for delivery, retirada, and viagem order types, insert with `status: "preparing"` instead of `"pending"`. Mesa orders stay as `"pending"`. Same change in CreateOrderDrawer for non-mesa types.
-
-**Files**: `src/components/admin/PDVTab.tsx`, `src/components/admin/CreateOrderDrawer.tsx`
-
----
-
-### 5. Auto-print toggle in PDV
-
-**Current**: No auto-print option in PDV.
-**Change**: Add a "Imprimir Automaticamente" toggle button in the PDV header area. Store preference in localStorage (`pdv_auto_print`). After order creation succeeds, if enabled, call `printOrder()` with the newly created order data automatically.
-
-**Files**: `src/components/admin/PDVTab.tsx` (add toggle + auto-print logic after order creation)
-
----
-
-### 6. Internal scrolling for each cost category in CostosTab
-
-**Current**: All cost lists render in a single scrollable card.
-**Change**: Wrap each cost list (Custos Operacionais, Custos Variaveis, Mao de Obra) in a container with `max-h-[200px] overflow-y-auto` so each section scrolls independently when it has many items.
-
-**File**: `src/components/admin/CostosTab.tsx`
-
----
-
-### 7. Global 90% zoom
-
-**Current**: Default 100% browser zoom scale.
-**Change**: Add `font-size: 90%` or `zoom: 0.9` to the `#root` element in `src/index.css` for the admin layout. Use `transform: scale(0.9)` with `transform-origin: top left` and adjusted width on the admin wrapper to achieve a uniform 90% scale without breaking layouts.
-
-**File**: `src/index.css` — add a CSS rule targeting the admin panel root. Specifically, set `font-size: 14.4px` (90% of 16px) on `html` and use relative units, or simpler: apply `zoom: 0.9` on the admin `SidebarInset` wrapper in RestaurantAdmin.tsx.
+**Technical details:**
+- Use `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent` from existing UI components for inner tabs
+- Use `BarChart`, `Bar`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `ResponsiveContainer` from recharts (already in project via chart.tsx)
+- Split data fetching: platform metrics fetch on mount, restaurant metrics fetch when date/restaurant filter changes
+- Add daily sales aggregation logic (group delivery orders, bills, counter orders by date) for the restaurant dashboard chart
+- Add subscription count metric (count of paid subscription_payments in range)
 
