@@ -21,6 +21,7 @@ interface FiscalConfig {
   razao_social: string;
   nome_fantasia: string;
   inscricao_estadual: string;
+  inscricao_municipal: string;
   email: string;
   telefone: string;
   cep: string;
@@ -38,7 +39,7 @@ interface FiscalConfig {
 }
 
 const emptyConfig: FiscalConfig = {
-  cnpj: "", razao_social: "", nome_fantasia: "", inscricao_estadual: "",
+  cnpj: "", razao_social: "", nome_fantasia: "", inscricao_estadual: "", inscricao_municipal: "",
   email: "", telefone: "", cep: "", logradouro: "", numero: "",
   complemento: "", bairro: "", municipio_codigo: "", municipio_nome: "", uf: "SP",
   csc_id: "", csc_code: "", certificate_password: "", certificate_file_path: "",
@@ -93,6 +94,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
         setConfig({
           cnpj: data.cnpj || "", razao_social: data.razao_social || "",
           nome_fantasia: data.nome_fantasia || "", inscricao_estadual: data.inscricao_estadual || "",
+          inscricao_municipal: (data as any).inscricao_municipal || "",
           email: data.email || "", telefone: data.telefone || "",
           cep: data.cep || "", logradouro: data.logradouro || "",
           numero: data.numero || "", complemento: data.complemento || "",
@@ -326,6 +328,10 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
             <div className="space-y-1.5">
               <Label className="text-[13px]">Inscrição Estadual</Label>
               <Input placeholder="Inscrição Estadual" value={config.inscricao_estadual} onChange={(e) => handleChange("inscricao_estadual", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Inscrição Municipal</Label>
+              <Input placeholder="Inscrição Municipal" value={config.inscricao_municipal} onChange={(e) => handleChange("inscricao_municipal", e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Email</Label>

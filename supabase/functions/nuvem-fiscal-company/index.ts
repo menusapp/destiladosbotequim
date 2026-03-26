@@ -127,6 +127,7 @@ Deno.serve(async (req) => {
     const payload = {
       cpf_cnpj: cpfCnpj,
       inscricao_estadual: config.inscricao_estadual || "",
+      inscricao_municipal: config.inscricao_municipal || "",
       nome_razao_social: config.razao_social,
       nome_fantasia: config.nome_fantasia || config.razao_social,
       email: config.email || "",
@@ -230,18 +231,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Upload certificate to Nuvem Fiscal via multipart/form-data
+    // Upload certificate to Nuvem Fiscal via JSON + base64
     console.log(`Uploading certificate to Nuvem Fiscal for CNPJ: ${cpfCnpj}`);
-    const formData = new FormData();
-    formData.append("file", new Blob([await fileData.arrayBuffer()]), "certificate.pfx");
-    formData.append("password", certPassword);
+    const certBytes = new Uint8Array(await fileData.arrayBuffer());
+    let certBase64 = "";
+    // Encode in chunks to avoid stack overflow on large files
+    const CHUNK = 8192;
+    for (let i = 0; i < certBytes.length; i += CHUNK) {
+      certBase64 += String.fromCharCode(...certBytes.subarray(i, i + CHUNK));
+    }
+    certBase64 = btoa(certBase64);
 
     const certRes = await fetch(`https://api.nuvemfiscal.com.br/empresas/${cpfCnpj}/certificado`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
       },
-      body: formData,
+      body: JSON.stringify({
+        certificado: certBase64,
+        password: certPassword,
+      }),
     });
 
     const certText = await certRes.text();
