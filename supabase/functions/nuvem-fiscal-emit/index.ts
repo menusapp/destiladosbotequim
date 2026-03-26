@@ -160,9 +160,9 @@ Deno.serve(async (req) => {
           uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnCom, indTot: 1,
         },
         imposto: {
-          ICMS: { [`ICMSSN${csosn}`]: { orig, CSOSN: csosn } },
-          PIS: { PISOutr: { CST: pisCst, vBC: 0, pPIS: 0, vPIS: 0 } },
-          COFINS: { COFINSOutr: { CST: cofinsCst, vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
+          ICMS: { ICMS00: { orig, CST: "00", modBC: 3, vBC: 0, pICMS: 0, vICMS: 0 } },
+          PIS: { PISOutr: { CST: "07", vBC: 0, pPIS: 0, vPIS: 0 } },
+          COFINS: { COFINSOutr: { CST: "07", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
         },
       });
 
@@ -182,9 +182,9 @@ Deno.serve(async (req) => {
             uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnExtra, indTot: 1,
           },
           imposto: {
-            ICMS: { ICMSSN102: { orig: 0, CSOSN: "102" } },
-            PIS: { PISOutr: { CST: "49", vBC: 0, pPIS: 0, vPIS: 0 } },
-            COFINS: { COFINSOutr: { CST: "49", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
+            ICMS: { ICMS00: { orig: 0, CST: "00", modBC: 3, vBC: 0, pICMS: 0, vICMS: 0 } },
+            PIS: { PISOutr: { CST: "07", vBC: 0, pPIS: 0, vPIS: 0 } },
+            COFINS: { COFINSOutr: { CST: "07", vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
           },
         });
       }
@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
           xNome: config.razao_social || config.nome_fantasia || "",
           xFant: config.nome_fantasia || config.razao_social || "",
           IE: config.inscricao_estadual?.replace(/\D/g, "") || "",
-          CRT: 1,
+          CRT: 3,
           enderEmit: {
             xLgr: config.logradouro || "",
             nro: config.numero || "S/N",
@@ -280,7 +280,11 @@ Deno.serve(async (req) => {
     });
 
     const apiResult = await apiResponse.json();
-    console.log("[NuvemFiscal] API response status:", apiResponse.status, JSON.stringify(apiResult).substring(0, 500));
+    console.log("[NuvemFiscal] Full response:", JSON.stringify(apiResult));
+    if (apiResult.status === "rejeitado") {
+      console.log("[NuvemFiscal] Motivo rejeição:", JSON.stringify(apiResult.autorizacao));
+      console.log("[NuvemFiscal] Status motivo:", apiResult.motivo_status);
+    }
 
     if (!apiResponse.ok && apiResponse.status !== 202) {
       const errMsg = apiResult?.error?.message || apiResult?.message || JSON.stringify(apiResult).substring(0, 300);
