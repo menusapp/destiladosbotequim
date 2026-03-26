@@ -8,8 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText } from "lucide-react";
-import CategoriesTab from "@/components/admin/CategoriesTab";
-import DestaquesTab from "@/components/admin/DestaquesTab";
 
 interface Settings {
   logo_url: string | null;
@@ -444,11 +442,6 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             Salvar Configurações do Cardápio
           </Button>
 
-          {/* Categorias */}
-          <CategoriesTab restaurantId={restaurantId} isRestaurantOpen={true} />
-
-          {/* Destaques */}
-          <DestaquesTab restaurantId={restaurantId} />
         </TabsContent>
       </Tabs>
     </div>
