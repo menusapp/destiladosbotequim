@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Minus, Plus, ChevronDown } from "lucide-react";
 import { useRef } from "react";
 import { Product, ProductExtra } from "@/types/menu";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface ProductDetailDrawerProps {
   product: Product | null;

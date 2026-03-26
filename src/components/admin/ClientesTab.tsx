@@ -23,7 +23,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, Users, UserPlus, TrendingUp, ArrowUpDown, Phone, Mail, ShoppingBag } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { CustomerDetailDrawer } from "./CustomerDetailDrawer";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";

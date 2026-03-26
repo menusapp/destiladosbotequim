@@ -10,7 +10,7 @@ import { OnlinePaymentStep } from "./checkout/OnlinePaymentStep";
 import { DeliveryTypeStep } from "./checkout/DeliveryTypeStep";
 import { CartItem } from "@/types/menu";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { DiscountReward } from "./checkout/LoyaltyRewardNotification";
 
 type CheckoutStep = "cart" | "delivery-type" | "address" | "payment" | "online-payment" | "summary";

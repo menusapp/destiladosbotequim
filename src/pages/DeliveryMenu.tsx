@@ -15,7 +15,7 @@ import { PedidosHistory } from "@/components/menu/PedidosHistory";
 import { ProfileView } from "@/components/menu/ProfileView";
 import { ReservationsView } from "@/components/menu/ReservationsView";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
 
 export default function DeliveryMenu() {

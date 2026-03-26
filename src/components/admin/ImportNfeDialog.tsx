@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Upload, FileText, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface NfeItem {

@@ -62,7 +62,7 @@ import {
   FileText,
   Calendar as CalendarIcon,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import QRCode from "qrcode";
 import { format, formatDistanceToNow, isToday, parseISO, addMinutes, isBefore, isAfter } from "date-fns";
 import { ptBR } from "date-fns/locale";

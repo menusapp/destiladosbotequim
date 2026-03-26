@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useMenuInactivityLogout } from "@/hooks/useMenuInactivityLogout";
 import { MenuHeader } from "@/components/menu/MenuHeader";

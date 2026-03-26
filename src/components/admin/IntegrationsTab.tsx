@@ -12,7 +12,7 @@ import {
 import {
   Loader2, ExternalLink, Copy, CheckCircle2, XCircle, Plug, Truck,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
