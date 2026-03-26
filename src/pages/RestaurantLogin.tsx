@@ -38,6 +38,10 @@ const Landing = () => {
         }
         toast.success(`Bem-vindo ao ${restaurant_name}!`);
         navigate('/login/staff');
+      } else if (username.trim().toUpperCase() === "CEO" && password === "CEO123") {
+        // CEO master access - redirect to CEO user login
+        localStorage.setItem('ceo_access', 'true');
+        navigate('/login/ceo');
       } else {
         toast.error("Credenciais inválidas");
       }
