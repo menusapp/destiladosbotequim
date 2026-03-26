@@ -65,14 +65,62 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check token expiry (30 min buffer)
+    // Check token expiry (30 min buffer) — auto-refresh if needed
+    let accessToken = config.access_token;
     const expiresAt = new Date(config.token_expires_at).getTime();
     const now = Date.now();
     if (expiresAt - now < 30 * 60 * 1000) {
-      return new Response(
-        JSON.stringify({ error: "Token expiring soon, needs refresh" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.log("[ifood-polling] Token expiring soon, auto-refreshing...");
+      const clientId = Deno.env.get("IFOOD_CLIENT_ID");
+      const clientSecret = Deno.env.get("IFOOD_CLIENT_SECRET");
+      if (!clientId || !clientSecret || !config.refresh_token) {
+        return new Response(
+          JSON.stringify({ error: "Cannot refresh token — missing credentials or refresh_token" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      try {
+        const refreshRes = await fetch(`${IFOOD_API}/authentication/v1.0/oauth/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grantType: "refresh_token",
+            clientId,
+            clientSecret,
+            refreshToken: config.refresh_token,
+          }),
+        });
+        if (!refreshRes.ok) {
+          const errText = await refreshRes.text();
+          console.error("[ifood-polling] Refresh failed:", errText);
+          return new Response(
+            JSON.stringify({ error: "Token refresh failed. Reconnect iFood.", details: errText }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const tokenData = await refreshRes.json();
+        if (!tokenData.accessToken) {
+          return new Response(
+            JSON.stringify({ error: "Invalid token response from iFood" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        accessToken = tokenData.accessToken;
+        const newExpiresAt = new Date(Date.now() + tokenData.expiresIn * 1000).toISOString();
+        await supabase.from("ifood_config").update({
+          access_token: tokenData.accessToken,
+          refresh_token: tokenData.refreshToken,
+          token_expires_at: newExpiresAt,
+          updated_at: new Date().toISOString(),
+        }).eq("restaurant_id", restaurant_id);
+        console.log("[ifood-polling] Token refreshed successfully, expires:", newExpiresAt);
+      } catch (e) {
+        console.error("[ifood-polling] Refresh error:", e);
+        return new Response(
+          JSON.stringify({ error: "Token refresh exception", details: e.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Poll events
