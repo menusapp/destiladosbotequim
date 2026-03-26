@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
     const eventsRes = await fetch(`${IFOOD_API}/events/v1.0/events:polling`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${config.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
         "X-Polling-Merchants": merchantId,
       },
     });
