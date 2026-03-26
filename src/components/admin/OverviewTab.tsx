@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DollarSign, ShoppingBag, TrendingUp, Store, Truck } from "lucide-react";
-import { useState } from "react";
 import { useOrderMetrics, type DateRange } from "@/hooks/useOrderMetrics";
 import { formatPaymentMethod } from "@/lib/utils";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface OverviewTabProps {
   restaurantId: string;
@@ -44,22 +44,12 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
   const isSingleDay = dateRange === "today" || dateRange === "yesterday";
   const chartData = isSingleDay ? data.hourlySales : data.dailySales;
   const chartLabel = isSingleDay ? "Vendas por Hora" : "Vendas por Dia";
-  const chartSubLabel = isSingleDay ? dateRangeLabels[dateRange] : dateRangeLabels[dateRange];
 
-  // SVG Chart
-  const maxChartValue = Math.max(...chartData.map(h => 'total' in h ? h.total : 0), 1);
-  const chartPadding = { top: 10, right: 10, bottom: 25, left: 50 };
-  const chartW = 600, chartH = 200;
-  const innerW = chartW - chartPadding.left - chartPadding.right;
-  const innerH = chartH - chartPadding.top - chartPadding.bottom;
-  const points = chartData.map((h, i) => ({
-    x: chartPadding.left + (i / Math.max(chartData.length - 1, 1)) * innerW,
-    y: chartPadding.top + innerH - ((h as any).total / maxChartValue) * innerH,
-    label: isSingleDay ? (h as any).hour : (h as any).day,
-    value: (h as any).total,
+  // Prepare recharts data
+  const rechartsData = chartData.map((h: any) => ({
+    label: isSingleDay ? (h.hour?.slice(0, 2) + "h") : h.day?.slice(5),
+    total: h.total ?? 0,
   }));
-  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-  const areaPath = linePath + ` L ${points[points.length - 1]?.x ?? 0} ${chartPadding.top + innerH} L ${points[0]?.x ?? 0} ${chartPadding.top + innerH} Z`;
 
   return (
     <div className="space-y-5">
@@ -97,43 +87,23 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="font-semibold text-sm">{chartLabel}</h3>
-                  <p className="text-xs text-muted-foreground">{chartSubLabel}</p>
+                  <p className="text-xs text-muted-foreground">{dateRangeLabels[dateRange]}</p>
                 </div>
                 <span className="text-lg font-bold">R$ {data.totalSales.toFixed(2)}</span>
               </div>
-              <div className="w-full overflow-x-auto">
-                <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full h-auto" style={{ minHeight: 180 }}>
-                  {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
-                    const y = chartPadding.top + innerH - pct * innerH;
-                    return (
-                      <g key={pct}>
-                        <line x1={chartPadding.left} y1={y} x2={chartW - chartPadding.right} y2={y} stroke="hsl(var(--border))" strokeWidth={0.5} strokeDasharray="4,4" />
-                        <text x={chartPadding.left - 5} y={y + 3} textAnchor="end" className="fill-muted-foreground" fontSize={9}>
-                          {(maxChartValue * pct).toFixed(0)}
-                        </text>
-                      </g>
-                    );
-                  })}
-                  {points.length > 1 && (
-                    <>
-                      <path d={areaPath} fill="hsl(var(--primary) / 0.15)" />
-                      <path d={linePath} fill="none" stroke="hsl(var(--primary))" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-                    </>
-                  )}
-                  {points.map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r={3} fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth={1.5} />
-                  ))}
-                  {points.filter((_, i) => {
-                    // Show fewer labels for large datasets
-                    const step = Math.max(1, Math.floor(points.length / 15));
-                    return i % step === 0;
-                  }).map((p, i) => (
-                    <text key={i} x={p.x} y={chartH - 5} textAnchor="middle" className="fill-muted-foreground" fontSize={9}>
-                      {isSingleDay ? p.label.slice(0, 2) + "h" : p.label.slice(5)}
-                    </text>
-                  ))}
-                </svg>
-              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={rechartsData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v}`} width={60} />
+                  <Tooltip
+                    formatter={(value: number) => [`R$ ${value.toFixed(2)}`, "Faturamento"]}
+                    labelFormatter={(label) => isSingleDay ? `Horário: ${label}` : `Data: ${label}`}
+                    contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", fontSize: 12 }}
+                  />
+                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         )}
