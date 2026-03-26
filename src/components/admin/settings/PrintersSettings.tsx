@@ -6,12 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Printer, RefreshCw, AlertCircle, CheckCircle2, Monitor, Globe } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { isElectronApp } from "@/lib/localDB";
+
 import { supabase } from "@/integrations/supabase/client";
 
-// Type assertions for Electron APIs
-const getElectronPrinter = () => (window as any).electronPrinter;
-const getElectronDB = () => (window as any).electronDB;
 
 interface PrinterInfo {
   name: string;

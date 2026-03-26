@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { DevelopmentPlaceholder } from "@/components/admin/DevelopmentPlaceholder";
+
 import MarketingTab from "@/components/admin/MarketingTab";
 import { ReportsTab } from "@/components/admin/ReportsTab";
 import UnifiedOrdersTab from "@/components/admin/UnifiedOrdersTab";
