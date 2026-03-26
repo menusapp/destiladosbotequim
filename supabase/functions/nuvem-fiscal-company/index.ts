@@ -283,9 +283,10 @@ Deno.serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          csc_producao: {
-            id: Number(cscId),
-            codigo: cscCode,
+          ambiente: "producao",
+          sefaz: {
+            id_csc: Number(cscId),
+            csc: cscCode,
           },
         }),
       });
