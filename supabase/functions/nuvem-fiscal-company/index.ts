@@ -7,13 +7,48 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function getAccessToken(): Promise<string> {
+  const clientId = Deno.env.get("NUVEM_FISCAL_CLIENT_ID");
+  const clientSecret = Deno.env.get("NUVEM_FISCAL_CLIENT_SECRET");
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Credenciais Nuvem Fiscal não configuradas");
+  }
+
+  const tokenRes = await fetch("https://auth.nuvemfiscal.com.br/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: clientId,
+      client_secret: clientSecret,
+      scope: "empresa cep cnpj nfce",
+      audience: "https://api.nuvemfiscal.com.br/",
+    }),
+  });
+
+  const tokenText = await tokenRes.text();
+  let tokenData: any;
+  try {
+    tokenData = JSON.parse(tokenText);
+  } catch {
+    throw new Error(`Resposta inválida do OAuth: ${tokenText.substring(0, 200)}`);
+  }
+
+  if (!tokenRes.ok || !tokenData.access_token) {
+    throw new Error(`Falha na autenticação Nuvem Fiscal (${tokenRes.status}): ${tokenData.error_description || tokenData.error || "desconhecido"}`);
+  }
+
+  return tokenData.access_token;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { restaurantId } = await req.json();
+    const { restaurantId, action } = await req.json();
     if (!restaurantId) {
       return new Response(
         JSON.stringify({ success: false, error: "restaurantId é obrigatório" }),
@@ -21,7 +56,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 1. Fetch fiscal config from DB
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -40,7 +74,44 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate required fields
+    const cpfCnpj = (config.cnpj || "").replace(/\D/g, "");
+
+    // ============ DISCONNECT ACTION ============
+    if (action === "disconnect") {
+      if (!cpfCnpj) {
+        return new Response(
+          JSON.stringify({ success: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        const accessToken = await getAccessToken();
+
+        // Delete company from Nuvem Fiscal
+        const deleteRes = await fetch(`https://api.nuvemfiscal.com.br/empresas/${cpfCnpj}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        console.log(`[Disconnect] DELETE company response: ${deleteRes.status}`);
+
+        if (!deleteRes.ok && deleteRes.status !== 404) {
+          const body = await deleteRes.text();
+          console.error(`[Disconnect] Failed to delete company: ${body}`);
+        }
+      } catch (err) {
+        console.error("[Disconnect] Error calling Nuvem Fiscal:", err);
+        // Continue anyway — we still want to clear local state
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ============ SYNC ACTION (default) ============
     const required = ["cnpj", "razao_social", "cep", "logradouro", "numero", "bairro", "municipio_codigo", "uf"];
     const missing = required.filter((f) => !config[f]);
     if (missing.length > 0) {
@@ -50,53 +121,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2. OAuth2 - get access token
-    const clientId = Deno.env.get("NUVEM_FISCAL_CLIENT_ID");
-    const clientSecret = Deno.env.get("NUVEM_FISCAL_CLIENT_SECRET");
+    const accessToken = await getAccessToken();
 
-    if (!clientId || !clientSecret) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Credenciais Nuvem Fiscal não configuradas" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const tokenRes = await fetch("https://auth.nuvemfiscal.com.br/oauth/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: clientId,
-        client_secret: clientSecret,
-        scope: "empresa cep cnpj nfce",
-        audience: "https://api.nuvemfiscal.com.br/",
-      }),
-    });
-
-    const tokenText = await tokenRes.text();
-    let tokenData: any;
-    try {
-      tokenData = JSON.parse(tokenText);
-    } catch {
-      console.error("OAuth response not JSON:", tokenText);
-      return new Response(
-        JSON.stringify({ success: false, error: `Resposta inválida do OAuth: ${tokenText.substring(0, 200)}` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!tokenRes.ok || !tokenData.access_token) {
-      console.error("OAuth error:", tokenRes.status, tokenData);
-      return new Response(
-        JSON.stringify({ success: false, error: `Falha na autenticação Nuvem Fiscal (${tokenRes.status}): ${tokenData.error_description || tokenData.error || "desconhecido"}` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // 3. Clean CNPJ (remove formatting)
-    const cpfCnpj = config.cnpj.replace(/\D/g, "");
-
-    // 4. Create company payload
+    // 1. Create company payload
     const payload = {
       cpf_cnpj: cpfCnpj,
       inscricao_estadual: config.inscricao_estadual || "",
@@ -117,11 +144,11 @@ Deno.serve(async (req) => {
 
     console.log("Creating company in Nuvem Fiscal:", JSON.stringify(payload));
 
-    // 5. POST to Nuvem Fiscal API
+    // 2. POST to create company (or handle already exists)
     const companyRes = await fetch("https://api.nuvemfiscal.com.br/empresas", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
@@ -139,26 +166,105 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Handle EmpresaAlreadyExists — treat as success, proceed to certificate
     if (!companyRes.ok) {
-      console.error("Nuvem Fiscal API error:", companyRes.status, companyData);
-      const errorMsg = companyData?.error?.message || companyData?.message || JSON.stringify(companyData);
+      if (companyData?.error?.code === "EmpresaAlreadyExists") {
+        console.log("Company already exists, proceeding to certificate upload...");
+      } else {
+        console.error("Nuvem Fiscal API error:", companyRes.status, companyData);
+        const errorMsg = companyData?.error?.message || companyData?.message || JSON.stringify(companyData);
+        return new Response(
+          JSON.stringify({ success: false, error: `Erro Nuvem Fiscal (${companyRes.status}): ${errorMsg}` }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      console.log("Company created successfully:", companyData);
+    }
+
+    // 3. Upload certificate to Nuvem Fiscal
+    const certPath = config.certificate_file_path;
+    const certPassword = config.certificate_password;
+
+    if (!certPath) {
+      // No certificate uploaded yet — mark as synced without cert
+      await supabase
+        .from("fiscal_configs")
+        .update({ nuvem_fiscal_status: "synced" })
+        .eq("restaurant_id", restaurantId);
+
       return new Response(
-        JSON.stringify({ success: false, error: `Erro Nuvem Fiscal (${companyRes.status}): ${errorMsg}` }),
+        JSON.stringify({ success: true, data: companyData, warning: "Empresa sincronizada, mas certificado não encontrado no storage. Faça upload do .pfx e salve novamente." }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Company created successfully:", companyData);
+    if (!certPassword) {
+      await supabase
+        .from("fiscal_configs")
+        .update({ nuvem_fiscal_status: "synced" })
+        .eq("restaurant_id", restaurantId);
 
-    // Update fiscal_configs status to 'synced'
-    const { error: updateError } = await supabase
+      return new Response(
+        JSON.stringify({ success: true, data: companyData, warning: "Empresa sincronizada, mas senha do certificado não informada." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Download .pfx from Supabase Storage
+    console.log(`Downloading certificate from storage: ${certPath}`);
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from("fiscal-certificates")
+      .download(certPath);
+
+    if (downloadError || !fileData) {
+      console.error("Failed to download certificate:", downloadError);
+      await supabase
+        .from("fiscal_configs")
+        .update({ nuvem_fiscal_status: "synced" })
+        .eq("restaurant_id", restaurantId);
+
+      return new Response(
+        JSON.stringify({ success: true, data: companyData, warning: "Empresa sincronizada, mas erro ao baixar certificado do storage." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Upload certificate to Nuvem Fiscal via multipart/form-data
+    console.log(`Uploading certificate to Nuvem Fiscal for CNPJ: ${cpfCnpj}`);
+    const formData = new FormData();
+    formData.append("file", new Blob([await fileData.arrayBuffer()]), "certificate.pfx");
+    formData.append("password", certPassword);
+
+    const certRes = await fetch(`https://api.nuvemfiscal.com.br/empresas/${cpfCnpj}/certificado`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: formData,
+    });
+
+    const certText = await certRes.text();
+    console.log(`Certificate upload response: ${certRes.status} ${certText.substring(0, 300)}`);
+
+    if (!certRes.ok) {
+      let certError = certText;
+      try {
+        const parsed = JSON.parse(certText);
+        certError = parsed?.error?.message || parsed?.message || certText;
+      } catch { /* ignore */ }
+
+      return new Response(
+        JSON.stringify({ success: false, error: `Empresa sincronizada, mas erro ao enviar certificado: ${certError}` }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // All good — mark as synced
+    await supabase
       .from("fiscal_configs")
       .update({ nuvem_fiscal_status: "synced" })
       .eq("restaurant_id", restaurantId);
-
-    if (updateError) {
-      console.error("Failed to update nuvem_fiscal_status:", updateError);
-    }
 
     return new Response(
       JSON.stringify({ success: true, data: companyData }),
