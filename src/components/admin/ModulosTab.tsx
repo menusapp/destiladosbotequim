@@ -165,7 +165,7 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
 
   // Find the "recommended" plan (middle one, or most expensive if only 2)
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+    <div className="w-full space-y-6">
       {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold tracking-tight text-foreground">Escolha seu plano</h2>

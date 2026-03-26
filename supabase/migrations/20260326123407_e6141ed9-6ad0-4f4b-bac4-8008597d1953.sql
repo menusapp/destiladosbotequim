@@ -1,0 +1,1 @@
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS pdv_source boolean NOT NULL DEFAULT false;

@@ -24,7 +24,10 @@ import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/sonner";
+import { Switch } from "@/components/ui/switch";
+import { Printer } from "lucide-react";
 import { PDVProductDrawer } from "./PDVProductDrawer";
+import { printOrder } from "@/lib/printOrder";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { TableDetailDialog } from "./TableDetailDialog";
 import { ManageTablesDrawer } from "./ManageTablesDrawer";
@@ -81,6 +84,9 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
   const [notes, setNotes] = useState("");
   const [paymentType, setPaymentType] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
+
+  // Auto-print toggle
+  const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem("pdv_auto_print") === "true");
 
   // Table management state
   const [selectedTableForDrawer, setSelectedTableForDrawer] = useState<TableData | null>(null);
@@ -356,11 +362,12 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
         if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
-          status: "pending", customer_name: customerName,
+          status: "preparing", customer_name: customerName,
           customer_cpf: customerCpf || "000.000.000-00",
           delivery_phone: customerPhone,
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
           notes: notes || null, payment_type: paymentType || null,
+          pdv_source: true,
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
@@ -368,9 +375,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
       } else if (orderType === "retirada") {
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
-          status: "pending", customer_name: customerName || "Cliente",
+          status: "preparing", customer_name: customerName || "Cliente",
           customer_cpf: customerCpf || "000.000.000-00",
           notes: notes || null, payment_type: paymentType || null,
+          pdv_source: true,
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
@@ -378,9 +386,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
       } else if (orderType === "viagem") {
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "takeaway",
-          status: "pending", customer_name: customerName || "Cliente Viagem",
+          status: "preparing", customer_name: customerName || "Cliente Viagem",
           customer_cpf: customerCpf || "000.000.000-00",
           notes: notes || null, payment_type: paymentType || null,
+          pdv_source: true,
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
@@ -434,12 +443,45 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
           notes: notes || null, payment_type: paymentType || null,
+          pdv_source: true,
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
       }
 
       toast.success("Pedido criado com sucesso!");
+
+      // Auto-print if enabled
+      if (autoPrint) {
+        const table = orderType === "mesa" ? tables?.find(t => t.id === selectedTableId) : undefined;
+        const printOrderObj = {
+          id: "PDV-" + Date.now(),
+          created_at: new Date().toISOString(),
+          customer_name: customerName || "Cliente PDV",
+          order_type: orderType === "mesa" ? "local" : "delivery",
+          delivery_type: orderType === "delivery" ? "delivery" : orderType === "retirada" ? "pickup" : orderType === "viagem" ? "takeaway" : undefined,
+          tables: table ? { table_number: table.table_number } : null,
+          delivery_address: deliveryAddress || undefined,
+          delivery_phone: customerPhone || undefined,
+          payment_type: paymentType || undefined,
+          notes: notes || undefined,
+          order_items: cart.map((item, i) => ({
+            id: `item-${i}`,
+            quantity: item.quantity,
+            price_at_order: item.price,
+            notes: item.notes || undefined,
+            products: { name: item.productName },
+            order_item_extras: item.extras.map(e => ({
+              price_at_order: e.price,
+              product_extras: { name: e.name },
+            })),
+          })),
+        };
+        try {
+          await printOrder(printOrderObj, restaurantId);
+        } catch { /* ignore print errors */ }
+      }
+
       clearForm();
       refetchTables();
       queryClient.invalidateQueries({ queryKey: ["unified-orders"] });
@@ -522,6 +564,19 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
           <p className="text-sm text-muted-foreground">
             {tables?.length || 0} mesas • {occupiedTables} ocupadas • {availableTables} livres
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Printer className="h-4 w-4 text-muted-foreground" />
+          <label htmlFor="auto-print-toggle" className="text-xs text-muted-foreground cursor-pointer">Auto-print</label>
+          <Switch
+            id="auto-print-toggle"
+            checked={autoPrint}
+            onCheckedChange={(checked) => {
+              setAutoPrint(checked);
+              localStorage.setItem("pdv_auto_print", String(checked));
+              toast.success(checked ? "Impressão automática ativada" : "Impressão automática desativada");
+            }}
+          />
         </div>
       </div>
 

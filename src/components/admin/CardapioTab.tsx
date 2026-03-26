@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProductsGrid from "./ProductsGrid";
-import CategoriesTab from "./CategoriesTab";
-import DestaquesTab from "./DestaquesTab";
 import ComplementosTab from "./ComplementosTab";
 
 interface CardapioTabProps {
@@ -31,22 +29,10 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
             Produtos
           </TabsTrigger>
           <TabsTrigger 
-            value="categorias"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
-          >
-            Categorias
-          </TabsTrigger>
-          <TabsTrigger 
             value="complementos"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
           >
             Complementos
-          </TabsTrigger>
-          <TabsTrigger 
-            value="destaques"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
-          >
-            Destaques
           </TabsTrigger>
         </TabsList>
 
@@ -54,16 +40,8 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
           <ProductsGrid restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
         </TabsContent>
 
-        <TabsContent value="categorias" className="mt-6">
-          <CategoriesTab restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
-        </TabsContent>
-
         <TabsContent value="complementos" className="mt-6">
           <ComplementosTab restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
-        </TabsContent>
-
-        <TabsContent value="destaques" className="mt-6">
-          <DestaquesTab restaurantId={restaurantId} />
         </TabsContent>
       </Tabs>
     </div>

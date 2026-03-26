@@ -190,6 +190,10 @@ const RestaurantAdmin = () => {
           
           // Verificar diretamente pelo restaurant_id do pedido e status pending
           if (orderRestaurantId === restaurantId && status === 'pending') {
+            // Skip PDV-sourced orders
+            const isPdvSource = order.pdv_source === true;
+            if (isPdvSource) return;
+            
             // Verificar se já foi notificado (usar ref para evitar stale closure)
             if (notifiedOrdersRef.current.has(orderId)) return;
 

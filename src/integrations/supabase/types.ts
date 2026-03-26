@@ -2347,6 +2347,7 @@ export type Database = {
           order_type: string | null
           payment_status: string | null
           payment_type: string | null
+          pdv_source: boolean
           restaurant_id: string
           reward_discount: number | null
           reward_id: string | null
@@ -2379,6 +2380,7 @@ export type Database = {
           order_type?: string | null
           payment_status?: string | null
           payment_type?: string | null
+          pdv_source?: boolean
           restaurant_id: string
           reward_discount?: number | null
           reward_id?: string | null
@@ -2411,6 +2413,7 @@ export type Database = {
           order_type?: string | null
           payment_status?: string | null
           payment_type?: string | null
+          pdv_source?: boolean
           restaurant_id?: string
           reward_discount?: number | null
           reward_id?: string | null

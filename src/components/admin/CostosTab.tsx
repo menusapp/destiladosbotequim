@@ -322,7 +322,7 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
             </div>
 
             {fixedCosts.length > 0 && (
-              <div className="rounded-lg border bg-muted/30 divide-y divide-border">
+              <div className="rounded-lg border bg-muted/30 divide-y divide-border max-h-[200px] overflow-y-auto scrollbar-thin">
                 {fixedCosts.map((cost) => (
                   <div key={cost.id} className="flex items-center justify-between px-3 py-2 group hover:bg-muted/50 transition-colors">
                     <div className="flex-1 min-w-0">
@@ -427,7 +427,7 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
             </div>
 
             {variableCosts.length > 0 && (
-              <div className="rounded-lg border bg-muted/30 divide-y divide-border">
+              <div className="rounded-lg border bg-muted/30 divide-y divide-border max-h-[200px] overflow-y-auto scrollbar-thin">
                 {variableCosts.map((cost) => (
                   <div key={cost.id} className="flex items-center justify-between px-3 py-2 group hover:bg-muted/50 transition-colors">
                     <div className="flex-1 min-w-0">
@@ -519,7 +519,7 @@ export default function CostosTab({ restaurantId }: CostosTabProps) {
             </div>
 
             {laborCosts.length > 0 && (
-              <div className="rounded-lg border bg-muted/30 divide-y divide-border">
+              <div className="rounded-lg border bg-muted/30 divide-y divide-border max-h-[200px] overflow-y-auto scrollbar-thin">
                 {laborCosts.map((cost) => (
                   <div key={cost.id} className="flex items-center justify-between px-3 py-2 group hover:bg-muted/50 transition-colors">
                     <div className="flex-1 min-w-0">
