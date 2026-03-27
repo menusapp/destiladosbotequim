@@ -29,6 +29,14 @@ async function getNuvemFiscalToken(): Promise<string> {
   return tokenData.access_token;
 }
 
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -36,48 +44,77 @@ Deno.serve(async (req) => {
 
   try {
     const { nuvem_fiscal_ref, type } = await req.json();
+    console.log("[NuvemFiscal-Download] Request:", { nuvem_fiscal_ref, type });
 
     if (!nuvem_fiscal_ref || !type) {
       return new Response(JSON.stringify({ error: "nuvem_fiscal_ref e type (pdf|xml) são obrigatórios" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (type !== "pdf" && type !== "xml") {
       return new Response(JSON.stringify({ error: "type deve ser 'pdf' ou 'xml'" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const accessToken = await getNuvemFiscalToken();
 
-    // GET /nfce/{id}/pdf or /nfce/{id}/xml
-    const downloadRes = await fetch(`https://api.nuvemfiscal.com.br/nfce/${nuvem_fiscal_ref}/${type}`, {
+    // First verify the document exists
+    const checkUrl = `https://api.nuvemfiscal.com.br/nfce/${nuvem_fiscal_ref}`;
+    console.log("[NuvemFiscal-Download] Checking document at:", checkUrl);
+    const checkRes = await fetch(checkUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!checkRes.ok) {
+      const checkBody = await checkRes.text();
+      console.log("[NuvemFiscal-Download] Document check failed:", checkRes.status, checkBody);
+      return new Response(JSON.stringify({ 
+        error: `Documento não encontrado na Nuvem Fiscal. Verifique se a nota foi emitida no mesmo ambiente (produção/homologação). Status: ${checkRes.status}` 
+      }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const docInfo = await checkRes.json();
+    console.log("[NuvemFiscal-Download] Document found, status:", docInfo.status, "ambiente:", docInfo.ambiente);
+
+    // Now download the file
+    const downloadUrl = `https://api.nuvemfiscal.com.br/nfce/${nuvem_fiscal_ref}/${type}`;
+    console.log("[NuvemFiscal-Download] Downloading from:", downloadUrl);
+
+    const downloadRes = await fetch(downloadUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!downloadRes.ok) {
       const errBody = await downloadRes.text();
+      console.log("[NuvemFiscal-Download] Download failed:", downloadRes.status, errBody);
       return new Response(JSON.stringify({ error: `Erro ao baixar ${type}: ${errBody.substring(0, 300)}` }), {
-        status: downloadRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const fileBytes = new Uint8Array(await downloadRes.arrayBuffer());
+    const base64Data = uint8ToBase64(fileBytes);
     const contentType = type === "pdf" ? "application/pdf" : "application/xml";
-    const fileData = await downloadRes.arrayBuffer();
+    const filename = `nfce_${nuvem_fiscal_ref}.${type}`;
 
-    return new Response(fileData, {
+    console.log("[NuvemFiscal-Download] Success! File size:", fileBytes.length, "bytes");
+
+    return new Response(JSON.stringify({
+      data: base64Data,
+      content_type: contentType,
+      filename: filename,
+    }), {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="nfce_${nuvem_fiscal_ref}.${type}"`,
-      },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
     console.error("[NuvemFiscal-Download] Error:", error);
     return new Response(JSON.stringify({ error: error.message || "Erro interno" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
