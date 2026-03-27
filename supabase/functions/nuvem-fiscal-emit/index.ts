@@ -58,7 +58,20 @@ const validOutrCSTs = new Set(["49","50","51","52","53","54","55","56","60","61"
 
 function safeOutrCST(cst: string | null | undefined): string {
   if (cst && validOutrCSTs.has(cst)) return cst;
-  return "49"; // Outras operações de saída - fallback seguro para Simples Nacional
+  return "49";
+}
+
+const brandCodes: Record<string, string> = {
+  visa: "01", mastercard: "02", amex: "03", "american express": "03",
+  elo: "04", hipercard: "06", diners: "07", "diners club": "07",
+};
+
+function extractBrandCode(brandName: string): string | null {
+  const lower = brandName.toLowerCase().trim();
+  for (const [key, code] of Object.entries(brandCodes)) {
+    if (lower.includes(key)) return code;
+  }
+  return null;
 }
 
 function mapNuvemFiscalStatus(apiResult: any): { dbStatus: string; errorMessage?: string } {
