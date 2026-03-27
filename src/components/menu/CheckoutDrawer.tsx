@@ -182,6 +182,7 @@ export const CheckoutDrawer = ({
         delivery_neighborhood: deliveryType === "delivery" ? addressData?.address?.neighborhood : null,
         delivery_city: deliveryType === "delivery" ? addressData?.address?.city : null,
         payment_type: paymentData?.method || (onlinePaymentId ? "online" : "pending"),
+        payment_brand: paymentData?.payment_brand || null,
         coupon_code: coupon?.code,
         coupon_discount: couponDiscount,
         delivery_fee: deliveryFee,
