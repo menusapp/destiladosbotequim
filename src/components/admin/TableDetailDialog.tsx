@@ -320,6 +320,20 @@ export const TableDetailDialog = ({
 
     const orderIds = payingComanda._comanda_order_ids || [payingComanda.id];
     for (const oid of orderIds) {
+      // Check if this order is still pending (never went through accepted/preparing)
+      // If so, manually deduct stock before marking as delivered
+      const { data: orderData } = await supabase.from("orders")
+        .select("id, status, order_items(id)")
+        .eq("id", oid)
+        .single();
+      
+      if (orderData && ["pending"].includes(orderData.status)) {
+        // Deduct stock for items that were never deducted by trigger
+        for (const oi of (orderData.order_items || [])) {
+          await supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: oi.id });
+        }
+      }
+      
       await supabase.from("orders").update({ status: "delivered" }).eq("id", oid);
     }
 
