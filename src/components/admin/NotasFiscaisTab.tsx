@@ -56,8 +56,6 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     return { from, to };
   });
 
-  const [syncing, setSyncing] = useState(false);
-
   useEffect(() => {
     fetchNotes();
   }, [restaurantId, dateRange, statusFilter]);
@@ -98,38 +96,12 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  const syncProcessingNotes = async () => {
-    setSyncing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("nuvem-fiscal-sync", {
-        body: { restaurant_id: restaurantId },
-      });
-      if (error) {
-        console.error("Erro ao sincronizar:", error);
-      } else if (data?.synced > 0) {
-        toast.success(`${data.synced} nota(s) atualizada(s)`);
-      }
-      await fetchNotes();
-    } catch (err) {
-      console.error("Erro ao sincronizar:", err);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  // Auto-sync on load if there are processing notes
-  useEffect(() => {
-    if (!loading && notes.some(n => n.status === "processing" || n.status === "pending")) {
-      syncProcessingNotes();
-    }
-  }, [loading]);
-
   const handleRetry = async (note: FiscalNote) => {
     setRetrying(prev => new Set(prev).add(note.id));
     try {
-      // If note already has nuvem_fiscal_ref, just sync instead of re-emitting
+      // Only re-emit if there's no nuvem_fiscal_ref — never auto-sync
       if (note.nuvem_fiscal_ref) {
-        await syncProcessingNotes();
+        toast.info("Esta nota já foi enviada. Verifique o status no painel fiscal.");
       } else {
         const { data, error } = await supabase.functions.invoke("nuvem-fiscal-emit", {
           body: { order_id: note.order_id, restaurant_id: restaurantId, fiscal_note_id: note.id },
@@ -320,9 +292,9 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                             <FileCode className="h-4 w-4 text-blue-600" />
                           </Button>
                         )}
-                        {(note.status === "error" || note.status === "pending" || note.status === "processing") && (
-                          <Button variant="ghost" size="sm" onClick={() => handleRetry(note)} disabled={retrying.has(note.id) || syncing} title={note.nuvem_fiscal_ref ? "Atualizar status" : "Retentar emissão"}>
-                            {retrying.has(note.id) || syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 text-amber-600" />}
+                        {(note.status === "error" || note.status === "pending") && !note.nuvem_fiscal_ref && (
+                          <Button variant="ghost" size="sm" onClick={() => handleRetry(note)} disabled={retrying.has(note.id)} title="Retentar emissão">
+                            {retrying.has(note.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 text-amber-600" />}
                           </Button>
                         )}
                         {!note.pdf_url && !note.xml_url && note.status !== "error" && note.status !== "pending" && note.status !== "processing" && (
