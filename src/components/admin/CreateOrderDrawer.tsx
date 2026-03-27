@@ -219,6 +219,23 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
     if (!customerName && orderType !== "mesa") { toast.error("Nome do cliente é obrigatório"); return; }
 
+    // Resolve payment type
+    let resolvedPaymentType = paymentType || null;
+    let resolvedPaymentBrand: string | null = null;
+
+    if (paymentType === "mixed") {
+      const validEntries = mixedPayments.filter(p => p.method && parseFloat(p.amount) > 0);
+      if (validEntries.length < 2) { toast.error("Pagamento misto requer pelo menos 2 formas"); return; }
+      if (mixedRemaining > 0.01) { toast.error(`Faltam R$ ${mixedRemaining.toFixed(2)} para completar o valor`); return; }
+      const { paymentStr, brandCode } = getMixedPaymentString();
+      resolvedPaymentType = paymentStr;
+      resolvedPaymentBrand = brandCode;
+    } else if (paymentType?.includes(" - ")) {
+      // Has brand embedded (e.g. "Crédito - Visa")
+      const brandPart = paymentType.split(" - ")[1]?.toLowerCase().trim();
+      resolvedPaymentBrand = brandPart || null;
+    }
+
     setSubmitting(true);
     try {
       if (orderType === "delivery") {
