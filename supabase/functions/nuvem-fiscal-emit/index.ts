@@ -97,6 +97,19 @@ const ufCodes: Record<string, number> = {
   SP: 35, SE: 28, TO: 17,
 };
 
+function mapPaymentMethod(paymentType: string | null | undefined, vPag: number): Record<string, any> {
+  const pt = (paymentType || "").toLowerCase().trim();
+  if (pt === "cash" || pt === "dinheiro") return { tPag: "01", vPag };
+  if (pt === "credit" || pt === "crédito" || pt === "credito" || pt === "cartão de crédito" || pt === "credit_card_online") return { tPag: "03", vPag };
+  if (pt === "debit" || pt === "débito" || pt === "debito" || pt === "cartão de débito") return { tPag: "04", vPag };
+  if (pt === "meal_voucher" || pt === "vale refeição" || pt === "vale refeicao") return { tPag: "10", vPag };
+  if (pt === "pix" || pt === "pix_online") return { tPag: "17", vPag };
+  if (pt === "ifood_online" || pt === "pago pelo ifood") return { tPag: "99", xPag: "Pagamento Online", vPag };
+  // Fallback: tPag 99 with description
+  const xPag = paymentType || "Outros";
+  return { tPag: "99", xPag, vPag };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
