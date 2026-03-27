@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     console.error("[NuvemFiscal-Cancel] Error:", error);
     return new Response(JSON.stringify({ error: error.message || "Erro interno" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
