@@ -142,12 +142,12 @@ function mapPaymentMethod(paymentType: string | null | undefined, vPag: number, 
 
   if (pt.startsWith("créd") || pt.startsWith("cred") || pt === "credit" || pt === "cartão de crédito" || pt === "credit_card_online") {
     const brand = paymentBrand ? extractBrandCode(paymentBrand) : extractBrandCode(pt);
-    return { tPag: "03", vPag, cartao: { tpIntegra: "2", tBand: brand || "99" } };
+    return { tPag: "03", vPag, card: { tpIntegra: "2", tBand: brand || "99" } };
   }
 
   if (pt.startsWith("déb") || pt.startsWith("deb") || pt === "debit" || pt === "cartão de débito") {
     const brand = paymentBrand ? extractBrandCode(paymentBrand) : extractBrandCode(pt);
-    return { tPag: "04", vPag, cartao: { tpIntegra: "2", tBand: brand || "99" } };
+    return { tPag: "04", vPag, card: { tpIntegra: "2", tBand: brand || "99" } };
   }
 
   if (pt.startsWith("vale") || pt === "meal_voucher") return { tPag: "10", vPag };
@@ -364,9 +364,18 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Log payment mapping for debug
+    const detPag = nfcePayload.infNFe.pag.detPag;
+    console.log("[NuvemFiscal] Payment detPag:", JSON.stringify(detPag));
     console.log("[NuvemFiscal] Emitting NFC-e for order:", order_id, "nNF:", nfceNumero, "serie:", nfceSerie);
 
-    // 7. Send to Nuvem Fiscal API
+    // 7. Increment nfce_numero BEFORE API call to avoid reuse on failure
+    await supabase
+      .from("fiscal_configs")
+      .update({ nfce_numero: nfceNumero + 1 })
+      .eq("restaurant_id", restaurant_id);
+
+    // 8. Send to Nuvem Fiscal API
     const apiResponse = await fetch("https://api.nuvemfiscal.com.br/nfce", {
       method: "POST",
       headers: {
@@ -379,7 +388,7 @@ Deno.serve(async (req) => {
     const apiResult = await apiResponse.json();
     console.log("[NuvemFiscal] Full response:", JSON.stringify(apiResult));
 
-    // 8. Use robust status mapping
+    // 9. Use robust status mapping
     let { dbStatus, errorMessage } = mapNuvemFiscalStatus(apiResult);
 
     if (!apiResponse.ok && apiResponse.status !== 202) {
@@ -387,12 +396,6 @@ Deno.serve(async (req) => {
       await updateNoteStatus(supabase, fiscal_note_id, "error", `Erro Nuvem Fiscal (${apiResponse.status}): ${fullErr}`);
       return jsonResponse({ error: fullErr, nuvem_response: apiResult });
     }
-
-    // 9. Increment nfce_numero for next emission
-    await supabase
-      .from("fiscal_configs")
-      .update({ nfce_numero: nfceNumero + 1 })
-      .eq("restaurant_id", restaurant_id);
 
     // 10. Update fiscal note with result
     const nuvemId = apiResult.id || null;
