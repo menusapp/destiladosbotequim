@@ -321,8 +321,8 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                           </Button>
                         )}
                         {(note.status === "error" || note.status === "pending" || note.status === "processing") && (
-                          <Button variant="ghost" size="sm" onClick={() => handleRetry(note)} disabled={retrying.has(note.id)} title="Retentar emissão">
-                            {retrying.has(note.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 text-amber-600" />}
+                          <Button variant="ghost" size="sm" onClick={() => handleRetry(note)} disabled={retrying.has(note.id) || syncing} title={note.nuvem_fiscal_ref ? "Atualizar status" : "Retentar emissão"}>
+                            {retrying.has(note.id) || syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 text-amber-600" />}
                           </Button>
                         )}
                         {!note.pdf_url && !note.xml_url && note.status !== "error" && note.status !== "pending" && note.status !== "processing" && (
