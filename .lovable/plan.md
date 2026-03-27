@@ -1,60 +1,52 @@
 
 
-# Correção: Rejeição de Pagamento + Download PDF/XML
+# Correção: Rejeição de Pagamento (cartao → card) + Número NFC-e
 
-## Diagnóstico
+## Causa Raiz
 
-### Problema 1 - Rejeição de pagamento com cartão
-A tabela `orders` só tem `payment_type` (ex: "Crédito - Visa", "cash", "debit"). A edge function `nuvem-fiscal-emit` tenta extrair a bandeira do cartão dessa string usando regex, mas falha na maioria dos casos porque:
-- No delivery (PaymentStep), o método é salvo como `credit`, `debit`, `meal_voucher` **sem bandeira**
-- No PDV (PaymentConfirmationModal), salva como "Cartão de Crédito - Visa" mas a função não parseia bem
-- Não existe coluna `payment_brand` no banco
+Dois problemas combinados causam as rejeições:
 
-A SEFAZ rejeita quando `tPag` é `03` (crédito) ou `04` (débito) mas falta o nó `cartao` com `tBand`.
+### Problema 1 — Propriedade `cartao` em vez de `card`
+Em `nuvem-fiscal-emit/index.ts` linhas 145 e 150, o código usa `cartao` como chave do objeto de pagamento. A API Nuvem Fiscal espera `card`. Quando o pedido é de crédito/débito, a API rejeita com `InvalidJsonProperty` e o `nfce_numero` NÃO é incrementado (a função retorna na linha 385-388 antes de chegar na linha 392).
 
-### Problema 2 - Download PDF mostra "UNAUTHORIZED"
-A função `nuvem-fiscal-download` baixa o arquivo da Nuvem Fiscal e retorna em base64. Se a API retornar um erro HTML (ex: token expirado, 401), a função codifica esse HTML como base64, o frontend decodifica e abre como "PDF" — mostrando a página de erro. A função não valida o `content-type` da resposta antes de retornar.
+### Problema 2 — Número NFC-e não incrementa em falha
+O `nfce_numero` só é incrementado após chamada bem-sucedida (linha 392). Quando a API rejeita (ex: `InvalidJsonProperty`), o número fica estagnado. O próximo pedido (mesmo que seja PIX, correto) usa o mesmo nNF, e a SEFAZ pode rejeitá-lo por conflito ou por ter recebido a tentativa anterior parcialmente.
+
+### Problema 3 — `payment_brand` nunca salvo
+A coluna `payment_brand` existe mas está NULL em todos os pedidos. A função `mapPaymentMethod` cai no fallback de extrair a bandeira do `payment_type` (ex: "Crédito - Mastercard"), o que funciona mas depende do nome correto.
 
 ## Plano de Correção
 
-### 1. Migração SQL — adicionar `payment_brand` à tabela `orders`
-```sql
-ALTER TABLE orders ADD COLUMN payment_brand text;
+### 1. Edge function `nuvem-fiscal-emit` — 3 correções
+
+**a)** Renomear `cartao` → `card` nas linhas 145 e 150:
+```typescript
+// Linha 145
+return { tPag: "03", vPag, card: { tpIntegra: "2", tBand: brand || "99" } };
+// Linha 150
+return { tPag: "04", vPag, card: { tpIntegra: "2", tBand: brand || "99" } };
 ```
-Coluna para armazenar o código da bandeira (visa, mastercard, elo, alelo, sodexo, etc.)
 
-### 2. Delivery Menu — PaymentStep: exigir seleção de bandeira
-Quando o cliente seleciona crédito/débito/vale-refeição, **exigir** que clique na bandeira específica antes de continuar. Salvar a bandeira selecionada no `onContinue` data. O CheckoutDrawer (que monta o insert do pedido) salvará o `payment_brand` junto.
+**b)** Incrementar `nfce_numero` ANTES de chamar a API (mover linhas 392-395 para antes da linha 370), garantindo que cada tentativa use um número único.
 
-### 3. Comanda (mesa) — já tem seleção de bandeira, salvar no banco
-O Comanda.tsx já mostra bandeiras ao selecionar cartão, mas não salva separadamente. Atualizar para salvar `payment_brand` no pedido.
+**c)** Adicionar log do payload de pagamento para debug futuro:
+```typescript
+console.log("[NuvemFiscal] Payment mapping:", JSON.stringify(detPag));
+```
 
-### 4. PDV — PaymentConfirmationModal: salvar `payment_brand`
-Já exige seleção de bandeira. Ao confirmar, salvar o código da bandeira na coluna `payment_brand` do pedido (além do `payment_type` concatenado que já salva).
+### 2. Frontend — garantir `payment_brand` seja salvo
 
-### 5. Edge function `nuvem-fiscal-emit` — ler `payment_brand` do banco
-- Buscar `payment_brand` junto com o pedido
-- Usar esse campo diretamente no mapeamento de `tBand` (código numérico da SEFAZ)
-- Se `payment_brand` estiver preenchido e o tipo for cartão, **sempre** incluir o nó `cartao`
-- Para vale-refeição: mapear bandeiras específicas (alelo, sodexo, ticket, vr → `tBand: "99"` com `xPag`)
-
-### 6. Edge function `nuvem-fiscal-download` — validar content-type
-Antes de retornar, verificar se o `content-type` da resposta da Nuvem Fiscal é realmente `application/pdf` ou `application/xml`. Se for `text/html` ou outro, significa erro — retornar mensagem de erro ao invés de base64 de HTML.
+Verificar e corrigir `PaymentConfirmationModal.tsx` para salvar `payment_brand` separadamente no update do pedido, e `CheckoutDrawer.tsx` para salvar no insert.
 
 ## Arquivos impactados
 
-- Migração SQL (nova coluna `payment_brand`)
-- `src/components/menu/checkout/PaymentStep.tsx` — seleção obrigatória de bandeira
-- `src/components/menu/checkout/CheckoutDrawer.tsx` ou `SummaryStep.tsx` — salvar brand no insert
-- `src/components/admin/PaymentConfirmationModal.tsx` — salvar brand no update
-- `src/pages/Comanda.tsx` — salvar brand
-- `supabase/functions/nuvem-fiscal-emit/index.ts` — ler payment_brand, mapear tBand
-- `supabase/functions/nuvem-fiscal-download/index.ts` — validar content-type da resposta
+- `supabase/functions/nuvem-fiscal-emit/index.ts` — `cartao` → `card`, incremento antecipado do nNF, log de debug
+- `src/components/admin/PaymentConfirmationModal.tsx` — verificar se salva `payment_brand`
+- `src/components/menu/CheckoutDrawer.tsx` — verificar se salva `payment_brand`
 
-### Mapeamento de bandeira → código SEFAZ (tBand)
-```
-visa → "01", mastercard → "02", amex → "03", sorocred → "04",
-hipercard → "05", elo → "06", diners → "07"
-alelo/sodexo/ticket/vr/pluxee/ifood → tPag "10" (vale refeição), sem tBand
-```
+## Resultado esperado
+
+- Pagamentos com cartão emitirão corretamente com o nó `card` + `tBand`
+- PIX, dinheiro e outros continuarão funcionando
+- Cada emissão usará um número NFC-e único, evitando conflitos na SEFAZ
 
