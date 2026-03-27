@@ -370,7 +370,7 @@ export const PaymentStep = ({
                           ? "border-primary bg-primary/5"
                           : "hover:border-primary/50"
                       }`}
-                      onClick={() => setPaymentMethod(method.value)}
+                      onClick={() => { setPaymentMethod(method.value); setSelectedBrand(""); }}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
