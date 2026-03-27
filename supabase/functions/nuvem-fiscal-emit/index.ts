@@ -58,7 +58,20 @@ const validOutrCSTs = new Set(["49","50","51","52","53","54","55","56","60","61"
 
 function safeOutrCST(cst: string | null | undefined): string {
   if (cst && validOutrCSTs.has(cst)) return cst;
-  return "49"; // Outras operações de saída - fallback seguro para Simples Nacional
+  return "49";
+}
+
+const brandCodes: Record<string, string> = {
+  visa: "01", mastercard: "02", amex: "03", "american express": "03",
+  elo: "04", hipercard: "06", diners: "07", "diners club": "07",
+};
+
+function extractBrandCode(brandName: string): string | null {
+  const lower = brandName.toLowerCase().trim();
+  for (const [key, code] of Object.entries(brandCodes)) {
+    if (lower.includes(key)) return code;
+  }
+  return null;
 }
 
 function mapNuvemFiscalStatus(apiResult: any): { dbStatus: string; errorMessage?: string } {
@@ -74,19 +87,27 @@ function mapNuvemFiscalStatus(apiResult: any): { dbStatus: string; errorMessage?
     return { dbStatus: "error", errorMessage: messages.join(" | ") || "Erro de validação" };
   }
 
+  // Check authorization sub-object first (more reliable)
+  const authStatus = (apiResult.autorizacao?.status || "").toLowerCase().trim();
   const raw = (apiResult.status || "").toLowerCase().trim();
+  const effectiveStatus = authStatus || raw;
 
-  if (["autorizada", "autorizado"].includes(raw)) {
+  if (["autorizada", "autorizado"].includes(effectiveStatus)) {
     return { dbStatus: "authorized" };
   }
-  if (["rejeitada", "rejeitado", "denegada", "denegado"].includes(raw)) {
-    return { dbStatus: "error", errorMessage: apiResult.motivo_status || "Nota rejeitada pela SEFAZ" };
+  if (["rejeitada", "rejeitado", "denegada", "denegado"].includes(effectiveStatus)) {
+    const motivo = apiResult.autorizacao?.motivo_status || apiResult.motivo_status || "Nota rejeitada pela SEFAZ";
+    return { dbStatus: "error", errorMessage: motivo };
   }
-  if (["cancelada", "cancelado"].includes(raw)) {
+  if (["cancelada", "cancelado"].includes(effectiveStatus)) {
     return { dbStatus: "canceled", errorMessage: apiResult.motivo_status };
   }
 
-  // processando, em_processamento, etc → processing
+  // If there's a protocolo in autorizacao, it's likely authorized
+  if (apiResult.autorizacao?.protocolo) {
+    return { dbStatus: "authorized" };
+  }
+
   return { dbStatus: "processing" };
 }
 
@@ -99,13 +120,36 @@ const ufCodes: Record<string, number> = {
 
 function mapPaymentMethod(paymentType: string | null | undefined, vPag: number): Record<string, any> {
   const pt = (paymentType || "").toLowerCase().trim();
+
+  // Cash
   if (pt === "cash" || pt === "dinheiro") return { tPag: "01", vPag };
-  if (pt === "credit" || pt === "crédito" || pt === "credito" || pt === "cartão de crédito" || pt === "credit_card_online") return { tPag: "03", vPag };
-  if (pt === "debit" || pt === "débito" || pt === "debito" || pt === "cartão de débito") return { tPag: "04", vPag };
-  if (pt === "meal_voucher" || pt === "vale refeição" || pt === "vale refeicao") return { tPag: "10", vPag };
+
+  // Credit card — with or without brand (e.g. "Crédito - Visa", "credit")
+  if (pt.startsWith("créd") || pt.startsWith("cred") || pt === "credit" || pt === "cartão de crédito" || pt === "credit_card_online") {
+    const result: Record<string, any> = { tPag: "03", vPag };
+    const brand = extractBrandCode(pt);
+    if (brand) result.tBand = brand;
+    return result;
+  }
+
+  // Debit card — with or without brand
+  if (pt.startsWith("déb") || pt.startsWith("deb") || pt === "debit" || pt === "cartão de débito") {
+    const result: Record<string, any> = { tPag: "04", vPag };
+    const brand = extractBrandCode(pt);
+    if (brand) result.tBand = brand;
+    return result;
+  }
+
+  // Meal voucher — with or without brand (Alelo, Sodexo, etc.)
+  if (pt.startsWith("vale") || pt === "meal_voucher") return { tPag: "10", vPag };
+
+  // PIX
   if (pt === "pix" || pt === "pix_online") return { tPag: "17", vPag };
+
+  // iFood / online
   if (pt === "ifood_online" || pt === "pago pelo ifood") return { tPag: "99", xPag: "Pagamento Online", vPag };
-  // Fallback: tPag 99 with description
+
+  // Fallback
   const xPag = paymentType || "Outros";
   return { tPag: "99", xPag, vPag };
 }
@@ -346,11 +390,22 @@ Deno.serve(async (req) => {
       .update({ nfce_numero: nfceNumero + 1 })
       .eq("restaurant_id", restaurant_id);
 
-    // 10. Update fiscal note with result
+    // 10. Update fiscal note with result — save ALL response data
+    const nuvemId = apiResult.id || null;
     const updateData: Record<string, any> = { status: dbStatus };
     if (apiResult.numero) updateData.nfe_number = String(apiResult.numero);
     if (apiResult.chave) updateData.nfe_key = apiResult.chave;
+    if (nuvemId) updateData.nuvem_fiscal_ref = nuvemId;
     if (errorMessage) updateData.error_message = errorMessage;
+
+    // Build PDF and XML URLs from Nuvem Fiscal API
+    if (nuvemId) {
+      updateData.pdf_url = `https://api.nuvemfiscal.com.br/nfce/${nuvemId}/pdf`;
+      updateData.xml_url = `https://api.nuvemfiscal.com.br/nfce/${nuvemId}/xml`;
+    }
+    // Override with direct response data if available
+    if (apiResult.autorizacao?.xml_url) updateData.xml_url = apiResult.autorizacao.xml_url;
+    if (apiResult.autorizacao?.pdf_url) updateData.pdf_url = apiResult.autorizacao.pdf_url;
 
     if (fiscal_note_id) {
       await supabase.from("order_fiscal_notes").update(updateData).eq("id", fiscal_note_id);
