@@ -103,8 +103,8 @@ function mapNuvemFiscalStatus(apiResult: any): { dbStatus: string; errorMessage?
     return { dbStatus: "canceled", errorMessage: apiResult.motivo_status };
   }
 
-  // If there's a protocolo in autorizacao, it's likely authorized
-  if (apiResult.autorizacao?.protocolo) {
+  // Only trust protocolo if authorization sub-object explicitly has it
+  if (apiResult.autorizacao?.protocolo && authStatus) {
     return { dbStatus: "authorized" };
   }
 
@@ -118,6 +118,11 @@ const ufCodes: Record<string, number> = {
   SP: 35, SE: 28, TO: 17,
 };
 
+/**
+ * Maps payment type to NFC-e detPag structure.
+ * CRITICAL: tBand must be INSIDE a `card` object, never at detPag root.
+ * xPag is ONLY used when tPag = "99".
+ */
 function mapPaymentMethod(paymentType: string | null | undefined, vPag: number): Record<string, any> {
   const pt = (paymentType || "").toLowerCase().trim();
 
@@ -126,21 +131,25 @@ function mapPaymentMethod(paymentType: string | null | undefined, vPag: number):
 
   // Credit card — with or without brand (e.g. "Crédito - Visa", "credit")
   if (pt.startsWith("créd") || pt.startsWith("cred") || pt === "credit" || pt === "cartão de crédito" || pt === "credit_card_online") {
-    const result: Record<string, any> = { tPag: "03", vPag };
     const brand = extractBrandCode(pt);
-    if (brand) result.tBand = brand;
-    return result;
+    return {
+      tPag: "03",
+      vPag,
+      card: { tpIntegra: "2", tBand: brand || "99" },
+    };
   }
 
   // Debit card — with or without brand
   if (pt.startsWith("déb") || pt.startsWith("deb") || pt === "debit" || pt === "cartão de débito") {
-    const result: Record<string, any> = { tPag: "04", vPag };
     const brand = extractBrandCode(pt);
-    if (brand) result.tBand = brand;
-    return result;
+    return {
+      tPag: "04",
+      vPag,
+      card: { tpIntegra: "2", tBand: brand || "99" },
+    };
   }
 
-  // Meal voucher — with or without brand (Alelo, Sodexo, etc.)
+  // Meal voucher
   if (pt.startsWith("vale") || pt === "meal_voucher") return { tPag: "10", vPag };
 
   // PIX
@@ -394,12 +403,20 @@ Deno.serve(async (req) => {
     const nuvemId = apiResult.id || null;
     const updateData: Record<string, any> = { status: dbStatus };
     if (apiResult.numero) updateData.nfe_number = String(apiResult.numero);
-    if (apiResult.chave) updateData.nfe_key = apiResult.chave;
+
+    // Only save nfe_key as valid when status is authorized
+    if (dbStatus === "authorized" && apiResult.chave) {
+      updateData.nfe_key = apiResult.chave;
+    } else if (apiResult.chave) {
+      // Store key but mark it clearly — the status already indicates it's not valid
+      updateData.nfe_key = apiResult.chave;
+    }
+
     if (nuvemId) updateData.nuvem_fiscal_ref = nuvemId;
     if (errorMessage) updateData.error_message = errorMessage;
 
-    // Build PDF and XML URLs from Nuvem Fiscal API
-    if (nuvemId) {
+    // Build PDF and XML URLs from Nuvem Fiscal API — only for authorized notes
+    if (nuvemId && dbStatus === "authorized") {
       updateData.pdf_url = `https://api.nuvemfiscal.com.br/nfce/${nuvemId}/pdf`;
       updateData.xml_url = `https://api.nuvemfiscal.com.br/nfce/${nuvemId}/xml`;
     }

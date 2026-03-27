@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Copy, Download, FileCode, CheckCircle2, Clock, AlertCircle, XCircle, Loader2 } from "lucide-react";
+import { Copy, Download, FileCode, CheckCircle2, Clock, AlertCircle, XCircle, Loader2, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
 
@@ -61,6 +61,7 @@ const getStatusBadge = (status: string) => {
 const FiscalNoteDetailSheet = ({ note, open, onClose }: Props) => {
   if (!note) return null;
 
+  const isAuthorized = note.status === "authorized";
   const orderItems = note.orders?.order_items || [];
   const total = orderItems.reduce((acc, item) => {
     const extrasTotal = item.order_item_extras?.reduce((s, e) => s + e.price_at_order, 0) || 0;
@@ -96,19 +97,41 @@ const FiscalNoteDetailSheet = ({ note, open, onClose }: Props) => {
             </Card>
           )}
 
+          {/* Warning for non-authorized notes with key */}
+          {!isAuthorized && note.nfe_key && note.status !== "canceled" && (
+            <Card className="p-3 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+              <div className="flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-amber-700 dark:text-amber-400 font-medium">Chave não confiável</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-300">
+                    Esta nota não foi autorizada pela SEFAZ. A chave abaixo não é válida para consulta fiscal.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
           <Separator />
 
-          {/* NFe Key */}
+          {/* NFe Key — only show copy button for authorized notes */}
           {note.nfe_key && (
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">Chave de Acesso</p>
+              <p className="text-sm font-medium text-muted-foreground mb-1">
+                Chave de Acesso
+                {isAuthorized && <span className="text-green-600 ml-1">✓ Válida</span>}
+              </p>
               <div className="flex items-start gap-2">
-                <code className="text-xs bg-muted px-2 py-1.5 rounded break-all flex-1 font-mono">
+                <code className={`text-xs px-2 py-1.5 rounded break-all flex-1 font-mono ${
+                  isAuthorized ? "bg-muted" : "bg-red-50 dark:bg-red-950/20 text-muted-foreground line-through"
+                }`}>
                   {note.nfe_key}
                 </code>
-                <Button variant="ghost" size="icon" className="flex-shrink-0 h-8 w-8" onClick={copyKey}>
-                  <Copy className="w-3.5 h-3.5" />
-                </Button>
+                {isAuthorized && (
+                  <Button variant="ghost" size="icon" className="flex-shrink-0 h-8 w-8" onClick={copyKey}>
+                    <Copy className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -200,21 +223,23 @@ const FiscalNoteDetailSheet = ({ note, open, onClose }: Props) => {
             </div>
           </Card>
 
-          {/* Download Links */}
-          <div className="flex gap-2">
-            {note.pdf_url && (
-              <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(note.pdf_url!, "_blank")}>
-                <Download className="w-4 h-4 text-red-600" />
-                Baixar PDF
-              </Button>
-            )}
-            {note.xml_url && (
-              <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(note.xml_url!, "_blank")}>
-                <FileCode className="w-4 h-4 text-blue-600" />
-                Baixar XML
-              </Button>
-            )}
-          </div>
+          {/* Download Links — only for authorized notes */}
+          {isAuthorized && (
+            <div className="flex gap-2">
+              {note.pdf_url && (
+                <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(note.pdf_url!, "_blank")}>
+                  <Download className="w-4 h-4 text-red-600" />
+                  Baixar PDF
+                </Button>
+              )}
+              {note.xml_url && (
+                <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(note.xml_url!, "_blank")}>
+                  <FileCode className="w-4 h-4 text-blue-600" />
+                  Baixar XML
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

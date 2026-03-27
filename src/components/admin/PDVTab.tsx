@@ -449,6 +449,24 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
         await insertOrderItems(order.id);
       }
 
+      // Deduct stock for PDV orders that start in 'preparing' (trigger misses them)
+      if (orderType !== "mesa") {
+        // For delivery/retirada/viagem, order starts at 'preparing' but items are inserted after
+        // The trigger fires on status change but items don't exist yet, so we manually deduct
+        const lastOrder = await supabase.from("orders")
+          .select("id, order_items(id)")
+          .eq("restaurant_id", restaurantId)
+          .eq("pdv_source", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        if (lastOrder.data?.order_items) {
+          for (const oi of lastOrder.data.order_items) {
+            await supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: oi.id });
+          }
+        }
+      }
+
       toast.success("Pedido criado com sucesso!");
 
       // Auto-print if enabled
@@ -861,7 +879,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
               {/* Payment */}
               <div className="space-y-1">
                 <Label className="text-xs font-semibold">Pagamento</Label>
-                <Select value={paymentType} onValueChange={setPaymentType}>
+                <Select value={paymentType} onValueChange={(v) => {
+                  // If switching away from card type, clear brand suffix
+                  setPaymentType(v);
+                }}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Dinheiro</SelectItem>
@@ -872,6 +893,37 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                     <SelectItem value="mixed">Misto</SelectItem>
                   </SelectContent>
                 </Select>
+                {/* Card brand selection for credit/debit */}
+                {(paymentType === "credit" || paymentType === "debit" || paymentType.startsWith("Crédito") || paymentType.startsWith("Débito")) && (
+                  <Select
+                    value={
+                      paymentType.includes(" - ") ? paymentType : ""
+                    }
+                    onValueChange={(v) => setPaymentType(v)}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Selecione a bandeira do cartão" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(paymentType === "credit" || paymentType.startsWith("Crédito")) ? (
+                        <>
+                          <SelectItem value="Crédito - Visa">Crédito - Visa</SelectItem>
+                          <SelectItem value="Crédito - Mastercard">Crédito - Mastercard</SelectItem>
+                          <SelectItem value="Crédito - Elo">Crédito - Elo</SelectItem>
+                          <SelectItem value="Crédito - Amex">Crédito - Amex</SelectItem>
+                          <SelectItem value="Crédito - Hipercard">Crédito - Hipercard</SelectItem>
+                          <SelectItem value="Crédito - Diners">Crédito - Diners</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="Débito - Visa">Débito - Visa</SelectItem>
+                          <SelectItem value="Débito - Mastercard">Débito - Mastercard</SelectItem>
+                          <SelectItem value="Débito - Elo">Débito - Elo</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               {/* Products search + grid */}

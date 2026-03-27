@@ -214,6 +214,22 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         await insertOrderItems(order.id);
       }
 
+      // Deduct stock for non-mesa PDV orders (start in 'preparing', trigger misses items)
+      if (orderType !== "mesa") {
+        const lastOrder = await supabase.from("orders")
+          .select("id, order_items(id)")
+          .eq("restaurant_id", restaurantId)
+          .eq("pdv_source", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        if (lastOrder.data?.order_items) {
+          for (const oi of lastOrder.data.order_items) {
+            await supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: oi.id });
+          }
+        }
+      }
+
       toast.success("Pedido criado com sucesso!");
       clearForm();
       onOpenChange(false);
@@ -308,21 +324,48 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                   <Textarea placeholder="Observações do pedido..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[60px]" />
                 </div>
 
-                {/* Payment */}
-                <div className="space-y-2">
-                  <Label>Pagamento</Label>
-                  <Select value={paymentType} onValueChange={setPaymentType}>
-                    <SelectTrigger><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
+              {/* Payment */}
+              <div className="space-y-2">
+                <Label>Pagamento</Label>
+                <Select value={paymentType} onValueChange={setPaymentType}>
+                  <SelectTrigger><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Dinheiro</SelectItem>
+                    <SelectItem value="debit">Débito</SelectItem>
+                    <SelectItem value="credit">Crédito</SelectItem>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="meal_voucher">Vale Refeição</SelectItem>
+                    <SelectItem value="mixed">Misto</SelectItem>
+                  </SelectContent>
+                </Select>
+                {/* Card brand selection */}
+                {(paymentType === "credit" || paymentType === "debit" || paymentType.startsWith("Crédito") || paymentType.startsWith("Débito")) && (
+                  <Select
+                    value={paymentType.includes(" - ") ? paymentType : ""}
+                    onValueChange={(v) => setPaymentType(v)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecione a bandeira do cartão" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Dinheiro</SelectItem>
-                      <SelectItem value="debit">Débito</SelectItem>
-                      <SelectItem value="credit">Crédito</SelectItem>
-                      <SelectItem value="pix">Pix</SelectItem>
-                      <SelectItem value="meal_voucher">Vale Refeição</SelectItem>
-                      <SelectItem value="mixed">Misto</SelectItem>
+                      {(paymentType === "credit" || paymentType.startsWith("Crédito")) ? (
+                        <>
+                          <SelectItem value="Crédito - Visa">Crédito - Visa</SelectItem>
+                          <SelectItem value="Crédito - Mastercard">Crédito - Mastercard</SelectItem>
+                          <SelectItem value="Crédito - Elo">Crédito - Elo</SelectItem>
+                          <SelectItem value="Crédito - Amex">Crédito - Amex</SelectItem>
+                          <SelectItem value="Crédito - Hipercard">Crédito - Hipercard</SelectItem>
+                          <SelectItem value="Crédito - Diners">Crédito - Diners</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="Débito - Visa">Débito - Visa</SelectItem>
+                          <SelectItem value="Débito - Mastercard">Débito - Mastercard</SelectItem>
+                          <SelectItem value="Débito - Elo">Débito - Elo</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
-                </div>
+                )}
+              </div>
 
                 {/* Cart Summary */}
                 {cart.length > 0 && (
