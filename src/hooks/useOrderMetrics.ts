@@ -194,32 +194,47 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       }
 
       // --- Revenue by payment method ---
-      const normalizeMethod = (method: string | null | undefined): string | null => {
-        if (!method) return null;
-        if (method === "Pago pelo iFood") return "ifood_online";
-        const validTypes = ["cash", "credit", "debit", "pix", "meal_voucher", "ifood_online"];
-        if (validTypes.includes(method)) return method;
-        // Online payment method aliases
-        if (method === "card" || method === "credit_card_online") return "credit";
-        if (method === "pix_online") return "pix";
+      const normalizeMethod = (method: string | null | undefined): string => {
+        if (!method) return "Outros";
+
+        // Portuguese display strings — keep them as-is (includes brand)
+        if (method.startsWith("Crédito")) return method;
+        if (method.startsWith("Débito")) return method;
+        if (method.startsWith("Vale")) return method;
+        if (method === "Dinheiro") return "Dinheiro";
+        if (method === "PIX") return "PIX";
+
+        // Internal codes → display labels
+        if (method === "cash") return "Dinheiro";
+        if (method === "pix" || method === "pix_online") return "PIX";
+        if (method === "credit" || method === "card" || method === "credit_card_online") return "Crédito";
+        if (method === "debit") return "Débito";
+        if (method === "meal_voucher") return "Vale Refeição";
+        if (method === "Pago pelo iFood" || method === "ifood_online") return "iFood Online";
+
+        // Mixed payments (comma-separated) — split into individual labels
+        if (method.includes(",")) return "Misto";
+
+        // Try payment_methods table lookup
         const byId = paymentMethods.find(p => p.id === method);
-        if (byId) return byId.method_type;
+        if (byId) return normalizeMethod(byId.method_type);
         const byName = paymentMethods.find(p => p.name.toLowerCase() === method.toLowerCase());
-        if (byName) return byName.method_type;
-        return null;
+        if (byName) return normalizeMethod(byName.method_type);
+
+        return "Outros";
       };
 
       const methodTotals: Record<string, number> = {};
       paidBills.forEach((b: any) => {
-        const m = normalizeMethod(b.payment_method) || "Outros";
+        const m = normalizeMethod(b.payment_method);
         methodTotals[m] = (methodTotals[m] || 0) + Number(b.total_amount);
       });
       counterOrders.forEach((co: any) => {
-        const m = normalizeMethod(co.payment_method) || "Outros";
+        const m = normalizeMethod(co.payment_method);
         methodTotals[m] = (methodTotals[m] || 0) + Number(co.total_amount);
       });
       deliveryOrders.forEach((o: any) => {
-        const m = normalizeMethod(o.payment_type) || "Outros";
+        const m = normalizeMethod(o.payment_type);
         methodTotals[m] = (methodTotals[m] || 0) + calcDeliveryOrderTotal(o);
       });
 

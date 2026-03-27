@@ -16,9 +16,15 @@ const dateRangeLabels: Record<DateRange, string> = {
   thisMonth: "Este mês", lastMonth: "Mês passado", "60days": "Últimos 60 dias", annual: "Anual",
 };
 
-const methodColors: Record<string, string> = {
-  pix: "bg-emerald-500", credit: "bg-blue-500", debit: "bg-amber-500",
-  cash: "bg-green-600", meal_voucher: "bg-purple-500", ifood_online: "bg-red-500", Outros: "bg-muted-foreground",
+const getMethodColor = (method: string): string => {
+  if (method === "PIX") return "bg-emerald-500";
+  if (method === "Dinheiro") return "bg-green-600";
+  if (method.startsWith("Crédito")) return "bg-blue-500";
+  if (method.startsWith("Débito")) return "bg-amber-500";
+  if (method.startsWith("Vale")) return "bg-purple-500";
+  if (method.startsWith("iFood")) return "bg-red-500";
+  if (method === "Misto") return "bg-indigo-500";
+  return "bg-gray-400";
 };
 
 const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
@@ -120,15 +126,15 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
               <div className="space-y-3">
                 <div className="flex h-4 rounded-full overflow-hidden bg-muted/40">
                   {data.revenueByMethod.map((r, i) => (
-                    <div key={i} className={`${methodColors[r.method] || "bg-muted-foreground"} transition-all`} style={{ width: `${(r.total / totalMethodRevenue) * 100}%` }} />
+                    <div key={i} className={`${getMethodColor(r.method)} transition-all`} style={{ width: `${(r.total / totalMethodRevenue) * 100}%` }} />
                   ))}
                 </div>
                 <div className="space-y-2">
                   {data.revenueByMethod.map((r, i) => (
                     <div key={i} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        <div className={`h-2.5 w-2.5 rounded-sm ${methodColors[r.method] || "bg-muted-foreground"}`} />
-                        <span className="text-muted-foreground">{formatPaymentMethod(r.method)}</span>
+                        <div className={`h-2.5 w-2.5 rounded-sm ${getMethodColor(r.method)}`} />
+                        <span className="text-muted-foreground">{r.method}</span>
                       </div>
                       <span className="font-medium">R$ {r.total.toFixed(2)}</span>
                     </div>
