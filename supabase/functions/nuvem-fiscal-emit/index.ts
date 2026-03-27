@@ -385,7 +385,7 @@ Deno.serve(async (req) => {
     console.log("[NuvemFiscal] Full response:", JSON.stringify(apiResult));
 
     // 8. Use robust status mapping
-    const { dbStatus, errorMessage } = mapNuvemFiscalStatus(apiResult);
+    let { dbStatus, errorMessage } = mapNuvemFiscalStatus(apiResult);
 
     if (!apiResponse.ok && apiResponse.status !== 202) {
       const fullErr = errorMessage || apiResult?.message || JSON.stringify(apiResult).substring(0, 500);
@@ -399,17 +399,59 @@ Deno.serve(async (req) => {
       .update({ nfce_numero: nfceNumero + 1 })
       .eq("restaurant_id", restaurant_id);
 
-    // 10. Update fiscal note with result — save ALL response data
+    // 9.5. If still processing, try sync loop (up to 3 attempts with 2s delay)
+    let finalResult = apiResult;
     const nuvemId = apiResult.id || null;
-    const updateData: Record<string, any> = { status: dbStatus };
-    if (apiResult.numero) updateData.nfe_number = String(apiResult.numero);
 
-    // Only save nfe_key as valid when status is authorized
-    if (dbStatus === "authorized" && apiResult.chave) {
-      updateData.nfe_key = apiResult.chave;
-    } else if (apiResult.chave) {
-      // Store key but mark it clearly — the status already indicates it's not valid
-      updateData.nfe_key = apiResult.chave;
+    if (dbStatus === "processing" && nuvemId) {
+      console.log("[NuvemFiscal] Status is processing, starting sync loop for:", nuvemId);
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Try to sync first
+        try {
+          const syncRes = await fetch(`https://api.nuvemfiscal.com.br/nfce/${nuvemId}/sincronizar`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          const syncBody = await syncRes.text();
+          console.log(`[NuvemFiscal] Sync attempt ${attempt + 1} status: ${syncRes.status}`);
+        } catch (e) {
+          console.log(`[NuvemFiscal] Sync attempt ${attempt + 1} failed:`, e);
+        }
+
+        // Then check status
+        try {
+          const checkRes = await fetch(`https://api.nuvemfiscal.com.br/nfce/${nuvemId}`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (checkRes.ok) {
+            finalResult = await checkRes.json();
+            console.log(`[NuvemFiscal] Check attempt ${attempt + 1}:`, JSON.stringify(finalResult).substring(0, 500));
+            const mapped = mapNuvemFiscalStatus(finalResult);
+            dbStatus = mapped.dbStatus;
+            errorMessage = mapped.errorMessage;
+            if (dbStatus !== "processing") {
+              console.log(`[NuvemFiscal] Resolved to: ${dbStatus}`);
+              break;
+            }
+          } else {
+            await checkRes.text();
+          }
+        } catch (e) {
+          console.log(`[NuvemFiscal] Check attempt ${attempt + 1} failed:`, e);
+        }
+      }
+    }
+
+    // 10. Update fiscal note with result — save ALL response data
+    const updateData: Record<string, any> = { status: dbStatus };
+    if (finalResult.numero) updateData.nfe_number = String(finalResult.numero);
+
+    // Save nfe_key
+    if (finalResult.chave) {
+      updateData.nfe_key = finalResult.chave;
     }
 
     if (nuvemId) updateData.nuvem_fiscal_ref = nuvemId;
@@ -421,8 +463,8 @@ Deno.serve(async (req) => {
       updateData.xml_url = `https://api.nuvemfiscal.com.br/nfce/${nuvemId}/xml`;
     }
     // Override with direct response data if available
-    if (apiResult.autorizacao?.xml_url) updateData.xml_url = apiResult.autorizacao.xml_url;
-    if (apiResult.autorizacao?.pdf_url) updateData.pdf_url = apiResult.autorizacao.pdf_url;
+    if (finalResult.autorizacao?.xml_url) updateData.xml_url = finalResult.autorizacao.xml_url;
+    if (finalResult.autorizacao?.pdf_url) updateData.pdf_url = finalResult.autorizacao.pdf_url;
 
     if (fiscal_note_id) {
       await supabase.from("order_fiscal_notes").update(updateData).eq("id", fiscal_note_id);
@@ -430,7 +472,7 @@ Deno.serve(async (req) => {
       await supabase.from("order_fiscal_notes").update(updateData).eq("order_id", order_id).eq("restaurant_id", restaurant_id);
     }
 
-    return jsonResponse({ success: true, status: dbStatus, nuvem_response: apiResult });
+    return jsonResponse({ success: true, status: dbStatus, nuvem_response: finalResult });
   } catch (error: any) {
     console.error("[NuvemFiscal] Error:", error);
     return jsonResponse({ error: error.message || "Erro interno" }, 500);
