@@ -1,44 +1,45 @@
 
-Objetivo: eliminar o “processando infinito” na NFC-e sem quebrar emissão, estoque ou pagamentos.
+Objetivo: parar imediatamente o consumo na Nuvem Fiscal e reverter apenas o bloco fiscal/sync (como você confirmou), sem mexer em PDV/cartão/estoque.
 
-1) Diagnóstico confirmado (com base no código + docs)
-- A emissão da NFC-e é assíncrona: `POST /nfce` pode retornar `status: pendente/processando` antes do resultado final da SEFAZ.
-- Hoje a função `supabase/functions/nuvem-fiscal-emit/index.ts` salva `processing`, mas não faz ciclo de consulta/sincronização depois disso.
-- A tela `NotasFiscaisTab.tsx` também não faz atualização automática de status.
-- Resultado: nota fica “processing” indefinidamente mesmo quando já há `nuvem_fiscal_ref` e até chave/número.
+1) Contenção imediata (primeiro deploy)
+- Reverter `src/components/admin/NotasFiscaisTab.tsx` para remover o auto-sync:
+  - remover `useEffect` que chama `syncProcessingNotes()` quando há notas em `processing/pending`;
+  - remover chamada automática de `syncProcessingNotes` no fluxo de carregamento.
+- Ajustar ações da tabela:
+  - notas com `nuvem_fiscal_ref` não vão mais disparar sync automático;
+  - botão de “retentar/atualizar status” passa a não chamar sync em massa (só reemitir quando não existir `nuvem_fiscal_ref`).
 
-2) Correção principal (sem alterar regras fiscais já estabilizadas)
-- Ajustar `nuvem-fiscal-emit` para, quando retorno inicial vier pendente/processando:
-  - Consultar `GET /nfce/{id}`.
-  - Se ainda pendente, chamar `POST /nfce/{id}/sincronizar`.
-  - Consultar novamente `GET /nfce/{id}` e gravar status final quando disponível.
-- Manter nota em `processing` apenas quando realmente ainda não houver resposta final, salvando mensagem de acompanhamento (última tentativa/retorno).
+2) Rollback do backend que está gerando consumo
+- Reverter `supabase/functions/nuvem-fiscal-emit/index.ts`:
+  - remover loop de 3 tentativas com `POST /nfce/{id}/sincronizar` + `GET /nfce/{id}` dentro da emissão;
+  - emissão volta a fazer apenas o `POST /nfce`, salvar retorno e encerrar rápido.
+- Desativar `supabase/functions/nuvem-fiscal-sync/index.ts` (rollback):
+  - remover uso no front;
+  - remover função implantada para impedir qualquer chamada acidental.
 
-3) Evitar reemissão indevida e duplicidade
-- Em `src/components/admin/NotasFiscaisTab.tsx`:
-  - Para notas com `status=processing` e `nuvem_fiscal_ref` preenchido, botão deixa de “retentar emissão” e passa a “atualizar status”.
-  - Esse botão chama sincronização/consulta (não cria nova emissão).
-- Isso evita pular numeração e evita gerar nova NFC-e para o mesmo pedido enquanto a anterior está em processamento.
+3) Correção de status travado (sem consumir novos eventos)
+- Aplicar ajuste de dados para limpar “processing” que já têm chave/número válidos:
+  - marcar como `authorized` quando houver `nfe_key` + `nfe_number` + sem erro técnico.
+- Notas realmente sem resposta final permanecem pendentes para ação manual futura.
 
-4) Sincronização automática de pendências (robustez)
-- Criar função backend dedicada (ex.: `nuvem-fiscal-sync`) para atualizar notas em `processing` por `nuvem_fiscal_ref`.
-- Na aba de notas, ao carregar e detectar pendências, chamar essa função e refazer `fetchNotes`.
-- (Opcional seguro) polling leve só enquanto houver notas em processamento.
+4) Correção de causa lógica (para não voltar o bug)
+- Ajustar mapeamento de status para não priorizar `autorizacao.status="registrado"` sobre `status="autorizado"` do documento.
+- Regra: status final da nota vem do status da NFC-e; evento de autorização não deve forçar “processing”.
 
-5) Validação de não regressão
-- Caso real travado: nota `91e657b3-...` deve sair de `processing` após consulta/sincronização.
-- Nova emissão dinheiro/cartão deve continuar funcionando como hoje.
-- Nota rejeitada continua indo para `error` com motivo.
-- Nota autorizada mantém chave, XML e PDF válidos.
-- Fluxos de estoque/PDV não serão tocados nessa correção.
+5) Validação obrigatória após rollback
+- Confirmar que abrir aba de notas não dispara mais ondas de execução da função de sync.
+- Confirmar queda imediata de novos eventos consumidos.
+- Confirmar que notas já com chave aparecem como autorizadas.
+- Confirmar que nova emissão cria 1 evento de emissão (sem laço de sincronização interno).
 
-Detalhes técnicos (implementação)
-- Arquivos:
-  - `supabase/functions/nuvem-fiscal-emit/index.ts`
-  - `supabase/functions/nuvem-fiscal-sync/index.ts` (novo)
-  - `src/components/admin/NotasFiscaisTab.tsx`
-- Endpoints da Nuvem Fiscal usados na reconciliação:
-  - `GET /nfce/{id}`
-  - `POST /nfce/{id}/sincronizar`
-  - (já existentes para arquivos finais) `GET /nfce/{id}/pdf` e `GET /nfce/{id}/xml`
-- Sem migração de banco obrigatória.
+Arquivos impactados
+- `src/components/admin/NotasFiscaisTab.tsx`
+- `supabase/functions/nuvem-fiscal-emit/index.ts`
+- `supabase/functions/nuvem-fiscal-sync/index.ts` (remoção/desativação)
+- ajuste pontual de dados em `order_fiscal_notes` (migração SQL de correção)
+
+Detalhes técnicos
+- Diagnóstico confirmado no código/logs:
+  - loop de consumo veio do `useEffect` em `NotasFiscaisTab` + chamadas repetidas de `nuvem-fiscal-sync`;
+  - havia também classificação incorreta para “processing” em notas já autorizadas por priorização de campo errado no mapeamento.
+- Estratégia escolhida: rollback fiscal/sync para estado estável + saneamento de dados travados, sem alterar módulos de PDV/estoque.
