@@ -45,13 +45,13 @@ Deno.serve(async (req) => {
 
     if (!nuvem_fiscal_ref) {
       return new Response(JSON.stringify({ error: "nuvem_fiscal_ref é obrigatório" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (!justificativa || justificativa.trim().length < 15) {
       return new Response(JSON.stringify({ error: "Justificativa deve ter no mínimo 15 caracteres" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
