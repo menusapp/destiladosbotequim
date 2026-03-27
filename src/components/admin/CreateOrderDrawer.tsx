@@ -316,7 +316,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           comanda_id: comandaId, status: "pending",
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
-          notes: notes || null, payment_type: paymentType || null,
+          notes: notes || null, payment_type: resolvedPaymentType,
+          payment_brand: resolvedPaymentBrand,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
