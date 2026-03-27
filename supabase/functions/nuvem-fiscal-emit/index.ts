@@ -390,11 +390,22 @@ Deno.serve(async (req) => {
       .update({ nfce_numero: nfceNumero + 1 })
       .eq("restaurant_id", restaurant_id);
 
-    // 10. Update fiscal note with result
+    // 10. Update fiscal note with result — save ALL response data
+    const nuvemId = apiResult.id || null;
     const updateData: Record<string, any> = { status: dbStatus };
     if (apiResult.numero) updateData.nfe_number = String(apiResult.numero);
     if (apiResult.chave) updateData.nfe_key = apiResult.chave;
+    if (nuvemId) updateData.nuvem_fiscal_ref = nuvemId;
     if (errorMessage) updateData.error_message = errorMessage;
+
+    // Build PDF and XML URLs from Nuvem Fiscal API
+    if (nuvemId) {
+      updateData.pdf_url = `https://api.nuvemfiscal.com.br/nfce/${nuvemId}/pdf`;
+      updateData.xml_url = `https://api.nuvemfiscal.com.br/nfce/${nuvemId}/xml`;
+    }
+    // Override with direct response data if available
+    if (apiResult.autorizacao?.xml_url) updateData.xml_url = apiResult.autorizacao.xml_url;
+    if (apiResult.autorizacao?.pdf_url) updateData.pdf_url = apiResult.autorizacao.pdf_url;
 
     if (fiscal_note_id) {
       await supabase.from("order_fiscal_notes").update(updateData).eq("id", fiscal_note_id);
