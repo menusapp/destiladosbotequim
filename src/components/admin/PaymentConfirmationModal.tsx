@@ -415,7 +415,7 @@ export const PaymentConfirmationModal = ({
                 {getBrandsForMethod(pendingMethod?.method_type || "").map((brand) => (
                   <button
                     key={brand.code}
-                    onClick={() => handleBrandSelect(brand.name)}
+                    onClick={() => handleBrandSelect(brand)}
                     className="flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all duration-200"
                   >
                     <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
