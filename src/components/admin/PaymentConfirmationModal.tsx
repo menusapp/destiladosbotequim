@@ -211,9 +211,12 @@ export const PaymentConfirmationModal = ({
       const uniqueTypes = [...new Set(allMethodTypes)];
       const billPaymentMethod = uniqueTypes.length === 1 ? uniqueTypes[0] : null;
 
+      // Get the primary brand code (first payment with a brand)
+      const primaryBrand = selectedPayments.find(p => p.brandCode)?.brandCode || null;
+
       const { error } = await supabase
         .from("orders")
-        .update({ payment_type: paymentDisplayStr })
+        .update({ payment_type: paymentDisplayStr, payment_brand: primaryBrand })
         .eq("id", order.id);
 
       if (error) throw error;
