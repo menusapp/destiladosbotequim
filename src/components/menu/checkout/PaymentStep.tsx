@@ -86,6 +86,7 @@ export const PaymentStep = ({
   customerEmail: emailProp,
 }: PaymentStepProps) => {
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
   const [changeFor, setChangeFor] = useState("");
   const [customerName, setCustomerName] = useState(nameProp || "");
   const [customerCPF, setCustomerCPF] = useState(cpfProp || "");
@@ -185,6 +186,25 @@ export const PaymentStep = ({
     loadUserData();
   }, [requireCustomerInfo, nameProp, cpfProp, phoneProp]);
 
+  // Check if selected method needs brand selection
+  const getSelectedMethodType = () => {
+    const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
+    return (selectedMethod as any)?.methodType || selectedMethod?.value || "";
+  };
+
+  const needsBrandForMethod = (methodType: string) => {
+    return ["credit", "debit", "meal_voucher", "voucher"].includes(methodType);
+  };
+
+  const getBrandsForSelectedMethod = () => {
+    const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
+    if (!selectedMethod) return [];
+    const methodType = (selectedMethod as any)?.methodType || selectedMethod?.value;
+    if (methodType === "meal_voucher" || methodType === "voucher") return MEAL_VOUCHER_BRANDS;
+    if (methodType === "credit" || methodType === "debit") return CARD_BRANDS;
+    return [];
+  };
+
   const handleContinue = () => {
     if (!paymentMethod) {
       toast.error("Selecione uma forma de pagamento");
@@ -207,7 +227,6 @@ export const PaymentStep = ({
         sessionStorage.setItem("customer_phone", customerPhone);
       }
 
-      // Save email to sessionStorage and CRM
       sessionStorage.setItem("customer_email", customerEmail);
       const cpf = customerCPF || cpfProp || sessionStorage.getItem("customer_cpf") || "";
       if (cpf && restaurantId) {
@@ -225,12 +244,19 @@ export const PaymentStep = ({
         isOnlinePayment: true,
         onlineMethod: paymentMethod === "pix_online" ? "pix" : "credit_card",
         customerEmail,
+        payment_brand: paymentMethod === "credit_card_online" ? "online" : undefined,
       });
       return;
     }
 
     const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
     const methodType = (selectedMethod as any)?.methodType || selectedMethod?.value;
+
+    // Require brand for card/voucher methods
+    if (needsBrandForMethod(methodType) && !selectedBrand) {
+      toast.error("Selecione a bandeira do cartão");
+      return;
+    }
 
     if (methodType === "cash") {
       if (!changeFor || changeFor.trim() === "") {
@@ -264,6 +290,7 @@ export const PaymentStep = ({
       type: "delivery",
       method: methodType,
       changeFor: methodType === "cash" ? changeFor : null,
+      payment_brand: selectedBrand || undefined,
     });
   };
 
