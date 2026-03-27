@@ -1,45 +1,110 @@
 
-Objetivo: parar imediatamente o consumo na Nuvem Fiscal e reverter apenas o bloco fiscal/sync (como você confirmou), sem mexer em PDV/cartão/estoque.
 
-1) Contenção imediata (primeiro deploy)
-- Reverter `src/components/admin/NotasFiscaisTab.tsx` para remover o auto-sync:
-  - remover `useEffect` que chama `syncProcessingNotes()` quando há notas em `processing/pending`;
-  - remover chamada automática de `syncProcessingNotes` no fluxo de carregamento.
-- Ajustar ações da tabela:
-  - notas com `nuvem_fiscal_ref` não vão mais disparar sync automático;
-  - botão de “retentar/atualizar status” passa a não chamar sync em massa (só reemitir quando não existir `nuvem_fiscal_ref`).
+# Correção Fiscal NFC-e + Gestão de Documentos
 
-2) Rollback do backend que está gerando consumo
-- Reverter `supabase/functions/nuvem-fiscal-emit/index.ts`:
-  - remover loop de 3 tentativas com `POST /nfce/{id}/sincronizar` + `GET /nfce/{id}` dentro da emissão;
-  - emissão volta a fazer apenas o `POST /nfce`, salvar retorno e encerrar rápido.
-- Desativar `supabase/functions/nuvem-fiscal-sync/index.ts` (rollback):
-  - remover uso no front;
-  - remover função implantada para impedir qualquer chamada acidental.
+## Resumo
 
-3) Correção de status travado (sem consumir novos eventos)
-- Aplicar ajuste de dados para limpar “processing” que já têm chave/número válidos:
-  - marcar como `authorized` quando houver `nfe_key` + `nfe_number` + sem erro técnico.
-- Notas realmente sem resposta final permanecem pendentes para ação manual futura.
+O problema das rejeições vem de 3 pontos: (1) ICMS sempre usando `ICMSSN102` com CSOSN `400` em vez do CSOSN real do produto, (2) PIS/COFINS usando `PISOutr/COFINSOutr` em vez de `PISNT/COFINSNT`, (3) potencial falta do nó `cartao` em pagamentos de cartão. Além disso, a resposta da API não está sendo tratada corretamente - o campo `chave` da raiz do objeto `Dfe` é a chave de acesso real, mas `autorizacao.status` pode ser `registrado` (que significa sucesso na SEFAZ), não `autorizado`.
 
-4) Correção de causa lógica (para não voltar o bug)
-- Ajustar mapeamento de status para não priorizar `autorizacao.status="registrado"` sobre `status="autorizado"` do documento.
-- Regra: status final da nota vem do status da NFC-e; evento de autorização não deve forçar “processing”.
+## O que será feito
 
-5) Validação obrigatória após rollback
-- Confirmar que abrir aba de notas não dispara mais ondas de execução da função de sync.
-- Confirmar queda imediata de novos eventos consumidos.
-- Confirmar que notas já com chave aparecem como autorizadas.
-- Confirmar que nova emissão cria 1 evento de emissão (sem laço de sincronização interno).
+### 1. Migração de banco - adicionar colunas `url_consulta` e `url_qrcode`
+- Adicionar `url_consulta TEXT` e `url_qrcode TEXT` à tabela `order_fiscal_notes`
+- Permitir armazenar os links oficiais retornados pela API
 
-Arquivos impactados
-- `src/components/admin/NotasFiscaisTab.tsx`
-- `supabase/functions/nuvem-fiscal-emit/index.ts`
-- `supabase/functions/nuvem-fiscal-sync/index.ts` (remoção/desativação)
-- ajuste pontual de dados em `order_fiscal_notes` (migração SQL de correção)
+### 2. Refatorar `nuvem-fiscal-emit/index.ts` - Impostos
 
-Detalhes técnicos
-- Diagnóstico confirmado no código/logs:
-  - loop de consumo veio do `useEffect` em `NotasFiscaisTab` + chamadas repetidas de `nuvem-fiscal-sync`;
-  - havia também classificação incorreta para “processing” em notas já autorizadas por priorização de campo errado no mapeamento.
-- Estratégia escolhida: rollback fiscal/sync para estado estável + saneamento de dados travados, sem alterar módulos de PDV/estoque.
+**ICMS dinâmico baseado no CSOSN do produto:**
+- Se CSOSN `102` ou `103` -> nó `ICMSSN102` com `{ orig, CSOSN }`
+- Se CSOSN `500` -> nó `ICMSSN500` com `{ orig, CSOSN: "500" }`
+- Fallback para `ICMSSN102` com CSOSN `102` se campo vazio
+
+**PIS/COFINS corrigido:**
+- Trocar de `PISOutr`/`COFINSOutr` para `PISNT`/`COFINSNT` com CST `"07"`
+- Isso elimina rejeição por grupo de imposto incorreto
+
+### 3. Refatorar `nuvem-fiscal-emit/index.ts` - Pagamentos
+
+O mapeamento de cartão já existe e parece correto (campo `card` com `tpIntegra` e `tBand`). Vou:
+- Corrigir o mapa de bandeiras: `elo` deve ser `"06"` (não `"04"`)
+- Adicionar `sorocred: "04"` e `hipercard: "05"`
+- Garantir que `tpIntegra` seja enviado como `"2"` (string, não número)
+
+### 4. Corrigir mapeamento de status da resposta
+
+Conforme o swagger, o `Dfe.status` retorna: `pendente`, `autorizado`, `rejeitado`, `denegado`, `cancelado`, `erro`. E `autorizacao.status` retorna: `pendente`, `registrado`, `rejeitado`, `erro`.
+
+O bug atual: `autorizacao.status = "registrado"` significa que o protocolo foi registrado na SEFAZ (nota autorizada), mas o código não reconhece isso. Corrigir:
+- `Dfe.status === "autorizado"` -> `authorized`
+- `autorizacao.status === "registrado"` -> `authorized` (quando `Dfe.status` é `autorizado`)
+- Salvar `Dfe.chave` como a chave de acesso de 44 dígitos
+
+### 5. Criar edge function `nuvem-fiscal-cancel`
+
+Nova função para cancelamento via `POST /nfce/{id}/cancelamento`:
+```
+Body: { "justificativa": "..." }
+```
+- Recebe `nuvem_fiscal_ref` (o id da nota na API) e `justificativa`
+- Chama a API e atualiza status para `canceled` no banco
+
+### 6. Criar edge function `nuvem-fiscal-download`
+
+Nova função proxy para download de PDF/XML autenticado:
+- Recebe `nuvem_fiscal_ref` e `type` (pdf ou xml)
+- Chama `GET /nfce/{id}/pdf` ou `GET /nfce/{id}/xml` com token OAuth
+- Retorna o arquivo ao cliente
+- Isso resolve o problema de que as URLs salvas precisam de autenticação
+
+### 7. Atualizar `NotasFiscaisTab.tsx` - Botões de ação
+
+Para notas autorizadas:
+- **PDF**: Chamar `nuvem-fiscal-download` com type=pdf e abrir em nova aba
+- **XML**: Chamar `nuvem-fiscal-download` com type=xml e baixar
+- **Cancelar**: Modal com campo de justificativa (min 15 chars), chamar `nuvem-fiscal-cancel`
+
+Para notas canceladas: desabilitar botões de download
+
+### 8. Atualizar `FiscalNoteDetailSheet.tsx`
+
+- Exibir chave de acesso formatada (grupos de 4 dígitos)
+- Botão "Consultar na SEFAZ" usando `url_consulta` se disponível
+- Exibir QR Code se `url_qrcode` disponível
+
+## Arquivos impactados
+
+- `supabase/functions/nuvem-fiscal-emit/index.ts` (corrigir impostos, pagamentos, status)
+- `supabase/functions/nuvem-fiscal-cancel/index.ts` (novo)
+- `supabase/functions/nuvem-fiscal-download/index.ts` (novo)
+- `src/components/admin/NotasFiscaisTab.tsx` (botões de ação)
+- `src/components/admin/FiscalNoteDetailSheet.tsx` (exibição melhorada)
+- Migração SQL (colunas `url_consulta`, `url_qrcode`)
+
+## Detalhes técnicos
+
+### Mapeamento ICMS (switch no emit)
+```
+CSOSN 102/103 -> { ICMS: { ICMSSN102: { orig, CSOSN: "102" } } }
+CSOSN 500     -> { ICMS: { ICMSSN500: { orig, CSOSN: "500" } } }
+default       -> { ICMS: { ICMSSN102: { orig: 0, CSOSN: "102" } } }
+```
+
+### PIS/COFINS fixo
+```
+PIS:    { PISNT:    { CST: "07" } }
+COFINS: { COFINSNT: { CST: "07" } }
+```
+
+### Bandeiras corrigidas
+```
+visa: "01", mastercard: "02", amex: "03", sorocred: "04",
+hipercard: "05", elo: "06", diners: "07", outros: "99"
+```
+
+### Resposta Dfe (captura)
+```
+chave_acesso = apiResult.chave  (44 dígitos)
+numero       = apiResult.numero
+status       = apiResult.status (autorizado/rejeitado/etc)
+```
+
