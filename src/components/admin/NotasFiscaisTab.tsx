@@ -7,7 +7,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Plus, Printer, RotateCcw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Plus, Printer, RotateCcw, Ban } from "lucide-react";
 import { format } from "date-fns";
 import NovaEmissaoModal from "./NovaEmissaoModal";
 import FiscalNoteDetailSheet from "./FiscalNoteDetailSheet";
@@ -25,6 +27,8 @@ interface FiscalNote {
   pdf_url: string | null;
   error_message: string | null;
   created_at: string;
+  url_consulta?: string | null;
+  url_qrcode?: string | null;
   orders: {
     id: string;
     customer_name: string;
@@ -46,9 +50,13 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   const [notes, setNotes] = useState<FiscalNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
+  const [downloading, setDownloading] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showEmissaoModal, setShowEmissaoModal] = useState(false);
   const [selectedNote, setSelectedNote] = useState<FiscalNote | null>(null);
+  const [cancelModal, setCancelModal] = useState<{ open: boolean; note: FiscalNote | null }>({ open: false, note: null });
+  const [cancelJustificativa, setCancelJustificativa] = useState("");
+  const [canceling, setCanceling] = useState(false);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
     const today = new Date();
     const from = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -66,7 +74,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       let query = supabase
         .from("order_fiscal_notes")
         .select(`
-          id, order_id, status, nfe_number, nfe_key, nuvem_fiscal_ref, xml_url, pdf_url, error_message, created_at,
+          id, order_id, status, nfe_number, nfe_key, nuvem_fiscal_ref, xml_url, pdf_url, error_message, created_at, url_consulta, url_qrcode,
           orders (
             id, customer_name, customer_cpf, payment_type, order_type, created_at,
             order_items (
@@ -99,7 +107,6 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   const handleRetry = async (note: FiscalNote) => {
     setRetrying(prev => new Set(prev).add(note.id));
     try {
-      // Only re-emit if there's no nuvem_fiscal_ref — never auto-sync
       if (note.nuvem_fiscal_ref) {
         toast.info("Esta nota já foi enviada. Verifique o status no painel fiscal.");
       } else {
@@ -119,6 +126,64 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       toast.error("Erro ao retentar emissão");
     } finally {
       setRetrying(prev => { const s = new Set(prev); s.delete(note.id); return s; });
+    }
+  };
+
+  const handleDownload = async (note: FiscalNote, type: "pdf" | "xml") => {
+    if (!note.nuvem_fiscal_ref) return;
+    const key = `${note.id}-${type}`;
+    setDownloading(prev => new Set(prev).add(key));
+    try {
+      const { data, error } = await supabase.functions.invoke("nuvem-fiscal-download", {
+        body: { nuvem_fiscal_ref: note.nuvem_fiscal_ref, type },
+      });
+      if (error) throw error;
+
+      // data is already a Blob-like from functions.invoke
+      const blob = data instanceof Blob ? data : new Blob([data], { type: type === "pdf" ? "application/pdf" : "application/xml" });
+      const url = URL.createObjectURL(blob);
+
+      if (type === "pdf") {
+        window.open(url, "_blank");
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `nfce_${note.nfe_number || note.id}.xml`;
+        a.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error(`Erro ao baixar ${type.toUpperCase()}`);
+    } finally {
+      setDownloading(prev => { const s = new Set(prev); s.delete(key); return s; });
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!cancelModal.note || cancelJustificativa.trim().length < 15) return;
+    setCanceling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("nuvem-fiscal-cancel", {
+        body: {
+          nuvem_fiscal_ref: cancelModal.note.nuvem_fiscal_ref,
+          justificativa: cancelJustificativa.trim(),
+          fiscal_note_id: cancelModal.note.id,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(`Erro: ${data.error}`);
+      } else {
+        toast.success("Nota cancelada com sucesso!");
+        setCancelModal({ open: false, note: null });
+        setCancelJustificativa("");
+        fetchNotes();
+      }
+    } catch (err) {
+      toast.error("Erro ao cancelar nota fiscal");
+    } finally {
+      setCanceling(false);
     }
   };
 
@@ -277,28 +342,41 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        {note.pdf_url && (
+                        {/* PDF download via proxy */}
+                        {note.status === "authorized" && note.nuvem_fiscal_ref && (
                           <>
-                            <Button variant="ghost" size="sm" onClick={() => window.open(note.pdf_url!, "_blank")} title="Baixar PDF/DANFE">
-                              <Download className="h-4 w-4 text-red-600" />
+                            <Button
+                              variant="ghost" size="sm"
+                              onClick={() => handleDownload(note, "pdf")}
+                              disabled={downloading.has(`${note.id}-pdf`)}
+                              title="Baixar PDF/DANFE"
+                            >
+                              {downloading.has(`${note.id}-pdf`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-red-600" />}
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => { const w = window.open(note.pdf_url!, "_blank"); if (w) setTimeout(() => w.print(), 1000); }} title="Imprimir Nota">
-                              <Printer className="h-4 w-4 text-orange-600" />
+                            <Button
+                              variant="ghost" size="sm"
+                              onClick={() => handleDownload(note, "xml")}
+                              disabled={downloading.has(`${note.id}-xml`)}
+                              title="Baixar XML"
+                            >
+                              {downloading.has(`${note.id}-xml`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode className="h-4 w-4 text-blue-600" />}
+                            </Button>
+                            <Button
+                              variant="ghost" size="sm"
+                              onClick={() => { setCancelModal({ open: true, note }); setCancelJustificativa(""); }}
+                              title="Cancelar Nota"
+                            >
+                              <Ban className="h-4 w-4 text-gray-600" />
                             </Button>
                           </>
-                        )}
-                        {note.xml_url && (
-                          <Button variant="ghost" size="sm" onClick={() => window.open(note.xml_url!, "_blank")} title="Baixar XML">
-                            <FileCode className="h-4 w-4 text-blue-600" />
-                          </Button>
                         )}
                         {(note.status === "error" || note.status === "pending") && !note.nuvem_fiscal_ref && (
                           <Button variant="ghost" size="sm" onClick={() => handleRetry(note)} disabled={retrying.has(note.id)} title="Retentar emissão">
                             {retrying.has(note.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 text-amber-600" />}
                           </Button>
                         )}
-                        {!note.pdf_url && !note.xml_url && note.status !== "error" && note.status !== "pending" && note.status !== "processing" && (
-                          <span className="text-xs text-muted-foreground">—</span>
+                        {note.status === "canceled" && (
+                          <span className="text-xs text-muted-foreground">Cancelada</span>
                         )}
                       </div>
                     </TableCell>
@@ -309,6 +387,40 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Cancel Modal */}
+      <Dialog open={cancelModal.open} onOpenChange={(o) => { if (!o) setCancelModal({ open: false, note: null }); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar Nota Fiscal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Informe a justificativa para o cancelamento (mínimo 15 caracteres). A SEFAZ permite cancelamento em até 30 minutos após a emissão.
+            </p>
+            <Textarea
+              placeholder="Motivo do cancelamento..."
+              value={cancelJustificativa}
+              onChange={(e) => setCancelJustificativa(e.target.value)}
+              rows={3}
+            />
+            {cancelJustificativa.trim().length > 0 && cancelJustificativa.trim().length < 15 && (
+              <p className="text-xs text-red-500">Mínimo 15 caracteres ({cancelJustificativa.trim().length}/15)</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelModal({ open: false, note: null })}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancel}
+              disabled={canceling || cancelJustificativa.trim().length < 15}
+            >
+              {canceling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar Cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <NovaEmissaoModal open={showEmissaoModal} onClose={() => setShowEmissaoModal(false)} restaurantId={restaurantId} onEmitted={fetchNotes} />
       <FiscalNoteDetailSheet note={selectedNote} open={!!selectedNote} onClose={() => setSelectedNote(null)} />
