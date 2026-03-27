@@ -65,6 +65,8 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   const [selectedSessionMovements, setSelectedSessionMovements] = useState<CashMovement[]>([]);
 
   const [openedBy, setOpenedBy] = useState("");
+  const [openingMode, setOpeningMode] = useState<"full" | "detailed">("full");
+  const [fullOpeningBalance, setFullOpeningBalance] = useState("");
   const [billCounts, setBillCounts] = useState<Record<number, number>>(() => 
     Object.fromEntries(BILL_DENOMINATIONS.map(d => [d, 0]))
   );
@@ -215,10 +217,17 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   };
 
   const handleOpenCashRegister = async () => {
-    const openingBalance = calculateOpeningBalance();
+    const openingBalance = openingMode === "full"
+      ? parseFloat(fullOpeningBalance) || 0
+      : calculateOpeningBalance();
     
     if (!openedBy) {
       toast.error("Preencha o nome do responsável");
+      return;
+    }
+
+    if (openingMode === "full" && !fullOpeningBalance) {
+      toast.error("Informe o valor de abertura");
       return;
     }
 
@@ -234,6 +243,8 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       
       toast.success("Caixa aberto com sucesso!");
       setOpenedBy("");
+      setFullOpeningBalance("");
+      setOpeningMode("full");
       setBillCounts(Object.fromEntries(BILL_DENOMINATIONS.map(d => [d, 0])));
       setCoinCounts(Object.fromEntries(COIN_DENOMINATIONS.map(d => [d, 0])));
       fetchCurrentSession();
@@ -416,69 +427,112 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                       />
                     </div>
 
-                    {/* Cédulas */}
+                    {/* Mode toggle */}
                     <div className="space-y-2">
-                     <div className="flex items-center gap-2 text-muted-foreground">
-                         <DollarSign className="h-4 w-4" />
-                         <Label className="text-base font-semibold">Cédulas</Label>
-                       </div>
-                      <div className="grid grid-cols-7 gap-2">
-                        {BILL_DENOMINATIONS.map((denom) => (
-                          <div key={denom} className="text-center">
-                            <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              className="text-center h-10"
-                              value={billCounts[denom] || 0}
-                              onChange={(e) => setBillCounts(prev => ({
-                                ...prev,
-                                [denom]: parseInt(e.target.value) || 0
-                              }))}
-                            />
-                             <p className="text-xs text-muted-foreground mt-1">
-                               R${(denom * (billCounts[denom] || 0)).toFixed(2)}
-                             </p>
-                          </div>
-                        ))}
+                      <Label className="text-sm">Modo de abertura</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant={openingMode === "full" ? "default" : "outline"}
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setOpeningMode("full")}
+                        >
+                          <DollarSign className="h-3.5 w-3.5 mr-1.5" />
+                          Valor cheio
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={openingMode === "detailed" ? "default" : "outline"}
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setOpeningMode("detailed")}
+                        >
+                          <Coins className="h-3.5 w-3.5 mr-1.5" />
+                          Cédulas e moedas
+                        </Button>
                       </div>
                     </div>
 
-                    {/* Moedas */}
-                    <div className="space-y-2">
-                       <div className="flex items-center gap-2 text-muted-foreground">
-                         <Coins className="h-4 w-4" />
-                         <Label className="text-base font-semibold">Moedas</Label>
-                       </div>
-                      <div className="grid grid-cols-5 gap-2">
-                        {COIN_DENOMINATIONS.map((denom) => (
-                          <div key={denom} className="text-center">
-                            <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              className="text-center h-10"
-                              value={coinCounts[denom] || 0}
-                              onChange={(e) => setCoinCounts(prev => ({
-                                ...prev,
-                                [denom]: parseInt(e.target.value) || 0
-                              }))}
-                            />
-                             <p className="text-xs text-muted-foreground mt-1">
-                               R${(denom * (coinCounts[denom] || 0)).toFixed(2)}
-                             </p>
-                          </div>
-                        ))}
+                    {openingMode === "full" ? (
+                      <div className="space-y-2">
+                        <Label>Valor de abertura (R$)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={fullOpeningBalance}
+                          onChange={(e) => setFullOpeningBalance(e.target.value)}
+                          placeholder="0,00"
+                          className="text-lg font-mono"
+                        />
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        {/* Cédulas */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <DollarSign className="h-4 w-4" />
+                            <Label className="text-base font-semibold">Cédulas</Label>
+                          </div>
+                          <div className="grid grid-cols-7 gap-2">
+                            {BILL_DENOMINATIONS.map((denom) => (
+                              <div key={denom} className="text-center">
+                                <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  className="text-center h-10"
+                                  value={billCounts[denom] || 0}
+                                  onChange={(e) => setBillCounts(prev => ({
+                                    ...prev,
+                                    [denom]: parseInt(e.target.value) || 0
+                                  }))}
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  R${(denom * (billCounts[denom] || 0)).toFixed(2)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Moedas */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Coins className="h-4 w-4" />
+                            <Label className="text-base font-semibold">Moedas</Label>
+                          </div>
+                          <div className="grid grid-cols-5 gap-2">
+                            {COIN_DENOMINATIONS.map((denom) => (
+                              <div key={denom} className="text-center">
+                                <Label className="text-xs text-muted-foreground">{formatDenomination(denom)}</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  className="text-center h-10"
+                                  value={coinCounts[denom] || 0}
+                                  onChange={(e) => setCoinCounts(prev => ({
+                                    ...prev,
+                                    [denom]: parseInt(e.target.value) || 0
+                                  }))}
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  R${(denom * (coinCounts[denom] || 0)).toFixed(2)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     {/* Total */}
-                     <div className="bg-muted/50 p-4 rounded-lg border">
-                       <div className="flex justify-between items-center">
-                         <span className="text-lg font-semibold">Valor de Abertura:</span>
-                         <span className="text-2xl font-bold font-mono">
-                           R$ {calculateOpeningBalance().toFixed(2)}
-                         </span>
+                    <div className="bg-muted/50 p-4 rounded-lg border">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold">Valor de Abertura:</span>
+                        <span className="text-2xl font-bold font-mono">
+                          R$ {(openingMode === "full" ? (parseFloat(fullOpeningBalance) || 0) : calculateOpeningBalance()).toFixed(2)}
+                        </span>
                       </div>
                     </div>
 
