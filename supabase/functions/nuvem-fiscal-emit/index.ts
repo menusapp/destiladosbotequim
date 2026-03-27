@@ -112,13 +112,36 @@ const ufCodes: Record<string, number> = {
 
 function mapPaymentMethod(paymentType: string | null | undefined, vPag: number): Record<string, any> {
   const pt = (paymentType || "").toLowerCase().trim();
+
+  // Cash
   if (pt === "cash" || pt === "dinheiro") return { tPag: "01", vPag };
-  if (pt === "credit" || pt === "crédito" || pt === "credito" || pt === "cartão de crédito" || pt === "credit_card_online") return { tPag: "03", vPag };
-  if (pt === "debit" || pt === "débito" || pt === "debito" || pt === "cartão de débito") return { tPag: "04", vPag };
-  if (pt === "meal_voucher" || pt === "vale refeição" || pt === "vale refeicao") return { tPag: "10", vPag };
+
+  // Credit card — with or without brand (e.g. "Crédito - Visa", "credit")
+  if (pt.startsWith("créd") || pt.startsWith("cred") || pt === "credit" || pt === "cartão de crédito" || pt === "credit_card_online") {
+    const result: Record<string, any> = { tPag: "03", vPag };
+    const brand = extractBrandCode(pt);
+    if (brand) result.tBand = brand;
+    return result;
+  }
+
+  // Debit card — with or without brand
+  if (pt.startsWith("déb") || pt.startsWith("deb") || pt === "debit" || pt === "cartão de débito") {
+    const result: Record<string, any> = { tPag: "04", vPag };
+    const brand = extractBrandCode(pt);
+    if (brand) result.tBand = brand;
+    return result;
+  }
+
+  // Meal voucher — with or without brand (Alelo, Sodexo, etc.)
+  if (pt.startsWith("vale") || pt === "meal_voucher") return { tPag: "10", vPag };
+
+  // PIX
   if (pt === "pix" || pt === "pix_online") return { tPag: "17", vPag };
+
+  // iFood / online
   if (pt === "ifood_online" || pt === "pago pelo ifood") return { tPag: "99", xPag: "Pagamento Online", vPag };
-  // Fallback: tPag 99 with description
+
+  // Fallback
   const xPag = paymentType || "Outros";
   return { tPag: "99", xPag, vPag };
 }
