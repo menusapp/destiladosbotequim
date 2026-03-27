@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Printer, ShoppingCart, Percent, Banknote, CreditCard, Smartphone, Utensils } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Printer, ShoppingCart, Percent, Banknote, CreditCard, Smartphone, Utensils, X, ArrowLeft, Check } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -51,21 +52,21 @@ const METHOD_ICONS: Record<string, any> = {
 };
 
 const CARD_BRANDS = [
-  { code: "visa", name: "Visa", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png" },
-  { code: "mastercard", name: "Mastercard", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/200px-Mastercard-logo.svg.png" },
-  { code: "elo", name: "Elo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/ELO_logo.svg/200px-ELO_logo.svg.png" },
-  { code: "amex", name: "American Express", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/American_Express_logo_%282018%29.svg/200px-American_Express_logo_%282018%29.svg.png" },
-  { code: "hipercard", name: "Hipercard", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Hipercard_logo.svg/200px-Hipercard_logo.svg.png" },
-  { code: "diners", name: "Diners Club", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Diners_Club_Logo3.svg/200px-Diners_Club_Logo3.svg.png" },
+  { code: "visa", name: "Visa" },
+  { code: "mastercard", name: "Mastercard" },
+  { code: "elo", name: "Elo" },
+  { code: "amex", name: "American Express" },
+  { code: "hipercard", name: "Hipercard" },
+  { code: "diners", name: "Diners Club" },
 ];
 
 const MEAL_VOUCHER_BRANDS = [
-  { code: "alelo", name: "Alelo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Alelo_logo.svg/200px-Alelo_logo.svg.png" },
-  { code: "sodexo", name: "Sodexo", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sodexo_logo.svg/200px-Sodexo_logo.svg.png" },
-  { code: "ticket", name: "Ticket", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Edenred_logo.svg/200px-Edenred_logo.svg.png" },
-  { code: "vr", name: "VR", logo: "https://www.vr.com.br/assets/img/logo.svg" },
-  { code: "pluxee", name: "Pluxee", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sodexo_logo.svg/200px-Sodexo_logo.svg.png" },
-  { code: "ifood", name: "iFood Benefícios", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/IFood_logo.svg/200px-IFood_logo.svg.png" },
+  { code: "alelo", name: "Alelo" },
+  { code: "sodexo", name: "Sodexo" },
+  { code: "ticket", name: "Ticket" },
+  { code: "vr", name: "VR" },
+  { code: "pluxee", name: "Pluxee" },
+  { code: "ifood", name: "iFood Benefícios" },
 ];
 
 const DEFAULT_METHODS: PaymentMethod[] = [
@@ -74,6 +75,17 @@ const DEFAULT_METHODS: PaymentMethod[] = [
   { id: "credit", method_type: "credit", name: "Cartão de Crédito", is_active: true, accepted_brands: null },
   { id: "debit", method_type: "debit", name: "Cartão de Débito", is_active: true, accepted_brands: null },
 ];
+
+const METHOD_COLORS: Record<string, string> = {
+  cash: "bg-green-500/10 border-green-500/30 hover:bg-green-500/20 text-green-700 dark:text-green-400",
+  pix: "bg-teal-500/10 border-teal-500/30 hover:bg-teal-500/20 text-teal-700 dark:text-teal-400",
+  credit: "bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400",
+  debit: "bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/20 text-purple-700 dark:text-purple-400",
+  meal_voucher: "bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400",
+  voucher: "bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400",
+};
+
+type Step = "methods" | "brand-select";
 
 export const PaymentConfirmationModal = ({
   order,
@@ -87,15 +99,11 @@ export const PaymentConfirmationModal = ({
   const [currentAmount, setCurrentAmount] = useState("");
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(DEFAULT_METHODS);
   const [loading, setLoading] = useState(true);
-
-  const getBrandInfo = (brandCode: string) => {
-    const allBrands = [...CARD_BRANDS, ...MEAL_VOUCHER_BRANDS];
-    return allBrands.find(b => b.code === brandCode);
-  };
+  const [step, setStep] = useState<Step>("methods");
+  const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch payment methods and restaurant config in parallel
       const [methodsRes, restaurantRes] = await Promise.all([
         supabase.from("payment_methods").select("*").eq("restaurant_id", restaurantId).eq("is_active", true),
         supabase.from("restaurants").select("service_fee_enabled, service_fee_percentage").eq("id", restaurantId).single(),
@@ -136,6 +144,33 @@ export const PaymentConfirmationModal = ({
   const paidAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, Math.round((total - paidAmount) * 100) / 100);
 
+  const needsBrandSelection = (methodType: string) => {
+    return ["credit", "debit", "meal_voucher", "voucher"].includes(methodType);
+  };
+
+  const getBrandsForMethod = (methodType: string) => {
+    if (methodType === "credit" || methodType === "debit") return CARD_BRANDS;
+    if (methodType === "meal_voucher" || methodType === "voucher") return MEAL_VOUCHER_BRANDS;
+    return [];
+  };
+
+  const handleMethodClick = (method: PaymentMethod) => {
+    if (needsBrandSelection(method.method_type)) {
+      setPendingMethod(method);
+      setStep("brand-select");
+    } else {
+      addPayment(method.name, method.method_type);
+    }
+  };
+
+  const handleBrandSelect = (brandName: string) => {
+    if (!pendingMethod) return;
+    const displayName = `${pendingMethod.name} - ${brandName}`;
+    addPayment(displayName, pendingMethod.method_type);
+    setStep("methods");
+    setPendingMethod(null);
+  };
+
   const addPayment = (methodName: string, methodType: string) => {
     const amount = parseFloat(currentAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -147,9 +182,12 @@ export const PaymentConfirmationModal = ({
       return;
     }
     const adjustedAmount = Math.min(amount, remaining);
-
     setSelectedPayments([...selectedPayments, { method: methodName, methodType, amount: adjustedAmount }]);
     setCurrentAmount("");
+  };
+
+  const removePayment = (idx: number) => {
+    setSelectedPayments(selectedPayments.filter((_, i) => i !== idx));
   };
 
   const fillRemaining = () => {
@@ -165,12 +203,10 @@ export const PaymentConfirmationModal = ({
     }
 
     try {
-      // Build display string for orders.payment_type (no constraint)
       const allMethodNames = selectedPayments.map(p => p.method);
       const uniqueNames = [...new Set(allMethodNames)];
       const paymentDisplayStr = uniqueNames.join(", ");
 
-      // For bills.payment_method (has check constraint: pix, card, credit, debit, cash, meal_voucher, NULL)
       const allMethodTypes = selectedPayments.map(p => p.methodType);
       const uniqueTypes = [...new Set(allMethodTypes)];
       const billPaymentMethod = uniqueTypes.length === 1 ? uniqueTypes[0] : null;
@@ -182,7 +218,6 @@ export const PaymentConfirmationModal = ({
 
       if (error) throw error;
 
-      // Always create a new bill for table orders (triggers customer logout via realtime)
       if (order.table_id) {
         const comandaId = (order as any)._comanda_id || (order as any).comanda_id || null;
         const { error: billError } = await supabase.from("bills").insert({
@@ -198,7 +233,6 @@ export const PaymentConfirmationModal = ({
         if (billError) console.error("Erro ao criar conta:", billError);
       }
 
-      // Create individual cash_movements for each split payment
       const { data: cashSession } = await supabase
         .from("cash_register_sessions")
         .select("id")
@@ -209,13 +243,11 @@ export const PaymentConfirmationModal = ({
         .maybeSingle();
 
       if (cashSession) {
-        // Delete any existing trigger-created movement for this order to avoid duplicates
         await supabase.from("cash_movements")
           .delete()
           .eq("cash_session_id", cashSession.id)
           .like("description", `Pedido Local #${order.id}%`);
 
-        // Insert one cash_movement per payment split
         for (const payment of selectedPayments) {
           await supabase.from("cash_movements").insert({
             cash_session_id: cashSession.id,
@@ -242,173 +274,206 @@ export const PaymentConfirmationModal = ({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">Finalizar atendimento</DialogTitle>
+          <DialogTitle className="text-xl font-bold">💰 Finalizar Pagamento</DialogTitle>
         </DialogHeader>
 
-        {/* Resumo do pedido */}
-        <Card className="p-4">
+        {/* Order Summary */}
+        <Card className="p-4 border-2">
           <div className="flex items-center gap-2 mb-3">
-            <ShoppingCart className="w-5 h-5" />
-            <h3 className="font-semibold">Resumo do pedido</h3>
+            <ShoppingCart className="w-5 h-5 text-primary" />
+            <h3 className="font-bold text-base">Resumo do Pedido</h3>
           </div>
-          <div className="space-y-2 text-sm">
-            {order.order_items.map((item) => (
-              <div key={item.id} className="flex justify-between">
-                <span>
-                  {item.quantity}x {item.products?.name || "Produto"}
-                </span>
-                <span>R$ {(item.price_at_order * item.quantity).toFixed(2)}</span>
-              </div>
-            ))}
-            <div className="border-t pt-2 flex justify-between font-medium">
-              <span>Subtotal dos produtos:</span>
-              <span>R$ {subtotal.toFixed(2)}</span>
+          <div className="space-y-1.5 text-sm">
+            {order.order_items.map((item) => {
+              const extrasTotal = item.order_item_extras.reduce((s, e) => s + e.price_at_order, 0) * item.quantity;
+              const itemTotal = item.price_at_order * item.quantity + extrasTotal;
+              return (
+                <div key={item.id} className="flex justify-between items-center">
+                  <span className="text-muted-foreground">
+                    <span className="font-medium text-foreground">{item.quantity}x</span> {item.products?.name || "Produto"}
+                  </span>
+                  <span className="font-medium">R$ {itemTotal.toFixed(2)}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="border-t mt-3 pt-3 space-y-1.5">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal:</span>
+              <span className="font-medium">R$ {subtotal.toFixed(2)}</span>
             </div>
-            {splitsPaidTotal > 0 && (
-              <>
-                {serviceFeeEnabled && (
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Taxa de serviço ({serviceFeePercentage}%):</span>
-                    <span>R$ {feeAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm text-green-600 font-medium">
-                  <span>Já pago via divisões:</span>
-                  <span>- R$ {splitsPaidTotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-bold text-base border-t pt-1">
-                  <span>Valor restante a pagar:</span>
-                  <span>R$ {total.toFixed(2)}</span>
-                </div>
-              </>
+            {serviceFeeEnabled && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Percent className="w-3 h-3" /> Taxa de serviço ({serviceFeePercentage}%):
+                </span>
+                <span className="font-medium">R$ {feeAmount.toFixed(2)}</span>
+              </div>
             )}
+            {splitsPaidTotal > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Já pago via divisões:</span>
+                <span className="font-medium">- R$ {splitsPaidTotal.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-lg font-bold pt-1 border-t">
+              <span>Total:</span>
+              <span>R$ {total.toFixed(2)}</span>
+            </div>
           </div>
         </Card>
 
-        {/* Taxa de serviço (somente se ativada nas configurações) */}
-        {serviceFeeEnabled && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Percent className="w-5 h-5" />
-                <span className="font-semibold">Taxa de serviço ({serviceFeePercentage}%)</span>
+        {/* Payment Methods / Brand Selection */}
+        <Card className="p-4 border-2">
+          {step === "methods" ? (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-base">Forma de Pagamento</h3>
+                {remaining > 0 && (
+                  <Badge variant="destructive" className="text-sm px-3 py-1">
+                    Falta: R$ {remaining.toFixed(2)}
+                  </Badge>
+                )}
+                {remaining <= 0.01 && selectedPayments.length > 0 && (
+                  <Badge className="bg-green-600 text-white text-sm px-3 py-1">
+                    <Check className="w-3 h-3 mr-1" /> Pago
+                  </Badge>
+                )}
               </div>
-              <span className="text-lg font-bold">R$ {feeAmount.toFixed(2)}</span>
+
+              {/* Amount input */}
+              <div className="mb-4">
+                <Label className="text-sm font-medium mb-1.5 block">Valor</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">R$</span>
+                    <Input
+                      type="number"
+                      value={currentAmount}
+                      onChange={(e) => setCurrentAmount(e.target.value)}
+                      placeholder="0,00"
+                      step="0.01"
+                      className="pl-10 text-lg font-semibold h-12"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={fillRemaining}
+                    disabled={remaining <= 0}
+                    className="h-12 px-4 whitespace-nowrap"
+                  >
+                    Valor Total
+                  </Button>
+                </div>
+              </div>
+
+              {/* Method buttons */}
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {paymentMethods.map((method) => {
+                    const Icon = METHOD_ICONS[method.method_type] || CreditCard;
+                    const colorClass = METHOD_COLORS[method.method_type] || "bg-muted/50 border-border hover:bg-muted";
+                    const needsBrand = needsBrandSelection(method.method_type);
+
+                    return (
+                      <button
+                        key={method.id}
+                        onClick={() => handleMethodClick(method)}
+                        disabled={remaining <= 0 || !currentAmount || parseFloat(currentAmount) <= 0}
+                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 ${colorClass} disabled:opacity-40 disabled:cursor-not-allowed`}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-background/80 flex items-center justify-center flex-shrink-0">
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold text-sm">{method.name}</p>
+                          {needsBrand && (
+                            <p className="text-[11px] opacity-70">Selecionar bandeira →</p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            /* Brand selection step */
+            <>
+              <div className="flex items-center gap-2 mb-4">
+                <Button variant="ghost" size="icon" onClick={() => { setStep("methods"); setPendingMethod(null); }}>
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <h3 className="font-bold text-base">
+                  Selecione a bandeira — {pendingMethod?.name}
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {getBrandsForMethod(pendingMethod?.method_type || "").map((brand) => (
+                  <button
+                    key={brand.code}
+                    onClick={() => handleBrandSelect(brand.name)}
+                    className="flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all duration-200"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <span className="font-semibold text-sm">{brand.name}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </Card>
+
+        {/* Added Payments */}
+        {selectedPayments.length > 0 && (
+          <Card className="p-4 border-2 border-green-500/30 bg-green-500/5">
+            <h3 className="font-bold text-sm mb-3 text-green-700 dark:text-green-400">
+              ✅ Pagamentos Registrados
+            </h3>
+            <div className="space-y-2">
+              {selectedPayments.map((payment, idx) => (
+                <div key={idx} className="flex items-center justify-between bg-background rounded-lg px-3 py-2 border">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{payment.method}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">R$ {payment.amount.toFixed(2)}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => removePayment(idx)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between text-sm pt-2 border-t">
+                <span className="text-muted-foreground">Total pago:</span>
+                <span className="font-bold">R$ {paidAmount.toFixed(2)}</span>
+              </div>
             </div>
           </Card>
         )}
 
-        {/* Formas de pagamento */}
-        <Card className="p-4">
-          <h3 className="font-semibold mb-3">📋 Formas de pagamento</h3>
-          
-          <div className="space-y-3">
-            <div>
-              <Label>Valor a adicionar</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  value={currentAmount}
-                  onChange={(e) => setCurrentAmount(e.target.value)}
-                  placeholder="0.00"
-                  step="0.01"
-                  className="flex-1"
-                />
-                <Button type="button" variant="outline" size="sm" onClick={fillRemaining} disabled={remaining <= 0}>
-                  Pagar Total
-                </Button>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="text-center py-4 text-muted-foreground">Carregando...</div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {paymentMethods.map((method) => {
-                  const Icon = METHOD_ICONS[method.method_type] || CreditCard;
-                  const hasBrands = method.accepted_brands && method.accepted_brands.length > 0;
-                  
-                  return (
-                    <Button
-                      key={method.id}
-                      variant="outline"
-                      onClick={() => addPayment(method.name, method.method_type)}
-                      className="h-auto p-3 flex-col items-start text-left"
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <Icon className="w-4 h-4 flex-shrink-0" />
-                        <span className="text-xs font-medium truncate">{method.name}</span>
-                      </div>
-                      
-                      {hasBrands && (
-                        <div className="flex flex-wrap gap-1 mt-2 w-full">
-                          {method.accepted_brands!.slice(0, 4).map((brandCode) => {
-                            const brand = getBrandInfo(brandCode);
-                            if (!brand) return null;
-                            return (
-                              <img 
-                                key={brandCode}
-                                src={brand.logo} 
-                                alt={brand.name}
-                                className="h-3 sm:h-4 w-auto object-contain"
-                                title={brand.name}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                              />
-                            );
-                          })}
-                          {method.accepted_brands!.length > 4 && (
-                            <span className="text-[10px] text-muted-foreground">
-                              +{method.accepted_brands!.length - 4}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </Button>
-                  );
-                })}
-              </div>
-            )}
-
-            {selectedPayments.length > 0 && (
-              <div className="border-t pt-3 space-y-2">
-                <p className="text-sm font-medium">Pagamentos adicionados:</p>
-                {selectedPayments.map((payment, idx) => (
-                  <div key={idx} className="flex justify-between text-sm">
-                    <span>{payment.method}</span>
-                    <span>R$ {payment.amount.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Totais */}
-        <Card className="p-4 bg-primary/5">
-          <div className="flex justify-between items-center text-lg font-bold">
-            <span>Total:</span>
-            <span>R$ {total.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between items-center text-lg font-bold text-red-600">
-            <span>Restante:</span>
-            <span>R$ {remaining.toFixed(2)}</span>
-          </div>
-        </Card>
-
-        {/* Ações */}
-        <div className="flex gap-2">
-          <Button variant="outline" className="flex-1 gap-2">
-            <Printer className="w-4 h-4" />
-            Imprimir resumo
+        {/* Actions */}
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" className="flex-1 gap-2 h-12" onClick={onClose}>
+            Cancelar
           </Button>
           <Button
             onClick={handleConfirmPayment}
             disabled={remaining > 0.01}
-            className="flex-1 gap-2"
+            className="flex-1 gap-2 h-12 text-base font-bold"
           >
-            ✓ Confirmar Pagamento
+            <Check className="w-5 h-5" />
+            Confirmar Pagamento
           </Button>
         </div>
       </DialogContent>
