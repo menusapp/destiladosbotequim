@@ -98,20 +98,51 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
+  const syncProcessingNotes = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("nuvem-fiscal-sync", {
+        body: { restaurant_id: restaurantId },
+      });
+      if (error) {
+        console.error("Erro ao sincronizar:", error);
+      } else if (data?.synced > 0) {
+        toast.success(`${data.synced} nota(s) atualizada(s)`);
+      }
+      await fetchNotes();
+    } catch (err) {
+      console.error("Erro ao sincronizar:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Auto-sync on load if there are processing notes
+  useEffect(() => {
+    if (!loading && notes.some(n => n.status === "processing" || n.status === "pending")) {
+      syncProcessingNotes();
+    }
+  }, [loading]);
+
   const handleRetry = async (note: FiscalNote) => {
     setRetrying(prev => new Set(prev).add(note.id));
     try {
-      const { data, error } = await supabase.functions.invoke("nuvem-fiscal-emit", {
-        body: { order_id: note.order_id, restaurant_id: restaurantId, fiscal_note_id: note.id },
-      });
-      if (error) {
-        toast.error("Erro ao retentar emissão");
-      } else if (data?.error) {
-        toast.error(`Erro: ${data.error}`);
+      // If note already has nuvem_fiscal_ref, just sync instead of re-emitting
+      if (note.nuvem_fiscal_ref) {
+        await syncProcessingNotes();
       } else {
-        toast.success("Emissão retentada com sucesso!");
+        const { data, error } = await supabase.functions.invoke("nuvem-fiscal-emit", {
+          body: { order_id: note.order_id, restaurant_id: restaurantId, fiscal_note_id: note.id },
+        });
+        if (error) {
+          toast.error("Erro ao retentar emissão");
+        } else if (data?.error) {
+          toast.error(`Erro: ${data.error}`);
+        } else {
+          toast.success("Emissão retentada com sucesso!");
+        }
+        fetchNotes();
       }
-      fetchNotes();
     } catch (err) {
       toast.error("Erro ao retentar emissão");
     } finally {
