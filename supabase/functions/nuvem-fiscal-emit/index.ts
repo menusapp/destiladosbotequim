@@ -133,20 +133,20 @@ const ufCodes: Record<string, number> = {
 
 /**
  * Maps payment type to NFC-e detPag structure.
- * CRITICAL: For cards, `cartao` object with `tpIntegra` (string "2") and `tBand` is mandatory.
+ * Uses the separate payment_brand field for accurate tBand mapping.
  */
-function mapPaymentMethod(paymentType: string | null | undefined, vPag: number): Record<string, any> {
+function mapPaymentMethod(paymentType: string | null | undefined, vPag: number, paymentBrand: string | null | undefined): Record<string, any> {
   const pt = (paymentType || "").toLowerCase().trim();
 
   if (pt === "cash" || pt === "dinheiro") return { tPag: "01", vPag };
 
   if (pt.startsWith("créd") || pt.startsWith("cred") || pt === "credit" || pt === "cartão de crédito" || pt === "credit_card_online") {
-    const brand = extractBrandCode(pt);
+    const brand = paymentBrand ? extractBrandCode(paymentBrand) : extractBrandCode(pt);
     return { tPag: "03", vPag, cartao: { tpIntegra: "2", tBand: brand || "99" } };
   }
 
   if (pt.startsWith("déb") || pt.startsWith("deb") || pt === "debit" || pt === "cartão de débito") {
-    const brand = extractBrandCode(pt);
+    const brand = paymentBrand ? extractBrandCode(paymentBrand) : extractBrandCode(pt);
     return { tPag: "04", vPag, cartao: { tpIntegra: "2", tBand: brand || "99" } };
   }
 
@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
     // 2. Fetch order
     const { data: order, error: orderErr } = await supabase
       .from("orders")
-      .select("id, customer_name, customer_cpf, created_at, delivery_fee, payment_type")
+      .select("id, customer_name, customer_cpf, created_at, delivery_fee, payment_type, payment_brand")
       .eq("id", order_id)
       .single();
 
@@ -345,7 +345,7 @@ Deno.serve(async (req) => {
           },
         },
         pag: {
-          detPag: [mapPaymentMethod(order.payment_type, Number(totalProdutos.toFixed(2)))],
+          detPag: [mapPaymentMethod(order.payment_type, Number(totalProdutos.toFixed(2)), order.payment_brand)],
         },
         transp: { modFrete: 9 },
         infAdic: { infCpl: `Pedido: ${order_id}` },

@@ -91,7 +91,17 @@ Deno.serve(async (req) => {
     if (!downloadRes.ok) {
       const errBody = await downloadRes.text();
       console.log("[NuvemFiscal-Download] Download failed:", downloadRes.status, errBody);
-      return new Response(JSON.stringify({ error: `Erro ao baixar ${type}: ${errBody.substring(0, 300)}` }), {
+      return new Response(JSON.stringify({ error: `Erro ao baixar ${type}: Status ${downloadRes.status}. ${errBody.substring(0, 300)}` }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate content-type to avoid returning HTML error pages as file data
+    const responseContentType = downloadRes.headers.get("content-type") || "";
+    if (responseContentType.includes("text/html")) {
+      const htmlBody = await downloadRes.text();
+      console.log("[NuvemFiscal-Download] Got HTML instead of file:", htmlBody.substring(0, 300));
+      return new Response(JSON.stringify({ error: "A API retornou uma página de erro. Verifique se as credenciais estão corretas e se a nota existe no ambiente atual." }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
