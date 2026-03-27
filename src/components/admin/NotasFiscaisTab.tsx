@@ -56,6 +56,8 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     return { from, to };
   });
 
+  const [syncing, setSyncing] = useState(false);
+
   useEffect(() => {
     fetchNotes();
   }, [restaurantId, dateRange, statusFilter]);
