@@ -85,6 +85,10 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [notes, setNotes] = useState("");
   const [paymentType, setPaymentType] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
+  const [mixedPayments, setMixedPayments] = useState<MixedPaymentEntry[]>([
+    { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
+    { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
+  ]);
 
   const { data: products } = useQuery({
     queryKey: ["products-create-order", restaurantId],
