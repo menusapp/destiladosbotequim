@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
     // 2. Fetch order
     const { data: order, error: orderErr } = await supabase
       .from("orders")
-      .select("id, customer_name, customer_cpf, created_at, delivery_fee")
+      .select("id, customer_name, customer_cpf, created_at, delivery_fee, payment_type")
       .eq("id", order_id)
       .single();
 
@@ -284,7 +284,7 @@ Deno.serve(async (req) => {
           },
         },
         pag: {
-          detPag: [{ tPag: "99", vPag: Number(totalProdutos.toFixed(2)) }],
+          detPag: [mapPaymentMethod(order.payment_type, Number(totalProdutos.toFixed(2)))],
         },
         transp: { modFrete: 9 },
         infAdic: { infCpl: `Pedido: ${order_id}` },
