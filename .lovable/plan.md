@@ -1,76 +1,51 @@
 
-Objetivo: corrigir de uma vez o “Validation failed”, impedir notas presas em “processing” e deixar a nota travada como recusada/rejeitada sem quebrar os fluxos já existentes.
 
-1) Diagnóstico (confirmado nos logs)
-- Erro atual real: `ValidationFailed` por CST inválido em:
-  - `infNFe.det[0].imposto.PIS.PISOutr.CST = 07`
-  - `infNFe.det[0].imposto.COFINS.COFINSOutr.CST = 07`
-- A API aceita CSTs como 49, 50, 51...99 para esse bloco.
-- Há inconsistência de status no código:
-  - log verifica `rejeitado` (masculino)
-  - mapeamento final só trata `rejeitada` (feminino)
-  - isso pode deixar nota em `processing` quando deveria ir para erro/rejeição.
-- Já existe nota travada em `processing` no banco (com chave), então precisamos tratar backlog também.
+## Plano: 3 Correções Urgentes
 
-2) Correção “uma jogada só” (implementação)
-Arquivo: `supabase/functions/nuvem-fiscal-emit/index.ts`
+### 1. Pagamento melhorado com seleção de bandeira para cartão
 
-2.1 Corrigir imposto PIS/COFINS para valores válidos
-- Remover hardcode `CST: "07"` em PIS/COFINS.
-- Usar:
-  - produto: `fiscal_pis_cst` / `fiscal_cofins_cst`
-  - fallback seguro: `"49"` se vier vazio/inválido
-- Aplicar a mesma regra aos extras.
-- Manter ICMS no formato que já está aceito para Simples (`ICMSSN102` + `CSOSN: "400"`), sem alterar o resto fiscal desnecessariamente.
+**Problema**: A tela de pagamento (`PaymentConfirmationModal`) é simples demais e ao selecionar Débito/Crédito não pede para escolher a bandeira do cartão, o que é necessário para emissão de NFC-e.
 
-2.2 Normalizar mapeamento de status da Nuvem Fiscal
-- Criar normalização robusta (lowercase) para mapear:
-  - `autorizada`/`autorizado` -> `authorized`
-  - `rejeitada`/`rejeitado`/`denegada`/`denegado` -> `error`
-  - demais -> `processing`
-- Se `apiResult.error` existir, forçar `status = error` e salvar motivo detalhado.
+**Solução**:
+- Redesenhar o `PaymentConfirmationModal.tsx` com layout mais profissional:
+  - Cards maiores com ícones mais visíveis para cada método
+  - Quando selecionar Crédito ou Débito, abrir um sub-painel/step para escolher a bandeira (Visa, Mastercard, Elo, Amex, Hipercard, Diners)
+  - Quando selecionar Vale Refeição, abrir sub-painel para escolher a bandeira (Alelo, Sodexo, Ticket, VR, Pluxee)
+  - O `payment.method` gravado incluirá a bandeira (ex: "Crédito - Visa", "Débito - Mastercard")
+  - Manter compatibilidade com o `methodType` para a tabela `bills` e mapeamento fiscal
+- Melhorar visual geral: resumo do pedido mais claro, totais destacados, lista de pagamentos adicionados com botão de remover
 
-2.3 Salvar motivo completo da rejeição/validação no banco
-- Continuar logando response completo.
-- Montar `error_message` completo com:
-  - `apiResult.error.message`
-  - concatenação de `apiResult.error.errors[].message` (sem truncar)
-  - `motivo_status` quando existir
-- Assim o usuário vê o motivo real sem depender só dos logs.
+### 2. Estoque não descontado em pedidos PDV
 
-2.4 Tirar nota travada de processing
-- Na própria emissão, antes/ao final de tentativa com erro, atualizar a nota atual para `error`.
-- Adicionar migração de saneamento (one-shot) para notas antigas:
-  - `status='processing'` e antigas (ex.: > 30 min) -> `status='error'`
-  - `error_message='Recusada automaticamente: processamento inconsistente/expirado'`
-- Isso atende ao pedido de parar a nota que ficou processando.
+**Problema**: O trigger `process_order_stock_movement` só desconta estoque quando o status muda para `accepted`. Pedidos PDV (delivery/retirada) pulam `accepted` e vão direto para `preparing`, então o estoque nunca é descontado.
 
-3) Ajustes de interface para operação segura
-Arquivo: `src/components/admin/NotasFiscaisTab.tsx`
-- Exibir mensagem completa de erro (não só truncada) em área expandível/tooltip melhorado.
-- Permitir “Retentar emissão” também quando status estiver `processing` (além de `pending`/`error`) para destravar operacionalmente.
-- Onde hoje aparece “Erro”, ajustar rótulo para “Rejeitada/Erro” para refletir melhor o contexto fiscal.
+**Solução** (migração SQL):
+- Atualizar a função `process_order_stock_movement()` para TAMBÉM disparar quando o status muda para `preparing` (verificando que o status anterior era `pending` ou é um INSERT novo), evitando dupla dedução
+- Condição: `IF (NEW.status = 'accepted' AND (OLD IS NULL OR OLD.status != 'accepted')) OR (NEW.status = 'preparing' AND (OLD IS NULL OR OLD.status NOT IN ('accepted', 'preparing', 'ready', ...)))` — basicamente, deduzir na primeira transição para `accepted` OU `preparing`, o que vier primeiro
+- Isso cobre tanto pedidos normais (pending → accepted) quanto PDV (pending → preparing)
 
-4) Verificação de estabilidade (sem quebrar fluxo existente)
-- Não mudar contrato de payload fora de impostos/status.
-- Não alterar fluxo de sincronização da empresa/certificado.
-- Não mexer em autenticação, pedidos, caixa ou módulos não fiscais.
-- Manter endpoint e chamadas atuais (`nuvem-fiscal-emit` e UI existente).
+### 3. Detalhes da Nota Fiscal ao clicar
 
-5) Teste E2E obrigatório após deploy (checklist único)
-- Salvar Configurações Fiscais.
-- Sincronizar empresa.
-- Emitir nota de um pedido concluído.
-- Confirmar:
-  - não retorna mais `Validation failed` por CST 07,
-  - nota vai para `authorized` ou `error` com motivo completo,
-  - nota antiga “processing” aparece como recusada/erro e sai do limbo,
-  - botão de retentativa funciona para casos travados.
+**Problema**: Não há como ver detalhes da nota emitida (chave, produtos, cliente, valores).
 
-Detalhes técnicos (resumo)
-- Principais causas do erro atual: CST inválido (07) + mapeamento inconsistente de rejeição.
-- Arquivos impactados:
-  - `supabase/functions/nuvem-fiscal-emit/index.ts` (principal)
-  - `src/components/admin/NotasFiscaisTab.tsx` (visibilidade/retentativa)
-  - `supabase/migrations/*` (saneamento de registros em processing)
-- Risco: baixo-médio, concentrado no módulo fiscal; mitigado com fallback de CST válido e mapeamento defensivo de status.
+**Solução**:
+- Criar um componente `FiscalNoteDetailSheet.tsx` (Sheet/Drawer lateral) que abre ao clicar em qualquer linha da tabela de notas
+- Expandir a query `fetchNotes` para trazer também: `nfe_key`, `nuvem_fiscal_ref`, e dados completos do pedido (`payment_type`, `delivery_type`, `order_items.products.name`)
+- O sheet exibirá:
+  - Status da nota com badge
+  - Chave de acesso (nfe_key) com botão de copiar
+  - Número da nota e referência Nuvem Fiscal
+  - Data de emissão
+  - Dados do cliente (nome, CPF)
+  - Lista de produtos com quantidades e valores
+  - Forma de pagamento
+  - Valor total
+  - Mensagem de erro (se houver)
+  - Links para PDF e XML
+
+**Arquivos impactados**:
+- `src/components/admin/PaymentConfirmationModal.tsx` — redesign com seleção de bandeira
+- `src/components/admin/NotasFiscaisTab.tsx` — query expandida + clique na linha abre detalhes
+- `src/components/admin/FiscalNoteDetailSheet.tsx` — novo componente
+- Nova migração SQL — fix do trigger de estoque para cobrir status `preparing`
+
