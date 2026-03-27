@@ -130,7 +130,10 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleDownload = async (note: FiscalNote, type: "pdf" | "xml") => {
-    if (!note.nuvem_fiscal_ref) return;
+    if (!note.nuvem_fiscal_ref) {
+      toast.error("Referência Nuvem Fiscal não encontrada para esta nota.");
+      return;
+    }
     const key = `${note.id}-${type}`;
     setDownloading(prev => new Set(prev).add(key));
     try {
@@ -139,8 +142,26 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       });
       if (error) throw error;
 
-      // data is already a Blob-like from functions.invoke
-      const blob = data instanceof Blob ? data : new Blob([data], { type: type === "pdf" ? "application/pdf" : "application/xml" });
+      // Check if response contains an error message
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      if (!data?.data) {
+        toast.error("Resposta vazia da função de download.");
+        return;
+      }
+
+      // Decode base64 to binary
+      const binaryString = atob(data.data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const contentType = data.content_type || (type === "pdf" ? "application/pdf" : "application/xml");
+      const blob = new Blob([bytes], { type: contentType });
       const url = URL.createObjectURL(blob);
 
       if (type === "pdf") {
@@ -148,10 +169,10 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       } else {
         const a = document.createElement("a");
         a.href = url;
-        a.download = `nfce_${note.nfe_number || note.id}.xml`;
+        a.download = data.filename || `nfce_${note.nfe_number || note.id}.xml`;
         a.click();
       }
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (err) {
       console.error("Download error:", err);
       toast.error(`Erro ao baixar ${type.toUpperCase()}`);
