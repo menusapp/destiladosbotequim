@@ -159,6 +159,60 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentType(""); setSelectedTableId("");
+    setMixedPayments([
+      { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
+      { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
+    ]);
+  };
+
+  const getMixedPaymentString = (): { paymentStr: string; brandCode: string | null } => {
+    const valid = mixedPayments.filter(p => p.method && parseFloat(p.amount) > 0);
+    if (valid.length === 0) return { paymentStr: "", brandCode: null };
+
+    const labels = valid.map(p => {
+      const methodLabel = MIXED_METHODS.find(m => m.value === p.method)?.label || p.method;
+      if (p.brand) {
+        const allBrands = [...CARD_BRANDS_PDV, ...VOUCHER_BRANDS_PDV];
+        const brandName = allBrands.find(b => b.code === p.brand)?.name || p.brand;
+        return `${methodLabel} - ${brandName}`;
+      }
+      return methodLabel;
+    });
+
+    const firstBrand = valid.find(p => p.brand)?.brand || null;
+    return { paymentStr: labels.join(", "), brandCode: firstBrand };
+  };
+
+  const mixedTotal = useMemo(() => {
+    return mixedPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+  }, [mixedPayments]);
+
+  const mixedRemaining = Math.max(0, Math.round((cartSubtotal - mixedTotal) * 100) / 100);
+
+  const needsBrandForMethod = (method: string) => ["credit", "debit", "meal_voucher"].includes(method);
+
+  const getBrandsForMixedMethod = (method: string) => {
+    if (method === "credit" || method === "debit") return CARD_BRANDS_PDV;
+    if (method === "meal_voucher") return VOUCHER_BRANDS_PDV;
+    return [];
+  };
+
+  const updateMixedPayment = (id: string, field: keyof MixedPaymentEntry, value: string) => {
+    setMixedPayments(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      const updated = { ...p, [field]: value };
+      if (field === "method") updated.brand = "";
+      return updated;
+    }));
+  };
+
+  const addMixedPayment = () => {
+    setMixedPayments(prev => [...prev, { id: crypto.randomUUID(), method: "", brand: "", amount: "" }]);
+  };
+
+  const removeMixedPayment = (id: string) => {
+    if (mixedPayments.length <= 2) return;
+    setMixedPayments(prev => prev.filter(p => p.id !== id));
   };
 
   const handleSubmit = async () => {
