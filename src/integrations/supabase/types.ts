@@ -2168,6 +2168,8 @@ export type Database = {
           restaurant_id: string
           status: string
           updated_at: string | null
+          url_consulta: string | null
+          url_qrcode: string | null
           xml_url: string | null
         }
         Insert: {
@@ -2182,6 +2184,8 @@ export type Database = {
           restaurant_id: string
           status?: string
           updated_at?: string | null
+          url_consulta?: string | null
+          url_qrcode?: string | null
           xml_url?: string | null
         }
         Update: {
@@ -2196,6 +2200,8 @@ export type Database = {
           restaurant_id?: string
           status?: string
           updated_at?: string | null
+          url_consulta?: string | null
+          url_qrcode?: string | null
           xml_url?: string | null
         }
         Relationships: [

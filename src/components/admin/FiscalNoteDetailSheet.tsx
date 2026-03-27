@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Copy, Download, FileCode, CheckCircle2, Clock, AlertCircle, XCircle, Loader2, ShieldAlert } from "lucide-react";
+import { Copy, Download, FileCode, CheckCircle2, Clock, AlertCircle, XCircle, Loader2, ShieldAlert, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
 
@@ -18,6 +18,8 @@ interface FiscalNoteDetail {
   pdf_url: string | null;
   error_message: string | null;
   created_at: string;
+  url_consulta?: string | null;
+  url_qrcode?: string | null;
   orders: {
     id: string;
     customer_name: string;
@@ -58,6 +60,12 @@ const getStatusBadge = (status: string) => {
   }
 };
 
+/** Format 44-digit key into groups of 4 */
+function formatAccessKey(key: string): string {
+  const clean = key.replace(/\D/g, "");
+  return clean.replace(/(.{4})/g, "$1 ").trim();
+}
+
 const FiscalNoteDetailSheet = ({ note, open, onClose }: Props) => {
   if (!note) return null;
 
@@ -70,7 +78,7 @@ const FiscalNoteDetailSheet = ({ note, open, onClose }: Props) => {
 
   const copyKey = () => {
     if (note.nfe_key) {
-      navigator.clipboard.writeText(note.nfe_key);
+      navigator.clipboard.writeText(note.nfe_key.replace(/\D/g, ""));
       toast.success("Chave copiada!");
     }
   };
@@ -114,7 +122,7 @@ const FiscalNoteDetailSheet = ({ note, open, onClose }: Props) => {
 
           <Separator />
 
-          {/* NFe Key — only show copy button for authorized notes */}
+          {/* NFe Key — formatted in groups of 4 */}
           {note.nfe_key && (
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">
@@ -125,7 +133,7 @@ const FiscalNoteDetailSheet = ({ note, open, onClose }: Props) => {
                 <code className={`text-xs px-2 py-1.5 rounded break-all flex-1 font-mono ${
                   isAuthorized ? "bg-muted" : "bg-red-50 dark:bg-red-950/20 text-muted-foreground line-through"
                 }`}>
-                  {note.nfe_key}
+                  {formatAccessKey(note.nfe_key)}
                 </code>
                 {isAuthorized && (
                   <Button variant="ghost" size="icon" className="flex-shrink-0 h-8 w-8" onClick={copyKey}>
@@ -134,6 +142,18 @@ const FiscalNoteDetailSheet = ({ note, open, onClose }: Props) => {
                 )}
               </div>
             </div>
+          )}
+
+          {/* Consulta SEFAZ link */}
+          {isAuthorized && (note as any).url_consulta && (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => window.open((note as any).url_consulta, "_blank")}
+            >
+              <ExternalLink className="w-4 h-4" />
+              Consultar na SEFAZ
+            </Button>
           )}
 
           {/* Basic Info */}
@@ -224,20 +244,16 @@ const FiscalNoteDetailSheet = ({ note, open, onClose }: Props) => {
           </Card>
 
           {/* Download Links — only for authorized notes */}
-          {isAuthorized && (
+          {isAuthorized && note.nuvem_fiscal_ref && (
             <div className="flex gap-2">
-              {note.pdf_url && (
-                <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(note.pdf_url!, "_blank")}>
-                  <Download className="w-4 h-4 text-red-600" />
-                  Baixar PDF
-                </Button>
-              )}
-              {note.xml_url && (
-                <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(note.xml_url!, "_blank")}>
-                  <FileCode className="w-4 h-4 text-blue-600" />
-                  Baixar XML
-                </Button>
-              )}
+              <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(`https://api.nuvemfiscal.com.br/nfce/${note.nuvem_fiscal_ref}/pdf`, "_blank")}>
+                <Download className="w-4 h-4 text-red-600" />
+                Baixar PDF
+              </Button>
+              <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(`https://api.nuvemfiscal.com.br/nfce/${note.nuvem_fiscal_ref}/xml`, "_blank")}>
+                <FileCode className="w-4 h-4 text-blue-600" />
+                Baixar XML
+              </Button>
             </div>
           )}
         </div>

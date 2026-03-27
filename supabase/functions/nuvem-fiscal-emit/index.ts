@@ -53,17 +53,10 @@ function formatDateBRT(): string {
   return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}T${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}-03:00`;
 }
 
-// Valid CSTs for PISOutr/COFINSOutr
-const validOutrCSTs = new Set(["49","50","51","52","53","54","55","56","60","61","62","63","64","65","66","67","70","71","72","73","74","75","98","99"]);
-
-function safeOutrCST(cst: string | null | undefined): string {
-  if (cst && validOutrCSTs.has(cst)) return cst;
-  return "49";
-}
-
+// ── Card brand mapping (corrected) ──
 const brandCodes: Record<string, string> = {
   visa: "01", mastercard: "02", amex: "03", "american express": "03",
-  elo: "04", hipercard: "06", diners: "07", "diners club": "07",
+  sorocred: "04", hipercard: "05", elo: "06", diners: "07", "diners club": "07",
 };
 
 function extractBrandCode(brandName: string): string | null {
@@ -74,8 +67,20 @@ function extractBrandCode(brandName: string): string | null {
   return null;
 }
 
+// ── Dynamic ICMS node based on product CSOSN ──
+function buildICMSNode(csosn: string | null | undefined, orig: number): Record<string, any> {
+  const code = (csosn || "").trim();
+  if (code === "500") {
+    return { ICMSSN500: { orig, CSOSN: "500" } };
+  }
+  // 102, 103 or any other / empty → ICMSSN102 with real CSOSN or default 102
+  const effectiveCST = (code === "102" || code === "103") ? code : "102";
+  return { ICMSSN102: { orig, CSOSN: effectiveCST } };
+}
+
+// ── Status mapping from Nuvem Fiscal Dfe response ──
 function mapNuvemFiscalStatus(apiResult: any): { dbStatus: string; errorMessage?: string } {
-  // If API returned an error object, it's always an error
+  // API error object
   if (apiResult.error) {
     const messages: string[] = [];
     if (apiResult.error.message) messages.push(apiResult.error.message);
@@ -87,25 +92,33 @@ function mapNuvemFiscalStatus(apiResult: any): { dbStatus: string; errorMessage?
     return { dbStatus: "error", errorMessage: messages.join(" | ") || "Erro de validação" };
   }
 
-  // Check authorization sub-object first (more reliable)
+  // Dfe.status is the document-level status (autorizado, rejeitado, denegado, cancelado, erro, pendente)
+  const dfeStatus = (apiResult.status || "").toLowerCase().trim();
+  // autorizacao.status is the protocol-level (pendente, registrado, rejeitado, erro)
   const authStatus = (apiResult.autorizacao?.status || "").toLowerCase().trim();
-  const raw = (apiResult.status || "").toLowerCase().trim();
-  const effectiveStatus = authStatus || raw;
 
-  if (["autorizada", "autorizado"].includes(effectiveStatus)) {
+  // Document authorized
+  if (["autorizada", "autorizado"].includes(dfeStatus)) {
     return { dbStatus: "authorized" };
   }
-  if (["rejeitada", "rejeitado", "denegada", "denegado"].includes(effectiveStatus)) {
+  // Protocol registered = SEFAZ authorized the note
+  if (authStatus === "registrado") {
+    return { dbStatus: "authorized" };
+  }
+
+  // Rejected / denied
+  if (["rejeitada", "rejeitado", "denegada", "denegado"].includes(dfeStatus) || authStatus === "rejeitado") {
     const motivo = apiResult.autorizacao?.motivo_status || apiResult.motivo_status || "Nota rejeitada pela SEFAZ";
     return { dbStatus: "error", errorMessage: motivo };
   }
-  if (["cancelada", "cancelado"].includes(effectiveStatus)) {
+  // Canceled
+  if (["cancelada", "cancelado"].includes(dfeStatus)) {
     return { dbStatus: "canceled", errorMessage: apiResult.motivo_status };
   }
-
-  // Only trust protocolo if authorization sub-object explicitly has it
-  if (apiResult.autorizacao?.protocolo && authStatus) {
-    return { dbStatus: "authorized" };
+  // Error
+  if (dfeStatus === "erro" || authStatus === "erro") {
+    const motivo = apiResult.autorizacao?.motivo_status || apiResult.motivo_status || "Erro na SEFAZ";
+    return { dbStatus: "error", errorMessage: motivo };
   }
 
   return { dbStatus: "processing" };
@@ -120,45 +133,27 @@ const ufCodes: Record<string, number> = {
 
 /**
  * Maps payment type to NFC-e detPag structure.
- * CRITICAL: tBand must be INSIDE a `card` object, never at detPag root.
- * xPag is ONLY used when tPag = "99".
+ * CRITICAL: For cards, `cartao` object with `tpIntegra` (string "2") and `tBand` is mandatory.
  */
 function mapPaymentMethod(paymentType: string | null | undefined, vPag: number): Record<string, any> {
   const pt = (paymentType || "").toLowerCase().trim();
 
-  // Cash
   if (pt === "cash" || pt === "dinheiro") return { tPag: "01", vPag };
 
-  // Credit card — with or without brand (e.g. "Crédito - Visa", "credit")
   if (pt.startsWith("créd") || pt.startsWith("cred") || pt === "credit" || pt === "cartão de crédito" || pt === "credit_card_online") {
     const brand = extractBrandCode(pt);
-    return {
-      tPag: "03",
-      vPag,
-      card: { tpIntegra: "2", tBand: brand || "99" },
-    };
+    return { tPag: "03", vPag, cartao: { tpIntegra: "2", tBand: brand || "99" } };
   }
 
-  // Debit card — with or without brand
   if (pt.startsWith("déb") || pt.startsWith("deb") || pt === "debit" || pt === "cartão de débito") {
     const brand = extractBrandCode(pt);
-    return {
-      tPag: "04",
-      vPag,
-      card: { tpIntegra: "2", tBand: brand || "99" },
-    };
+    return { tPag: "04", vPag, cartao: { tpIntegra: "2", tBand: brand || "99" } };
   }
 
-  // Meal voucher
   if (pt.startsWith("vale") || pt === "meal_voucher") return { tPag: "10", vPag };
-
-  // PIX
   if (pt === "pix" || pt === "pix_online") return { tPag: "17", vPag };
-
-  // iFood / online
   if (pt === "ifood_online" || pt === "pago pelo ifood") return { tPag: "99", xPag: "Pagamento Online", vPag };
 
-  // Fallback
   const xPag = paymentType || "Outros";
   return { tPag: "99", xPag, vPag };
 }
@@ -211,12 +206,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: errMsg });
     }
 
-    // 3. Fetch order items
+    // 3. Fetch order items with fiscal fields
     const { data: orderItems, error: itemsErr } = await supabase
       .from("order_items")
       .select(`
         id, quantity, price_at_order, notes, product_id,
-        products (name, pdv_code, fiscal_ncm, fiscal_cest, fiscal_cfop, fiscal_icms_csosn, fiscal_icms_origin, fiscal_pis_cst, fiscal_cofins_cst),
+        products (name, pdv_code, fiscal_ncm, fiscal_cest, fiscal_cfop, fiscal_icms_csosn, fiscal_icms_origin),
         order_item_extras (price_at_order, product_extra_id, product_extras (name))
       `)
       .eq("order_id", order_id);
@@ -236,7 +231,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: e.message });
     }
 
-    // 5. Build NFC-e det items
+    // 5. Build NFC-e det items with dynamic ICMS and correct PIS/COFINS
     const ncmDefault = "21069090";
     const cfopDefault = "5102";
     let itemNumber = 1;
@@ -247,8 +242,7 @@ Deno.serve(async (req) => {
       const ncm = (prod?.fiscal_ncm || ncmDefault).replace(/\./g, "");
       const cfop = prod?.fiscal_cfop || cfopDefault;
       const orig = Number(prod?.fiscal_icms_origin || "0");
-      const pisCst = safeOutrCST(prod?.fiscal_pis_cst);
-      const cofinsCst = safeOutrCST(prod?.fiscal_cofins_cst);
+      const csosn = prod?.fiscal_icms_csosn || "102";
       const vUnCom = Number(item.price_at_order.toFixed(2));
       const vProd = Number((item.quantity * item.price_at_order).toFixed(2));
 
@@ -262,12 +256,13 @@ Deno.serve(async (req) => {
           uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnCom, indTot: 1,
         },
         imposto: {
-          ICMS: { ICMSSN102: { orig, CSOSN: "400" } },
-          PIS: { PISOutr: { CST: pisCst, vBC: 0, pPIS: 0, vPIS: 0 } },
-          COFINS: { COFINSOutr: { CST: cofinsCst, vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
+          ICMS: buildICMSNode(csosn, orig),
+          PIS: { PISNT: { CST: "07" } },
+          COFINS: { COFINSNT: { CST: "07" } },
         },
       });
 
+      // Extras — use defaults (production = 102, orig 0)
       const extras = (item as any).order_item_extras || [];
       for (const extra of extras) {
         const extraName = extra.product_extras?.name || "Adicional";
@@ -284,9 +279,9 @@ Deno.serve(async (req) => {
             uTrib: "UN", qTrib: item.quantity, vUnTrib: vUnExtra, indTot: 1,
           },
           imposto: {
-            ICMS: { ICMSSN102: { orig: 0, CSOSN: "400" } },
-            PIS: { PISOutr: { CST: pisCst, vBC: 0, pPIS: 0, vPIS: 0 } },
-            COFINS: { COFINSOutr: { CST: cofinsCst, vBC: 0, pCOFINS: 0, vCOFINS: 0 } },
+            ICMS: buildICMSNode("102", 0),
+            PIS: { PISNT: { CST: "07" } },
+            COFINS: { COFINSNT: { CST: "07" } },
           },
         });
       }
@@ -399,29 +394,29 @@ Deno.serve(async (req) => {
       .update({ nfce_numero: nfceNumero + 1 })
       .eq("restaurant_id", restaurant_id);
 
-    // 10. Update fiscal note with result — save ALL response data (NO sync loop)
-    const finalResult = apiResult;
+    // 10. Update fiscal note with result
     const nuvemId = apiResult.id || null;
 
     const updateData: Record<string, any> = { status: dbStatus };
-    if (finalResult.numero) updateData.nfe_number = String(finalResult.numero);
+    if (apiResult.numero) updateData.nfe_number = String(apiResult.numero);
 
-    // Save nfe_key
-    if (finalResult.chave) {
-      updateData.nfe_key = finalResult.chave;
+    // Save chave_acesso (44 digits) from Dfe.chave
+    if (apiResult.chave) {
+      updateData.nfe_key = apiResult.chave;
     }
 
     if (nuvemId) updateData.nuvem_fiscal_ref = nuvemId;
     if (errorMessage) updateData.error_message = errorMessage;
 
-    // Build PDF and XML URLs from Nuvem Fiscal API — only for authorized notes
+    // Build PDF and XML URLs — only for authorized notes
     if (nuvemId && dbStatus === "authorized") {
       updateData.pdf_url = `https://api.nuvemfiscal.com.br/nfce/${nuvemId}/pdf`;
       updateData.xml_url = `https://api.nuvemfiscal.com.br/nfce/${nuvemId}/xml`;
     }
-    // Override with direct response data if available
-    if (finalResult.autorizacao?.xml_url) updateData.xml_url = finalResult.autorizacao.xml_url;
-    if (finalResult.autorizacao?.pdf_url) updateData.pdf_url = finalResult.autorizacao.pdf_url;
+
+    // Save url_consulta and url_qrcode if available
+    if (apiResult.autorizacao?.url_consulta) updateData.url_consulta = apiResult.autorizacao.url_consulta;
+    if (apiResult.autorizacao?.url_qrcode) updateData.url_qrcode = apiResult.autorizacao.url_qrcode;
 
     if (fiscal_note_id) {
       await supabase.from("order_fiscal_notes").update(updateData).eq("id", fiscal_note_id);
@@ -429,7 +424,7 @@ Deno.serve(async (req) => {
       await supabase.from("order_fiscal_notes").update(updateData).eq("order_id", order_id).eq("restaurant_id", restaurant_id);
     }
 
-    return jsonResponse({ success: true, status: dbStatus, nuvem_response: finalResult });
+    return jsonResponse({ success: true, status: dbStatus, nuvem_response: apiResult });
   } catch (error: any) {
     console.error("[NuvemFiscal] Error:", error);
     return jsonResponse({ error: error.message || "Erro interno" }, 500);
