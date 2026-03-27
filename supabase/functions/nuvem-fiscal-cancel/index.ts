@@ -57,8 +57,40 @@ Deno.serve(async (req) => {
 
     const accessToken = await getNuvemFiscalToken();
 
+    // First verify document exists
+    const checkUrl = `https://api.nuvemfiscal.com.br/nfce/${nuvem_fiscal_ref}`;
+    console.log("[NuvemFiscal-Cancel] Checking document at:", checkUrl);
+    const checkRes = await fetch(checkUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!checkRes.ok) {
+      const checkBody = await checkRes.text();
+      console.log("[NuvemFiscal-Cancel] Document not found:", checkRes.status, checkBody);
+      return new Response(JSON.stringify({ 
+        error: `Documento não encontrado na Nuvem Fiscal (ref: ${nuvem_fiscal_ref}). A nota pode ter sido emitida em outro ambiente (produção/homologação) ou não existe no provedor.` 
+      }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const docInfo = await checkRes.json();
+    console.log("[NuvemFiscal-Cancel] Document found, status:", docInfo.status, "ambiente:", docInfo.ambiente);
+
+    if (docInfo.status === "cancelado") {
+      // Already canceled, just update DB
+      if (fiscal_note_id) {
+        await supabase.from("order_fiscal_notes").update({ status: "canceled" }).eq("id", fiscal_note_id);
+      }
+      return new Response(JSON.stringify({ success: true, message: "Nota já estava cancelada." }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // POST /nfce/{id}/cancelamento
-    const cancelRes = await fetch(`https://api.nuvemfiscal.com.br/nfce/${nuvem_fiscal_ref}/cancelamento`, {
+    const cancelUrl = `https://api.nuvemfiscal.com.br/nfce/${nuvem_fiscal_ref}/cancelamento`;
+    console.log("[NuvemFiscal-Cancel] Canceling at:", cancelUrl);
+    const cancelRes = await fetch(cancelUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -73,7 +105,7 @@ Deno.serve(async (req) => {
     if (!cancelRes.ok) {
       const errMsg = cancelResult?.error?.message || cancelResult?.message || JSON.stringify(cancelResult).substring(0, 300);
       return new Response(JSON.stringify({ error: errMsg }), {
-        status: cancelRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
