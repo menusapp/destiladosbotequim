@@ -87,19 +87,27 @@ function mapNuvemFiscalStatus(apiResult: any): { dbStatus: string; errorMessage?
     return { dbStatus: "error", errorMessage: messages.join(" | ") || "Erro de validação" };
   }
 
+  // Check authorization sub-object first (more reliable)
+  const authStatus = (apiResult.autorizacao?.status || "").toLowerCase().trim();
   const raw = (apiResult.status || "").toLowerCase().trim();
+  const effectiveStatus = authStatus || raw;
 
-  if (["autorizada", "autorizado"].includes(raw)) {
+  if (["autorizada", "autorizado"].includes(effectiveStatus)) {
     return { dbStatus: "authorized" };
   }
-  if (["rejeitada", "rejeitado", "denegada", "denegado"].includes(raw)) {
-    return { dbStatus: "error", errorMessage: apiResult.motivo_status || "Nota rejeitada pela SEFAZ" };
+  if (["rejeitada", "rejeitado", "denegada", "denegado"].includes(effectiveStatus)) {
+    const motivo = apiResult.autorizacao?.motivo_status || apiResult.motivo_status || "Nota rejeitada pela SEFAZ";
+    return { dbStatus: "error", errorMessage: motivo };
   }
-  if (["cancelada", "cancelado"].includes(raw)) {
+  if (["cancelada", "cancelado"].includes(effectiveStatus)) {
     return { dbStatus: "canceled", errorMessage: apiResult.motivo_status };
   }
 
-  // processando, em_processamento, etc → processing
+  // If there's a protocolo in autorizacao, it's likely authorized
+  if (apiResult.autorizacao?.protocolo) {
+    return { dbStatus: "authorized" };
+  }
+
   return { dbStatus: "processing" };
 }
 
