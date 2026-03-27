@@ -5,7 +5,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DollarSign, ShoppingBag, TrendingUp, Store, Truck } from "lucide-react";
 import { useOrderMetrics, type DateRange } from "@/hooks/useOrderMetrics";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface OverviewTabProps {
   restaurantId: string;
