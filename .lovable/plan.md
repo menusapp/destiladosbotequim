@@ -1,51 +1,39 @@
 
 
-## Plano: 3 Correções Urgentes
+## Plano: Corrigir nota "inválida" e salvar dados completos da emissão
 
-### 1. Pagamento melhorado com seleção de bandeira para cartão
+### Diagnóstico
+1. A edge function `nuvem-fiscal-emit` não salva `nuvem_fiscal_ref` (ID da Nuvem Fiscal), `xml_url` e `pdf_url` da resposta da API — todos estão NULL no banco
+2. Sem esses dados, não há como validar ou consultar a nota externamente
+3. O mapeamento de pagamento quebrou após a adição de bandeiras de cartão — "Crédito - Visa" cai no fallback tPag "99" ao invés de "03" com `tBand`
+4. Para pagamentos com cartão (tPag 03/04), a SEFAZ exige o campo `tBand` (bandeira do cartão) — que nunca é enviado
 
-**Problema**: A tela de pagamento (`PaymentConfirmationModal`) é simples demais e ao selecionar Débito/Crédito não pede para escolher a bandeira do cartão, o que é necessário para emissão de NFC-e.
+### Correções (arquivo único: `supabase/functions/nuvem-fiscal-emit/index.ts`)
 
-**Solução**:
-- Redesenhar o `PaymentConfirmationModal.tsx` com layout mais profissional:
-  - Cards maiores com ícones mais visíveis para cada método
-  - Quando selecionar Crédito ou Débito, abrir um sub-painel/step para escolher a bandeira (Visa, Mastercard, Elo, Amex, Hipercard, Diners)
-  - Quando selecionar Vale Refeição, abrir sub-painel para escolher a bandeira (Alelo, Sodexo, Ticket, VR, Pluxee)
-  - O `payment.method` gravado incluirá a bandeira (ex: "Crédito - Visa", "Débito - Mastercard")
-  - Manter compatibilidade com o `methodType` para a tabela `bills` e mapeamento fiscal
-- Melhorar visual geral: resumo do pedido mais claro, totais destacados, lista de pagamentos adicionados com botão de remover
+**1. Salvar todos os campos da resposta da Nuvem Fiscal**
+- Após emissão bem-sucedida, extrair e salvar:
+  - `apiResult.id` → `nuvem_fiscal_ref`
+  - `apiResult.autorizacao?.xml` ou URL do XML → `xml_url`  
+  - PDF URL construída ou retornada → `pdf_url`
+  - `apiResult.chave` → `nfe_key` (já faz)
+  - `apiResult.numero` → `nfe_number` (já faz)
 
-### 2. Estoque não descontado em pedidos PDV
+**2. Corrigir `mapPaymentMethod` para suportar formato com bandeira**
+- Detectar padrões como "Crédito - Visa", "Débito - Mastercard" usando `startsWith`/`includes`
+- Mapear para o tPag correto (03 crédito, 04 débito)
+- Adicionar campo `tBand` com código da bandeira:
+  - Visa → "01", Mastercard → "02", Amex → "03", Elo → "04", Hipercard → "06", Diners → "07"
+- Manter compatibilidade com formatos antigos ("cash", "pix", etc.)
 
-**Problema**: O trigger `process_order_stock_movement` só desconta estoque quando o status muda para `accepted`. Pedidos PDV (delivery/retirada) pulam `accepted` e vão direto para `preparing`, então o estoque nunca é descontado.
+**3. Melhorar o mapeamento de status**
+- Verificar se o status real está em `apiResult.autorizacao.status` além do top-level
+- Se existir `protocolo` na resposta, usar como confirmação adicional de autorização
 
-**Solução** (migração SQL):
-- Atualizar a função `process_order_stock_movement()` para TAMBÉM disparar quando o status muda para `preparing` (verificando que o status anterior era `pending` ou é um INSERT novo), evitando dupla dedução
-- Condição: `IF (NEW.status = 'accepted' AND (OLD IS NULL OR OLD.status != 'accepted')) OR (NEW.status = 'preparing' AND (OLD IS NULL OR OLD.status NOT IN ('accepted', 'preparing', 'ready', ...)))` — basicamente, deduzir na primeira transição para `accepted` OU `preparing`, o que vier primeiro
-- Isso cobre tanto pedidos normais (pending → accepted) quanto PDV (pending → preparing)
+### Arquivos impactados
+- `supabase/functions/nuvem-fiscal-emit/index.ts` — único arquivo alterado
 
-### 3. Detalhes da Nota Fiscal ao clicar
-
-**Problema**: Não há como ver detalhes da nota emitida (chave, produtos, cliente, valores).
-
-**Solução**:
-- Criar um componente `FiscalNoteDetailSheet.tsx` (Sheet/Drawer lateral) que abre ao clicar em qualquer linha da tabela de notas
-- Expandir a query `fetchNotes` para trazer também: `nfe_key`, `nuvem_fiscal_ref`, e dados completos do pedido (`payment_type`, `delivery_type`, `order_items.products.name`)
-- O sheet exibirá:
-  - Status da nota com badge
-  - Chave de acesso (nfe_key) com botão de copiar
-  - Número da nota e referência Nuvem Fiscal
-  - Data de emissão
-  - Dados do cliente (nome, CPF)
-  - Lista de produtos com quantidades e valores
-  - Forma de pagamento
-  - Valor total
-  - Mensagem de erro (se houver)
-  - Links para PDF e XML
-
-**Arquivos impactados**:
-- `src/components/admin/PaymentConfirmationModal.tsx` — redesign com seleção de bandeira
-- `src/components/admin/NotasFiscaisTab.tsx` — query expandida + clique na linha abre detalhes
-- `src/components/admin/FiscalNoteDetailSheet.tsx` — novo componente
-- Nova migração SQL — fix do trigger de estoque para cobrir status `preparing`
+### Sem impacto em
+- Fluxo de sincronização de empresa/certificado
+- UI de notas fiscais (já tem colunas para xml_url, pdf_url, nuvem_fiscal_ref)
+- Pedidos, estoque, caixa
 
