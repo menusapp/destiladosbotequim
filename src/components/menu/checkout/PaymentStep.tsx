@@ -86,6 +86,7 @@ export const PaymentStep = ({
   customerEmail: emailProp,
 }: PaymentStepProps) => {
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
   const [changeFor, setChangeFor] = useState("");
   const [customerName, setCustomerName] = useState(nameProp || "");
   const [customerCPF, setCustomerCPF] = useState(cpfProp || "");
@@ -185,6 +186,25 @@ export const PaymentStep = ({
     loadUserData();
   }, [requireCustomerInfo, nameProp, cpfProp, phoneProp]);
 
+  // Check if selected method needs brand selection
+  const getSelectedMethodType = () => {
+    const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
+    return (selectedMethod as any)?.methodType || selectedMethod?.value || "";
+  };
+
+  const needsBrandForMethod = (methodType: string) => {
+    return ["credit", "debit", "meal_voucher", "voucher"].includes(methodType);
+  };
+
+  const getBrandsForSelectedMethod = () => {
+    const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
+    if (!selectedMethod) return [];
+    const methodType = (selectedMethod as any)?.methodType || selectedMethod?.value;
+    if (methodType === "meal_voucher" || methodType === "voucher") return MEAL_VOUCHER_BRANDS;
+    if (methodType === "credit" || methodType === "debit") return CARD_BRANDS;
+    return [];
+  };
+
   const handleContinue = () => {
     if (!paymentMethod) {
       toast.error("Selecione uma forma de pagamento");
@@ -207,7 +227,6 @@ export const PaymentStep = ({
         sessionStorage.setItem("customer_phone", customerPhone);
       }
 
-      // Save email to sessionStorage and CRM
       sessionStorage.setItem("customer_email", customerEmail);
       const cpf = customerCPF || cpfProp || sessionStorage.getItem("customer_cpf") || "";
       if (cpf && restaurantId) {
@@ -225,12 +244,19 @@ export const PaymentStep = ({
         isOnlinePayment: true,
         onlineMethod: paymentMethod === "pix_online" ? "pix" : "credit_card",
         customerEmail,
+        payment_brand: paymentMethod === "credit_card_online" ? "online" : undefined,
       });
       return;
     }
 
     const selectedMethod = availableMethods.find(m => m.value === paymentMethod);
     const methodType = (selectedMethod as any)?.methodType || selectedMethod?.value;
+
+    // Require brand for card/voucher methods
+    if (needsBrandForMethod(methodType) && !selectedBrand) {
+      toast.error("Selecione a bandeira do cartão");
+      return;
+    }
 
     if (methodType === "cash") {
       if (!changeFor || changeFor.trim() === "") {
@@ -264,6 +290,7 @@ export const PaymentStep = ({
       type: "delivery",
       method: methodType,
       changeFor: methodType === "cash" ? changeFor : null,
+      payment_brand: selectedBrand || undefined,
     });
   };
 
@@ -343,7 +370,7 @@ export const PaymentStep = ({
                           ? "border-primary bg-primary/5"
                           : "hover:border-primary/50"
                       }`}
-                      onClick={() => setPaymentMethod(method.value)}
+                      onClick={() => { setPaymentMethod(method.value); setSelectedBrand(""); }}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -360,29 +387,39 @@ export const PaymentStep = ({
                           )}
                         </div>
                         
-                        {/* Gavetinha de bandeiras */}
+                        {/* Brand selection (required for card/voucher) */}
                         {isSelected && hasBrands && (
                           <div className="mt-3 pt-3 border-t">
-                            <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
-                            <div className="flex flex-wrap gap-2">
+                            <p className="text-xs text-muted-foreground mb-2">Selecione a bandeira:</p>
+                            <div className="grid grid-cols-3 gap-2">
                               {method.brands.map((brandCode) => {
                                 const brand = getBrandInfo(brandCode);
                                 if (!brand) return null;
+                                const isBrandSelected = selectedBrand === brandCode;
                                 return (
-                                  <div 
-                                    key={brandCode} 
-                                    className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
+                                  <button 
+                                    key={brandCode}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedBrand(brandCode);
+                                    }}
+                                    className={`flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all ${
+                                      isBrandSelected 
+                                        ? "border-primary bg-primary/10" 
+                                        : "border-transparent bg-muted hover:border-primary/30"
+                                    }`}
                                   >
                                     <img 
                                       src={brand.logo} 
                                       alt={brand.name} 
-                                      className="h-4 w-auto object-contain"
+                                      className="h-5 w-auto object-contain"
                                       onError={(e) => {
                                         (e.target as HTMLImageElement).style.display = 'none';
                                       }}
                                     />
-                                    <span className="text-xs font-medium">{brand.name}</span>
-                                  </div>
+                                    <span className="text-[10px] font-medium leading-tight text-center">{brand.name}</span>
+                                  </button>
                                 );
                               })}
                             </div>

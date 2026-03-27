@@ -2393,6 +2393,7 @@ export type Database = {
           notes: string | null
           online_payment_id: string | null
           order_type: string | null
+          payment_brand: string | null
           payment_status: string | null
           payment_type: string | null
           pdv_source: boolean
@@ -2426,6 +2427,7 @@ export type Database = {
           notes?: string | null
           online_payment_id?: string | null
           order_type?: string | null
+          payment_brand?: string | null
           payment_status?: string | null
           payment_type?: string | null
           pdv_source?: boolean
@@ -2459,6 +2461,7 @@ export type Database = {
           notes?: string | null
           online_payment_id?: string | null
           order_type?: string | null
+          payment_brand?: string | null
           payment_status?: string | null
           payment_type?: string | null
           pdv_source?: boolean

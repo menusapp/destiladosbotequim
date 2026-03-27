@@ -121,6 +121,7 @@ const Comanda = () => {
   const [hasAcceptedOrder, setHasAcceptedOrder] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [selectedPaymentMethodType, setSelectedPaymentMethodType] = useState<string>("");
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [changeAmount, setChangeAmount] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
@@ -1144,6 +1145,7 @@ const Comanda = () => {
                   <div className="space-y-4 max-h-[60vh] overflow-y-auto">
                     <RadioGroup value={paymentMethod} onValueChange={(value) => {
                       setPaymentMethod(value);
+                      setSelectedBrand("");
                       const selected = paymentMethods.find(m => m.name === value);
                       if (selected) setSelectedPaymentMethodType(selected.method_type);
                     }}>
@@ -1205,23 +1207,34 @@ const Comanda = () => {
                               </div>
                               {isSelected && brands.length > 0 && (
                                 <div className="mt-3 pt-3 border-t animate-in fade-in slide-in-from-top-1 duration-200">
-                                  <p className="text-xs text-muted-foreground mb-2">Bandeiras aceitas:</p>
-                                  <div className="flex flex-wrap gap-2">
+                                  <p className="text-xs text-muted-foreground mb-2">Selecione a bandeira:</p>
+                                  <div className="grid grid-cols-3 gap-2">
                                     {brands.map((brandCode: string) => {
                                       const brand = getBrandInfo(brandCode);
                                       if (!brand) return null;
+                                      const isBrandSelected = selectedBrand === brandCode;
                                       return (
-                                        <div 
-                                          key={brandCode} 
-                                          className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md"
+                                        <button 
+                                          key={brandCode}
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedBrand(brandCode);
+                                          }}
+                                          className={`flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all ${
+                                            isBrandSelected 
+                                              ? "border-primary bg-primary/10" 
+                                              : "border-transparent bg-muted hover:border-primary/30"
+                                          }`}
                                         >
                                           <img 
                                             src={brand.logo} 
                                             alt={brand.name}
-                                            className="h-4 w-auto object-contain"
+                                            className="h-5 w-auto object-contain"
+                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                           />
-                                          <span className="text-xs font-medium">{brand.name}</span>
-                                        </div>
+                                          <span className="text-[10px] font-medium leading-tight text-center">{brand.name}</span>
+                                        </button>
                                       );
                                     })}
                                   </div>

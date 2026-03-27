@@ -95,7 +95,7 @@ export const PaymentConfirmationModal = ({
 }: PaymentConfirmationModalProps) => {
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
   const [serviceFeePercentage, setServiceFeePercentage] = useState(0);
-  const [selectedPayments, setSelectedPayments] = useState<Array<{ method: string; methodType: string; amount: number }>>([]);
+  const [selectedPayments, setSelectedPayments] = useState<Array<{ method: string; methodType: string; amount: number; brandCode?: string }>>([]);
   const [currentAmount, setCurrentAmount] = useState("");
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(DEFAULT_METHODS);
   const [loading, setLoading] = useState(true);
@@ -163,15 +163,15 @@ export const PaymentConfirmationModal = ({
     }
   };
 
-  const handleBrandSelect = (brandName: string) => {
+  const handleBrandSelect = (brand: { code: string; name: string }) => {
     if (!pendingMethod) return;
-    const displayName = `${pendingMethod.name} - ${brandName}`;
-    addPayment(displayName, pendingMethod.method_type);
+    const displayName = `${pendingMethod.name} - ${brand.name}`;
+    addPayment(displayName, pendingMethod.method_type, brand.code);
     setStep("methods");
     setPendingMethod(null);
   };
 
-  const addPayment = (methodName: string, methodType: string) => {
+  const addPayment = (methodName: string, methodType: string, brandCode?: string) => {
     const amount = parseFloat(currentAmount);
     if (isNaN(amount) || amount <= 0) {
       toast.error("Digite um valor válido");
@@ -182,7 +182,7 @@ export const PaymentConfirmationModal = ({
       return;
     }
     const adjustedAmount = Math.min(amount, remaining);
-    setSelectedPayments([...selectedPayments, { method: methodName, methodType, amount: adjustedAmount }]);
+    setSelectedPayments([...selectedPayments, { method: methodName, methodType, amount: adjustedAmount, brandCode }]);
     setCurrentAmount("");
   };
 
@@ -211,9 +211,12 @@ export const PaymentConfirmationModal = ({
       const uniqueTypes = [...new Set(allMethodTypes)];
       const billPaymentMethod = uniqueTypes.length === 1 ? uniqueTypes[0] : null;
 
+      // Get the primary brand code (first payment with a brand)
+      const primaryBrand = selectedPayments.find(p => p.brandCode)?.brandCode || null;
+
       const { error } = await supabase
         .from("orders")
-        .update({ payment_type: paymentDisplayStr })
+        .update({ payment_type: paymentDisplayStr, payment_brand: primaryBrand })
         .eq("id", order.id);
 
       if (error) throw error;
@@ -415,7 +418,7 @@ export const PaymentConfirmationModal = ({
                 {getBrandsForMethod(pendingMethod?.method_type || "").map((brand) => (
                   <button
                     key={brand.code}
-                    onClick={() => handleBrandSelect(brand.name)}
+                    onClick={() => handleBrandSelect(brand)}
                     className="flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all duration-200"
                   >
                     <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
