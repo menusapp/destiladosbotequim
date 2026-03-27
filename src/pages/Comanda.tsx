@@ -1145,6 +1145,7 @@ const Comanda = () => {
                   <div className="space-y-4 max-h-[60vh] overflow-y-auto">
                     <RadioGroup value={paymentMethod} onValueChange={(value) => {
                       setPaymentMethod(value);
+                      setSelectedBrand("");
                       const selected = paymentMethods.find(m => m.name === value);
                       if (selected) setSelectedPaymentMethodType(selected.method_type);
                     }}>
