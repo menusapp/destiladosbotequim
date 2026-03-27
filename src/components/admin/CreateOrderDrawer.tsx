@@ -246,7 +246,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           customer_cpf: customerCpf || "000.000.000-00",
           delivery_phone: customerPhone,
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
-          notes: notes || null, payment_type: paymentType || null,
+          notes: notes || null, payment_type: resolvedPaymentType,
+          payment_brand: resolvedPaymentBrand,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
@@ -257,7 +258,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
           status: "preparing", customer_name: customerName,
           customer_cpf: customerCpf || "000.000.000-00",
-          notes: notes || null, payment_type: paymentType || null,
+          notes: notes || null, payment_type: resolvedPaymentType,
+          payment_brand: resolvedPaymentBrand,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
