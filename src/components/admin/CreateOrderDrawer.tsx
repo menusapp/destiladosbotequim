@@ -11,10 +11,42 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2 } from "lucide-react";
+import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2, Plus, CreditCard } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
+
+interface MixedPaymentEntry {
+  id: string;
+  method: string;
+  brand?: string;
+  amount: string;
+}
+
+const MIXED_METHODS = [
+  { value: "cash", label: "Dinheiro" },
+  { value: "pix", label: "PIX" },
+  { value: "credit", label: "Crédito" },
+  { value: "debit", label: "Débito" },
+  { value: "meal_voucher", label: "Vale Refeição" },
+];
+
+const CARD_BRANDS_PDV = [
+  { code: "visa", name: "Visa" },
+  { code: "mastercard", name: "Mastercard" },
+  { code: "elo", name: "Elo" },
+  { code: "amex", name: "Amex" },
+  { code: "hipercard", name: "Hipercard" },
+  { code: "diners", name: "Diners" },
+];
+
+const VOUCHER_BRANDS_PDV = [
+  { code: "alelo", name: "Alelo" },
+  { code: "sodexo", name: "Sodexo" },
+  { code: "ticket", name: "Ticket" },
+  { code: "vr", name: "VR" },
+  { code: "pluxee", name: "Pluxee" },
+];
 
 interface CartItem {
   productId: string;
