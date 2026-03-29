@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { CreditCard, CheckCircle, XCircle } from "lucide-react";
+import { CreditCard, CheckCircle, XCircle, AlertTriangle, Filter } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ export function SubscriptionsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
+  const [filterInadimplente, setFilterInadimplente] = useState(false);
 
   const [formRestaurant, setFormRestaurant] = useState("");
   const [formPlan, setFormPlan] = useState("");
@@ -70,7 +71,15 @@ export function SubscriptionsTab() {
   const getRestaurantName = (id: string) => restaurants.find(r => r.id === id)?.name || "—";
   const getPlanName = (id: string) => plans.find(p => p.id === id)?.name || "—";
 
-  const statusBadge = (status: string) => {
+  const isInadimplente = (sub: Subscription) => {
+    if (sub.status !== "active" || !sub.next_payment_at) return false;
+    return new Date(sub.next_payment_at) < new Date();
+  };
+
+  const statusBadge = (status: string, sub?: Subscription) => {
+    if (sub && isInadimplente(sub)) {
+      return <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> Inadimplente</Badge>;
+    }
     const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
       active: { label: "Ativo", variant: "default" },
       suspended: { label: "Suspenso", variant: "destructive" },
@@ -79,6 +88,12 @@ export function SubscriptionsTab() {
     const s = map[status] || { label: status, variant: "outline" as const };
     return <Badge variant={s.variant}>{s.label}</Badge>;
   };
+
+  const filteredSubs = filterInadimplente
+    ? latestSubs.filter(isInadimplente)
+    : latestSubs;
+
+  const inadimplenteCount = latestSubs.filter(isInadimplente).length;
 
   const handleCreateSubscription = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,7 +165,19 @@ export function SubscriptionsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Assinaturas</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold">Assinaturas</h2>
+          {inadimplenteCount > 0 && (
+            <Button
+              variant={filterInadimplente ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setFilterInadimplente(!filterInadimplente)}
+            >
+              <Filter className="h-4 w-4 mr-1" />
+              {inadimplenteCount} Inadimplente{inadimplenteCount > 1 ? "s" : ""}
+            </Button>
+          )}
+        </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button size="sm"><CreditCard className="h-4 w-4 mr-2" /> Nova Assinatura</Button>
@@ -208,13 +235,13 @@ export function SubscriptionsTab() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {latestSubs.map(sub => (
-            <Card key={sub.id}>
+          {filteredSubs.map(sub => (
+            <Card key={sub.id} className={isInadimplente(sub) ? "border-destructive/50" : ""}>
               <CardContent className="flex items-center justify-between p-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{getRestaurantName(sub.restaurant_id)}</span>
-                    {statusBadge(sub.status)}
+                    {statusBadge(sub.status, sub)}
                   </div>
                   <p className="text-sm text-muted-foreground">Plano: {getPlanName(sub.plan_id)}</p>
                   {sub.next_payment_at && (

@@ -59,16 +59,19 @@ const plans = [
     name: "Básico", price: "99", daily: "R$ 3,30/dia", description: "Para começar a digitalizar", highlighted: false,
     features: ["Cardápio digital ilimitado", "QR Code para mesas", "Pedidos em tempo real", "1 usuário administrador", "Suporte por email"],
     cta: "Começar Agora",
+    mpLink: "#", // TODO: substituir pelo link de assinatura do Mercado Pago — Plano Básico
   },
   {
     name: "Intermediário", price: "199", daily: "R$ 6,63/dia", description: "Para crescer com eficiência", highlighted: true,
     features: ["Tudo do Básico", "Delivery completo", "Gestão de estoque & CMV", "Relatórios e DRE", "Programa de fidelidade", "Até 5 usuários", "Suporte prioritário"],
     cta: "Escolher Intermediário",
+    mpLink: "#", // TODO: substituir pelo link de assinatura do Mercado Pago — Plano Intermediário
   },
   {
     name: "Avançado", price: "349", daily: "R$ 11,63/dia", description: "Solução completa", highlighted: false,
     features: ["Tudo do Intermediário", "Marketing WhatsApp", "Remarketing automático", "Nota fiscal eletrônica", "Fluxo de caixa & DRE", "Reservas online", "Usuários ilimitados", "Suporte VIP"],
     cta: "Escolher Avançado",
+    mpLink: "#", // TODO: substituir pelo link de assinatura do Mercado Pago — Plano Avançado
   },
 ];
 
@@ -440,7 +443,17 @@ const LandingPage = () => {
                         </li>
                       ))}
                     </ul>
-                    <Button className={`w-full mt-8 h-11 font-semibold ${plan.highlighted ? "shadow-lg shadow-primary/25" : ""}`} variant={plan.highlighted ? "default" : "outline"}>
+                    <Button
+                      className={`w-full mt-8 h-11 font-semibold ${plan.highlighted ? "shadow-lg shadow-primary/25" : ""}`}
+                      variant={plan.highlighted ? "default" : "outline"}
+                      onClick={() => {
+                        if (plan.mpLink && plan.mpLink !== "#") {
+                          window.open(plan.mpLink, "_blank");
+                        } else {
+                          document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
+                        }
+                      }}
+                    >
                       {plan.cta}
                       <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
