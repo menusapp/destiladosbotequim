@@ -165,7 +165,19 @@ export function SubscriptionsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Assinaturas</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold">Assinaturas</h2>
+          {inadimplenteCount > 0 && (
+            <Button
+              variant={filterInadimplente ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setFilterInadimplente(!filterInadimplente)}
+            >
+              <Filter className="h-4 w-4 mr-1" />
+              {inadimplenteCount} Inadimplente{inadimplenteCount > 1 ? "s" : ""}
+            </Button>
+          )}
+        </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button size="sm"><CreditCard className="h-4 w-4 mr-2" /> Nova Assinatura</Button>
