@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import StaffLogin from "./pages/StaffLogin";
 import { TableDetailView } from "./components/admin/TableDetailView";
 import MercadoPagoCallback from "./pages/MercadoPagoCallback";
+import RestaurantRegistration from "./pages/RestaurantRegistration";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +53,9 @@ const App = () => (
 
             {/* MercadoPago callback */}
             <Route path="/admin/mercadopago/callback" element={<MercadoPagoCallback />} />
+
+            {/* Registration routes (post-payment redirect) */}
+            <Route path="/registro/:planSlug" element={<RestaurantRegistration />} />
 
             {/* Restaurant-scoped routes (slug-based) */}
             <Route path="/:slug" element={<DeliveryMenu />} />
