@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     let passwordHash: string;
     try {
       console.log("[register-restaurant] Hashing password...");
-      passwordHash = await hash(password);
+      passwordHash = hashSync(password);
       console.log("[register-restaurant] Password hashed successfully");
     } catch (hashError) {
       console.error("[register-restaurant] bcrypt hash failed:", hashError);
