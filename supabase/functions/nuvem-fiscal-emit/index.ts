@@ -142,17 +142,18 @@ function mapPaymentMethod(paymentType: string | null | undefined, vPag: number, 
 
   if (pt.startsWith("créd") || pt.startsWith("cred") || pt === "credit" || pt === "cartão de crédito" || pt === "credit_card_online") {
     const brand = paymentBrand ? extractBrandCode(paymentBrand) : extractBrandCode(pt);
-    return { tPag: "03", vPag, card: { tpIntegra: "2", tBand: brand || "99" } };
+    return { tPag: "03", vPag, card: { tpIntegra: 2, tBand: brand || "99" } };
   }
 
   if (pt.startsWith("déb") || pt.startsWith("deb") || pt === "debit" || pt === "cartão de débito") {
     const brand = paymentBrand ? extractBrandCode(paymentBrand) : extractBrandCode(pt);
-    return { tPag: "04", vPag, card: { tpIntegra: "2", tBand: brand || "99" } };
+    return { tPag: "04", vPag, card: { tpIntegra: 2, tBand: brand || "99" } };
   }
 
   if (pt.startsWith("vale") || pt === "meal_voucher") return { tPag: "10", vPag };
   if (pt === "pix" || pt === "pix_online") return { tPag: "17", vPag };
   if (pt === "ifood_online" || pt === "pago pelo ifood") return { tPag: "99", xPag: "Pagamento Online", vPag };
+  if (pt === "misto" || pt === "mixed") return { tPag: "99", xPag: "Pagamento Misto", vPag };
 
   const xPag = paymentType || "Outros";
   return { tPag: "99", xPag, vPag };
