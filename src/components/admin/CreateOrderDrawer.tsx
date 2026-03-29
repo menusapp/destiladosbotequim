@@ -454,8 +454,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                   <Textarea placeholder="Observações do pedido..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[60px]" />
                 </div>
 
-              {/* Payment */}
-              <div className="space-y-2">
+                {/* Payment */}
+                <div className="space-y-2">
                 <Label>Pagamento</Label>
                 <Select value={paymentMethod} onValueChange={(v) => { setPaymentMethod(v); setPaymentBrand(""); if (v !== "mixed") setMixedPayments([{ id: crypto.randomUUID(), method: "", brand: "", amount: "" }, { id: crypto.randomUUID(), method: "", brand: "", amount: "" }]); }}>
                   <SelectTrigger><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
@@ -572,7 +572,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                     </div>
                   </div>
                 )}
-              </div>
+                </div>
 
                 {/* Cart Summary */}
                 {cart.length > 0 && (
