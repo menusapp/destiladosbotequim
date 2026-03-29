@@ -1,4 +1,4 @@
-import { hash } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+import { hashSync } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") || "*";
 const corsHeaders = {
@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const hashedPassword = await hash(password);
+    const hashedPassword = hashSync(password);
 
     return new Response(
       JSON.stringify({ hash: hashedPassword }),
