@@ -33,6 +33,7 @@ export function SubscriptionsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
+  const [filterInadimplente, setFilterInadimplente] = useState(false);
 
   const [formRestaurant, setFormRestaurant] = useState("");
   const [formPlan, setFormPlan] = useState("");
@@ -70,7 +71,15 @@ export function SubscriptionsTab() {
   const getRestaurantName = (id: string) => restaurants.find(r => r.id === id)?.name || "—";
   const getPlanName = (id: string) => plans.find(p => p.id === id)?.name || "—";
 
-  const statusBadge = (status: string) => {
+  const isInadimplente = (sub: Subscription) => {
+    if (sub.status !== "active" || !sub.next_payment_at) return false;
+    return new Date(sub.next_payment_at) < new Date();
+  };
+
+  const statusBadge = (status: string, sub?: Subscription) => {
+    if (sub && isInadimplente(sub)) {
+      return <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> Inadimplente</Badge>;
+    }
     const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
       active: { label: "Ativo", variant: "default" },
       suspended: { label: "Suspenso", variant: "destructive" },
@@ -79,6 +88,12 @@ export function SubscriptionsTab() {
     const s = map[status] || { label: status, variant: "outline" as const };
     return <Badge variant={s.variant}>{s.label}</Badge>;
   };
+
+  const filteredSubs = filterInadimplente
+    ? latestSubs.filter(isInadimplente)
+    : latestSubs;
+
+  const inadimplenteCount = latestSubs.filter(isInadimplente).length;
 
   const handleCreateSubscription = async (e: React.FormEvent) => {
     e.preventDefault();
