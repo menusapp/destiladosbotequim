@@ -86,6 +86,15 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentBrand, setPaymentBrand] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
+  const mixedSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (paymentMethod === "mixed") {
+      setTimeout(() => {
+        mixedSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [paymentMethod]);
   const [mixedPayments, setMixedPayments] = useState<MixedPaymentEntry[]>([
     { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
     { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
