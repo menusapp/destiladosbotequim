@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -500,7 +500,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
 
                 {/* Mixed payment UI */}
                 {paymentMethod === "mixed" && (
-                  <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+                  <div ref={mixedSectionRef} className="space-y-3 border rounded-lg p-3 bg-muted/30">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Formas de pagamento</span>
                       {mixedRemaining > 0.01 ? (
