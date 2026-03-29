@@ -1,22 +1,23 @@
 
 
-# Fix: Campos de pagamento Misto não aparecem no PDV
+# Fix: Campos Misto não visíveis no PDV
 
-## Diagnóstico
+## Diagnóstico Real
 
-O código do `CreateOrderDrawer.tsx` tem a lógica correta — a seção `{paymentMethod === "mixed" && (...)}` existe (linhas 501-574). Porém, analisando a estrutura do JSX, o bloco de Pagamento (linhas 457-575) está com **indentação incorreta no JSX**, ficando fora do container `space-y-4` do formulário. Isso causa o seguinte:
-
-- O `<div>` do Payment na linha 458 está no mesmo nível do container pai, em vez de dentro dele
-- O `overflow-y-auto` do container pai não engloba corretamente a seção de pagamento
-- Os campos do misto são renderizados fora da área visível/scrollável
+O código JSX está correto — a seção `{paymentMethod === "mixed" && (...)}` (linhas 502-574) está dentro do container scrollável. A lógica de estado também funciona. O problema é de **visibilidade/scroll**: quando o usuário seleciona "Misto", os campos são renderizados abaixo da área visível do painel esquerdo (que tem `max-h-[calc(100vh-180px)]` e `overflow-y-auto`), mas o scroll não acontece automaticamente, então o usuário não vê os campos.
 
 ## Correção
 
 ### Arquivo: `src/components/admin/CreateOrderDrawer.tsx`
 
-**Reindentação e reestruturação do bloco de pagamento** — mover a seção Payment (linhas 457-575) para dentro do mesmo nível de indentação dos outros campos do formulário (Customer, Address, Notes), garantindo que fique dentro do `<div className="p-4 space-y-4">`.
+1. **Adicionar `useRef` + `useEffect` para auto-scroll**: Quando `paymentMethod` muda para `"mixed"`, fazer scroll automático até a seção de pagamento misto usando `scrollIntoView()`.
 
-Adicionalmente, mover o **Cart Summary** (linhas 577-606) para que também fique corretamente dentro do container do formulário.
+2. **Adicionar ref no container do mixed payment**: Colocar um `ref` no `<div>` da seção misto (linha 503) para servir de alvo do scroll.
 
-Sem alteração de lógica — apenas corrigir a estrutura JSX para que os campos do pagamento misto sejam renderizados dentro da área scrollável visível.
+3. **Implementação**:
+   - Criar `const mixedSectionRef = useRef<HTMLDivElement>(null)` 
+   - Adicionar `useEffect` que observa `paymentMethod` — quando for `"mixed"`, chamar `mixedSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })`
+   - Adicionar `ref={mixedSectionRef}` no div da linha 503
+
+Isso garante que ao selecionar "Misto", a tela rola automaticamente para mostrar os campos de divisão de pagamento.
 
