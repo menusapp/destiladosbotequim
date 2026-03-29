@@ -83,8 +83,26 @@ const RestaurantRegistration = () => {
         },
       });
 
-      if (res.error || res.data?.error) {
-        toast.error(res.data?.error || "Erro ao registrar. Tente novamente.");
+      if (res.error) {
+        // Extract error from FunctionsHttpError response body
+        let errorMsg = "Erro ao registrar. Tente novamente.";
+        try {
+          if (res.error.context && typeof res.error.context === "object") {
+            const body = await (res.error.context as Response).json();
+            if (body?.error) errorMsg = body.error;
+          } else if (res.error.message) {
+            errorMsg = res.error.message;
+          }
+        } catch {
+          // fallback to generic message
+        }
+        toast.error(errorMsg);
+        setLoading(false);
+        return;
+      }
+
+      if (res.data?.error) {
+        toast.error(res.data.error);
         setLoading(false);
         return;
       }
@@ -170,7 +188,7 @@ const RestaurantRegistration = () => {
                 {slugAvailable === true && <CheckCircle className="h-5 w-5 text-green-500 mt-2" />}
                 {slugAvailable === false && <span className="text-xs text-destructive mt-2.5">Indisponível</span>}
               </div>
-              <p className="text-xs text-muted-foreground">Seu cardápio ficará em: menu-mesa-master.lovable.app/<strong>{form.slug || "seu-slug"}</strong></p>
+              <p className="text-xs text-muted-foreground">Seu cardápio ficará em: menusapp.com.br/<strong>{form.slug || "seu-slug"}</strong></p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
