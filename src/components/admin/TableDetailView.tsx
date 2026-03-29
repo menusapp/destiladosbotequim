@@ -60,6 +60,7 @@ interface Order {
   customer_name: string;
   notes?: string;
   comanda_id?: string;
+  payment_type?: string;
   order_items: OrderItem[];
 }
 
@@ -145,6 +146,7 @@ export const TableDetailView = () => {
           customer_name,
           notes,
           comanda_id,
+          payment_type,
           order_items (
             id,
             quantity,
@@ -436,6 +438,11 @@ export const TableDetailView = () => {
                             </p>
                             {comanda.orders.map((order) => (
                               <div key={order.id} className="text-sm space-y-1">
+                                {order.payment_type && (
+                                  <Badge variant="outline" className="text-[10px] mb-1 border-green-500 text-green-700 dark:text-green-400">
+                                    Pago - {order.payment_type}
+                                  </Badge>
+                                )}
                                 {order.order_items.map((item) => (
                                   <div key={item.id} className="flex justify-between">
                                     <span>

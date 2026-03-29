@@ -83,7 +83,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [deliveryNeighborhood, setDeliveryNeighborhood] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
   const [notes, setNotes] = useState("");
-  const [paymentType, setPaymentType] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentBrand, setPaymentBrand] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
   const [mixedPayments, setMixedPayments] = useState<MixedPaymentEntry[]>([
     { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
@@ -158,7 +159,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setCart([]);
     setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
-    setNotes(""); setPaymentType(""); setSelectedTableId("");
+    setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
     setMixedPayments([
       { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
       { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
@@ -220,20 +221,39 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     if (!customerName && orderType !== "mesa") { toast.error("Nome do cliente é obrigatório"); return; }
 
     // Resolve payment type
-    let resolvedPaymentType = paymentType || null;
+    let resolvedPaymentType: string | null = null;
     let resolvedPaymentBrand: string | null = null;
 
-    if (paymentType === "mixed") {
+    if (paymentMethod === "mixed") {
       const validEntries = mixedPayments.filter(p => p.method && parseFloat(p.amount) > 0);
       if (validEntries.length < 2) { toast.error("Pagamento misto requer pelo menos 2 formas"); return; }
       if (mixedRemaining > 0.01) { toast.error(`Faltam R$ ${mixedRemaining.toFixed(2)} para completar o valor`); return; }
       const { paymentStr, brandCode } = getMixedPaymentString();
       resolvedPaymentType = paymentStr;
       resolvedPaymentBrand = brandCode;
-    } else if (paymentType?.includes(" - ")) {
-      // Has brand embedded (e.g. "Crédito - Visa")
-      const brandPart = paymentType.split(" - ")[1]?.toLowerCase().trim();
-      resolvedPaymentBrand = brandPart || null;
+    } else if (paymentMethod === "credit" || paymentMethod === "debit") {
+      const methodLabel = paymentMethod === "credit" ? "Crédito" : "Débito";
+      if (paymentBrand) {
+        const brandName = CARD_BRANDS_PDV.find(b => b.code === paymentBrand)?.name || paymentBrand;
+        resolvedPaymentType = `${methodLabel} - ${brandName}`;
+        resolvedPaymentBrand = paymentBrand;
+      } else {
+        resolvedPaymentType = methodLabel;
+      }
+    } else if (paymentMethod === "meal_voucher") {
+      if (paymentBrand) {
+        const brandName = VOUCHER_BRANDS_PDV.find(b => b.code === paymentBrand)?.name || paymentBrand;
+        resolvedPaymentType = `Vale - ${brandName}`;
+        resolvedPaymentBrand = paymentBrand;
+      } else {
+        resolvedPaymentType = "Vale Refeição";
+      }
+    } else if (paymentMethod === "cash") {
+      resolvedPaymentType = "Dinheiro";
+    } else if (paymentMethod === "pix") {
+      resolvedPaymentType = "PIX";
+    } else if (paymentMethod) {
+      resolvedPaymentType = paymentMethod;
     }
 
     setSubmitting(true);
@@ -437,7 +457,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
               {/* Payment */}
               <div className="space-y-2">
                 <Label>Pagamento</Label>
-                <Select value={paymentType.startsWith("Crédito") || paymentType.startsWith("Débito") ? paymentType.split(" - ")[0] === "Crédito" ? "credit" : "debit" : paymentType} onValueChange={(v) => { setPaymentType(v); if (v !== "mixed") setMixedPayments([{ id: crypto.randomUUID(), method: "", brand: "", amount: "" }, { id: crypto.randomUUID(), method: "", brand: "", amount: "" }]); }}>
+                <Select value={paymentMethod} onValueChange={(v) => { setPaymentMethod(v); setPaymentBrand(""); if (v !== "mixed") setMixedPayments([{ id: crypto.randomUUID(), method: "", brand: "", amount: "" }, { id: crypto.randomUUID(), method: "", brand: "", amount: "" }]); }}>
                   <SelectTrigger><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Dinheiro</SelectItem>
@@ -450,46 +470,36 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                 </Select>
 
                 {/* Card brand selection for single method */}
-                {(paymentType === "credit" || paymentType === "debit" || paymentType.startsWith("Crédito") || paymentType.startsWith("Débito")) && (
-                  <Select
-                    value={paymentType.includes(" - ") ? paymentType : ""}
-                    onValueChange={(v) => setPaymentType(v)}
-                  >
+                {(paymentMethod === "credit" || paymentMethod === "debit") && (
+                  <Select value={paymentBrand} onValueChange={setPaymentBrand}>
                     <SelectTrigger><SelectValue placeholder="Selecione a bandeira do cartão" /></SelectTrigger>
                     <SelectContent>
-                      {(paymentType === "credit" || paymentType.startsWith("Crédito")) ? (
-                        <>
-                          <SelectItem value="Crédito - Visa">Crédito - Visa</SelectItem>
-                          <SelectItem value="Crédito - Mastercard">Crédito - Mastercard</SelectItem>
-                          <SelectItem value="Crédito - Elo">Crédito - Elo</SelectItem>
-                          <SelectItem value="Crédito - Amex">Crédito - Amex</SelectItem>
-                          <SelectItem value="Crédito - Hipercard">Crédito - Hipercard</SelectItem>
-                          <SelectItem value="Crédito - Diners">Crédito - Diners</SelectItem>
-                        </>
+                      {paymentMethod === "credit" ? (
+                        CARD_BRANDS_PDV.map(b => (
+                          <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                        ))
                       ) : (
-                        <>
-                          <SelectItem value="Débito - Visa">Débito - Visa</SelectItem>
-                          <SelectItem value="Débito - Mastercard">Débito - Mastercard</SelectItem>
-                          <SelectItem value="Débito - Elo">Débito - Elo</SelectItem>
-                        </>
+                        CARD_BRANDS_PDV.filter(b => ["visa", "mastercard", "elo"].includes(b.code)).map(b => (
+                          <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                        ))
                       )}
                     </SelectContent>
                   </Select>
                 )}
 
-                {paymentType === "meal_voucher" && (
-                  <Select value="" onValueChange={(v) => setPaymentType(v)}>
+                {paymentMethod === "meal_voucher" && (
+                  <Select value={paymentBrand} onValueChange={setPaymentBrand}>
                     <SelectTrigger><SelectValue placeholder="Selecione a bandeira do vale" /></SelectTrigger>
                     <SelectContent>
                       {VOUCHER_BRANDS_PDV.map(b => (
-                        <SelectItem key={b.code} value={`Vale - ${b.name}`}>{b.name}</SelectItem>
+                        <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 )}
 
                 {/* Mixed payment UI */}
-                {paymentType === "mixed" && (
+                {paymentMethod === "mixed" && (
                   <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Formas de pagamento</span>
