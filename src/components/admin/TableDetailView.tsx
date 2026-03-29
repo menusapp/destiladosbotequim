@@ -60,6 +60,7 @@ interface Order {
   customer_name: string;
   notes?: string;
   comanda_id?: string;
+  payment_type?: string;
   order_items: OrderItem[];
 }
 
@@ -145,6 +146,7 @@ export const TableDetailView = () => {
           customer_name,
           notes,
           comanda_id,
+          payment_type,
           order_items (
             id,
             quantity,
