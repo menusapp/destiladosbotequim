@@ -235,13 +235,13 @@ export function SubscriptionsTab() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {latestSubs.map(sub => (
-            <Card key={sub.id}>
+          {filteredSubs.map(sub => (
+            <Card key={sub.id} className={isInadimplente(sub) ? "border-destructive/50" : ""}>
               <CardContent className="flex items-center justify-between p-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{getRestaurantName(sub.restaurant_id)}</span>
-                    {statusBadge(sub.status)}
+                    {statusBadge(sub.status, sub)}
                   </div>
                   <p className="text-sm text-muted-foreground">Plano: {getPlanName(sub.plan_id)}</p>
                   {sub.next_payment_at && (
