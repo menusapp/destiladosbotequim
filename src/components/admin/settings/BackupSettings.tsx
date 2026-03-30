@@ -60,12 +60,20 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
   const [pendingRestore, setPendingRestore] = useState<any>(null);
   const [showConfirmRestore, setShowConfirmRestore] = useState(false);
   const [lastBackupDate, setLastBackupDate] = useState<string | null>(null);
+  const [backupPath, setBackupPath] = useState(() => localStorage.getItem(`backupPath_${restaurantId}`) || "");
 
   useEffect(() => {
     fetchCloudBackups();
     const stored = localStorage.getItem(`lastBackup_${restaurantId}`);
     if (stored) setLastBackupDate(stored);
   }, [restaurantId]);
+
+  const saveBackupPath = (path: string) => {
+    setBackupPath(path);
+    localStorage.setItem(`backupPath_${restaurantId}`, path);
+  };
+
+  const supportsFileSystemAccess = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 
   const fetchCloudBackups = async () => {
     setLoadingCloud(true);
@@ -164,10 +172,37 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
       };
 
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const fileName = `backup_${restaurantId}_${format(new Date(), "yyyy-MM-dd_HH-mm")}.json`;
+
+      // Try File System Access API first
+      if (supportsFileSystemAccess) {
+        try {
+          const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+          const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          
+          const now = new Date().toISOString();
+          localStorage.setItem(`lastBackup_${restaurantId}`, now);
+          setLastBackupDate(now);
+          toast.success("Backup salvo na pasta escolhida!");
+          setDownloading(false);
+          return;
+        } catch (fsErr: any) {
+          // User cancelled or API failed — fall through to normal download
+          if (fsErr.name === 'AbortError') {
+            setDownloading(false);
+            return;
+          }
+        }
+      }
+
+      // Fallback: normal download
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `backup_${restaurantId}_${format(new Date(), "yyyy-MM-dd_HH-mm")}.json`;
+      a.download = fileName;
       a.click();
       URL.revokeObjectURL(url);
 
@@ -404,6 +439,21 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Backup path preference */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Pasta padrão para backup (lembrete)</label>
+            <Input
+              value={backupPath}
+              onChange={e => saveBackupPath(e.target.value)}
+              placeholder="Ex: C:\Backups\Menus ou ~/Downloads/backups"
+            />
+            <p className="text-xs text-muted-foreground">
+              {supportsFileSystemAccess
+                ? "Ao clicar em \"Baixar Backup\", você poderá escolher a pasta diretamente."
+                : "Configure a pasta de download do seu navegador: Configurações → Downloads → Perguntar onde salvar cada arquivo."}
+            </p>
+          </div>
+
           <div className="flex items-center justify-between">
             <div>
               {lastBackupDate && (

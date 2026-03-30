@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
-import { Check, Crown, ArrowUp, ArrowDown, Package, Sparkles } from "lucide-react";
+import { Check, Crown, ArrowUp, ArrowDown, Package } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +28,34 @@ const ALL_MODULES: Record<string, string> = {
   fiscal: "Fiscal / NF-e",
   pagamentos_online: "Pagamentos Online",
   reservas: "Reservas",
+};
+const PLAN_TEXT_FEATURES: Record<string, string[]> = {
+  "básico": [
+    "Cardápio digital ilimitado",
+    "QR Code para mesas",
+    "Pedidos em tempo real",
+    "1 usuário administrador",
+    "Suporte por email",
+  ],
+  "intermediário": [
+    "Tudo do Básico",
+    "Delivery completo",
+    "Gestão de estoque & CMV",
+    "Relatórios e DRE",
+    "Programa de fidelidade",
+    "Até 5 usuários",
+    "Suporte prioritário",
+  ],
+  "avançado": [
+    "Tudo do Intermediário",
+    "Marketing WhatsApp",
+    "Remarketing automático",
+    "Nota fiscal eletrônica",
+    "Fluxo de caixa & DRE",
+    "Reservas online",
+    "Usuários ilimitados",
+    "Suporte VIP",
+  ],
 };
 
 interface Plan {
@@ -213,11 +241,16 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                 </div>
 
                 {/* Price */}
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-foreground">
-                    R$ {plan.price.toFixed(2).replace(".", ",")}
-                  </span>
-                  <span className="text-xs text-muted-foreground">/mês</span>
+                <div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-bold text-foreground">
+                      R$ {plan.price.toFixed(2).replace(".", ",")}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/mês</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    R$ {(plan.price / 30).toFixed(2).replace(".", ",")}/dia
+                  </p>
                 </div>
 
                 {/* CTA Button */}
@@ -240,17 +273,36 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                 {/* Divider */}
                 <div className="border-t border-border" />
 
-                {/* Features */}
-                <ul className="space-y-2.5">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2.5 text-sm text-foreground">
-                      <div className="flex-shrink-0 h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Check className="h-2.5 w-2.5 text-primary" />
+                {/* Textual Features from LP */}
+                {PLAN_TEXT_FEATURES[plan.name.toLowerCase()] && (
+                  <ul className="space-y-2">
+                    {PLAN_TEXT_FEATURES[plan.name.toLowerCase()].map((feat) => (
+                      <li key={feat} className="flex items-center gap-2.5 text-sm text-foreground">
+                        <div className="flex-shrink-0 h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Check className="h-2.5 w-2.5 text-primary" />
+                        </div>
+                        <span className="text-xs">{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Module badges */}
+                {plan.features.length > 0 && (
+                  <>
+                    <div className="border-t border-border" />
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider font-medium">Módulos incluídos</p>
+                      <div className="flex flex-wrap gap-1">
+                        {plan.features.map((f) => (
+                          <Badge key={f} variant="outline" className="text-[10px]">
+                            {ALL_MODULES[f] || f}
+                          </Badge>
+                        ))}
                       </div>
-                      <span className="text-xs">{ALL_MODULES[f] || f}</span>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           );

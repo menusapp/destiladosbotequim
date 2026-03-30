@@ -185,6 +185,7 @@ export function SubscriptionPlansTab() {
                   {!plan.is_active && <Badge variant="secondary">Inativo</Badge>}
                 </div>
                 <p className="text-2xl font-bold text-primary">R$ {plan.price.toFixed(2)}<span className="text-sm text-muted-foreground font-normal">/mês</span></p>
+                <p className="text-xs text-muted-foreground">≈ R$ {(plan.price / 30).toFixed(2)}/dia</p>
                 {plan.description && <p className="text-sm text-muted-foreground">{plan.description}</p>}
                 <div className="flex flex-wrap gap-1">
                   {plan.features.map(f => (

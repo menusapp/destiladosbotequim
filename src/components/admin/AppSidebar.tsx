@@ -50,9 +50,10 @@ interface AppSidebarProps {
   staffRole?: string;
   staffAllowedSections?: string[];
   primaryColor?: string;
+  onPrefetch?: (sectionId: string) => void;
 }
 
-export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, hasNewLocalOrders, isSectionAllowed, hasActiveSubscription, staffRole, staffAllowedSections, primaryColor = "#FF6B35" }: AppSidebarProps) {
+export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNewBills, hasNewDeliveryOrders, hasNewLocalOrders, isSectionAllowed, hasActiveSubscription, staffRole, staffAllowedSections, primaryColor = "#FF6B35", onPrefetch }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const [configOpen, setConfigOpen] = useState(activeSection.startsWith("config-"));
@@ -144,6 +145,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                     <SidebarMenuItem key={item.id}>
                       <SidebarMenuButton
                         onClick={() => onSectionChange(item.id)}
+                        onMouseEnter={() => onPrefetch?.(item.id)}
                         isActive={activeSection === item.id}
                         tooltip={item.label}
                         className={`relative h-9 px-3 rounded-button text-[13px] transition-colors ${
@@ -192,6 +194,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                           <SidebarMenuButton
                             key={subItem.id}
                             onClick={() => onSectionChange(subItem.id)}
+                            onMouseEnter={() => onPrefetch?.(subItem.id)}
                             isActive={activeSection === subItem.id}
                            className={`w-full h-8 px-3 rounded-button text-[13px] ${
                               activeSection === subItem.id
