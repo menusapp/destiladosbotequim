@@ -73,7 +73,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     to: endOfDay(new Date()),
   });
   const [pendingExportDateRange, setPendingExportDateRange] = useState<DateRange | undefined>();
-  const [exportDatePopoverOpen, setExportDatePopoverOpen] = useState(false);
+  const [exportDialogKey, setExportDialogKey] = useState(0);
   const [exporting, setExporting] = useState(false);
 
   const fetchNotes = useCallback(async () => {
