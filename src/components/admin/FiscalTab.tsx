@@ -9,7 +9,7 @@ interface FiscalTabProps {
 }
 
 export default function FiscalTab({ restaurantId }: FiscalTabProps) {
-  const [activeTab, setActiveTab] = useState("settings");
+  const [activeTab, setActiveTab] = useState("invoices");
 
   return (
     <div className="space-y-4">

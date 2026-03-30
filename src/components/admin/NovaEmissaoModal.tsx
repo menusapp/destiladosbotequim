@@ -48,12 +48,12 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
   const [deliveryAddresses, setDeliveryAddresses] = useState<Record<string, string>>({});
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
     const today = new Date();
-    const from = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(today);
-    to.setHours(23, 59, 59, 999);
-    return { from, to };
+    return {
+      from: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0),
+      to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999),
+    };
   });
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   useEffect(() => {
     if (open) fetchPendingOrders();
@@ -209,7 +209,7 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
 
         {/* Date Filter */}
         <div className="flex items-center gap-3">
-          <Popover>
+          <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -227,9 +227,11 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
                     const to = new Date(range.to);
                     to.setHours(23, 59, 59, 999);
                     setDateRange({ from, to });
+                    setDatePopoverOpen(false);
                   }
                 }}
                 locale={ptBR}
+                className="pointer-events-auto"
               />
             </PopoverContent>
           </Popover>
