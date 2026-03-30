@@ -49,6 +49,7 @@ interface LaborCost {
 export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
   const [dateFilter, setDateFilter] = useState<string>("today");
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
+  const [pendingCustomDateRange, setPendingCustomDateRange] = useState<DateRange | undefined>();
   const [customDatePopoverOpen, setCustomDatePopoverOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -518,7 +519,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
             {f.label}
           </Button>
         ))}
-        <Popover open={customDatePopoverOpen} onOpenChange={setCustomDatePopoverOpen}>
+        <Popover
+          open={customDatePopoverOpen}
+          onOpenChange={(open) => {
+            setCustomDatePopoverOpen(open);
+            if (open) setPendingCustomDateRange(undefined);
+          }}
+        >
           <PopoverTrigger asChild>
             <Button variant={dateFilter === "custom" ? "default" : "outline"} size="sm" className="justify-start text-left font-normal">
               <CalendarIcon className="mr-2 h-4 w-4" />
@@ -532,16 +539,19 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           <PopoverContent className="w-auto p-0" align="start">
             <CalendarComponent
               mode="range"
-              selected={customDateRange}
+              selected={pendingCustomDateRange}
               onSelect={(range) => {
-                setCustomDateRange(range);
-                if (range?.from) setDateFilter("custom");
+                setPendingCustomDateRange(range);
                 if (range?.from && range?.to) {
+                  const isForward = range.from <= range.to;
+                  const from = isForward ? range.from : range.to;
+                  const to = isForward ? range.to : range.from;
+                  setCustomDateRange({ from: startOfDay(from), to: endOfDay(to) });
+                  setDateFilter("custom");
                   setCustomDatePopoverOpen(false);
                 }
               }}
               locale={ptBR}
-              numberOfMonths={2}
               className="pointer-events-auto"
             />
           </PopoverContent>
