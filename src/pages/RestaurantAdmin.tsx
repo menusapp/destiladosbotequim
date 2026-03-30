@@ -750,7 +750,10 @@ const RestaurantAdmin = () => {
             onIsOpenUpdate={(isOpen) => setRestaurant({ ...restaurant, is_open: isOpen })}
           />
           <main className="flex-1 overflow-auto p-4">
-            {renderContent()}
+            <Suspense fallback={<div className="flex items-center justify-center h-96 text-muted-foreground">Carregando...</div>}>
+              {renderContent()}
+            </Suspense>
+          </main>
           </main>
         </SidebarInset>
 
