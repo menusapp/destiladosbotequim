@@ -40,6 +40,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <InstallPWA />
           <Routes>
             {/* Landing page comercial */}
             <Route path="/" element={<LandingPage />} />

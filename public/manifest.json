@@ -1,0 +1,13 @@
+{
+  "name": "Menu's",
+  "short_name": "Menus",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#F97316",
+  "background_color": "#ffffff",
+  "orientation": "any",
+  "icons": [
+    { "src": "/logo-menus.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo-menus.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
