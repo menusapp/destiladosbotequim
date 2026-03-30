@@ -20,7 +20,7 @@ export const SupportChatWidget = () => {
             <Button
               variant="outline"
               className="w-full justify-start gap-2 text-sm"
-              onClick={() => window.open("https://wa.me/5511999999999?text=Ol%C3%A1%2C%20preciso%20de%20ajuda%20com%20o%20sistema", "_blank")}
+              onClick={() => window.open("https://wa.me/5516995868928?text=Ol%C3%A1%2C%20preciso%20de%20ajuda%20com%20o%20sistema", "_blank")}
             >
               <MessageCircle className="w-4 h-4 text-green-600" />
               Falar via WhatsApp
