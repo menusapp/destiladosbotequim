@@ -754,7 +754,6 @@ const RestaurantAdmin = () => {
               {renderContent()}
             </Suspense>
           </main>
-          </main>
         </SidebarInset>
 
         {/* Global Order Notifications - stacked queue */}
