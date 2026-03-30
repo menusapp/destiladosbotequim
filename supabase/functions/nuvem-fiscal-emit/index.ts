@@ -375,7 +375,7 @@ Deno.serve(async (req) => {
           },
         },
         pag: {
-          detPag: [mapPaymentMethod(order.payment_type, Number(totalProdutos.toFixed(2)), order.payment_brand)],
+          detPag: buildDetPag(order.payment_type, Number(totalProdutos.toFixed(2)), order.payment_brand),
         },
         transp: { modFrete: 9 },
         infAdic: { infCpl: `Pedido: ${order_id}` },

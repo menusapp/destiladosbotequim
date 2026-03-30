@@ -194,26 +194,27 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       }
 
       // --- Revenue by payment method ---
+      // Normalize payment method to a base category, grouping online and presencial together
       const normalizeMethod = (method: string | null | undefined): string => {
         if (!method) return "Outros";
 
-        // Portuguese display strings — keep them as-is (includes brand)
-        if (method.startsWith("Crédito")) return method;
-        if (method.startsWith("Débito")) return method;
-        if (method.startsWith("Vale")) return method;
-        if (method === "Dinheiro") return "Dinheiro";
-        if (method === "PIX") return "PIX";
+        // Strip brand suffix: "Crédito - Visa" → "Crédito", "Débito - Mastercard" → "Débito"
+        const base = method.split(" - ")[0].trim();
 
-        // Internal codes → display labels
+        // Portuguese display strings
+        if (base.startsWith("Crédito") || base.startsWith("Créd")) return "Crédito";
+        if (base.startsWith("Débito") || base.startsWith("Déb")) return "Débito";
+        if (base.startsWith("Vale")) return "Vale Refeição";
+        if (base === "Dinheiro") return "Dinheiro";
+        if (base === "PIX") return "PIX";
+
+        // Internal codes → display labels (online = presencial)
         if (method === "cash") return "Dinheiro";
         if (method === "pix" || method === "pix_online") return "PIX";
         if (method === "credit" || method === "card" || method === "credit_card_online") return "Crédito";
         if (method === "debit") return "Débito";
         if (method === "meal_voucher") return "Vale Refeição";
         if (method === "Pago pelo iFood" || method === "ifood_online") return "iFood Online";
-
-        // Mixed payments (comma-separated) — split into individual labels
-        if (method.includes(",")) return "Misto";
 
         // Try payment_methods table lookup
         const byId = paymentMethods.find(p => p.id === method);
@@ -224,18 +225,36 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
         return "Outros";
       };
 
+      // For split/mixed payments stored as comma-separated strings,
+      // distribute the total evenly across each method
+      const addMethodRevenue = (methodTotals: Record<string, number>, method: string | null | undefined, total: number) => {
+        if (!method) {
+          methodTotals["Outros"] = (methodTotals["Outros"] || 0) + total;
+          return;
+        }
+        // If comma-separated (mixed), split and distribute evenly
+        if (method.includes(",")) {
+          const parts = method.split(",").map(s => s.trim()).filter(Boolean);
+          const perPart = total / (parts.length || 1);
+          for (const part of parts) {
+            const m = normalizeMethod(part);
+            methodTotals[m] = (methodTotals[m] || 0) + perPart;
+          }
+          return;
+        }
+        const m = normalizeMethod(method);
+        methodTotals[m] = (methodTotals[m] || 0) + total;
+      };
+
       const methodTotals: Record<string, number> = {};
       paidBills.forEach((b: any) => {
-        const m = normalizeMethod(b.payment_method);
-        methodTotals[m] = (methodTotals[m] || 0) + Number(b.total_amount);
+        addMethodRevenue(methodTotals, b.payment_method, Number(b.total_amount));
       });
       counterOrders.forEach((co: any) => {
-        const m = normalizeMethod(co.payment_method);
-        methodTotals[m] = (methodTotals[m] || 0) + Number(co.total_amount);
+        addMethodRevenue(methodTotals, co.payment_method, Number(co.total_amount));
       });
       deliveryOrders.forEach((o: any) => {
-        const m = normalizeMethod(o.payment_type);
-        methodTotals[m] = (methodTotals[m] || 0) + calcDeliveryOrderTotal(o);
+        addMethodRevenue(methodTotals, o.payment_type, calcDeliveryOrderTotal(o));
       });
 
       const revenueByMethod = Object.entries(methodTotals)

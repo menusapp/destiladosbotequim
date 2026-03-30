@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -15,21 +15,6 @@ import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2, Plus, CreditCard } 
 import { toast } from "@/components/ui/sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
-
-interface MixedPaymentEntry {
-  id: string;
-  method: string;
-  brand?: string;
-  amount: string;
-}
-
-const MIXED_METHODS = [
-  { value: "cash", label: "Dinheiro" },
-  { value: "pix", label: "PIX" },
-  { value: "credit", label: "Crédito" },
-  { value: "debit", label: "Débito" },
-  { value: "meal_voucher", label: "Vale Refeição" },
-];
 
 const CARD_BRANDS_PDV = [
   { code: "visa", name: "Visa" },
@@ -86,24 +71,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentBrand, setPaymentBrand] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
-  const mixedSectionRef = useRef<HTMLDivElement>(null);
-  const leftPanelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (paymentMethod === "mixed") {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (leftPanelRef.current) {
-            leftPanelRef.current.scrollTop = leftPanelRef.current.scrollHeight;
-          }
-        });
-      });
-    }
-  }, [paymentMethod]);
-  const [mixedPayments, setMixedPayments] = useState<MixedPaymentEntry[]>([
-    { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
-    { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
-  ]);
 
   const { data: products } = useQuery({
     queryKey: ["products-create-order", restaurantId],
@@ -174,60 +141,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
-    setMixedPayments([
-      { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
-      { id: crypto.randomUUID(), method: "", brand: "", amount: "" },
-    ]);
-  };
-
-  const getMixedPaymentString = (): { paymentStr: string; brandCode: string | null } => {
-    const valid = mixedPayments.filter(p => p.method && parseFloat(p.amount) > 0);
-    if (valid.length === 0) return { paymentStr: "", brandCode: null };
-
-    const labels = valid.map(p => {
-      const methodLabel = MIXED_METHODS.find(m => m.value === p.method)?.label || p.method;
-      if (p.brand) {
-        const allBrands = [...CARD_BRANDS_PDV, ...VOUCHER_BRANDS_PDV];
-        const brandName = allBrands.find(b => b.code === p.brand)?.name || p.brand;
-        return `${methodLabel} - ${brandName}`;
-      }
-      return methodLabel;
-    });
-
-    const firstBrand = valid.find(p => p.brand)?.brand || null;
-    return { paymentStr: labels.join(", "), brandCode: firstBrand };
-  };
-
-  const mixedTotal = useMemo(() => {
-    return mixedPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-  }, [mixedPayments]);
-
-  const mixedRemaining = Math.max(0, Math.round((cartSubtotal - mixedTotal) * 100) / 100);
-
-  const needsBrandForMethod = (method: string) => ["credit", "debit", "meal_voucher"].includes(method);
-
-  const getBrandsForMixedMethod = (method: string) => {
-    if (method === "credit" || method === "debit") return CARD_BRANDS_PDV;
-    if (method === "meal_voucher") return VOUCHER_BRANDS_PDV;
-    return [];
-  };
-
-  const updateMixedPayment = (id: string, field: keyof MixedPaymentEntry, value: string) => {
-    setMixedPayments(prev => prev.map(p => {
-      if (p.id !== id) return p;
-      const updated = { ...p, [field]: value };
-      if (field === "method") updated.brand = "";
-      return updated;
-    }));
-  };
-
-  const addMixedPayment = () => {
-    setMixedPayments(prev => [...prev, { id: crypto.randomUUID(), method: "", brand: "", amount: "" }]);
-  };
-
-  const removeMixedPayment = (id: string) => {
-    if (mixedPayments.length <= 2) return;
-    setMixedPayments(prev => prev.filter(p => p.id !== id));
   };
 
   const handleSubmit = async () => {
@@ -238,14 +151,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     let resolvedPaymentType: string | null = null;
     let resolvedPaymentBrand: string | null = null;
 
-    if (paymentMethod === "mixed") {
-      const validEntries = mixedPayments.filter(p => p.method && parseFloat(p.amount) > 0);
-      if (validEntries.length < 2) { toast.error("Pagamento misto requer pelo menos 2 formas"); return; }
-      if (mixedRemaining > 0.01) { toast.error(`Faltam R$ ${mixedRemaining.toFixed(2)} para completar o valor`); return; }
-      const { paymentStr, brandCode } = getMixedPaymentString();
-      resolvedPaymentType = paymentStr;
-      resolvedPaymentBrand = brandCode;
-    } else if (paymentMethod === "credit" || paymentMethod === "debit") {
+    if (paymentMethod === "credit" || paymentMethod === "debit") {
       const methodLabel = paymentMethod === "credit" ? "Crédito" : "Débito";
       if (paymentBrand) {
         const brandName = CARD_BRANDS_PDV.find(b => b.code === paymentBrand)?.name || paymentBrand;
@@ -311,7 +217,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         const currentCustomerCpf = customerCpf || "000.000.000-00";
 
         if (table.is_occupied) {
-          // Search for an existing comanda for THIS SPECIFIC customer (by name AND cpf)
           let query = supabase.from("comandas")
             .select("*").eq("table_id", tableId).eq("status", "active")
             .eq("customer_name", currentCustomerName);
@@ -324,7 +229,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           if (existingComanda) {
             comandaId = existingComanda.id;
           } else {
-            // Create a NEW comanda for this different customer
             const { data: nc } = await supabase.from("comandas").insert({
               restaurant_id: restaurantId, table_id: tableId,
               customer_name: currentCustomerName,
@@ -358,7 +262,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         await insertOrderItems(order.id);
       }
 
-      // Deduct stock for non-mesa PDV orders (start in 'preparing', trigger misses items)
+      // Deduct stock for non-mesa PDV orders
       if (orderType !== "mesa") {
         const lastOrder = await supabase.from("orders")
           .select("id, order_items(id)")
@@ -411,7 +315,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           <div className="flex-1 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 h-full">
               {/* Left: Form */}
-              <div ref={leftPanelRef} className="p-4 space-y-4 border-r overflow-y-auto max-h-[calc(100vh-180px)]">
+              <div className="p-4 space-y-4 border-r overflow-y-auto max-h-[calc(100vh-180px)]">
                 <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)}>
                   <TabsList className="w-full">
                     <TabsTrigger value="delivery" className="flex-1">Delivery</TabsTrigger>
@@ -471,7 +375,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                 {/* Payment */}
                 <div className="space-y-2">
                 <Label>Pagamento</Label>
-                <Select value={paymentMethod} onValueChange={(v) => { setPaymentMethod(v); setPaymentBrand(""); if (v !== "mixed") setMixedPayments([{ id: crypto.randomUUID(), method: "", brand: "", amount: "" }, { id: crypto.randomUUID(), method: "", brand: "", amount: "" }]); }}>
+                <Select value={paymentMethod} onValueChange={(v) => { setPaymentMethod(v); setPaymentBrand(""); }}>
                   <SelectTrigger><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Dinheiro</SelectItem>
@@ -479,11 +383,10 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                     <SelectItem value="credit">Crédito</SelectItem>
                     <SelectItem value="pix">Pix</SelectItem>
                     <SelectItem value="meal_voucher">Vale Refeição</SelectItem>
-                    <SelectItem value="mixed">Misto (2+ formas)</SelectItem>
                   </SelectContent>
                 </Select>
 
-                {/* Card brand selection for single method */}
+                {/* Card brand selection */}
                 {(paymentMethod === "credit" || paymentMethod === "debit") && (
                   <Select value={paymentBrand} onValueChange={setPaymentBrand}>
                     <SelectTrigger><SelectValue placeholder="Selecione a bandeira do cartão" /></SelectTrigger>
@@ -510,81 +413,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       ))}
                     </SelectContent>
                   </Select>
-                )}
-
-                {/* Mixed payment UI */}
-                {paymentMethod === "mixed" && (
-                  <div ref={mixedSectionRef} className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Formas de pagamento</span>
-                      {mixedRemaining > 0.01 ? (
-                        <Badge variant="destructive" className="text-xs">Falta: R$ {mixedRemaining.toFixed(2)}</Badge>
-                      ) : (
-                        <Badge className="bg-green-600 text-white text-xs">✓ Completo</Badge>
-                      )}
-                    </div>
-
-                    {mixedPayments.map((entry, idx) => (
-                      <div key={entry.id} className="space-y-1.5 border rounded-md p-2 bg-background">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-muted-foreground w-5">{idx + 1}.</span>
-                          <Select value={entry.method} onValueChange={(v) => updateMixedPayment(entry.id, "method", v)}>
-                            <SelectTrigger className="flex-1 h-9 text-sm">
-                              <SelectValue placeholder="Forma..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {MIXED_METHODS.map(m => (
-                                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <div className="relative w-28">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={entry.amount}
-                              onChange={(e) => updateMixedPayment(entry.id, "amount", e.target.value)}
-                              placeholder="0,00"
-                              className="pl-7 h-9 text-sm"
-                            />
-                          </div>
-                          {mixedPayments.length > 2 && (
-                            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => removeMixedPayment(entry.id)}>
-                              <X className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* Brand selector for card/voucher methods */}
-                        {needsBrandForMethod(entry.method) && (
-                          <div className="ml-7">
-                            <Select value={entry.brand || ""} onValueChange={(v) => updateMixedPayment(entry.id, "brand", v)}>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Selecione a bandeira" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {getBrandsForMixedMethod(entry.method).map(b => (
-                                  <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    <Button variant="outline" size="sm" className="w-full" onClick={addMixedPayment}>
-                      <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar forma
-                    </Button>
-
-                    <div className="flex justify-between text-xs pt-1 border-t">
-                      <span className="text-muted-foreground">Total informado:</span>
-                      <span className={`font-bold ${mixedRemaining > 0.01 ? "text-destructive" : "text-green-600"}`}>
-                        R$ {mixedTotal.toFixed(2)} / R$ {cartSubtotal.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
                 )}
                 </div>
 

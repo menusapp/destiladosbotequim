@@ -418,6 +418,8 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
           variant="outline"
           onClick={() => {
             setExportDateRange({ from: startOfDay(new Date()), to: endOfDay(new Date()) });
+            setPendingExportDateRange(undefined);
+            setExportDialogKey(prev => prev + 1);
             setExportDialogOpen(true);
           }}
           className="gap-2"
