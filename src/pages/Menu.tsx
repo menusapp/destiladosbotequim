@@ -7,6 +7,7 @@ import { MenuHeader } from "@/components/menu/MenuHeader";
 import { RestaurantInfoCard } from "@/components/menu/RestaurantInfoCard";
 import { FeaturedProducts } from "@/components/menu/FeaturedProducts";
 import { CategoryProducts } from "@/components/menu/CategoryProducts";
+import { CategoryNav } from "@/components/menu/CategoryNav";
 import { CartBottomBar } from "@/components/menu/CartBottomBar";
 import { ComandaBottomBar } from "@/components/menu/ComandaBottomBar";
 import { CartDrawer } from "@/components/menu/CartDrawer";
