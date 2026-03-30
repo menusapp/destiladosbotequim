@@ -1,71 +1,66 @@
 
 
-# Plano — Remover Misto do PDV + Corrigir XML Export + Pagamentos Separados no Banco
+# Plano — PWA Instalável (sem Service Worker)
 
-## 3 Alterações
+## Abordagem: Manifest-only (sem risco)
 
-### 1. Remover "Misto" do PDV (CreateOrderDrawer.tsx)
+Conforme as diretrizes do projeto, **não usaremos `vite-plugin-pwa` nem Service Worker**. Isso evita qualquer problema de cache stale, interferência com preview do Lovable, ou quebra de funcionalidades existentes (realtime, fiscal, iFood, MercadoPago, impressão).
 
-O usuário quer que o PDV **não tenha mais a opção "Misto"**. Atualmente o Misto salva as formas concatenadas (ex: "Dinheiro, Crédito - Visa") como uma única string em `payment_type`. Isso é o problema central — não há separação real no banco.
+Um simples `manifest.json` com `display: "standalone"` já torna o app **instalável** no celular e desktop — sem offline, mas com zero risco de quebrar algo.
 
-**Ação:** Remover completamente do `CreateOrderDrawer.tsx`:
-- Remover a `SelectItem value="mixed"` (linha 482)
-- Remover toda a interface `MixedPaymentEntry`, constantes `MIXED_METHODS`, funções `getMixedPaymentString`, `updateMixedPayment`, `addMixedPayment`, `removeMixedPayment`, `needsBrandForMethod`, `getBrandsForMixedMethod`, `mixedTotal`, `mixedRemaining`
-- Remover o state `mixedPayments` e o `useEffect` do scroll
-- Remover o bloco UI de pagamento misto (linhas 516-588)
-- Remover a lógica `if (paymentMethod === "mixed")` no `handleSubmit` (linhas 241-247)
-- Remover a `ref` `mixedSectionRef`
+## Nenhuma funcionalidade será afetada
 
-O PDV só terá: Dinheiro, Débito, Crédito, PIX, Vale Refeição. Se precisar de 2+ formas, usa-se o fluxo de finalização do `PaymentConfirmationModal` (que já funciona corretamente com múltiplos métodos separados no `cash_movements`).
+- Realtime/subscriptions: sem alteração
+- Pedidos, fiscal, iFood, impressão: sem alteração
+- MercadoPago SDK: continua carregando normalmente
+- Rotas e navegação: sem alteração
+- Supabase queries: sem cache de SW, dados sempre frescos
 
----
+## Alterações
 
-### 2. Corrigir Export XMLs (NotasFiscaisTab.tsx)
+### 1. Criar `public/manifest.json`
+```json
+{
+  "name": "Menu's",
+  "short_name": "Menus",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#F97316",
+  "background_color": "#ffffff",
+  "icons": [
+    { "src": "/logo-menus.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo-menus.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
+```
+Usará o `logo-menus.png` existente no `/public`.
 
-O export funciona na lógica mas o calendário inline pode ter conflito de interação. O problema mais provável é que o `pendingExportDateRange` não está sendo resetado ao abrir o dialog, fazendo com que o range fique "travado" de sessões anteriores.
+### 2. Atualizar `index.html`
+Adicionar no `<head>`:
+- `<link rel="manifest" href="/manifest.json">`
+- `<meta name="apple-mobile-web-app-capable" content="yes">`
+- `<meta name="apple-mobile-web-app-status-bar-style" content="default">`
+- `<meta name="theme-color" content="#F97316">`
+- `<link rel="apple-touch-icon" href="/logo-menus.png">`
 
-**Ação em `NotasFiscaisTab.tsx`:**
-- Ao abrir o dialog de export (linha 420), resetar `pendingExportDateRange` para `undefined`
-- Verificar se o erro é no download em si — adicionar melhor tratamento de erro com `try/catch` mais específico e log do status HTTP
-- Garantir que o `Calendar` inline receba `key` dinâmico para forçar re-render ao abrir
+### 3. Criar `src/components/InstallPWA.tsx`
+Componente que:
+- Escuta o evento `beforeinstallprompt` (Android/Desktop Chrome)
+- Mostra um banner discreto "Instalar aplicativo" com botão
+- Em iOS, detecta via `navigator.standalone` e mostra instrução: "No Safari, toque em Compartilhar → Adicionar à Tela de Início"
+- Dismissível pelo usuário (salva no localStorage)
 
----
+### 4. Integrar o componente
+- Renderizar `<InstallPWA />` no `App.tsx` (fora das rotas, visível globalmente)
 
-### 3. Pagamentos separados no banco + Normalização de métricas
+## Arquivos
 
-**Problema atual:** Quando se usa o `PaymentConfirmationModal` com múltiplas formas, o `orders.payment_type` recebe uma string concatenada tipo "Dinheiro, Crédito - Visa". Nos relatórios, isso vira "Misto" em vez de metrificar cada forma separadamente.
+| Arquivo | Ação |
+|---------|------|
+| `public/manifest.json` | Criar |
+| `index.html` | Adicionar meta tags PWA |
+| `src/components/InstallPWA.tsx` | Criar |
+| `src/App.tsx` | Adicionar `<InstallPWA />` |
 
-**Problema 2:** "Crédito - Visa" (pago presencial) e "Crédito - Visa" (pago online) aparecem como coisas diferentes, e PIX normal vs PIX online idem. Devem ser a mesma coisa.
-
-**Correção em `useOrderMetrics.ts`:**
-- Na função `normalizeMethod`: quando encontrar string com vírgulas (método misto), **não retornar "Misto"**. Em vez disso, NÃO processar como método único — esse cenário será tratado pelo novo approach abaixo.
-- Normalizar `credit_card_online` → mesmo bucket que `credit` → "Crédito"
-- Normalizar `pix_online` → mesmo bucket que `pix` → "PIX"
-- Strings como "Crédito - Visa" devem normalizar para "Crédito" (extrair antes do " - ")
-
-**Correção na acumulação de métricas:**
-- Para delivery orders com `payment_type` contendo vírgulas: fazer split por ", " e distribuir o valor proporcionalmente (ou igualmente se não há dados de valor individual). Alternativa pragmática: usar os `cash_movements` como fonte de verdade para pagamentos split, já que lá **cada método já está separado com seu valor**.
-
-**Abordagem concreta para `useOrderMetrics.ts`:**
-- Buscar `cash_movements` agrupados por `payment_method` no mesmo período
-- Usar `cash_movements` como fonte primária de receita por método (já separados corretamente)
-- Para delivery orders (que não têm cash_movements), normalizar `payment_type` extraindo a parte base antes de " - " e tratando `_online` como igual ao presencial
-- Remover completamente a categoria "Misto" dos relatórios
-
-**Correção no `nuvem-fiscal-emit`:**
-- Quando `payment_type` contém vírgulas (misto), gerar múltiplos `detPag` em vez de um único `tPag: 99`. Buscar os `cash_movements` do pedido para obter cada método e valor individual. Se não encontrar, manter fallback `tPag: 99`.
-
----
-
-## Arquivos a editar
-
-| Arquivo | Alteração |
-|---------|----------|
-| `CreateOrderDrawer.tsx` | Remover toda lógica/UI do Misto |
-| `NotasFiscaisTab.tsx` | Reset do pendingExportDateRange + key dinâmico no Calendar |
-| `useOrderMetrics.ts` | Normalizar online=presencial, split por vírgula em vez de "Misto", extrair base do método |
-| `nuvem-fiscal-emit/index.ts` | Gerar múltiplos detPag para pagamentos mistos |
-| `lib/utils.ts` | Atualizar `formatPaymentMethod` para normalizar online igual presencial |
-
-Nenhuma funcionalidade existente será quebrada — o `PaymentConfirmationModal` já salva corretamente cada método separado no `cash_movements`.
+Nenhum arquivo existente terá lógica alterada. Apenas adições.
 
