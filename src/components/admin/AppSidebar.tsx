@@ -145,6 +145,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                     <SidebarMenuItem key={item.id}>
                       <SidebarMenuButton
                         onClick={() => onSectionChange(item.id)}
+                        onMouseEnter={() => onPrefetch?.(item.id)}
                         isActive={activeSection === item.id}
                         tooltip={item.label}
                         className={`relative h-9 px-3 rounded-button text-[13px] transition-colors ${
