@@ -155,10 +155,37 @@ function mapPaymentMethod(paymentType: string | null | undefined, vPag: number, 
   if (pt.startsWith("vale") || pt === "meal_voucher") return { tPag: "10", vPag };
   if (pt === "pix" || pt === "pix_online") return { tPag: "20", vPag };
   if (pt === "ifood_online" || pt === "pago pelo ifood") return { tPag: "99", xPag: "Pagamento Online", vPag };
-  if (pt === "misto" || pt === "mixed") return { tPag: "99", xPag: "Pagamento Misto", vPag };
-
   const xPag = paymentType || "Outros";
   return { tPag: "99", xPag, vPag };
+}
+
+/**
+ * For mixed/split payments (comma-separated), generates multiple detPag entries.
+ * Falls back to single tPag 99 if parsing fails.
+ */
+function buildDetPag(paymentType: string | null | undefined, vTotal: number, paymentBrand: string | null | undefined): Record<string, any>[] {
+  const pt = (paymentType || "").trim();
+  
+  // If it contains commas, it's a mixed payment — split into individual methods
+  if (pt.includes(",")) {
+    const parts = pt.split(",").map(s => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      // Distribute total evenly across parts (best approximation without per-method values)
+      const perPart = Number((vTotal / parts.length).toFixed(2));
+      // Adjust last part for rounding
+      const result: Record<string, any>[] = [];
+      let remaining = vTotal;
+      for (let i = 0; i < parts.length; i++) {
+        const isLast = i === parts.length - 1;
+        const amount = isLast ? Number(remaining.toFixed(2)) : perPart;
+        remaining -= perPart;
+        result.push(mapPaymentMethod(parts[i], amount, paymentBrand));
+      }
+      return result;
+    }
+  }
+  
+  return [mapPaymentMethod(paymentType, vTotal, paymentBrand)];
 }
 
 Deno.serve(async (req) => {
