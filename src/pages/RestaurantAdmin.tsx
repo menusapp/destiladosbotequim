@@ -480,7 +480,7 @@ const RestaurantAdmin = () => {
       // Buscar horários de funcionamento
       const { data: hours, error } = await supabase
         .from('business_hours')
-        .select('*')
+        .select('day_of_week, is_open, open_time, close_time')
         .eq('restaurant_id', restaurantData.id);
 
       if (error) throw error;
