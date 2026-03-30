@@ -890,7 +890,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                     <SelectItem value="credit">Crédito</SelectItem>
                     <SelectItem value="pix">Pix</SelectItem>
                     <SelectItem value="meal_voucher">Vale Refeição</SelectItem>
-                    <SelectItem value="mixed">Misto</SelectItem>
                   </SelectContent>
                 </Select>
                 {/* Card brand selection for credit/debit */}
