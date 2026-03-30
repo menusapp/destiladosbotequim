@@ -58,7 +58,7 @@ const PLAN_TEXT_FEATURES: Record<string, string[]> = {
   ],
 };
 
-
+interface Plan {
   id: string;
   name: string;
   description: string | null;
