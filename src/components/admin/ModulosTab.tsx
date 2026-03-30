@@ -29,8 +29,36 @@ const ALL_MODULES: Record<string, string> = {
   pagamentos_online: "Pagamentos Online",
   reservas: "Reservas",
 };
+const PLAN_TEXT_FEATURES: Record<string, string[]> = {
+  "básico": [
+    "Cardápio digital ilimitado",
+    "QR Code para mesas",
+    "Pedidos em tempo real",
+    "1 usuário administrador",
+    "Suporte por email",
+  ],
+  "intermediário": [
+    "Tudo do Básico",
+    "Delivery completo",
+    "Gestão de estoque & CMV",
+    "Relatórios e DRE",
+    "Programa de fidelidade",
+    "Até 5 usuários",
+    "Suporte prioritário",
+  ],
+  "avançado": [
+    "Tudo do Intermediário",
+    "Marketing WhatsApp",
+    "Remarketing automático",
+    "Nota fiscal eletrônica",
+    "Fluxo de caixa & DRE",
+    "Reservas online",
+    "Usuários ilimitados",
+    "Suporte VIP",
+  ],
+};
 
-interface Plan {
+
   id: string;
   name: string;
   description: string | null;
