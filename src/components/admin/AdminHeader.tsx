@@ -12,6 +12,7 @@ import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
+import { RealtimeStatusIndicator } from "./RealtimeStatusIndicator";
 
 interface AdminHeaderProps {
   restaurantId: string;
