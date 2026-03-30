@@ -12,6 +12,7 @@ import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
+import { RealtimeStatusIndicator } from "./RealtimeStatusIndicator";
 
 interface AdminHeaderProps {
   restaurantId: string;
@@ -131,6 +132,9 @@ export const AdminHeader = ({
       </div>
 
       <div className="flex-1" />
+
+      {/* Realtime connection status */}
+      <RealtimeStatusIndicator />
 
       {/* Toggle Abrir/Fechar */}
       <div className="flex items-center gap-2 px-2.5 py-1 rounded-button border border-border">
