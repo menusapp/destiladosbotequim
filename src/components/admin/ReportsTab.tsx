@@ -49,6 +49,7 @@ interface LaborCost {
 export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
   const [dateFilter, setDateFilter] = useState<string>("today");
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
+  const [customDatePopoverOpen, setCustomDatePopoverOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   
   // Dashboard stats
@@ -517,7 +518,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
             {f.label}
           </Button>
         ))}
-        <Popover>
+        <Popover open={customDatePopoverOpen} onOpenChange={setCustomDatePopoverOpen}>
           <PopoverTrigger asChild>
             <Button variant={dateFilter === "custom" ? "default" : "outline"} size="sm" className="justify-start text-left font-normal">
               <CalendarIcon className="mr-2 h-4 w-4" />
@@ -532,7 +533,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
             <CalendarComponent
               mode="range"
               selected={customDateRange}
-              onSelect={(range) => { setCustomDateRange(range); if (range?.from) setDateFilter("custom"); }}
+              onSelect={(range) => {
+                setCustomDateRange(range);
+                if (range?.from) setDateFilter("custom");
+                if (range?.from && range?.to) {
+                  setCustomDatePopoverOpen(false);
+                }
+              }}
               locale={ptBR}
               numberOfMonths={2}
               className="pointer-events-auto"

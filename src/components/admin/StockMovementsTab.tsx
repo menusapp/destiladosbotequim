@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,13 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, Plus, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { CalendarIcon, Plus, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, format } from "date-fns";
-import { pt } from "date-fns/locale";
+import { ptBR } from "date-fns/locale";
 
 interface StockItem {
   id: string;
@@ -40,8 +40,11 @@ export default function StockMovementsTab({ restaurantId }: StockMovementsTabPro
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState<Date>(startOfDay(new Date()));
-  const [endDate, setEndDate] = useState<Date>(endOfDay(new Date()));
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: startOfDay(new Date()),
+    to: endOfDay(new Date()),
+  });
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,9 +58,52 @@ export default function StockMovementsTab({ restaurantId }: StockMovementsTabPro
     fetchStockItems();
   }, [restaurantId]);
 
+  const fetchMovements = useCallback(async () => {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("stock_movements")
+      .select(`
+        id,
+        stock_item_id,
+        quantity,
+        movement_type,
+        reason,
+        order_id,
+        created_at,
+        stock_items!inner(id, name, unit, restaurant_id)
+      `)
+      .eq("stock_items.restaurant_id", restaurantId)
+      .gte("created_at", dateRange.from.toISOString())
+      .lte("created_at", dateRange.to.toISOString())
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Erro ao carregar movimentações:", error);
+      toast.error("Erro ao carregar movimentações");
+      setLoading(false);
+      return;
+    }
+
+    setMovements(data || []);
+    setLoading(false);
+  }, [restaurantId, dateRange]);
+
   useEffect(() => {
     fetchMovements();
-  }, [restaurantId, startDate, endDate]);
+  }, [fetchMovements]);
+
+  // Realtime subscription
+  useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    const ch = supabase.channel(`stock-movements-rt-${restaurantId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchMovements, 400);
+      })
+      .subscribe();
+    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
+  }, [restaurantId, fetchMovements]);
 
   const fetchStockItems = async () => {
     const { data, error } = await supabase
@@ -74,37 +120,6 @@ export default function StockMovementsTab({ restaurantId }: StockMovementsTabPro
     setStockItems(data || []);
   };
 
-  const fetchMovements = async () => {
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from("stock_movements")
-      .select(`
-        id,
-        stock_item_id,
-        quantity,
-        movement_type,
-        reason,
-        order_id,
-        created_at,
-        stock_items!inner(id, name, unit, restaurant_id)
-      `)
-      .eq("stock_items.restaurant_id", restaurantId)
-      .gte("created_at", startDate.toISOString())
-      .lte("created_at", endDate.toISOString())
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Erro ao carregar movimentações:", error);
-      toast.error("Erro ao carregar movimentações");
-      setLoading(false);
-      return;
-    }
-
-    setMovements(data || []);
-    setLoading(false);
-  };
-
   const handleSubmitMovement = async () => {
     if (!formStockItemId) {
       toast.error("Selecione um insumo");
@@ -119,7 +134,6 @@ export default function StockMovementsTab({ restaurantId }: StockMovementsTabPro
 
     setSubmitting(true);
 
-    // Insert movement
     const { error: movementError } = await supabase
       .from("stock_movements")
       .insert({
@@ -135,7 +149,6 @@ export default function StockMovementsTab({ restaurantId }: StockMovementsTabPro
       return;
     }
 
-    // Update stock item quantity
     const selectedItem = stockItems.find(s => s.id === formStockItemId);
     if (selectedItem) {
       const { data: currentItem } = await supabase
@@ -184,37 +197,27 @@ export default function StockMovementsTab({ restaurantId }: StockMovementsTabPro
           Nova Movimentação
         </Button>
 
-        {/* Date Filter */}
-        <Popover>
+        {/* Date Filter - unified range */}
+        <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2">
-              <Calendar className="h-4 w-4" />
-              {format(startDate, "dd/MM/yy", { locale: pt })} - {format(endDate, "dd/MM/yy", { locale: pt })}
+              <CalendarIcon className="h-4 w-4" />
+              {format(dateRange.from, "dd/MM/yy", { locale: ptBR })} - {format(dateRange.to, "dd/MM/yy", { locale: ptBR })}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
-            <div className="p-3 space-y-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Data inicial</Label>
-                <CalendarComponent
-                  mode="single"
-                  selected={startDate}
-                  onSelect={(date) => date && setStartDate(startOfDay(date))}
-                  locale={pt}
-                  className="pointer-events-auto"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Data final</Label>
-                <CalendarComponent
-                  mode="single"
-                  selected={endDate}
-                  onSelect={(date) => date && setEndDate(endOfDay(date))}
-                  locale={pt}
-                  className="pointer-events-auto"
-                />
-              </div>
-            </div>
+            <Calendar
+              mode="range"
+              selected={{ from: dateRange.from, to: dateRange.to }}
+              onSelect={(range) => {
+                if (range?.from && range?.to) {
+                  setDateRange({ from: startOfDay(range.from), to: endOfDay(range.to) });
+                  setDatePopoverOpen(false);
+                }
+              }}
+              locale={ptBR}
+              className="pointer-events-auto"
+            />
           </PopoverContent>
         </Popover>
       </div>
@@ -247,7 +250,7 @@ export default function StockMovementsTab({ restaurantId }: StockMovementsTabPro
                   {movements.map((movement) => (
                     <TableRow key={movement.id}>
                       <TableCell className="whitespace-nowrap">
-                        {format(new Date(movement.created_at), "dd/MM/yyyy HH:mm", { locale: pt })}
+                        {format(new Date(movement.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                       </TableCell>
                       <TableCell className="font-medium">
                         {movement.stock_items?.name || "Insumo removido"}
