@@ -70,12 +70,14 @@ function extractBrandCode(brandName: string): string | null {
 // ── Dynamic ICMS node based on product CSOSN ──
 function buildICMSNode(csosn: string | null | undefined, orig: number): Record<string, any> {
   const code = (csosn || "").trim();
-  if (code === "500") {
+  if (code === "500" || code === "400") {
     return { ICMSSN500: { orig, CSOSN: "500" } };
   }
-  // 102, 103 or any other / empty → ICMSSN102 with real CSOSN or default 102
-  const effectiveCST = (code === "102" || code === "103") ? code : "102";
-  return { ICMSSN102: { orig, CSOSN: effectiveCST } };
+  if (code === "102" || code === "103") {
+    return { ICMSSN102: { orig, CSOSN: code } };
+  }
+  // Default: CSOSN 500 (most food/beverage products in SP have ST)
+  return { ICMSSN500: { orig, CSOSN: "500" } };
 }
 
 // ── Status mapping from Nuvem Fiscal Dfe response ──
