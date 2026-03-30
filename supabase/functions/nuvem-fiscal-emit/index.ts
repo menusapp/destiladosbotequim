@@ -153,7 +153,7 @@ function mapPaymentMethod(paymentType: string | null | undefined, vPag: number, 
   }
 
   if (pt.startsWith("vale") || pt === "meal_voucher") return { tPag: "10", vPag };
-  if (pt === "pix" || pt === "pix_online") return { tPag: "17", vPag };
+  if (pt === "pix" || pt === "pix_online") return { tPag: "20", vPag };
   if (pt === "ifood_online" || pt === "pago pelo ifood") return { tPag: "99", xPag: "Pagamento Online", vPag };
   if (pt === "misto" || pt === "mixed") return { tPag: "99", xPag: "Pagamento Misto", vPag };
 
