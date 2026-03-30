@@ -13,6 +13,7 @@ import { CalendarIcon, FileText, Loader2, MapPin, UtensilsCrossed, Truck } from 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/components/ui/sonner";
+import type { DateRange } from "react-day-picker";
 
 interface PendingOrder {
   id: string;
@@ -53,6 +54,7 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
       to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999),
     };
   });
+  const [pendingDateRange, setPendingDateRange] = useState<DateRange | undefined>();
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   useEffect(() => {
@@ -209,7 +211,13 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
 
         {/* Date Filter */}
         <div className="flex items-center gap-3">
-          <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+          <Popover
+            open={datePopoverOpen}
+            onOpenChange={(open) => {
+              setDatePopoverOpen(open);
+              if (open) setPendingDateRange(undefined);
+            }}
+          >
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -219,12 +227,17 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="range"
-                selected={{ from: dateRange.from, to: dateRange.to }}
+                selected={pendingDateRange}
                 onSelect={(range) => {
+                  setPendingDateRange(range);
                   if (range?.from && range?.to) {
-                    const from = new Date(range.from);
+                    const isForward = range.from <= range.to;
+                    const normalizedFrom = isForward ? range.from : range.to;
+                    const normalizedTo = isForward ? range.to : range.from;
+
+                    const from = new Date(normalizedFrom);
                     from.setHours(0, 0, 0, 0);
-                    const to = new Date(range.to);
+                    const to = new Date(normalizedTo);
                     to.setHours(23, 59, 59, 999);
                     setDateRange({ from, to });
                     setDatePopoverOpen(false);
