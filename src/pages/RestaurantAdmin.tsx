@@ -37,6 +37,7 @@ const PaymentMethodsSettings = lazy(() => import("@/components/admin/settings/Pa
 const PrintersSettings = lazy(() => import("@/components/admin/settings/PrintersSettings"));
 const WhatsAppSettings = lazy(() => import("@/components/admin/settings/WhatsAppSettings"));
 const OnlinePaymentsSettings = lazy(() => import("@/components/admin/settings/OnlinePaymentsSettings"));
+const BackupSettings = lazy(() => import("@/components/admin/settings/BackupSettings"));
 
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { useRestaurantModules } from "@/hooks/useRestaurantModules";
