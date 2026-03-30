@@ -194,6 +194,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                           <SidebarMenuButton
                             key={subItem.id}
                             onClick={() => onSectionChange(subItem.id)}
+                            onMouseEnter={() => onPrefetch?.(subItem.id)}
                             isActive={activeSection === subItem.id}
                            className={`w-full h-8 px-3 rounded-button text-[13px] ${
                               activeSection === subItem.id

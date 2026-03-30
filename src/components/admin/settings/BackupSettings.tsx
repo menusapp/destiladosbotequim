@@ -439,6 +439,21 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Backup path preference */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Pasta padrão para backup (lembrete)</label>
+            <Input
+              value={backupPath}
+              onChange={e => saveBackupPath(e.target.value)}
+              placeholder="Ex: C:\Backups\Menus ou ~/Downloads/backups"
+            />
+            <p className="text-xs text-muted-foreground">
+              {supportsFileSystemAccess
+                ? "Ao clicar em \"Baixar Backup\", você poderá escolher a pasta diretamente."
+                : "Configure a pasta de download do seu navegador: Configurações → Downloads → Perguntar onde salvar cada arquivo."}
+            </p>
+          </div>
+
           <div className="flex items-center justify-between">
             <div>
               {lastBackupDate && (
