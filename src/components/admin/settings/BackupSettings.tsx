@@ -60,12 +60,20 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
   const [pendingRestore, setPendingRestore] = useState<any>(null);
   const [showConfirmRestore, setShowConfirmRestore] = useState(false);
   const [lastBackupDate, setLastBackupDate] = useState<string | null>(null);
+  const [backupPath, setBackupPath] = useState(() => localStorage.getItem(`backupPath_${restaurantId}`) || "");
 
   useEffect(() => {
     fetchCloudBackups();
     const stored = localStorage.getItem(`lastBackup_${restaurantId}`);
     if (stored) setLastBackupDate(stored);
   }, [restaurantId]);
+
+  const saveBackupPath = (path: string) => {
+    setBackupPath(path);
+    localStorage.setItem(`backupPath_${restaurantId}`, path);
+  };
+
+  const supportsFileSystemAccess = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 
   const fetchCloudBackups = async () => {
     setLoadingCloud(true);
