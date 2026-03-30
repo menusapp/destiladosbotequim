@@ -1,36 +1,59 @@
 
 
-# Plano — Misto PDV + Export XMLs + Categorias Sticky
+# Plano — Remover Misto do PDV + Corrigir XML Export + Pagamentos Separados no Banco
 
-## 3 correções
+## 3 Alterações
 
-### 1. Campos do Misto não aparecem no PDV
+### 1. Remover "Misto" do PDV (CreateOrderDrawer.tsx)
 
-**Problema:** O `scrollIntoView` com `setTimeout(100)` não funciona porque o container pai (`div` linha 409) tem `overflow-y-auto` com `max-h` — o `scrollIntoView` tenta scroll no viewport, não no container correto.
+O usuário quer que o PDV **não tenha mais a opção "Misto"**. Atualmente o Misto salva as formas concatenadas (ex: "Dinheiro, Crédito - Visa") como uma única string em `payment_type`. Isso é o problema central — não há separação real no banco.
 
-**Correção em `CreateOrderDrawer.tsx`:**
-- Adicionar `useRef` ao container de scroll (div linha 409)
-- Substituir o `setTimeout + scrollIntoView` por `requestAnimationFrame` com `containerRef.current.scrollTop = containerRef.current.scrollHeight`
+**Ação:** Remover completamente do `CreateOrderDrawer.tsx`:
+- Remover a `SelectItem value="mixed"` (linha 482)
+- Remover toda a interface `MixedPaymentEntry`, constantes `MIXED_METHODS`, funções `getMixedPaymentString`, `updateMixedPayment`, `addMixedPayment`, `removeMixedPayment`, `needsBrandForMethod`, `getBrandsForMixedMethod`, `mixedTotal`, `mixedRemaining`
+- Remover o state `mixedPayments` e o `useEffect` do scroll
+- Remover o bloco UI de pagamento misto (linhas 516-588)
+- Remover a lógica `if (paymentMethod === "mixed")` no `handleSubmit` (linhas 241-247)
+- Remover a `ref` `mixedSectionRef`
 
-### 2. Botão "Exportar XMLs" não funciona
+O PDV só terá: Dinheiro, Débito, Crédito, PIX, Vale Refeição. Se precisar de 2+ formas, usa-se o fluxo de finalização do `PaymentConfirmationModal` (que já funciona corretamente com múltiplos métodos separados no `cash_movements`).
 
-**Problema:** Popover (calendário) dentro de Dialog — o Dialog captura focus/pointer-events e bloqueia cliques no Popover.
+---
 
-**Correção em `NotasFiscaisTab.tsx`:**
-- Remover o Popover do export dialog
-- Renderizar o Calendar **inline** direto dentro do Dialog (sem Popover wrapper)
-- Manter mesma lógica de 2 cliques com `pendingExportDateRange`
+### 2. Corrigir Export XMLs (NotasFiscaisTab.tsx)
 
-### 3. Barra de categorias acima dos destaques + reduzir padding
+O export funciona na lógica mas o calendário inline pode ter conflito de interação. O problema mais provável é que o `pendingExportDateRange` não está sendo resetado ao abrir o dialog, fazendo com que o range fique "travado" de sessões anteriores.
 
-**Problema:** A sticky bar de categorias está dentro de `CategoryProducts`, que renderiza DEPOIS de `FeaturedProducts` no `DeliveryMenu.tsx`. Por isso fica abaixo dos destaques.
+**Ação em `NotasFiscaisTab.tsx`:**
+- Ao abrir o dialog de export (linha 420), resetar `pendingExportDateRange` para `undefined`
+- Verificar se o erro é no download em si — adicionar melhor tratamento de erro com `try/catch` mais específico e log do status HTTP
+- Garantir que o `Calendar` inline receba `key` dinâmico para forçar re-render ao abrir
 
-**Correção:**
-- Em `CategoryProducts.tsx`: extrair a nav bar para ser exportada separadamente OU adicionar uma prop `categories` ao componente pai
-- Em `DeliveryMenu.tsx` (linhas 429-444): renderizar a barra de categorias ANTES do `FeaturedProducts`, passando as categorias disponíveis
-- Reduzir padding dos botões de categoria: `px-4 py-1.5` → `px-3 py-1` e `text-sm` → `text-xs`
+---
 
-**Abordagem concreta:** Criar um componente `CategoryNav` separado (ou exportar de CategoryProducts) e renderizar em DeliveryMenu antes de FeaturedProducts. O CategoryProducts continua renderizando os produtos mas sem a nav duplicada (recebe `showNav={false}` ou remove a nav quando já existe externamente).
+### 3. Pagamentos separados no banco + Normalização de métricas
+
+**Problema atual:** Quando se usa o `PaymentConfirmationModal` com múltiplas formas, o `orders.payment_type` recebe uma string concatenada tipo "Dinheiro, Crédito - Visa". Nos relatórios, isso vira "Misto" em vez de metrificar cada forma separadamente.
+
+**Problema 2:** "Crédito - Visa" (pago presencial) e "Crédito - Visa" (pago online) aparecem como coisas diferentes, e PIX normal vs PIX online idem. Devem ser a mesma coisa.
+
+**Correção em `useOrderMetrics.ts`:**
+- Na função `normalizeMethod`: quando encontrar string com vírgulas (método misto), **não retornar "Misto"**. Em vez disso, NÃO processar como método único — esse cenário será tratado pelo novo approach abaixo.
+- Normalizar `credit_card_online` → mesmo bucket que `credit` → "Crédito"
+- Normalizar `pix_online` → mesmo bucket que `pix` → "PIX"
+- Strings como "Crédito - Visa" devem normalizar para "Crédito" (extrair antes do " - ")
+
+**Correção na acumulação de métricas:**
+- Para delivery orders com `payment_type` contendo vírgulas: fazer split por ", " e distribuir o valor proporcionalmente (ou igualmente se não há dados de valor individual). Alternativa pragmática: usar os `cash_movements` como fonte de verdade para pagamentos split, já que lá **cada método já está separado com seu valor**.
+
+**Abordagem concreta para `useOrderMetrics.ts`:**
+- Buscar `cash_movements` agrupados por `payment_method` no mesmo período
+- Usar `cash_movements` como fonte primária de receita por método (já separados corretamente)
+- Para delivery orders (que não têm cash_movements), normalizar `payment_type` extraindo a parte base antes de " - " e tratando `_online` como igual ao presencial
+- Remover completamente a categoria "Misto" dos relatórios
+
+**Correção no `nuvem-fiscal-emit`:**
+- Quando `payment_type` contém vírgulas (misto), gerar múltiplos `detPag` em vez de um único `tPag: 99`. Buscar os `cash_movements` do pedido para obter cada método e valor individual. Se não encontrar, manter fallback `tPag: 99`.
 
 ---
 
@@ -38,10 +61,11 @@
 
 | Arquivo | Alteração |
 |---------|----------|
-| `CreateOrderDrawer.tsx` | Ref no container + scroll correto para misto |
-| `NotasFiscaisTab.tsx` | Calendar inline no export dialog (sem Popover) |
-| `CategoryProducts.tsx` | Extrair nav ou aceitar prop para ocultar |
-| `DeliveryMenu.tsx` | Renderizar nav de categorias antes dos destaques |
+| `CreateOrderDrawer.tsx` | Remover toda lógica/UI do Misto |
+| `NotasFiscaisTab.tsx` | Reset do pendingExportDateRange + key dinâmico no Calendar |
+| `useOrderMetrics.ts` | Normalizar online=presencial, split por vírgula em vez de "Misto", extrair base do método |
+| `nuvem-fiscal-emit/index.ts` | Gerar múltiplos detPag para pagamentos mistos |
+| `lib/utils.ts` | Atualizar `formatPaymentMethod` para normalizar online igual presencial |
 
-Nenhuma funcionalidade existente será quebrada.
+Nenhuma funcionalidade existente será quebrada — o `PaymentConfirmationModal` já salva corretamente cada método separado no `cash_movements`.
 
