@@ -8,38 +8,42 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 
-import MarketingTab from "@/components/admin/MarketingTab";
-import { ReportsTab } from "@/components/admin/ReportsTab";
+import { lazy, Suspense } from "react";
+
+// Critical tabs loaded eagerly (always visible on first render)
 import UnifiedOrdersTab from "@/components/admin/UnifiedOrdersTab";
-import CardapioTab from "@/components/admin/CardapioTab";
-import TablesTab from "@/components/admin/TablesTab";
-import StockTab from "@/components/admin/StockTab";
-import CostosTab from "@/components/admin/CostosTab";
-import MargensTab from "@/components/admin/MargensTab";
-import FluxoCaixaTab from "@/components/admin/FluxoCaixaTab";
 import PDVTab from "@/components/admin/PDVTab";
-import ClientesTab from "@/components/admin/ClientesTab";
-import FidelityTab from "@/components/admin/FidelityTab";
-// ReservasTab removed - unified into TablesTab
+import OverviewTab from "@/components/admin/OverviewTab";
+
+// Lazy-loaded tabs (only loaded when user navigates to them)
+const MarketingTab = lazy(() => import("@/components/admin/MarketingTab"));
+const ReportsTab = lazy(() => import("@/components/admin/ReportsTab").then(m => ({ default: m.ReportsTab })));
+const CardapioTab = lazy(() => import("@/components/admin/CardapioTab"));
+const TablesTab = lazy(() => import("@/components/admin/TablesTab"));
+const StockTab = lazy(() => import("@/components/admin/StockTab"));
+const CostosTab = lazy(() => import("@/components/admin/CostosTab"));
+const MargensTab = lazy(() => import("@/components/admin/MargensTab"));
+const FluxoCaixaTab = lazy(() => import("@/components/admin/FluxoCaixaTab"));
+const ClientesTab = lazy(() => import("@/components/admin/ClientesTab"));
+const FidelityTab = lazy(() => import("@/components/admin/FidelityTab"));
+const FiscalTab = lazy(() => import("@/components/admin/FiscalTab"));
+const ContasTab = lazy(() => import("@/components/admin/ContasTab"));
+const IntegrationsTab = lazy(() => import("@/components/admin/IntegrationsTab"));
+const ModulosTab = lazy(() => import("@/components/admin/ModulosTab"));
+const CompanyDataSettings = lazy(() => import("@/components/admin/settings/CompanyDataSettings"));
+const BusinessHoursSettings = lazy(() => import("@/components/admin/settings/BusinessHoursSettings"));
+const DeliveryZonesSettings = lazy(() => import("@/components/admin/settings/DeliveryZonesSettings"));
+const PaymentMethodsSettings = lazy(() => import("@/components/admin/settings/PaymentMethodsSettings"));
+const PrintersSettings = lazy(() => import("@/components/admin/settings/PrintersSettings"));
+const WhatsAppSettings = lazy(() => import("@/components/admin/settings/WhatsAppSettings"));
+const OnlinePaymentsSettings = lazy(() => import("@/components/admin/settings/OnlinePaymentsSettings"));
+
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { useRestaurantModules } from "@/hooks/useRestaurantModules";
-import ModulosTab from "@/components/admin/ModulosTab";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
 import { NewReservationNotification } from "@/components/admin/NewReservationNotification";
-// Settings sub-tabs
-import CompanyDataSettings from "@/components/admin/settings/CompanyDataSettings";
-import BusinessHoursSettings from "@/components/admin/settings/BusinessHoursSettings";
-import DeliveryZonesSettings from "@/components/admin/settings/DeliveryZonesSettings";
-import PaymentMethodsSettings from "@/components/admin/settings/PaymentMethodsSettings";
-import PrintersSettings from "@/components/admin/settings/PrintersSettings";
-import WhatsAppSettings from "@/components/admin/settings/WhatsAppSettings";
-import OnlinePaymentsSettings from "@/components/admin/settings/OnlinePaymentsSettings";
-import FiscalTab from "@/components/admin/FiscalTab";
-import ContasTab from "@/components/admin/ContasTab";
-import OverviewTab from "@/components/admin/OverviewTab";
 import { SupportChatWidget } from "@/components/admin/SupportChatWidget";
-import IntegrationsTab from "@/components/admin/IntegrationsTab";
 
 interface Restaurant {
   id: string;
