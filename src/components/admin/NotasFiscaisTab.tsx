@@ -63,6 +63,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
   });
+  const [pendingDateRange, setPendingDateRange] = useState<DateRange | undefined>();
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   // Export XMLs state
@@ -71,6 +72,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
   });
+  const [pendingExportDateRange, setPendingExportDateRange] = useState<DateRange | undefined>();
   const [exportDatePopoverOpen, setExportDatePopoverOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -368,7 +370,13 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap gap-3 items-center">
-          <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+          <Popover
+            open={datePopoverOpen}
+            onOpenChange={(open) => {
+              setDatePopoverOpen(open);
+              if (open) setPendingDateRange(undefined);
+            }}
+          >
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -378,13 +386,15 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="range"
-                selected={{ from: dateRange.from, to: dateRange.to }}
+                selected={pendingDateRange}
                 onSelect={(range) => {
+                  setPendingDateRange(range);
                   if (range?.from && range?.to) {
-                    setDateRange({ from: startOfDay(range.from), to: endOfDay(range.to) });
+                    const isForward = range.from <= range.to;
+                    const from = isForward ? range.from : range.to;
+                    const to = isForward ? range.to : range.from;
+                    setDateRange({ from: startOfDay(from), to: endOfDay(to) });
                     setDatePopoverOpen(false);
-                  } else if (range?.from) {
-                    // First click only - wait for second
                   }
                 }}
                 locale={ptBR}
@@ -558,7 +568,13 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
             <p className="text-sm text-muted-foreground">
               Selecione o período para exportar os XMLs das notas autorizadas em um arquivo ZIP.
             </p>
-            <Popover open={exportDatePopoverOpen} onOpenChange={setExportDatePopoverOpen}>
+            <Popover
+              open={exportDatePopoverOpen}
+              onOpenChange={(open) => {
+                setExportDatePopoverOpen(open);
+                if (open) setPendingExportDateRange(undefined);
+              }}
+            >
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-start">
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -570,10 +586,14 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="range"
-                  selected={exportDateRange}
+                  selected={pendingExportDateRange}
                   onSelect={(range) => {
-                    setExportDateRange(range);
+                    setPendingExportDateRange(range);
                     if (range?.from && range?.to) {
+                      const isForward = range.from <= range.to;
+                      const from = isForward ? range.from : range.to;
+                      const to = isForward ? range.to : range.from;
+                      setExportDateRange({ from: startOfDay(from), to: endOfDay(to) });
                       setExportDatePopoverOpen(false);
                     }
                   }}
