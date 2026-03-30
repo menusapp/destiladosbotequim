@@ -568,40 +568,26 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
             <p className="text-sm text-muted-foreground">
               Selecione o período para exportar os XMLs das notas autorizadas em um arquivo ZIP.
             </p>
-            <Popover
-              open={exportDatePopoverOpen}
-              onOpenChange={(open) => {
-                setExportDatePopoverOpen(open);
-                if (open) setPendingExportDateRange(undefined);
+            <div className="text-sm text-center font-medium text-muted-foreground">
+              {exportDateRange?.from && exportDateRange?.to
+                ? `${format(exportDateRange.from, "dd/MM/yyyy")} - ${format(exportDateRange.to, "dd/MM/yyyy")}`
+                : "Clique para selecionar o período"}
+            </div>
+            <Calendar
+              mode="range"
+              selected={pendingExportDateRange}
+              onSelect={(range) => {
+                setPendingExportDateRange(range);
+                if (range?.from && range?.to) {
+                  const isForward = range.from <= range.to;
+                  const from = isForward ? range.from : range.to;
+                  const to = isForward ? range.to : range.from;
+                  setExportDateRange({ from: startOfDay(from), to: endOfDay(to) });
+                }
               }}
-            >
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {exportDateRange?.from && exportDateRange?.to
-                    ? `${format(exportDateRange.from, "dd/MM/yyyy")} - ${format(exportDateRange.to, "dd/MM/yyyy")}`
-                    : "Selecione o período"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="range"
-                  selected={pendingExportDateRange}
-                  onSelect={(range) => {
-                    setPendingExportDateRange(range);
-                    if (range?.from && range?.to) {
-                      const isForward = range.from <= range.to;
-                      const from = isForward ? range.from : range.to;
-                      const to = isForward ? range.to : range.from;
-                      setExportDateRange({ from: startOfDay(from), to: endOfDay(to) });
-                      setExportDatePopoverOpen(false);
-                    }
-                  }}
-                  locale={ptBR}
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
+              locale={ptBR}
+              className="pointer-events-auto mx-auto"
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setExportDialogOpen(false)}>Cancelar</Button>

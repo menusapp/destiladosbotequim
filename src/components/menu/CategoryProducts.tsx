@@ -7,12 +7,14 @@ interface CategoryProductsProps {
   categories: Category[];
   primaryColor: string;
   onProductClick: (product: Product) => void;
+  showNav?: boolean;
 }
 
 export const CategoryProducts = memo(({
   categories,
   primaryColor,
   onProductClick,
+  showNav = true,
 }: CategoryProductsProps) => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 

@@ -87,12 +87,17 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [paymentBrand, setPaymentBrand] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
   const mixedSectionRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (paymentMethod === "mixed") {
-      setTimeout(() => {
-        mixedSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (leftPanelRef.current) {
+            leftPanelRef.current.scrollTop = leftPanelRef.current.scrollHeight;
+          }
+        });
+      });
     }
   }, [paymentMethod]);
   const [mixedPayments, setMixedPayments] = useState<MixedPaymentEntry[]>([
@@ -406,7 +411,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           <div className="flex-1 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 h-full">
               {/* Left: Form */}
-              <div className="p-4 space-y-4 border-r overflow-y-auto max-h-[calc(100vh-180px)]">
+              <div ref={leftPanelRef} className="p-4 space-y-4 border-r overflow-y-auto max-h-[calc(100vh-180px)]">
                 <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)}>
                   <TabsList className="w-full">
                     <TabsTrigger value="delivery" className="flex-1">Delivery</TabsTrigger>
