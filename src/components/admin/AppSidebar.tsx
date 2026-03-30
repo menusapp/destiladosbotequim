@@ -24,6 +24,7 @@ import {
   Smartphone,
   FileText,
   Plug,
+  HardDrive,
 } from "lucide-react";
 import {
   Sidebar,
