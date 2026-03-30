@@ -735,6 +735,7 @@ const RestaurantAdmin = () => {
           staffRole={staffRole}
           staffAllowedSections={staffAllowedSections}
           primaryColor={restaurant.primary_color}
+          onPrefetch={handlePrefetch}
         />
         <SidebarInset className="flex-1 flex flex-col">
           <AdminHeader
