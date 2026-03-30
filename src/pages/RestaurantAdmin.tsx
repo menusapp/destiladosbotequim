@@ -633,75 +633,72 @@ const RestaurantAdmin = () => {
     setReservationNotification(null);
   };
 
+  // Prefetch map: section → dynamic import
+  const prefetchMap: Record<string, () => void> = {
+    cardapio: () => import("@/components/admin/CardapioTab"),
+    estoque: () => import("@/components/admin/StockTab"),
+    custos: () => import("@/components/admin/CostosTab"),
+    margens: () => import("@/components/admin/MargensTab"),
+    caixa: () => import("@/components/admin/FluxoCaixaTab"),
+    clientes: () => import("@/components/admin/ClientesTab"),
+    fidelidade: () => import("@/components/admin/FidelityTab"),
+    marketing: () => import("@/components/admin/MarketingTab"),
+    fiscal: () => import("@/components/admin/FiscalTab"),
+    integracoes: () => import("@/components/admin/IntegrationsTab"),
+    modulos: () => import("@/components/admin/ModulosTab"),
+    contas: () => import("@/components/admin/ContasTab"),
+    relatorios: () => import("@/components/admin/ReportsTab"),
+    "mesas-reservas": () => import("@/components/admin/TablesTab"),
+    "config-dados": () => import("@/components/admin/settings/CompanyDataSettings"),
+    "config-horario": () => import("@/components/admin/settings/BusinessHoursSettings"),
+    "config-regioes": () => import("@/components/admin/settings/DeliveryZonesSettings"),
+    "config-pagamentos": () => import("@/components/admin/settings/PaymentMethodsSettings"),
+    "config-pagamentos-online": () => import("@/components/admin/settings/OnlinePaymentsSettings"),
+    "config-impressoras": () => import("@/components/admin/settings/PrintersSettings"),
+    "config-whatsapp": () => import("@/components/admin/settings/WhatsAppSettings"),
+    "config-backup": () => import("@/components/admin/settings/BackupSettings"),
+  };
+
+  const handlePrefetch = (sectionId: string) => {
+    prefetchMap[sectionId]?.();
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case "visao-geral":
         return <OverviewTab restaurantId={restaurant.id} />;
-      // Pedidos (unified)
       case "pedidos":
         return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
-      
-      // PDV (Balcão + Mesas)
       case "pdv":
         return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} />;
-      
-      // Mesas e Reservas (unified)
       case "mesas-reservas":
         return <TablesTab restaurantId={restaurant.id} />;
-      
-      // Cardápio
       case "cardapio":
         return <CardapioTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
-      
-      // Caixa
       case "caixa":
         return <FluxoCaixaTab restaurantId={restaurant.id} />;
-      
-      // Estoque
       case "estoque":
         return <StockTab restaurantId={restaurant.id} />;
-      
-      // Custos
       case "custos":
         return <CostosTab restaurantId={restaurant.id} />;
-      
-      // Margens
       case "margens":
         return <MargensTab restaurantId={restaurant.id} />;
-      
-      // Relatórios
       case "relatorios":
         return <ReportsTab restaurantId={restaurant.id} />;
-      
-      // Clientes
       case "clientes":
         return <ClientesTab restaurantId={restaurant.id} />;
-      
-      // Fidelidade
       case "fidelidade":
         return <FidelityTab restaurantId={restaurant.id} />;
-      
-      // Marketing
       case "marketing":
         return <MarketingTab restaurantId={restaurant.id} onNavigateToWhatsApp={() => setActiveSection("config-whatsapp")} />;
-      
-      // Fiscal (unified: settings + invoices)
       case "fiscal":
         return <FiscalTab restaurantId={restaurant.id} />;
-      
-      // Integrações
       case "integracoes":
         return <IntegrationsTab restaurantId={restaurant.id} />;
-      
-      // Módulos
       case "modulos":
         return <ModulosTab restaurantId={restaurant.id} />;
-      
-      // Contas (admin only)
       case "contas":
         return staffRole === "admin" ? <ContasTab restaurantId={restaurant.id} /> : null;
-      
-      // Configurações - Subabas
       case "config-dados":
         return <CompanyDataSettings restaurantId={restaurant.id} />;
       case "config-horario":
@@ -718,7 +715,6 @@ const RestaurantAdmin = () => {
         return <WhatsAppSettings restaurantId={restaurant.id} />;
       case "config-backup":
         return <BackupSettings restaurantId={restaurant.id} />;
-      
       default:
         return <OverviewTab restaurantId={restaurant.id} />;
     }
