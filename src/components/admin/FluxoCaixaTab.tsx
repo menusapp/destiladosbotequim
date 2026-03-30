@@ -10,10 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { toast } from "@/components/ui/sonner";
 import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle, ChevronDown, Receipt, Coins, Search, Calendar as CalendarIcon } from "lucide-react";
 import { formatPaymentMethod } from "@/lib/utils";
-import { format, isToday, isYesterday, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import CashMovementDetailSheet from "./CashMovementDetailSheet";
 
@@ -60,7 +62,11 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   // Estados para histórico de caixa
   const [closedSessions, setClosedSessions] = useState<CashSession[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState("all");
+  const [historyDateRange, setHistoryDateRange] = useState<{ from: Date; to: Date }>({
+    from: startOfDay(new Date()),
+    to: endOfDay(new Date()),
+  });
+  const [historyDatePopoverOpen, setHistoryDatePopoverOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<CashSession | null>(null);
   const [selectedSessionMovements, setSelectedSessionMovements] = useState<CashMovement[]>([]);
 
@@ -353,35 +359,14 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
     return value >= 1 ? `R$${value}` : `R$${value.toFixed(2).replace('.', ',')}`;
   };
 
-  const filterByDateRange = (session: CashSession) => {
-    if (!session.closed_at) return false;
-    
-    const closedDate = new Date(session.closed_at);
-    const now = new Date();
-    
-    switch (dateFilter) {
-      case "today":
-        return isToday(closedDate);
-      case "yesterday":
-        return isYesterday(closedDate);
-      case "7days":
-        return closedDate >= subDays(now, 7);
-      case "thisMonth":
-        return closedDate >= startOfMonth(now) && closedDate <= endOfMonth(now);
-      case "lastMonth":
-        const lastMonth = subMonths(now, 1);
-        return closedDate >= startOfMonth(lastMonth) && closedDate <= endOfMonth(lastMonth);
-      default:
-        return true;
-    }
-  };
-
   const filteredSessions = closedSessions.filter(session => {
     const matchesSearch = 
       session.opened_by.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (session.closed_by || "").toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesDate = filterByDateRange(session);
+    if (!session.closed_at) return false;
+    const closedDate = new Date(session.closed_at);
+    const matchesDate = closedDate >= historyDateRange.from && closedDate <= historyDateRange.to;
     
     return matchesSearch && matchesDate;
   });
@@ -871,20 +856,28 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                   </div>
                 </div>
                 <div>
-                  <Select value={dateFilter} onValueChange={setDateFilter}>
-                    <SelectTrigger className="w-[200px]">
-                      <CalendarIcon className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Filtrar por data" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="today">Hoje</SelectItem>
-                      <SelectItem value="yesterday">Ontem</SelectItem>
-                      <SelectItem value="7days">Últimos 7 dias</SelectItem>
-                      <SelectItem value="thisMonth">Este mês</SelectItem>
-                      <SelectItem value="lastMonth">Mês passado</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Popover open={historyDatePopoverOpen} onOpenChange={setHistoryDatePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        {format(historyDateRange.from, "dd/MM/yyyy")} - {format(historyDateRange.to, "dd/MM/yyyy")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="range"
+                        selected={{ from: historyDateRange.from, to: historyDateRange.to }}
+                        onSelect={(range) => {
+                          if (range?.from && range?.to) {
+                            setHistoryDateRange({ from: startOfDay(range.from), to: endOfDay(range.to) });
+                            setHistoryDatePopoverOpen(false);
+                          }
+                        }}
+                        locale={ptBR}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
               

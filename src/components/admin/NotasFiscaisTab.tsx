@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,11 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Plus, Printer, RotateCcw, Ban } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import NovaEmissaoModal from "./NovaEmissaoModal";
 import FiscalNoteDetailSheet from "./FiscalNoteDetailSheet";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/components/ui/sonner";
+import type { DateRange } from "react-day-picker";
+import JSZip from "jszip";
 
 interface FiscalNote {
   id: string;
@@ -57,18 +59,22 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   const [cancelModal, setCancelModal] = useState<{ open: boolean; note: FiscalNote | null }>({ open: false, note: null });
   const [cancelJustificativa, setCancelJustificativa] = useState("");
   const [canceling, setCanceling] = useState(false);
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
-    const today = new Date();
-    const from = new Date(today.getFullYear(), today.getMonth(), 1);
-    const to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-    return { from, to };
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: startOfDay(new Date()),
+    to: endOfDay(new Date()),
   });
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
-  useEffect(() => {
-    fetchNotes();
-  }, [restaurantId, dateRange, statusFilter]);
+  // Export XMLs state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>({
+    from: startOfDay(new Date()),
+    to: endOfDay(new Date()),
+  });
+  const [exportDatePopoverOpen, setExportDatePopoverOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     setLoading(true);
     try {
       let query = supabase
@@ -102,7 +108,23 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [restaurantId, dateRange, statusFilter]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  // Realtime subscription
+  useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    const ch = supabase.channel(`fiscal-notes-rt-${restaurantId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_fiscal_notes' }, () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchNotes, 400);
+      })
+      .subscribe();
+    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
+  }, [restaurantId, fetchNotes]);
 
   const handleRetry = async (note: FiscalNote) => {
     setRetrying(prev => new Set(prev).add(note.id));
@@ -142,7 +164,6 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       });
       if (error) throw error;
 
-      // Check if response contains an error message
       if (data?.error) {
         toast.error(data.error);
         return;
@@ -153,7 +174,6 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
         return;
       }
 
-      // Decode base64 to binary
       const binaryString = atob(data.data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -208,6 +228,86 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
+  const handleExportXmls = async () => {
+    if (!exportDateRange?.from || !exportDateRange?.to) {
+      toast.error("Selecione o período para exportar");
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const from = startOfDay(exportDateRange.from);
+      const to = endOfDay(exportDateRange.to);
+
+      // Fetch authorized notes in the period
+      const { data: authorizedNotes, error } = await supabase
+        .from("order_fiscal_notes")
+        .select("id, nfe_number, nuvem_fiscal_ref, created_at")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "authorized")
+        .not("nuvem_fiscal_ref", "is", null)
+        .gte("created_at", from.toISOString())
+        .lte("created_at", to.toISOString())
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      if (!authorizedNotes || authorizedNotes.length === 0) {
+        toast.error("Nenhuma nota autorizada encontrada no período selecionado");
+        setExporting(false);
+        return;
+      }
+
+      toast.info(`Baixando ${authorizedNotes.length} XMLs...`);
+
+      const zip = new JSZip();
+      let successCount = 0;
+
+      for (const note of authorizedNotes) {
+        try {
+          const { data } = await supabase.functions.invoke("nuvem-fiscal-download", {
+            body: { nuvem_fiscal_ref: note.nuvem_fiscal_ref, type: "xml" },
+          });
+
+          if (data?.data) {
+            const binaryString = atob(data.data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            const filename = data.filename || `nfce_${note.nfe_number || note.id}.xml`;
+            zip.file(filename, bytes);
+            successCount++;
+          }
+        } catch (err) {
+          console.error(`Erro ao baixar XML da nota ${note.id}:`, err);
+        }
+      }
+
+      if (successCount === 0) {
+        toast.error("Não foi possível baixar nenhum XML");
+        setExporting(false);
+        return;
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `xmls_${format(from, "dd-MM-yyyy")}_a_${format(to, "dd-MM-yyyy")}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      toast.success(`${successCount} XMLs exportados com sucesso!`);
+      setExportDialogOpen(false);
+    } catch (err) {
+      console.error("Erro ao exportar XMLs:", err);
+      toast.error("Erro ao exportar XMLs");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const calculateOrderTotal = (note: FiscalNote) => {
     if (!note.orders?.order_items) return 0;
     return note.orders.order_items.reduce((total, item) => {
@@ -233,12 +333,12 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: notes.length,
     authorized: notes.filter(n => n.status === "authorized").length,
     pending: notes.filter(n => n.status === "pending" || n.status === "processing").length,
     error: notes.filter(n => n.status === "error").length,
-  };
+  }), [notes]);
 
   return (
     <div className="space-y-6">
@@ -268,7 +368,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap gap-3 items-center">
-          <Popover>
+          <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -281,14 +381,14 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                 selected={{ from: dateRange.from, to: dateRange.to }}
                 onSelect={(range) => {
                   if (range?.from && range?.to) {
-                    const from = new Date(range.from);
-                    from.setHours(0, 0, 0, 0);
-                    const to = new Date(range.to);
-                    to.setHours(23, 59, 59, 999);
-                    setDateRange({ from, to });
+                    setDateRange({ from: startOfDay(range.from), to: endOfDay(range.to) });
+                    setDatePopoverOpen(false);
+                  } else if (range?.from) {
+                    // First click only - wait for second
                   }
                 }}
                 locale={ptBR}
+                className="pointer-events-auto"
               />
             </PopoverContent>
           </Popover>
@@ -306,11 +406,14 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
         </div>
         <Button
           variant="outline"
-          onClick={() => toast.info("A funcionalidade de compactação de XMLs em formato .ZIP será ativada junto com a integração da SEFAZ.")}
+          onClick={() => {
+            setExportDateRange({ from: startOfDay(new Date()), to: endOfDay(new Date()) });
+            setExportDialogOpen(true);
+          }}
           className="gap-2"
         >
           <FileArchive className="h-4 w-4" />
-          Exportar XMLs (Mês Atual)
+          Exportar XMLs
         </Button>
       </div>
 
@@ -363,7 +466,6 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        {/* PDF download via proxy */}
                         {note.status === "authorized" && note.nuvem_fiscal_ref && (
                           <>
                             <Button
@@ -438,6 +540,54 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
             >
               {canceling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Confirmar Cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export XMLs Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileArchive className="h-5 w-5" />
+              Exportar XMLs
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Selecione o período para exportar os XMLs das notas autorizadas em um arquivo ZIP.
+            </p>
+            <Popover open={exportDatePopoverOpen} onOpenChange={setExportDatePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {exportDateRange?.from && exportDateRange?.to
+                    ? `${format(exportDateRange.from, "dd/MM/yyyy")} - ${format(exportDateRange.to, "dd/MM/yyyy")}`
+                    : "Selecione o período"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  selected={exportDateRange}
+                  onSelect={(range) => {
+                    setExportDateRange(range);
+                    if (range?.from && range?.to) {
+                      setExportDatePopoverOpen(false);
+                    }
+                  }}
+                  locale={ptBR}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleExportXmls} disabled={exporting || !exportDateRange?.from || !exportDateRange?.to}>
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+              {exporting ? "Exportando..." : "Exportar ZIP"}
             </Button>
           </DialogFooter>
         </DialogContent>

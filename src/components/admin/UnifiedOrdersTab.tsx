@@ -85,6 +85,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
   }));
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -356,7 +357,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
               await supabase.from('printer_settings').upsert({ restaurant_id: restaurantId, auto_print_orders: v }, { onConflict: 'restaurant_id' });
             }} />
           </div>
-          <Popover>
+          <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
@@ -370,9 +371,11 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
                 onSelect={(range) => {
                   if (range?.from && range?.to) {
                     setDateRange({ from: startOfDay(range.from), to: endOfDay(range.to) });
+                    setDatePopoverOpen(false);
                   }
                 }}
                 locale={ptBR}
+                className="pointer-events-auto"
               />
             </PopoverContent>
           </Popover>
