@@ -750,7 +750,20 @@ const RestaurantAdmin = () => {
             onIsOpenUpdate={(isOpen) => setRestaurant({ ...restaurant, is_open: isOpen })}
           />
           <main className="flex-1 overflow-auto p-4">
-            <Suspense fallback={<div className="flex items-center justify-center h-96 text-muted-foreground">Carregando...</div>}>
+            <Suspense fallback={
+              <div className="space-y-6 p-2">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-48 animate-pulse rounded-md bg-muted" />
+                  <div className="h-8 w-32 animate-pulse rounded-md bg-muted" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="h-32 animate-pulse rounded-xl bg-muted" />
+                  ))}
+                </div>
+                <div className="h-64 animate-pulse rounded-xl bg-muted" />
+              </div>
+            }>
               {renderContent()}
             </Suspense>
           </main>
