@@ -133,6 +133,9 @@ export const AdminHeader = ({
 
       <div className="flex-1" />
 
+      {/* Realtime connection status */}
+      <RealtimeStatusIndicator />
+
       {/* Toggle Abrir/Fechar */}
       <div className="flex items-center gap-2 px-2.5 py-1 rounded-button border border-border">
         <Store className={`h-3.5 w-3.5 ${isOpen ? 'text-green-500' : 'text-destructive'}`} />
