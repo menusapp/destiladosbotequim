@@ -18,6 +18,7 @@ import { formatPaymentMethod } from "@/lib/utils";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import CashMovementDetailSheet from "./CashMovementDetailSheet";
+import type { DateRange } from "react-day-picker";
 
 interface FluxoCaixaTabProps {
   restaurantId: string;
@@ -66,6 +67,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
   });
+  const [pendingHistoryDateRange, setPendingHistoryDateRange] = useState<DateRange | undefined>();
   const [historyDatePopoverOpen, setHistoryDatePopoverOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<CashSession | null>(null);
   const [selectedSessionMovements, setSelectedSessionMovements] = useState<CashMovement[]>([]);
@@ -856,7 +858,13 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                   </div>
                 </div>
                 <div>
-                  <Popover open={historyDatePopoverOpen} onOpenChange={setHistoryDatePopoverOpen}>
+                    <Popover
+                      open={historyDatePopoverOpen}
+                      onOpenChange={(open) => {
+                        setHistoryDatePopoverOpen(open);
+                        if (open) setPendingHistoryDateRange(undefined);
+                      }}
+                    >
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-2">
                         <CalendarIcon className="h-4 w-4" />
@@ -866,10 +874,14 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                     <PopoverContent className="w-auto p-0" align="end">
                       <Calendar
                         mode="range"
-                        selected={{ from: historyDateRange.from, to: historyDateRange.to }}
+                          selected={pendingHistoryDateRange}
                         onSelect={(range) => {
+                            setPendingHistoryDateRange(range);
                           if (range?.from && range?.to) {
-                            setHistoryDateRange({ from: startOfDay(range.from), to: endOfDay(range.to) });
+                              const isForward = range.from <= range.to;
+                              const from = isForward ? range.from : range.to;
+                              const to = isForward ? range.to : range.from;
+                              setHistoryDateRange({ from: startOfDay(from), to: endOfDay(to) });
                             setHistoryDatePopoverOpen(false);
                           }
                         }}
