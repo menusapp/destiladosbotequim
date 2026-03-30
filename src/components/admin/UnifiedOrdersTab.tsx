@@ -18,6 +18,7 @@ import { OrderDetailModal } from "./OrderDetailModal";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { printOrder } from "@/lib/printOrder";
+import type { DateRange } from "react-day-picker";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -85,6 +86,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
   }));
+  const [pendingDateRange, setPendingDateRange] = useState<DateRange | undefined>();
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   useEffect(() => {
@@ -357,7 +359,13 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
               await supabase.from('printer_settings').upsert({ restaurant_id: restaurantId, auto_print_orders: v }, { onConflict: 'restaurant_id' });
             }} />
           </div>
-          <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+          <Popover
+            open={datePopoverOpen}
+            onOpenChange={(open) => {
+              setDatePopoverOpen(open);
+              if (open) setPendingDateRange(undefined);
+            }}
+          >
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
@@ -367,10 +375,14 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar
                 mode="range"
-                selected={{ from: dateRange.from, to: dateRange.to }}
+                selected={pendingDateRange}
                 onSelect={(range) => {
+                  setPendingDateRange(range);
                   if (range?.from && range?.to) {
-                    setDateRange({ from: startOfDay(range.from), to: endOfDay(range.to) });
+                    const isForward = range.from <= range.to;
+                    const from = isForward ? range.from : range.to;
+                    const to = isForward ? range.to : range.from;
+                    setDateRange({ from: startOfDay(from), to: endOfDay(to) });
                     setDatePopoverOpen(false);
                   }
                 }}
