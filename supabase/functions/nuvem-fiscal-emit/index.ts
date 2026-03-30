@@ -314,6 +314,7 @@ Deno.serve(async (req) => {
           tpAmb: 1,
           finNFe: 1,
           indFinal: 1,
+          indPag: 0,
           indPres: 1,
           procEmi: 0,
           verProc: "MenuMesa-1.0",
