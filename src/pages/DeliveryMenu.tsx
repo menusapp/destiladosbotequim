@@ -5,6 +5,7 @@ import { MenuHeader } from "@/components/menu/MenuHeader";
 import { RestaurantInfoCard } from "@/components/menu/RestaurantInfoCard";
 import { FeaturedProducts } from "@/components/menu/FeaturedProducts";
 import { CategoryProducts } from "@/components/menu/CategoryProducts";
+import { CategoryNav } from "@/components/menu/CategoryNav";
 import { CartBottomBar } from "@/components/menu/CartBottomBar";
 import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
 import { CheckoutDrawer } from "@/components/menu/CheckoutDrawer";
@@ -427,6 +428,11 @@ export default function DeliveryMenu() {
             </div>
           ) : (
             <>
+              <CategoryNav
+                categories={filteredCategories}
+                primaryColor={primaryColor}
+              />
+
               {restaurant.featured_section_enabled && featuredProducts.length > 0 && (
                 <FeaturedProducts
                   products={featuredProducts}
@@ -440,6 +446,7 @@ export default function DeliveryMenu() {
                 categories={filteredCategories}
                 primaryColor={primaryColor}
                 onProductClick={handleProductClick}
+                showNav={false}
               />
             </>
           )}
