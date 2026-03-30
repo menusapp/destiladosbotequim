@@ -453,7 +453,7 @@ const RestaurantAdmin = () => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("*")
+        .select("id, name, slug, is_open, prep_time_minutes, pickup_time_minutes, auto_open_close, primary_color")
         .eq("id", restaurantId)
         .single();
 
