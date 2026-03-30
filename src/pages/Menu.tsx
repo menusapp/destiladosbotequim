@@ -1060,6 +1060,11 @@ const Menu = () => {
         </div>
       ) : (
         <>
+          <CategoryNav
+            categories={filteredCategories}
+            primaryColor={primaryColor}
+          />
+
           {featuredProducts.length > 0 && (
             <FeaturedProducts
               products={featuredProducts}
@@ -1069,13 +1074,13 @@ const Menu = () => {
             />
           )}
 
-          {/* Adiciona margem quando não há destaques para a primeira categoria não ficar colada */}
           {featuredProducts.length === 0 && <div className="h-6" />}
 
           <CategoryProducts
             categories={filteredCategories}
             primaryColor={primaryColor}
             onProductClick={handleProductClick}
+            showNav={false}
           />
         </>
       )}
