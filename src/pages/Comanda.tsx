@@ -409,7 +409,7 @@ const Comanda = () => {
       
       setServiceFeeEnabled(restData.service_fee_enabled || false);
       setServiceFeePercentage(restData.service_fee_percentage || 10);
-      setPrepTimeMinutes(restData.prep_time_minutes || 30);
+      setShowPrepTimer(restData.show_prep_timer ?? true);
       setRestaurantColor(restData.primary_color || "#FF6B35");
       setRestaurantId(restData.id);
       setBillRequestEnabled(restData.bill_request_enabled ?? true);
