@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, AlertCircle, Gift, X, Ticket } from "lucide-react";
@@ -250,23 +250,16 @@ export const CartStep = ({
         </div>
       </div>
 
-      {/* Product Suggestions */}
-      <ProductSuggestions
-        restaurantId={restaurant.id}
-        excludeIds={cart.map((item) => item.product.id)}
-        primaryColor={restaurant.primary_color}
-        onProductClick={onSuggestionClick}
-      />
-
-      {/* Coupon */}
-      <CouponInput
-        ref={couponInputRef}
-        restaurantId={restaurant.id}
-        subtotal={subtotal}
-        appliedCoupon={coupon}
-        onApplyCoupon={onApplyCoupon}
-        primaryColor={restaurant.primary_color}
-      />
+      {/* Loyalty Points */}
+      {restaurant.loyalty_enabled && (
+        <LoyaltyPointsDisplay
+          points={loyaltyPoints}
+          pointsUsed={loyaltyPointsUsed}
+          realPerPoint={restaurant.loyalty_real_per_point || 0.01}
+          onRedeem={onRedeemPoints}
+          primaryColor={restaurant.primary_color}
+        />
+      )}
 
       {/* Loyalty Reward Notification */}
       {customerCPF && onAddRewardItem && (
@@ -309,16 +302,23 @@ export const CartStep = ({
         </Card>
       )}
 
-      {/* Loyalty Points */}
-      {restaurant.loyalty_enabled && (
-        <LoyaltyPointsDisplay
-          points={loyaltyPoints}
-          pointsUsed={loyaltyPointsUsed}
-          realPerPoint={restaurant.loyalty_real_per_point || 0.01}
-          onRedeem={onRedeemPoints}
-          primaryColor={restaurant.primary_color}
-        />
-      )}
+      {/* Product Suggestions */}
+      <ProductSuggestions
+        restaurantId={restaurant.id}
+        excludeIds={cart.map((item) => item.product.id)}
+        primaryColor={restaurant.primary_color}
+        onProductClick={onSuggestionClick}
+      />
+
+      {/* Coupon */}
+      <CouponInput
+        ref={couponInputRef}
+        restaurantId={restaurant.id}
+        subtotal={subtotal}
+        appliedCoupon={coupon}
+        onApplyCoupon={onApplyCoupon}
+        primaryColor={restaurant.primary_color}
+      />
 
       {/* Summary */}
       <div className="border-t pt-4">

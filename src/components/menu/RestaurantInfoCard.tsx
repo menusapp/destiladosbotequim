@@ -129,12 +129,7 @@ export const RestaurantInfoCard = ({
                 {deliveryTime} • R$ {deliveryFee.toFixed(2)}
               </span>
             </>
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              <Clock className="w-4 h-4 inline mr-1" />
-              Tempo estimado: {deliveryTime}
-            </span>
-          )}
+          ) : null}
         </div>
 
         <p className="text-xs text-muted-foreground mt-2">

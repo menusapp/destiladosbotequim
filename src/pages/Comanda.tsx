@@ -75,6 +75,7 @@ interface OrderItem {
   notes?: string;
   products: {
     name: string;
+    prep_time_minutes?: number | null;
   } | null;
   order_item_extras: OrderItemExtra[];
 }
@@ -117,8 +118,7 @@ const Comanda = () => {
   const [loading, setLoading] = useState(true);
   const [billRequested, setBillRequested] = useState(false);
   const [billOnTheWay, setBillOnTheWay] = useState(false);
-  const [prepTimerSeconds, setPrepTimerSeconds] = useState(0);
-  const [hasAcceptedOrder, setHasAcceptedOrder] = useState(false);
+  const [showPrepTimer, setShowPrepTimer] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [selectedPaymentMethodType, setSelectedPaymentMethodType] = useState<string>("");
   const [selectedBrand, setSelectedBrand] = useState<string>("");
@@ -126,7 +126,7 @@ const Comanda = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
   const [serviceFeePercentage, setServiceFeePercentage] = useState(10);
-  const [prepTimeMinutes, setPrepTimeMinutes] = useState(30);
+  const [currentTime, setCurrentTime] = useState(() => Math.floor(Date.now() / 1000));
   const [restaurantColor, setRestaurantColor] = useState("#FF6B35");
   const [orderNotes, setOrderNotes] = useState("");
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
@@ -351,15 +351,6 @@ const Comanda = () => {
           },
           (payload) => {
             console.log("Order atualizada em tempo real:", payload);
-            const updatedOrder = payload.new as any;
-            
-            if (updatedOrder?.status === "accepted") {
-              setHasAcceptedOrder(true);
-              const prepTimeMs = (prepTimeMinutes || 30) * 60 * 1000;
-              setPrepTimerSeconds(Math.floor(prepTimeMs / 1000));
-              // Silenciado para cliente
-            }
-            
             // Atualiza dados para refletir status
             fetchData();
           }
@@ -383,22 +374,16 @@ const Comanda = () => {
     };
   }, [restaurantSlug, tableNumber]);
 
+  // Tick every second for per-item prep timers
   useEffect(() => {
-    // Cronômetro de preparo
-    if (prepTimerSeconds > 0) {
-      const interval = setInterval(() => {
-        setPrepTimerSeconds((prev) => Math.max(0, prev - 1));
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [prepTimerSeconds]);
-
-  // Iniciar timer quando houver pedido aceito
-  useEffect(() => {
-    if (hasAcceptedOrder && prepTimerSeconds === 0 && prepTimeMinutes > 0) {
-      setPrepTimerSeconds(prepTimeMinutes * 60);
-    }
-  }, [hasAcceptedOrder, prepTimeMinutes]);
+    if (!showPrepTimer) return;
+    const hasAccepted = orders.some(o => o.status === "accepted" || o.status === "preparing");
+    if (!hasAccepted) return;
+    const interval = setInterval(() => {
+      setCurrentTime(Math.floor(Date.now() / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showPrepTimer, orders]);
 
   const fetchData = useCallback(async () => {
     if (!restaurantSlug || !tableNumber) return;
@@ -410,7 +395,7 @@ const Comanda = () => {
       
       const restResult = await supabase
         .from("restaurants")
-        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled")
+        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled, show_prep_timer")
         .eq("slug", restaurantSlug)
         .maybeSingle();
 
@@ -424,7 +409,7 @@ const Comanda = () => {
       
       setServiceFeeEnabled(restData.service_fee_enabled || false);
       setServiceFeePercentage(restData.service_fee_percentage || 10);
-      setPrepTimeMinutes(restData.prep_time_minutes || 30);
+      setShowPrepTimer(restData.show_prep_timer ?? true);
       setRestaurantColor(restData.primary_color || "#FF6B35");
       setRestaurantId(restData.id);
       setBillRequestEnabled(restData.bill_request_enabled ?? true);
@@ -483,7 +468,7 @@ const Comanda = () => {
             id, status, created_at, customer_name, notes,
             order_items(
               id, quantity, price_at_order, notes,
-              products(name),
+              products(name, prep_time_minutes),
               order_item_extras(price_at_order, product_extras(name))
             )
           `)
@@ -497,7 +482,7 @@ const Comanda = () => {
             id, status, created_at, customer_name, notes,
             order_items(
               id, quantity, price_at_order, notes,
-              products(name),
+              products(name, prep_time_minutes),
               order_item_extras(price_at_order, product_extras(name))
             )
           `)
@@ -537,9 +522,6 @@ const Comanda = () => {
 
       if (ordersResult.data) {
         setOrders(ordersResult.data);
-        // Verificar se há algum pedido aceito para mostrar cronômetro
-        const hasAccepted = ordersResult.data.some(order => order.status === "accepted");
-        setHasAcceptedOrder(hasAccepted);
       }
 
       // Só mostrar status de bill se houver pedidos
@@ -560,7 +542,7 @@ const Comanda = () => {
     } finally {
       setLoading(false);
     }
-  }, [restaurantSlug, tableNumber, prepTimeMinutes]);
+  }, [restaurantSlug, tableNumber]);
 
   // Buscar formas de pagamento quando restaurantId estiver disponível
   useEffect(() => {
@@ -840,6 +822,8 @@ const Comanda = () => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+  // Keep formatTime available for potential future use
+  void formatTime;
 
   if (loading) {
     return (
@@ -886,7 +870,7 @@ const Comanda = () => {
                 <Receipt className="h-5 w-5" style={{ color: restaurantColor }} />
                 <div className="text-center">
                   <p className="text-lg font-semibold" style={{ color: restaurantColor }}>
-                    🧾 A conta está a caminho!
+                    A conta está a caminho!
                   </p>
                   <p className="text-sm text-muted-foreground">
                     O garçom chegará em breve com sua conta
@@ -895,7 +879,7 @@ const Comanda = () => {
               </div>
             </CardContent>
           </Card>
-        ) : hasAcceptedOrder && !billRequested ? (
+        ) : orders.some(o => o.status === "accepted" || o.status === "preparing") && !billRequested ? (
           <Card 
             className="border-2" 
             style={{ 
@@ -908,13 +892,7 @@ const Comanda = () => {
                 <Clock className="h-5 w-5" style={{ color: restaurantColor }} />
                 <div className="text-center">
                   <p className="text-sm font-medium" style={{ color: restaurantColor }}>
-                    👨‍🍳 Em Preparo
-                  </p>
-                  <p className="text-3xl font-bold mt-1" style={{ color: restaurantColor }}>
-                    {formatTime(prepTimerSeconds)}
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: restaurantColor, opacity: 0.8 }}>
-                    {prepTimerSeconds > 0 ? "Tempo estimado restante" : "Seu pedido deve estar pronto"}
+                    Em Preparo
                   </p>
                 </div>
               </div>
@@ -927,7 +905,7 @@ const Comanda = () => {
                 <Clock className="h-5 w-5 text-blue-600" />
                 <div className="text-center">
                   <p className="text-lg font-semibold text-blue-800">
-                    ⏳ Pedido realizado!
+                    Pedido realizado!
                   </p>
                   <p className="text-sm text-blue-700 mt-1">
                     Aguardando aceitação da cozinha
@@ -1027,8 +1005,8 @@ const Comanda = () => {
                   <div key={order.id} className="space-y-2">
                      <div className="flex items-center gap-2">
                        <Badge variant="outline" className={order.status === "pending" ? "border-blue-500 text-blue-700" : ""}>
-                          {order.status === "pending" && "⏳ Aguardando"}
-                          {order.status === "accepted" && "👨‍🍳 Em Preparo"}
+                          {order.status === "pending" && "Aguardando"}
+                          {order.status === "accepted" && "Em Preparo"}
                           {order.status === "preparing" && "Em Preparo"}
                           {order.status === "ready" && "Pronto"}
                           {order.status === "delivered" && "Entregue"}
@@ -1048,7 +1026,28 @@ const Comanda = () => {
                         className="flex justify-between items-start py-2 border-b last:border-0"
                       >
                         <div className="flex-1">
-                          <p className="font-medium">{item.products?.name || "Produto removido"}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{item.products?.name || "Produto removido"}</p>
+                            {showPrepTimer && item.products?.prep_time_minutes && (order.status === "accepted" || order.status === "preparing") && (() => {
+                              const orderCreatedAt = Math.floor(new Date(order.created_at).getTime() / 1000);
+                              const elapsed = currentTime - orderCreatedAt;
+                              const totalSecs = (item.products.prep_time_minutes || 0) * 60;
+                              const remaining = Math.max(0, totalSecs - elapsed);
+                              const mins = Math.floor(remaining / 60);
+                              const secs = remaining % 60;
+                              return (
+                                <span 
+                                  className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                                  style={{ 
+                                    backgroundColor: remaining > 0 ? `${restaurantColor}20` : '#dcfce7',
+                                    color: remaining > 0 ? restaurantColor : '#16a34a'
+                                  }}
+                                >
+                                  {remaining > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : 'Pronto'}
+                                </span>
+                              );
+                            })()}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             Qtd: {item.quantity}
                           </p>
