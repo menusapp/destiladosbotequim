@@ -60,7 +60,7 @@ interface PDVTabProps {
   prepTimeMinutes?: number;
 }
 
-const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps) => {
+const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, prepTimeMinutes = 30 }: PDVTabProps) => {
   const queryClient = useQueryClient();
 
   // Order creation state
