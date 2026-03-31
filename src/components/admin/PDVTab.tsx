@@ -778,7 +778,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps
                       <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">
                         {isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
                       </Badge>
-                      {isOccupied && occupiedSince && (
+                      {isOccupied && occupiedSince && showPrepTimer && (
                         <p className="text-[10px] text-muted-foreground">Desde {occupiedSince}</p>
                       )}
                       {/* Always show customer names from active comandas */}
