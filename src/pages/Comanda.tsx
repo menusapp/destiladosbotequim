@@ -822,6 +822,8 @@ const Comanda = () => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+  // Keep formatTime available for potential future use
+  void formatTime;
 
   if (loading) {
     return (
