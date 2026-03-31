@@ -522,9 +522,6 @@ const Comanda = () => {
 
       if (ordersResult.data) {
         setOrders(ordersResult.data);
-        // Verificar se há algum pedido aceito para mostrar cronômetro
-        const hasAccepted = ordersResult.data.some(order => order.status === "accepted");
-        setHasAcceptedOrder(hasAccepted);
       }
 
       // Só mostrar status de bill se houver pedidos
