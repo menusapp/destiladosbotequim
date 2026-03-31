@@ -76,7 +76,9 @@ const RestaurantAdmin = () => {
     orderType: 'local' | 'delivery';
     tableNumber?: number;
     deliveryType?: 'delivery' | 'pickup';
+    items?: Array<{name: string; quantity: number}>;
   }>>([]);
+  const [cascadeExpanded, setCascadeExpanded] = useState(false);
   const notificationQueueRef = useRef<typeof notificationQueue>([]);
   const [billNotification, setBillNotification] = useState<{
     billId: string;
