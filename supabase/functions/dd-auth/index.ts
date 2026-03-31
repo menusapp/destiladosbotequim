@@ -39,13 +39,20 @@ Deno.serve(async (req) => {
 
       // Step 1: Authenticate with DD API
       console.log("[dd-auth] Requesting token from Delivery Direto...");
-      const tokenRes = await fetch(`${DD_API_BASE}/auth/token`, {
+      const tokenRes = await fetch(`${DD_API_BASE}/token`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
           "X-DeliveryDireto-Client-Id": DD_CLIENT_ID,
+          "X-DeliveryDireto-Id": store_id,
         },
-        body: JSON.stringify({ username, password, store_id }),
+        body: new URLSearchParams({
+          grant_type: "password",
+          client_id: DD_CLIENT_ID,
+          client_secret: Deno.env.get("DD_CLIENT_SECRET")!,
+          username,
+          password,
+        }).toString(),
       });
 
       const tokenText = await tokenRes.text();
