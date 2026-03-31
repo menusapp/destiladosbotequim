@@ -75,6 +75,7 @@ interface OrderItem {
   notes?: string;
   products: {
     name: string;
+    prep_time_minutes?: number | null;
   } | null;
   order_item_extras: OrderItemExtra[];
 }
