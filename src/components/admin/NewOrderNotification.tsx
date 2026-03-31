@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Bell, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -23,7 +24,100 @@ export const NewOrderNotification = ({
   onView,
   onDismiss,
 }: NewOrderNotificationProps) => {
-  const typeLabel = orderType === 'local' ? 'Mesa' : 'Online';
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const oscillatorRef = useRef<OscillatorNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    playBeepSound();
+
+    return () => {
+      stopSound();
+    };
+  }, []);
+
+  const playBeepSound = () => {
+    try {
+      // Create audio context
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      const playBeep = () => {
+        if (!audioContextRef.current) return;
+
+        const oscillator = audioContextRef.current.createOscillator();
+        const gainNode = audioContextRef.current.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContextRef.current.destination);
+        
+        // Apito agudo - 1000Hz com onda quadrada
+        oscillator.frequency.value = 1000;
+        oscillator.type = 'square';
+        
+        // Volume moderado
+        gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.2);
+        
+        // Bip curto de 200ms
+        oscillator.start(audioContextRef.current.currentTime);
+        oscillator.stop(audioContextRef.current.currentTime + 0.2);
+      };
+
+      // Toca o primeiro bip imediatamente
+      playBeep();
+
+      // Loop: bip-bip-bip (200ms on, 200ms off)
+      intervalRef.current = setInterval(() => {
+        playBeep();
+      }, 400); // 200ms som + 200ms pausa
+    } catch (error) {
+      console.error("Erro ao reproduzir som:", error);
+    }
+  };
+
+  const stopSound = () => {
+    // Para o intervalo
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    // Para o oscillator se existir
+    if (oscillatorRef.current) {
+      try {
+        oscillatorRef.current.stop();
+      } catch (e) {
+        // Oscillator já foi parado
+      }
+      oscillatorRef.current = null;
+    }
+
+    // Fecha o AudioContext
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    // Para o gain node
+    if (gainNodeRef.current) {
+      gainNodeRef.current = null;
+    }
+  };
+
+  const handleStopSound = () => {
+    stopSound();
+  };
+
+  const handleView = () => {
+    stopSound();
+    onView();
+  };
+
+  const handleClose = () => {
+    stopSound();
+    onDismiss();
+  };
 
   return (
     <div className="w-96 animate-in slide-in-from-top-5">
@@ -38,10 +132,10 @@ export const NewOrderNotification = ({
                 <h3 className="text-xl font-bold text-orange-900">Novo Pedido!</h3>
                 <p className="text-sm text-orange-700">
                   {orderType === 'local' 
-                    ? `🍽️ Pedido Mesa — Mesa ${tableNumber || '?'}` 
+                    ? `🍽️ Pedido local - Mesa ${tableNumber || '?'}` 
                     : deliveryType === 'pickup' 
-                      ? '📦 Pedido Online — Retirada'
-                      : '🚚 Pedido Online — Entrega'
+                      ? '📦 Pedido online - Retirada'
+                      : '🚚 Pedido online - Entrega'
                   }
                 </p>
               </div>
@@ -49,7 +143,7 @@ export const NewOrderNotification = ({
             <Button
               variant="ghost"
               size="icon"
-              onClick={onDismiss}
+              onClick={handleClose}
               className="h-8 w-8 text-orange-700 hover:text-orange-900 hover:bg-orange-100"
             >
               <X className="h-4 w-4" />
@@ -58,7 +152,7 @@ export const NewOrderNotification = ({
           
           <div className="space-y-1">
             <p className="text-lg font-semibold text-orange-800">
-              Pedido #{orderId.slice(0, 8)} — {typeLabel}
+              Pedido #{orderId.slice(0, 8)}
             </p>
             <p className="text-orange-700">{customerName}</p>
             <p className="text-2xl font-bold text-orange-900">
@@ -66,12 +160,21 @@ export const NewOrderNotification = ({
             </p>
           </div>
 
-          <Button
-            onClick={onView}
-            className="w-full bg-orange-600 hover:bg-orange-700"
-          >
-            VER PEDIDO
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleView}
+              className="flex-1 bg-orange-600 hover:bg-orange-700"
+            >
+              VER PEDIDO
+            </Button>
+            <Button
+              onClick={handleStopSound}
+              variant="outline"
+              className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-100"
+            >
+              Parar Som
+            </Button>
+          </div>
         </div>
       </Card>
     </div>

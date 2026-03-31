@@ -94,7 +94,6 @@ const RestaurantAdmin = () => {
   const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
   const [notifiedBills, setNotifiedBills] = useState<Set<string>>(new Set());
   const [notifiedReservations, setNotifiedReservations] = useState<Set<string>>(new Set());
-  const lastSoundTimeRef = useRef(0);
   const notifiedOrdersRef = useRef<Set<string>>(new Set());
   const notifiedBillsRef = useRef<Set<string>>(new Set());
   const notifiedReservationsRef = useRef<Set<string>>(new Set());
@@ -130,32 +129,6 @@ const RestaurantAdmin = () => {
   
   useInactivityLogout();
   const { isSectionAllowed, hasActiveSubscription } = useRestaurantModules(restaurant?.id || null);
-
-  // Single notification sound - debounced so batch orders play only once
-  const playNotificationSound = () => {
-    const now = Date.now();
-    if (now - lastSoundTimeRef.current < 3000) return;
-    lastSoundTimeRef.current = now;
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const playTone = (freq: number, startTime: number, duration: number) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = freq;
-        osc.type = 'sine';
-        gain.gain.setValueAtTime(0.25, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-        osc.start(startTime);
-        osc.stop(startTime + duration);
-      };
-      // Pleasant ascending chime: C5 → E5 → G5
-      playTone(523.25, ctx.currentTime, 0.15);
-      playTone(659.25, ctx.currentTime + 0.18, 0.18);
-      playTone(783.99, ctx.currentTime + 0.4, 0.25);
-    } catch { /* ignore audio errors */ }
-  };
 
   // Force "modulos" section when no active subscription
   useEffect(() => {
@@ -282,7 +255,6 @@ const RestaurantAdmin = () => {
                 deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
               };
               setNotificationQueue(prev => [...prev, newNotification]);
-              playNotificationSound();
 
               // Marcar como notificado (atualizar ref e state)
               const updated = new Set(notifiedOrdersRef.current);
@@ -698,7 +670,7 @@ const RestaurantAdmin = () => {
       case "pedidos":
         return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
       case "pdv":
-        return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} prepTimeMinutes={restaurant.prep_time_minutes} />;
+        return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} />;
       case "mesas-reservas":
         return <TablesTab restaurantId={restaurant.id} />;
       case "cardapio":
