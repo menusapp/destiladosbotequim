@@ -19,6 +19,7 @@ interface Settings {
   login_require_name: boolean;
   login_require_phone: boolean;
   bill_request_enabled: boolean;
+  show_prep_timer: boolean;
 }
 
 const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
