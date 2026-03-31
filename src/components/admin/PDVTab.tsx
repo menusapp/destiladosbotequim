@@ -57,6 +57,7 @@ interface PDVTabProps {
   restaurantId: string;
   pendingTableToOpen?: string | null;
   onTableOpened?: () => void;
+  prepTimeMinutes?: number;
 }
 
 const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened }: PDVTabProps) => {
