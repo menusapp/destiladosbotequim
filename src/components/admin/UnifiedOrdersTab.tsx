@@ -287,9 +287,12 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
            <div className="flex items-center gap-1.5">
              {getOrderTypeIcon(order)}
              <span className="text-xs font-medium">{getOrderTypeLabel(order)}</span>
-             {order.ifood_source && (
-               <Badge className="bg-[#EA1D2C] text-white text-[10px] px-1.5 py-0 border-0">iFood</Badge>
-             )}
+              {order.ifood_source && (
+                <Badge className="bg-[#EA1D2C] text-white text-[10px] px-1.5 py-0 border-0">iFood</Badge>
+              )}
+              {order.dd_source && (
+                <Badge className="bg-[#0066CC] text-white text-[10px] px-1.5 py-0 border-0">Delivery Direto</Badge>
+              )}
            </div>
           <p className="text-sm font-semibold truncate">{order.customer_name}</p>
           <div className="text-xs text-muted-foreground">
