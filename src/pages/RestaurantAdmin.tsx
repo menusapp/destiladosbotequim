@@ -732,7 +732,7 @@ const RestaurantAdmin = () => {
       case "pedidos":
         return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
       case "pdv":
-        return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} />;
+        return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} showPrepTimer={restaurant.show_prep_timer !== false} />;
       case "mesas-reservas":
         return <TablesTab restaurantId={restaurant.id} />;
       case "cardapio":
