@@ -118,8 +118,7 @@ const Comanda = () => {
   const [loading, setLoading] = useState(true);
   const [billRequested, setBillRequested] = useState(false);
   const [billOnTheWay, setBillOnTheWay] = useState(false);
-  const [prepTimerSeconds, setPrepTimerSeconds] = useState(0);
-  const [hasAcceptedOrder, setHasAcceptedOrder] = useState(false);
+  const [showPrepTimer, setShowPrepTimer] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [selectedPaymentMethodType, setSelectedPaymentMethodType] = useState<string>("");
   const [selectedBrand, setSelectedBrand] = useState<string>("");
