@@ -56,3 +56,12 @@ verify_jwt = false
 
 [functions.register-restaurant]
 verify_jwt = false
+
+[functions.dd-auth]
+verify_jwt = false
+
+[functions.dd-webhook]
+verify_jwt = false
+
+[functions.dd-order-action]
+verify_jwt = false

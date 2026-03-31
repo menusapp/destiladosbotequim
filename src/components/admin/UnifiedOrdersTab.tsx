@@ -54,6 +54,8 @@ interface Order {
   loyalty_points_used?: number;
   ifood_source?: boolean;
   ifood_order_id?: string;
+  dd_source?: boolean;
+  dd_order_id?: string;
 }
 
 interface UnifiedOrdersTabProps {
@@ -177,7 +179,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
       .eq("restaurant_id", restaurantId)
       .neq("order_type", "local")
       .gte("created_at", dateRange.from.toISOString())
@@ -285,9 +287,12 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
            <div className="flex items-center gap-1.5">
              {getOrderTypeIcon(order)}
              <span className="text-xs font-medium">{getOrderTypeLabel(order)}</span>
-             {order.ifood_source && (
-               <Badge className="bg-[#EA1D2C] text-white text-[10px] px-1.5 py-0 border-0">iFood</Badge>
-             )}
+              {order.ifood_source && (
+                <Badge className="bg-[#EA1D2C] text-white text-[10px] px-1.5 py-0 border-0">iFood</Badge>
+              )}
+              {order.dd_source && (
+                <Badge className="bg-[#0066CC] text-white text-[10px] px-1.5 py-0 border-0">Delivery Direto</Badge>
+              )}
            </div>
           <p className="text-sm font-semibold truncate">{order.customer_name}</p>
           <div className="text-xs text-muted-foreground">

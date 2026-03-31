@@ -26,37 +26,71 @@ interface IfoodConfig {
   access_token: string | null;
 }
 
+interface DDConfig {
+  id: string;
+  restaurant_id: string;
+  enabled: boolean;
+  store_id: string | null;
+  username: string | null;
+  access_token: string | null;
+  token_expires_at: string | null;
+}
+
 interface IntegrationsTabProps {
   restaurantId: string;
 }
 
 const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [config, setConfig] = useState<IfoodConfig | null>(null);
-  const [loading, setLoading] = useState(true);
+  // iFood state
+  const [ifoodSheetOpen, setIfoodSheetOpen] = useState(false);
+  const [ifoodConfig, setIfoodConfig] = useState<IfoodConfig | null>(null);
+  const [ifoodLoading, setIfoodLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [userCode, setUserCode] = useState<string | null>(null);
   const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
   const [authCode, setAuthCode] = useState("");
 
+  // DD state
+  const [ddSheetOpen, setDdSheetOpen] = useState(false);
+  const [ddConfig, setDdConfig] = useState<DDConfig | null>(null);
+  const [ddLoading, setDdLoading] = useState(true);
+  const [ddConnecting, setDdConnecting] = useState(false);
+  const [ddStoreId, setDdStoreId] = useState("");
+  const [ddUsername, setDdUsername] = useState("");
+  const [ddPassword, setDdPassword] = useState("");
+
   useEffect(() => {
-    fetchConfig();
+    fetchIfoodConfig();
+    fetchDdConfig();
   }, [restaurantId]);
 
-  const fetchConfig = async () => {
-    setLoading(true);
+  const fetchIfoodConfig = async () => {
+    setIfoodLoading(true);
     const { data } = await supabase
       .from("ifood_config" as any)
       .select("id, restaurant_id, enabled, merchant_id, token_expires_at, access_token")
       .eq("restaurant_id", restaurantId)
       .maybeSingle();
-    setConfig(data as unknown as IfoodConfig | null);
-    setLoading(false);
+    setIfoodConfig(data as unknown as IfoodConfig | null);
+    setIfoodLoading(false);
   };
 
-  const isConnected = config?.access_token && config?.merchant_id;
+  const fetchDdConfig = async () => {
+    setDdLoading(true);
+    const { data } = await supabase
+      .from("deliverydireto_config" as any)
+      .select("id, restaurant_id, enabled, store_id, username, access_token, token_expires_at")
+      .eq("restaurant_id", restaurantId)
+      .maybeSingle();
+    setDdConfig(data as unknown as DDConfig | null);
+    setDdLoading(false);
+  };
 
+  const isIfoodConnected = ifoodConfig?.access_token && ifoodConfig?.merchant_id;
+  const isDdConnected = ddConfig?.access_token && ddConfig?.store_id && ddConfig?.enabled;
+
+  // === iFood handlers ===
   const handleGenerateCode = async () => {
     setGeneratingCode(true);
     try {
@@ -78,35 +112,25 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleExchangeToken = async () => {
-    if (!authCode.trim()) {
-      toast.error("Cole o código de autorização do iFood");
-      return;
-    }
+    if (!authCode.trim()) { toast.error("Cole o código de autorização do iFood"); return; }
     setConnecting(true);
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "exchange_token",
-          restaurant_id: restaurantId,
-          authorization_code: authCode.trim(),
-        }),
+        body: JSON.stringify({ action: "exchange_token", restaurant_id: restaurantId, authorization_code: authCode.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao conectar");
       toast.success("iFood conectado com sucesso!");
       setUserCode(null);
       setAuthCode("");
-      await fetchConfig();
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setConnecting(false);
-    }
+      await fetchIfoodConfig();
+    } catch (err: any) { toast.error(err.message); }
+    finally { setConnecting(false); }
   };
 
-  const handleDisconnect = async () => {
+  const handleIfoodDisconnect = async () => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
         method: "POST",
@@ -115,23 +139,75 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
       });
       if (!res.ok) throw new Error("Erro ao desconectar");
       toast.success("iFood desconectado");
-      await fetchConfig();
-    } catch (err: any) {
-      toast.error(err.message);
-    }
+      await fetchIfoodConfig();
+    } catch (err: any) { toast.error(err.message); }
   };
 
-  const handleToggleEnabled = async (enabled: boolean) => {
+  const handleIfoodToggle = async (enabled: boolean) => {
     await supabase
       .from("ifood_config" as any)
       .update({ enabled, updated_at: new Date().toISOString() } as any)
       .eq("restaurant_id", restaurantId);
-    setConfig((prev) => (prev ? { ...prev, enabled } : null));
+    setIfoodConfig((prev) => (prev ? { ...prev, enabled } : null));
     toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
   };
 
-  const maskMerchantId = (id: string) =>
-    id.length > 8 ? `${id.slice(0, 4)}****${id.slice(-4)}` : id;
+  const maskId = (id: string) => id.length > 8 ? `${id.slice(0, 4)}****${id.slice(-4)}` : id;
+
+  // === DD handlers ===
+  const handleDdConnect = async () => {
+    if (!ddStoreId.trim() || !ddUsername.trim() || !ddPassword.trim()) {
+      toast.error("Preencha Store ID, Username e Password");
+      return;
+    }
+    setDdConnecting(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/dd-auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "connect",
+          restaurant_id: restaurantId,
+          store_id: ddStoreId.trim(),
+          username: ddUsername.trim(),
+          password: ddPassword.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao conectar");
+      toast.success("Delivery Direto conectado com sucesso!");
+      setDdStoreId("");
+      setDdUsername("");
+      setDdPassword("");
+      await fetchDdConfig();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setDdConnecting(false);
+    }
+  };
+
+  const handleDdDisconnect = async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/dd-auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "disconnect", restaurant_id: restaurantId }),
+      });
+      if (!res.ok) throw new Error("Erro ao desconectar");
+      toast.success("Delivery Direto desconectado");
+      await fetchDdConfig();
+    } catch (err: any) { toast.error(err.message); }
+  };
+
+  const handleDdToggle = async (enabled: boolean) => {
+    await supabase
+      .from("deliverydireto_config" as any)
+      .update({ enabled, updated_at: new Date().toISOString() } as any)
+      .eq("restaurant_id", restaurantId);
+    setDdConfig((prev) => (prev ? { ...prev, enabled } : null));
+    toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
+  };
 
   return (
     <div className="space-y-6">
@@ -142,10 +218,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* iFood Card */}
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow border"
-          onClick={() => setSheetOpen(true)}
-        >
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border" onClick={() => setIfoodSheetOpen(true)}>
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -157,7 +230,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
                   <p className="text-xs text-muted-foreground">Receba pedidos do iFood</p>
                 </div>
               </div>
-              {isConnected ? (
+              {isIfoodConnected ? (
                 <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">Conectado</Badge>
               ) : (
                 <Badge variant="outline" className="text-[10px]">Desconectado</Badge>
@@ -166,117 +239,78 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
           </CardContent>
         </Card>
 
-        {/* Delivery Direto — Em breve */}
-        <Card className="opacity-60 cursor-not-allowed border">
+        {/* Delivery Direto Card — ACTIVE */}
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border" onClick={() => setDdSheetOpen(true)}>
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                  <Plug className="h-5 w-5 text-muted-foreground" />
+                <div className="h-10 w-10 rounded-lg bg-[#0066CC]/10 flex items-center justify-center">
+                  <Plug className="h-5 w-5 text-[#0066CC]" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm">Delivery Direto</h3>
                   <p className="text-xs text-muted-foreground">Plataforma de delivery própria</p>
                 </div>
               </div>
-              <Badge variant="secondary" className="text-[10px]">Em breve</Badge>
+              {isDdConnected ? (
+                <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">Conectado</Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px]">Desconectado</Badge>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* iFood Config Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+      <Sheet open={ifoodSheetOpen} onOpenChange={setIfoodSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-[#EA1D2C]" />
               Configuração iFood
             </SheetTitle>
-            <SheetDescription>
-              Conecte sua loja iFood para receber pedidos automaticamente
-            </SheetDescription>
+            <SheetDescription>Conecte sua loja iFood para receber pedidos automaticamente</SheetDescription>
           </SheetHeader>
-
           <div className="mt-6 space-y-6">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : isConnected ? (
-              /* Connected State */
+            {ifoodLoading ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : isIfoodConnected ? (
               <div className="space-y-5">
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <span className="text-sm font-medium text-green-700">Conectado ao iFood</span>
                 </div>
-
-                {config?.merchant_id && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Merchant ID</Label>
-                    <p className="text-sm font-mono">{maskMerchantId(config.merchant_id)}</p>
-                  </div>
+                {ifoodConfig?.merchant_id && (
+                  <div><Label className="text-xs text-muted-foreground">Merchant ID</Label><p className="text-sm font-mono">{maskId(ifoodConfig.merchant_id)}</p></div>
                 )}
-
                 <Separator />
-
                 <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Receber pedidos</Label>
-                    <p className="text-xs text-muted-foreground">Ativar ou pausar o recebimento</p>
-                  </div>
-                  <Switch
-                    checked={config?.enabled ?? false}
-                    onCheckedChange={handleToggleEnabled}
-                  />
+                  <div><Label className="text-sm font-medium">Receber pedidos</Label><p className="text-xs text-muted-foreground">Ativar ou pausar o recebimento</p></div>
+                  <Switch checked={ifoodConfig?.enabled ?? false} onCheckedChange={handleIfoodToggle} />
                 </div>
-
                 <Separator />
-
-                <Button
-                  variant="destructive"
-                  className="w-full"
-                  onClick={() => handleDisconnect()}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Desconectar iFood
+                <Button variant="destructive" className="w-full" onClick={handleIfoodDisconnect}>
+                  <XCircle className="h-4 w-4 mr-2" />Desconectar iFood
                 </Button>
               </div>
             ) : (
-              /* Not Connected State */
               <div className="space-y-5">
                 <div className="space-y-3">
                   <h4 className="font-semibold text-sm">Como conectar:</h4>
                   <div className="space-y-2">
-                    <div className="flex gap-3 items-start">
-                      <span className="flex-shrink-0 h-6 w-6 rounded-full bg-[#EA1D2C] text-white text-xs flex items-center justify-center font-bold">1</span>
-                      <p className="text-sm text-muted-foreground">Clique em "Gerar Código" abaixo para obter seu código de verificação</p>
-                    </div>
-                    <div className="flex gap-3 items-start">
-                      <span className="flex-shrink-0 h-6 w-6 rounded-full bg-[#EA1D2C] text-white text-xs flex items-center justify-center font-bold">2</span>
-                      <p className="text-sm text-muted-foreground">Acesse o Portal do Parceiro iFood e autorize o aplicativo com o código gerado</p>
-                    </div>
-                    <div className="flex gap-3 items-start">
-                      <span className="flex-shrink-0 h-6 w-6 rounded-full bg-[#EA1D2C] text-white text-xs flex items-center justify-center font-bold">3</span>
-                      <p className="text-sm text-muted-foreground">Copie o código de autorização retornado e cole abaixo</p>
-                    </div>
+                    {["Clique em \"Gerar Código\" abaixo", "Acesse o Portal do Parceiro iFood e autorize", "Cole o código de autorização retornado"].map((text, i) => (
+                      <div key={i} className="flex gap-3 items-start">
+                        <span className="flex-shrink-0 h-6 w-6 rounded-full bg-[#EA1D2C] text-white text-xs flex items-center justify-center font-bold">{i + 1}</span>
+                        <p className="text-sm text-muted-foreground">{text}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
                 <Separator />
-
                 {!userCode ? (
-                  <Button
-                    className="w-full bg-[#EA1D2C] hover:bg-[#c4161f]"
-                    onClick={() => handleGenerateCode()}
-                    disabled={generatingCode}
-                  >
-                    {generatingCode ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Plug className="h-4 w-4 mr-2" />
-                    )}
-                    Gerar Código
+                  <Button className="w-full bg-[#EA1D2C] hover:bg-[#c4161f]" onClick={handleGenerateCode} disabled={generatingCode}>
+                    {generatingCode ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plug className="h-4 w-4 mr-2" />}Gerar Código
                   </Button>
                 ) : (
                   <div className="space-y-4">
@@ -284,55 +318,102 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
                       <Label className="text-xs text-muted-foreground">Seu código de verificação:</Label>
                       <div className="flex items-center gap-2 mt-1">
                         <code className="text-lg font-bold tracking-widest">{userCode}</code>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            navigator.clipboard.writeText(userCode);
-                            toast.success("Código copiado!");
-                          }}
-                        >
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { navigator.clipboard.writeText(userCode); toast.success("Código copiado!"); }}>
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
-
                     {verificationUrl && (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => window.open(verificationUrl, "_blank")}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Abrir Portal iFood para autorizar
+                      <Button variant="outline" className="w-full" onClick={() => window.open(verificationUrl, "_blank")}>
+                        <ExternalLink className="h-4 w-4 mr-2" />Abrir Portal iFood para autorizar
                       </Button>
                     )}
-
                     <Separator />
-
                     <div className="space-y-2">
                       <Label className="text-sm">Código de autorização do iFood:</Label>
-                      <Input
-                        placeholder="Cole aqui o código retornado pelo iFood"
-                        value={authCode}
-                        onChange={(e) => setAuthCode(e.target.value)}
-                      />
-                      <Button
-                        className="w-full bg-[#EA1D2C] hover:bg-[#c4161f]"
-                        onClick={() => handleExchangeToken()}
-                        disabled={connecting || !authCode.trim()}
-                      >
-                        {connecting ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                        )}
-                        Conectar
+                      <Input placeholder="Cole aqui o código retornado pelo iFood" value={authCode} onChange={(e) => setAuthCode(e.target.value)} />
+                      <Button className="w-full bg-[#EA1D2C] hover:bg-[#c4161f]" onClick={handleExchangeToken} disabled={connecting || !authCode.trim()}>
+                        {connecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}Conectar
                       </Button>
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Delivery Direto Config Sheet */}
+      <Sheet open={ddSheetOpen} onOpenChange={setDdSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Plug className="h-5 w-5 text-[#0066CC]" />
+              Configuração Delivery Direto
+            </SheetTitle>
+            <SheetDescription>Conecte sua loja do Delivery Direto para receber pedidos automaticamente</SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            {ddLoading ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : isDdConnected ? (
+              <div className="space-y-5">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">Conectado ao Delivery Direto</span>
+                </div>
+                {ddConfig?.store_id && (
+                  <div><Label className="text-xs text-muted-foreground">Store ID</Label><p className="text-sm font-mono">{maskId(ddConfig.store_id)}</p></div>
+                )}
+                {ddConfig?.username && (
+                  <div><Label className="text-xs text-muted-foreground">Usuário</Label><p className="text-sm font-mono">{ddConfig.username}</p></div>
+                )}
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div><Label className="text-sm font-medium">Receber pedidos</Label><p className="text-xs text-muted-foreground">Ativar ou pausar o recebimento</p></div>
+                  <Switch checked={ddConfig?.enabled ?? false} onCheckedChange={handleDdToggle} />
+                </div>
+                <Separator />
+                <Button variant="destructive" className="w-full" onClick={handleDdDisconnect}>
+                  <XCircle className="h-4 w-4 mr-2" />Desconectar Delivery Direto
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm">Como conectar:</h4>
+                  <div className="space-y-2">
+                    {[
+                      "Acesse o painel do Delivery Direto e copie o Store ID da sua loja",
+                      "Insira o username e password gerados no painel",
+                      "Clique em Conectar"
+                    ].map((text, i) => (
+                      <div key={i} className="flex gap-3 items-start">
+                        <span className="flex-shrink-0 h-6 w-6 rounded-full bg-[#0066CC] text-white text-xs flex items-center justify-center font-bold">{i + 1}</span>
+                        <p className="text-sm text-muted-foreground">{text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <Separator />
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Store ID</Label>
+                    <Input placeholder="Ex: abc123-store-id" value={ddStoreId} onChange={(e) => setDdStoreId(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Username</Label>
+                    <Input placeholder="Usuário gerado no painel DD" value={ddUsername} onChange={(e) => setDdUsername(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Password</Label>
+                    <Input type="password" placeholder="Senha gerada no painel DD" value={ddPassword} onChange={(e) => setDdPassword(e.target.value)} />
+                  </div>
+                  <Button className="w-full bg-[#0066CC] hover:bg-[#0055AA]" onClick={handleDdConnect} disabled={ddConnecting || !ddStoreId.trim() || !ddUsername.trim() || !ddPassword.trim()}>
+                    {ddConnecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}Conectar
+                  </Button>
+                </div>
               </div>
             )}
           </div>
