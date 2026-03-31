@@ -31,6 +31,7 @@ import { printOrder } from "@/lib/printOrder";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { TableDetailDialog } from "./TableDetailDialog";
 import { ManageTablesDrawer } from "./ManageTablesDrawer";
+import { PDVOrderDrawers } from "./PDVOrderDrawers";
 
 interface CartItem {
   productId: string;
