@@ -332,6 +332,47 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Timer de preparo visível */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Timer className="h-5 w-5" />
+                  Contador de Tempo nos Pedidos
+                </CardTitle>
+                <CardDescription>Controle a visibilidade do timer de preparo nos cards de pedido e mesas</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <Label htmlFor="show-prep-timer" className="font-medium cursor-pointer">Mostrar tempo de preparo</Label>
+                  <Switch
+                    id="show-prep-timer"
+                    checked={settings.show_prep_timer}
+                    onCheckedChange={(checked) => setSettings({ ...settings, show_prep_timer: checked })}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  className="gap-2 w-full"
+                  onClick={async () => {
+                    try {
+                      const { error } = await supabase
+                        .from('tables')
+                        .update({ occupied_at: new Date().toISOString() })
+                        .eq('restaurant_id', restaurantId)
+                        .eq('is_occupied', true);
+                      if (error) throw error;
+                      toast.success("Tempo de todas as mesas zerado!");
+                    } catch {
+                      toast.error("Erro ao zerar tempo");
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Zerar tempo de todas as mesas
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
           <Button onClick={handleSaveSettings} className="w-full sm:w-auto gap-2">
