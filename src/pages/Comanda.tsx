@@ -351,15 +351,6 @@ const Comanda = () => {
           },
           (payload) => {
             console.log("Order atualizada em tempo real:", payload);
-            const updatedOrder = payload.new as any;
-            
-            if (updatedOrder?.status === "accepted") {
-              setHasAcceptedOrder(true);
-              const prepTimeMs = (prepTimeMinutes || 30) * 60 * 1000;
-              setPrepTimerSeconds(Math.floor(prepTimeMs / 1000));
-              // Silenciado para cliente
-            }
-            
             // Atualiza dados para refletir status
             fetchData();
           }
