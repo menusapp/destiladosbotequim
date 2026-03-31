@@ -126,7 +126,7 @@ const Comanda = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
   const [serviceFeePercentage, setServiceFeePercentage] = useState(10);
-  const [prepTimeMinutes, setPrepTimeMinutes] = useState(30);
+  const [currentTime, setCurrentTime] = useState(() => Math.floor(Date.now() / 1000));
   const [restaurantColor, setRestaurantColor] = useState("#FF6B35");
   const [orderNotes, setOrderNotes] = useState("");
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
