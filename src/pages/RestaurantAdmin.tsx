@@ -282,6 +282,7 @@ const RestaurantAdmin = () => {
                 deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
               };
               setNotificationQueue(prev => [...prev, newNotification]);
+              playNotificationSound();
 
               // Marcar como notificado (atualizar ref e state)
               const updated = new Set(notifiedOrdersRef.current);
