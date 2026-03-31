@@ -64,7 +64,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           login_require_name: data.login_require_name ?? true,
           login_require_phone: data.login_require_phone ?? false,
           bill_request_enabled: data.bill_request_enabled ?? true,
-          
+          show_prep_timer: data.show_prep_timer ?? true,
         });
       }
     } catch (error) {
