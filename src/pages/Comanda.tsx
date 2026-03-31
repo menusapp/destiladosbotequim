@@ -905,7 +905,7 @@ const Comanda = () => {
                 <Clock className="h-5 w-5 text-blue-600" />
                 <div className="text-center">
                   <p className="text-lg font-semibold text-blue-800">
-                    ⏳ Pedido realizado!
+                    Pedido realizado!
                   </p>
                   <p className="text-sm text-blue-700 mt-1">
                     Aguardando aceitação da cozinha
