@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
 import { Product } from "@/types/menu";
 
 interface ProductSuggestionsProps {
@@ -28,7 +27,7 @@ export const ProductSuggestions = ({
       .select("*, categories!inner(restaurant_id)")
       .eq("categories.restaurant_id", restaurantId)
       .eq("available", true)
-      .limit(12);
+      .limit(8);
 
     if (excludeIds.length > 0) {
       query = query.not("id", "in", `(${excludeIds.join(",")})`);
@@ -37,8 +36,7 @@ export const ProductSuggestions = ({
     const { data } = await query;
 
     if (data) {
-      // Embaralhar e pegar apenas 6
-      const shuffled = data.sort(() => Math.random() - 0.5).slice(0, 6);
+      const shuffled = data.sort(() => Math.random() - 0.5).slice(0, 3);
       setProducts(shuffled);
     }
   };
@@ -47,39 +45,34 @@ export const ProductSuggestions = ({
 
   return (
     <div>
-      <h4 className="font-bold text-foreground mb-3">Que tal adicionar?</h4>
-      <div className="grid grid-cols-3 gap-2">
+      <h4 className="font-bold text-foreground mb-2 text-sm">Que tal adicionar?</h4>
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {products.map((product) => (
-          <Card
+          <div
             key={product.id}
-            className="cursor-pointer hover:shadow-md transition-shadow"
+            className="flex items-center gap-2 min-w-[180px] max-w-[200px] p-2 rounded-lg border border-border bg-card cursor-pointer hover:shadow-sm transition-shadow flex-shrink-0"
             onClick={() => onProductClick?.(product)}
           >
-            <CardContent className="p-2">
-              <div className="aspect-square bg-muted rounded-lg mb-2 overflow-hidden">
-                {product.image_url ? (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-4xl">
-                    🍽️
-                  </div>
-                )}
-              </div>
-              <p className="text-xs font-medium line-clamp-2 mb-1">
-                {product.name}
-              </p>
-              <p
-                className="text-sm font-bold"
-                style={{ color: primaryColor }}
-              >
+            <div className="w-12 h-12 bg-muted rounded-md overflow-hidden flex-shrink-0">
+              {product.image_url ? (
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                  Foto
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium line-clamp-1">{product.name}</p>
+              <p className="text-xs font-bold" style={{ color: primaryColor }}>
                 R$ {product.price.toFixed(2)}
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
       </div>
     </div>
