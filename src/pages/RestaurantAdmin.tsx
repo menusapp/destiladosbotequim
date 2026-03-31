@@ -55,6 +55,7 @@ interface Restaurant {
   pickup_time_minutes: number;
   auto_open_close?: boolean;
   primary_color?: string;
+  show_prep_timer?: boolean;
 }
 
 const RestaurantAdmin = () => {
