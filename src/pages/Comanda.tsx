@@ -468,7 +468,7 @@ const Comanda = () => {
             id, status, created_at, customer_name, notes,
             order_items(
               id, quantity, price_at_order, notes,
-              products(name),
+              products(name, prep_time_minutes),
               order_item_extras(price_at_order, product_extras(name))
             )
           `)
