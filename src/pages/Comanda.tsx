@@ -877,7 +877,7 @@ const Comanda = () => {
               </div>
             </CardContent>
           </Card>
-        ) : hasAcceptedOrder && !billRequested ? (
+        ) : orders.some(o => o.status === "accepted" || o.status === "preparing") && !billRequested ? (
           <Card 
             className="border-2" 
             style={{ 
@@ -890,13 +890,7 @@ const Comanda = () => {
                 <Clock className="h-5 w-5" style={{ color: restaurantColor }} />
                 <div className="text-center">
                   <p className="text-sm font-medium" style={{ color: restaurantColor }}>
-                    👨‍🍳 Em Preparo
-                  </p>
-                  <p className="text-3xl font-bold mt-1" style={{ color: restaurantColor }}>
-                    {formatTime(prepTimerSeconds)}
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: restaurantColor, opacity: 0.8 }}>
-                    {prepTimerSeconds > 0 ? "Tempo estimado restante" : "Seu pedido deve estar pronto"}
+                    Em Preparo
                   </p>
                 </div>
               </div>
