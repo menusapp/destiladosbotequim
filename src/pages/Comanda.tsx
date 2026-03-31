@@ -1005,8 +1005,8 @@ const Comanda = () => {
                   <div key={order.id} className="space-y-2">
                      <div className="flex items-center gap-2">
                        <Badge variant="outline" className={order.status === "pending" ? "border-blue-500 text-blue-700" : ""}>
-                          {order.status === "pending" && "⏳ Aguardando"}
-                          {order.status === "accepted" && "👨‍🍳 Em Preparo"}
+                          {order.status === "pending" && "Aguardando"}
+                          {order.status === "accepted" && "Em Preparo"}
                           {order.status === "preparing" && "Em Preparo"}
                           {order.status === "ready" && "Pronto"}
                           {order.status === "delivered" && "Entregue"}
