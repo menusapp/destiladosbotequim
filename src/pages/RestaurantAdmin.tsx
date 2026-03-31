@@ -94,6 +94,7 @@ const RestaurantAdmin = () => {
   const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
   const [notifiedBills, setNotifiedBills] = useState<Set<string>>(new Set());
   const [notifiedReservations, setNotifiedReservations] = useState<Set<string>>(new Set());
+  const lastSoundTimeRef = useRef(0);
   const notifiedOrdersRef = useRef<Set<string>>(new Set());
   const notifiedBillsRef = useRef<Set<string>>(new Set());
   const notifiedReservationsRef = useRef<Set<string>>(new Set());
