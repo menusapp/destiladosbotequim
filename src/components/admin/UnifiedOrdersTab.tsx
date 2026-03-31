@@ -76,7 +76,7 @@ const PAYMENT_LABELS: Record<string, { icon: React.ReactNode; label: string }> =
   "Pago pelo iFood": { icon: <Smartphone className="w-3 h-3" />, label: "Pago pelo iFood" },
 };
 
-const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: UnifiedOrdersTabProps) => {
+const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, showPrepTimer = true }: UnifiedOrdersTabProps) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
