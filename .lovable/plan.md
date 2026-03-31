@@ -1,53 +1,114 @@
 
 
-# Plano — Performance PWA + Backup Path + Planos Atualizados
+# Plano — 6 Ajustes de Notificações e Interface
 
-## 3 Alterações
+## Análise de Risco
 
-### 1. Performance: Prefetch e transições mais rápidas entre abas
+Nenhuma funcionalidade existente será quebrada. Todos os ajustes são na camada de UI/notificação ou em preferências aditivas. Fluxos de pedidos, fiscal, iFood, pagamentos permanecem intactos.
 
-O PWA standalone não tem a barra de URL do Chrome, então a percepção de lentidão vem do tempo de carregamento dos lazy chunks + queries de cada aba. Sem alterar funcionalidades:
+## Ajuste 1 — Remover UI de instalação PWA
+
+**Alterações:**
+- Remover `<InstallPWA />` do `App.tsx` (linha ~47) e o import correspondente
+- Deletar `src/components/InstallPWA.tsx`
+- O `manifest.json` e meta tags permanecem (o app continua instalável pelo menu do navegador)
+
+**Risco:** Zero. Apenas remove um banner visual.
+
+---
+
+## Ajuste 2 — Toggle de timer de preparo para mesas
+
+O timer atual é o badge `{elapsed}min` nos cards de pedido no `UnifiedOrdersTab.tsx` (linha 278) e no PDV o `Desde {occupiedSince}` (linha 782).
+
+**Alterações:**
+- Migração: adicionar coluna `show_prep_timer boolean DEFAULT true` na tabela `restaurants`
+- `UnifiedOrdersTab.tsx`: receber prop `showPrepTimer`, ocultar badge de elapsed quando `false`
+- `PDVTab.tsx`: ocultar "Desde HH:mm" quando `showPrepTimer` é `false`
+- `RestaurantAdmin.tsx`: buscar `show_prep_timer` do restaurante e passar como prop
+- `CompanyDataSettings.tsx`: adicionar toggle "Mostrar tempo de preparo" e botão "Zerar tempo" (que reseta `occupied_at` de todas as mesas para `now()`)
+- Salvar preferência no banco via update na tabela `restaurants`
+
+**Risco:** Baixo. Adição de coluna com default, sem alterar fluxos existentes.
+
+---
+
+## Ajuste 3 — Botão fixo na comanda (Menu.tsx)
+
+O `ComandaBottomBar` já é `fixed bottom-0` com `z-50` e `Menu.tsx` já tem `pb-32`. O componente já funciona corretamente como especificado. Vou verificar se o conteúdo não é sobreposto e garantir o z-index adequado.
+
+**Alterações:**
+- Garantir que `ComandaBottomBar` tenha `z-[60]` (acima de outros elementos fixos)
+- Confirmar `pb-32` no container principal (já existe na linha 983)
+- Nenhuma mudança de comportamento
+
+**Risco:** Zero. Apenas ajuste de z-index se necessário.
+
+---
+
+## Ajuste 4 — Notificações estilo iPhone (cascata compacta + expansão)
+
+Substituir o sistema atual de popups empilhados em `RestaurantAdmin.tsx` (linhas 772-788) + `NewOrderNotification.tsx`.
+
+**Alterações em `NewOrderNotification.tsx`** — reescrever completamente:
+- **Estado fechado (pílula):** card compacto ~60px de altura: ícone tipo + "Mesa 5 — João" ou "🚚 Delivery — Maria" + valor. Clicável para expandir.
+- **Estado aberto:** expande com itens, cliente, pagamento, botões "Aceitar" e "Parar Som"
+- Cada notificação controla seu estado aberto/fechado individualmente
+- Aceitar = chama `onView` (navega para o pedido) e remove da fila
+
+**Alterações em `RestaurantAdmin.tsx`** (linhas 772-788):
+- Renderizar máximo 3 pílulas empilhadas com deslocamento vertical (top: 16px, 26px, 36px em cascata)
+- Se houver mais de 3, mostrar badge "+N" na última pílula visível
+- Container: `fixed top-4 right-4 z-[100]` com `max-h-[70vh] overflow-y-auto` quando expandido
+- Remover o padrão atual de empilhamento com `index * 220px`
+
+**Risco:** Baixo. Apenas camada visual. A lógica de `notificationQueue`, `setNotificationQueue`, `handleViewOrder` e `handleDismiss` permanece idêntica.
+
+---
+
+## Ajuste 5 — Identificação clara do tipo de pedido
+
+Já parcialmente implementado no `UnifiedOrdersTab.tsx` (linhas 232-244) e `NewOrderNotification.tsx` (linhas 133-139).
+
+**Alterações:**
+- `NewOrderNotification.tsx`: no título da pílula compacta, usar formato "🍽️ Mesa 5 — João" ou "🚚 Delivery — Maria" ou "📦 Retirada — Maria"
+- `UnifiedOrdersTab.tsx`: prefixar o nome do cliente com o tipo — "🍽️ Mesa X — Nome" para locais, "🚚 Delivery — Nome" ou "📦 Retirada — Nome" para online
+- `OrderDetailModal.tsx`: verificar e garantir que o cabeçalho mostra o tipo de pedido
+
+**Risco:** Zero. Apenas mudanças de texto/label.
+
+---
+
+## Ajuste 6 — Som de notificação único e global
+
+Atualmente cada `NewOrderNotification` cria seu próprio `AudioContext` e `setInterval`, causando duplicação de som.
 
 **Alterações em `RestaurantAdmin.tsx`:**
-- Adicionar **prefetch on hover** no sidebar: quando o mouse passar sobre um item do menu, pré-carregar o chunk daquela aba via dynamic import (ex: `import("@/components/admin/StockTab")`)
-- Adicionar um **skeleton de carregamento** mais visual no `Suspense fallback` em vez do texto simples "Carregando..." — usar componente Skeleton já existente no projeto para dar feedback instantâneo
-- Memoizar o `renderContent()` com `useMemo` baseado no `activeSection` e `restaurant.id` para evitar re-render desnecessário
+- Criar um `audioContextRef` e `audioIntervalRef` globais no componente
+- Função `startGlobalSound()`: se já tocando (`audioIntervalRef.current !== null`), retorna sem fazer nada. Caso contrário, cria AudioContext + setInterval com beep
+- Função `stopGlobalSound()`: limpa interval, fecha AudioContext
+- Quando `notificationQueue.length > 0` e som não está tocando → `startGlobalSound()`
+- Quando `notificationQueue.length === 0` → `stopGlobalSound()` automaticamente
+- Botão "Parar Som" chama `stopGlobalSound()` sem remover notificações
+- Remover toda lógica de som do `NewOrderNotification.tsx` (será apenas visual)
 
-**Alterações em `AppSidebar.tsx`:**
-- Adicionar `onMouseEnter` nos itens do menu para disparar prefetch do chunk correspondente (mapeamento section → import)
+**Risco:** Baixo. Centraliza controle de áudio sem alterar fluxo de pedidos.
 
-### 2. Backup: Campo de pasta padrão para downloads
+---
 
-O navegador não permite escolher programaticamente a pasta de download (limitação de segurança). Mas podemos:
+## Arquivos Afetados
 
-**Alterações em `BackupSettings.tsx`:**
-- Adicionar um campo de texto "Pasta padrão para backup" onde o usuário digita o caminho desejado (ex: `C:\Backups\Menus`) — salvo no localStorage
-- Mostrar esse caminho como **lembrete visual** antes do download, com aviso: "Configure a pasta de download do seu navegador para salvar automaticamente neste local"
-- Adicionar um card informativo explicando como configurar o navegador (Chrome: Configurações → Downloads → Perguntar onde salvar)
-- Usar a **File System Access API** (`showDirectoryPicker`) quando disponível no navegador para permitir salvar diretamente na pasta escolhida — com fallback para download normal quando a API não estiver disponível
+| Arquivo | Ação |
+|---------|------|
+| `src/components/InstallPWA.tsx` | Deletar |
+| `src/App.tsx` | Remover import + uso de InstallPWA |
+| `src/components/admin/NewOrderNotification.tsx` | Reescrever (pílula + expansão, sem som) |
+| `src/pages/RestaurantAdmin.tsx` | Som global, cascata iPhone, prop showPrepTimer |
+| `src/components/admin/UnifiedOrdersTab.tsx` | Prop showPrepTimer, labels de tipo |
+| `src/components/admin/PDVTab.tsx` | Prop showPrepTimer |
+| `src/components/admin/settings/CompanyDataSettings.tsx` | Toggle + botão zerar timer |
+| `src/components/menu/ComandaBottomBar.tsx` | z-index ajuste |
+| Migração SQL | Adicionar `show_prep_timer` na tabela `restaurants` |
 
-### 3. Planos: Sincronizar com a Landing Page
-
-A LP define 3 planos: **Básico R$99**, **Intermediário R$199**, **Avançado R$349**. O `ModulosTab.tsx` puxa os planos do banco (`subscription_plans`). A divergência não é no código — é nos dados do banco.
-
-**Alterações em `ModulosTab.tsx`:**
-- Adicionar os detalhes textuais da LP (preço diário, lista de features em texto legível) diretamente nos cards, mapeando por nome do plano
-- Exibir features tanto como módulos (badges) quanto como lista textual (igual na LP): "Cardápio digital ilimitado", "QR Code para mesas", etc.
-- Adicionar o valor diário "R$ X,XX/dia" abaixo do preço mensal, igual na LP
-
-**Alterações no `SubscriptionPlansTab.tsx` (CEO):**
-- Adicionar campo "Preço diário" calculado automaticamente (price / 30) no card de visualização
-- Adicionar campo de texto "Features textuais" (lista de benefícios em texto livre, além dos módulos) para o CEO configurar o que aparece na aba de planos do restaurante
-
-## Detalhes Técnicos
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `RestaurantAdmin.tsx` | Prefetch on hover, Skeleton no Suspense fallback, memoização |
-| `AppSidebar.tsx` | `onMouseEnter` com prefetch dinâmico por seção |
-| `BackupSettings.tsx` | Campo de pasta padrão, File System Access API, card informativo |
-| `ModulosTab.tsx` | Features textuais da LP, preço diário, visual alinhado com LP |
-| `SubscriptionPlansTab.tsx` | Campo de features textuais, preço diário calculado |
-
-Nenhuma funcionalidade existente será alterada. Todas as mudanças são aditivas ou visuais.
+Nenhum fluxo de aceitação, processamento ou status de pedidos será alterado.
 
