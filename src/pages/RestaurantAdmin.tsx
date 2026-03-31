@@ -102,6 +102,67 @@ const RestaurantAdmin = () => {
   const reservationNotificationRef = useRef<typeof reservationNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
   const [pendingTableToOpen, setPendingTableToOpen] = useState<string | null>(null);
+
+  // Global sound control (Ajuste 6)
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [soundMuted, setSoundMuted] = useState(false);
+
+  const startGlobalSound = useCallback(() => {
+    if (audioIntervalRef.current !== null) return; // Already playing
+    try {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playBeep = () => {
+        if (!audioContextRef.current) return;
+        const osc = audioContextRef.current.createOscillator();
+        const gain = audioContextRef.current.createGain();
+        osc.connect(gain);
+        gain.connect(audioContextRef.current.destination);
+        osc.frequency.value = 1000;
+        osc.type = 'square';
+        gain.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.2);
+        osc.start(audioContextRef.current.currentTime);
+        osc.stop(audioContextRef.current.currentTime + 0.2);
+      };
+      playBeep();
+      audioIntervalRef.current = setInterval(playBeep, 400);
+    } catch (e) {
+      console.error("Erro ao iniciar som:", e);
+    }
+  }, []);
+
+  const stopGlobalSound = useCallback(() => {
+    if (audioIntervalRef.current) {
+      clearInterval(audioIntervalRef.current);
+      audioIntervalRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+  }, []);
+
+  // Auto-start/stop sound based on notification queue
+  useEffect(() => {
+    if (notificationQueue.length > 0 && !soundMuted) {
+      startGlobalSound();
+    } else {
+      stopGlobalSound();
+    }
+  }, [notificationQueue.length, soundMuted, startGlobalSound, stopGlobalSound]);
+
+  // Reset mute when all notifications cleared
+  useEffect(() => {
+    if (notificationQueue.length === 0) {
+      setSoundMuted(false);
+    }
+  }, [notificationQueue.length]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => stopGlobalSound();
+  }, [stopGlobalSound]);
   
   // Sync refs with state to avoid stale closure in realtime callback
   useEffect(() => {
