@@ -309,6 +309,18 @@ const RestaurantAdmin = () => {
                 tableNumber = tableData?.table_number;
               }
 
+              // Fetch order items for notification preview
+              const { data: orderItems } = await supabase
+                .from('order_items')
+                .select('quantity, products(name)')
+                .eq('order_id', orderId)
+                .limit(5);
+
+              const items = orderItems?.map((oi: any) => ({
+                name: oi.products?.name || 'Item',
+                quantity: oi.quantity,
+              })) || [];
+
               // Add to notification queue
               const newNotification = {
                 orderId: orderId,
@@ -317,6 +329,7 @@ const RestaurantAdmin = () => {
                 orderType: (orderType === 'delivery' ? 'delivery' : 'local') as 'local' | 'delivery',
                 tableNumber,
                 deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
+                items,
               };
               setNotificationQueue(prev => [...prev, newNotification]);
 
