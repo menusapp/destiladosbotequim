@@ -60,6 +60,7 @@ interface UnifiedOrdersTabProps {
   restaurantId: string;
   pendingOrderToOpen: string | null;
   onOrderOpened: () => void;
+  showPrepTimer?: boolean;
 }
 
 const PAYMENT_LABELS: Record<string, { icon: React.ReactNode; label: string }> = {
