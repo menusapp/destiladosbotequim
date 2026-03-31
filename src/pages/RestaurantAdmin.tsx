@@ -831,23 +831,51 @@ const RestaurantAdmin = () => {
           </main>
         </SidebarInset>
 
-        {/* Global Order Notifications - stacked queue */}
-        {notificationQueue.map((notification, index) => (
-          <div key={notification.orderId} style={{ top: `${16 + index * 220}px`, position: 'fixed', right: '16px', zIndex: 100 - index }}>
-            <NewOrderNotification
-              orderId={notification.orderId}
-              customerName={notification.customerName}
-              total={notification.total}
-              orderType={notification.orderType}
-              tableNumber={notification.tableNumber}
-              deliveryType={notification.deliveryType}
-              onView={index === 0 ? handleViewOrder : () => {
-                setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId));
-              }}
-              onDismiss={() => setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId))}
-            />
+        {/* Global Order Notifications - iPhone-style cascade */}
+        {notificationQueue.length > 0 && (
+          <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-h-[70vh] overflow-y-auto">
+            {notificationQueue.slice(0, 3).map((notification, index) => (
+              <div key={notification.orderId} style={{ zIndex: 100 - index }}>
+                <NewOrderNotification
+                  orderId={notification.orderId}
+                  customerName={notification.customerName}
+                  total={notification.total}
+                  orderType={notification.orderType}
+                  tableNumber={notification.tableNumber}
+                  deliveryType={notification.deliveryType}
+                  onView={() => {
+                    // Accept: navigate to the order
+                    const current = notification;
+                    (async () => {
+                      if (current.orderType === 'local') {
+                        const { data: orderData } = await supabase
+                          .from("orders")
+                          .select("table_id")
+                          .eq("id", current.orderId)
+                          .single();
+                        setActiveSection('pdv');
+                        if (orderData?.table_id) setPendingTableToOpen(orderData.table_id);
+                      } else {
+                        setActiveSection('pedidos');
+                        setPendingOrderToOpen(current.orderId);
+                      }
+                    })();
+                    setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId));
+                  }}
+                  onDismiss={() => setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId))}
+                  onStopSound={() => setSoundMuted(true)}
+                />
+              </div>
+            ))}
+            {notificationQueue.length > 3 && (
+              <div className="text-center">
+                <span className="inline-block px-3 py-1 rounded-full bg-orange-500 text-white text-xs font-bold shadow">
+                  +{notificationQueue.length - 3} pedidos
+                </span>
+              </div>
+            )}
           </div>
-        ))}
+        )}
         
         {/* Global Bill Notification */}
         {billNotification && (
