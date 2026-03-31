@@ -542,7 +542,7 @@ const Comanda = () => {
     } finally {
       setLoading(false);
     }
-  }, [restaurantSlug, tableNumber, prepTimeMinutes]);
+  }, [restaurantSlug, tableNumber]);
 
   // Buscar formas de pagamento quando restaurantId estiver disponível
   useEffect(() => {
