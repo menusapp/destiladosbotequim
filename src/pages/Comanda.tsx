@@ -1024,7 +1024,28 @@ const Comanda = () => {
                         className="flex justify-between items-start py-2 border-b last:border-0"
                       >
                         <div className="flex-1">
-                          <p className="font-medium">{item.products?.name || "Produto removido"}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{item.products?.name || "Produto removido"}</p>
+                            {showPrepTimer && item.products?.prep_time_minutes && (order.status === "accepted" || order.status === "preparing") && (() => {
+                              const orderCreatedAt = Math.floor(new Date(order.created_at).getTime() / 1000);
+                              const elapsed = currentTime - orderCreatedAt;
+                              const totalSecs = (item.products.prep_time_minutes || 0) * 60;
+                              const remaining = Math.max(0, totalSecs - elapsed);
+                              const mins = Math.floor(remaining / 60);
+                              const secs = remaining % 60;
+                              return (
+                                <span 
+                                  className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                                  style={{ 
+                                    backgroundColor: remaining > 0 ? `${restaurantColor}20` : '#dcfce7',
+                                    color: remaining > 0 ? restaurantColor : '#16a34a'
+                                  }}
+                                >
+                                  {remaining > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : 'Pronto'}
+                                </span>
+                              );
+                            })()}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             Qtd: {item.quantity}
                           </p>
