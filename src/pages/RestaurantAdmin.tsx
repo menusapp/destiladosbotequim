@@ -76,7 +76,9 @@ const RestaurantAdmin = () => {
     orderType: 'local' | 'delivery';
     tableNumber?: number;
     deliveryType?: 'delivery' | 'pickup';
+    items?: Array<{name: string; quantity: number}>;
   }>>([]);
+  const [cascadeExpanded, setCascadeExpanded] = useState(false);
   const notificationQueueRef = useRef<typeof notificationQueue>([]);
   const [billNotification, setBillNotification] = useState<{
     billId: string;
@@ -307,6 +309,18 @@ const RestaurantAdmin = () => {
                 tableNumber = tableData?.table_number;
               }
 
+              // Fetch order items for notification preview
+              const { data: orderItems } = await supabase
+                .from('order_items')
+                .select('quantity, products(name)')
+                .eq('order_id', orderId)
+                .limit(5);
+
+              const items = orderItems?.map((oi: any) => ({
+                name: oi.products?.name || 'Item',
+                quantity: oi.quantity,
+              })) || [];
+
               // Add to notification queue
               const newNotification = {
                 orderId: orderId,
@@ -315,6 +329,7 @@ const RestaurantAdmin = () => {
                 orderType: (orderType === 'delivery' ? 'delivery' : 'local') as 'local' | 'delivery',
                 tableNumber,
                 deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
+                items,
               };
               setNotificationQueue(prev => [...prev, newNotification]);
 
@@ -833,45 +848,105 @@ const RestaurantAdmin = () => {
 
         {/* Global Order Notifications - iPhone-style cascade */}
         {notificationQueue.length > 0 && (
-          <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-h-[70vh] overflow-y-auto">
-            {notificationQueue.slice(0, 3).map((notification, index) => (
-              <div key={notification.orderId} style={{ zIndex: 100 - index }}>
-                <NewOrderNotification
-                  orderId={notification.orderId}
-                  customerName={notification.customerName}
-                  total={notification.total}
-                  orderType={notification.orderType}
-                  tableNumber={notification.tableNumber}
-                  deliveryType={notification.deliveryType}
-                  onView={() => {
-                    // Accept: navigate to the order
-                    const current = notification;
-                    (async () => {
-                      if (current.orderType === 'local') {
-                        const { data: orderData } = await supabase
-                          .from("orders")
-                          .select("table_id")
-                          .eq("id", current.orderId)
-                          .single();
-                        setActiveSection('pdv');
-                        if (orderData?.table_id) setPendingTableToOpen(orderData.table_id);
-                      } else {
-                        setActiveSection('pedidos');
-                        setPendingOrderToOpen(current.orderId);
-                      }
-                    })();
-                    setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId));
-                  }}
-                  onDismiss={() => setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId))}
-                  onStopSound={() => setSoundMuted(true)}
-                />
+          <div className="fixed top-4 right-4 z-[100]">
+            {!cascadeExpanded ? (
+              /* Collapsed: stacked cards behind the front one */
+              <div
+                className="relative cursor-pointer"
+                onClick={() => setCascadeExpanded(true)}
+                style={{ height: `${68 + Math.min(notificationQueue.length - 1, 2) * 8}px` }}
+              >
+                {notificationQueue.slice(0, 3).map((notification, index) => (
+                  <div
+                    key={notification.orderId}
+                    className="absolute right-0 transition-all duration-200"
+                    style={{
+                      top: `${index * 8}px`,
+                      zIndex: 100 - index,
+                      transform: `scale(${1 - index * 0.03})`,
+                      opacity: index === 0 ? 1 : 0.85,
+                    }}
+                  >
+                    <NewOrderNotification
+                      orderId={notification.orderId}
+                      customerName={notification.customerName}
+                      total={notification.total}
+                      orderType={notification.orderType}
+                      tableNumber={notification.tableNumber}
+                      deliveryType={notification.deliveryType}
+                      items={notification.items}
+                      onView={() => {
+                        const current = notification;
+                        (async () => {
+                          if (current.orderType === 'local') {
+                            const { data: orderData } = await supabase
+                              .from("orders")
+                              .select("table_id")
+                              .eq("id", current.orderId)
+                              .single();
+                            setActiveSection('pdv');
+                            if (orderData?.table_id) setPendingTableToOpen(orderData.table_id);
+                          } else {
+                            setActiveSection('pedidos');
+                            setPendingOrderToOpen(current.orderId);
+                          }
+                        })();
+                        setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId));
+                      }}
+                      onDismiss={() => setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId))}
+                      onStopSound={() => setSoundMuted(true)}
+                    />
+                  </div>
+                ))}
+                {notificationQueue.length > 3 && (
+                  <div className="absolute right-2" style={{ top: `${3 * 8 + 4}px`, zIndex: 96 }}>
+                    <span className="inline-block px-2 py-0.5 rounded-full bg-orange-500 text-white text-xs font-bold shadow">
+                      +{notificationQueue.length - 3}
+                    </span>
+                  </div>
+                )}
               </div>
-            ))}
-            {notificationQueue.length > 3 && (
-              <div className="text-center">
-                <span className="inline-block px-3 py-1 rounded-full bg-orange-500 text-white text-xs font-bold shadow">
-                  +{notificationQueue.length - 3} pedidos
-                </span>
+            ) : (
+              /* Expanded: scrollable list of all notifications */
+              <div className="flex flex-col gap-2 max-h-[70vh] overflow-y-auto pr-1">
+                <button
+                  onClick={() => setCascadeExpanded(false)}
+                  className="self-end mb-1 text-xs text-orange-600 hover:text-orange-800 font-medium"
+                >
+                  Recolher
+                </button>
+                {notificationQueue.map((notification) => (
+                  <NewOrderNotification
+                    key={notification.orderId}
+                    orderId={notification.orderId}
+                    customerName={notification.customerName}
+                    total={notification.total}
+                    orderType={notification.orderType}
+                    tableNumber={notification.tableNumber}
+                    deliveryType={notification.deliveryType}
+                    items={notification.items}
+                    onView={() => {
+                      const current = notification;
+                      (async () => {
+                        if (current.orderType === 'local') {
+                          const { data: orderData } = await supabase
+                            .from("orders")
+                            .select("table_id")
+                            .eq("id", current.orderId)
+                            .single();
+                          setActiveSection('pdv');
+                          if (orderData?.table_id) setPendingTableToOpen(orderData.table_id);
+                        } else {
+                          setActiveSection('pedidos');
+                          setPendingOrderToOpen(current.orderId);
+                        }
+                      })();
+                      setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId));
+                    }}
+                    onDismiss={() => setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId))}
+                    onStopSound={() => setSoundMuted(true)}
+                  />
+                ))}
               </div>
             )}
           </div>

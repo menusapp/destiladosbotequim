@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, X } from "lucide-react";
+
+interface OrderItem {
+  name: string;
+  quantity: number;
+}
 
 interface NewOrderNotificationProps {
   orderId: string;
@@ -9,6 +14,7 @@ interface NewOrderNotificationProps {
   orderType: 'local' | 'delivery';
   tableNumber?: number;
   deliveryType?: 'delivery' | 'pickup';
+  items?: OrderItem[];
   onView: () => void;
   onDismiss: () => void;
   onStopSound?: () => void;
@@ -21,6 +27,7 @@ export const NewOrderNotification = ({
   orderType,
   tableNumber,
   deliveryType,
+  items,
   onView,
   onDismiss,
   onStopSound,
@@ -28,9 +35,9 @@ export const NewOrderNotification = ({
   const [expanded, setExpanded] = useState(false);
 
   const getTypeLabel = () => {
-    if (orderType === 'local') return `🍽️ Mesa ${tableNumber || '?'}`;
-    if (deliveryType === 'pickup') return '📦 Retirada';
-    return '🚚 Delivery';
+    if (orderType === 'local') return `Mesa ${tableNumber || '?'}`;
+    if (deliveryType === 'pickup') return 'Retirada';
+    return 'Delivery';
   };
 
   const title = `${getTypeLabel()} — ${customerName}`;
@@ -40,10 +47,10 @@ export const NewOrderNotification = ({
     return (
       <div
         onClick={() => setExpanded(true)}
-        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-50 border border-orange-200 shadow-lg cursor-pointer hover:shadow-xl transition-all w-80 animate-in slide-in-from-right-5"
+        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-50 border border-orange-200 shadow-lg cursor-pointer hover:shadow-xl transition-all w-80"
       >
         <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
-          <span className="text-white text-sm">🔔</span>
+          <Bell className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-orange-900 truncate">{title}</p>
@@ -57,12 +64,12 @@ export const NewOrderNotification = ({
 
   // Expanded card
   return (
-    <div className="w-80 rounded-xl bg-orange-50 border border-orange-200 shadow-2xl animate-in slide-in-from-right-5">
+    <div className="w-80 rounded-xl bg-orange-50 border border-orange-200 shadow-2xl">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-orange-200">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-sm">🔔</span>
+            <Bell className="w-4 h-4 text-white" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-orange-900 truncate">{title}</p>
@@ -78,6 +85,20 @@ export const NewOrderNotification = ({
           </button>
         </div>
       </div>
+
+      {/* Items preview */}
+      {items && items.length > 0 && (
+        <div className="px-4 pt-2 space-y-1">
+          {items.slice(0, 3).map((item, i) => (
+            <div key={i} className="flex justify-between text-xs text-orange-800">
+              <span className="truncate mr-2">{item.quantity}x {item.name}</span>
+            </div>
+          ))}
+          {items.length > 3 && (
+            <p className="text-xs text-orange-500">+{items.length - 3} itens</p>
+          )}
+        </div>
+      )}
 
       {/* Body */}
       <div className="px-4 py-3 space-y-3">
