@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DD_API_BASE = "https://api.deliverydireto.com.br";
+const DD_API_BASE = "https://deliverydireto.com.br/admin-api/v1";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {

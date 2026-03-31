@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       
       try {
         for (const event of ["ORDER_PLACED", "ORDER_STATUS_CHANGED"]) {
-          const whRes = await fetch(`${DD_API_BASE}/webhooks`, {
+          const whRes = await fetch(`${DD_API_BASE}/v1/webhooks`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

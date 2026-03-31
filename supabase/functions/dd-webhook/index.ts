@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
 
       // Fetch order details from DD API
       console.log(`[dd-webhook] Fetching order details from DD API...`);
-      const orderRes = await fetch(`https://api.deliverydireto.com.br/orders/${orderId}`, {
+      const orderRes = await fetch(`https://deliverydireto.com.br/admin-api/v1/orders/${orderId}`, {
         headers: {
           "Authorization": `Bearer ${accessToken}`,
           "X-DeliveryDireto-Client-Id": DD_CLIENT_ID,
