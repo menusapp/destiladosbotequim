@@ -275,9 +275,11 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
         <CardContent className="p-3 space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="font-bold text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
-            <Badge className={`text-[10px] px-1.5 py-0 ${getElapsedColor(elapsed)}`}>
-              {elapsed}min
-            </Badge>
+            {showPrepTimer && (
+              <Badge className={`text-[10px] px-1.5 py-0 ${getElapsedColor(elapsed)}`}>
+                {elapsed}min
+              </Badge>
+            )}
           </div>
            <div className="flex items-center gap-1.5">
              {getOrderTypeIcon(order)}
