@@ -870,7 +870,7 @@ const Comanda = () => {
                 <Receipt className="h-5 w-5" style={{ color: restaurantColor }} />
                 <div className="text-center">
                   <p className="text-lg font-semibold" style={{ color: restaurantColor }}>
-                    🧾 A conta está a caminho!
+                    A conta está a caminho!
                   </p>
                   <p className="text-sm text-muted-foreground">
                     O garçom chegará em breve com sua conta
