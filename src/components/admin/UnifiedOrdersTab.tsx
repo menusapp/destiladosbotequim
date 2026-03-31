@@ -54,6 +54,8 @@ interface Order {
   loyalty_points_used?: number;
   ifood_source?: boolean;
   ifood_order_id?: string;
+  dd_source?: boolean;
+  dd_order_id?: string;
 }
 
 interface UnifiedOrdersTabProps {
