@@ -268,7 +268,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div>
-                <DialogTitle className="text-2xl">Pedido #{order.id.slice(0, 8)}</DialogTitle>
+                <DialogTitle className="text-2xl">Pedido #{order.id.slice(0, 8)} — {order.order_type === "local" || (!order.order_type && order.table_id) ? "Mesa" : "Online"}</DialogTitle>
                 <p className="text-sm text-muted-foreground mt-1">{format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}</p>
               </div>
               <div className="flex items-center gap-2">

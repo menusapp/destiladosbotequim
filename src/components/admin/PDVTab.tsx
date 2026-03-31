@@ -1020,7 +1020,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, prepTimeMinut
             </div>
           </ScrollArea>
 
-          {/* Footer */}
+          {/* Footer (in-panel) */}
           <div className="border-t pt-3 mt-2 flex items-center justify-between">
             <div className="text-xs">
               <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
@@ -1028,11 +1028,28 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, prepTimeMinut
             </div>
             <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-              Criar Pedido
+              {orderType === "mesa" ? "Enviar Pedido Mesa" : "Criar Pedido"}
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Fixed floating submit button */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 bg-background border rounded-xl shadow-2xl p-3 flex items-center gap-3">
+          <div className="text-xs">
+            <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
+            {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartSubtotal.toFixed(2)}</span>
+          </div>
+          <Button onClick={handleSubmit} disabled={submitting || cart.length === 0} className="gap-1.5">
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {orderType === "mesa" ? "Enviar Pedido Mesa" : "Criar Pedido"}
+          </Button>
+        </div>
+      )}
+
+      {/* Order Drawers (Mesa + Online) */}
+      <PDVOrderDrawers restaurantId={restaurantId} prepTimeMinutes={prepTimeMinutes} />
 
       {/* Product Drawer */}
       <PDVProductDrawer

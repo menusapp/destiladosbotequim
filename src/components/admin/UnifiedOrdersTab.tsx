@@ -274,7 +274,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
       >
         <CardContent className="p-3 space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="font-bold text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
+            <span className="font-bold text-xs text-muted-foreground">#{order.id.slice(0, 8)} — {order.order_type === "local" ? "Mesa" : "Online"}</span>
             <Badge className={`text-[10px] px-1.5 py-0 ${getElapsedColor(elapsed)}`}>
               {elapsed}min
             </Badge>
