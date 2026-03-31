@@ -951,9 +951,6 @@ const RestaurantAdmin = () => {
             )}
           </div>
         )}
-            )}
-          </div>
-        )}
         
         {/* Global Bill Notification */}
         {billNotification && (
