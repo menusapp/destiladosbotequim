@@ -60,6 +60,7 @@ interface UnifiedOrdersTabProps {
   restaurantId: string;
   pendingOrderToOpen: string | null;
   onOrderOpened: () => void;
+  showPrepTimer?: boolean;
 }
 
 const PAYMENT_LABELS: Record<string, { icon: React.ReactNode; label: string }> = {
@@ -75,7 +76,7 @@ const PAYMENT_LABELS: Record<string, { icon: React.ReactNode; label: string }> =
   "Pago pelo iFood": { icon: <Smartphone className="w-3 h-3" />, label: "Pago pelo iFood" },
 };
 
-const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: UnifiedOrdersTabProps) => {
+const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, showPrepTimer = true }: UnifiedOrdersTabProps) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -275,9 +276,11 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened }: U
         <CardContent className="p-3 space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="font-bold text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
-            <Badge className={`text-[10px] px-1.5 py-0 ${getElapsedColor(elapsed)}`}>
-              {elapsed}min
-            </Badge>
+            {showPrepTimer && (
+              <Badge className={`text-[10px] px-1.5 py-0 ${getElapsedColor(elapsed)}`}>
+                {elapsed}min
+              </Badge>
+            )}
           </div>
            <div className="flex items-center gap-1.5">
              {getOrderTypeIcon(order)}

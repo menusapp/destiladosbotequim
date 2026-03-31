@@ -1,0 +1,1 @@
+ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS show_prep_timer boolean DEFAULT true;

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +55,7 @@ interface Restaurant {
   pickup_time_minutes: number;
   auto_open_close?: boolean;
   primary_color?: string;
+  show_prep_timer?: boolean;
 }
 
 const RestaurantAdmin = () => {
@@ -101,6 +102,67 @@ const RestaurantAdmin = () => {
   const reservationNotificationRef = useRef<typeof reservationNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
   const [pendingTableToOpen, setPendingTableToOpen] = useState<string | null>(null);
+
+  // Global sound control (Ajuste 6)
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [soundMuted, setSoundMuted] = useState(false);
+
+  const startGlobalSound = useCallback(() => {
+    if (audioIntervalRef.current !== null) return; // Already playing
+    try {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playBeep = () => {
+        if (!audioContextRef.current) return;
+        const osc = audioContextRef.current.createOscillator();
+        const gain = audioContextRef.current.createGain();
+        osc.connect(gain);
+        gain.connect(audioContextRef.current.destination);
+        osc.frequency.value = 1000;
+        osc.type = 'square';
+        gain.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.2);
+        osc.start(audioContextRef.current.currentTime);
+        osc.stop(audioContextRef.current.currentTime + 0.2);
+      };
+      playBeep();
+      audioIntervalRef.current = setInterval(playBeep, 400);
+    } catch (e) {
+      console.error("Erro ao iniciar som:", e);
+    }
+  }, []);
+
+  const stopGlobalSound = useCallback(() => {
+    if (audioIntervalRef.current) {
+      clearInterval(audioIntervalRef.current);
+      audioIntervalRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+  }, []);
+
+  // Auto-start/stop sound based on notification queue
+  useEffect(() => {
+    if (notificationQueue.length > 0 && !soundMuted) {
+      startGlobalSound();
+    } else {
+      stopGlobalSound();
+    }
+  }, [notificationQueue.length, soundMuted, startGlobalSound, stopGlobalSound]);
+
+  // Reset mute when all notifications cleared
+  useEffect(() => {
+    if (notificationQueue.length === 0) {
+      setSoundMuted(false);
+    }
+  }, [notificationQueue.length]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => stopGlobalSound();
+  }, [stopGlobalSound]);
   
   // Sync refs with state to avoid stale closure in realtime callback
   useEffect(() => {
@@ -454,7 +516,7 @@ const RestaurantAdmin = () => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("id, name, slug, is_open, prep_time_minutes, pickup_time_minutes, auto_open_close, primary_color")
+        .select("id, name, slug, is_open, prep_time_minutes, pickup_time_minutes, auto_open_close, primary_color, show_prep_timer")
         .eq("id", restaurantId)
         .single();
 
@@ -668,9 +730,9 @@ const RestaurantAdmin = () => {
       case "visao-geral":
         return <OverviewTab restaurantId={restaurant.id} />;
       case "pedidos":
-        return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} />;
+        return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} showPrepTimer={restaurant.show_prep_timer !== false} />;
       case "pdv":
-        return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} />;
+        return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} showPrepTimer={restaurant.show_prep_timer !== false} />;
       case "mesas-reservas":
         return <TablesTab restaurantId={restaurant.id} />;
       case "cardapio":
@@ -769,23 +831,51 @@ const RestaurantAdmin = () => {
           </main>
         </SidebarInset>
 
-        {/* Global Order Notifications - stacked queue */}
-        {notificationQueue.map((notification, index) => (
-          <div key={notification.orderId} style={{ top: `${16 + index * 220}px`, position: 'fixed', right: '16px', zIndex: 100 - index }}>
-            <NewOrderNotification
-              orderId={notification.orderId}
-              customerName={notification.customerName}
-              total={notification.total}
-              orderType={notification.orderType}
-              tableNumber={notification.tableNumber}
-              deliveryType={notification.deliveryType}
-              onView={index === 0 ? handleViewOrder : () => {
-                setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId));
-              }}
-              onDismiss={() => setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId))}
-            />
+        {/* Global Order Notifications - iPhone-style cascade */}
+        {notificationQueue.length > 0 && (
+          <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-h-[70vh] overflow-y-auto">
+            {notificationQueue.slice(0, 3).map((notification, index) => (
+              <div key={notification.orderId} style={{ zIndex: 100 - index }}>
+                <NewOrderNotification
+                  orderId={notification.orderId}
+                  customerName={notification.customerName}
+                  total={notification.total}
+                  orderType={notification.orderType}
+                  tableNumber={notification.tableNumber}
+                  deliveryType={notification.deliveryType}
+                  onView={() => {
+                    // Accept: navigate to the order
+                    const current = notification;
+                    (async () => {
+                      if (current.orderType === 'local') {
+                        const { data: orderData } = await supabase
+                          .from("orders")
+                          .select("table_id")
+                          .eq("id", current.orderId)
+                          .single();
+                        setActiveSection('pdv');
+                        if (orderData?.table_id) setPendingTableToOpen(orderData.table_id);
+                      } else {
+                        setActiveSection('pedidos');
+                        setPendingOrderToOpen(current.orderId);
+                      }
+                    })();
+                    setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId));
+                  }}
+                  onDismiss={() => setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId))}
+                  onStopSound={() => setSoundMuted(true)}
+                />
+              </div>
+            ))}
+            {notificationQueue.length > 3 && (
+              <div className="text-center">
+                <span className="inline-block px-3 py-1 rounded-full bg-orange-500 text-white text-xs font-bold shadow">
+                  +{notificationQueue.length - 3} pedidos
+                </span>
+              </div>
+            )}
           </div>
-        ))}
+        )}
         
         {/* Global Bill Notification */}
         {billNotification && (

@@ -37,7 +37,7 @@ export const ComandaBottomBar = ({
   const leftText = hasSubmittedOrders ? "Enviar Pedido" : "Enviar Pedido";
   return (
     <div 
-      className={`fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
+      className={`fixed bottom-0 left-0 right-0 z-[60] bg-white border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
         isVisible ? 'translate-y-0' : 'translate-y-full'
       }`}
     >

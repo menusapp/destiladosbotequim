@@ -3383,6 +3383,7 @@ export type Database = {
           secondary_color: string | null
           service_fee_enabled: boolean | null
           service_fee_percentage: number | null
+          show_prep_timer: boolean | null
           slug: string
           target_cmv_percentage: number | null
           uf: string | null
@@ -3420,6 +3421,7 @@ export type Database = {
           secondary_color?: string | null
           service_fee_enabled?: boolean | null
           service_fee_percentage?: number | null
+          show_prep_timer?: boolean | null
           slug: string
           target_cmv_percentage?: number | null
           uf?: string | null
@@ -3457,6 +3459,7 @@ export type Database = {
           secondary_color?: string | null
           service_fee_enabled?: boolean | null
           service_fee_percentage?: number | null
+          show_prep_timer?: boolean | null
           slug?: string
           target_cmv_percentage?: number | null
           uf?: string | null

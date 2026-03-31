@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText } from "lucide-react";
+import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText, Timer, RotateCcw } from "lucide-react";
 
 interface Settings {
   logo_url: string | null;
@@ -19,6 +19,7 @@ interface Settings {
   login_require_name: boolean;
   login_require_phone: boolean;
   bill_request_enabled: boolean;
+  show_prep_timer: boolean;
 }
 
 const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
@@ -32,6 +33,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     login_require_name: true,
     login_require_phone: false,
     bill_request_enabled: true,
+    show_prep_timer: true,
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -45,7 +47,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, bill_request_enabled")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, bill_request_enabled, show_prep_timer")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -62,7 +64,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           login_require_name: data.login_require_name ?? true,
           login_require_phone: data.login_require_phone ?? false,
           bill_request_enabled: data.bill_request_enabled ?? true,
-          
+          show_prep_timer: data.show_prep_timer ?? true,
         });
       }
     } catch (error) {
@@ -127,7 +129,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           login_require_name: settings.login_require_name,
           login_require_phone: settings.login_require_phone,
           bill_request_enabled: settings.bill_request_enabled,
-          
+          show_prep_timer: settings.show_prep_timer,
         })
         .eq('id', restaurantId);
       if (error) throw error;
@@ -328,6 +330,47 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                   />
                   <p className="text-xs text-muted-foreground">Tempo médio exibido na confirmação do pedido</p>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Timer de preparo visível */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Timer className="h-5 w-5" />
+                  Contador de Tempo nos Pedidos
+                </CardTitle>
+                <CardDescription>Controle a visibilidade do timer de preparo nos cards de pedido e mesas</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <Label htmlFor="show-prep-timer" className="font-medium cursor-pointer">Mostrar tempo de preparo</Label>
+                  <Switch
+                    id="show-prep-timer"
+                    checked={settings.show_prep_timer}
+                    onCheckedChange={(checked) => setSettings({ ...settings, show_prep_timer: checked })}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  className="gap-2 w-full"
+                  onClick={async () => {
+                    try {
+                      const { error } = await supabase
+                        .from('tables')
+                        .update({ occupied_at: new Date().toISOString() })
+                        .eq('restaurant_id', restaurantId)
+                        .eq('is_occupied', true);
+                      if (error) throw error;
+                      toast.success("Tempo de todas as mesas zerado!");
+                    } catch {
+                      toast.error("Erro ao zerar tempo");
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Zerar tempo de todas as mesas
+                </Button>
               </CardContent>
             </Card>
           </div>

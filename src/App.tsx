@@ -21,7 +21,7 @@ import StaffLogin from "./pages/StaffLogin";
 import { TableDetailView } from "./components/admin/TableDetailView";
 import MercadoPagoCallback from "./pages/MercadoPagoCallback";
 import RestaurantRegistration from "./pages/RestaurantRegistration";
-import { InstallPWA } from "./components/InstallPWA";
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,7 +40,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <InstallPWA />
+          
           <Routes>
             {/* Landing page comercial */}
             <Route path="/" element={<LandingPage />} />

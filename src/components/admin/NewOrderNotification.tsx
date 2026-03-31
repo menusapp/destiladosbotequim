@@ -1,7 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Bell, X } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { ChevronDown, ChevronUp, X } from "lucide-react";
 
 interface NewOrderNotificationProps {
   orderId: string;
@@ -12,6 +11,7 @@ interface NewOrderNotificationProps {
   deliveryType?: 'delivery' | 'pickup';
   onView: () => void;
   onDismiss: () => void;
+  onStopSound?: () => void;
 }
 
 export const NewOrderNotification = ({
@@ -23,160 +23,89 @@ export const NewOrderNotification = ({
   deliveryType,
   onView,
   onDismiss,
+  onStopSound,
 }: NewOrderNotificationProps) => {
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const oscillatorRef = useRef<OscillatorNode | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
-    playBeepSound();
-
-    return () => {
-      stopSound();
-    };
-  }, []);
-
-  const playBeepSound = () => {
-    try {
-      // Create audio context
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      const playBeep = () => {
-        if (!audioContextRef.current) return;
-
-        const oscillator = audioContextRef.current.createOscillator();
-        const gainNode = audioContextRef.current.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContextRef.current.destination);
-        
-        // Apito agudo - 1000Hz com onda quadrada
-        oscillator.frequency.value = 1000;
-        oscillator.type = 'square';
-        
-        // Volume moderado
-        gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.2);
-        
-        // Bip curto de 200ms
-        oscillator.start(audioContextRef.current.currentTime);
-        oscillator.stop(audioContextRef.current.currentTime + 0.2);
-      };
-
-      // Toca o primeiro bip imediatamente
-      playBeep();
-
-      // Loop: bip-bip-bip (200ms on, 200ms off)
-      intervalRef.current = setInterval(() => {
-        playBeep();
-      }, 400); // 200ms som + 200ms pausa
-    } catch (error) {
-      console.error("Erro ao reproduzir som:", error);
-    }
+  const getTypeLabel = () => {
+    if (orderType === 'local') return `🍽️ Mesa ${tableNumber || '?'}`;
+    if (deliveryType === 'pickup') return '📦 Retirada';
+    return '🚚 Delivery';
   };
 
-  const stopSound = () => {
-    // Para o intervalo
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+  const title = `${getTypeLabel()} — ${customerName}`;
 
-    // Para o oscillator se existir
-    if (oscillatorRef.current) {
-      try {
-        oscillatorRef.current.stop();
-      } catch (e) {
-        // Oscillator já foi parado
-      }
-      oscillatorRef.current = null;
-    }
+  // Compact pill (collapsed)
+  if (!expanded) {
+    return (
+      <div
+        onClick={() => setExpanded(true)}
+        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-50 border border-orange-200 shadow-lg cursor-pointer hover:shadow-xl transition-all w-80 animate-in slide-in-from-right-5"
+      >
+        <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
+          <span className="text-white text-sm">🔔</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-orange-900 truncate">{title}</p>
+          <p className="text-xs text-orange-600">#{orderId.slice(0, 8)}</p>
+        </div>
+        <span className="text-sm font-bold text-orange-900 flex-shrink-0">R$ {total.toFixed(2)}</span>
+        <ChevronDown className="w-4 h-4 text-orange-400 flex-shrink-0" />
+      </div>
+    );
+  }
 
-    // Fecha o AudioContext
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-
-    // Para o gain node
-    if (gainNodeRef.current) {
-      gainNodeRef.current = null;
-    }
-  };
-
-  const handleStopSound = () => {
-    stopSound();
-  };
-
-  const handleView = () => {
-    stopSound();
-    onView();
-  };
-
-  const handleClose = () => {
-    stopSound();
-    onDismiss();
-  };
-
+  // Expanded card
   return (
-    <div className="w-96 animate-in slide-in-from-top-5">
-      <Card className="bg-orange-50 border-orange-200 shadow-2xl">
-        <div className="p-6 space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center animate-bounce">
-                <Bell className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-orange-900">Novo Pedido!</h3>
-                <p className="text-sm text-orange-700">
-                  {orderType === 'local' 
-                    ? `🍽️ Pedido local - Mesa ${tableNumber || '?'}` 
-                    : deliveryType === 'pickup' 
-                      ? '📦 Pedido online - Retirada'
-                      : '🚚 Pedido online - Entrega'
-                  }
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="h-8 w-8 text-orange-700 hover:text-orange-900 hover:bg-orange-100"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+    <div className="w-80 rounded-xl bg-orange-50 border border-orange-200 shadow-2xl animate-in slide-in-from-right-5">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-orange-200">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-sm">🔔</span>
           </div>
-          
-          <div className="space-y-1">
-            <p className="text-lg font-semibold text-orange-800">
-              Pedido #{orderId.slice(0, 8)}
-            </p>
-            <p className="text-orange-700">{customerName}</p>
-            <p className="text-2xl font-bold text-orange-900">
-              R$ {total.toFixed(2)}
-            </p>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-orange-900 truncate">{title}</p>
+            <p className="text-xs text-orange-600">#{orderId.slice(0, 8)}</p>
           </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setExpanded(false)} className="p-1 rounded hover:bg-orange-100">
+            <ChevronUp className="w-4 h-4 text-orange-500" />
+          </button>
+          <button onClick={onDismiss} className="p-1 rounded hover:bg-orange-100">
+            <X className="w-4 h-4 text-orange-500" />
+          </button>
+        </div>
+      </div>
 
-          <div className="flex gap-2">
+      {/* Body */}
+      <div className="px-4 py-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-orange-700">Total</span>
+          <span className="text-xl font-bold text-orange-900">R$ {total.toFixed(2)}</span>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            onClick={onView}
+            size="sm"
+            className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+          >
+            Aceitar
+          </Button>
+          {onStopSound && (
             <Button
-              onClick={handleView}
-              className="flex-1 bg-orange-600 hover:bg-orange-700"
-            >
-              VER PEDIDO
-            </Button>
-            <Button
-              onClick={handleStopSound}
+              onClick={onStopSound}
+              size="sm"
               variant="outline"
               className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-100"
             >
               Parar Som
             </Button>
-          </div>
+          )}
         </div>
-      </Card>
+      </div>
     </div>
   );
 };
