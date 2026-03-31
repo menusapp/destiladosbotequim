@@ -1,114 +1,58 @@
 
 
-# Plano — 6 Ajustes de Notificações e Interface
+# Plano — 3 Ajustes Rápidos
 
-## Análise de Risco
+## 1. Remover emojis das notificações
 
-Nenhuma funcionalidade existente será quebrada. Todos os ajustes são na camada de UI/notificação ou em preferências aditivas. Fluxos de pedidos, fiscal, iFood, pagamentos permanecem intactos.
+**`NewOrderNotification.tsx`:**
+- Trocar `🍽️ Mesa X` → `Mesa X`, `📦 Retirada` → `Retirada`, `🚚 Delivery` → `Delivery`
+- Trocar o `🔔` do ícone circular por um ícone Lucide `Bell`
 
-## Ajuste 1 — Remover UI de instalação PWA
+**Risco:** Zero.
 
-**Alterações:**
-- Remover `<InstallPWA />` do `App.tsx` (linha ~47) e o import correspondente
-- Deletar `src/components/InstallPWA.tsx`
-- O `manifest.json` e meta tags permanecem (o app continua instalável pelo menu do navegador)
+## 2. Cascata real estilo iPhone (empilhamento visual)
 
-**Risco:** Zero. Apenas remove um banner visual.
+Atualmente as notificações ficam em `flex-col gap-2` (uma embaixo da outra). O comportamento desejado tem **2 estados**:
 
----
+**Estado colapsado (padrão):** pílulas empilhadas visualmente "atrás" da mais recente, com offset de ~8px cada, mostrando só a bordinha. A mais recente (índice 0) fica na frente. Máximo 3 visíveis + badge "+N".
 
-## Ajuste 2 — Toggle de timer de preparo para mesas
+**Estado expandido (ao clicar na pilha):** todas as notificações aparecem em lista vertical com scroll, cada uma como pílula fechada. Aí o operador pode abrir cada uma individualmente para ver detalhes e aceitar.
 
-O timer atual é o badge `{elapsed}min` nos cards de pedido no `UnifiedOrdersTab.tsx` (linha 278) e no PDV o `Desde {occupiedSince}` (linha 782).
+**Alterações em `RestaurantAdmin.tsx` (linhas 834-877):**
+- Adicionar estado `cascadeExpanded` (boolean) para controlar pilha colapsada vs lista expandida
+- Quando colapsado: renderizar com `position: absolute`, offset `top: index * 8px`, escala levemente menor nas de trás
+- Quando expandido: renderizar como lista vertical com scroll (`max-h-[70vh] overflow-y-auto`)
+- Clicar na pilha colapsada → expande. Botão "fechar" na lista → colapsa
 
-**Alterações:**
-- Migração: adicionar coluna `show_prep_timer boolean DEFAULT true` na tabela `restaurants`
-- `UnifiedOrdersTab.tsx`: receber prop `showPrepTimer`, ocultar badge de elapsed quando `false`
-- `PDVTab.tsx`: ocultar "Desde HH:mm" quando `showPrepTimer` é `false`
-- `RestaurantAdmin.tsx`: buscar `show_prep_timer` do restaurante e passar como prop
-- `CompanyDataSettings.tsx`: adicionar toggle "Mostrar tempo de preparo" e botão "Zerar tempo" (que reseta `occupied_at` de todas as mesas para `now()`)
-- Salvar preferência no banco via update na tabela `restaurants`
+**Alterações em `NewOrderNotification.tsx`:**
+- Quando expandido individualmente, mostrar primeiros 3 itens do pedido (precisará receber `items` como prop opcional)
+- Adicionar prop `items?: Array<{name: string; quantity: number}>` 
 
-**Risco:** Baixo. Adição de coluna com default, sem alterar fluxos existentes.
+**Alterações em `RestaurantAdmin.tsx` (notificação queue):**
+- Ao criar notificação, buscar os itens do pedido e incluir na fila
 
----
+**Risco:** Baixo. Apenas visual, lógica de fila/aceitar/som intacta.
 
-## Ajuste 3 — Botão fixo na comanda (Menu.tsx)
+## 3. Sugestões "Que tal adicionar?" menores na sacola
 
-O `ComandaBottomBar` já é `fixed bottom-0` com `z-50` e `Menu.tsx` já tem `pb-32`. O componente já funciona corretamente como especificado. Vou verificar se o conteúdo não é sobreposto e garantir o z-index adequado.
+**`ProductSuggestions.tsx`:**
+- Reduzir de 6 para 3 produtos sugeridos
+- Trocar grid `grid-cols-3` para layout horizontal scrollável em linha única
+- Reduzir tamanho dos cards: imagem menor (48x48 em vez de aspect-square), texto compacto
+- Remover o emoji `🍽️` do placeholder de imagem
 
-**Alterações:**
-- Garantir que `ComandaBottomBar` tenha `z-[60]` (acima de outros elementos fixos)
-- Confirmar `pb-32` no container principal (já existe na linha 983)
-- Nenhuma mudança de comportamento
+**`CartStep.tsx` (checkout):**
+- O componente já está inline no scroll, não precisa de mudança estrutural. A redução do `ProductSuggestions` já resolverá o problema de ter que rolar para ver o subtotal e botão Continuar.
 
-**Risco:** Zero. Apenas ajuste de z-index se necessário.
+**Risco:** Zero. Apenas visual.
 
----
+## Arquivos
 
-## Ajuste 4 — Notificações estilo iPhone (cascata compacta + expansão)
+| Arquivo | Alteração |
+|---------|-----------|
+| `NewOrderNotification.tsx` | Remover emojis, usar ícone Lucide, prop items, mostrar itens ao expandir |
+| `RestaurantAdmin.tsx` (linhas 834-877) | Cascata colapsada/expandida, buscar items na notificação |
+| `ProductSuggestions.tsx` | Cards menores, scroll horizontal, max 3 |
 
-Substituir o sistema atual de popups empilhados em `RestaurantAdmin.tsx` (linhas 772-788) + `NewOrderNotification.tsx`.
-
-**Alterações em `NewOrderNotification.tsx`** — reescrever completamente:
-- **Estado fechado (pílula):** card compacto ~60px de altura: ícone tipo + "Mesa 5 — João" ou "🚚 Delivery — Maria" + valor. Clicável para expandir.
-- **Estado aberto:** expande com itens, cliente, pagamento, botões "Aceitar" e "Parar Som"
-- Cada notificação controla seu estado aberto/fechado individualmente
-- Aceitar = chama `onView` (navega para o pedido) e remove da fila
-
-**Alterações em `RestaurantAdmin.tsx`** (linhas 772-788):
-- Renderizar máximo 3 pílulas empilhadas com deslocamento vertical (top: 16px, 26px, 36px em cascata)
-- Se houver mais de 3, mostrar badge "+N" na última pílula visível
-- Container: `fixed top-4 right-4 z-[100]` com `max-h-[70vh] overflow-y-auto` quando expandido
-- Remover o padrão atual de empilhamento com `index * 220px`
-
-**Risco:** Baixo. Apenas camada visual. A lógica de `notificationQueue`, `setNotificationQueue`, `handleViewOrder` e `handleDismiss` permanece idêntica.
-
----
-
-## Ajuste 5 — Identificação clara do tipo de pedido
-
-Já parcialmente implementado no `UnifiedOrdersTab.tsx` (linhas 232-244) e `NewOrderNotification.tsx` (linhas 133-139).
-
-**Alterações:**
-- `NewOrderNotification.tsx`: no título da pílula compacta, usar formato "🍽️ Mesa 5 — João" ou "🚚 Delivery — Maria" ou "📦 Retirada — Maria"
-- `UnifiedOrdersTab.tsx`: prefixar o nome do cliente com o tipo — "🍽️ Mesa X — Nome" para locais, "🚚 Delivery — Nome" ou "📦 Retirada — Nome" para online
-- `OrderDetailModal.tsx`: verificar e garantir que o cabeçalho mostra o tipo de pedido
-
-**Risco:** Zero. Apenas mudanças de texto/label.
-
----
-
-## Ajuste 6 — Som de notificação único e global
-
-Atualmente cada `NewOrderNotification` cria seu próprio `AudioContext` e `setInterval`, causando duplicação de som.
-
-**Alterações em `RestaurantAdmin.tsx`:**
-- Criar um `audioContextRef` e `audioIntervalRef` globais no componente
-- Função `startGlobalSound()`: se já tocando (`audioIntervalRef.current !== null`), retorna sem fazer nada. Caso contrário, cria AudioContext + setInterval com beep
-- Função `stopGlobalSound()`: limpa interval, fecha AudioContext
-- Quando `notificationQueue.length > 0` e som não está tocando → `startGlobalSound()`
-- Quando `notificationQueue.length === 0` → `stopGlobalSound()` automaticamente
-- Botão "Parar Som" chama `stopGlobalSound()` sem remover notificações
-- Remover toda lógica de som do `NewOrderNotification.tsx` (será apenas visual)
-
-**Risco:** Baixo. Centraliza controle de áudio sem alterar fluxo de pedidos.
-
----
-
-## Arquivos Afetados
-
-| Arquivo | Ação |
-|---------|------|
-| `src/components/InstallPWA.tsx` | Deletar |
-| `src/App.tsx` | Remover import + uso de InstallPWA |
-| `src/components/admin/NewOrderNotification.tsx` | Reescrever (pílula + expansão, sem som) |
-| `src/pages/RestaurantAdmin.tsx` | Som global, cascata iPhone, prop showPrepTimer |
-| `src/components/admin/UnifiedOrdersTab.tsx` | Prop showPrepTimer, labels de tipo |
-| `src/components/admin/PDVTab.tsx` | Prop showPrepTimer |
-| `src/components/admin/settings/CompanyDataSettings.tsx` | Toggle + botão zerar timer |
-| `src/components/menu/ComandaBottomBar.tsx` | z-index ajuste |
-| Migração SQL | Adicionar `show_prep_timer` na tabela `restaurants` |
-
-Nenhum fluxo de aceitação, processamento ou status de pedidos será alterado.
+Nenhuma funcionalidade alterada. Apenas camada visual.
 
