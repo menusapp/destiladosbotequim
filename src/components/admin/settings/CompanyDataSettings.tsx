@@ -312,45 +312,23 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Tempo de Preparo
-                </CardTitle>
-                <CardDescription>Tempo estimado exibido ao cliente após o pedido</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="prep-time">Minutos estimados</Label>
-                  <Input
-                    id="prep-time"
-                    type="number"
-                    min="1"
-                    max="180"
-                    value={settings.prep_time_minutes}
-                    onChange={(e) => setSettings({ ...settings, prep_time_minutes: parseInt(e.target.value) || 30 })}
-                  />
-                  <p className="text-xs text-muted-foreground">Tempo médio exibido na confirmação do pedido</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Timer de preparo visível */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
                   <Timer className="h-5 w-5" />
-                  Contador de Tempo nos Pedidos
+                  Tempo de Preparo nos Pedidos
                 </CardTitle>
-                <CardDescription>Controle a visibilidade do timer de preparo nos cards de pedido e mesas</CardDescription>
+                <CardDescription>Exibe o tempo de preparo individual de cada produto nos pedidos de mesa</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <Label htmlFor="show-prep-timer" className="font-medium cursor-pointer">Mostrar tempo de preparo</Label>
+                  <Label htmlFor="show-prep-timer" className="font-medium cursor-pointer">Ativar tempo de preparo</Label>
                   <Switch
                     id="show-prep-timer"
                     checked={settings.show_prep_timer}
                     onCheckedChange={(checked) => setSettings({ ...settings, show_prep_timer: checked })}
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Quando ativado, exibe uma contagem regressiva ao lado de cada item pedido na comanda, baseada no tempo de preparo cadastrado em cada produto.
+                </p>
                 <Button
                   variant="outline"
                   className="gap-2 w-full"

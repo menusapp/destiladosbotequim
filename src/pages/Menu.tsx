@@ -1018,7 +1018,7 @@ const Menu = () => {
           logoUrl={restaurant.logo_url}
           primaryColor={primaryColor}
           tableInfo={`Mesa ${tableNumber}`}
-          deliveryTime={`${restaurant.prep_time_minutes || 50}-${(restaurant.prep_time_minutes || 50) + 10} min`}
+          deliveryTime=""
           deliveryFee={0}
         />
       </div>
