@@ -374,22 +374,16 @@ const Comanda = () => {
     };
   }, [restaurantSlug, tableNumber]);
 
+  // Tick every second for per-item prep timers
   useEffect(() => {
-    // Cronômetro de preparo
-    if (prepTimerSeconds > 0) {
-      const interval = setInterval(() => {
-        setPrepTimerSeconds((prev) => Math.max(0, prev - 1));
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [prepTimerSeconds]);
-
-  // Iniciar timer quando houver pedido aceito
-  useEffect(() => {
-    if (hasAcceptedOrder && prepTimerSeconds === 0 && prepTimeMinutes > 0) {
-      setPrepTimerSeconds(prepTimeMinutes * 60);
-    }
-  }, [hasAcceptedOrder, prepTimeMinutes]);
+    if (!showPrepTimer) return;
+    const hasAccepted = orders.some(o => o.status === "accepted" || o.status === "preparing");
+    if (!hasAccepted) return;
+    const interval = setInterval(() => {
+      setCurrentTime(Math.floor(Date.now() / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showPrepTimer, orders]);
 
   const fetchData = useCallback(async () => {
     if (!restaurantSlug || !tableNumber) return;
