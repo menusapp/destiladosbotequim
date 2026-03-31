@@ -1,58 +1,71 @@
 
 
-# Plano — 3 Ajustes Rápidos
+# Plano — 2 Ajustes (Fidelidade + Tempo de Preparo)
 
-## 1. Remover emojis das notificações
+## Ajuste 1 — Fidelidade visível imediatamente ao abrir sacola
 
-**`NewOrderNotification.tsx`:**
-- Trocar `🍽️ Mesa X` → `Mesa X`, `📦 Retirada` → `Retirada`, `🚚 Delivery` → `Delivery`
-- Trocar o `🔔` do ícone circular por um ícone Lucide `Bell`
+**Problema:** O `LoyaltyRewardNotification` no `CartStep.tsx` faz queries assíncronas ao montar, causando delay visual. Ele fica após `ProductSuggestions` e `CouponInput`, que também fazem queries.
 
-**Risco:** Zero.
+**Solução:** Mover o bloco de `LoyaltyPointsDisplay` e `LoyaltyRewardNotification` para **antes** das sugestões de produtos no `CartStep.tsx`. Ordem nova:
+1. Itens adicionados
+2. Loyalty Points Display (se `loyalty_enabled`)
+3. Loyalty Reward Notification (se `customerCPF`)
+4. Active Reward Discount
+5. Product Suggestions
+6. Coupon Input
+7. Summary + Botão Continuar
 
-## 2. Cascata real estilo iPhone (empilhamento visual)
+**Arquivo:** `src/components/menu/checkout/CartStep.tsx` — reordenar JSX (linhas 253-321)
 
-Atualmente as notificações ficam em `flex-col gap-2` (uma embaixo da outra). O comportamento desejado tem **2 estados**:
+**Risco:** Zero. Apenas reordena componentes visuais.
 
-**Estado colapsado (padrão):** pílulas empilhadas visualmente "atrás" da mais recente, com offset de ~8px cada, mostrando só a bordinha. A mais recente (índice 0) fica na frente. Máximo 3 visíveis + badge "+N".
+---
 
-**Estado expandido (ao clicar na pilha):** todas as notificações aparecem em lista vertical com scroll, cada uma como pílula fechada. Aí o operador pode abrir cada uma individualmente para ver detalhes e aceitar.
+## Ajuste 2 — Tempo de preparo por produto (não geral)
 
-**Alterações em `RestaurantAdmin.tsx` (linhas 834-877):**
-- Adicionar estado `cascadeExpanded` (boolean) para controlar pilha colapsada vs lista expandida
-- Quando colapsado: renderizar com `position: absolute`, offset `top: index * 8px`, escala levemente menor nas de trás
-- Quando expandido: renderizar como lista vertical com scroll (`max-h-[70vh] overflow-y-auto`)
-- Clicar na pilha colapsada → expande. Botão "fechar" na lista → colapsa
+**Problema atual:** A Comanda usa `prep_time_minutes` geral do restaurante para mostrar um timer único. O usuário quer:
+- Remover o timer geral da Comanda e do RestaurantInfoCard (mesas)
+- Remover o campo "Minutos estimados" das configurações operacionais
+- Manter apenas o toggle ativar/desativar no card de "Tempo de Preparo" nas configurações
+- Se ativado, mostrar o `prep_time_minutes` de **cada produto** ao lado de cada item pedido na Comanda
+- Timer por item: conta regressiva desde o `created_at` do pedido, não reinicia ao navegar
 
-**Alterações em `NewOrderNotification.tsx`:**
-- Quando expandido individualmente, mostrar primeiros 3 itens do pedido (precisará receber `items` como prop opcional)
-- Adicionar prop `items?: Array<{name: string; quantity: number}>` 
+### Alterações:
 
-**Alterações em `RestaurantAdmin.tsx` (notificação queue):**
-- Ao criar notificação, buscar os itens do pedido e incluir na fila
+**`CompanyDataSettings.tsx`:**
+- Remover o card separado "Tempo de Preparo" com campo de minutos (linhas 311-334)
+- No card "Contador de Tempo nos Pedidos" (linhas 336-375), manter apenas o toggle e o botão zerar — agora será o único card de tempo
 
-**Risco:** Baixo. Apenas visual, lógica de fila/aceitar/som intacta.
+**`RestaurantInfoCard.tsx`:**
+- Quando `tableInfo` está presente, **não mostrar** a linha "Tempo estimado: X-Y min" (linhas 132-137)
 
-## 3. Sugestões "Que tal adicionar?" menores na sacola
+**`Menu.tsx`:**
+- Remover o cálculo de `deliveryTime` baseado em `prep_time_minutes` para mesas (linha 1021)
+- Não passar `deliveryTime` ao `RestaurantInfoCard` quando for mesa
 
-**`ProductSuggestions.tsx`:**
-- Reduzir de 6 para 3 produtos sugeridos
-- Trocar grid `grid-cols-3` para layout horizontal scrollável em linha única
-- Reduzir tamanho dos cards: imagem menor (48x48 em vez de aspect-square), texto compacto
-- Remover o emoji `🍽️` do placeholder de imagem
+**`Comanda.tsx`:**
+- Buscar `show_prep_timer` do restaurante
+- Buscar `prep_time_minutes` de cada produto nos `order_items` (join com `products`)
+- Remover o timer geral (o card grande com contagem regressiva geral, linhas 898-922)
+- Em cada item pedido, se `show_prep_timer === true`, mostrar um badge pequeno com contagem regressiva baseada em: `max(0, product.prep_time_minutes * 60 - elapsed_seconds_since_order_created_at)`
+- O `created_at` do pedido (order) é a referência — não resetar ao navegar
+- Quando o timer de um item chega a 0, mostrar "Pronto"
 
-**`CartStep.tsx` (checkout):**
-- O componente já está inline no scroll, não precisa de mudança estrutural. A redução do `ProductSuggestions` já resolverá o problema de ter que rolar para ver o subtotal e botão Continuar.
+**`Comanda.tsx` — tipo `OrderItem` e `Order`:**
+- Adicionar `prep_time_minutes` ao tipo `products` no OrderItem
+- Na query de orders, incluir `products(name, prep_time_minutes)` em vez de apenas `products(name)`
 
-**Risco:** Zero. Apenas visual.
+**Risco:** Baixo. Remove funcionalidade de timer geral e substitui por timer por produto. Nenhum fluxo de pedido/pagamento alterado.
+
+---
 
 ## Arquivos
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `NewOrderNotification.tsx` | Remover emojis, usar ícone Lucide, prop items, mostrar itens ao expandir |
-| `RestaurantAdmin.tsx` (linhas 834-877) | Cascata colapsada/expandida, buscar items na notificação |
-| `ProductSuggestions.tsx` | Cards menores, scroll horizontal, max 3 |
-
-Nenhuma funcionalidade alterada. Apenas camada visual.
+| `CartStep.tsx` | Reordenar: fidelidade antes das sugestões |
+| `CompanyDataSettings.tsx` | Unificar cards de tempo, remover campo minutos |
+| `RestaurantInfoCard.tsx` | Remover "Tempo estimado" para mesas |
+| `Menu.tsx` | Não passar deliveryTime para mesas |
+| `Comanda.tsx` | Timer por produto, buscar show_prep_timer, remover timer geral |
 
