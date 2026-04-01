@@ -154,8 +154,8 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
 
   // Sync status with Delivery Direto
-  const syncDDStatus = async (newStatus: string, reason?: string) => {
-    if (!order.dd_source || !order.dd_order_id) return;
+  const syncDDStatus = async (newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string }> => {
+    if (!order.dd_source || !order.dd_order_id) return { ok: true };
 
     const statusToAction: Record<string, string> = {
       accepted: "accept",
@@ -168,10 +168,10 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     };
 
     const ddAction = statusToAction[newStatus];
-    if (!ddAction) return;
+    if (!ddAction) return { ok: true };
 
     try {
-      const { error } = await supabase.functions.invoke("dd-order-action", {
+      const res = await supabase.functions.invoke("dd-order-action", {
         body: {
           restaurant_id: restaurantId,
           dd_order_id: order.dd_order_id,
@@ -179,12 +179,23 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
           reason: reason || undefined,
         },
       });
-      if (error) {
-        console.error("DD action error:", error);
-        toast.error("Erro ao sincronizar com Delivery Direto, mas o status local será atualizado");
+      
+      if (res.error) {
+        const errMsg = typeof res.error === 'object' ? (res.error as any)?.message || JSON.stringify(res.error) : String(res.error);
+        console.error("DD action error:", res.error);
+        return { ok: false, errorMsg: errMsg };
       }
+      
+      // Check response body for error
+      if (res.data?.error) {
+        console.error("DD action API error:", res.data.error);
+        return { ok: false, errorMsg: res.data.error };
+      }
+      
+      return { ok: true };
     } catch (e) {
       console.error("DD sync error:", e);
+      return { ok: false, errorMsg: (e as Error).message };
     }
   };
 
@@ -194,6 +205,10 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       setShowPaymentModal(true);
       return;
     }
+
+    // Optimistic UI: update local state immediately
+    const previousStatus = order.status;
+    setOrder(prev => ({ ...prev, status: newStatus, ...(newStatus === "cancelled" && reason ? { cancellation_reason: reason } : {}) }));
 
     try {
       // Sync with iFood
@@ -223,14 +238,12 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       }
 
       // Sync with Delivery Direto
-      await syncDDStatus(newStatus, reason);
-
-      // Update local status
-      const updateData: Record<string, any> = {};
-      if (newStatus === "cancelled" && reason) {
-        updateData.cancellation_reason = reason;
+      const ddResult = await syncDDStatus(newStatus, reason);
+      if (!ddResult.ok) {
+        toast.warning(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}. Status local será atualizado.`);
       }
 
+      // Update local status in DB
       const { error } = await supabase.rpc("admin_update_order_status", { p_order_id: order.id, p_new_status: newStatus, p_restaurant_id: restaurantId });
       if (error) throw error;
 
@@ -252,7 +265,12 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       toast.success("Status atualizado!");
       onStatusUpdate();
       onClose();
-    } catch (error) { console.error("Erro ao atualizar status:", error); toast.error("Erro ao atualizar status"); }
+    } catch (error) {
+      // Revert optimistic update
+      setOrder(prev => ({ ...prev, status: previousStatus }));
+      console.error("Erro ao atualizar status:", error);
+      toast.error("Erro ao atualizar status");
+    }
   };
 
   const handleCancelOrder = async () => {
