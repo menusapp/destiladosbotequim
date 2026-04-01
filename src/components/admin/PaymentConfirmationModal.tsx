@@ -177,12 +177,14 @@ export const PaymentConfirmationModal = ({
       toast.error("Digite um valor válido");
       return;
     }
-    if (amount > remaining + 0.01) {
+    // For cash, allow overpayment (change will be calculated)
+    if (methodType !== "cash" && amount > remaining + 0.01) {
       toast.error("Valor maior que o restante");
       return;
     }
-    const adjustedAmount = Math.min(amount, remaining);
-    setSelectedPayments([...selectedPayments, { method: methodName, methodType, amount: adjustedAmount, brandCode }]);
+    const adjustedAmount = methodType === "cash" ? Math.min(amount, remaining) : Math.min(amount, remaining);
+    const cashChange = methodType === "cash" && amount > remaining ? Math.round((amount - remaining) * 100) / 100 : 0;
+    setSelectedPayments([...selectedPayments, { method: methodName, methodType, amount: adjustedAmount, brandCode, cashChange }]);
     setCurrentAmount("");
   };
 
