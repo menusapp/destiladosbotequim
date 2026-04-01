@@ -295,6 +295,7 @@ export default function Kiosk() {
           customerName={customer?.name || ""}
           onCancel={resetSession}
           restaurant={restaurant}
+          featuredProducts={categories.flatMap(c => c.products).filter(p => p.is_featured)}
         />
       )}
 
