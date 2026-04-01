@@ -180,16 +180,20 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
         },
       });
       
-      if (res.error) {
-        const errMsg = typeof res.error === 'object' ? (res.error as any)?.message || JSON.stringify(res.error) : String(res.error);
-        console.error("DD action error:", res.error);
-        return { ok: false, errorMsg: errMsg };
+      // Function always returns 200, check response body for errors
+      if (res.data?.error) {
+        console.error("DD action error:", res.data.error);
+        return { 
+          ok: res.data?.local_updated === true, 
+          errorMsg: res.data.error,
+          localUpdated: res.data?.local_updated === true,
+        };
       }
       
-      // Check response body for error
-      if (res.data?.error) {
-        console.error("DD action API error:", res.data.error);
-        return { ok: false, errorMsg: res.data.error };
+      if (res.error) {
+        const errMsg = typeof res.error === 'object' ? (res.error as any)?.message || JSON.stringify(res.error) : String(res.error);
+        console.error("DD invoke error:", res.error);
+        return { ok: false, errorMsg: errMsg };
       }
       
       return { ok: true };
