@@ -41,27 +41,39 @@ export function KioskIdentification({ restaurant, onIdentified, onBack }: Props)
   // Auto-check CPF
   useEffect(() => {
     const raw = cpf.replace(/\D/g, "");
-    if (raw.length !== 11 || !validateCPF(raw)) {
+    if (raw.length !== 11 || !validateCPF(raw) || !restaurant?.id) {
       setExisting(null);
       setShowForm(false);
+      setChecking(false);
       return;
     }
     setChecking(true);
     const t = setTimeout(async () => {
-      const { data } = await supabase
-        .from("customers")
-        .select("name, phone")
-        .eq("restaurant_id", restaurant.id)
-        .eq("cpf", raw)
-        .maybeSingle();
-      if (data) {
-        setExisting(data);
-        setShowForm(false);
-      } else {
+      try {
+        const { data, error } = await supabase
+          .from("customers")
+          .select("name, phone")
+          .eq("restaurant_id", restaurant.id)
+          .eq("cpf", raw)
+          .maybeSingle();
+        if (error) {
+          console.error("[Kiosk CPF] Erro na busca:", error);
+          setExisting(null);
+          setShowForm(true);
+        } else if (data) {
+          setExisting(data);
+          setShowForm(false);
+        } else {
+          setExisting(null);
+          setShowForm(true);
+        }
+      } catch (err) {
+        console.error("[Kiosk CPF] Exceção:", err);
         setExisting(null);
         setShowForm(true);
+      } finally {
+        setChecking(false);
       }
-      setChecking(false);
     }, 300);
     return () => clearTimeout(t);
   }, [cpf, restaurant?.id]);
@@ -79,12 +91,14 @@ export function KioskIdentification({ restaurant, onIdentified, onBack }: Props)
 
     const phoneRaw = phone.replace(/\D/g, "") || undefined;
     // Save new customer
-    await supabase.from("customers").insert({
-      restaurant_id: restaurant.id,
-      cpf: raw,
-      name: name.trim(),
-      phone: phoneRaw,
-    });
+    if (restaurant?.id) {
+      await supabase.from("customers").insert({
+        restaurant_id: restaurant.id,
+        cpf: raw,
+        name: name.trim(),
+        phone: phoneRaw,
+      });
+    }
 
     onIdentified({ name: name.trim(), cpf: raw, phone: phoneRaw, isExisting: false });
   };

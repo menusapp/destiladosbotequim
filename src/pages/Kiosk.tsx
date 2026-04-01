@@ -79,15 +79,23 @@ export default function Kiosk() {
         .from("restaurants")
         .select("*")
         .eq("slug", slug)
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (!r) {
+        console.warn("[Kiosk] Restaurante não encontrado para slug:", slug);
+        toast.error("Restaurante não encontrado");
+        setLoading(false);
+        return;
+      }
       setRestaurant(r);
 
-      const { data: cats } = await supabase
+      const { data: cats, error: catsErr } = await supabase
         .from("categories")
         .select("*, products(*)")
         .eq("restaurant_id", r.id)
         .order("display_order");
+
+      if (catsErr) console.error("[Kiosk] Erro ao carregar categorias:", catsErr);
 
       const filtered = (cats || []).map((cat: any) => ({
         ...cat,
@@ -95,8 +103,8 @@ export default function Kiosk() {
       })).filter((cat: any) => cat.products.length > 0);
       setCategories(filtered);
     } catch (err) {
-      console.error("Kiosk: error loading restaurant", err);
-      toast.error("Erro ao carregar dados");
+      console.error("[Kiosk] Erro crítico no bootstrap:", err);
+      toast.error("Erro ao carregar dados do restaurante");
     } finally {
       setLoading(false);
     }
@@ -107,11 +115,19 @@ export default function Kiosk() {
   // Product extras loader
   const openProduct = useCallback(async (product: Product) => {
     setSelectedProduct(product);
-    const { data } = await supabase
-      .from("product_extras")
-      .select("*")
-      .eq("product_id", product.id);
-    setProductExtras(data || []);
+    try {
+      const { data, error } = await supabase
+        .from("product_extras")
+        .select("*")
+        .eq("product_id", product.id);
+      if (error) {
+        console.error("[Kiosk] Erro ao carregar extras:", error);
+      }
+      setProductExtras(data || []);
+    } catch (err) {
+      console.error("[Kiosk] Exceção ao carregar extras:", err);
+      setProductExtras([]);
+    }
     setStep("product");
   }, []);
 
@@ -155,6 +171,18 @@ export default function Kiosk() {
       <KioskLayout primaryColor={primaryColor}>
         <div className="flex items-center justify-center h-screen">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-t-transparent" style={{ borderColor: primaryColor, borderTopColor: "transparent" }} />
+        </div>
+      </KioskLayout>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <KioskLayout primaryColor={primaryColor}>
+        <div className="flex flex-col items-center justify-center h-screen gap-4 px-8 text-center">
+          <p className="text-6xl">🔍</p>
+          <h2 className="text-2xl font-bold text-foreground">Restaurante não encontrado</h2>
+          <p className="text-lg text-muted-foreground">Verifique o endereço e tente novamente.</p>
         </div>
       </KioskLayout>
     );
