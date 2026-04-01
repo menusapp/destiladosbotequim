@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Product } from "@/types/menu";
-import { Search, ShoppingCart, X, LogOut } from "lucide-react";
+import { Search, ShoppingCart, X, LogOut, Star } from "lucide-react";
 
 interface Props {
   categories: Category[];
@@ -18,7 +18,14 @@ interface Props {
 }
 
 export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant }: Props) {
-  const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || "");
+  const featuredProducts = useMemo(() => {
+    return categories.flatMap(c => c.products).filter(p => p.is_featured || p.promotional_price != null);
+  }, [categories]);
+
+  const featuredSectionTitle = restaurant?.featured_section_title || "Destaques";
+  const hasFeatured = featuredProducts.length > 0;
+
+  const [activeCategory, setActiveCategory] = useState<string>(hasFeatured ? "__featured__" : (categories[0]?.id || ""));
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
 
