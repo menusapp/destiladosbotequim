@@ -80,12 +80,13 @@ const RestaurantAdmin = () => {
   }>>([]);
   const [cascadeExpanded, setCascadeExpanded] = useState(false);
   const notificationQueueRef = useRef<typeof notificationQueue>([]);
-  const [billNotification, setBillNotification] = useState<{
+  const [billNotificationQueue, setBillNotificationQueue] = useState<Array<{
     billId: string;
     tableNumber: number;
     total: number;
     customerName: string;
-  } | null>(null);
+  }>>([]);
+  const [billCascadeExpanded, setBillCascadeExpanded] = useState(false);
   const [reservationNotification, setReservationNotification] = useState<{
     reservationId: string;
     customerName: string;
@@ -100,7 +101,7 @@ const RestaurantAdmin = () => {
   const notifiedOrdersRef = useRef<Set<string>>(new Set());
   const notifiedBillsRef = useRef<Set<string>>(new Set());
   const notifiedReservationsRef = useRef<Set<string>>(new Set());
-  const billNotificationRef = useRef<typeof billNotification>(null);
+  const billNotificationQueueRef = useRef<typeof billNotificationQueue>([]);
   const reservationNotificationRef = useRef<typeof reservationNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
   const [pendingTableToOpen, setPendingTableToOpen] = useState<string | null>(null);
@@ -184,8 +185,8 @@ const RestaurantAdmin = () => {
   }, [notificationQueue]);
   
   useEffect(() => {
-    billNotificationRef.current = billNotification;
-  }, [billNotification]);
+    billNotificationQueueRef.current = billNotificationQueue;
+  }, [billNotificationQueue]);
 
   useEffect(() => {
     reservationNotificationRef.current = reservationNotification;
@@ -404,11 +405,14 @@ const RestaurantAdmin = () => {
               .maybeSingle();
             
             // Mostrar notificação pop-up
-            setBillNotification({
-              billId: billId,
-              tableNumber: tableData.table_number,
-              total: bill.total_amount,
-              customerName: comandaData?.customer_name || 'Cliente',
+            setBillNotificationQueue(prev => {
+              if (prev.some(b => b.billId === billId)) return prev;
+              return [...prev, {
+                billId: billId,
+                tableNumber: tableData.table_number,
+                total: bill.total_amount,
+                customerName: comandaData?.customer_name || 'Cliente',
+              }];
             });
             
             // Marcar como notificado
@@ -436,9 +440,9 @@ const RestaurantAdmin = () => {
           const billId = bill.id;
           const status = bill.status;
           
-          // Se a conta foi atualizada (não mais requested), fechar notificação
-          if (billNotificationRef.current && billNotificationRef.current.billId === billId && status !== 'requested') {
-            setBillNotification(null);
+          // Se a conta foi atualizada (não mais requested), remover da fila
+          if (status !== 'requested') {
+            setBillNotificationQueue(prev => prev.filter(b => b.billId !== billId));
           }
         }
       )
@@ -683,13 +687,11 @@ const RestaurantAdmin = () => {
     setNotificationQueue(prev => prev.slice(1));
   };
 
-  const handleViewBill = async () => {
-    if (!billNotification) return;
-    // Route to PDV and open the table that requested the bill
+  const handleViewBill = async (bill: { billId: string; tableNumber: number }) => {
     const { data: tableData } = await supabase
       .from("tables")
       .select("id")
-      .eq("table_number", billNotification.tableNumber)
+      .eq("table_number", bill.tableNumber)
       .eq("restaurant_id", restaurant!.id)
       .single();
     
@@ -697,7 +699,7 @@ const RestaurantAdmin = () => {
     if (tableData?.id) {
       setPendingTableToOpen(tableData.id);
     }
-    setBillNotification(null);
+    setBillNotificationQueue(prev => prev.filter(b => b.billId !== bill.billId));
   };
 
   const handleViewReservation = () => {
@@ -952,16 +954,68 @@ const RestaurantAdmin = () => {
           </div>
         )}
         
-        {/* Global Bill Notification */}
-        {billNotification && (
-          <NewBillNotification
-            billId={billNotification.billId}
-            tableNumber={billNotification.tableNumber}
-            total={billNotification.total}
-            customerName={billNotification.customerName}
-            onView={handleViewBill}
-            onDismiss={() => setBillNotification(null)}
-          />
+        {/* Global Bill Notifications - cascade like orders */}
+        {billNotificationQueue.length > 0 && (
+          <div className="fixed top-4 left-4 z-[100]">
+            {!billCascadeExpanded ? (
+              <div
+                className="relative cursor-pointer"
+                onClick={() => setBillCascadeExpanded(true)}
+                style={{ height: `${68 + Math.min(billNotificationQueue.length - 1, 2) * 8}px` }}
+              >
+                {billNotificationQueue.slice(0, 3).map((notification, index) => (
+                  <div
+                    key={notification.billId}
+                    className="absolute left-0 transition-all duration-200"
+                    style={{
+                      top: `${index * 8}px`,
+                      zIndex: 100 - index,
+                      transform: `scale(${1 - index * 0.03})`,
+                      opacity: index === 0 ? 1 : 0.85,
+                    }}
+                  >
+                    <NewBillNotification
+                      billId={notification.billId}
+                      tableNumber={notification.tableNumber}
+                      total={notification.total}
+                      customerName={notification.customerName}
+                      onView={() => handleViewBill(notification)}
+                      onDismiss={() => setBillNotificationQueue(prev => prev.filter(b => b.billId !== notification.billId))}
+                      onStopSound={() => setSoundMuted(true)}
+                    />
+                  </div>
+                ))}
+                {billNotificationQueue.length > 3 && (
+                  <div className="absolute left-2" style={{ top: `${3 * 8 + 4}px`, zIndex: 96 }}>
+                    <span className="inline-block px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-bold shadow">
+                      +{billNotificationQueue.length - 3}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-[70vh] overflow-y-auto pr-1">
+                <button
+                  onClick={() => setBillCascadeExpanded(false)}
+                  className="self-end mb-1 text-xs text-amber-600 hover:text-amber-800 font-medium"
+                >
+                  Recolher
+                </button>
+                {billNotificationQueue.map((notification) => (
+                  <NewBillNotification
+                    key={notification.billId}
+                    billId={notification.billId}
+                    tableNumber={notification.tableNumber}
+                    total={notification.total}
+                    customerName={notification.customerName}
+                    onView={() => handleViewBill(notification)}
+                    onDismiss={() => setBillNotificationQueue(prev => prev.filter(b => b.billId !== notification.billId))}
+                    onStopSound={() => setSoundMuted(true)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Global Reservation Notification */}
