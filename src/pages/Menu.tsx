@@ -1098,7 +1098,7 @@ const Menu = () => {
           total={comandaTotal}
           primaryColor={primaryColor}
           status={comandaStatus}
-          isVisible={showComandaBar}
+          isVisible={showComandaBar && !showProductDialog}
           hasSubmittedOrders={hasOpenComanda}
           cartItemCount={cartItemCount}
           onViewComanda={() => navigate(`/${restaurantSlug}/comanda/${tableNumber}`)}
