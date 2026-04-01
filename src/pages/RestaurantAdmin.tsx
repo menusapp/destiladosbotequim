@@ -687,13 +687,11 @@ const RestaurantAdmin = () => {
     setNotificationQueue(prev => prev.slice(1));
   };
 
-  const handleViewBill = async () => {
-    if (!billNotification) return;
-    // Route to PDV and open the table that requested the bill
+  const handleViewBill = async (bill: { billId: string; tableNumber: number }) => {
     const { data: tableData } = await supabase
       .from("tables")
       .select("id")
-      .eq("table_number", billNotification.tableNumber)
+      .eq("table_number", bill.tableNumber)
       .eq("restaurant_id", restaurant!.id)
       .single();
     
@@ -701,7 +699,7 @@ const RestaurantAdmin = () => {
     if (tableData?.id) {
       setPendingTableToOpen(tableData.id);
     }
-    setBillNotification(null);
+    setBillNotificationQueue(prev => prev.filter(b => b.billId !== bill.billId));
   };
 
   const handleViewReservation = () => {
