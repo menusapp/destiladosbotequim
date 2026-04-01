@@ -92,6 +92,20 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
         {!filteredProducts && (
           <ScrollArea className="w-44 md:w-52 border-r bg-card/50 shrink-0">
             <div className="flex flex-col p-2 gap-1">
+              {hasFeatured && (
+                <button
+                  onClick={() => scrollToCategory("__featured__")}
+                  className={`text-left px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                    activeCategory === "__featured__"
+                      ? "text-white shadow-md"
+                      : "text-foreground hover:bg-muted"
+                  }`}
+                  style={activeCategory === "__featured__" ? { backgroundColor: primaryColor } : {}}
+                >
+                  <Star className="h-4 w-4 shrink-0" />
+                  <span className="line-clamp-2">{featuredSectionTitle}</span>
+                </button>
+              )}
               {categories.map(cat => (
                 <button
                   key={cat.id}
