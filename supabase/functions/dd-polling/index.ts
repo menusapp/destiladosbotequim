@@ -324,8 +324,8 @@ Deno.serve(async (req) => {
         ? `${addr.street || addr.streetName || ""}, ${addr.number || ""} - ${addr.neighborhood || addr.district || ""}, ${addr.city || ""}`
         : null;
 
-      // Payment mapping - store-api provides payment.type and payment.paymentDetails
-      const payment = fullOrder.payment || (Array.isArray(fullOrder.payments) ? fullOrder.payments[0] : null) || fullOrder.paymentMethod || {};
+      // Payment mapping - admin-api returns paymentMethod with .name field
+      const payment = fullOrder.paymentMethod || fullOrder.payment || (Array.isArray(fullOrder.payments) ? fullOrder.payments[0] : null) || {};
       const paymentLabel = mapPaymentLabel(payment);
       console.log(`[dd-polling] Order ${ddOrderId} payment: ${JSON.stringify(payment).substring(0, 300)}, mapped="${paymentLabel}"`);
 

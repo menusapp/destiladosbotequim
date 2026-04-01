@@ -65,13 +65,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Map action to admin-api status values
-    const actionMap: Record<string, { ddStatus: string; localStatus: string }> = {
-      accept:   { ddStatus: "APPROVED",    localStatus: "accepted" },
-      ready:    { ddStatus: "READY",       localStatus: "ready" },
-      dispatch: { ddStatus: "DISPATCHED",  localStatus: "out_for_delivery" },
-      deliver:  { ddStatus: "DONE",        localStatus: "delivered" },
-      reject:   { ddStatus: "CANCELLED",   localStatus: "cancelled" },
+    // Map action to KDS status values (KDS uses PREPARING/READY/DONE, not APPROVED/DISPATCHED)
+    const actionMap: Record<string, { ddStatus: string | null; localStatus: string }> = {
+      accept:   { ddStatus: "PREPARING",   localStatus: "accepted" },
+      ready:    { ddStatus: "READY",        localStatus: "ready" },
+      dispatch: { ddStatus: null,           localStatus: "out_for_delivery" },  // KDS has no dispatch
+      deliver:  { ddStatus: "DONE",         localStatus: "delivered" },
+      reject:   { ddStatus: null,           localStatus: "cancelled" },         // Cancel via Orders API, not KDS
     };
 
     const actionConfig = actionMap[action];
@@ -88,28 +88,27 @@ Deno.serve(async (req) => {
       "X-DeliveryDireto-Id": config.store_id,
     };
 
-    // Use PUT /admin-api/v1/orders/{id} with status in body
-    const actionUrl = `${DD_ADMIN_API}/kds/orders/${dd_order_id}`;
-    const body: Record<string, string> = { status: actionConfig.ddStatus };
-    if (action === "reject" && reason) {
-      body.statusReason = reason;
-    }
+    // Only send to KDS API if there's a valid KDS status
+    if (actionConfig.ddStatus) {
+      const actionUrl = `${DD_ADMIN_API}/kds/orders/${dd_order_id}`;
+      const body: Record<string, string> = { status: actionConfig.ddStatus };
 
-    console.log(`[dd-order-action] PUT ${actionUrl}, body: ${JSON.stringify(body)}`);
+      console.log(`[dd-order-action] PUT ${actionUrl}, body: ${JSON.stringify(body)}`);
 
-    const apiRes = await fetch(actionUrl, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    const apiText = await apiRes.text();
-    console.log(`[dd-order-action] Response: status=${apiRes.status}, body=${apiText.substring(0, 500)}`);
-
-    if (!apiRes.ok && apiRes.status !== 204 && apiRes.status !== 202) {
-      return new Response(JSON.stringify({ error: `Erro na API DD: ${apiRes.status} - ${apiText.substring(0, 200)}` }), {
-        status: apiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const apiRes = await fetch(actionUrl, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body),
       });
+
+      const apiText = await apiRes.text();
+      console.log(`[dd-order-action] Response: status=${apiRes.status}, body=${apiText.substring(0, 500)}`);
+
+      if (!apiRes.ok && apiRes.status !== 204 && apiRes.status !== 202) {
+        console.warn(`[dd-order-action] KDS status update failed, continuing with local update`);
+      }
+    } else {
+      console.log(`[dd-order-action] Action "${action}" not supported by KDS, updating locally only`);
     }
 
     // Update local order status + cancellation reason
