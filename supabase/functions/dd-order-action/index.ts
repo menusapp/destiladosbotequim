@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     };
 
     // Use PUT /admin-api/v1/orders/{id} with status in body
-    const actionUrl = `${DD_ADMIN_API}/orders/${dd_order_id}`;
+    const actionUrl = `${DD_ADMIN_API}/kds/orders/${dd_order_id}`;
     const body: Record<string, string> = { status: actionConfig.ddStatus };
     if (action === "reject" && reason) {
       body.statusReason = reason;
