@@ -80,12 +80,13 @@ const RestaurantAdmin = () => {
   }>>([]);
   const [cascadeExpanded, setCascadeExpanded] = useState(false);
   const notificationQueueRef = useRef<typeof notificationQueue>([]);
-  const [billNotification, setBillNotification] = useState<{
+  const [billNotificationQueue, setBillNotificationQueue] = useState<Array<{
     billId: string;
     tableNumber: number;
     total: number;
     customerName: string;
-  } | null>(null);
+  }>>([]);
+  const [billCascadeExpanded, setBillCascadeExpanded] = useState(false);
   const [reservationNotification, setReservationNotification] = useState<{
     reservationId: string;
     customerName: string;
