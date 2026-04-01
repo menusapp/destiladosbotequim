@@ -7,6 +7,10 @@ const corsHeaders = {
 
 const DD_ADMIN_API = "https://deliverydireto.com.br/admin-api/v1";
 
+// DD Admin API PUT /orders/{id}/status accepts these statuses ONLY:
+// APPROVED, DONE, IN_TRANSIT, HIDDEN, REJECTED, WARNING
+// There is NO "CANCELLED" status — use REJECTED for cancellation.
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -17,7 +21,6 @@ Deno.serve(async (req) => {
     console.log(`[dd-order-action] action=${action}, dd_order_id=${dd_order_id}, restaurant_id=${restaurant_id}`);
 
     if (!restaurant_id || !dd_order_id || !action) {
-      // ALWAYS return 200 so client can read error body
       return new Response(JSON.stringify({ error: "restaurant_id, dd_order_id e action são obrigatórios" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -67,13 +70,13 @@ Deno.serve(async (req) => {
     }
 
     // ── Status mapping: ERP action → DD Admin API status ────────────────
-    // DD Admin API PUT /orders/{id}/status accepts: APPROVED, IN_TRANSIT, DONE, REJECTED, CANCELLED
+    // Valid DD statuses: APPROVED, DONE, IN_TRANSIT, HIDDEN, REJECTED, WARNING
     const actionMap: Record<string, { ddStatus: string; localStatus: string }> = {
       accept:   { ddStatus: "APPROVED",   localStatus: "accepted" },
       dispatch: { ddStatus: "IN_TRANSIT", localStatus: "out_for_delivery" },
       ready:    { ddStatus: "APPROVED",   localStatus: "ready" },
       deliver:  { ddStatus: "DONE",       localStatus: "delivered" },
-      reject:   { ddStatus: "CANCELLED",  localStatus: "cancelled" },
+      reject:   { ddStatus: "REJECTED",   localStatus: "cancelled" },
     };
 
     const actionConfig = actionMap[action];
@@ -91,70 +94,25 @@ Deno.serve(async (req) => {
       "X-DeliveryDireto-Id": config.store_id,
     };
 
-    // Try multiple endpoints/payloads for maximum compatibility
     const statusUrl = `${DD_ADMIN_API}/orders/${dd_order_id}/status`;
-    const orderUrl = `${DD_ADMIN_API}/orders/${dd_order_id}`;
 
     const body: Record<string, string> = { status: actionConfig.ddStatus };
     if (action === "reject" && reason) {
       body.statusReason = reason;
     }
 
-    console.log(`[dd-order-action] Attempt 1: PUT ${statusUrl}`);
+    console.log(`[dd-order-action] PUT ${statusUrl}`);
     console.log(`[dd-order-action] Body: ${JSON.stringify(body)}`);
 
-    let apiRes = await fetch(statusUrl, {
+    const apiRes = await fetch(statusUrl, {
       method: "PUT",
       headers,
       body: JSON.stringify(body),
     });
 
-    let apiText = await apiRes.text();
-    console.log(`[dd-order-action] Response 1: status=${apiRes.status}, body=${apiText.substring(0, 500)}`);
+    const apiText = await apiRes.text();
+    console.log(`[dd-order-action] Response: status=${apiRes.status}, body=${apiText.substring(0, 500)}`);
 
-    // If /status endpoint fails, try fallback endpoints
-    if (!apiRes.ok && apiRes.status !== 204 && apiRes.status !== 202) {
-      // Fallback 1: Try with "REJECTED" instead of "CANCELLED" for cancel
-      if (action === "reject" && actionConfig.ddStatus === "CANCELLED") {
-        console.log(`[dd-order-action] Attempt 2: trying REJECTED instead of CANCELLED`);
-        const body2 = { ...body, status: "REJECTED" };
-        const res2 = await fetch(statusUrl, { method: "PUT", headers, body: JSON.stringify(body2) });
-        const text2 = await res2.text();
-        console.log(`[dd-order-action] Response 2: status=${res2.status}, body=${text2.substring(0, 500)}`);
-        if (res2.ok || res2.status === 204 || res2.status === 202) {
-          apiRes = res2;
-          apiText = text2;
-        }
-      }
-
-      // Fallback 2: Try PUT /orders/{id} without /status
-      if (!apiRes.ok && apiRes.status !== 204 && apiRes.status !== 202) {
-        if (apiRes.status === 404 || apiRes.status === 405) {
-          console.log(`[dd-order-action] Attempt 3: PUT ${orderUrl} (fallback without /status)`);
-          const res3 = await fetch(orderUrl, { method: "PUT", headers, body: JSON.stringify(body) });
-          const text3 = await res3.text();
-          console.log(`[dd-order-action] Response 3: status=${res3.status}, body=${text3.substring(0, 500)}`);
-          if (res3.ok || res3.status === 204 || res3.status === 202) {
-            apiRes = res3;
-            apiText = text3;
-          }
-        }
-      }
-
-      // Fallback 3: Try POST instead of PUT
-      if (!apiRes.ok && apiRes.status !== 204 && apiRes.status !== 202) {
-        console.log(`[dd-order-action] Attempt 4: POST ${statusUrl}`);
-        const res4 = await fetch(statusUrl, { method: "POST", headers, body: JSON.stringify(body) });
-        const text4 = await res4.text();
-        console.log(`[dd-order-action] Response 4: status=${res4.status}, body=${text4.substring(0, 500)}`);
-        if (res4.ok || res4.status === 204 || res4.status === 202) {
-          apiRes = res4;
-          apiText = text4;
-        }
-      }
-    }
-
-    // Final result check
     const ddSuccess = apiRes.ok || apiRes.status === 204 || apiRes.status === 202;
 
     if (!ddSuccess) {
@@ -170,7 +128,6 @@ Deno.serve(async (req) => {
       const friendlyError = `Delivery Direto recusou a ação "${action}" (HTTP ${apiRes.status}): ${ddErrorMsg}`;
       console.error(`[dd-order-action] ${friendlyError}`);
 
-      // ALWAYS return 200 so client reads error body, but include dd_error flag
       // Still update local status since user wants the change
       const updateData: Record<string, any> = {
         status: actionConfig.localStatus,
@@ -228,7 +185,6 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("[dd-order-action] Unexpected error:", err);
-    // ALWAYS return 200 so client reads error body
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
