@@ -79,15 +79,23 @@ export default function Kiosk() {
         .from("restaurants")
         .select("*")
         .eq("slug", slug)
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (!r) {
+        console.warn("[Kiosk] Restaurante não encontrado para slug:", slug);
+        toast.error("Restaurante não encontrado");
+        setLoading(false);
+        return;
+      }
       setRestaurant(r);
 
-      const { data: cats } = await supabase
+      const { data: cats, error: catsErr } = await supabase
         .from("categories")
         .select("*, products(*)")
         .eq("restaurant_id", r.id)
         .order("display_order");
+
+      if (catsErr) console.error("[Kiosk] Erro ao carregar categorias:", catsErr);
 
       const filtered = (cats || []).map((cat: any) => ({
         ...cat,
@@ -95,8 +103,8 @@ export default function Kiosk() {
       })).filter((cat: any) => cat.products.length > 0);
       setCategories(filtered);
     } catch (err) {
-      console.error("Kiosk: error loading restaurant", err);
-      toast.error("Erro ao carregar dados");
+      console.error("[Kiosk] Erro crítico no bootstrap:", err);
+      toast.error("Erro ao carregar dados do restaurante");
     } finally {
       setLoading(false);
     }
