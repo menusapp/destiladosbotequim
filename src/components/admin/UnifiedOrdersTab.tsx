@@ -56,6 +56,8 @@ interface Order {
   ifood_order_id?: string;
   dd_source?: boolean;
   dd_order_id?: string;
+  dd_scheduled_for?: string;
+  cancellation_reason?: string;
 }
 
 interface UnifiedOrdersTabProps {
