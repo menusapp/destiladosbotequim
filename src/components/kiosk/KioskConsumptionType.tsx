@@ -47,7 +47,9 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
       setSubStep("dine_in_sub");
       return;
     }
+    // For takeaway and delivery, set mode directly and move to sub step to enable "Continuar"
     onChangeMode(key as ConsumptionMode);
+    setSubStep("dine_in_sub"); // reuse sub step state to enable proceed button
   };
 
   const handleSubSelect = (key: ConsumptionMode) => {
