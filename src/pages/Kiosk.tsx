@@ -184,12 +184,19 @@ export default function Kiosk() {
   }
 
   if (!restaurant) {
+    const isSlugMissing = !slug;
     return (
       <KioskLayout primaryColor={primaryColor}>
         <div className="flex flex-col items-center justify-center h-screen gap-4 px-8 text-center">
-          <p className="text-6xl">🔍</p>
-          <h2 className="text-2xl font-bold text-foreground">Restaurante não encontrado</h2>
-          <p className="text-lg text-muted-foreground">Verifique o endereço e tente novamente.</p>
+          <p className="text-6xl">{isSlugMissing ? "⚠️" : "🔍"}</p>
+          <h2 className="text-2xl font-bold text-foreground">
+            {isSlugMissing ? "Link do totem inválido" : "Restaurante não encontrado"}
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            {isSlugMissing
+              ? "O endereço acessado não contém a identificação do restaurante."
+              : "Verifique o endereço e tente novamente."}
+          </p>
         </div>
       </KioskLayout>
     );
