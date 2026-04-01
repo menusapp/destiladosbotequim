@@ -440,9 +440,9 @@ const RestaurantAdmin = () => {
           const billId = bill.id;
           const status = bill.status;
           
-          // Se a conta foi atualizada (não mais requested), fechar notificação
-          if (billNotificationRef.current && billNotificationRef.current.billId === billId && status !== 'requested') {
-            setBillNotification(null);
+          // Se a conta foi atualizada (não mais requested), remover da fila
+          if (status !== 'requested') {
+            setBillNotificationQueue(prev => prev.filter(b => b.billId !== billId));
           }
         }
       )
