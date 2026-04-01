@@ -339,6 +339,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   };
 
   const getOrderOrigin = () => {
+    if (order.order_type === "balcao") return "Balcão";
     const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
     if (isLocal) return `Digital - Mesa ${order.tables?.table_number || "?"}`;
     if (order.delivery_type === "takeaway") return "PDV - Para Viagem";
