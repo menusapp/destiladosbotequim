@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Product } from "@/types/menu";
-import { Search, ShoppingCart, X, LogOut } from "lucide-react";
+import { Search, ShoppingCart, X, LogOut, Star } from "lucide-react";
 
 interface Props {
   categories: Category[];
@@ -18,7 +18,14 @@ interface Props {
 }
 
 export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant }: Props) {
-  const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || "");
+  const featuredProducts = useMemo(() => {
+    return categories.flatMap(c => c.products).filter(p => p.is_featured || p.promotional_price != null);
+  }, [categories]);
+
+  const featuredSectionTitle = restaurant?.featured_section_title || "Destaques";
+  const hasFeatured = featuredProducts.length > 0;
+
+  const [activeCategory, setActiveCategory] = useState<string>(hasFeatured ? "__featured__" : (categories[0]?.id || ""));
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -85,6 +92,20 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
         {!filteredProducts && (
           <ScrollArea className="w-44 md:w-52 border-r bg-card/50 shrink-0">
             <div className="flex flex-col p-2 gap-1">
+              {hasFeatured && (
+                <button
+                  onClick={() => scrollToCategory("__featured__")}
+                  className={`text-left px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                    activeCategory === "__featured__"
+                      ? "text-white shadow-md"
+                      : "text-foreground hover:bg-muted"
+                  }`}
+                  style={activeCategory === "__featured__" ? { backgroundColor: primaryColor } : {}}
+                >
+                  <Star className="h-4 w-4 shrink-0" />
+                  <span className="line-clamp-2">{featuredSectionTitle}</span>
+                </button>
+              )}
               {categories.map(cat => (
                 <button
                   key={cat.id}
@@ -120,21 +141,37 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
                 {filteredProducts.length === 0 && <p className="text-center text-muted-foreground text-lg py-12">Nenhum produto encontrado</p>}
               </>
             ) : (
-              categories.map(cat => (
-                <div key={cat.id} id={`kiosk-cat-${cat.id}`} className="mb-8">
-                  <div className="flex items-center gap-3 mb-4">
-                    {(cat as any).image_url && (
-                      <img src={(cat as any).image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
-                    )}
-                    <h3 className="text-xl md:text-2xl font-bold text-foreground">{cat.name}</h3>
+              <>
+                {/* Featured Section */}
+                {hasFeatured && (
+                  <div id="kiosk-cat-__featured__" className="mb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Star className="h-6 w-6" style={{ color: primaryColor }} />
+                      <h3 className="text-xl md:text-2xl font-bold text-foreground">{featuredSectionTitle}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                      {featuredProducts.map(p => (
+                        <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                    {cat.products.map(p => (
-                      <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
-                    ))}
+                )}
+                {categories.map(cat => (
+                  <div key={cat.id} id={`kiosk-cat-${cat.id}`} className="mb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      {(cat as any).image_url && (
+                        <img src={(cat as any).image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                      )}
+                      <h3 className="text-xl md:text-2xl font-bold text-foreground">{cat.name}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                      {cat.products.map(p => (
+                        <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </>
             )}
           </div>
         </ScrollArea>
@@ -142,24 +179,18 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
 
       {/* Cart FAB */}
       {cartCount > 0 && (
-        <div className="border-t bg-card p-3 md:p-4 shrink-0">
-          <button
-            onClick={onOpenCart}
-            className="w-full flex items-center justify-between px-6 py-4 rounded-2xl text-white text-lg font-bold shadow-xl transition-transform active:scale-[0.98]"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <ShoppingCart className="h-6 w-6" />
-                <span className="absolute -top-2 -right-2 bg-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" style={{ color: primaryColor }}>
-                  {cartCount}
-                </span>
-              </div>
-              <span>Ver Pedido</span>
-            </div>
-            <span>R$ {cartTotal.toFixed(2)}</span>
-          </button>
-        </div>
+        <button
+          onClick={onOpenCart}
+          className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl transition-transform active:scale-90"
+          style={{ backgroundColor: primaryColor }}
+        >
+          <div className="relative">
+            <ShoppingCart className="h-7 w-7" />
+            <span className="absolute -top-2 -right-3 bg-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" style={{ color: primaryColor }}>
+              {cartCount}
+            </span>
+          </div>
+        </button>
       )}
     </div>
   );

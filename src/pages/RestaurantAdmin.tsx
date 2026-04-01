@@ -75,7 +75,7 @@ const RestaurantAdmin = () => {
     orderId: string;
     customerName: string;
     total: number;
-    orderType: 'local' | 'delivery';
+    orderType: 'local' | 'delivery' | 'balcao';
     tableNumber?: number;
     deliveryType?: 'delivery' | 'pickup';
     items?: Array<{name: string; quantity: number}>;
@@ -330,7 +330,7 @@ const RestaurantAdmin = () => {
                 orderId: orderId,
                 customerName: order.customer_name,
                 total,
-                orderType: (orderType === 'delivery' ? 'delivery' : 'local') as 'local' | 'delivery',
+                orderType: (orderType === 'balcao' ? 'balcao' : orderType === 'delivery' ? 'delivery' : 'local') as 'local' | 'delivery' | 'balcao',
                 tableNumber,
                 deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
                 items,
@@ -346,7 +346,7 @@ const RestaurantAdmin = () => {
             }
 
             // Atualizar badges da sidebar
-            if (orderType === 'delivery' && activeSectionRef.current !== 'pedidos') {
+            if ((orderType === 'delivery' || orderType === 'balcao') && activeSectionRef.current !== 'pedidos') {
               setHasNewDeliveryOrders(true);
             } else if ((orderType === 'local' || !orderType) && activeSectionRef.current !== 'pdv') {
               setHasNewLocalOrders(true);

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package,
+  CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package, Store,
   Clock, Printer, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
@@ -218,7 +218,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
       .from("orders")
       .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
       .eq("restaurant_id", restaurantId)
-      .neq("order_type", "local")
+      .in("order_type", ["delivery", "balcao"])
       .gte("created_at", dateRange.from.toISOString())
       .lte("created_at", dateRange.to.toISOString())
       .order("created_at", { ascending: false });
@@ -242,7 +242,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     if (activeTab === "delivery") {
       filtered = filtered.filter(o => o.order_type === "delivery" && o.delivery_type === "delivery");
     } else if (activeTab === "retirada") {
-      filtered = filtered.filter(o => o.order_type === "delivery" && (o.delivery_type === "pickup" || o.delivery_type === "takeaway"));
+      filtered = filtered.filter(o => o.order_type === "balcao" || (o.order_type === "delivery" && (o.delivery_type === "pickup" || o.delivery_type === "takeaway")));
     }
     // "todos" shows everything
 
@@ -270,6 +270,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   }, [filteredOrders]);
 
   const getOrderTypeIcon = (order: Order) => {
+    if (order.order_type === "balcao") return <Store className="w-3.5 h-3.5" />;
     if (order.order_type === "local") return <UtensilsCrossed className="w-3.5 h-3.5" />;
     if (order.delivery_type === "delivery") return <Truck className="w-3.5 h-3.5" />;
     if (order.delivery_type === "takeaway") return <Package className="w-3.5 h-3.5" />;
@@ -277,6 +278,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   };
 
   const getOrderTypeLabel = (order: Order) => {
+    if (order.order_type === "balcao") return "Balcão";
     if (order.order_type === "local") return `Mesa ${order.tables?.table_number || "?"}`;
     if (order.delivery_type === "delivery") return "Entrega";
     if (order.delivery_type === "takeaway") return "Para Viagem";

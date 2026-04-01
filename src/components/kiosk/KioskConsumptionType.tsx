@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumber, onChangeMode, onChangeTable, onBack, onNext, kioskConfig }: Props) {
-  const [subStep, setSubStep] = useState<"main" | "dine_in_sub">("main");
+  const [subStep, setSubStep] = useState<"main" | "dine_in_sub" | "selected">("main");
 
   const mainOptions = [
     { key: "dine_in" as const, label: "Comer no local", icon: UtensilsCrossed, configKey: "order_dine_in" as keyof KioskConfig },
@@ -37,6 +37,7 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
   ];
 
   const canProceed = () => {
+    if (subStep === "main") return false;
     if (consumptionMode === "table" && !tableNumber.trim()) return false;
     return true;
   };
@@ -47,6 +48,7 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
       return;
     }
     onChangeMode(key as ConsumptionMode);
+    setSubStep("selected");
   };
 
   const handleSubSelect = (key: ConsumptionMode) => {
@@ -54,11 +56,20 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
   };
 
   const handleBack = () => {
-    if (subStep === "dine_in_sub") {
+    if (subStep === "dine_in_sub" || subStep === "selected") {
       setSubStep("main");
       return;
     }
     onBack();
+  };
+
+  const getTitle = () => {
+    if (subStep === "dine_in_sub") return "Comer no local";
+    if (subStep === "selected") {
+      if (consumptionMode === "takeaway") return "Para viagem";
+      if (consumptionMode === "delivery") return "Entrega";
+    }
+    return "Como deseja consumir?";
   };
 
   return (
@@ -67,9 +78,7 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
         <Button variant="ghost" size="icon" onClick={handleBack} className="h-12 w-12 rounded-full">
           <ArrowLeft className="h-6 w-6" />
         </Button>
-        <h2 className="text-xl font-bold text-foreground">
-          {subStep === "dine_in_sub" ? "Comer no local" : "Como deseja consumir?"}
-        </h2>
+        <h2 className="text-xl font-bold text-foreground">{getTitle()}</h2>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 gap-5 max-w-lg mx-auto w-full">
@@ -136,6 +145,26 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
             </p>
           </div>
         )}
+
+        {subStep === "selected" && consumptionMode === "takeaway" && (
+          <div className="w-full text-center space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="h-20 w-20 mx-auto rounded-2xl flex items-center justify-center" style={{ backgroundColor: primaryColor }}>
+              <ShoppingBag className="h-10 w-10 text-white" />
+            </div>
+            <p className="text-lg font-semibold text-foreground">Seu pedido será preparado para viagem</p>
+            <p className="text-sm text-muted-foreground">Retire no balcão quando estiver pronto</p>
+          </div>
+        )}
+
+        {subStep === "selected" && consumptionMode === "delivery" && (
+          <div className="w-full text-center space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="h-20 w-20 mx-auto rounded-2xl flex items-center justify-center" style={{ backgroundColor: primaryColor }}>
+              <Truck className="h-10 w-10 text-white" />
+            </div>
+            <p className="text-lg font-semibold text-foreground">Pedido para entrega</p>
+            <p className="text-sm text-muted-foreground">Confirme os detalhes na próxima etapa</p>
+          </div>
+        )}
       </div>
 
       <div className="border-t bg-card p-5 shrink-0">
@@ -144,7 +173,7 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
             onClick={onNext}
             className="w-full h-14 text-lg font-bold rounded-xl text-white"
             style={{ backgroundColor: primaryColor }}
-            disabled={subStep === "main" || !canProceed()}
+            disabled={!canProceed()}
           >
             Continuar
           </Button>

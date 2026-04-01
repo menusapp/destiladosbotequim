@@ -11,7 +11,7 @@ interface NewOrderNotificationProps {
   orderId: string;
   customerName: string;
   total: number;
-  orderType: 'local' | 'delivery';
+  orderType: 'local' | 'delivery' | 'balcao';
   tableNumber?: number;
   deliveryType?: 'delivery' | 'pickup';
   items?: OrderItem[];
@@ -35,6 +35,7 @@ export const NewOrderNotification = ({
   const [expanded, setExpanded] = useState(false);
 
   const getTypeLabel = () => {
+    if (orderType === 'balcao') return 'Balcão';
     if (orderType === 'local') return `Mesa ${tableNumber || '?'}`;
     if (deliveryType === 'pickup') return 'Retirada';
     return 'Delivery';

@@ -152,6 +152,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   };
 
   const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
+  const isBalcao = order.order_type === "balcao";
 
   // Sync status with Delivery Direto
   const syncDDStatus = async (newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string; localUpdated?: boolean }> => {
@@ -338,6 +339,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   };
 
   const getOrderOrigin = () => {
+    if (order.order_type === "balcao") return "Balcão";
     const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
     if (isLocal) return `Digital - Mesa ${order.tables?.table_number || "?"}`;
     if (order.delivery_type === "takeaway") return "PDV - Para Viagem";
@@ -396,6 +398,12 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
               )}
               {(order.status === "accepted" || order.status === "preparing") && order.order_type === "delivery" && order.delivery_type === "pickup" && (
                 <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2"><Play className="w-4 h-4" />Pronto para Retirada</Button>
+              )}
+              {(order.status === "accepted" || order.status === "preparing") && isBalcao && (
+                <Button onClick={() => updateStatus("ready")} className="gap-2"><Play className="w-4 h-4" />Pronto para Retirada</Button>
+              )}
+              {(order.status === "ready") && isBalcao && (
+                <Button onClick={() => updateStatus("picked_up")} className="gap-2"><Play className="w-4 h-4" />Retirado</Button>
               )}
               {(order.status === "accepted" || order.status === "preparing") && isTakeaway && (
                 <Button onClick={() => updateStatus("picked_up")} className="gap-2"><Play className="w-4 h-4" />Finalizar (Retirado)</Button>
