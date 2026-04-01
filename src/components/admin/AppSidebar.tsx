@@ -25,6 +25,7 @@ import {
   FileText,
   Plug,
   HardDrive,
+  Monitor,
 } from "lucide-react";
 import {
   Sidebar,
