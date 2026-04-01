@@ -21,6 +21,7 @@ import StaffLogin from "./pages/StaffLogin";
 import { TableDetailView } from "./components/admin/TableDetailView";
 import MercadoPagoCallback from "./pages/MercadoPagoCallback";
 import RestaurantRegistration from "./pages/RestaurantRegistration";
+import Kiosk from "./pages/Kiosk";
 
 
 const queryClient = new QueryClient({
