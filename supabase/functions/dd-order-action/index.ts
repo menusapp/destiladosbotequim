@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DD_STORE_API = "https://deliverydireto.com.br/store-api/v1";
+const DD_ADMIN_API = "https://deliverydireto.com.br/admin-api/v1";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -65,14 +65,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Map action to store-api endpoint and local status
-    // store-api uses POST /orders/{id}/{action} pattern
-    const actionMap: Record<string, { endpoint: string; localStatus: string; method: string }> = {
-      accept:   { endpoint: "approve",          localStatus: "accepted",         method: "POST" },
-      ready:    { endpoint: "ready-for-pickup",  localStatus: "ready",            method: "POST" },
-      dispatch: { endpoint: "dispatch",          localStatus: "out_for_delivery", method: "POST" },
-      deliver:  { endpoint: "deliver",           localStatus: "delivered",        method: "POST" },
-      reject:   { endpoint: "cancel",            localStatus: "cancelled",        method: "POST" },
+    // Map action to admin-api status values
+    const actionMap: Record<string, { ddStatus: string; localStatus: string }> = {
+      accept:   { ddStatus: "APPROVED",    localStatus: "accepted" },
+      ready:    { ddStatus: "READY",       localStatus: "ready" },
+      dispatch: { ddStatus: "DISPATCHED",  localStatus: "out_for_delivery" },
+      deliver:  { ddStatus: "DONE",        localStatus: "delivered" },
+      reject:   { ddStatus: "CANCELLED",   localStatus: "cancelled" },
     };
 
     const actionConfig = actionMap[action];
@@ -89,19 +88,19 @@ Deno.serve(async (req) => {
       "X-DeliveryDireto-Id": config.store_id,
     };
 
-    // Build request - store-api uses POST /orders/{id}/{action}
-    const actionUrl = `${DD_STORE_API}/orders/${dd_order_id}/${actionConfig.endpoint}`;
-    const body: Record<string, string> = {};
+    // Use PUT /admin-api/v1/orders/{id} with status in body
+    const actionUrl = `${DD_ADMIN_API}/orders/${dd_order_id}`;
+    const body: Record<string, string> = { status: actionConfig.ddStatus };
     if (action === "reject" && reason) {
       body.statusReason = reason;
     }
 
-    console.log(`[dd-order-action] ${actionConfig.method} ${actionUrl}, body: ${JSON.stringify(body)}`);
+    console.log(`[dd-order-action] PUT ${actionUrl}, body: ${JSON.stringify(body)}`);
 
     const apiRes = await fetch(actionUrl, {
-      method: actionConfig.method,
+      method: "PUT",
       headers,
-      body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+      body: JSON.stringify(body),
     });
 
     const apiText = await apiRes.text();

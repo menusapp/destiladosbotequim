@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DD_STORE_API = "https://deliverydireto.com.br/store-api/v1";
+const DD_ADMIN_API = "https://deliverydireto.com.br/admin-api/v1";
 
 // Convert DD Money object (cents) to decimal - ALL DD values are in cents
 function money(v: any): number {
@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
     params.set("updatedAt[gte]", lastSync.toISOString());
     params.set("limit", "50");
 
-    const ordersUrl = `${DD_STORE_API}/orders?${params.toString()}`;
+    const ordersUrl = `${DD_ADMIN_API}/orders?${params.toString()}`;
     console.log(`[dd-polling] Fetching orders: ${ordersUrl}`);
 
     const ordersRes = await fetch(ordersUrl, { headers: ddHeaders });
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
     } else if (ordersData?.orders && Array.isArray(ordersData.orders)) {
       ordersList = ordersData.orders;
     }
-    console.log(`[dd-polling] Found ${ordersList.length} orders from store-api`);
+    console.log(`[dd-polling] Found ${ordersList.length} orders from admin-api`);
     
     // Log first order structure for debugging
     if (ordersList.length > 0) {
@@ -255,23 +255,34 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // NEW ORDER - Fetch full detail from store-api to get items
+      // NEW ORDER - Fetch full detail from KDS endpoint to get items
       let fullOrder = ddOrder;
       const orderId = ddOrder.id || ddOrder.orderNumber;
       try {
-        const detailUrl = `${DD_STORE_API}/orders/${orderId}`;
+        // Use KDS detail endpoint which returns complete items
+        const detailUrl = `${DD_ADMIN_API}/kds/orders/${orderId}`;
         console.log(`[dd-polling] Fetching order detail: GET ${detailUrl}`);
         const detailRes = await fetch(detailUrl, { headers: ddHeaders });
         if (detailRes.ok) {
           const detailText = await detailRes.text();
           const detailData = JSON.parse(detailText);
-          // store-api may wrap in { data: ... } or return directly
           fullOrder = detailData?.data || detailData;
-          console.log(`[dd-polling] Detail keys: ${Object.keys(fullOrder).join(", ")}`);
-          console.log(`[dd-polling] Detail (3000): ${JSON.stringify(fullOrder).substring(0, 3000)}`);
+          console.log(`[dd-polling] KDS Detail keys: ${Object.keys(fullOrder).join(", ")}`);
+          console.log(`[dd-polling] KDS Detail (3000): ${JSON.stringify(fullOrder).substring(0, 3000)}`);
         } else {
-          const errBody = await detailRes.text();
-          console.warn(`[dd-polling] Detail failed (${detailRes.status}): ${errBody.substring(0, 300)}`);
+          // Fallback: try regular orders detail
+          const fallbackUrl = `${DD_ADMIN_API}/orders/${orderId}`;
+          console.log(`[dd-polling] KDS failed, trying: GET ${fallbackUrl}`);
+          const fallbackRes = await fetch(fallbackUrl, { headers: ddHeaders });
+          if (fallbackRes.ok) {
+            const fbText = await fallbackRes.text();
+            const fbData = JSON.parse(fbText);
+            fullOrder = fbData?.data || fbData;
+            console.log(`[dd-polling] Fallback detail keys: ${Object.keys(fullOrder).join(", ")}`);
+          } else {
+            const errBody = await fallbackRes.text();
+            console.warn(`[dd-polling] Both detail endpoints failed for ${orderId}: ${errBody.substring(0, 300)}`);
+          }
         }
       } catch (e) {
         console.warn(`[dd-polling] Detail error:`, e);
@@ -281,7 +292,7 @@ Deno.serve(async (req) => {
       let orderItems = fullOrder.items || fullOrder.orderItems || fullOrder.cart || [];
       if (!orderItems.length && orderId) {
         try {
-          const itemsUrl = `${DD_STORE_API}/orders/${orderId}/items`;
+          const itemsUrl = `${DD_ADMIN_API}/orders/${orderId}/items`;
           console.log(`[dd-polling] Fetching items separately: GET ${itemsUrl}`);
           const itemsRes = await fetch(itemsUrl, { headers: ddHeaders });
           if (itemsRes.ok) {
