@@ -983,7 +983,8 @@ const Menu = () => {
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
-      <div className="relative">
+      {/* Fixed header area */}
+      <div className="relative shrink-0">
         <div className="h-48 overflow-hidden relative">
           {restaurant.banner_url ? (
             <div
@@ -1024,6 +1025,9 @@ const Menu = () => {
           deliveryFee={0}
         />
       </div>
+
+      {/* Scrollable product content */}
+      <div className="flex-1 overflow-y-auto min-h-0" style={{ paddingBottom: customerName ? '80px' : '0px' }}>
 
       {searchQuery.trim() ? (
         <div className="px-4 py-6">
