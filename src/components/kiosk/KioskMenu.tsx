@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Product } from "@/types/menu";
-import { Search, ShoppingCart, X, LogOut } from "lucide-react";
+import { Search, ShoppingCart, X, LogOut, Star } from "lucide-react";
 
 interface Props {
   categories: Category[];
@@ -15,9 +15,10 @@ interface Props {
   customerName: string;
   onCancel: () => void;
   restaurant?: any;
+  featuredProducts?: Product[];
 }
 
-export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant }: Props) {
+export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant, featuredProducts = [] }: Props) {
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || "");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -85,6 +86,25 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
         {!filteredProducts && (
           <ScrollArea className="w-44 md:w-52 border-r bg-card/50 shrink-0">
             <div className="flex flex-col p-2 gap-1">
+              {/* Featured category link */}
+              {featuredProducts.length > 0 && (
+                <button
+                  onClick={() => {
+                    setActiveCategory("__featured__");
+                    const el = document.getElementById("kiosk-cat-featured");
+                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className={`text-left px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                    activeCategory === "__featured__"
+                      ? "text-white shadow-md"
+                      : "text-foreground hover:bg-muted"
+                  }`}
+                  style={activeCategory === "__featured__" ? { backgroundColor: primaryColor } : {}}
+                >
+                  <Star className="h-5 w-5 shrink-0" />
+                  <span className="line-clamp-2">Destaques</span>
+                </button>
+              )}
               {categories.map(cat => (
                 <button
                   key={cat.id}
@@ -120,58 +140,71 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
                 {filteredProducts.length === 0 && <p className="text-center text-muted-foreground text-lg py-12">Nenhum produto encontrado</p>}
               </>
             ) : (
-              categories.map(cat => (
-                <div key={cat.id} id={`kiosk-cat-${cat.id}`} className="mb-8">
-                  <div className="flex items-center gap-3 mb-4">
-                    {(cat as any).image_url && (
-                      <img src={(cat as any).image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
-                    )}
-                    <h3 className="text-xl md:text-2xl font-bold text-foreground">{cat.name}</h3>
+              <>
+                {/* Featured section */}
+                {featuredProducts.length > 0 && (
+                  <div id="kiosk-cat-featured" className="mb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Star className="h-6 w-6" style={{ color: primaryColor }} />
+                      <h3 className="text-xl md:text-2xl font-bold text-foreground">Destaques</h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                      {featuredProducts.map(p => (
+                        <KioskProductCard key={`feat-${p.id}`} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} featured />
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                    {cat.products.map(p => (
-                      <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
-                    ))}
+                )}
+
+                {categories.map(cat => (
+                  <div key={cat.id} id={`kiosk-cat-${cat.id}`} className="mb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      {(cat as any).image_url && (
+                        <img src={(cat as any).image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                      )}
+                      <h3 className="text-xl md:text-2xl font-bold text-foreground">{cat.name}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                      {cat.products.map(p => (
+                        <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </>
             )}
           </div>
         </ScrollArea>
       </div>
 
-      {/* Cart FAB */}
+      {/* Cart FAB - bottom right */}
       {cartCount > 0 && (
-        <div className="border-t bg-card p-3 md:p-4 shrink-0">
-          <button
-            onClick={onOpenCart}
-            className="w-full flex items-center justify-between px-6 py-4 rounded-2xl text-white text-lg font-bold shadow-xl transition-transform active:scale-[0.98]"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <ShoppingCart className="h-6 w-6" />
-                <span className="absolute -top-2 -right-2 bg-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" style={{ color: primaryColor }}>
-                  {cartCount}
-                </span>
-              </div>
-              <span>Ver Pedido</span>
-            </div>
-            <span>R$ {cartTotal.toFixed(2)}</span>
-          </button>
-        </div>
+        <button
+          onClick={onOpenCart}
+          className="fixed bottom-6 right-6 flex items-center gap-3 px-6 py-4 rounded-2xl text-white text-base font-bold shadow-2xl transition-transform active:scale-95 z-50"
+          style={{ backgroundColor: primaryColor }}
+        >
+          <div className="relative">
+            <ShoppingCart className="h-6 w-6" />
+            <span className="absolute -top-2 -right-2 bg-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" style={{ color: primaryColor }}>
+              {cartCount}
+            </span>
+          </div>
+          <span>R$ {cartTotal.toFixed(2)}</span>
+        </button>
       )}
     </div>
   );
 }
 
-function KioskProductCard({ product, primaryColor, onSelect }: { product: Product; primaryColor: string; onSelect: (p: Product) => void }) {
+function KioskProductCard({ product, primaryColor, onSelect, featured }: { product: Product; primaryColor: string; onSelect: (p: Product) => void; featured?: boolean }) {
   const effectivePrice = product.promotional_price ?? product.price;
 
   return (
     <button
       onClick={() => onSelect(product)}
-      className="flex flex-col bg-card rounded-2xl border overflow-hidden text-left transition-all hover:shadow-xl active:scale-[0.97] group"
+      className={`flex flex-col bg-card rounded-2xl border overflow-hidden text-left transition-all hover:shadow-xl active:scale-[0.97] group ${featured ? "ring-2" : ""}`}
+      style={featured ? { ringColor: primaryColor } : undefined}
     >
       {product.image_url ? (
         <div className="relative w-full aspect-[4/3] overflow-hidden">
