@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, UtensilsCrossed, ShoppingBag } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed, ShoppingBag, Store, Truck } from "lucide-react";
+import { KioskConfig } from "@/hooks/useKioskConfig";
 
 interface Props {
   primaryColor: string;
@@ -11,9 +12,19 @@ interface Props {
   onChangeTable: (v: string) => void;
   onBack: () => void;
   onNext: () => void;
+  kioskConfig?: KioskConfig | null;
 }
 
-export function KioskConsumptionType({ primaryColor, consumptionType, tableNumber, onChangeType, onChangeTable, onBack, onNext }: Props) {
+export function KioskConsumptionType({ primaryColor, consumptionType, tableNumber, onChangeType, onChangeTable, onBack, onNext, kioskConfig }: Props) {
+  const options: { key: "dine_in" | "takeaway"; label: string; icon: any; configKey: keyof KioskConfig }[] = [
+    { key: "dine_in", label: "Comer no local", icon: UtensilsCrossed, configKey: "order_dine_in" },
+    { key: "takeaway", label: "Para viagem", icon: ShoppingBag, configKey: "order_takeaway" },
+  ];
+
+  const filteredOptions = kioskConfig
+    ? options.filter(o => kioskConfig[o.configKey] !== false)
+    : options;
+
   return (
     <div className="flex flex-col h-screen">
       <div className="flex items-center gap-4 p-6 border-b bg-card">
@@ -24,27 +35,19 @@ export function KioskConsumptionType({ primaryColor, consumptionType, tableNumbe
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-8 gap-8 max-w-lg mx-auto w-full">
-        <button
-          onClick={() => onChangeType("dine_in")}
-          className={`w-full p-8 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${
-            consumptionType === "dine_in" ? "border-2 shadow-lg" : "border-muted hover:border-muted-foreground/30"
-          }`}
-          style={consumptionType === "dine_in" ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
-        >
-          <UtensilsCrossed className="h-16 w-16" style={{ color: consumptionType === "dine_in" ? primaryColor : undefined }} />
-          <span className="text-2xl font-bold text-foreground">Comer no local</span>
-        </button>
-
-        <button
-          onClick={() => onChangeType("takeaway")}
-          className={`w-full p-8 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${
-            consumptionType === "takeaway" ? "border-2 shadow-lg" : "border-muted hover:border-muted-foreground/30"
-          }`}
-          style={consumptionType === "takeaway" ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
-        >
-          <ShoppingBag className="h-16 w-16" style={{ color: consumptionType === "takeaway" ? primaryColor : undefined }} />
-          <span className="text-2xl font-bold text-foreground">Para viagem</span>
-        </button>
+        {filteredOptions.map(opt => (
+          <button
+            key={opt.key}
+            onClick={() => onChangeType(opt.key)}
+            className={`w-full p-8 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${
+              consumptionType === opt.key ? "border-2 shadow-lg" : "border-muted hover:border-muted-foreground/30"
+            }`}
+            style={consumptionType === opt.key ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
+          >
+            <opt.icon className="h-16 w-16" style={{ color: consumptionType === opt.key ? primaryColor : undefined }} />
+            <span className="text-2xl font-bold text-foreground">{opt.label}</span>
+          </button>
+        ))}
 
         {consumptionType === "dine_in" && (
           <div className="w-full space-y-2">
