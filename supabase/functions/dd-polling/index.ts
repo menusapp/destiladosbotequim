@@ -255,23 +255,34 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // NEW ORDER - Fetch full detail from store-api to get items
+      // NEW ORDER - Fetch full detail from KDS endpoint to get items
       let fullOrder = ddOrder;
       const orderId = ddOrder.id || ddOrder.orderNumber;
       try {
-        const detailUrl = `${DD_STORE_API}/orders/${orderId}`;
+        // Use KDS detail endpoint which returns complete items
+        const detailUrl = `${DD_ADMIN_API}/kds/orders/${orderId}`;
         console.log(`[dd-polling] Fetching order detail: GET ${detailUrl}`);
         const detailRes = await fetch(detailUrl, { headers: ddHeaders });
         if (detailRes.ok) {
           const detailText = await detailRes.text();
           const detailData = JSON.parse(detailText);
-          // store-api may wrap in { data: ... } or return directly
           fullOrder = detailData?.data || detailData;
-          console.log(`[dd-polling] Detail keys: ${Object.keys(fullOrder).join(", ")}`);
-          console.log(`[dd-polling] Detail (3000): ${JSON.stringify(fullOrder).substring(0, 3000)}`);
+          console.log(`[dd-polling] KDS Detail keys: ${Object.keys(fullOrder).join(", ")}`);
+          console.log(`[dd-polling] KDS Detail (3000): ${JSON.stringify(fullOrder).substring(0, 3000)}`);
         } else {
-          const errBody = await detailRes.text();
-          console.warn(`[dd-polling] Detail failed (${detailRes.status}): ${errBody.substring(0, 300)}`);
+          // Fallback: try regular orders detail
+          const fallbackUrl = `${DD_ADMIN_API}/orders/${orderId}`;
+          console.log(`[dd-polling] KDS failed, trying: GET ${fallbackUrl}`);
+          const fallbackRes = await fetch(fallbackUrl, { headers: ddHeaders });
+          if (fallbackRes.ok) {
+            const fbText = await fallbackRes.text();
+            const fbData = JSON.parse(fbText);
+            fullOrder = fbData?.data || fbData;
+            console.log(`[dd-polling] Fallback detail keys: ${Object.keys(fullOrder).join(", ")}`);
+          } else {
+            const errBody = await fallbackRes.text();
+            console.warn(`[dd-polling] Both detail endpoints failed for ${orderId}: ${errBody.substring(0, 300)}`);
+          }
         }
       } catch (e) {
         console.warn(`[dd-polling] Detail error:`, e);
