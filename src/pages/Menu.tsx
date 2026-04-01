@@ -574,6 +574,88 @@ const Menu = () => {
     };
   }, [fetchData, restaurantSlug, tableNumber]);
 
+  // 🔒 Revalidar sessão ao voltar do background (visibilitychange + focus)
+  useEffect(() => {
+    const revalidateSession = async () => {
+      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
+      
+      if (!comandaId || !savedName) return;
+      
+      try {
+        const { data: comanda } = await supabase
+          .from("comandas")
+          .select("status")
+          .eq("id", comandaId)
+          .maybeSingle();
+        
+        if (!comanda || comanda.status === "closed") {
+          console.log('🔒 Comanda fechada ao voltar do background - logout');
+          
+          const { data: paidBill } = await supabase
+            .from("bills")
+            .select("id")
+            .eq("comanda_id", comandaId)
+            .eq("status", "paid")
+            .limit(1)
+            .maybeSingle();
+          
+          if (paidBill) {
+            sessionStorage.setItem('shouldShowReview', 'true');
+            sessionStorage.setItem('reviewBillId', paidBill.id);
+          }
+          
+          sessionStorage.removeItem(`customer_name_${tableNumber}`);
+          sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+          sessionStorage.removeItem(`cart_${tableNumber}`);
+          sessionStorage.removeItem(`comanda_id_${tableNumber}`);
+          sessionStorage.removeItem(`table_id_${tableNumber}`);
+          sessionStorage.removeItem("customerInfo");
+          
+          window.location.reload();
+          return;
+        }
+        
+        const savedTableId = sessionStorage.getItem(`table_id_${tableNumber}`);
+        if (savedTableId) {
+          const { data: table } = await supabase
+            .from("tables")
+            .select("is_occupied")
+            .eq("id", savedTableId)
+            .maybeSingle();
+          
+          if (table && !table.is_occupied) {
+            console.log('🔒 Mesa liberada ao voltar do background - logout');
+            
+            sessionStorage.removeItem(`customer_name_${tableNumber}`);
+            sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+            sessionStorage.removeItem(`cart_${tableNumber}`);
+            sessionStorage.removeItem(`comanda_id_${tableNumber}`);
+            sessionStorage.removeItem(`table_id_${tableNumber}`);
+            sessionStorage.removeItem("customerInfo");
+            
+            window.location.reload();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao revalidar sessão:', err);
+      }
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') revalidateSession();
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', revalidateSession);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', revalidateSession);
+    };
+  }, [tableNumber]);
+
   useEffect(() => {
     // ✅ Só salvar se temos dados válidos (não strings vazias)
     if (customerName && customerName.trim() !== "" && 
