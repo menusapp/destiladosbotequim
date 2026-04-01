@@ -217,8 +217,8 @@ Deno.serve(async (req) => {
           status: orderStatus,
           dd_source: true,
           dd_order_id: ddOrderId,
-          delivery_fee: ddOrder.delivery_fee || ddOrder.deliveryFee || 0,
-          notes: ddOrder.observations || null,
+          delivery_fee: deliveryFee,
+          notes: ddOrder.observations || ddOrder.note || null,
         })
         .select("id")
         .single();
@@ -229,14 +229,14 @@ Deno.serve(async (req) => {
       }
 
       // Insert items
-      const items = ddOrder.items || [];
+      const items = ddOrder.items || ddOrder.orderItems || [];
       if (items.length > 0 && newOrder) {
         const orderItems = items.map((item: any) => ({
           order_id: newOrder.id,
           product_id: null,
           quantity: item.quantity || 1,
-          price_at_order: item.unit_price || item.unitPrice || item.price || 0,
-          notes: item.observations || item.name || null,
+          price_at_order: item.unit_price || item.unitPrice || item.price || item.totalPrice || 0,
+          notes: item.observations || item.name || item.productName || null,
         }));
 
         const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
