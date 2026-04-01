@@ -1,7 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Receipt, X } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Receipt, ChevronDown, ChevronUp, X } from "lucide-react";
 
 interface NewBillNotificationProps {
   billId: string;
@@ -10,6 +9,7 @@ interface NewBillNotificationProps {
   customerName?: string;
   onView: () => void;
   onDismiss: () => void;
+  onStopSound?: () => void;
 }
 
 export const NewBillNotification = ({
@@ -19,127 +19,83 @@ export const NewBillNotification = ({
   customerName,
   onView,
   onDismiss,
+  onStopSound,
 }: NewBillNotificationProps) => {
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
-    playBeepSound();
+  const title = `Mesa ${tableNumber} — ${customerName || 'Cliente'}`;
 
-    return () => {
-      stopSound();
-    };
-  }, []);
+  // Compact pill (collapsed)
+  if (!expanded) {
+    return (
+      <div
+        onClick={() => setExpanded(true)}
+        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 shadow-lg cursor-pointer hover:shadow-xl transition-all w-80 dark:bg-amber-950 dark:border-amber-800"
+      >
+        <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
+          <Receipt className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-amber-900 truncate dark:text-amber-100">{title}</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400">Conta solicitada</p>
+        </div>
+        <span className="text-sm font-bold text-amber-900 flex-shrink-0 dark:text-amber-100">R$ {total.toFixed(2)}</span>
+        <ChevronDown className="w-4 h-4 text-amber-400 flex-shrink-0" />
+      </div>
+    );
+  }
 
-  const playBeepSound = () => {
-    try {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      const playBeep = () => {
-        if (!audioContextRef.current) return;
-
-        const oscillator = audioContextRef.current.createOscillator();
-        const gainNode = audioContextRef.current.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContextRef.current.destination);
-        
-        // Som diferenciado - 800Hz
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        
-        gainNode.gain.setValueAtTime(0.25, audioContextRef.current.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.15);
-        
-        oscillator.start(audioContextRef.current.currentTime);
-        oscillator.stop(audioContextRef.current.currentTime + 0.15);
-      };
-
-      playBeep();
-
-      intervalRef.current = setInterval(() => {
-        playBeep();
-      }, 500);
-    } catch (error) {
-      console.error("Erro ao reproduzir som:", error);
-    }
-  };
-
-  const stopSound = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-  };
-
-  const handleStopSound = () => {
-    stopSound();
-  };
-
-  const handleView = () => {
-    stopSound();
-    onView();
-  };
-
-  const handleClose = () => {
-    stopSound();
-    onDismiss();
-  };
-
+  // Expanded card
   return (
-    <div className="fixed top-4 right-4 z-[100] w-96 animate-in slide-in-from-top-5">
-      <Card className="bg-amber-50 border-amber-200 shadow-2xl dark:bg-amber-950 dark:border-amber-800">
-        <div className="p-6 space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center animate-bounce">
-                <Receipt className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-amber-900 dark:text-amber-100">Conta Solicitada!</h3>
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  🍽️ Mesa {tableNumber} {customerName && `• ${customerName}`}
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="h-8 w-8 text-amber-700 hover:text-amber-900 hover:bg-amber-100 dark:text-amber-300"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+    <div className="w-80 rounded-xl bg-amber-50 border border-amber-200 shadow-2xl dark:bg-amber-950 dark:border-amber-800">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-amber-200 dark:border-amber-800">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center flex-shrink-0">
+            <Receipt className="w-4 h-4 text-white" />
           </div>
-          
-          <div className="space-y-1">
-            <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">
-              R$ {total.toFixed(2)}
-            </p>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900 truncate dark:text-amber-100">{title}</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400">Conta solicitada</p>
           </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setExpanded(false)} className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900">
+            <ChevronUp className="w-4 h-4 text-amber-500" />
+          </button>
+          <button onClick={onDismiss} className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900">
+            <X className="w-4 h-4 text-amber-500" />
+          </button>
+        </div>
+      </div>
 
-          <div className="flex gap-2">
+      {/* Body */}
+      <div className="px-4 py-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-amber-700 dark:text-amber-300">Total</span>
+          <span className="text-xl font-bold text-amber-900 dark:text-amber-100">R$ {total.toFixed(2)}</span>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            onClick={onView}
+            size="sm"
+            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+          >
+            Ver Conta
+          </Button>
+          {onStopSound && (
             <Button
-              onClick={handleView}
-              className="flex-1 bg-amber-600 hover:bg-amber-700"
-            >
-              VER CONTA
-            </Button>
-            <Button
-              onClick={handleStopSound}
+              onClick={onStopSound}
+              size="sm"
               variant="outline"
               className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-300"
             >
               Parar Som
             </Button>
-          </div>
+          )}
         </div>
-      </Card>
+      </div>
     </div>
   );
 };
