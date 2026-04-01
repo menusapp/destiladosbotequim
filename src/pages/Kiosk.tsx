@@ -10,7 +10,7 @@ import { KioskIdentification } from "@/components/kiosk/KioskIdentification";
 import { KioskMenu } from "@/components/kiosk/KioskMenu";
 import { KioskProductDetail } from "@/components/kiosk/KioskProductDetail";
 import { KioskCart } from "@/components/kiosk/KioskCart";
-import { KioskConsumptionType } from "@/components/kiosk/KioskConsumptionType";
+import { KioskConsumptionType, ConsumptionMode } from "@/components/kiosk/KioskConsumptionType";
 import { KioskPayment } from "@/components/kiosk/KioskPayment";
 import { KioskConfirmation } from "@/components/kiosk/KioskConfirmation";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
@@ -34,17 +34,57 @@ export default function Kiosk() {
   const [customer, setCustomer] = useState<KioskCustomer | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productExtras, setProductExtras] = useState<ProductExtra[]>([]);
-  const [consumptionType, setConsumptionType] = useState<"dine_in" | "takeaway">("dine_in");
+  const [consumptionMode, setConsumptionMode] = useState<ConsumptionMode>("counter");
   const [tableNumber, setTableNumber] = useState<string>("");
   const [orderId, setOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [kioskDisabled, setKioskDisabled] = useState(false);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch kiosk config after restaurant is loaded
-  const { config: kioskConfig, loading: configLoading } = useKioskConfig(restaurant?.id || null);
+  // Coupon & loyalty state
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
 
+  const { config: kioskConfig, loading: configLoading } = useKioskConfig(restaurant?.id || null);
   const timeoutMs = (kioskConfig?.inactivity_timeout_seconds || 120) * 1000;
+
+  const cartTotal = cart.reduce((sum, item) => {
+    const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+    const price = item.product.promotional_price ?? item.product.price;
+    return sum + (price + extrasTotal) * item.quantity;
+  }, 0);
+
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const primaryColor = restaurant?.primary_color || "#FF6B35";
+  const loyaltyRealPerPoint = restaurant?.loyalty_real_per_point || 0.01;
+
+  // Calculate coupon discount
+  useEffect(() => {
+    if (!appliedCoupon) { setCouponDiscount(0); return; }
+    let discount = 0;
+    if (appliedCoupon.discount_type === "percentage") {
+      discount = cartTotal * (appliedCoupon.discount_value / 100);
+      if (appliedCoupon.max_discount) discount = Math.min(discount, appliedCoupon.max_discount);
+    } else {
+      discount = appliedCoupon.discount_value;
+    }
+    setCouponDiscount(Math.min(discount, cartTotal));
+  }, [appliedCoupon, cartTotal]);
+
+  // Fetch loyalty points
+  useEffect(() => {
+    if (!customer?.cpf || !restaurant?.id || !restaurant?.loyalty_enabled) return;
+    supabase.from("loyalty_points")
+      .select("points_balance")
+      .eq("customer_cpf", customer.cpf)
+      .eq("restaurant_id", restaurant.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setLoyaltyPoints(data?.points_balance || 0);
+      });
+  }, [customer?.cpf, restaurant?.id, restaurant?.loyalty_enabled]);
 
   const resetSession = useCallback(() => {
     setStep("idle");
@@ -52,9 +92,13 @@ export default function Kiosk() {
     setCustomer(null);
     setSelectedProduct(null);
     setProductExtras([]);
-    setConsumptionType("dine_in");
+    setConsumptionMode("counter");
     setTableNumber("");
     setOrderId(null);
+    setAppliedCoupon(null);
+    setCouponDiscount(0);
+    setLoyaltyPoints(0);
+    setLoyaltyPointsUsed(0);
   }, []);
 
   // Inactivity timer
@@ -101,7 +145,6 @@ export default function Kiosk() {
       }
       setRestaurant(r);
 
-      // Check if kiosk is enabled
       const { data: kConf } = await supabase
         .from("kiosk_config")
         .select("enabled")
@@ -138,7 +181,6 @@ export default function Kiosk() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Product extras loader
   const openProduct = useCallback(async (product: Product) => {
     setSelectedProduct(product);
     try {
@@ -146,9 +188,7 @@ export default function Kiosk() {
         .from("product_extras")
         .select("*")
         .eq("product_id", product.id);
-      if (error) {
-        console.error("[Kiosk] Erro ao carregar extras:", error);
-      }
+      if (error) console.error("[Kiosk] Erro ao carregar extras:", error);
       setProductExtras(data || []);
     } catch (err) {
       console.error("[Kiosk] Exceção ao carregar extras:", err);
@@ -182,20 +222,8 @@ export default function Kiosk() {
     setCart(prev => prev.filter(i => i.id !== itemId));
   }, []);
 
-  const cartTotal = cart.reduce((sum, item) => {
-    const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
-    const price = item.product.promotional_price ?? item.product.price;
-    return sum + (price + extrasTotal) * item.quantity;
-  }, 0);
-
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  const primaryColor = restaurant?.primary_color || "#FF6B35";
-
-  // Determine which consumption types are available
   const handleStartOrder = () => {
     if (kioskConfig?.require_cpf === false) {
-      // Skip identification, go straight to menu
       setCustomer({ name: "Cliente", cpf: "", isExisting: false });
       setStep("menu");
     } else {
@@ -223,9 +251,7 @@ export default function Kiosk() {
             {isSlugMissing ? "Link do totem inválido" : "Restaurante não encontrado"}
           </h2>
           <p className="text-lg text-muted-foreground">
-            {isSlugMissing
-              ? "O endereço acessado não contém a identificação do restaurante."
-              : "Verifique o endereço e tente novamente."}
+            {isSlugMissing ? "O endereço acessado não contém a identificação do restaurante." : "Verifique o endereço e tente novamente."}
           </p>
         </div>
       </KioskLayout>
@@ -247,10 +273,7 @@ export default function Kiosk() {
   return (
     <KioskLayout primaryColor={primaryColor}>
       {step === "idle" && (
-        <KioskIdleScreen
-          restaurant={restaurant}
-          onStart={handleStartOrder}
-        />
+        <KioskIdleScreen restaurant={restaurant} onStart={handleStartOrder} />
       )}
 
       {step === "identification" && (
@@ -271,6 +294,7 @@ export default function Kiosk() {
           onOpenCart={() => setStep("cart")}
           customerName={customer?.name || ""}
           onCancel={resetSession}
+          restaurant={restaurant}
         />
       )}
 
@@ -293,15 +317,24 @@ export default function Kiosk() {
           cartTotal={cartTotal}
           onBack={() => setStep("menu")}
           onNext={() => setStep("consumption")}
+          customerCpf={customer?.cpf}
+          restaurantId={restaurant.id}
+          appliedCoupon={appliedCoupon}
+          onApplyCoupon={setAppliedCoupon}
+          couponDiscount={couponDiscount}
+          loyaltyPoints={loyaltyPoints}
+          loyaltyPointsUsed={loyaltyPointsUsed}
+          loyaltyRealPerPoint={loyaltyRealPerPoint}
+          onRedeemPoints={setLoyaltyPointsUsed}
         />
       )}
 
       {step === "consumption" && (
         <KioskConsumptionType
           primaryColor={primaryColor}
-          consumptionType={consumptionType}
+          consumptionMode={consumptionMode}
           tableNumber={tableNumber}
-          onChangeType={setConsumptionType}
+          onChangeMode={setConsumptionMode}
           onChangeTable={setTableNumber}
           onBack={() => setStep("cart")}
           onNext={() => setStep("payment")}
@@ -314,13 +347,17 @@ export default function Kiosk() {
           cart={cart}
           restaurant={restaurant}
           customer={customer!}
-          consumptionType={consumptionType}
+          consumptionMode={consumptionMode}
           tableNumber={tableNumber}
           primaryColor={primaryColor}
           cartTotal={cartTotal}
           onBack={() => setStep("consumption")}
           onOrderCreated={(id) => { setOrderId(id); setStep("confirmation"); }}
           kioskConfig={kioskConfig}
+          appliedCoupon={appliedCoupon}
+          couponDiscount={couponDiscount}
+          loyaltyPointsUsed={loyaltyPointsUsed}
+          loyaltyRealPerPoint={loyaltyRealPerPoint}
         />
       )}
 

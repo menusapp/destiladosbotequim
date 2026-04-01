@@ -2460,6 +2460,7 @@ export type Database = {
           loyalty_points_used: number | null
           notes: string | null
           online_payment_id: string | null
+          order_channel: string | null
           order_type: string | null
           payment_brand: string | null
           payment_status: string | null
@@ -2496,6 +2497,7 @@ export type Database = {
           loyalty_points_used?: number | null
           notes?: string | null
           online_payment_id?: string | null
+          order_channel?: string | null
           order_type?: string | null
           payment_brand?: string | null
           payment_status?: string | null
@@ -2532,6 +2534,7 @@ export type Database = {
           loyalty_points_used?: number | null
           notes?: string | null
           online_payment_id?: string | null
+          order_channel?: string | null
           order_type?: string | null
           payment_brand?: string | null
           payment_status?: string | null
