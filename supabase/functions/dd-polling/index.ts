@@ -292,7 +292,7 @@ Deno.serve(async (req) => {
       let orderItems = fullOrder.items || fullOrder.orderItems || fullOrder.cart || [];
       if (!orderItems.length && orderId) {
         try {
-          const itemsUrl = `${DD_STORE_API}/orders/${orderId}/items`;
+          const itemsUrl = `${DD_ADMIN_API}/orders/${orderId}/items`;
           console.log(`[dd-polling] Fetching items separately: GET ${itemsUrl}`);
           const itemsRes = await fetch(itemsUrl, { headers: ddHeaders });
           if (itemsRes.ok) {
