@@ -325,6 +325,12 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
               {order.dd_source && (
                 <Badge className="bg-[#0066CC] text-white text-[10px] px-1.5 py-0 border-0">Delivery Direto</Badge>
               )}
+              {order.dd_scheduled_for && (
+                <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 border-0 gap-0.5">
+                  <CalendarClock className="w-2.5 h-2.5" />
+                  Agendado {new Date(order.dd_scheduled_for).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </Badge>
+              )}
            </div>
           <p className="text-sm font-semibold truncate">{order.customer_name}</p>
           <div className="text-xs text-muted-foreground">
