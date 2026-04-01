@@ -183,10 +183,11 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       // Function always returns 200, check response body for errors
       if (res.data?.error) {
         console.error("DD action error:", res.data.error);
+        // DD rejected — do NOT treat as success, do NOT update locally
         return { 
-          ok: res.data?.local_updated === true, 
+          ok: false, 
           errorMsg: res.data.error,
-          localUpdated: res.data?.local_updated === true,
+          localUpdated: false,
         };
       }
       
@@ -241,14 +242,13 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
         }
       }
 
-      // Sync with Delivery Direto
+      // Sync with Delivery Direto — DD is source of truth for DD orders
       const ddResult = await syncDDStatus(newStatus, reason);
       if (!ddResult.ok) {
-        if (ddResult.localUpdated) {
-          toast.warning(`${ddResult.errorMsg || "Erro ao sincronizar com Delivery Direto"}. Status local atualizado.`);
-        } else {
-          toast.error(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}`);
-        }
+        // DD rejected — revert optimistic update and abort
+        setOrder(prev => ({ ...prev, status: previousStatus }));
+        toast.error(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}`);
+        return;
       }
 
       // Update local status in DB
