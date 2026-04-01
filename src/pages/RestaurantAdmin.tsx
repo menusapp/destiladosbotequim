@@ -797,7 +797,9 @@ const RestaurantAdmin = () => {
       case "config-whatsapp":
         return <WhatsAppSettings restaurantId={restaurant.id} />;
       case "config-totem":
-        return <KioskSettings restaurantId={restaurant.id} />;
+        return isTotemUnlocked
+          ? <KioskSettings restaurantId={restaurant.id} />
+          : <KioskUpsellScreen />;
       case "config-backup":
         return <BackupSettings restaurantId={restaurant.id} />;
       default:
