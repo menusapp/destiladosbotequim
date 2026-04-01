@@ -152,18 +152,22 @@ Deno.serve(async (req) => {
       "Accept": "application/json",
     };
 
-    // Build query - use store-api orders endpoint
+    // Build query - use KDS orders endpoint (returns items!)
     const now = new Date();
     const lastSync = config.last_sync_at
       ? new Date(config.last_sync_at)
       : new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+    // KDS endpoint uses dateStart in "yyyy-MM-dd HH:mm:ss" UTC format
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const dateStart = `${lastSync.getUTCFullYear()}-${pad(lastSync.getUTCMonth() + 1)}-${pad(lastSync.getUTCDate())} ${pad(lastSync.getUTCHours())}:${pad(lastSync.getUTCMinutes())}:${pad(lastSync.getUTCSeconds())}`;
+
     const params = new URLSearchParams();
-    params.set("updatedAt[gte]", lastSync.toISOString());
+    params.set("dateStart", dateStart);
     params.set("limit", "50");
 
-    const ordersUrl = `${DD_ADMIN_API}/orders?${params.toString()}`;
-    console.log(`[dd-polling] Fetching orders: ${ordersUrl}`);
+    const ordersUrl = `${DD_ADMIN_API}/kds/orders?${params.toString()}`;
+    console.log(`[dd-polling] Fetching KDS orders: ${ordersUrl}`);
 
     const ordersRes = await fetch(ordersUrl, { headers: ddHeaders });
 
@@ -198,7 +202,7 @@ Deno.serve(async (req) => {
     } else if (ordersData?.orders && Array.isArray(ordersData.orders)) {
       ordersList = ordersData.orders;
     }
-    console.log(`[dd-polling] Found ${ordersList.length} orders from admin-api`);
+    console.log(`[dd-polling] Found ${ordersList.length} orders from KDS admin-api`);
     
     // Log first order structure for debugging
     if (ordersList.length > 0) {
@@ -320,8 +324,8 @@ Deno.serve(async (req) => {
         ? `${addr.street || addr.streetName || ""}, ${addr.number || ""} - ${addr.neighborhood || addr.district || ""}, ${addr.city || ""}`
         : null;
 
-      // Payment mapping - store-api provides payment.type and payment.paymentDetails
-      const payment = fullOrder.payment || (Array.isArray(fullOrder.payments) ? fullOrder.payments[0] : null) || fullOrder.paymentMethod || {};
+      // Payment mapping - admin-api returns paymentMethod with .name field
+      const payment = fullOrder.paymentMethod || fullOrder.payment || (Array.isArray(fullOrder.payments) ? fullOrder.payments[0] : null) || {};
       const paymentLabel = mapPaymentLabel(payment);
       console.log(`[dd-polling] Order ${ddOrderId} payment: ${JSON.stringify(payment).substring(0, 300)}, mapped="${paymentLabel}"`);
 
