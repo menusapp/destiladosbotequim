@@ -133,13 +133,13 @@ Deno.serve(async (req) => {
       });
     } catch (fetchErr) {
       console.error("[dd-order-action] Fetch error:", fetchErr);
-      // Update local status even if DD is unreachable
-      await updateLocalStatus(supabase, dd_order_id, actionCfg.localStatus, action, reason);
+      // DO NOT update local status — DD is source of truth
+      console.log(`[dd-order-action] ✗ Status local NÃO alterado — falha de conexão com DD`);
       return respond({
         success: false,
         dd_error: true,
         error: `Não foi possível conectar ao Delivery Direto: ${(fetchErr as Error).message}`,
-        local_updated: true,
+        local_updated: false,
       });
     }
 
@@ -162,8 +162,8 @@ Deno.serve(async (req) => {
       const friendlyError = buildFriendlyError(action, actionCfg.ddStatus, apiRes.status, ddErrorMsg);
       console.error(`[dd-order-action] ✗ ${friendlyError}`);
 
-      // Still update local status
-      const localOk = await updateLocalStatus(supabase, dd_order_id, actionCfg.localStatus, action, reason);
+      // DO NOT update local status — DD rejected the transition
+      console.log(`[dd-order-action] ✗ Status local NÃO alterado — DD rejeitou a transição`);
 
       return respond({
         success: false,
@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
         dd_http_status: apiRes.status,
         dd_response: ddErrorMsg,
         error: friendlyError,
-        local_updated: localOk,
+        local_updated: false,
       });
     }
 
