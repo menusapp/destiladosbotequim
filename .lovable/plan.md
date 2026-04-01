@@ -1,74 +1,63 @@
 
 
-# Corrigir Itens Vazios e Status -- Endpoints Errados no Admin-API
+# Corrigir Itens Vazios: Usar GET /orders/{id} para Detalhe do Pedido
 
-## Diagnostico Definitivo (da OpenAPI oficial)
+## Diagnostico Definitivo (dos Logs Reais)
 
-### Problema 1: Itens vazios -- URL do KDS detail ERRADA
+Os logs confirmam TUDO:
 
-O codigo atual busca detalhes do pedido com:
 ```text
-GET /admin-api/v1/kds/orders/{id}    <-- ERRADO (este e o endpoint de PUT)
+GET /admin-api/v1/orders  ->  retorna pedidos COM "items":[] (VAZIO)
+GET /admin-api/v1/kds/orders  ->  retorna 0 pedidos (KDS so mostra pedidos aprovados/preparando)
+GET /admin-api/v1/kds/order?orderId=69572069  ->  falha silenciosa (sem log de resultado)
+GET /admin-api/v1/orders/69572069/items  ->  404 "Nao encontrado"
 ```
 
-A OpenAPI oficial do admin-api mostra que o endpoint correto e:
-```text
-GET /admin-api/v1/kds/order?orderId={id}    <-- CORRETO (singular "order", query param)
-```
+O que NUNCA foi tentado: **`GET /admin-api/v1/orders/{id}`** (detalhe individual do pedido). A documentacao admin-api tem `PUT /admin-api/v1/orders/{id}` documentado -- se PUT existe nesse path, GET tambem deve existir. O Gemini confirmou: "usar o endpoint de buscar detalhes do pedido (GET /orders/{orderId})".
 
-O endpoint de lista KDS retorna os itens do pedido (schema `KdsorderDTO`). O endpoint `/kds/orders/{id}` so aceita PUT (para atualizar status). O GET com path param simplesmente nao existe, retorna 404 silenciosamente, e o codigo cai no fallback que tambem falha.
-
-### Problema 2: Status 404 -- PUT no endpoint errado
-
-O codigo usa:
-```text
-PUT /admin-api/v1/orders/{id}    <-- retorna 404 (HTML generico)
-```
-
-A OpenAPI mostra que o endpoint correto para atualizar status e:
-```text
-PUT /admin-api/v1/kds/orders/{id}    <-- CORRETO (KDS status update)
-```
-
-O `PUT /admin-api/v1/orders/{id}` pode existir mas retorna 404 porque a rota espera um formato diferente ou nao e funcional. O KDS PUT esta documentado e aceita `UpdateKdsorderStatusDTO`.
+Pagamento ja funciona: `paymentMethod.name` = "Visa (credito)" mapeia corretamente para "Cartao de Credito Visa".
 
 ## Alteracoes
 
 ### 1. `supabase/functions/dd-polling/index.ts`
 
-**Corrigir URL do detalhe KDS** (linha 263):
-- DE: `GET ${DD_ADMIN_API}/kds/orders/${orderId}`
-- PARA: `GET ${DD_ADMIN_API}/kds/order?orderId=${orderId}`
-- Resposta sera `{ status: "success", data: { ...KdsorderDTO } }` com itens inclusos
+**Substituir busca de detalhe KDS por GET /orders/{id}**:
 
-**Corrigir fallback** (linha 274):
-- Remover fallback para `GET /orders/${orderId}` (nao existe no admin-api como GET individual)
-- Manter apenas o endpoint KDS correto
+Ao encontrar pedido novo, em vez de tentar `/kds/order?orderId=X` e depois `/orders/X/items`:
+- Tentar: `GET /admin-api/v1/orders/{id}` (detalhe individual do pedido via Orders API)
+- Logar resposta completa para descobrir estrutura exata dos items
+- Se items vierem como array, usar campo `customCode` ou `pdvCode` para matching
+- KDS endpoint removido completamente do fluxo de polling
+- Remover tambem fallback `/orders/{id}/items` (retorna 404 confirmado)
 
-**Manter todo o resto identico**: parsing de items, payment mapping, valores em centavos, customer info, tudo permanece igual.
+**Manter tudo que ja funciona**: listing via `/admin-api/v1/orders`, parsing de `paymentMethod.name`, valores em centavos, customer info, delivery_fee.
 
 ### 2. `supabase/functions/dd-order-action/index.ts`
 
-**Corrigir endpoint de status** (linha 92):
-- DE: `PUT ${DD_ADMIN_API}/orders/${dd_order_id}`
-- PARA: `PUT ${DD_ADMIN_API}/kds/orders/${dd_order_id}`
-- Mesmo body: `{ status: "APPROVED" }` etc.
-- Manter mapeamento: accept->APPROVED, ready->READY, dispatch->DISPATCHED, deliver->DONE, reject->CANCELLED
+**Usar PUT /orders/{id} (Orders API, NAO KDS)**:
+
+A documentacao admin-api confirma: `PUT /admin-api/v1/orders/{id}` - "Atualiza o status de um pedido".
+
+Mudar de `PUT /kds/orders/{id}` para `PUT /orders/{id}`. Os status do pedido (nao KDS) sao:
+- accept -> `APPROVED`
+- dispatch -> `DISPATCHED` (ou `IN_TRANSIT` baseado em `operationTime.inTransitTime`)
+- deliver -> `DONE`
+- reject -> `CANCELLED` (com `statusReason`)
+
+Se `PUT /orders/{id}` retornar 400 ou 404, tentar como fallback o body com campo `status` como string simples.
 
 ### 3. Nenhuma outra alteracao
 
-- `dd-auth/index.ts` -- sem alteracao (auth funciona)
+- `dd-auth` -- sem alteracao (funciona)
 - UI -- sem alteracao
-- Pagamento -- sem alteracao (ja funciona correto)
-- Valores -- sem alteracao (ja funciona correto)
+- Pagamento -- sem alteracao (funciona)
 
 ## Resumo Tecnico
 
-| Arquivo | Linha | De | Para |
-|---------|-------|----|----|
-| dd-polling | ~263 | `GET /kds/orders/${id}` | `GET /kds/order?orderId=${id}` |
-| dd-polling | ~274 | fallback `GET /orders/${id}` | remover fallback |
-| dd-order-action | ~92 | `PUT /orders/${id}` | `PUT /kds/orders/${id}` |
+| Arquivo | De | Para |
+|---------|-----|------|
+| dd-polling | `GET /kds/order?orderId=X` + `GET /orders/X/items` | `GET /orders/{id}` |
+| dd-order-action | `PUT /kds/orders/{id}` | `PUT /orders/{id}` |
 
-Duas correcoes de URL. Nenhuma funcionalidade existente alterada.
+Duas mudancas de URL. Nenhuma funcionalidade existente alterada.
 
