@@ -1,3 +1,4 @@
+// KioskSettings v2 - force chunk refresh
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
