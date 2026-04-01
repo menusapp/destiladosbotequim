@@ -101,7 +101,7 @@ const RestaurantAdmin = () => {
   const notifiedOrdersRef = useRef<Set<string>>(new Set());
   const notifiedBillsRef = useRef<Set<string>>(new Set());
   const notifiedReservationsRef = useRef<Set<string>>(new Set());
-  const billNotificationRef = useRef<typeof billNotification>(null);
+  const billNotificationQueueRef = useRef<typeof billNotificationQueue>([]);
   const reservationNotificationRef = useRef<typeof reservationNotification>(null);
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
   const [pendingTableToOpen, setPendingTableToOpen] = useState<string | null>(null);
