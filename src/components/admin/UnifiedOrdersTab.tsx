@@ -242,7 +242,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     if (activeTab === "delivery") {
       filtered = filtered.filter(o => o.order_type === "delivery" && o.delivery_type === "delivery");
     } else if (activeTab === "retirada") {
-      filtered = filtered.filter(o => o.order_type === "delivery" && (o.delivery_type === "pickup" || o.delivery_type === "takeaway"));
+      filtered = filtered.filter(o => o.order_type === "balcao" || (o.order_type === "delivery" && (o.delivery_type === "pickup" || o.delivery_type === "takeaway")));
     }
     // "todos" shows everything
 
