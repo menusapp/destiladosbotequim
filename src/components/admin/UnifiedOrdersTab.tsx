@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package,
-  Clock, Printer, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone
+  Clock, Printer, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { format, startOfDay, endOfDay } from "date-fns";
