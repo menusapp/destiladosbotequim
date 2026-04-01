@@ -27,8 +27,8 @@ export const ComandaBottomBar = ({
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="px-4 py-3 flex items-center justify-between gap-4">
-        <span className="text-sm font-medium text-foreground">
-          {cartItemCount > 0 ? "Enviar Pedido" : "Ver Comanda"}
+        <span className="text-sm font-medium text-foreground mx-[5px]">
+          Enviar Pedido
         </span>
 
         <button
