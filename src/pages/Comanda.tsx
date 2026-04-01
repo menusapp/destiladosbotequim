@@ -374,6 +374,64 @@ const Comanda = () => {
     };
   }, [restaurantSlug, tableNumber]);
 
+  // 🔒 Revalidar sessão ao voltar do background
+  useEffect(() => {
+    const revalidateSession = async () => {
+      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
+      
+      if (!comandaId || !savedName) return;
+      
+      try {
+        const { data: comanda } = await supabase
+          .from("comandas")
+          .select("status")
+          .eq("id", comandaId)
+          .maybeSingle();
+        
+        if (!comanda || comanda.status === "closed") {
+          console.log('🔒 Comanda fechada ao voltar do background - redirecionando');
+          
+          const { data: paidBill } = await supabase
+            .from("bills")
+            .select("id")
+            .eq("comanda_id", comandaId)
+            .eq("status", "paid")
+            .limit(1)
+            .maybeSingle();
+          
+          if (paidBill) {
+            sessionStorage.setItem('shouldShowReview', 'true');
+            sessionStorage.setItem('reviewBillId', paidBill.id);
+          }
+          
+          sessionStorage.removeItem(`customer_name_${tableNumber}`);
+          sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
+          sessionStorage.removeItem(`cart_${tableNumber}`);
+          sessionStorage.removeItem(`comanda_id_${tableNumber}`);
+          sessionStorage.removeItem("customerInfo");
+          
+          navigate(`/${restaurantSlug}/mesa/${tableNumber}`);
+          return;
+        }
+      } catch (err) {
+        console.error('Erro ao revalidar sessão:', err);
+      }
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') revalidateSession();
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', revalidateSession);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', revalidateSession);
+    };
+  }, [tableNumber, restaurantSlug, navigate]);
+
   // Tick every second for per-item prep timers
   useEffect(() => {
     if (!showPrepTimer) return;
@@ -1295,6 +1353,14 @@ const Comanda = () => {
                           onChange={(e) => setChangeAmount(e.target.value)}
                           placeholder="Ex: 100.00"
                         />
+                        {changeAmount && parseFloat(changeAmount) > totals.total && (
+                          <div className="flex justify-between items-center p-2 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
+                            <span className="text-sm text-muted-foreground">Troco:</span>
+                            <span className="text-sm font-bold text-orange-600">
+                              R$ {(parseFloat(changeAmount) - totals.total).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 

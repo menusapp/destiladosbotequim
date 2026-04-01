@@ -77,12 +77,12 @@ const DEFAULT_METHODS: PaymentMethod[] = [
 ];
 
 const METHOD_COLORS: Record<string, string> = {
-  cash: "bg-green-500/10 border-green-500/30 hover:bg-green-500/20 text-green-700 dark:text-green-400",
-  pix: "bg-teal-500/10 border-teal-500/30 hover:bg-teal-500/20 text-teal-700 dark:text-teal-400",
-  credit: "bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400",
-  debit: "bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/20 text-purple-700 dark:text-purple-400",
-  meal_voucher: "bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400",
-  voucher: "bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400",
+  cash: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  pix: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  credit: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  debit: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  meal_voucher: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  voucher: "bg-muted/50 border-border hover:bg-muted text-foreground",
 };
 
 type Step = "methods" | "brand-select";
@@ -95,7 +95,7 @@ export const PaymentConfirmationModal = ({
 }: PaymentConfirmationModalProps) => {
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
   const [serviceFeePercentage, setServiceFeePercentage] = useState(0);
-  const [selectedPayments, setSelectedPayments] = useState<Array<{ method: string; methodType: string; amount: number; brandCode?: string }>>([]);
+  const [selectedPayments, setSelectedPayments] = useState<Array<{ method: string; methodType: string; amount: number; brandCode?: string; cashChange?: number }>>([]);
   const [currentAmount, setCurrentAmount] = useState("");
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(DEFAULT_METHODS);
   const [loading, setLoading] = useState(true);
@@ -177,12 +177,14 @@ export const PaymentConfirmationModal = ({
       toast.error("Digite um valor válido");
       return;
     }
-    if (amount > remaining + 0.01) {
+    // For cash, allow overpayment (change will be calculated)
+    if (methodType !== "cash" && amount > remaining + 0.01) {
       toast.error("Valor maior que o restante");
       return;
     }
-    const adjustedAmount = Math.min(amount, remaining);
-    setSelectedPayments([...selectedPayments, { method: methodName, methodType, amount: adjustedAmount, brandCode }]);
+    const adjustedAmount = methodType === "cash" ? Math.min(amount, remaining) : Math.min(amount, remaining);
+    const cashChange = methodType === "cash" && amount > remaining ? Math.round((amount - remaining) * 100) / 100 : 0;
+    setSelectedPayments([...selectedPayments, { method: methodName, methodType, amount: adjustedAmount, brandCode, cashChange }]);
     setCurrentAmount("");
   };
 
@@ -277,7 +279,7 @@ export const PaymentConfirmationModal = ({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">💰 Finalizar Pagamento</DialogTitle>
+          <DialogTitle className="text-xl font-bold">Finalizar Pagamento</DialogTitle>
         </DialogHeader>
 
         {/* Order Summary */}
@@ -381,12 +383,13 @@ export const PaymentConfirmationModal = ({
                     const colorClass = METHOD_COLORS[method.method_type] || "bg-muted/50 border-border hover:bg-muted";
                     const needsBrand = needsBrandSelection(method.method_type);
 
+                    const isAdded = selectedPayments.some(p => p.methodType === method.method_type);
                     return (
                       <button
                         key={method.id}
                         onClick={() => handleMethodClick(method)}
                         disabled={remaining <= 0 || !currentAmount || parseFloat(currentAmount) <= 0}
-                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 ${colorClass} disabled:opacity-40 disabled:cursor-not-allowed`}
+                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 ${isAdded ? "border-orange-400 bg-orange-50 dark:bg-orange-950/30" : colorClass} disabled:opacity-40 disabled:cursor-not-allowed`}
                       >
                         <div className="w-10 h-10 rounded-lg bg-background/80 flex items-center justify-center flex-shrink-0">
                           <Icon className="w-5 h-5" />
@@ -440,21 +443,29 @@ export const PaymentConfirmationModal = ({
             </h3>
             <div className="space-y-2">
               {selectedPayments.map((payment, idx) => (
-                <div key={idx} className="flex items-center justify-between bg-background rounded-lg px-3 py-2 border">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{payment.method}</span>
+                <div key={idx} className="bg-background rounded-lg px-3 py-2 border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{payment.method}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold">R$ {payment.amount.toFixed(2)}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => removePayment(idx)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold">R$ {payment.amount.toFixed(2)}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => removePayment(idx)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  {payment.cashChange && payment.cashChange > 0 && (
+                    <div className="flex justify-between text-sm mt-1 pt-1 border-t border-dashed">
+                      <span className="text-muted-foreground">Troco:</span>
+                      <span className="font-semibold text-orange-600">R$ {payment.cashChange.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               ))}
               <div className="flex justify-between text-sm pt-2 border-t">
