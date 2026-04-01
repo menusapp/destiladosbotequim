@@ -255,51 +255,29 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // NEW ORDER - Fetch full detail from KDS endpoint to get items
+      // NEW ORDER - Fetch full detail via GET /orders/{id} (Orders API)
       let fullOrder = ddOrder;
       const orderId = ddOrder.id || ddOrder.orderNumber;
       try {
-        // Use KDS detail endpoint which returns complete items
-        // Correct KDS endpoint: singular "order" with query param
-        const detailUrl = `${DD_ADMIN_API}/kds/order?orderId=${orderId}`;
+        const detailUrl = `${DD_ADMIN_API}/orders/${orderId}`;
         console.log(`[dd-polling] Fetching order detail: GET ${detailUrl}`);
         const detailRes = await fetch(detailUrl, { headers: ddHeaders });
         if (detailRes.ok) {
           const detailText = await detailRes.text();
           const detailData = JSON.parse(detailText);
           fullOrder = detailData?.data || detailData;
-          console.log(`[dd-polling] KDS Detail keys: ${Object.keys(fullOrder).join(", ")}`);
-          console.log(`[dd-polling] KDS Detail (3000): ${JSON.stringify(fullOrder).substring(0, 3000)}`);
+          console.log(`[dd-polling] Detail keys: ${Object.keys(fullOrder).join(", ")}`);
+          console.log(`[dd-polling] Detail items count: ${(fullOrder.items || []).length}, compositeItems: ${(fullOrder.compositeItems || []).length}`);
+          console.log(`[dd-polling] Detail (3000): ${JSON.stringify(fullOrder).substring(0, 3000)}`);
         } else {
           const errBody = await detailRes.text();
-          console.warn(`[dd-polling] KDS detail failed for ${orderId}: status=${detailRes.status}, body=${errBody.substring(0, 500)}`);
+          console.warn(`[dd-polling] Order detail failed for ${orderId}: status=${detailRes.status}, body=${errBody.substring(0, 500)}`);
         }
       } catch (e) {
         console.warn(`[dd-polling] Detail error:`, e);
       }
 
-      // If items still empty, try fetching items separately
       let orderItems = fullOrder.items || fullOrder.orderItems || fullOrder.cart || [];
-      if (!orderItems.length && orderId) {
-        try {
-          const itemsUrl = `${DD_ADMIN_API}/orders/${orderId}/items`;
-          console.log(`[dd-polling] Fetching items separately: GET ${itemsUrl}`);
-          const itemsRes = await fetch(itemsUrl, { headers: ddHeaders });
-          if (itemsRes.ok) {
-            const itemsText = await itemsRes.text();
-            const itemsData = JSON.parse(itemsText);
-            orderItems = itemsData?.data || itemsData || [];
-            if (Array.isArray(orderItems)) {
-              console.log(`[dd-polling] Got ${orderItems.length} items from items endpoint`);
-            }
-          } else {
-            const errBody = await itemsRes.text();
-            console.warn(`[dd-polling] Items endpoint failed (${itemsRes.status}): ${errBody.substring(0, 200)}`);
-          }
-        } catch (e) {
-          console.warn(`[dd-polling] Items fetch error:`, e);
-        }
-      }
 
       // Extract customer fields
       const customer = fullOrder.customer || {};
