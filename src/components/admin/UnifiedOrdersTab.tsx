@@ -270,6 +270,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   }, [filteredOrders]);
 
   const getOrderTypeIcon = (order: Order) => {
+    if (order.order_type === "balcao") return <Store className="w-3.5 h-3.5" />;
     if (order.order_type === "local") return <UtensilsCrossed className="w-3.5 h-3.5" />;
     if (order.delivery_type === "delivery") return <Truck className="w-3.5 h-3.5" />;
     if (order.delivery_type === "takeaway") return <Package className="w-3.5 h-3.5" />;
@@ -277,6 +278,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   };
 
   const getOrderTypeLabel = (order: Order) => {
+    if (order.order_type === "balcao") return "Balcão";
     if (order.order_type === "local") return `Mesa ${order.tables?.table_number || "?"}`;
     if (order.delivery_type === "delivery") return "Entrega";
     if (order.delivery_type === "takeaway") return "Para Viagem";
