@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, UtensilsCrossed, ShoppingBag, Store, Truck } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed, ShoppingBag } from "lucide-react";
 import { KioskConfig } from "@/hooks/useKioskConfig";
 
 interface Props {

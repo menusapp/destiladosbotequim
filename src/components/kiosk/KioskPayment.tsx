@@ -150,10 +150,14 @@ export function KioskPayment({ cart, restaurant, customer, consumptionType, tabl
     }
   };
 
-  const methods = [
-    { key: "dinheiro" as const, label: "Dinheiro", icon: Banknote },
-    { key: "cartao" as const, label: "Cartão", icon: CreditCard, sublabel: "Pague na maquininha" },
+  const allMethods = [
+    { key: "dinheiro" as const, label: "Dinheiro", icon: Banknote, configKey: "payment_cash" as const },
+    { key: "cartao" as const, label: "Cartão", icon: CreditCard, sublabel: "Pague na maquininha", configKey: "payment_card" as const },
   ];
+
+  const methods = kioskConfig
+    ? allMethods.filter(m => kioskConfig[m.configKey] !== false)
+    : allMethods;
 
   return (
     <div className="flex flex-col h-screen">

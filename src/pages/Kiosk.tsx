@@ -4,7 +4,7 @@ import { resolveSlug } from "@/lib/slugResolver";
 import { supabase } from "@/integrations/supabase/client";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "@/components/ui/sonner";
-import { useKioskConfig, KioskConfig } from "@/hooks/useKioskConfig";
+import { useKioskConfig } from "@/hooks/useKioskConfig";
 import { KioskIdleScreen } from "@/components/kiosk/KioskIdleScreen";
 import { KioskIdentification } from "@/components/kiosk/KioskIdentification";
 import { KioskMenu } from "@/components/kiosk/KioskMenu";
