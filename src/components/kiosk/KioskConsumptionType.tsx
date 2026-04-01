@@ -147,7 +147,7 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
             onClick={onNext}
             className="w-full h-14 text-lg font-bold rounded-xl text-white"
             style={{ backgroundColor: primaryColor }}
-            disabled={subStep === "main" || !canProceed()}
+            disabled={!canProceed()}
           >
             Continuar
           </Button>

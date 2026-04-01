@@ -179,24 +179,18 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
 
       {/* Cart FAB */}
       {cartCount > 0 && (
-        <div className="border-t bg-card p-3 md:p-4 shrink-0">
-          <button
-            onClick={onOpenCart}
-            className="w-full flex items-center justify-between px-6 py-4 rounded-2xl text-white text-lg font-bold shadow-xl transition-transform active:scale-[0.98]"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <ShoppingCart className="h-6 w-6" />
-                <span className="absolute -top-2 -right-2 bg-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" style={{ color: primaryColor }}>
-                  {cartCount}
-                </span>
-              </div>
-              <span>Ver Pedido</span>
-            </div>
-            <span>R$ {cartTotal.toFixed(2)}</span>
-          </button>
-        </div>
+        <button
+          onClick={onOpenCart}
+          className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl transition-transform active:scale-90"
+          style={{ backgroundColor: primaryColor }}
+        >
+          <div className="relative">
+            <ShoppingCart className="h-7 w-7" />
+            <span className="absolute -top-2 -right-3 bg-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" style={{ color: primaryColor }}>
+              {cartCount}
+            </span>
+          </div>
+        </button>
       )}
     </div>
   );
