@@ -95,12 +95,12 @@ Deno.serve(async (req) => {
       body.statusReason = reason;
     }
 
-    console.log(`[dd-order-action] ${actionConfig.method} ${actionUrl}, body: ${JSON.stringify(body)}`);
+    console.log(`[dd-order-action] PUT ${actionUrl}, body: ${JSON.stringify(body)}`);
 
     const apiRes = await fetch(actionUrl, {
-      method: actionConfig.method,
+      method: "PUT",
       headers,
-      body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+      body: JSON.stringify(body),
     });
 
     const apiText = await apiRes.text();
