@@ -244,7 +244,11 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       // Sync with Delivery Direto
       const ddResult = await syncDDStatus(newStatus, reason);
       if (!ddResult.ok) {
-        toast.warning(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}. Status local será atualizado.`);
+        if (ddResult.localUpdated) {
+          toast.warning(`${ddResult.errorMsg || "Erro ao sincronizar com Delivery Direto"}. Status local atualizado.`);
+        } else {
+          toast.error(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}`);
+        }
       }
 
       // Update local status in DB
