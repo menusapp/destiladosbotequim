@@ -154,7 +154,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
 
   // Sync status with Delivery Direto
-  const syncDDStatus = async (newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string }> => {
+  const syncDDStatus = async (newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string; localUpdated?: boolean }> => {
     if (!order.dd_source || !order.dd_order_id) return { ok: true };
 
     const statusToAction: Record<string, string> = {
@@ -180,16 +180,20 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
         },
       });
       
-      if (res.error) {
-        const errMsg = typeof res.error === 'object' ? (res.error as any)?.message || JSON.stringify(res.error) : String(res.error);
-        console.error("DD action error:", res.error);
-        return { ok: false, errorMsg: errMsg };
+      // Function always returns 200, check response body for errors
+      if (res.data?.error) {
+        console.error("DD action error:", res.data.error);
+        return { 
+          ok: res.data?.local_updated === true, 
+          errorMsg: res.data.error,
+          localUpdated: res.data?.local_updated === true,
+        };
       }
       
-      // Check response body for error
-      if (res.data?.error) {
-        console.error("DD action API error:", res.data.error);
-        return { ok: false, errorMsg: res.data.error };
+      if (res.error) {
+        const errMsg = typeof res.error === 'object' ? (res.error as any)?.message || JSON.stringify(res.error) : String(res.error);
+        console.error("DD invoke error:", res.error);
+        return { ok: false, errorMsg: errMsg };
       }
       
       return { ok: true };
@@ -240,7 +244,11 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       // Sync with Delivery Direto
       const ddResult = await syncDDStatus(newStatus, reason);
       if (!ddResult.ok) {
-        toast.warning(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}. Status local será atualizado.`);
+        if (ddResult.localUpdated) {
+          toast.warning(`${ddResult.errorMsg || "Erro ao sincronizar com Delivery Direto"}. Status local atualizado.`);
+        } else {
+          toast.error(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}`);
+        }
       }
 
       // Update local status in DB

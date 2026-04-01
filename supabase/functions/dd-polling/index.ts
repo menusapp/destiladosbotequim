@@ -361,14 +361,26 @@ Deno.serve(async (req) => {
         console.warn(`[dd-polling] Order keys: ${Object.keys(fullOrder).join(", ")}`);
       }
 
+      // Log available products for matching debug
+      console.log(`[dd-polling] Available products for matching: ${productsList.length}`);
+      if (productsList.length > 0) {
+        console.log(`[dd-polling] Products with pdv_code: ${productsList.filter(p => p.pdv_code).map(p => `"${p.name}"→pdv="${p.pdv_code}"`).join(", ")}`);
+      }
+
       const insertItems: any[] = [];
+      const insertExtras: any[] = [];
 
       // ── Process regular items ───────────────────────────────────────────
       for (const item of allDDItems) {
+        // DD API returns items flat (customCode, name directly on item)
+        // But some versions nest under item.item - check both
         const ddItem = item.item || item;
         const itemName = ddItem.name || item.name || "Produto DD";
-        const customCode = normalize(ddItem.customCode || ddItem.custom_code || ddItem.externalCode || ddItem.code || ddItem.pdvCode || "");
-        const quantity = item.amount || item.quantity || 1;
+        
+        // Extract customCode from ALL possible paths
+        const rawCustomCode = ddItem.customCode ?? ddItem.custom_code ?? ddItem.externalCode ?? ddItem.code ?? ddItem.pdvCode ?? item.customCode ?? item.custom_code ?? item.externalCode ?? "";
+        const customCode = normalize(String(rawCustomCode));
+        const quantity = item.amount || item.quantity || ddItem.amount || ddItem.quantity || 1;
 
         // Price
         let unitPrice = 0;
@@ -376,42 +388,60 @@ Deno.serve(async (req) => {
           unitPrice = money(item.totalPrice) / (quantity || 1);
         } else if (item.unitPrice !== undefined) {
           unitPrice = money(item.unitPrice);
+        } else if (item.price !== undefined) {
+          unitPrice = money(item.price);
         } else if (ddItem.price !== undefined) {
           unitPrice = money(ddItem.price);
         }
 
-        console.log(`[dd-polling] Item: "${itemName}", customCode="${customCode}", qty=${quantity}, unitPrice=R$${unitPrice.toFixed(2)}`);
+        console.log(`[dd-polling] ── ITEM DEBUG ──`);
+        console.log(`[dd-polling]   raw item keys: ${Object.keys(item).join(", ")}`);
+        if (item.item) console.log(`[dd-polling]   item.item keys: ${Object.keys(item.item).join(", ")}`);
+        console.log(`[dd-polling]   name="${itemName}", rawCustomCode="${rawCustomCode}", normalizedCode="${customCode}"`);
+        console.log(`[dd-polling]   qty=${quantity}, unitPrice=R$${unitPrice.toFixed(2)}`);
 
         // Match product by customCode → pdv_code (normalized)
         let matchedProductId: string | null = null;
-        if (customCode) {
-          const match = productsList.find(p => normalize(p.pdv_code) === customCode);
+        let matchRule = "none";
+
+        if (customCode && customCode !== "") {
+          const match = productsList.find(p => p.pdv_code && normalize(p.pdv_code) === customCode);
           if (match) {
             matchedProductId = match.id;
+            matchRule = `customCode "${customCode}" → pdv_code "${match.pdv_code}"`;
             if (unitPrice === 0 && match.price) unitPrice = match.price;
-            console.log(`[dd-polling] ✓ Matched by customCode "${customCode}" → product "${match.name}" (${match.id})`);
+            console.log(`[dd-polling]   ✓ MATCHED by ${matchRule} → product "${match.name}" (${match.id})`);
           } else {
-            console.log(`[dd-polling] ✗ No product found with pdv_code matching customCode "${customCode}"`);
+            console.log(`[dd-polling]   ✗ No product with pdv_code="${customCode}". Available pdv_codes: [${productsList.filter(p=>p.pdv_code).map(p=>normalize(p.pdv_code)).join(", ")}]`);
           }
+        } else {
+          console.log(`[dd-polling]   ℹ No customCode found on this item`);
         }
 
         // Fallback: match by normalized name
         if (!matchedProductId && itemName) {
           const normalizedName = normalize(itemName);
-          const match = productsList.find(p => normalize(p.name) === normalizedName);
+          // Try exact match first
+          let match = productsList.find(p => normalize(p.name) === normalizedName);
+          // Try contains match as second fallback
+          if (!match) {
+            match = productsList.find(p => normalize(p.name).includes(normalizedName) || normalizedName.includes(normalize(p.name)));
+          }
           if (match) {
             matchedProductId = match.id;
+            matchRule = `name "${itemName}" → "${match.name}"`;
             if (unitPrice === 0 && match.price) unitPrice = match.price;
-            console.log(`[dd-polling] ✓ Matched by name "${itemName}" → product "${match.name}" (${match.id})`);
+            console.log(`[dd-polling]   ✓ MATCHED by ${matchRule} (${match.id})`);
           } else {
-            console.log(`[dd-polling] ✗ No product found matching name "${itemName}"`);
+            console.log(`[dd-polling]   ✗ No product matching name "${itemName}". Searched ${productsList.length} products.`);
+            matchRule = "FALLBACK (no match)";
           }
         }
 
         // Build notes from properties/options/subitems
-        let itemNotes = item.observations || "";
+        let itemNotes = item.observations || item.comments || "";
 
-        // Properties (variações)
+        // Properties (variações) - also try to match as extras
         if (item.properties && Array.isArray(item.properties)) {
           for (const prop of item.properties) {
             const propName = prop.name || prop.propertyName || "";
@@ -421,8 +451,27 @@ Deno.serve(async (req) => {
               if (optNames.length) {
                 itemNotes += (itemNotes ? " | " : "") + `${propName}: ${optNames.join(", ")}`;
               }
+              // Try matching options as product extras
+              if (matchedProductId) {
+                for (const opt of options) {
+                  const optName = opt.name || opt.optionName || "";
+                  const optCode = normalize(opt.customCode || opt.externalCode || "");
+                  const optPrice = money(opt.price || opt.totalPrice || 0);
+                  
+                  let matchedExtra = null;
+                  if (optCode) {
+                    matchedExtra = extrasList.find(e => e.product_id === matchedProductId && e.pdv_code && normalize(e.pdv_code) === optCode);
+                  }
+                  if (!matchedExtra && optName) {
+                    matchedExtra = extrasList.find(e => e.product_id === matchedProductId && normalize(e.name) === normalize(optName));
+                  }
+                  if (matchedExtra) {
+                    console.log(`[dd-polling]   ✓ Extra matched: "${optName}" → "${matchedExtra.name}" (${matchedExtra.id})`);
+                  }
+                }
+              }
             }
-            console.log(`[dd-polling] Property: "${propName}", options: ${JSON.stringify(options).substring(0, 200)}`);
+            console.log(`[dd-polling]   Property: "${propName}", options: ${JSON.stringify(options).substring(0, 200)}`);
           }
         }
 
@@ -432,7 +481,6 @@ Deno.serve(async (req) => {
           if (optNames.length) {
             itemNotes += (itemNotes ? " | " : "") + `Opções: ${optNames.join(", ")}`;
           }
-          console.log(`[dd-polling] Options: ${JSON.stringify(item.options).substring(0, 200)}`);
         }
 
         // Subitems (extras/adicionais)
@@ -441,8 +489,9 @@ Deno.serve(async (req) => {
           if (subNames.length) {
             itemNotes += (itemNotes ? " | " : "") + `Extras: ${subNames.join(", ")}`;
           }
-          console.log(`[dd-polling] Subitems: ${JSON.stringify(item.subitems).substring(0, 200)}`);
         }
+
+        console.log(`[dd-polling]   RESULT: product_id=${matchedProductId || "NULL"}, matchRule=${matchRule}`);
 
         insertItems.push({
           order_id: newOrder.id,
@@ -483,11 +532,11 @@ Deno.serve(async (req) => {
         }
 
         // Try matching the composite by customCode or name
-        const customCode = normalize(composite.customCode || "");
+        const customCode = normalize(composite.customCode || composite.custom_code || "");
         let matchedProductId: string | null = null;
 
         if (customCode) {
-          const match = productsList.find(p => normalize(p.pdv_code) === customCode);
+          const match = productsList.find(p => p.pdv_code && normalize(p.pdv_code) === customCode);
           if (match) {
             matchedProductId = match.id;
             console.log(`[dd-polling] ✓ Composite matched by customCode "${customCode}" → "${match.name}"`);
@@ -495,7 +544,10 @@ Deno.serve(async (req) => {
         }
         if (!matchedProductId) {
           const normalizedName = normalize(compositeName);
-          const match = productsList.find(p => normalize(p.name) === normalizedName);
+          let match = productsList.find(p => normalize(p.name) === normalizedName);
+          if (!match) {
+            match = productsList.find(p => normalize(p.name).includes(normalizedName) || normalizedName.includes(normalize(p.name)));
+          }
           if (match) {
             matchedProductId = match.id;
             console.log(`[dd-polling] ✓ Composite matched by name "${compositeName}" → "${match.name}"`);
@@ -515,10 +567,15 @@ Deno.serve(async (req) => {
 
       // ── Insert all items ────────────────────────────────────────────────
       if (insertItems.length > 0) {
-        console.log(`[dd-polling] Inserting ${insertItems.length} items for order ${ddOrderId}`);
+        console.log(`[dd-polling] Inserting ${insertItems.length} items for order ${ddOrderId}:`);
+        for (const it of insertItems) {
+          console.log(`[dd-polling]   → product_id=${it.product_id || "NULL"}, qty=${it.quantity}, price=${it.price_at_order}, notes="${(it.notes || "").substring(0, 100)}"`);
+        }
         const { error: itemsError } = await supabase.from("order_items").insert(insertItems);
         if (itemsError) {
           console.error(`[dd-polling] Error inserting items for order ${ddOrderId}:`, itemsError);
+        } else {
+          console.log(`[dd-polling] ✓ ${insertItems.length} items inserted successfully`);
         }
       }
 
