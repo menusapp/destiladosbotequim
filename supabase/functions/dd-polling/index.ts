@@ -5,9 +5,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DD_API_BASE = "https://deliverydireto.com.br/admin-api";
+const DD_STORE_API = "https://deliverydireto.com.br/store-api/v1";
 
-// Convert DD Money object (cents) to decimal
+// Convert DD Money object (cents) to decimal - ALL DD values are in cents
 function money(v: any): number {
   if (v === null || v === undefined) return 0;
   if (typeof v === "object" && v.value !== undefined) return v.value / 100;
@@ -15,39 +15,61 @@ function money(v: any): number {
   return 0;
 }
 
-// Map DD payment to local label using paymentMethod object from DD API
-function mapPaymentLabel(paymentMethod: any, isOnlinePayment: boolean): string {
-  if (isOnlinePayment) return "Pago Delivery Direto";
-  if (!paymentMethod) return "Delivery Direto";
+// Map DD payment to local label using store-api payment object
+function mapPaymentLabel(payment: any): string {
+  if (!payment) return "Delivery Direto";
   
-  const name = (paymentMethod.name || "").toLowerCase();
+  const payType = (payment.type || "").toUpperCase();
+  const details = payment.paymentDetails || {};
+  const detailType = (details.type || "").toUpperCase();
+  const brand = details.brand || details.cardBrand || "";
   
-  // Check for PIX
-  if (name.includes("pix")) return "PIX";
+  // Online payment (PIX online, card online) = pre-paid through DD
+  if (payType === "ONLINE") return "Pago Delivery Direto";
   
-  // Check for cash/dinheiro
-  if (name.includes("dinheiro") || name.includes("cash")) return "Dinheiro";
-  
-  // Check for credit card
-  if (name.includes("crédito") || name.includes("credito") || name.includes("credit")) {
-    // Extract brand from name (e.g., "Visa (crédito)" -> "Visa")
-    const brand = (paymentMethod.name || "").replace(/\s*\(.*\)\s*/, "").trim();
-    return brand ? `Cartão de Crédito ${brand}` : "Cartão de Crédito";
+  // Offline payment - paid at delivery/pickup
+  if (payType === "OFFLINE" || payType === "AT_DELIVERY") {
+    if (detailType === "CASH" || detailType === "DINHEIRO") return "Dinheiro";
+    if (detailType === "PIX") return "PIX";
+    if (detailType === "CREDITCARD" || detailType === "CREDIT_CARD") {
+      return brand ? `Cartão de Crédito ${brand}` : "Cartão de Crédito";
+    }
+    if (detailType === "DEBITCARD" || detailType === "DEBIT_CARD") {
+      return brand ? `Cartão de Débito ${brand}` : "Cartão de Débito";
+    }
+    if (detailType === "MEAL_VOUCHER" || detailType === "FOOD_VOUCHER") return "Vale Refeição";
+    
+    // Fallback: try to parse from name field
+    const name = (details.name || payment.name || "").toLowerCase();
+    if (name.includes("pix")) return "PIX";
+    if (name.includes("dinheiro") || name.includes("cash")) return "Dinheiro";
+    if (name.includes("crédito") || name.includes("credito") || name.includes("credit")) {
+      const extractedBrand = (details.name || payment.name || "").replace(/\s*\(.*\)\s*/, "").trim();
+      return extractedBrand ? `Cartão de Crédito ${extractedBrand}` : "Cartão de Crédito";
+    }
+    if (name.includes("débito") || name.includes("debito") || name.includes("debit")) {
+      const extractedBrand = (details.name || payment.name || "").replace(/\s*\(.*\)\s*/, "").trim();
+      return extractedBrand ? `Cartão de Débito ${extractedBrand}` : "Cartão de Débito";
+    }
+    if (name.includes("vale") || name.includes("voucher") || name.includes("refeição")) return "Vale Refeição";
+    
+    return details.name || payment.name || "Delivery Direto";
   }
-  
-  // Check for debit card  
-  if (name.includes("débito") || name.includes("debito") || name.includes("debit")) {
-    const brand = (paymentMethod.name || "").replace(/\s*\(.*\)\s*/, "").trim();
-    return brand ? `Cartão de Débito ${brand}` : "Cartão de Débito";
+
+  // Also check legacy paymentMethod field
+  const legacyName = (payment.name || "").toLowerCase();
+  if (legacyName.includes("pix")) return "PIX";
+  if (legacyName.includes("dinheiro")) return "Dinheiro";
+  if (legacyName.includes("crédito") || legacyName.includes("credito")) {
+    const b = (payment.name || "").replace(/\s*\(.*\)\s*/, "").trim();
+    return b ? `Cartão de Crédito ${b}` : "Cartão de Crédito";
   }
-  
-  // Check for meal voucher
-  if (name.includes("refeição") || name.includes("refeicao") || name.includes("vale") || name.includes("voucher")) {
-    return "Vale Refeição";
+  if (legacyName.includes("débito") || legacyName.includes("debito")) {
+    const b = (payment.name || "").replace(/\s*\(.*\)\s*/, "").trim();
+    return b ? `Cartão de Débito ${b}` : "Cartão de Débito";
   }
-  
-  // Fallback to the name from DD
-  return paymentMethod.name || "Delivery Direto";
+
+  return payment.name || "Delivery Direto";
 }
 
 Deno.serve(async (req) => {
@@ -130,7 +152,7 @@ Deno.serve(async (req) => {
       "Accept": "application/json",
     };
 
-    // Build query URL with updatedAt filter
+    // Build query - use store-api orders endpoint
     const now = new Date();
     const lastSync = config.last_sync_at
       ? new Date(config.last_sync_at)
@@ -140,21 +162,21 @@ Deno.serve(async (req) => {
     params.set("updatedAt[gte]", lastSync.toISOString());
     params.set("limit", "50");
 
-    const ordersUrl = `${DD_API_BASE}/v1/orders?${params.toString()}`;
+    const ordersUrl = `${DD_STORE_API}/orders?${params.toString()}`;
     console.log(`[dd-polling] Fetching orders: ${ordersUrl}`);
 
     const ordersRes = await fetch(ordersUrl, { headers: ddHeaders });
 
     if (!ordersRes.ok) {
       const errText = await ordersRes.text();
-      console.error(`[dd-polling] Orders fetch failed: status=${ordersRes.status}, body=${errText}`);
+      console.error(`[dd-polling] Orders fetch failed: status=${ordersRes.status}, body=${errText.substring(0, 500)}`);
       return new Response(JSON.stringify({ new_orders: 0, error: "Falha ao buscar pedidos" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const ordersText = await ordersRes.text();
-    
+
     let ordersData: any;
     try {
       ordersData = JSON.parse(ordersText);
@@ -164,8 +186,8 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    
-    // Handle various response shapes from DD API
+
+    // Handle various response shapes
     let ordersList: any[] = [];
     if (ordersData?.data?.orders && Array.isArray(ordersData.data.orders)) {
       ordersList = ordersData.data.orders;
@@ -176,19 +198,26 @@ Deno.serve(async (req) => {
     } else if (ordersData?.orders && Array.isArray(ordersData.orders)) {
       ordersList = ordersData.orders;
     }
-    console.log(`[dd-polling] Found ${ordersList.length} orders from DD API`);
+    console.log(`[dd-polling] Found ${ordersList.length} orders from store-api`);
+    
+    // Log first order structure for debugging
+    if (ordersList.length > 0) {
+      const first = ordersList[0];
+      console.log(`[dd-polling] First order keys: ${Object.keys(first).join(", ")}`);
+      console.log(`[dd-polling] First order (3000): ${JSON.stringify(first).substring(0, 3000)}`);
+    }
 
     const statusMap: Record<string, string> = {
       "WAITING": "pending",
+      "PLACED": "pending",
       "APPROVED": "accepted",
+      "CONFIRMED": "accepted",
       "PREPARING": "preparing",
       "READY": "ready",
       "DISPATCHED": "out_for_delivery",
       "DONE": "delivered",
-      "CANCELLED": "cancelled",
-      "PLACED": "pending",
-      "CONFIRMED": "accepted",
       "DELIVERED": "delivered",
+      "CANCELLED": "cancelled",
     };
 
     // Pre-fetch all products with pdv_code for matching
@@ -226,25 +255,49 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // NEW ORDER - Fetch full detail from KDS endpoint to get items
+      // NEW ORDER - Fetch full detail from store-api to get items
       let fullOrder = ddOrder;
+      const orderId = ddOrder.id || ddOrder.orderNumber;
       try {
-        const kdsDetailUrl = `${DD_API_BASE}/v1/kds/orders/${ddOrder.id}`;
-        console.log(`[dd-polling] Fetching order detail: GET ${kdsDetailUrl}`);
-        const detailRes = await fetch(kdsDetailUrl, { headers: ddHeaders });
+        const detailUrl = `${DD_STORE_API}/orders/${orderId}`;
+        console.log(`[dd-polling] Fetching order detail: GET ${detailUrl}`);
+        const detailRes = await fetch(detailUrl, { headers: ddHeaders });
         if (detailRes.ok) {
           const detailText = await detailRes.text();
           const detailData = JSON.parse(detailText);
-          if (detailData?.data) {
-            fullOrder = detailData.data;
-            console.log(`[dd-polling] KDS detail keys: ${Object.keys(fullOrder).join(", ")}`);
-            console.log(`[dd-polling] KDS detail (2000): ${JSON.stringify(fullOrder).substring(0, 2000)}`);
-          }
+          // store-api may wrap in { data: ... } or return directly
+          fullOrder = detailData?.data || detailData;
+          console.log(`[dd-polling] Detail keys: ${Object.keys(fullOrder).join(", ")}`);
+          console.log(`[dd-polling] Detail (3000): ${JSON.stringify(fullOrder).substring(0, 3000)}`);
         } else {
-          console.warn(`[dd-polling] KDS detail failed (${detailRes.status}), using list data`);
+          const errBody = await detailRes.text();
+          console.warn(`[dd-polling] Detail failed (${detailRes.status}): ${errBody.substring(0, 300)}`);
         }
       } catch (e) {
-        console.warn(`[dd-polling] KDS detail error:`, e);
+        console.warn(`[dd-polling] Detail error:`, e);
+      }
+
+      // If items still empty, try fetching items separately
+      let orderItems = fullOrder.items || fullOrder.orderItems || fullOrder.cart || [];
+      if (!orderItems.length && orderId) {
+        try {
+          const itemsUrl = `${DD_STORE_API}/orders/${orderId}/items`;
+          console.log(`[dd-polling] Fetching items separately: GET ${itemsUrl}`);
+          const itemsRes = await fetch(itemsUrl, { headers: ddHeaders });
+          if (itemsRes.ok) {
+            const itemsText = await itemsRes.text();
+            const itemsData = JSON.parse(itemsText);
+            orderItems = itemsData?.data || itemsData || [];
+            if (Array.isArray(orderItems)) {
+              console.log(`[dd-polling] Got ${orderItems.length} items from items endpoint`);
+            }
+          } else {
+            const errBody = await itemsRes.text();
+            console.warn(`[dd-polling] Items endpoint failed (${itemsRes.status}): ${errBody.substring(0, 200)}`);
+          }
+        } catch (e) {
+          console.warn(`[dd-polling] Items fetch error:`, e);
+        }
       }
 
       // Extract customer fields
@@ -256,7 +309,7 @@ Deno.serve(async (req) => {
       const customerCpf = customer.document || customer.cpf || customer.taxPayerIdentificationNumber || "";
 
       // Order type mapping
-      const ddType = fullOrder.type || fullOrder.delivery_method || fullOrder.deliveryMethod || "";
+      const ddType = (fullOrder.type || fullOrder.delivery_method || fullOrder.deliveryMethod || "").toUpperCase();
       const isPickup = ddType === "TAKEOUT" || ddType === "PICKUP";
       const deliveryType = isPickup ? "pickup" : "delivery";
 
@@ -266,20 +319,19 @@ Deno.serve(async (req) => {
         ? `${addr.street || addr.streetName || ""}, ${addr.number || ""} - ${addr.neighborhood || addr.district || ""}, ${addr.city || ""}`
         : null;
 
-      // Payment mapping using DD's paymentMethod object
-      const paymentMethod = fullOrder.paymentMethod || fullOrder.payment || (Array.isArray(fullOrder.payments) ? fullOrder.payments[0] : null) || {};
-      const isOnlinePayment = fullOrder.isOnlinePayment === true;
-      const paymentLabel = mapPaymentLabel(paymentMethod, isOnlinePayment);
-      console.log(`[dd-polling] Order ${ddOrderId} payment: name="${paymentMethod.name}", online=${isOnlinePayment}, mapped="${paymentLabel}"`);
+      // Payment mapping - store-api provides payment.type and payment.paymentDetails
+      const payment = fullOrder.payment || (Array.isArray(fullOrder.payments) ? fullOrder.payments[0] : null) || fullOrder.paymentMethod || {};
+      const paymentLabel = mapPaymentLabel(payment);
+      console.log(`[dd-polling] Order ${ddOrderId} payment: ${JSON.stringify(payment).substring(0, 300)}, mapped="${paymentLabel}"`);
 
       // Status
       const orderStatus = statusMap[fullOrder.status || "WAITING"] || "pending";
 
-      // Prices - DD returns values in CENTS, ALWAYS divide by 100
+      // Prices - DD returns values in CENTS
       const values = fullOrder.total || fullOrder.values || {};
       const deliveryFee = money(values.deliveryFee || values.delivery_fee);
 
-      // Scheduled orders - DD uses "scheduledOrder" field
+      // Scheduled orders
       const scheduledFor = fullOrder.scheduledOrder || fullOrder.scheduling || fullOrder.scheduledFor || null;
 
       const { data: newOrder, error: orderError } = await supabase
@@ -308,45 +360,46 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Insert items - from KDS detail: items and compositeItems
-      const simpleItems = fullOrder.items || [];
+      // Process items
+      const allDDItems = Array.isArray(orderItems) ? orderItems : [];
+      // Also check for compositeItems
       const compositeItems = fullOrder.compositeItems || [];
-      const allItems = [...simpleItems, ...compositeItems];
-      console.log(`[dd-polling] Order ${ddOrderId} items: simple=${simpleItems.length}, composite=${compositeItems.length}, total=${allItems.length}`);
+      const combinedItems = [...allDDItems, ...compositeItems];
       
-      if (!allItems.length) {
-        console.warn(`[dd-polling] Order ${ddOrderId} has NO items! fullOrder keys: ${Object.keys(fullOrder).join(", ")}`);
+      console.log(`[dd-polling] Order ${ddOrderId} items: direct=${allDDItems.length}, composite=${compositeItems.length}, total=${combinedItems.length}`);
+
+      if (!combinedItems.length) {
+        console.warn(`[dd-polling] Order ${ddOrderId} has NO items! Order keys: ${Object.keys(fullOrder).join(", ")}`);
       }
 
-      if (allItems.length > 0 && newOrder) {
-        const orderItems = [];
-        for (const item of allItems) {
-          // DD KDS items structure: { item: { name, customCode, ... }, amount, totalPrice, unitPrice, ... }
+      if (combinedItems.length > 0 && newOrder) {
+        const insertItems = [];
+        for (const item of combinedItems) {
+          // store-api items: { itemId, amount, totalPrice: {value,currency}, item: {name, customCode, price: {value,currency}} }
           const ddItem = item.item || item;
           const itemName = ddItem.name || ddItem.productName || item.name || "Produto DD";
-          const customCode = String(ddItem.customCode || ddItem.custom_code || ddItem.externalCode || ddItem.code || "").trim();
+          const customCode = String(ddItem.customCode || ddItem.custom_code || ddItem.externalCode || ddItem.code || ddItem.pdvCode || "").trim();
           const quantity = item.amount || item.quantity || 1;
 
-          // Price handling - DD returns cents in Money objects
+          // Price handling
           let unitPrice = 0;
           if (item.totalPrice !== undefined) {
             unitPrice = money(item.totalPrice) / (quantity || 1);
           } else if (item.unitPrice !== undefined) {
             unitPrice = money(item.unitPrice);
-          } else if (ddItem.unitPrice !== undefined) {
-            unitPrice = money(ddItem.unitPrice);
           } else if (ddItem.price !== undefined) {
             unitPrice = money(ddItem.price);
           }
 
-          console.log(`[dd-polling] Item: "${itemName}", code: "${customCode}", qty: ${quantity}, unitPrice: ${unitPrice}`);
+          console.log(`[dd-polling] Item: "${itemName}", code: "${customCode}", qty: ${quantity}, unitPrice: R$${unitPrice.toFixed(2)}`);
 
-          // Try to match product by pdv_code first, then by name
+          // Match product by pdv_code first, then by name
           let matchedProductId: string | null = null;
           if (customCode) {
             const match = productsList.find(p => p.pdv_code === customCode);
             if (match) {
               matchedProductId = match.id;
+              if (unitPrice === 0 && match.price) unitPrice = match.price;
               console.log(`[dd-polling] Matched by pdv_code "${customCode}" -> ${match.id}`);
             }
           }
@@ -359,7 +412,7 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Build observations from item options/subitems for composite items
+          // Build observations from subitems/options
           let itemNotes = item.observations || "";
           if (item.subitems && Array.isArray(item.subitems)) {
             const subNames = item.subitems.map((s: any) => s.item?.name || s.name || "").filter(Boolean);
@@ -370,7 +423,7 @@ Deno.serve(async (req) => {
             if (optNames.length) itemNotes += (itemNotes ? " | " : "") + optNames.join(", ");
           }
 
-          orderItems.push({
+          insertItems.push({
             order_id: newOrder.id,
             product_id: matchedProductId,
             quantity,
@@ -379,7 +432,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
+        const { error: itemsError } = await supabase.from("order_items").insert(insertItems);
         if (itemsError) {
           console.error(`[dd-polling] Error inserting items for order ${ddOrderId}:`, itemsError);
         }

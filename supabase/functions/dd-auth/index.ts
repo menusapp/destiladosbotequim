@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DD_API_BASE = "https://deliverydireto.com.br/admin-api";
+const DD_STORE_API_BASE = "https://deliverydireto.com.br/store-api";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -37,9 +37,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Step 1: Authenticate with DD API using form-urlencoded (OAuth2 standard)
-      console.log("[dd-auth] Requesting token from Delivery Direto...");
-      const tokenRes = await fetch(`${DD_API_BASE}/token`, {
+      // Authenticate with DD store-api using password grant
+      console.log("[dd-auth] Requesting token from store-api...");
+      const tokenRes = await fetch(`${DD_STORE_API_BASE}/token`, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -68,13 +68,12 @@ Deno.serve(async (req) => {
       const tokenData = JSON.parse(tokenText);
       const accessToken = tokenData.access_token;
       const refreshToken = tokenData.refresh_token || null;
-      const expiresIn = tokenData.expires_in || 21600; // 6 hours default
+      const expiresIn = tokenData.expires_in || 21600;
       const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
       console.log(`[dd-auth] Token obtained, expires_in=${expiresIn}, has_refresh=${!!refreshToken}`);
 
-      // Step 2: Save config (including refresh_token)
-      console.log("[dd-auth] Saving config to database...");
+      // Save config
       const { error: upsertError } = await supabase
         .from("deliverydireto_config")
         .upsert({
@@ -96,13 +95,13 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Step 3: Register webhooks (bonus, non-blocking)
+      // Register webhooks (non-blocking)
       console.log("[dd-auth] Registering webhooks...");
       const webhookUrl = `${supabaseUrl}/functions/v1/dd-webhook`;
 
       try {
         for (const event of ["ORDER_PLACED", "ORDER_STATUS_CHANGED"]) {
-          const whRes = await fetch(`${DD_API_BASE}/v1/webhooks`, {
+          const whRes = await fetch(`${DD_STORE_API_BASE}/v1/webhooks`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -185,7 +184,6 @@ async function refreshTokenFn(supabase: any, restaurantId: string, clientId: str
     }
   }
 
-  // Use refresh_token to get new access_token
   if (!config.refresh_token) {
     console.warn("[dd-auth] No refresh_token available, re-auth needed");
     return new Response(JSON.stringify({ error: "Token expirado. Reconecte a integração.", expired: true }), {
@@ -194,7 +192,7 @@ async function refreshTokenFn(supabase: any, restaurantId: string, clientId: str
   }
 
   console.log("[dd-auth] Using refresh_token to get new access_token...");
-  const tokenRes = await fetch(`https://deliverydireto.com.br/admin-api/token`, {
+  const tokenRes = await fetch(`${DD_STORE_API_BASE}/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -225,7 +223,6 @@ async function refreshTokenFn(supabase: any, restaurantId: string, clientId: str
   const expiresIn = tokenData.expires_in || 21600;
   const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  // Save new tokens
   await supabase
     .from("deliverydireto_config")
     .update({
