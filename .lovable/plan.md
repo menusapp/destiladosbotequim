@@ -1,54 +1,74 @@
 
 
-# Corrigir dd-polling: Voltar para admin-api (API que FUNCIONAVA)
+# Corrigir Itens Vazios e Status -- Endpoints Errados no Admin-API
 
-## Problema Raiz
+## Diagnostico Definitivo (da OpenAPI oficial)
 
-Os logs mostram claramente:
+### Problema 1: Itens vazios -- URL do KDS detail ERRADA
+
+O codigo atual busca detalhes do pedido com:
 ```text
-"Rede de lojas \"store-api\" não encontrada!"
-URL: /store-api/v1/orders?updatedAt[gte]=...
+GET /admin-api/v1/kds/orders/{id}    <-- ERRADO (este e o endpoint de PUT)
 ```
 
-A mudanca para `/store-api/token` quebrou tudo. A **store-api** e uma API de CLIENTE (para quem faz pedido), nao de LOJISTA. O endpoint `/store-api/v1/orders` NAO EXISTE na store-api - o unico endpoint de pedidos e `/store-api/v1/customers/me/orders` (pedidos do cliente logado).
+A OpenAPI oficial do admin-api mostra que o endpoint correto e:
+```text
+GET /admin-api/v1/kds/order?orderId={id}    <-- CORRETO (singular "order", query param)
+```
 
-A **admin-api** (`https://deliverydireto.com.br/admin-api/`) e a API correta para lojistas. Confirmado na documentacao oficial:
-- `POST /admin-api/token` - Autenticacao OAuth do admin
-- `GET /admin-api/v1/orders` - Lista de pedidos (com items, payment, tudo)
-- `PUT /admin-api/v1/orders/{id}` - Atualiza status do pedido
-- KDS: `GET /admin-api/v1/kds/orders` - Lista pedidos KDS
-- KDS: `PUT /admin-api/v1/kds/orders/{id}` - Atualiza status KDS
-- KDS: `GET /admin-api/v1/kds/orders/{id}` - Detalhe do pedido
+O endpoint de lista KDS retorna os itens do pedido (schema `KdsorderDTO`). O endpoint `/kds/orders/{id}` so aceita PUT (para atualizar status). O GET com path param simplesmente nao existe, retorna 404 silenciosamente, e o codigo cai no fallback que tambem falha.
 
-O codigo ORIGINAL usava admin-api para auth e store-api/v1 para dados - e FUNCIONAVA. Nos quebramos ao mudar auth para store-api/token.
+### Problema 2: Status 404 -- PUT no endpoint errado
+
+O codigo usa:
+```text
+PUT /admin-api/v1/orders/{id}    <-- retorna 404 (HTML generico)
+```
+
+A OpenAPI mostra que o endpoint correto para atualizar status e:
+```text
+PUT /admin-api/v1/kds/orders/{id}    <-- CORRETO (KDS status update)
+```
+
+O `PUT /admin-api/v1/orders/{id}` pode existir mas retorna 404 porque a rota espera um formato diferente ou nao e funcional. O KDS PUT esta documentado e aceita `UpdateKdsorderStatusDTO`.
 
 ## Alteracoes
 
-### 1. `supabase/functions/dd-auth/index.ts`
-- Mudar `DD_STORE_API_BASE` de `https://deliverydireto.com.br/store-api` para `https://deliverydireto.com.br/admin-api`
-- Token: `POST /admin-api/token` (password grant para connect, refresh_token grant para refresh)
-- Webhooks: `POST /admin-api/v1/webhooks` (mesma logica, so muda base URL)
+### 1. `supabase/functions/dd-polling/index.ts`
 
-### 2. `supabase/functions/dd-polling/index.ts`
-- Mudar `DD_STORE_API` de `https://deliverydireto.com.br/store-api/v1` para `https://deliverydireto.com.br/admin-api/v1`
-- Listar pedidos: `GET /admin-api/v1/orders?updatedAt[gte]=...&limit=50`
-- Detalhe do pedido (para items): `GET /admin-api/v1/kds/orders/{id}` (endpoint KDS retorna items completos)
-- Manter toda a logica de parsing (money(), mapPaymentLabel(), matching por pdv_code, agendamento)
-- Manter headers `X-DeliveryDireto-Id` e `X-DeliveryDireto-Client-Id`
+**Corrigir URL do detalhe KDS** (linha 263):
+- DE: `GET ${DD_ADMIN_API}/kds/orders/${orderId}`
+- PARA: `GET ${DD_ADMIN_API}/kds/order?orderId=${orderId}`
+- Resposta sera `{ status: "success", data: { ...KdsorderDTO } }` com itens inclusos
 
-### 3. `supabase/functions/dd-order-action/index.ts`
-- Mudar base URL para `https://deliverydireto.com.br/admin-api/v1`
-- Status update: `PUT /admin-api/v1/orders/{id}` com body `{ "status": "APPROVED" }` (documentado na admin-api)
-- OU usar KDS: `PUT /admin-api/v1/kds/orders/{id}` como fallback
-- Mapeamento: accept->APPROVED, ready->READY, dispatch->DISPATCHED, deliver->DONE, reject->CANCELLED (com statusReason)
+**Corrigir fallback** (linha 274):
+- Remover fallback para `GET /orders/${orderId}` (nao existe no admin-api como GET individual)
+- Manter apenas o endpoint KDS correto
 
-## Arquivos Alterados
+**Manter todo o resto identico**: parsing de items, payment mapping, valores em centavos, customer info, tudo permanece igual.
 
-| Arquivo | Descricao |
-|---------|-----------|
-| `supabase/functions/dd-auth/index.ts` | Token URL: store-api -> admin-api |
-| `supabase/functions/dd-polling/index.ts` | Orders URL: store-api -> admin-api, detail via KDS |
-| `supabase/functions/dd-order-action/index.ts` | Status URL: store-api -> admin-api |
+### 2. `supabase/functions/dd-order-action/index.ts`
 
-Nenhuma alteracao em UI. Nenhuma funcionalidade existente alterada.
+**Corrigir endpoint de status** (linha 92):
+- DE: `PUT ${DD_ADMIN_API}/orders/${dd_order_id}`
+- PARA: `PUT ${DD_ADMIN_API}/kds/orders/${dd_order_id}`
+- Mesmo body: `{ status: "APPROVED" }` etc.
+- Manter mapeamento: accept->APPROVED, ready->READY, dispatch->DISPATCHED, deliver->DONE, reject->CANCELLED
+
+### 3. Nenhuma outra alteracao
+
+- `dd-auth/index.ts` -- sem alteracao (auth funciona)
+- UI -- sem alteracao
+- Pagamento -- sem alteracao (ja funciona correto)
+- Valores -- sem alteracao (ja funciona correto)
+
+## Resumo Tecnico
+
+| Arquivo | Linha | De | Para |
+|---------|-------|----|----|
+| dd-polling | ~263 | `GET /kds/orders/${id}` | `GET /kds/order?orderId=${id}` |
+| dd-polling | ~274 | fallback `GET /orders/${id}` | remover fallback |
+| dd-order-action | ~92 | `PUT /orders/${id}` | `PUT /kds/orders/${id}` |
+
+Duas correcoes de URL. Nenhuma funcionalidade existente alterada.
 
