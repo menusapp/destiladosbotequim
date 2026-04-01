@@ -141,21 +141,37 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
                 {filteredProducts.length === 0 && <p className="text-center text-muted-foreground text-lg py-12">Nenhum produto encontrado</p>}
               </>
             ) : (
-              categories.map(cat => (
-                <div key={cat.id} id={`kiosk-cat-${cat.id}`} className="mb-8">
-                  <div className="flex items-center gap-3 mb-4">
-                    {(cat as any).image_url && (
-                      <img src={(cat as any).image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
-                    )}
-                    <h3 className="text-xl md:text-2xl font-bold text-foreground">{cat.name}</h3>
+              <>
+                {/* Featured Section */}
+                {hasFeatured && (
+                  <div id="kiosk-cat-__featured__" className="mb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Star className="h-6 w-6" style={{ color: primaryColor }} />
+                      <h3 className="text-xl md:text-2xl font-bold text-foreground">{featuredSectionTitle}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                      {featuredProducts.map(p => (
+                        <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                    {cat.products.map(p => (
-                      <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
-                    ))}
+                )}
+                {categories.map(cat => (
+                  <div key={cat.id} id={`kiosk-cat-${cat.id}`} className="mb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      {(cat as any).image_url && (
+                        <img src={(cat as any).image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                      )}
+                      <h3 className="text-xl md:text-2xl font-bold text-foreground">{cat.name}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                      {cat.products.map(p => (
+                        <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </>
             )}
           </div>
         </ScrollArea>
