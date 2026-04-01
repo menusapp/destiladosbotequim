@@ -20,9 +20,9 @@ export const ComandaBottomBar = ({
 }: ComandaBottomBarProps) => {
   const showValue = cartItemCount > 0 && total > 0;
 
-  return (
+  return createPortal(
     <div 
-      className={`fixed bottom-0 left-0 right-0 z-[60] bg-background border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
+      className={`fixed bottom-0 left-0 right-0 z-[9999] bg-background border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
         isVisible ? 'translate-y-0' : 'translate-y-full'
       }`}
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
@@ -54,6 +54,7 @@ export const ComandaBottomBar = ({
           )}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
