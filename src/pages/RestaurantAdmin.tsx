@@ -405,11 +405,14 @@ const RestaurantAdmin = () => {
               .maybeSingle();
             
             // Mostrar notificação pop-up
-            setBillNotification({
-              billId: billId,
-              tableNumber: tableData.table_number,
-              total: bill.total_amount,
-              customerName: comandaData?.customer_name || 'Cliente',
+            setBillNotificationQueue(prev => {
+              if (prev.some(b => b.billId === billId)) return prev;
+              return [...prev, {
+                billId: billId,
+                tableNumber: tableData.table_number,
+                total: bill.total_amount,
+                customerName: comandaData?.customer_name || 'Cliente',
+              }];
             });
             
             // Marcar como notificado
