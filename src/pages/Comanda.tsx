@@ -1295,6 +1295,14 @@ const Comanda = () => {
                           onChange={(e) => setChangeAmount(e.target.value)}
                           placeholder="Ex: 100.00"
                         />
+                        {changeAmount && parseFloat(changeAmount) > totals.total && (
+                          <div className="flex justify-between items-center p-2 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
+                            <span className="text-sm text-muted-foreground">Troco:</span>
+                            <span className="text-sm font-bold text-orange-600">
+                              R$ {(parseFloat(changeAmount) - totals.total).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 
