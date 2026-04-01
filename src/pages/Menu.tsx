@@ -1090,6 +1090,7 @@ const Menu = () => {
           />
         </>
       )}
+      </div>
 
       {/* Barra de comanda - sempre visível no modo consumo local quando cliente está logado */}
       {customerName && (
@@ -1099,6 +1100,7 @@ const Menu = () => {
           status={comandaStatus}
           isVisible={showComandaBar}
           hasSubmittedOrders={hasOpenComanda}
+          cartItemCount={cartItemCount}
           onViewComanda={() => navigate(`/${restaurantSlug}/comanda/${tableNumber}`)}
         />
       )}
