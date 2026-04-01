@@ -443,21 +443,29 @@ export const PaymentConfirmationModal = ({
             </h3>
             <div className="space-y-2">
               {selectedPayments.map((payment, idx) => (
-                <div key={idx} className="flex items-center justify-between bg-background rounded-lg px-3 py-2 border">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{payment.method}</span>
+                <div key={idx} className="bg-background rounded-lg px-3 py-2 border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{payment.method}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold">R$ {payment.amount.toFixed(2)}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => removePayment(idx)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold">R$ {payment.amount.toFixed(2)}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => removePayment(idx)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  {payment.cashChange && payment.cashChange > 0 && (
+                    <div className="flex justify-between text-sm mt-1 pt-1 border-t border-dashed">
+                      <span className="text-muted-foreground">Troco:</span>
+                      <span className="font-semibold text-orange-600">R$ {payment.cashChange.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               ))}
               <div className="flex justify-between text-sm pt-2 border-t">
