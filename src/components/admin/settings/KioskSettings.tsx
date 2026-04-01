@@ -9,8 +9,24 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Monitor, Copy, ExternalLink, Power, CreditCard, Banknote, QrCode, Smartphone,
-  UtensilsCrossed, ShoppingBag, Truck, Store, Users, Gift, Tag, Percent, Timer, Loader2, Save,
+  Monitor,
+  Copy,
+  ExternalLink,
+  Power,
+  CreditCard,
+  Banknote,
+  QrCode,
+  Smartphone,
+  UtensilsCrossed,
+  ShoppingBag,
+  Truck,
+  Store,
+  Users,
+  Gift,
+  Tag,
+  Percent,
+  Timer,
+  Loader2,
 } from "lucide-react";
 
 interface Props {
@@ -37,7 +53,6 @@ interface KioskConfig {
 
 export default function KioskSettings({ restaurantId }: Props) {
   const [config, setConfig] = useState<KioskConfig | null>(null);
-  const [savedConfig, setSavedConfig] = useState<KioskConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [slug, setSlug] = useState<string>("");
@@ -48,6 +63,7 @@ export default function KioskSettings({ restaurantId }: Props) {
 
   const fetchConfig = async () => {
     try {
+      // Fetch restaurant slug
       const { data: rest } = await supabase
         .from("restaurants")
         .select("slug")
@@ -55,6 +71,7 @@ export default function KioskSettings({ restaurantId }: Props) {
         .single();
       if (rest) setSlug(rest.slug);
 
+      // Fetch or create kiosk config
       const { data, error } = await supabase
         .from("kiosk_config")
         .select("*")
@@ -65,8 +82,8 @@ export default function KioskSettings({ restaurantId }: Props) {
 
       if (data) {
         setConfig(data as any);
-        setSavedConfig(data as any);
       } else {
+        // Create default config
         const { data: newConfig, error: insertErr } = await supabase
           .from("kiosk_config")
           .insert({ restaurant_id: restaurantId })
@@ -74,7 +91,6 @@ export default function KioskSettings({ restaurantId }: Props) {
           .single();
         if (insertErr) throw insertErr;
         setConfig(newConfig as any);
-        setSavedConfig(newConfig as any);
       }
     } catch (err) {
       console.error("[KioskSettings] Error loading config:", err);
@@ -84,34 +100,28 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
-  const hasChanges = config && savedConfig && JSON.stringify(config) !== JSON.stringify(savedConfig);
-
-  const updateLocal = (updates: Partial<KioskConfig>) => {
-    if (!config) return;
-    setConfig({ ...config, ...updates });
-  };
-
-  const handleSave = async () => {
+  const updateConfig = async (updates: Partial<KioskConfig>) => {
     if (!config) return;
     setSaving(true);
     try {
-      const { id, ...rest } = config;
       const { error } = await supabase
         .from("kiosk_config")
-        .update({ ...rest, updated_at: new Date().toISOString() })
-        .eq("id", id);
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", config.id);
       if (error) throw error;
-      setSavedConfig({ ...config });
-      toast.success("Configurações do Totem salvas com sucesso!");
+      setConfig({ ...config, ...updates });
+      toast.success("Configuração salva!");
     } catch (err) {
       console.error("[KioskSettings] Error saving:", err);
-      toast.error("Erro ao salvar configurações");
+      toast.error("Erro ao salvar configuração");
     } finally {
       setSaving(false);
     }
   };
 
-  const kioskUrl = slug ? `${window.location.origin}/${slug}/kiosk` : "";
+  const kioskUrl = slug
+    ? `${window.location.origin}/${slug}/kiosk`
+    : "";
 
   const copyLink = () => {
     if (!kioskUrl) return;
@@ -131,17 +141,7 @@ export default function KioskSettings({ restaurantId }: Props) {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Save button - sticky */}
-      {hasChanges && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b pb-4 pt-2 -mx-2 px-2">
-          <Button onClick={handleSave} disabled={saving} className="w-full h-12 text-base font-bold gap-2">
-            {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-            {saving ? "Salvando..." : "Salvar Configurações"}
-          </Button>
-        </div>
-      )}
-
-      {/* Status */}
+      {/* Status do Módulo */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -156,13 +156,16 @@ export default function KioskSettings({ restaurantId }: Props) {
               <Badge variant={config.enabled ? "default" : "secondary"}>
                 {config.enabled ? "Ativo" : "Inativo"}
               </Badge>
-              <Switch checked={config.enabled} onCheckedChange={(v) => updateLocal({ enabled: v })} />
+              <Switch
+                checked={config.enabled}
+                onCheckedChange={(v) => updateConfig({ enabled: v })}
+              />
             </div>
           </div>
         </CardHeader>
       </Card>
 
-      {/* Link */}
+      {/* Link do Totem */}
       {config.enabled && kioskUrl && (
         <Card>
           <CardHeader>
@@ -170,14 +173,20 @@ export default function KioskSettings({ restaurantId }: Props) {
               <ExternalLink className="h-5 w-5 text-primary" />
               Link do Totem
             </CardTitle>
-            <CardDescription>Use este link no navegador do totem/tablet</CardDescription>
+            <CardDescription>
+              Use este link no navegador do totem/tablet
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
               <Input value={kioskUrl} readOnly className="font-mono text-sm" />
-              <Button variant="outline" size="icon" onClick={copyLink}><Copy className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" onClick={copyLink}>
+                <Copy className="h-4 w-4" />
+              </Button>
               <Button variant="outline" size="icon" asChild>
-                <a href={kioskUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
+                <a href={kioskUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
               </Button>
             </div>
           </CardContent>
@@ -191,34 +200,82 @@ export default function KioskSettings({ restaurantId }: Props) {
           <CardDescription>Quais opções de consumo o cliente pode escolher</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ToggleRow icon={UtensilsCrossed} label="Comer no local" description="Cliente consome no estabelecimento" checked={config.order_dine_in} onChange={(v) => updateLocal({ order_dine_in: v })} />
+          <ToggleRow
+            icon={UtensilsCrossed}
+            label="Comer no local"
+            description="Cliente consome no estabelecimento"
+            checked={config.order_dine_in}
+            onChange={(v) => updateConfig({ order_dine_in: v })}
+          />
           <Separator />
-          <ToggleRow icon={ShoppingBag} label="Para viagem" description="Cliente retira e leva" checked={config.order_takeaway} onChange={(v) => updateLocal({ order_takeaway: v })} />
+          <ToggleRow
+            icon={ShoppingBag}
+            label="Para viagem"
+            description="Cliente retira e leva"
+            checked={config.order_takeaway}
+            onChange={(v) => updateConfig({ order_takeaway: v })}
+          />
           <Separator />
-          <ToggleRow icon={Store} label="Retirada no balcão" description="Cliente retira no balcão" checked={config.order_pickup} onChange={(v) => updateLocal({ order_pickup: v })} />
+          <ToggleRow
+            icon={Store}
+            label="Retirada no balcão"
+            description="Cliente retira no balcão"
+            checked={config.order_pickup}
+            onChange={(v) => updateConfig({ order_pickup: v })}
+          />
           <Separator />
-          <ToggleRow icon={Truck} label="Entrega" description="Pedido para entrega (quando disponível)" checked={config.order_delivery} onChange={(v) => updateLocal({ order_delivery: v })} />
+          <ToggleRow
+            icon={Truck}
+            label="Entrega"
+            description="Pedido para entrega (quando disponível)"
+            checked={config.order_delivery}
+            onChange={(v) => updateConfig({ order_delivery: v })}
+          />
         </CardContent>
       </Card>
 
-      {/* Pagamentos */}
+      {/* Formas de Pagamento */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Formas de Pagamento</CardTitle>
           <CardDescription>Meios de pagamento aceitos no totem</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ToggleRow icon={Banknote} label="Dinheiro" description="Pagamento em espécie com cálculo de troco" checked={config.payment_cash} onChange={(v) => updateLocal({ payment_cash: v })} />
+          <ToggleRow
+            icon={Banknote}
+            label="Dinheiro"
+            description="Pagamento em espécie com cálculo de troco"
+            checked={config.payment_cash}
+            onChange={(v) => updateConfig({ payment_cash: v })}
+          />
           <Separator />
-          <ToggleRow icon={CreditCard} label="Cartão na maquininha" description="Pagamento na maquininha ao lado do totem" checked={config.payment_card} onChange={(v) => updateLocal({ payment_card: v })} />
+          <ToggleRow
+            icon={CreditCard}
+            label="Cartão na maquininha"
+            description="Pagamento na maquininha ao lado do totem"
+            checked={config.payment_card}
+            onChange={(v) => updateConfig({ payment_card: v })}
+          />
           <Separator />
-          <ToggleRow icon={QrCode} label="PIX" description="Pagamento via QR Code PIX" checked={config.payment_pix} onChange={(v) => updateLocal({ payment_pix: v })} />
+          <ToggleRow
+            icon={QrCode}
+            label="PIX"
+            description="Pagamento via QR Code PIX"
+            checked={config.payment_pix}
+            onChange={(v) => updateConfig({ payment_pix: v })}
+          />
           <Separator />
-          <ToggleRow icon={Smartphone} label="Pagamento online" description="Cartão online integrado (futura integração)" checked={config.payment_online} onChange={(v) => updateLocal({ payment_online: v })} />
+          <ToggleRow
+            icon={Smartphone}
+            label="Pagamento online"
+            description="Cartão online integrado (futura integração)"
+            checked={config.payment_online}
+            onChange={(v) => updateConfig({ payment_online: v })}
+          />
         </CardContent>
       </Card>
 
-      {/* Identificação */}
+      {/* Identificação do Cliente */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -228,11 +285,17 @@ export default function KioskSettings({ restaurantId }: Props) {
           <CardDescription>Configurações de CRM e identificação</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ToggleRow icon={Users} label="Exigir CPF" description="Obrigar identificação por CPF antes do pedido" checked={config.require_cpf} onChange={(v) => updateLocal({ require_cpf: v })} />
+          <ToggleRow
+            icon={Users}
+            label="Exigir CPF"
+            description="Obrigar identificação por CPF antes do pedido"
+            checked={config.require_cpf}
+            onChange={(v) => updateConfig({ require_cpf: v })}
+          />
         </CardContent>
       </Card>
 
-      {/* Fidelidade */}
+      {/* Fidelidade e Cupons */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -242,11 +305,29 @@ export default function KioskSettings({ restaurantId }: Props) {
           <CardDescription>Recursos de engajamento no totem</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ToggleRow icon={Gift} label="Programa de fidelidade" description="Acumular e resgatar pontos no totem" checked={config.loyalty_enabled} onChange={(v) => updateLocal({ loyalty_enabled: v })} />
+          <ToggleRow
+            icon={Gift}
+            label="Programa de fidelidade"
+            description="Acumular e resgatar pontos no totem"
+            checked={config.loyalty_enabled}
+            onChange={(v) => updateConfig({ loyalty_enabled: v })}
+          />
           <Separator />
-          <ToggleRow icon={Tag} label="Cupons de desconto" description="Permitir aplicar cupons no totem" checked={config.coupons_enabled} onChange={(v) => updateLocal({ coupons_enabled: v })} />
+          <ToggleRow
+            icon={Tag}
+            label="Cupons de desconto"
+            description="Permitir aplicar cupons no totem"
+            checked={config.coupons_enabled}
+            onChange={(v) => updateConfig({ coupons_enabled: v })}
+          />
           <Separator />
-          <ToggleRow icon={Percent} label="Promoções automáticas" description="Exibir descontos e promoções vigentes" checked={config.promotions_enabled} onChange={(v) => updateLocal({ promotions_enabled: v })} />
+          <ToggleRow
+            icon={Percent}
+            label="Promoções automáticas"
+            description="Exibir descontos e promoções vigentes"
+            checked={config.promotions_enabled}
+            onChange={(v) => updateConfig({ promotions_enabled: v })}
+          />
         </CardContent>
       </Card>
 
@@ -267,7 +348,7 @@ export default function KioskSettings({ restaurantId }: Props) {
               value={config.inactivity_timeout_seconds}
               onChange={(e) => {
                 const val = Math.max(30, parseInt(e.target.value) || 120);
-                updateLocal({ inactivity_timeout_seconds: val });
+                updateConfig({ inactivity_timeout_seconds: val });
               }}
               className="w-24"
               min={30}
@@ -279,18 +360,22 @@ export default function KioskSettings({ restaurantId }: Props) {
           </div>
         </CardContent>
       </Card>
-
-      {/* Bottom save button */}
-      <Button onClick={handleSave} disabled={saving || !hasChanges} className="w-full h-12 text-base font-bold gap-2">
-        {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-        {saving ? "Salvando..." : "Salvar Configurações"}
-      </Button>
     </div>
   );
 }
 
-function ToggleRow({ icon: Icon, label, description, checked, onChange }: {
-  icon: any; label: string; description: string; checked: boolean; onChange: (v: boolean) => void;
+function ToggleRow({
+  icon: Icon,
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  icon: any;
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
 }) {
   return (
     <div className="flex items-center justify-between">
