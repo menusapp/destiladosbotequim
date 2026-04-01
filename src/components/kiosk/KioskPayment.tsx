@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { CartItem } from "@/types/menu";
 import { KioskCustomer } from "@/pages/Kiosk";
+import { KioskConfig } from "@/hooks/useKioskConfig";
 
 interface Props {
   cart: CartItem[];
@@ -18,9 +19,10 @@ interface Props {
   cartTotal: number;
   onBack: () => void;
   onOrderCreated: (orderId: string) => void;
+  kioskConfig?: KioskConfig | null;
 }
 
-export function KioskPayment({ cart, restaurant, customer, consumptionType, tableNumber, primaryColor, cartTotal, onBack, onOrderCreated }: Props) {
+export function KioskPayment({ cart, restaurant, customer, consumptionType, tableNumber, primaryColor, cartTotal, onBack, onOrderCreated, kioskConfig }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<"dinheiro" | "cartao" | "pix">("dinheiro");
   const [cashPaid, setCashPaid] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -148,10 +150,14 @@ export function KioskPayment({ cart, restaurant, customer, consumptionType, tabl
     }
   };
 
-  const methods = [
-    { key: "dinheiro" as const, label: "Dinheiro", icon: Banknote },
-    { key: "cartao" as const, label: "Cartão", icon: CreditCard, sublabel: "Pague na maquininha" },
+  const allMethods = [
+    { key: "dinheiro" as const, label: "Dinheiro", icon: Banknote, configKey: "payment_cash" as const },
+    { key: "cartao" as const, label: "Cartão", icon: CreditCard, sublabel: "Pague na maquininha", configKey: "payment_card" as const },
   ];
+
+  const methods = kioskConfig
+    ? allMethods.filter(m => kioskConfig[m.configKey] !== false)
+    : allMethods;
 
   return (
     <div className="flex flex-col h-screen">

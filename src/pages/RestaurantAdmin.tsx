@@ -38,6 +38,7 @@ const PrintersSettings = lazy(() => import("@/components/admin/settings/Printers
 const WhatsAppSettings = lazy(() => import("@/components/admin/settings/WhatsAppSettings"));
 const OnlinePaymentsSettings = lazy(() => import("@/components/admin/settings/OnlinePaymentsSettings"));
 const BackupSettings = lazy(() => import("@/components/admin/settings/BackupSettings"));
+const KioskSettings = lazy(() => import("@/components/admin/settings/KioskSettings"));
 
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { useRestaurantModules } from "@/hooks/useRestaurantModules";
@@ -735,6 +736,7 @@ const RestaurantAdmin = () => {
     "config-pagamentos-online": () => import("@/components/admin/settings/OnlinePaymentsSettings"),
     "config-impressoras": () => import("@/components/admin/settings/PrintersSettings"),
     "config-whatsapp": () => import("@/components/admin/settings/WhatsAppSettings"),
+    "config-totem": () => import("@/components/admin/settings/KioskSettings"),
     "config-backup": () => import("@/components/admin/settings/BackupSettings"),
   };
 
@@ -792,6 +794,8 @@ const RestaurantAdmin = () => {
         return <PrintersSettings restaurantId={restaurant.id} />;
       case "config-whatsapp":
         return <WhatsAppSettings restaurantId={restaurant.id} />;
+      case "config-totem":
+        return <KioskSettings restaurantId={restaurant.id} />;
       case "config-backup":
         return <BackupSettings restaurantId={restaurant.id} />;
       default:

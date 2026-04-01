@@ -1409,6 +1409,69 @@ export type Database = {
           },
         ]
       }
+      kiosk_config: {
+        Row: {
+          coupons_enabled: boolean
+          created_at: string | null
+          enabled: boolean
+          id: string
+          inactivity_timeout_seconds: number
+          loyalty_enabled: boolean
+          order_delivery: boolean
+          order_dine_in: boolean
+          order_pickup: boolean
+          order_takeaway: boolean
+          payment_card: boolean
+          payment_cash: boolean
+          payment_online: boolean
+          payment_pix: boolean
+          promotions_enabled: boolean
+          require_cpf: boolean
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          coupons_enabled?: boolean
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          inactivity_timeout_seconds?: number
+          loyalty_enabled?: boolean
+          order_delivery?: boolean
+          order_dine_in?: boolean
+          order_pickup?: boolean
+          order_takeaway?: boolean
+          payment_card?: boolean
+          payment_cash?: boolean
+          payment_online?: boolean
+          payment_pix?: boolean
+          promotions_enabled?: boolean
+          require_cpf?: boolean
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          coupons_enabled?: boolean
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          inactivity_timeout_seconds?: number
+          loyalty_enabled?: boolean
+          order_delivery?: boolean
+          order_dine_in?: boolean
+          order_pickup?: boolean
+          order_takeaway?: boolean
+          payment_card?: boolean
+          payment_cash?: boolean
+          payment_online?: boolean
+          payment_pix?: boolean
+          promotions_enabled?: boolean
+          require_cpf?: boolean
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       labor_costs: {
         Row: {
           created_at: string | null

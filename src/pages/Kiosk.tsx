@@ -4,6 +4,7 @@ import { resolveSlug } from "@/lib/slugResolver";
 import { supabase } from "@/integrations/supabase/client";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "@/components/ui/sonner";
+import { useKioskConfig } from "@/hooks/useKioskConfig";
 import { KioskIdleScreen } from "@/components/kiosk/KioskIdleScreen";
 import { KioskIdentification } from "@/components/kiosk/KioskIdentification";
 import { KioskMenu } from "@/components/kiosk/KioskMenu";
@@ -23,8 +24,6 @@ export interface KioskCustomer {
   isExisting: boolean;
 }
 
-const INACTIVITY_TIMEOUT_MS = 120_000; // 2 minutes
-
 export default function Kiosk() {
   const { slug: pathSlug } = useParams<{ slug: string }>();
   const slug = resolveSlug(pathSlug);
@@ -39,7 +38,13 @@ export default function Kiosk() {
   const [tableNumber, setTableNumber] = useState<string>("");
   const [orderId, setOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [kioskDisabled, setKioskDisabled] = useState(false);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch kiosk config after restaurant is loaded
+  const { config: kioskConfig, loading: configLoading } = useKioskConfig(restaurant?.id || null);
+
+  const timeoutMs = (kioskConfig?.inactivity_timeout_seconds || 120) * 1000;
 
   const resetSession = useCallback(() => {
     setStep("idle");
@@ -59,8 +64,8 @@ export default function Kiosk() {
     inactivityTimer.current = setTimeout(() => {
       toast.info("Sessão encerrada por inatividade");
       resetSession();
-    }, INACTIVITY_TIMEOUT_MS);
-  }, [step, resetSession]);
+    }, timeoutMs);
+  }, [step, resetSession, timeoutMs]);
 
   useEffect(() => {
     const events = ["touchstart", "mousedown", "keydown", "scroll"];
@@ -95,6 +100,20 @@ export default function Kiosk() {
         return;
       }
       setRestaurant(r);
+
+      // Check if kiosk is enabled
+      const { data: kConf } = await supabase
+        .from("kiosk_config")
+        .select("enabled")
+        .eq("restaurant_id", r.id)
+        .maybeSingle();
+
+      if (kConf && !kConf.enabled) {
+        console.log("[Kiosk] Totem desativado para restaurante:", r.id);
+        setKioskDisabled(true);
+        setLoading(false);
+        return;
+      }
 
       const { data: cats, error: catsErr } = await supabase
         .from("categories")
@@ -173,7 +192,18 @@ export default function Kiosk() {
 
   const primaryColor = restaurant?.primary_color || "#FF6B35";
 
-  if (loading) {
+  // Determine which consumption types are available
+  const handleStartOrder = () => {
+    if (kioskConfig?.require_cpf === false) {
+      // Skip identification, go straight to menu
+      setCustomer({ name: "Cliente", cpf: "", isExisting: false });
+      setStep("menu");
+    } else {
+      setStep("identification");
+    }
+  };
+
+  if (loading || configLoading) {
     return (
       <KioskLayout primaryColor={primaryColor}>
         <div className="flex items-center justify-center h-screen">
@@ -202,12 +232,24 @@ export default function Kiosk() {
     );
   }
 
+  if (kioskDisabled) {
+    return (
+      <KioskLayout primaryColor={primaryColor}>
+        <div className="flex flex-col items-center justify-center h-screen gap-4 px-8 text-center">
+          <p className="text-6xl">🚫</p>
+          <h2 className="text-2xl font-bold text-foreground">Totem indisponível no momento</h2>
+          <p className="text-lg text-muted-foreground">O autoatendimento deste estabelecimento está desativado.</p>
+        </div>
+      </KioskLayout>
+    );
+  }
+
   return (
     <KioskLayout primaryColor={primaryColor}>
       {step === "idle" && (
         <KioskIdleScreen
           restaurant={restaurant}
-          onStart={() => setStep("identification")}
+          onStart={handleStartOrder}
         />
       )}
 
@@ -263,6 +305,7 @@ export default function Kiosk() {
           onChangeTable={setTableNumber}
           onBack={() => setStep("cart")}
           onNext={() => setStep("payment")}
+          kioskConfig={kioskConfig}
         />
       )}
 
@@ -277,6 +320,7 @@ export default function Kiosk() {
           cartTotal={cartTotal}
           onBack={() => setStep("consumption")}
           onOrderCreated={(id) => { setOrderId(id); setStep("confirmation"); }}
+          kioskConfig={kioskConfig}
         />
       )}
 
