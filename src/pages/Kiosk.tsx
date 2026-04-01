@@ -75,7 +75,12 @@ export default function Kiosk() {
 
   // Fetch restaurant + categories
   const fetchData = useCallback(async () => {
-    if (!slug) return;
+    console.log("[Kiosk] slug bruto (pathParam):", pathSlug, "| slug resolvido:", slug);
+    if (!slug) {
+      console.warn("[Kiosk] Slug ausente ou inválido — abortando bootstrap");
+      setLoading(false);
+      return;
+    }
     try {
       const { data: r, error } = await supabase
         .from("restaurants")
@@ -84,7 +89,7 @@ export default function Kiosk() {
         .maybeSingle();
       if (error) throw error;
       if (!r) {
-        console.warn("[Kiosk] Restaurante não encontrado para slug:", slug);
+        console.warn("[Kiosk] Nenhum restaurante encontrado para slug:", slug);
         toast.error("Restaurante não encontrado");
         setLoading(false);
         return;
