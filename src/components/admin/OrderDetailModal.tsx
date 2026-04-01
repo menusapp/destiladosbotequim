@@ -154,8 +154,8 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
 
   // Sync status with Delivery Direto
-  const syncDDStatus = async (newStatus: string, reason?: string) => {
-    if (!order.dd_source || !order.dd_order_id) return;
+  const syncDDStatus = async (newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string }> => {
+    if (!order.dd_source || !order.dd_order_id) return { ok: true };
 
     const statusToAction: Record<string, string> = {
       accepted: "accept",
@@ -168,10 +168,10 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     };
 
     const ddAction = statusToAction[newStatus];
-    if (!ddAction) return;
+    if (!ddAction) return { ok: true };
 
     try {
-      const { error } = await supabase.functions.invoke("dd-order-action", {
+      const res = await supabase.functions.invoke("dd-order-action", {
         body: {
           restaurant_id: restaurantId,
           dd_order_id: order.dd_order_id,
@@ -179,12 +179,23 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
           reason: reason || undefined,
         },
       });
-      if (error) {
-        console.error("DD action error:", error);
-        toast.error("Erro ao sincronizar com Delivery Direto, mas o status local será atualizado");
+      
+      if (res.error) {
+        const errMsg = typeof res.error === 'object' ? (res.error as any)?.message || JSON.stringify(res.error) : String(res.error);
+        console.error("DD action error:", res.error);
+        return { ok: false, errorMsg: errMsg };
       }
+      
+      // Check response body for error
+      if (res.data?.error) {
+        console.error("DD action API error:", res.data.error);
+        return { ok: false, errorMsg: res.data.error };
+      }
+      
+      return { ok: true };
     } catch (e) {
       console.error("DD sync error:", e);
+      return { ok: false, errorMsg: (e as Error).message };
     }
   };
 
