@@ -369,7 +369,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                 <p className="text-sm text-muted-foreground mt-1">{format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge className={elapsedTime.color}><Clock className="w-3 h-3 mr-1" />Tempo: {elapsedTime.text}</Badge>
+                <Badge variant="outline" className={`border-transparent ${elapsedTime.color} bg-primary-foreground`}><Clock className="w-3 h-3 mr-1" />Tempo: {elapsedTime.text}</Badge>
                 <Badge variant="secondary">{getStatusLabel(order.status)}</Badge>
                 {order.dd_source && (
                   <Badge className="bg-[#0066CC] text-white border-0">Delivery Direto</Badge>
