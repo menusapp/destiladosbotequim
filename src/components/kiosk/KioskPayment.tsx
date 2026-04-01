@@ -19,9 +19,10 @@ interface Props {
   cartTotal: number;
   onBack: () => void;
   onOrderCreated: (orderId: string) => void;
+  kioskConfig?: KioskConfig | null;
 }
 
-export function KioskPayment({ cart, restaurant, customer, consumptionType, tableNumber, primaryColor, cartTotal, onBack, onOrderCreated }: Props) {
+export function KioskPayment({ cart, restaurant, customer, consumptionType, tableNumber, primaryColor, cartTotal, onBack, onOrderCreated, kioskConfig }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<"dinheiro" | "cartao" | "pix">("dinheiro");
   const [cashPaid, setCashPaid] = useState("");
   const [submitting, setSubmitting] = useState(false);
