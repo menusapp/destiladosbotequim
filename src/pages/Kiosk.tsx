@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
+import { resolveSlug } from "@/lib/slugResolver";
 import { supabase } from "@/integrations/supabase/client";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "@/components/ui/sonner";
@@ -25,7 +26,8 @@ export interface KioskCustomer {
 const INACTIVITY_TIMEOUT_MS = 120_000; // 2 minutes
 
 export default function Kiosk() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug: pathSlug } = useParams<{ slug: string }>();
+  const slug = resolveSlug(pathSlug);
   const [step, setStep] = useState<KioskStep>("idle");
   const [restaurant, setRestaurant] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -73,7 +75,12 @@ export default function Kiosk() {
 
   // Fetch restaurant + categories
   const fetchData = useCallback(async () => {
-    if (!slug) return;
+    console.log("[Kiosk] slug bruto (pathParam):", pathSlug, "| slug resolvido:", slug);
+    if (!slug) {
+      console.warn("[Kiosk] Slug ausente ou inválido — abortando bootstrap");
+      setLoading(false);
+      return;
+    }
     try {
       const { data: r, error } = await supabase
         .from("restaurants")
@@ -82,7 +89,7 @@ export default function Kiosk() {
         .maybeSingle();
       if (error) throw error;
       if (!r) {
-        console.warn("[Kiosk] Restaurante não encontrado para slug:", slug);
+        console.warn("[Kiosk] Nenhum restaurante encontrado para slug:", slug);
         toast.error("Restaurante não encontrado");
         setLoading(false);
         return;
@@ -108,7 +115,7 @@ export default function Kiosk() {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, pathSlug]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -177,12 +184,19 @@ export default function Kiosk() {
   }
 
   if (!restaurant) {
+    const isSlugMissing = !slug;
     return (
       <KioskLayout primaryColor={primaryColor}>
         <div className="flex flex-col items-center justify-center h-screen gap-4 px-8 text-center">
-          <p className="text-6xl">🔍</p>
-          <h2 className="text-2xl font-bold text-foreground">Restaurante não encontrado</h2>
-          <p className="text-lg text-muted-foreground">Verifique o endereço e tente novamente.</p>
+          <p className="text-6xl">{isSlugMissing ? "⚠️" : "🔍"}</p>
+          <h2 className="text-2xl font-bold text-foreground">
+            {isSlugMissing ? "Link do totem inválido" : "Restaurante não encontrado"}
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            {isSlugMissing
+              ? "O endereço acessado não contém a identificação do restaurante."
+              : "Verifique o endereço e tente novamente."}
+          </p>
         </div>
       </KioskLayout>
     );
