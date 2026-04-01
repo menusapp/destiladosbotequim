@@ -383,12 +383,13 @@ export const PaymentConfirmationModal = ({
                     const colorClass = METHOD_COLORS[method.method_type] || "bg-muted/50 border-border hover:bg-muted";
                     const needsBrand = needsBrandSelection(method.method_type);
 
+                    const isAdded = selectedPayments.some(p => p.methodType === method.method_type);
                     return (
                       <button
                         key={method.id}
                         onClick={() => handleMethodClick(method)}
                         disabled={remaining <= 0 || !currentAmount || parseFloat(currentAmount) <= 0}
-                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 ${colorClass} disabled:opacity-40 disabled:cursor-not-allowed`}
+                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 ${isAdded ? "border-orange-400 bg-orange-50 dark:bg-orange-950/30" : colorClass} disabled:opacity-40 disabled:cursor-not-allowed`}
                       >
                         <div className="w-10 h-10 rounded-lg bg-background/80 flex items-center justify-center flex-shrink-0">
                           <Icon className="w-5 h-5" />
