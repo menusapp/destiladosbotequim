@@ -154,7 +154,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
 
   // Sync status with Delivery Direto
-  const syncDDStatus = async (newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string }> => {
+  const syncDDStatus = async (newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string; localUpdated?: boolean }> => {
     if (!order.dd_source || !order.dd_order_id) return { ok: true };
 
     const statusToAction: Record<string, string> = {
