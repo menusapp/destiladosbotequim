@@ -78,6 +78,10 @@ const PAYMENT_LABELS: Record<string, { icon: React.ReactNode; label: string }> =
   "pix": { icon: <Smartphone className="w-3 h-3" />, label: "PIX" },
   "online": { icon: <Smartphone className="w-3 h-3" />, label: "Pago Online" },
   "Pago pelo iFood": { icon: <Smartphone className="w-3 h-3" />, label: "Pago pelo iFood" },
+  "Pago Delivery Direto": { icon: <Smartphone className="w-3 h-3" />, label: "Pago DD" },
+  "Cartão": { icon: <CreditCard className="w-3 h-3" />, label: "Cartão" },
+  "Cartão de Débito": { icon: <CreditCard className="w-3 h-3" />, label: "Débito" },
+  "Vale Refeição": { icon: <CreditCard className="w-3 h-3" />, label: "Vale Refeição" },
 };
 
 const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, showPrepTimer = true }: UnifiedOrdersTabProps) => {
