@@ -1,116 +1,54 @@
 
 
-# Corrigir Integracao DD: Mudar de admin-api para store-api
+# Corrigir dd-polling: Voltar para admin-api (API que FUNCIONAVA)
 
 ## Problema Raiz
 
-O codigo usa a `admin-api` do Delivery Direto que e uma API interna/KDS. A API correta documentada e a **store-api** (`/store-api/v1/`). Por isso:
-
-1. **Itens vazios**: A admin-api lista pedidos sem itens. A store-api retorna pedidos COM itens completos (`items[].item.name`, `items[].item.customCode`, `items[].totalPrice`, etc.)
-2. **Status nao sincroniza**: `PUT /admin-api/v1/orders/{id}` e `PUT /admin-api/v1/kds/orders/{id}` retornam 404. A store-api usa endpoints de acao: `POST /orders/{id}/approve`, `POST /orders/{id}/cancel`, etc.
-3. **Pagamento generico**: A admin-api nao retorna `payment.type` e `payment.paymentDetails.type` corretamente. A store-api retorna o objeto `payment` completo.
-
-## Evidencias da Documentacao Oficial
-
-A store-api (https://developers.deliverydireto.com.br/store-api/docs/) documenta:
-
-**Autenticacao**: `POST /store-api/token` com `client_credentials` ou `password` grant
-
-**Pedido com itens**: Resposta do pedido inclui:
+Os logs mostram claramente:
 ```text
-{
-  "items": [{
-    "itemId": 123,
-    "amount": 3,
-    "totalPrice": { "value": 1000, "currency": "BRL" },
-    "item": {
-      "name": "Refrigerante Light",
-      "customCode": "001",
-      "price": { "value": 1000, "currency": "BRL" }
-    }
-  }],
-  "payment": {
-    "type": "ONLINE" | "OFFLINE",
-    "paymentDetails": { "type": "CREDITCARD" | "PIX" | "CASH" | ... }
-  }
-}
+"Rede de lojas \"store-api\" não encontrada!"
+URL: /store-api/v1/orders?updatedAt[gte]=...
 ```
 
-**Cancelamento**: `DELETE /store-api/v1/customers/me/orders/{id}`
+A mudanca para `/store-api/token` quebrou tudo. A **store-api** e uma API de CLIENTE (para quem faz pedido), nao de LOJISTA. O endpoint `/store-api/v1/orders` NAO EXISTE na store-api - o unico endpoint de pedidos e `/store-api/v1/customers/me/orders` (pedidos do cliente logado).
 
-**Acoes de status** (padrao Open Delivery):
-```text
-POST /store-api/v1/orders/{id}/approve
-POST /store-api/v1/orders/{id}/start-production
-POST /store-api/v1/orders/{id}/ready-for-pickup
-POST /store-api/v1/orders/{id}/dispatch
-POST /store-api/v1/orders/{id}/deliver
-POST /store-api/v1/orders/{id}/cancel   (body: { statusReason })
-```
+A **admin-api** (`https://deliverydireto.com.br/admin-api/`) e a API correta para lojistas. Confirmado na documentacao oficial:
+- `POST /admin-api/token` - Autenticacao OAuth do admin
+- `GET /admin-api/v1/orders` - Lista de pedidos (com items, payment, tudo)
+- `PUT /admin-api/v1/orders/{id}` - Atualiza status do pedido
+- KDS: `GET /admin-api/v1/kds/orders` - Lista pedidos KDS
+- KDS: `PUT /admin-api/v1/kds/orders/{id}` - Atualiza status KDS
+- KDS: `GET /admin-api/v1/kds/orders/{id}` - Detalhe do pedido
+
+O codigo ORIGINAL usava admin-api para auth e store-api/v1 para dados - e FUNCIONAVA. Nos quebramos ao mudar auth para store-api/token.
 
 ## Alteracoes
 
 ### 1. `supabase/functions/dd-auth/index.ts`
+- Mudar `DD_STORE_API_BASE` de `https://deliverydireto.com.br/store-api` para `https://deliverydireto.com.br/admin-api`
+- Token: `POST /admin-api/token` (password grant para connect, refresh_token grant para refresh)
+- Webhooks: `POST /admin-api/v1/webhooks` (mesma logica, so muda base URL)
 
-- Mudar token endpoint de `/admin-api/token` para `/store-api/token`
-- Manter `client_credentials` grant (nao precisa username/password para token de loja)
-- Manter headers `X-DeliveryDireto-Client-Id` e `X-DeliveryDireto-Id`
-- Atualizar refresh_token para usar `/store-api/token` tambem
-- Manter fluxo connect com `password` grant como fallback caso `client_credentials` nao funcione
+### 2. `supabase/functions/dd-polling/index.ts`
+- Mudar `DD_STORE_API` de `https://deliverydireto.com.br/store-api/v1` para `https://deliverydireto.com.br/admin-api/v1`
+- Listar pedidos: `GET /admin-api/v1/orders?updatedAt[gte]=...&limit=50`
+- Detalhe do pedido (para items): `GET /admin-api/v1/kds/orders/{id}` (endpoint KDS retorna items completos)
+- Manter toda a logica de parsing (money(), mapPaymentLabel(), matching por pdv_code, agendamento)
+- Manter headers `X-DeliveryDireto-Id` e `X-DeliveryDireto-Client-Id`
 
-### 2. `supabase/functions/dd-polling/index.ts` -- Rewrite completo da logica
-
-**Base URL**: Mudar de `admin-api` para `store-api`
-
-**Listagem de pedidos**: Usar `GET /store-api/v1/customers/me/orders?limit=30` (retorna pedidos com itens inclusos) OU tentar `GET /store-api/v1/orders?updatedAt[gte]=...` se disponivel para tokens de loja
-
-**Para cada novo pedido, buscar detalhe**: `GET /store-api/v1/orders/{id}` que retorna items completos
-
-**Buscar itens separadamente se necessario**: `GET /store-api/v1/orders/{id}/items`
-
-**Pagamento correto** (baseado na documentacao):
-```text
-payment.type === "ONLINE" -> "Pago Delivery Direto"
-payment.type === "OFFLINE":
-  paymentDetails.type === "CASH" -> "Dinheiro"
-  paymentDetails.type === "CREDITCARD" -> "Cartao de Credito" + brand
-  paymentDetails.type === "DEBITCARD" -> "Cartao de Debito" + brand
-  paymentDetails.type === "PIX" -> "PIX"
-  paymentDetails.type === "MEAL_VOUCHER" -> "Vale Refeicao"
-```
-
-**Itens com matching por customCode**:
-- `item.item.customCode` -> comparar com `products.pdv_code`
-- `item.item.name` -> fallback por nome
-- `item.totalPrice.value / 100` -> preco unitario
-
-**Valores em centavos**: Todos os campos `Money` ({value, currency}) dividir value por 100
-
-### 3. `supabase/functions/dd-order-action/index.ts` -- Endpoints corretos
-
-Substituir `PUT /admin-api/v1/kds/orders/{id}` por endpoints de acao da store-api:
-
-```text
-accept     -> POST /store-api/v1/orders/{id}/approve
-ready      -> POST /store-api/v1/orders/{id}/ready-for-pickup
-dispatch   -> POST /store-api/v1/orders/{id}/dispatch
-deliver    -> POST /store-api/v1/orders/{id}/deliver
-reject     -> POST /store-api/v1/orders/{id}/cancel  (body: { statusReason: reason })
-```
-
-Mesmos headers de autenticacao. Nao precisa de body exceto para cancel.
-
-### 4. Nenhuma alteracao em UI
-
-Os componentes `OrderDetailModal.tsx`, `UnifiedOrdersTab.tsx`, e `printOrder.ts` ja foram corrigidos anteriormente e funcionam. Apenas as Edge Functions mudam.
+### 3. `supabase/functions/dd-order-action/index.ts`
+- Mudar base URL para `https://deliverydireto.com.br/admin-api/v1`
+- Status update: `PUT /admin-api/v1/orders/{id}` com body `{ "status": "APPROVED" }` (documentado na admin-api)
+- OU usar KDS: `PUT /admin-api/v1/kds/orders/{id}` como fallback
+- Mapeamento: accept->APPROVED, ready->READY, dispatch->DISPATCHED, deliver->DONE, reject->CANCELLED (com statusReason)
 
 ## Arquivos Alterados
 
 | Arquivo | Descricao |
 |---------|-----------|
-| `supabase/functions/dd-auth/index.ts` | Token endpoint: admin-api -> store-api |
-| `supabase/functions/dd-polling/index.ts` | API surface: admin-api -> store-api, items inclusos, payment correto |
-| `supabase/functions/dd-order-action/index.ts` | PUT generico -> POST /orders/{id}/approve etc |
+| `supabase/functions/dd-auth/index.ts` | Token URL: store-api -> admin-api |
+| `supabase/functions/dd-polling/index.ts` | Orders URL: store-api -> admin-api, detail via KDS |
+| `supabase/functions/dd-order-action/index.ts` | Status URL: store-api -> admin-api |
 
-Nenhuma funcionalidade existente alterada. iFood, pedidos locais, PDV, mesas -- tudo permanece identico.
+Nenhuma alteracao em UI. Nenhuma funcionalidade existente alterada.
 
