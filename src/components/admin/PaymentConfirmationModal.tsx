@@ -77,12 +77,12 @@ const DEFAULT_METHODS: PaymentMethod[] = [
 ];
 
 const METHOD_COLORS: Record<string, string> = {
-  cash: "bg-green-500/10 border-green-500/30 hover:bg-green-500/20 text-green-700 dark:text-green-400",
-  pix: "bg-teal-500/10 border-teal-500/30 hover:bg-teal-500/20 text-teal-700 dark:text-teal-400",
-  credit: "bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400",
-  debit: "bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/20 text-purple-700 dark:text-purple-400",
-  meal_voucher: "bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400",
-  voucher: "bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400",
+  cash: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  pix: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  credit: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  debit: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  meal_voucher: "bg-muted/50 border-border hover:bg-muted text-foreground",
+  voucher: "bg-muted/50 border-border hover:bg-muted text-foreground",
 };
 
 type Step = "methods" | "brand-select";
