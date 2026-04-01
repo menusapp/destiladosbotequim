@@ -838,7 +838,7 @@ const Comanda = () => {
   const showSendOrderButton = cart.length > 0;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-background via-secondary/20 to-background">
+    <div className="flex flex-col overflow-hidden bg-gradient-to-br from-background via-secondary/20 to-background" style={{ height: '100dvh' }}>
       {/* Header - shrink-0 */}
       <div 
         className="shrink-0 text-white p-6 shadow-lg"
@@ -1104,7 +1104,7 @@ const Comanda = () => {
 
       {/* Footer fixo com botão de ação */}
       {(showSendOrderButton || showBillButton) && (
-        <div className="shrink-0 border-t bg-background p-4">
+        <div className="shrink-0 border-t bg-background p-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
           <div className="container mx-auto">
             {showSendOrderButton && (
               <Button 

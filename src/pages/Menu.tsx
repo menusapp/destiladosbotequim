@@ -8,7 +8,7 @@ import { RestaurantInfoCard } from "@/components/menu/RestaurantInfoCard";
 import { FeaturedProducts } from "@/components/menu/FeaturedProducts";
 import { CategoryProducts } from "@/components/menu/CategoryProducts";
 import { CategoryNav } from "@/components/menu/CategoryNav";
-import { CartBottomBar } from "@/components/menu/CartBottomBar";
+
 import { ComandaBottomBar } from "@/components/menu/ComandaBottomBar";
 import { CartDrawer } from "@/components/menu/CartDrawer";
 import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
@@ -43,7 +43,7 @@ const Menu = () => {
   const [comandaTotal, setComandaTotal] = useState(0);
   const [comandaStatus, setComandaStatus] = useState<string>("");
   const [showComandaBar, setShowComandaBar] = useState(true);
-  const lastScrollY = useRef(0);
+  
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [featuredSectionTitle, setFeaturedSectionTitle] = useState("Destaques");
 
@@ -979,9 +979,12 @@ const Menu = () => {
     ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : allProducts;
 
+  const cartItemCount = getTotalItemCount();
+
   return (
-    <div className="min-h-screen bg-background pb-32">
-      <div className="relative">
+    <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
+      {/* Fixed header area */}
+      <div className="relative shrink-0">
         <div className="h-48 overflow-hidden relative">
           {restaurant.banner_url ? (
             <div
@@ -1022,6 +1025,9 @@ const Menu = () => {
           deliveryFee={0}
         />
       </div>
+
+      {/* Scrollable product content */}
+      <div className="flex-1 overflow-y-auto min-h-0" style={{ paddingBottom: customerName ? '80px' : '0px' }}>
 
       {searchQuery.trim() ? (
         <div className="px-4 py-6">
@@ -1084,6 +1090,7 @@ const Menu = () => {
           />
         </>
       )}
+      </div>
 
       {/* Barra de comanda - sempre visível no modo consumo local quando cliente está logado */}
       {customerName && (
@@ -1093,6 +1100,7 @@ const Menu = () => {
           status={comandaStatus}
           isVisible={showComandaBar}
           hasSubmittedOrders={hasOpenComanda}
+          cartItemCount={cartItemCount}
           onViewComanda={() => navigate(`/${restaurantSlug}/comanda/${tableNumber}`)}
         />
       )}
