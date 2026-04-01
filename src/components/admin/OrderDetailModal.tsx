@@ -164,7 +164,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       ready: "ready",
       delivered: "deliver",
       picked_up: "deliver",
-      cancelled: "reject",
+      cancelled: "cancel",
     };
 
     const ddAction = statusToAction[newStatus];
