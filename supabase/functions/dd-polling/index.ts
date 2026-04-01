@@ -7,6 +7,14 @@ const corsHeaders = {
 
 const DD_API_BASE = "https://deliverydireto.com.br/admin-api";
 
+// Convert DD Money object (cents) to decimal
+function money(v: any): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "object" && v.value !== undefined) return v.value / 100;
+  if (typeof v === "number") return v / 100;
+  return 0;
+}
+
 // Map DD payment to local label
 function mapPaymentType(payment: any): string {
   if (!payment) return "Delivery Direto";
@@ -137,7 +145,8 @@ Deno.serve(async (req) => {
     }
 
     const ordersText = await ordersRes.text();
-    console.log(`[dd-polling] Raw response (first 500 chars): ${ordersText.substring(0, 500)}`);
+    // Log MORE of the response to see items/payment fields
+    console.log(`[dd-polling] Raw response (first 3000 chars): ${ordersText.substring(0, 3000)}`);
     
     let ordersData: any;
     try {
@@ -161,6 +170,25 @@ Deno.serve(async (req) => {
       ordersList = ordersData.orders;
     }
     console.log(`[dd-polling] Found ${ordersList.length} orders from DD API`);
+
+    // Log first order keys and critical fields for debugging
+    if (ordersList.length > 0) {
+      const first = ordersList[0];
+      console.log(`[dd-polling] First order keys: ${Object.keys(first).join(", ")}`);
+      console.log(`[dd-polling] First order FULL (3000): ${JSON.stringify(first).substring(0, 3000)}`);
+      
+      // Log items field specifically
+      const itemsField = first.items || first.orderItems || first.cart || first.products || first.orderProducts;
+      console.log(`[dd-polling] Items field found: ${itemsField ? `yes (${Array.isArray(itemsField) ? itemsField.length : 'not array'})` : 'NO - check keys above'}`);
+      if (itemsField && Array.isArray(itemsField) && itemsField.length > 0) {
+        console.log(`[dd-polling] First item keys: ${Object.keys(itemsField[0]).join(", ")}`);
+        console.log(`[dd-polling] First item FULL: ${JSON.stringify(itemsField[0]).substring(0, 1000)}`);
+      }
+      
+      // Log payment field specifically
+      const payField = first.payment || first.payments || first.paymentMethod;
+      console.log(`[dd-polling] Payment field: ${JSON.stringify(payField).substring(0, 500)}`);
+    }
 
     const statusMap: Record<string, string> = {
       "WAITING": "pending",
@@ -229,17 +257,18 @@ Deno.serve(async (req) => {
         ? `${addr.street || addr.streetName || ""}, ${addr.number || ""} - ${addr.neighborhood || addr.district || ""}, ${addr.city || ""}`
         : null;
 
-      // Payment mapping
-      const payment = ddOrder.payment || ddOrder.payments?.[0] || {};
+      // Payment mapping - try multiple field names
+      const payment = ddOrder.payment || (Array.isArray(ddOrder.payments) ? ddOrder.payments[0] : null) || ddOrder.paymentMethod || ddOrder.paymentDetails || {};
       const paymentType = mapPaymentType(payment);
+      console.log(`[dd-polling] Order ${ddOrderId} payment raw: ${JSON.stringify(payment).substring(0, 300)}, mapped: ${paymentType}`);
 
       // Status
       const orderStatus = statusMap[ddOrder.status || "WAITING"] || "pending";
 
-      // Prices - DD returns values in CENTS, divide by 100
+      // Prices - DD returns values in CENTS, ALWAYS divide by 100
       const values = ddOrder.total || ddOrder.values || {};
-      const deliveryFeeRaw = values.deliveryFee?.value || values.delivery_fee || ddOrder.delivery_fee || ddOrder.deliveryFee || 0;
-      const deliveryFee = typeof deliveryFeeRaw === "number" && deliveryFeeRaw > 100 ? deliveryFeeRaw / 100 : deliveryFeeRaw;
+      const deliveryFee = money(values.deliveryFee || values.delivery_fee || ddOrder.delivery_fee || ddOrder.deliveryFee);
+      const subtotal = money(values.subTotal || values.subtotal);
 
       // Scheduled orders
       const scheduledFor = ddOrder.scheduling || ddOrder.scheduledFor || ddOrder.scheduled_for || null;
@@ -259,7 +288,7 @@ Deno.serve(async (req) => {
           dd_source: true,
           dd_order_id: ddOrderId,
           delivery_fee: deliveryFee,
-          notes: ddOrder.observations || ddOrder.note || null,
+          notes: ddOrder.observations || ddOrder.notes || ddOrder.note || null,
           dd_scheduled_for: scheduledFor,
         })
         .select("id")
@@ -270,35 +299,45 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Insert items with product matching
-      const items = ddOrder.items || ddOrder.orderItems || [];
+      // Insert items with product matching - try ALL possible field names
+      const items = ddOrder.items || ddOrder.orderItems || ddOrder.cart || ddOrder.products || ddOrder.orderProducts || [];
+      console.log(`[dd-polling] Order ${ddOrderId} items count: ${items.length}`);
+      
+      if (!items.length) {
+        console.warn(`[dd-polling] Order ${ddOrderId} has NO items! Order keys: ${Object.keys(ddOrder).join(", ")}`);
+      }
+
       if (items.length > 0 && newOrder) {
         const orderItems = [];
         for (const item of items) {
+          // DD items can be nested: item.item or flat
           const ddItem = item.item || item;
           const itemName = ddItem.name || ddItem.productName || item.name || "Produto DD";
-          const customCode = ddItem.customCode || ddItem.custom_code || ddItem.externalCode || "";
+          const customCode = String(ddItem.customCode || ddItem.custom_code || ddItem.externalCode || ddItem.code || "").trim();
           const quantity = item.amount || item.quantity || 1;
 
-          // Price handling - DD returns cents
+          // Price handling - DD returns cents in Money objects
           let unitPrice = 0;
-          if (item.totalPrice?.value !== undefined) {
-            unitPrice = (item.totalPrice.value / 100) / (quantity || 1);
-          } else if (item.unitPrice?.value !== undefined) {
-            unitPrice = item.unitPrice.value / 100;
-          } else if (typeof item.unit_price === "number") {
-            unitPrice = item.unit_price > 100 ? item.unit_price / 100 : item.unit_price;
-          } else if (typeof item.price === "number") {
-            unitPrice = item.price > 100 ? item.price / 100 : item.price;
-          } else if (typeof item.totalPrice === "number") {
-            unitPrice = (item.totalPrice > 100 ? item.totalPrice / 100 : item.totalPrice) / (quantity || 1);
+          if (item.totalPrice !== undefined) {
+            unitPrice = money(item.totalPrice) / (quantity || 1);
+          } else if (item.unitPrice !== undefined) {
+            unitPrice = money(item.unitPrice);
+          } else if (ddItem.unitPrice !== undefined) {
+            unitPrice = money(ddItem.unitPrice);
+          } else if (ddItem.price !== undefined) {
+            unitPrice = money(ddItem.price);
           }
+
+          console.log(`[dd-polling] Item: "${itemName}", code: "${customCode}", qty: ${quantity}, unitPrice: ${unitPrice}`);
 
           // Try to match product by pdv_code first, then by name
           let matchedProductId: string | null = null;
           if (customCode) {
             const match = productsList.find(p => p.pdv_code === customCode);
-            if (match) matchedProductId = match.id;
+            if (match) {
+              matchedProductId = match.id;
+              console.log(`[dd-polling] Matched by pdv_code "${customCode}" -> ${match.id}`);
+            }
           }
           if (!matchedProductId && itemName) {
             const match = productsList.find(p => p.name.toLowerCase() === itemName.toLowerCase());
@@ -306,6 +345,7 @@ Deno.serve(async (req) => {
               matchedProductId = match.id;
               // Use local price if matched and DD price seems off
               if (unitPrice === 0 && match.price) unitPrice = match.price;
+              console.log(`[dd-polling] Matched by name "${itemName}" -> ${match.id}`);
             }
           }
 

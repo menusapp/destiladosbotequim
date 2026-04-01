@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Map action to DD API status (using PUT /orders/{id} with status body)
+    // Map action to DD API status
     const actionMap: Record<string, { ddStatus: string; localStatus: string }> = {
       accept: { ddStatus: "APPROVED", localStatus: "accepted" },
       reject: { ddStatus: "CANCELLED", localStatus: "cancelled" },
@@ -87,24 +87,43 @@ Deno.serve(async (req) => {
       body.statusReason = reason;
     }
 
-    console.log(`[dd-order-action] Calling DD API: PUT /orders/${dd_order_id} with body:`, JSON.stringify(body));
+    const headers = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${accessToken}`,
+      "X-DeliveryDireto-Client-Id": DD_CLIENT_ID,
+      "X-DeliveryDireto-Id": config.store_id,
+    };
 
-    const apiRes = await fetch(`${DD_API_BASE}/orders/${dd_order_id}`, {
+    // Try KDS endpoint first (documented for status updates)
+    const kdsUrl = `${DD_API_BASE}/kds/orders/${dd_order_id}`;
+    console.log(`[dd-order-action] Trying KDS endpoint: PUT ${kdsUrl} body: ${JSON.stringify(body)}`);
+
+    let apiRes = await fetch(kdsUrl, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessToken}`,
-        "X-DeliveryDireto-Client-Id": DD_CLIENT_ID,
-        "X-DeliveryDireto-Id": config.store_id,
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
-    const apiText = await apiRes.text();
-    console.log(`[dd-order-action] DD API response: status=${apiRes.status}, body=${apiText}`);
+    let apiText = await apiRes.text();
+    console.log(`[dd-order-action] KDS response: status=${apiRes.status}, body=${apiText.substring(0, 500)}`);
+
+    // If KDS returns 404, try the regular orders endpoint
+    if (apiRes.status === 404) {
+      const ordersUrl = `${DD_API_BASE}/orders/${dd_order_id}`;
+      console.log(`[dd-order-action] KDS 404, trying orders endpoint: PUT ${ordersUrl}`);
+
+      apiRes = await fetch(ordersUrl, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      apiText = await apiRes.text();
+      console.log(`[dd-order-action] Orders response: status=${apiRes.status}, body=${apiText.substring(0, 500)}`);
+    }
 
     if (!apiRes.ok && apiRes.status !== 204) {
-      return new Response(JSON.stringify({ error: `Erro na API: ${apiText}` }), {
+      return new Response(JSON.stringify({ error: `Erro na API DD: ${apiRes.status} - ${apiText.substring(0, 200)}` }), {
         status: apiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -134,7 +153,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("[dd-order-action] Unexpected error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
