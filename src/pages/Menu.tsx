@@ -43,7 +43,7 @@ const Menu = () => {
   const [comandaTotal, setComandaTotal] = useState(0);
   const [comandaStatus, setComandaStatus] = useState<string>("");
   const [showComandaBar, setShowComandaBar] = useState(true);
-  const lastScrollY = useRef(0);
+  
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [featuredSectionTitle, setFeaturedSectionTitle] = useState("Destaques");
 
