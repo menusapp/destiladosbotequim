@@ -44,23 +44,25 @@ export function KioskPayment({
 
   const canFinalize = paymentMethod !== "dinheiro" || !cashPaid || parseFloat(cashPaid) >= finalTotal;
 
-  // Determine order_type and delivery_type based on consumptionMode
+  // Mapping:
+  // counter (balcão) -> order_type: "delivery", delivery_type: "pickup" — follows takeaway-like ops flow, NOT a table order
+  // table -> order_type: "local", delivery_type: "local" — enters PDV/mesa flow
+  // takeaway -> order_type: "delivery", delivery_type: "takeaway"
+  // delivery -> order_type: "delivery", delivery_type: "delivery"
   const getOrderTypeFields = () => {
     switch (consumptionMode) {
       case "counter":
-        // Counter pickup: local order, pickup type
-        return { order_type: "local", delivery_type: "pickup" };
+        // Balcão: NOT a table order. Uses delivery flow with pickup type for operational parity with takeaway
+        return { order_type: "delivery", delivery_type: "pickup" };
       case "table":
-        // Table service: local order
+        // Mesa: local order, enters PDV/mesa flow
         return { order_type: "local", delivery_type: "local" };
       case "takeaway":
-        // Takeaway: delivery type with takeaway subtype
         return { order_type: "delivery", delivery_type: "takeaway" };
       case "delivery":
-        // Delivery
         return { order_type: "delivery", delivery_type: "delivery" };
       default:
-        return { order_type: "local", delivery_type: "local" };
+        return { order_type: "delivery", delivery_type: "pickup" };
     }
   };
 
@@ -81,7 +83,7 @@ export function KioskPayment({
     try {
       const { order_type, delivery_type } = getOrderTypeFields();
 
-      // Find table if applicable
+      // Find table ONLY for table consumption mode
       let tableId: string | null = null;
       if (consumptionMode === "table" && tableNumber) {
         const { data: table } = await supabase
@@ -90,7 +92,21 @@ export function KioskPayment({
           .eq("restaurant_id", restaurant.id)
           .eq("table_number", parseInt(tableNumber))
           .maybeSingle();
-        tableId = table?.id || null;
+
+        if (!table) {
+          toast.error(`Mesa ${tableNumber} não encontrada no sistema`);
+          setSubmitting(false);
+          return;
+        }
+
+        tableId = table.id;
+
+        // Mark table as occupied
+        console.log("[Kiosk] Marking table as occupied:", tableId);
+        await supabase
+          .from("tables")
+          .update({ is_occupied: true })
+          .eq("id", tableId);
       }
 
       const notes = [
@@ -104,8 +120,7 @@ export function KioskPayment({
         finalTotal, couponDiscount, pointsDiscount,
       });
 
-      const orderData = {
-        table_id: tableId,
+      const orderData: Record<string, any> = {
         restaurant_id: restaurant.id,
         customer_name: customer.name,
         customer_cpf: customer.cpf,
@@ -123,9 +138,14 @@ export function KioskPayment({
         reward_discount: pointsDiscount,
       };
 
+      // Only set table_id for table orders
+      if (tableId) {
+        orderData.table_id = tableId;
+      }
+
       const { data: order, error: orderError } = await supabase
         .from("orders")
-        .insert(orderData)
+        .insert([orderData] as any)
         .select()
         .single();
 
@@ -134,7 +154,7 @@ export function KioskPayment({
         throw orderError;
       }
 
-      console.log("[Kiosk] Order created:", order.id);
+      console.log("[Kiosk] Order created:", order.id, "| type:", order_type, "| delivery_type:", delivery_type, "| channel: totem");
 
       // Insert order items
       for (const item of cart) {

@@ -37,8 +37,13 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
   ];
 
   const canProceed = () => {
+    if (subStep === "main") {
+      // For main-level selections (takeaway, delivery), mode must be set
+      return consumptionMode === "takeaway" || consumptionMode === "delivery";
+    }
+    // For dine-in sub, mode must be selected and table number required if table
     if (consumptionMode === "table" && !tableNumber.trim()) return false;
-    return true;
+    return consumptionMode === "counter" || consumptionMode === "table";
   };
 
   const handleMainSelect = (key: string) => {
@@ -144,7 +149,7 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
             onClick={onNext}
             className="w-full h-14 text-lg font-bold rounded-xl text-white"
             style={{ backgroundColor: primaryColor }}
-            disabled={subStep === "main" || !canProceed()}
+            disabled={!canProceed()}
           >
             Continuar
           </Button>
