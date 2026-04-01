@@ -7,6 +7,32 @@ const corsHeaders = {
 
 const DD_API_BASE = "https://deliverydireto.com.br/admin-api";
 
+// Map DD payment to local label
+function mapPaymentType(payment: any): string {
+  if (!payment) return "Delivery Direto";
+  const pType = payment.type; // ONLINE or OFFLINE
+  const details = payment.paymentDetails || {};
+  const detailType = details.type || "";
+
+  if (pType === "ONLINE") return "Pago Delivery Direto";
+
+  // OFFLINE payments
+  switch (detailType) {
+    case "CASH": return "Dinheiro";
+    case "CREDITCARD": {
+      const brand = details.brand || details.cardBrand || "";
+      return brand ? `Cartão ${brand}` : "Cartão de Crédito";
+    }
+    case "DEBITCARD": {
+      const brand = details.brand || details.cardBrand || "";
+      return brand ? `Cartão Débito ${brand}` : "Cartão de Débito";
+    }
+    case "PIX": return "PIX";
+    case "MEAL_VOUCHER": return "Vale Refeição";
+    default: return detailType || "Delivery Direto";
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -51,7 +77,6 @@ Deno.serve(async (req) => {
     if (config.token_expires_at) {
       const expiresAt = new Date(config.token_expires_at).getTime();
       if (expiresAt < Date.now() + 30 * 60 * 1000) {
-        // Token expiring in < 30 min, refresh proactively
         console.log("[dd-polling] Token expiring soon, refreshing...");
         try {
           const refreshRes = await fetch(`${supabaseUrl}/functions/v1/dd-auth`, {
@@ -85,7 +110,7 @@ Deno.serve(async (req) => {
     const now = new Date();
     const lastSync = config.last_sync_at
       ? new Date(config.last_sync_at)
-      : new Date(now.getTime() - 24 * 60 * 60 * 1000); // Default: last 24h
+      : new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     const params = new URLSearchParams();
     params.set("updatedAt[gte]", lastSync.toISOString());
@@ -145,16 +170,22 @@ Deno.serve(async (req) => {
       "DISPATCHED": "out_for_delivery",
       "DONE": "delivered",
       "CANCELLED": "cancelled",
-      // Fallbacks for alternative naming
       "PLACED": "pending",
       "CONFIRMED": "accepted",
       "DELIVERED": "delivered",
     };
 
+    // Pre-fetch all products with pdv_code for matching
+    const { data: allProducts } = await supabase
+      .from("products")
+      .select("id, name, pdv_code, price")
+      .eq("restaurant_id", restaurant_id);
+    const productsList = allProducts || [];
+
     let newOrdersCount = 0;
 
     for (const ddOrder of ordersList) {
-      const ddOrderId = String(ddOrder.id || ddOrder.order_id || ddOrder.orderNumber || "");
+      const ddOrderId = String(ddOrder.orderNumber || ddOrder.id || ddOrder.order_id || "");
       if (!ddOrderId) continue;
 
       // Check if already imported
@@ -179,29 +210,39 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // New order - insert
+      // New order - extract fields
       const customer = ddOrder.customer || {};
-      const customerName = customer.name || "Cliente Delivery Direto";
+      const customerName = customer.name || customer.firstName
+        ? `${customer.firstName || ""} ${customer.lastName || ""}`.trim()
+        : "Cliente Delivery Direto";
       const customerPhone = customer.phone || customer.phones?.[0] || "";
       const customerCpf = customer.cpf || customer.document || customer.taxPayerIdentificationNumber || "";
 
-      const deliveryMethod = ddOrder.type || ddOrder.delivery_method || ddOrder.deliveryMethod || "";
-      const deliveryType = (deliveryMethod === "TAKEOUT" || deliveryMethod === "PICKUP") ? "retirada" : "delivery";
+      // Order type mapping
+      const ddType = ddOrder.type || ddOrder.delivery_method || ddOrder.deliveryMethod || "";
+      const isPickup = ddType === "TAKEOUT" || ddType === "PICKUP";
+      const deliveryType = isPickup ? "pickup" : "delivery";
 
+      // Address
       const addr = ddOrder.delivery_address || ddOrder.deliveryAddress || ddOrder.address || null;
       const deliveryAddress = addr
         ? `${addr.street || addr.streetName || ""}, ${addr.number || ""} - ${addr.neighborhood || addr.district || ""}, ${addr.city || ""}`
         : null;
 
+      // Payment mapping
       const payment = ddOrder.payment || ddOrder.payments?.[0] || {};
-      const paymentType = payment.prepaid ? "Pago pelo Delivery Direto" : (payment.method || payment.name || "Delivery Direto");
+      const paymentType = mapPaymentType(payment);
 
+      // Status
       const orderStatus = statusMap[ddOrder.status || "WAITING"] || "pending";
 
-      // Handle price - try multiple possible structures
-      const totalObj = ddOrder.total || {};
-      const orderTotal = totalObj.subTotal?.value || totalObj.orderAmount || ddOrder.subTotal || ddOrder.totalPrice || 0;
-      const deliveryFee = totalObj.deliveryFee?.value || ddOrder.delivery_fee || ddOrder.deliveryFee || 0;
+      // Prices - DD returns values in CENTS, divide by 100
+      const values = ddOrder.total || ddOrder.values || {};
+      const deliveryFeeRaw = values.deliveryFee?.value || values.delivery_fee || ddOrder.delivery_fee || ddOrder.deliveryFee || 0;
+      const deliveryFee = typeof deliveryFeeRaw === "number" && deliveryFeeRaw > 100 ? deliveryFeeRaw / 100 : deliveryFeeRaw;
+
+      // Scheduled orders
+      const scheduledFor = ddOrder.scheduling || ddOrder.scheduledFor || ddOrder.scheduled_for || null;
 
       const { data: newOrder, error: orderError } = await supabase
         .from("orders")
@@ -210,7 +251,7 @@ Deno.serve(async (req) => {
           customer_name: customerName,
           customer_cpf: customerCpf,
           delivery_type: deliveryType,
-          order_type: deliveryType,
+          order_type: "delivery",
           delivery_address: deliveryAddress,
           delivery_phone: customerPhone,
           payment_type: paymentType,
@@ -219,6 +260,7 @@ Deno.serve(async (req) => {
           dd_order_id: ddOrderId,
           delivery_fee: deliveryFee,
           notes: ddOrder.observations || ddOrder.note || null,
+          dd_scheduled_for: scheduledFor,
         })
         .select("id")
         .single();
@@ -228,16 +270,53 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Insert items
+      // Insert items with product matching
       const items = ddOrder.items || ddOrder.orderItems || [];
       if (items.length > 0 && newOrder) {
-        const orderItems = items.map((item: any) => ({
-          order_id: newOrder.id,
-          product_id: null,
-          quantity: item.quantity || 1,
-          price_at_order: item.unit_price || item.unitPrice || item.price || item.totalPrice || 0,
-          notes: item.observations || item.name || item.productName || null,
-        }));
+        const orderItems = [];
+        for (const item of items) {
+          const ddItem = item.item || item;
+          const itemName = ddItem.name || ddItem.productName || item.name || "Produto DD";
+          const customCode = ddItem.customCode || ddItem.custom_code || ddItem.externalCode || "";
+          const quantity = item.amount || item.quantity || 1;
+
+          // Price handling - DD returns cents
+          let unitPrice = 0;
+          if (item.totalPrice?.value !== undefined) {
+            unitPrice = (item.totalPrice.value / 100) / (quantity || 1);
+          } else if (item.unitPrice?.value !== undefined) {
+            unitPrice = item.unitPrice.value / 100;
+          } else if (typeof item.unit_price === "number") {
+            unitPrice = item.unit_price > 100 ? item.unit_price / 100 : item.unit_price;
+          } else if (typeof item.price === "number") {
+            unitPrice = item.price > 100 ? item.price / 100 : item.price;
+          } else if (typeof item.totalPrice === "number") {
+            unitPrice = (item.totalPrice > 100 ? item.totalPrice / 100 : item.totalPrice) / (quantity || 1);
+          }
+
+          // Try to match product by pdv_code first, then by name
+          let matchedProductId: string | null = null;
+          if (customCode) {
+            const match = productsList.find(p => p.pdv_code === customCode);
+            if (match) matchedProductId = match.id;
+          }
+          if (!matchedProductId && itemName) {
+            const match = productsList.find(p => p.name.toLowerCase() === itemName.toLowerCase());
+            if (match) {
+              matchedProductId = match.id;
+              // Use local price if matched and DD price seems off
+              if (unitPrice === 0 && match.price) unitPrice = match.price;
+            }
+          }
+
+          orderItems.push({
+            order_id: newOrder.id,
+            product_id: matchedProductId,
+            quantity,
+            price_at_order: unitPrice,
+            notes: matchedProductId ? (item.observations || null) : `[DD] ${itemName}${item.observations ? ` - ${item.observations}` : ""}`,
+          });
+        }
 
         const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
         if (itemsError) {

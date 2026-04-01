@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { 
-  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Home, Trash2, RefreshCw, Loader2
+  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Home, Trash2, RefreshCw, Loader2, CalendarClock
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +50,10 @@ interface Order {
   loyalty_points_used?: number;
   ifood_source?: boolean;
   ifood_order_id?: string;
+  dd_source?: boolean;
+  dd_order_id?: string;
+  dd_scheduled_for?: string;
+  cancellation_reason?: string;
 }
 
 interface OrderDetailModalProps {
@@ -65,21 +70,23 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const [showAddItems, setShowAddItems] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const [order, setOrder] = useState<Order>(initialOrder);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   // Realtime: refresh order data when order_items or orders change
   const refreshOrder = useCallback(async () => {
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
       .eq("id", order.id)
       .single();
     if (!error && data) {
-      setOrder(data as Order);
+      setOrder(data as unknown as Order);
     }
   }, [order.id]);
 
   useEffect(() => {
-    // Listen for changes to order_items for this order
     const ch = supabase.channel(`order-detail-${order.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `order_id=eq.${order.id}` }, () => {
         refreshOrder();
@@ -137,6 +144,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
 
   const requiresPaymentForFinalization = (newStatus: string) => {
     if (order.ifood_source && order.payment_type === "Pago pelo iFood") return false;
+    if (order.dd_source && order.payment_type === "Pago Delivery Direto") return false;
 
     const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
     if (isLocal) return false;
@@ -145,7 +153,42 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
 
   const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
 
-  const updateStatus = async (newStatus: string) => {
+  // Sync status with Delivery Direto
+  const syncDDStatus = async (newStatus: string, reason?: string) => {
+    if (!order.dd_source || !order.dd_order_id) return;
+
+    const statusToAction: Record<string, string> = {
+      accepted: "accept",
+      preparing: "accept",
+      out_for_delivery: "dispatch",
+      ready: "ready",
+      delivered: "deliver",
+      picked_up: "deliver",
+      cancelled: "reject",
+    };
+
+    const ddAction = statusToAction[newStatus];
+    if (!ddAction) return;
+
+    try {
+      const { error } = await supabase.functions.invoke("dd-order-action", {
+        body: {
+          restaurant_id: restaurantId,
+          dd_order_id: order.dd_order_id,
+          action: ddAction,
+          reason: reason || undefined,
+        },
+      });
+      if (error) {
+        console.error("DD action error:", error);
+        toast.error("Erro ao sincronizar com Delivery Direto, mas o status local será atualizado");
+      }
+    } catch (e) {
+      console.error("DD sync error:", e);
+    }
+  };
+
+  const updateStatus = async (newStatus: string, reason?: string) => {
     if (requiresPaymentForFinalization(newStatus) && (!order.payment_type || order.payment_type === "pending")) {
       toast.error("Defina a forma de pagamento antes de finalizar o pedido");
       setShowPaymentModal(true);
@@ -153,6 +196,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     }
 
     try {
+      // Sync with iFood
       if (order.ifood_source && order.ifood_order_id) {
         const statusToAction: Record<string, string> = {
           accepted: "confirm",
@@ -178,8 +222,23 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
         }
       }
 
+      // Sync with Delivery Direto
+      await syncDDStatus(newStatus, reason);
+
+      // Update local status
+      const updateData: Record<string, any> = {};
+      if (newStatus === "cancelled" && reason) {
+        updateData.cancellation_reason = reason;
+      }
+
       const { error } = await supabase.rpc("admin_update_order_status", { p_order_id: order.id, p_new_status: newStatus, p_restaurant_id: restaurantId });
       if (error) throw error;
+
+      // Save cancellation reason separately if needed
+      if (newStatus === "cancelled" && reason) {
+        await supabase.from("orders").update({ cancellation_reason: reason }).eq("id", order.id);
+      }
+
       sendWhatsAppNotification(newStatus);
       if (newStatus === 'accepted') {
         try {
@@ -194,6 +253,17 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       onStatusUpdate();
       onClose();
     } catch (error) { console.error("Erro ao atualizar status:", error); toast.error("Erro ao atualizar status"); }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!cancelReason.trim()) {
+      toast.error("Informe o motivo do cancelamento");
+      return;
+    }
+    setCancelling(true);
+    await updateStatus("cancelled", cancelReason.trim());
+    setCancelling(false);
+    setShowCancelDialog(false);
   };
 
   const handleRemoveItem = async (itemId: string) => {
@@ -245,6 +315,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
     if (isLocal) return `Digital - Mesa ${order.tables?.table_number || "?"}`;
     if (order.delivery_type === "takeaway") return "PDV - Para Viagem";
+    if (order.dd_source) return "Delivery Direto";
     return order.delivery_type === "delivery" ? "Digital - Delivery" : "Digital - Retirada";
   };
 
@@ -271,9 +342,18 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                 <DialogTitle className="text-2xl">Pedido #{order.id.slice(0, 8)}</DialogTitle>
                 <p className="text-sm text-muted-foreground mt-1">{format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge className={elapsedTime.color}><Clock className="w-3 h-3 mr-1" />Tempo: {elapsedTime.text}</Badge>
                 <Badge variant="secondary">{getStatusLabel(order.status)}</Badge>
+                {order.dd_source && (
+                  <Badge className="bg-[#0066CC] text-white border-0">Delivery Direto</Badge>
+                )}
+                {order.dd_scheduled_for && (
+                  <Badge className="bg-amber-500 text-white border-0 gap-1">
+                    <CalendarClock className="w-3 h-3" />
+                    Agendado {format(new Date(order.dd_scheduled_for), "dd/MM HH:mm")}
+                  </Badge>
+                )}
               </div>
             </div>
           </DialogHeader>
@@ -291,7 +371,6 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
               {(order.status === "accepted" || order.status === "preparing") && order.order_type === "delivery" && order.delivery_type === "pickup" && (
                 <Button onClick={() => updateStatus("out_for_delivery")} className="gap-2"><Play className="w-4 h-4" />Pronto para Retirada</Button>
               )}
-              {/* Takeaway: go directly from preparing to picked_up */}
               {(order.status === "accepted" || order.status === "preparing") && isTakeaway && (
                 <Button onClick={() => updateStatus("picked_up")} className="gap-2"><Play className="w-4 h-4" />Finalizar (Retirado)</Button>
               )}
@@ -324,7 +403,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                 <Button onClick={() => updateStatus("picked_up")} className="gap-2"><Play className="w-4 h-4" />Confirmar Retirada</Button>
               )}
               
-              <Button variant="destructive" onClick={() => updateStatus("cancelled")} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
+              <Button variant="destructive" onClick={() => setShowCancelDialog(true)} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
               
               {canAddItems && (
                 <Button variant="outline" className="gap-2" onClick={handleAddItems}><Plus className="w-4 h-4" />Adicionar Itens</Button>
@@ -431,6 +510,15 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
               <CardContent className="space-y-2">
                 <div><p className="text-sm text-muted-foreground">Data/Hora:</p><p className="font-medium">{format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}</p></div>
                 <div><p className="text-sm text-muted-foreground">Origem:</p><p className="font-medium">{getOrderOrigin()}</p></div>
+                {order.dd_scheduled_for && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Agendado para:</p>
+                    <p className="font-medium text-amber-600 flex items-center gap-1">
+                      <CalendarClock className="w-4 h-4" />
+                      {format(new Date(order.dd_scheduled_for), "dd/MM/yyyy 'às' HH:mm")}
+                    </p>
+                  </div>
+                )}
                 {order.table_id && (<div><p className="text-sm text-muted-foreground">Mesa:</p><p className="font-medium">{order.tables?.table_number}</p></div>)}
                 <div>
                   <p className="text-sm text-muted-foreground">Pagamento:</p>
@@ -447,6 +535,12 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                     )}
                   </div>
                 </div>
+                {order.cancellation_reason && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Motivo cancelamento:</p>
+                    <p className="font-medium text-destructive">{order.cancellation_reason}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -460,6 +554,29 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
               </CardContent>
             </Card>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Reason Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar Pedido</DialogTitle>
+            <DialogDescription>Informe o motivo do cancelamento. Este campo é obrigatório.</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Motivo do cancelamento..."
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            rows={3}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowCancelDialog(false); setCancelReason(""); }}>Voltar</Button>
+            <Button variant="destructive" onClick={handleCancelOrder} disabled={cancelling || !cancelReason.trim()}>
+              {cancelling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
+              Confirmar Cancelamento
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
