@@ -37,6 +37,7 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
   ];
 
   const canProceed = () => {
+    if (subStep === "main") return false;
     if (consumptionMode === "table" && !tableNumber.trim()) return false;
     return true;
   };
