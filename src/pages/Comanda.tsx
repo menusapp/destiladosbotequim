@@ -838,7 +838,7 @@ const Comanda = () => {
   const showSendOrderButton = cart.length > 0;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-background via-secondary/20 to-background">
+    <div className="flex flex-col overflow-hidden bg-gradient-to-br from-background via-secondary/20 to-background" style={{ height: '100dvh' }}>
       {/* Header - shrink-0 */}
       <div 
         className="shrink-0 text-white p-6 shadow-lg"
