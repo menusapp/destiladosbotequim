@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
     } else if (ordersData?.orders && Array.isArray(ordersData.orders)) {
       ordersList = ordersData.orders;
     }
-    console.log(`[dd-polling] Found ${ordersList.length} orders from admin-api`);
+    console.log(`[dd-polling] Found ${ordersList.length} orders from KDS admin-api`);
     
     // Log first order structure for debugging
     if (ordersList.length > 0) {
