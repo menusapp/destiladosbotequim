@@ -197,16 +197,16 @@ async function refreshTokenFn(supabase: any, restaurantId: string, clientId: str
   const tokenRes = await fetch(`https://deliverydireto.com.br/admin-api/token`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
       "X-DeliveryDireto-Client-Id": clientId,
       "X-DeliveryDireto-Id": config.store_id,
     },
-    body: JSON.stringify({
+    body: new URLSearchParams({
       grant_type: "refresh_token",
       client_id: clientId,
       client_secret: clientSecret,
       refresh_token: config.refresh_token,
-    }),
+    }).toString(),
   });
 
   const tokenText = await tokenRes.text();
