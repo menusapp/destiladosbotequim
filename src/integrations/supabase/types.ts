@@ -1073,6 +1073,7 @@ export type Database = {
           created_at: string | null
           enabled: boolean | null
           id: string
+          last_sync_at: string | null
           password_hash: string | null
           refresh_token: string | null
           restaurant_id: string
@@ -1088,6 +1089,7 @@ export type Database = {
           created_at?: string | null
           enabled?: boolean | null
           id?: string
+          last_sync_at?: string | null
           password_hash?: string | null
           refresh_token?: string | null
           restaurant_id: string
@@ -1103,6 +1105,7 @@ export type Database = {
           created_at?: string | null
           enabled?: boolean | null
           id?: string
+          last_sync_at?: string | null
           password_hash?: string | null
           refresh_token?: string | null
           restaurant_id?: string

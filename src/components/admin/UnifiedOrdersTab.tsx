@@ -160,6 +160,36 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     return () => { active = false; clearInterval(interval); };
   }, [restaurantId]);
 
+  // Delivery Direto polling every 30 seconds
+  useEffect(() => {
+    const SUPABASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+    let active = true;
+
+    const pollDD = async () => {
+      if (!active) return;
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/dd-polling`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ restaurant_id: restaurantId }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.new_orders > 0) {
+            fetchOrders();
+            toast.info(`${data.new_orders} novo(s) pedido(s) do Delivery Direto!`);
+          }
+        } else {
+          await res.text(); // consume body
+        }
+      } catch (_) { /* silent fail */ }
+    };
+
+    pollDD();
+    const interval = setInterval(pollDD, 30000);
+    return () => { active = false; clearInterval(interval); };
+  }, [restaurantId]);
+
   const setupRealtime = () => {
     let debounceTimer: ReturnType<typeof setTimeout>;
     const ch = supabase.channel(`unified-orders-${restaurantId}`)

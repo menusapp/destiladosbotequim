@@ -1,0 +1,1 @@
+ALTER TABLE public.deliverydireto_config ADD COLUMN IF NOT EXISTS last_sync_at timestamptz;
