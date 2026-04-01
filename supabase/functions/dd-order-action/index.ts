@@ -65,39 +65,42 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Map action to admin-api status values
+    // ── Status mapping: ERP action → DD Admin API status ────────────────
+    // Official route: PUT /admin-api/v1/orders/{id}/status
+    // Official status enum: APPROVED, IN_TRANSIT, DONE, REJECTED
     const actionMap: Record<string, { ddStatus: string; localStatus: string }> = {
-      accept:   { ddStatus: "APPROVED",    localStatus: "accepted" },
-      ready:    { ddStatus: "READY",       localStatus: "ready" },
-      dispatch: { ddStatus: "DISPATCHED",  localStatus: "out_for_delivery" },
-      deliver:  { ddStatus: "DONE",        localStatus: "delivered" },
-      reject:   { ddStatus: "CANCELLED",   localStatus: "cancelled" },
+      accept:   { ddStatus: "APPROVED",   localStatus: "accepted" },
+      dispatch: { ddStatus: "IN_TRANSIT", localStatus: "out_for_delivery" },
+      deliver:  { ddStatus: "DONE",       localStatus: "delivered" },
+      reject:   { ddStatus: "REJECTED",   localStatus: "cancelled" },
     };
 
     const actionConfig = actionMap[action];
     if (!actionConfig) {
-      return new Response(JSON.stringify({ error: `Ação inválida: ${action}` }), {
+      return new Response(JSON.stringify({ error: `Ação inválida: ${action}. Ações válidas: accept, dispatch, deliver, reject` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // ── Build request ───────────────────────────────────────────────────
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
       "X-DeliveryDireto-Client-Id": DD_CLIENT_ID,
       "X-DeliveryDireto-Id": config.store_id,
     };
 
-    // Use PUT /admin-api/v1/orders/{id} with status in body
-    const actionUrl = `${DD_ADMIN_API}/orders/${dd_order_id}`;
+    // Official Admin API route: PUT /admin-api/v1/orders/{id}/status
+    const statusUrl = `${DD_ADMIN_API}/orders/${dd_order_id}/status`;
     const body: Record<string, string> = { status: actionConfig.ddStatus };
     if (action === "reject" && reason) {
       body.statusReason = reason;
     }
 
-    console.log(`[dd-order-action] PUT ${actionUrl}, body: ${JSON.stringify(body)}`);
+    console.log(`[dd-order-action] PUT ${statusUrl}`);
+    console.log(`[dd-order-action] Body: ${JSON.stringify(body)}`);
 
-    const apiRes = await fetch(actionUrl, {
+    const apiRes = await fetch(statusUrl, {
       method: "PUT",
       headers,
       body: JSON.stringify(body),
@@ -107,12 +110,31 @@ Deno.serve(async (req) => {
     console.log(`[dd-order-action] Response: status=${apiRes.status}, body=${apiText.substring(0, 500)}`);
 
     if (!apiRes.ok && apiRes.status !== 204 && apiRes.status !== 202) {
-      return new Response(JSON.stringify({ error: `Erro na API DD: ${apiRes.status} - ${apiText.substring(0, 200)}` }), {
-        status: apiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // If /orders/{id}/status fails with 404, try fallback PUT /orders/{id}
+      if (apiRes.status === 404 || apiRes.status === 405) {
+        console.log(`[dd-order-action] /status route returned ${apiRes.status}, trying fallback PUT /orders/${dd_order_id}`);
+        const fallbackUrl = `${DD_ADMIN_API}/orders/${dd_order_id}`;
+        const fallbackRes = await fetch(fallbackUrl, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(body),
+        });
+        const fallbackText = await fallbackRes.text();
+        console.log(`[dd-order-action] Fallback response: status=${fallbackRes.status}, body=${fallbackText.substring(0, 500)}`);
+
+        if (!fallbackRes.ok && fallbackRes.status !== 204 && fallbackRes.status !== 202) {
+          return new Response(JSON.stringify({ error: `Erro na API DD: ${fallbackRes.status} - ${fallbackText.substring(0, 200)}` }), {
+            status: fallbackRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        return new Response(JSON.stringify({ error: `Erro na API DD: ${apiRes.status} - ${apiText.substring(0, 200)}` }), {
+          status: apiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
-    // Update local order status + cancellation reason
+    // ── Update local order status ───────────────────────────────────────
     const updateData: Record<string, any> = {
       status: actionConfig.localStatus,
       updated_at: new Date().toISOString(),
@@ -129,8 +151,10 @@ Deno.serve(async (req) => {
     if (updateError) {
       console.error("[dd-order-action] Local status update error:", updateError);
     } else {
-      console.log(`[dd-order-action] Local status updated to ${actionConfig.localStatus}`);
+      console.log(`[dd-order-action] ✓ Local status updated to ${actionConfig.localStatus}`);
     }
+
+    console.log(`[dd-order-action] ✓ Status ${action} → ${actionConfig.ddStatus} sent successfully for order ${dd_order_id}`);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

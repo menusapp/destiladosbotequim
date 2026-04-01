@@ -7,7 +7,9 @@ const corsHeaders = {
 
 const DD_ADMIN_API = "https://deliverydireto.com.br/admin-api/v1";
 
-// Convert DD Money object (cents) to decimal - ALL DD values are in cents
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Convert DD Money object (cents) to decimal */
 function money(v: any): number {
   if (v === null || v === undefined) return 0;
   if (typeof v === "object" && v.value !== undefined) return v.value / 100;
@@ -15,62 +17,57 @@ function money(v: any): number {
   return 0;
 }
 
-// Map DD payment to local label using store-api payment object
-function mapPaymentLabel(payment: any): string {
-  if (!payment) return "Delivery Direto";
-  
-  const payType = (payment.type || "").toUpperCase();
-  const details = payment.paymentDetails || {};
-  const detailType = (details.type || "").toUpperCase();
-  const brand = details.brand || details.cardBrand || "";
-  
-  // Online payment (PIX online, card online) = pre-paid through DD
-  if (payType === "ONLINE") return "Pago Delivery Direto";
-  
-  // Offline payment - paid at delivery/pickup
-  if (payType === "OFFLINE" || payType === "AT_DELIVERY") {
-    if (detailType === "CASH" || detailType === "DINHEIRO") return "Dinheiro";
-    if (detailType === "PIX") return "PIX";
-    if (detailType === "CREDITCARD" || detailType === "CREDIT_CARD") {
-      return brand ? `Cartão de Crédito ${brand}` : "Cartão de Crédito";
-    }
-    if (detailType === "DEBITCARD" || detailType === "DEBIT_CARD") {
-      return brand ? `Cartão de Débito ${brand}` : "Cartão de Débito";
-    }
-    if (detailType === "MEAL_VOUCHER" || detailType === "FOOD_VOUCHER") return "Vale Refeição";
-    
-    // Fallback: try to parse from name field
-    const name = (details.name || payment.name || "").toLowerCase();
-    if (name.includes("pix")) return "PIX";
-    if (name.includes("dinheiro") || name.includes("cash")) return "Dinheiro";
-    if (name.includes("crédito") || name.includes("credito") || name.includes("credit")) {
-      const extractedBrand = (details.name || payment.name || "").replace(/\s*\(.*\)\s*/, "").trim();
-      return extractedBrand ? `Cartão de Crédito ${extractedBrand}` : "Cartão de Crédito";
-    }
-    if (name.includes("débito") || name.includes("debito") || name.includes("debit")) {
-      const extractedBrand = (details.name || payment.name || "").replace(/\s*\(.*\)\s*/, "").trim();
-      return extractedBrand ? `Cartão de Débito ${extractedBrand}` : "Cartão de Débito";
-    }
-    if (name.includes("vale") || name.includes("voucher") || name.includes("refeição")) return "Vale Refeição";
-    
-    return details.name || payment.name || "Delivery Direto";
-  }
-
-  // Also check legacy paymentMethod field
-  const legacyName = (payment.name || "").toLowerCase();
-  if (legacyName.includes("pix")) return "PIX";
-  if (legacyName.includes("dinheiro")) return "Dinheiro";
-  if (legacyName.includes("crédito") || legacyName.includes("credito")) {
-    const b = (payment.name || "").replace(/\s*\(.*\)\s*/, "").trim();
-    return b ? `Cartão de Crédito ${b}` : "Cartão de Crédito";
-  }
-  if (legacyName.includes("débito") || legacyName.includes("debito")) {
-    const b = (payment.name || "").replace(/\s*\(.*\)\s*/, "").trim();
-    return b ? `Cartão de Débito ${b}` : "Cartão de Débito";
-  }
-
-  return payment.name || "Delivery Direto";
+/** Normalize a string for comparison: trim, uppercase, collapse spaces */
+function normalize(s: string | null | undefined): string {
+  return (s || "").trim().toUpperCase().replace(/\s+/g, " ");
 }
+
+/** Map DD paymentMethod object to a human-readable label */
+function mapPaymentLabel(pm: any, isOnlinePayment: boolean): string {
+  if (isOnlinePayment) return "Pago Delivery Direto";
+  if (!pm) return "Delivery Direto";
+
+  const name = (pm.name || "").toLowerCase();
+
+  if (name.includes("pix")) return "PIX";
+  if (name.includes("dinheiro") || name.includes("cash")) return "Dinheiro";
+
+  if (name.includes("crédito") || name.includes("credito")) {
+    // Extract brand from name like "Visa (crédito)" → "Visa"
+    const brand = (pm.name || "").replace(/\s*\(.*\)\s*/, "").trim();
+    return brand ? `Cartão de Crédito ${brand}` : "Cartão de Crédito";
+  }
+
+  if (name.includes("débito") || name.includes("debito")) {
+    const brand = (pm.name || "").replace(/\s*\(.*\)\s*/, "").trim();
+    return brand ? `Cartão de Débito ${brand}` : "Cartão de Débito";
+  }
+
+  if (name.includes("vale") || name.includes("voucher") || name.includes("refeição")) {
+    return "Vale Refeição";
+  }
+
+  return pm.name || "Delivery Direto";
+}
+
+// ─── DD Status → Local Status ───────────────────────────────────────────────
+
+const statusMap: Record<string, string> = {
+  WAITING: "pending",
+  PLACED: "pending",
+  APPROVED: "accepted",
+  CONFIRMED: "accepted",
+  PREPARING: "preparing",
+  IN_TRANSIT: "out_for_delivery",
+  DISPATCHED: "out_for_delivery",
+  READY: "ready",
+  DONE: "delivered",
+  DELIVERED: "delivered",
+  CANCELLED: "cancelled",
+  REJECTED: "cancelled",
+};
+
+// ─── Main Handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -98,7 +95,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get config
+    // ── Get config ──────────────────────────────────────────────────────────
     const { data: config } = await supabase
       .from("deliverydireto_config")
       .select("store_id, access_token, refresh_token, token_expires_at, last_sync_at, enabled")
@@ -111,7 +108,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check/refresh token
+    // ── Check / refresh token ───────────────────────────────────────────────
     let accessToken = config.access_token;
     if (config.token_expires_at) {
       const expiresAt = new Date(config.token_expires_at).getTime();
@@ -145,22 +142,30 @@ Deno.serve(async (req) => {
       });
     }
 
-    const ddHeaders = {
-      "Authorization": `Bearer ${accessToken}`,
+    // ── DD request headers (required by Admin API) ──────────────────────────
+    const ddHeaders: Record<string, string> = {
+      Authorization: `Bearer ${accessToken}`,
       "X-DeliveryDireto-Client-Id": DD_CLIENT_ID,
       "X-DeliveryDireto-Id": config.store_id,
-      "Accept": "application/json",
+      Accept: "application/json",
     };
 
-    // Build query - use store-api orders endpoint
+    // ── Build query ─────────────────────────────────────────────────────────
+    // Official Admin API: GET /admin-api/v1/orders
+    // CRITICAL: showItems, showExtras, showMetadata default to FALSE
     const now = new Date();
     const lastSync = config.last_sync_at
       ? new Date(config.last_sync_at)
       : new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     const params = new URLSearchParams();
-    params.set("updatedAt[gte]", lastSync.toISOString());
+    // Filters — use lastModifiedStart/End per official doc
+    params.set("lastModifiedStart", lastSync.toISOString());
     params.set("limit", "50");
+    // REQUIRED: ask the API to include item details
+    params.set("showItems", "true");
+    params.set("showExtras", "true");
+    params.set("showMetadata", "true");
 
     const ordersUrl = `${DD_ADMIN_API}/orders?${params.toString()}`;
     console.log(`[dd-polling] Fetching orders: ${ordersUrl}`);
@@ -169,19 +174,18 @@ Deno.serve(async (req) => {
 
     if (!ordersRes.ok) {
       const errText = await ordersRes.text();
-      console.error(`[dd-polling] Orders fetch failed: status=${ordersRes.status}, body=${errText.substring(0, 500)}`);
+      console.error(`[dd-polling] Orders fetch failed: method=GET, url=${ordersUrl}, status=${ordersRes.status}, body=${errText.substring(0, 500)}`);
       return new Response(JSON.stringify({ new_orders: 0, error: "Falha ao buscar pedidos" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const ordersText = await ordersRes.text();
-
     let ordersData: any;
     try {
       ordersData = JSON.parse(ordersText);
     } catch {
-      console.error("[dd-polling] Failed to parse response as JSON");
+      console.error("[dd-polling] Failed to parse JSON response");
       return new Response(JSON.stringify({ new_orders: 0, error: "Invalid JSON from DD API" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -198,42 +202,38 @@ Deno.serve(async (req) => {
     } else if (ordersData?.orders && Array.isArray(ordersData.orders)) {
       ordersList = ordersData.orders;
     }
+
     console.log(`[dd-polling] Found ${ordersList.length} orders from admin-api`);
-    
-    // Log first order structure for debugging
+
+    // Log first order for debugging
     if (ordersList.length > 0) {
       const first = ordersList[0];
       console.log(`[dd-polling] First order keys: ${Object.keys(first).join(", ")}`);
+      console.log(`[dd-polling] First order items count: ${(first.items || []).length}, compositeItems: ${(first.compositeItems || []).length}`);
       console.log(`[dd-polling] First order (3000): ${JSON.stringify(first).substring(0, 3000)}`);
     }
 
-    const statusMap: Record<string, string> = {
-      "WAITING": "pending",
-      "PLACED": "pending",
-      "APPROVED": "accepted",
-      "CONFIRMED": "accepted",
-      "PREPARING": "preparing",
-      "READY": "ready",
-      "DISPATCHED": "out_for_delivery",
-      "DONE": "delivered",
-      "DELIVERED": "delivered",
-      "CANCELLED": "cancelled",
-    };
-
-    // Pre-fetch all products with pdv_code for matching
+    // ── Pre-fetch products for matching ─────────────────────────────────────
     const { data: allProducts } = await supabase
       .from("products")
       .select("id, name, pdv_code, price")
       .eq("restaurant_id", restaurant_id);
     const productsList = allProducts || [];
 
+    // Also fetch product extras for option/property matching
+    const { data: allExtras } = await supabase
+      .from("product_extras")
+      .select("id, name, pdv_code, price, product_id")
+      .in("product_id", productsList.map(p => p.id));
+    const extrasList = allExtras || [];
+
     let newOrdersCount = 0;
 
     for (const ddOrder of ordersList) {
-      const ddOrderId = String(ddOrder.orderNumber || ddOrder.id || ddOrder.order_id || "");
+      const ddOrderId = String(ddOrder.orderNumber || ddOrder.id || "");
       if (!ddOrderId) continue;
 
-      // Check if already imported
+      // ── Check if already imported ───────────────────────────────────────
       const { data: existing } = await supabase
         .from("orders")
         .select("id")
@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (existing) {
-        // Update status if changed
+        // Just sync status if changed
         const ddStatus = ddOrder.status || "";
         const mappedStatus = statusMap[ddStatus] || null;
         if (mappedStatus) {
@@ -255,64 +255,75 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // NEW ORDER - Fetch full detail via GET /orders/{id} (Orders API)
+      // ── NEW ORDER ─────────────────────────────────────────────────────────
+
+      // Items from the listing (should be populated with showItems=true)
+      const rawItems = ddOrder.items || [];
+      const compositeItems = ddOrder.compositeItems || [];
+
+      console.log(`[dd-polling] Order ${ddOrderId}: items=${rawItems.length}, compositeItems=${compositeItems.length}`);
+
+      // If listing still returned empty items, try GET /orders/{id} as fallback
       let fullOrder = ddOrder;
-      const orderId = ddOrder.id || ddOrder.orderNumber;
-      try {
-        const detailUrl = `${DD_ADMIN_API}/orders/${orderId}`;
-        console.log(`[dd-polling] Fetching order detail: GET ${detailUrl}`);
-        const detailRes = await fetch(detailUrl, { headers: ddHeaders });
-        if (detailRes.ok) {
-          const detailText = await detailRes.text();
-          const detailData = JSON.parse(detailText);
-          fullOrder = detailData?.data || detailData;
-          console.log(`[dd-polling] Detail keys: ${Object.keys(fullOrder).join(", ")}`);
-          console.log(`[dd-polling] Detail items count: ${(fullOrder.items || []).length}, compositeItems: ${(fullOrder.compositeItems || []).length}`);
-          console.log(`[dd-polling] Detail (3000): ${JSON.stringify(fullOrder).substring(0, 3000)}`);
-        } else {
-          const errBody = await detailRes.text();
-          console.warn(`[dd-polling] Order detail failed for ${orderId}: status=${detailRes.status}, body=${errBody.substring(0, 500)}`);
+      if (rawItems.length === 0 && compositeItems.length === 0) {
+        const orderId = ddOrder.id || ddOrder.orderNumber;
+        try {
+          const detailUrl = `${DD_ADMIN_API}/orders/${orderId}?showItems=true&showExtras=true&showMetadata=true`;
+          console.log(`[dd-polling] Items empty in listing, fetching detail: GET ${detailUrl}`);
+          const detailRes = await fetch(detailUrl, { headers: ddHeaders });
+          if (detailRes.ok) {
+            const detailText = await detailRes.text();
+            const detailData = JSON.parse(detailText);
+            fullOrder = detailData?.data || detailData;
+            console.log(`[dd-polling] Detail response keys: ${Object.keys(fullOrder).join(", ")}`);
+            console.log(`[dd-polling] Detail items: ${(fullOrder.items || []).length}, compositeItems: ${(fullOrder.compositeItems || []).length}`);
+            console.log(`[dd-polling] Detail (3000): ${JSON.stringify(fullOrder).substring(0, 3000)}`);
+          } else {
+            const errBody = await detailRes.text();
+            console.warn(`[dd-polling] Detail fetch failed: status=${detailRes.status}, body=${errBody.substring(0, 500)}`);
+          }
+        } catch (e) {
+          console.warn(`[dd-polling] Detail error:`, e);
         }
-      } catch (e) {
-        console.warn(`[dd-polling] Detail error:`, e);
       }
 
-      let orderItems = fullOrder.items || fullOrder.orderItems || fullOrder.cart || [];
-
-      // Extract customer fields
+      // ── Extract customer ────────────────────────────────────────────────
       const customer = fullOrder.customer || {};
       const customerName = customer.firstName
         ? `${customer.firstName || ""} ${customer.lastName || ""}`.trim()
         : (customer.name || "Cliente Delivery Direto");
-      const customerPhone = customer.telephone || customer.phone || customer.phones?.[0] || "";
-      const customerCpf = customer.document || customer.cpf || customer.taxPayerIdentificationNumber || "";
+      const customerPhone = customer.telephone || customer.phone || "";
+      const customerCpf = customer.document || customer.cpf || "";
 
-      // Order type mapping
-      const ddType = (fullOrder.type || fullOrder.delivery_method || fullOrder.deliveryMethod || "").toUpperCase();
+      // ── Order type ──────────────────────────────────────────────────────
+      const ddType = (fullOrder.type || "").toUpperCase();
       const isPickup = ddType === "TAKEOUT" || ddType === "PICKUP";
       const deliveryType = isPickup ? "pickup" : "delivery";
 
-      // Address
-      const addr = fullOrder.address || fullOrder.delivery_address || fullOrder.deliveryAddress || null;
+      // ── Address ─────────────────────────────────────────────────────────
+      const addr = fullOrder.address || null;
       const deliveryAddress = addr
-        ? `${addr.street || addr.streetName || ""}, ${addr.number || ""} - ${addr.neighborhood || addr.district || ""}, ${addr.city || ""}`
+        ? `${addr.street || ""}, ${addr.number || ""} - ${addr.neighborhood || ""}, ${addr.city || ""}`
         : null;
 
-      // Payment mapping - store-api provides payment.type and payment.paymentDetails
-      const payment = fullOrder.payment || (Array.isArray(fullOrder.payments) ? fullOrder.payments[0] : null) || fullOrder.paymentMethod || {};
-      const paymentLabel = mapPaymentLabel(payment);
-      console.log(`[dd-polling] Order ${ddOrderId} payment: ${JSON.stringify(payment).substring(0, 300)}, mapped="${paymentLabel}"`);
+      // ── Payment ─────────────────────────────────────────────────────────
+      // Admin API uses "paymentMethod" object with "name" field
+      const paymentMethod = fullOrder.paymentMethod || {};
+      const isOnlinePayment = fullOrder.isOnlinePayment === true;
+      const paymentLabel = mapPaymentLabel(paymentMethod, isOnlinePayment);
+      console.log(`[dd-polling] Order ${ddOrderId} payment: name="${paymentMethod.name}", isOnline=${isOnlinePayment}, mapped="${paymentLabel}"`);
 
-      // Status
+      // ── Status ──────────────────────────────────────────────────────────
       const orderStatus = statusMap[fullOrder.status || "WAITING"] || "pending";
 
-      // Prices - DD returns values in CENTS
-      const values = fullOrder.total || fullOrder.values || {};
-      const deliveryFee = money(values.deliveryFee || values.delivery_fee);
+      // ── Prices (cents → decimal) ────────────────────────────────────────
+      const values = fullOrder.total || {};
+      const deliveryFee = money(values.deliveryFee);
 
-      // Scheduled orders
-      const scheduledFor = fullOrder.scheduledOrder || fullOrder.scheduling || fullOrder.scheduledFor || null;
+      // ── Scheduled ───────────────────────────────────────────────────────
+      const scheduledFor = fullOrder.scheduledOrder || null;
 
+      // ── Insert order ────────────────────────────────────────────────────
       const { data: newOrder, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -328,7 +339,7 @@ Deno.serve(async (req) => {
           dd_source: true,
           dd_order_id: ddOrderId,
           delivery_fee: deliveryFee,
-          notes: fullOrder.observations || fullOrder.notes || fullOrder.note || null,
+          notes: fullOrder.notes || null,
           dd_scheduled_for: scheduledFor,
         })
         .select("id")
@@ -339,78 +350,172 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Process items
-      const allDDItems = Array.isArray(orderItems) ? orderItems : [];
-      // Also check for compositeItems
-      const compositeItems = fullOrder.compositeItems || [];
-      const combinedItems = [...allDDItems, ...compositeItems];
-      
-      console.log(`[dd-polling] Order ${ddOrderId} items: direct=${allDDItems.length}, composite=${compositeItems.length}, total=${combinedItems.length}`);
+      // ── Process items ───────────────────────────────────────────────────
+      const allDDItems = fullOrder.items || [];
+      const allCompositeItems = fullOrder.compositeItems || [];
 
-      if (!combinedItems.length) {
-        console.warn(`[dd-polling] Order ${ddOrderId} has NO items! Order keys: ${Object.keys(fullOrder).join(", ")}`);
+      console.log(`[dd-polling] Order ${ddOrderId} processing: items=${allDDItems.length}, compositeItems=${allCompositeItems.length}`);
+
+      if (!allDDItems.length && !allCompositeItems.length) {
+        console.warn(`[dd-polling] ⚠ Order ${ddOrderId} has NO items and NO compositeItems!`);
+        console.warn(`[dd-polling] Order keys: ${Object.keys(fullOrder).join(", ")}`);
       }
 
-      if (combinedItems.length > 0 && newOrder) {
-        const insertItems = [];
-        for (const item of combinedItems) {
-          // store-api items: { itemId, amount, totalPrice: {value,currency}, item: {name, customCode, price: {value,currency}} }
-          const ddItem = item.item || item;
-          const itemName = ddItem.name || ddItem.productName || item.name || "Produto DD";
-          const customCode = String(ddItem.customCode || ddItem.custom_code || ddItem.externalCode || ddItem.code || ddItem.pdvCode || "").trim();
-          const quantity = item.amount || item.quantity || 1;
+      const insertItems: any[] = [];
 
-          // Price handling
-          let unitPrice = 0;
-          if (item.totalPrice !== undefined) {
-            unitPrice = money(item.totalPrice) / (quantity || 1);
-          } else if (item.unitPrice !== undefined) {
-            unitPrice = money(item.unitPrice);
-          } else if (ddItem.price !== undefined) {
-            unitPrice = money(ddItem.price);
-          }
+      // ── Process regular items ───────────────────────────────────────────
+      for (const item of allDDItems) {
+        const ddItem = item.item || item;
+        const itemName = ddItem.name || item.name || "Produto DD";
+        const customCode = normalize(ddItem.customCode || ddItem.custom_code || ddItem.externalCode || ddItem.code || ddItem.pdvCode || "");
+        const quantity = item.amount || item.quantity || 1;
 
-          console.log(`[dd-polling] Item: "${itemName}", code: "${customCode}", qty: ${quantity}, unitPrice: R$${unitPrice.toFixed(2)}`);
-
-          // Match product by pdv_code first, then by name
-          let matchedProductId: string | null = null;
-          if (customCode) {
-            const match = productsList.find(p => p.pdv_code === customCode);
-            if (match) {
-              matchedProductId = match.id;
-              if (unitPrice === 0 && match.price) unitPrice = match.price;
-              console.log(`[dd-polling] Matched by pdv_code "${customCode}" -> ${match.id}`);
-            }
-          }
-          if (!matchedProductId && itemName) {
-            const match = productsList.find(p => p.name.toLowerCase() === itemName.toLowerCase());
-            if (match) {
-              matchedProductId = match.id;
-              if (unitPrice === 0 && match.price) unitPrice = match.price;
-              console.log(`[dd-polling] Matched by name "${itemName}" -> ${match.id}`);
-            }
-          }
-
-          // Build observations from subitems/options
-          let itemNotes = item.observations || "";
-          if (item.subitems && Array.isArray(item.subitems)) {
-            const subNames = item.subitems.map((s: any) => s.item?.name || s.name || "").filter(Boolean);
-            if (subNames.length) itemNotes += (itemNotes ? " | " : "") + subNames.join(", ");
-          }
-          if (item.options && Array.isArray(item.options)) {
-            const optNames = item.options.map((o: any) => o.name || o.option?.name || "").filter(Boolean);
-            if (optNames.length) itemNotes += (itemNotes ? " | " : "") + optNames.join(", ");
-          }
-
-          insertItems.push({
-            order_id: newOrder.id,
-            product_id: matchedProductId,
-            quantity,
-            price_at_order: unitPrice,
-            notes: matchedProductId ? (itemNotes || null) : `[DD] ${itemName}${itemNotes ? ` - ${itemNotes}` : ""}`,
-          });
+        // Price
+        let unitPrice = 0;
+        if (item.totalPrice !== undefined) {
+          unitPrice = money(item.totalPrice) / (quantity || 1);
+        } else if (item.unitPrice !== undefined) {
+          unitPrice = money(item.unitPrice);
+        } else if (ddItem.price !== undefined) {
+          unitPrice = money(ddItem.price);
         }
 
+        console.log(`[dd-polling] Item: "${itemName}", customCode="${customCode}", qty=${quantity}, unitPrice=R$${unitPrice.toFixed(2)}`);
+
+        // Match product by customCode → pdv_code (normalized)
+        let matchedProductId: string | null = null;
+        if (customCode) {
+          const match = productsList.find(p => normalize(p.pdv_code) === customCode);
+          if (match) {
+            matchedProductId = match.id;
+            if (unitPrice === 0 && match.price) unitPrice = match.price;
+            console.log(`[dd-polling] ✓ Matched by customCode "${customCode}" → product "${match.name}" (${match.id})`);
+          } else {
+            console.log(`[dd-polling] ✗ No product found with pdv_code matching customCode "${customCode}"`);
+          }
+        }
+
+        // Fallback: match by normalized name
+        if (!matchedProductId && itemName) {
+          const normalizedName = normalize(itemName);
+          const match = productsList.find(p => normalize(p.name) === normalizedName);
+          if (match) {
+            matchedProductId = match.id;
+            if (unitPrice === 0 && match.price) unitPrice = match.price;
+            console.log(`[dd-polling] ✓ Matched by name "${itemName}" → product "${match.name}" (${match.id})`);
+          } else {
+            console.log(`[dd-polling] ✗ No product found matching name "${itemName}"`);
+          }
+        }
+
+        // Build notes from properties/options/subitems
+        let itemNotes = item.observations || "";
+
+        // Properties (variações)
+        if (item.properties && Array.isArray(item.properties)) {
+          for (const prop of item.properties) {
+            const propName = prop.name || prop.propertyName || "";
+            const options = prop.options || prop.selectedOptions || [];
+            if (Array.isArray(options) && options.length > 0) {
+              const optNames = options.map((o: any) => o.name || o.optionName || "").filter(Boolean);
+              if (optNames.length) {
+                itemNotes += (itemNotes ? " | " : "") + `${propName}: ${optNames.join(", ")}`;
+              }
+            }
+            console.log(`[dd-polling] Property: "${propName}", options: ${JSON.stringify(options).substring(0, 200)}`);
+          }
+        }
+
+        // Options (opções diretas)
+        if (item.options && Array.isArray(item.options)) {
+          const optNames = item.options.map((o: any) => o.name || o.optionName || "").filter(Boolean);
+          if (optNames.length) {
+            itemNotes += (itemNotes ? " | " : "") + `Opções: ${optNames.join(", ")}`;
+          }
+          console.log(`[dd-polling] Options: ${JSON.stringify(item.options).substring(0, 200)}`);
+        }
+
+        // Subitems (extras/adicionais)
+        if (item.subitems && Array.isArray(item.subitems)) {
+          const subNames = item.subitems.map((s: any) => s.item?.name || s.name || "").filter(Boolean);
+          if (subNames.length) {
+            itemNotes += (itemNotes ? " | " : "") + `Extras: ${subNames.join(", ")}`;
+          }
+          console.log(`[dd-polling] Subitems: ${JSON.stringify(item.subitems).substring(0, 200)}`);
+        }
+
+        insertItems.push({
+          order_id: newOrder.id,
+          product_id: matchedProductId,
+          quantity,
+          price_at_order: unitPrice,
+          notes: matchedProductId ? (itemNotes || null) : `[DD] ${itemName}${itemNotes ? ` - ${itemNotes}` : ""}`,
+        });
+      }
+
+      // ── Process composite items (pizzas, combos) ────────────────────────
+      for (const composite of allCompositeItems) {
+        const compositeName = composite.name || composite.compositeName || "Combo DD";
+        const quantity = composite.amount || composite.quantity || 1;
+        let totalPrice = 0;
+
+        if (composite.totalPrice !== undefined) {
+          totalPrice = money(composite.totalPrice);
+        } else if (composite.price !== undefined) {
+          totalPrice = money(composite.price);
+        }
+
+        const unitPrice = totalPrice / (quantity || 1);
+
+        console.log(`[dd-polling] CompositeItem: "${compositeName}", qty=${quantity}, total=R$${totalPrice.toFixed(2)}`);
+
+        // Build description from sub-items of the composite
+        let compositeNotes = "";
+        const subItems = composite.items || composite.subItems || [];
+        if (Array.isArray(subItems)) {
+          const subDescs = subItems.map((si: any) => {
+            const siItem = si.item || si;
+            return siItem.name || si.name || "";
+          }).filter(Boolean);
+          if (subDescs.length) {
+            compositeNotes = subDescs.join(", ");
+          }
+        }
+
+        // Try matching the composite by customCode or name
+        const customCode = normalize(composite.customCode || "");
+        let matchedProductId: string | null = null;
+
+        if (customCode) {
+          const match = productsList.find(p => normalize(p.pdv_code) === customCode);
+          if (match) {
+            matchedProductId = match.id;
+            console.log(`[dd-polling] ✓ Composite matched by customCode "${customCode}" → "${match.name}"`);
+          }
+        }
+        if (!matchedProductId) {
+          const normalizedName = normalize(compositeName);
+          const match = productsList.find(p => normalize(p.name) === normalizedName);
+          if (match) {
+            matchedProductId = match.id;
+            console.log(`[dd-polling] ✓ Composite matched by name "${compositeName}" → "${match.name}"`);
+          }
+        }
+
+        insertItems.push({
+          order_id: newOrder.id,
+          product_id: matchedProductId,
+          quantity,
+          price_at_order: unitPrice,
+          notes: matchedProductId
+            ? (compositeNotes || null)
+            : `[DD Combo] ${compositeName}${compositeNotes ? ` (${compositeNotes})` : ""}`,
+        });
+      }
+
+      // ── Insert all items ────────────────────────────────────────────────
+      if (insertItems.length > 0) {
+        console.log(`[dd-polling] Inserting ${insertItems.length} items for order ${ddOrderId}`);
         const { error: itemsError } = await supabase.from("order_items").insert(insertItems);
         if (itemsError) {
           console.error(`[dd-polling] Error inserting items for order ${ddOrderId}:`, itemsError);
@@ -418,10 +523,10 @@ Deno.serve(async (req) => {
       }
 
       newOrdersCount++;
-      console.log(`[dd-polling] New order imported: ${ddOrderId} -> ${newOrder?.id}`);
+      console.log(`[dd-polling] ✓ New order imported: DD#${ddOrderId} → ${newOrder.id} (${insertItems.length} items)`);
     }
 
-    // Update last_sync_at
+    // ── Update last_sync_at ─────────────────────────────────────────────────
     await supabase
       .from("deliverydireto_config")
       .update({ last_sync_at: now.toISOString() })
