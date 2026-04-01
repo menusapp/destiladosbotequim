@@ -330,7 +330,7 @@ const RestaurantAdmin = () => {
                 orderId: orderId,
                 customerName: order.customer_name,
                 total,
-                orderType: (orderType === 'delivery' ? 'delivery' : 'local') as 'local' | 'delivery',
+                orderType: (orderType === 'balcao' ? 'balcao' : orderType === 'delivery' ? 'delivery' : 'local') as 'local' | 'delivery' | 'balcao',
                 tableNumber,
                 deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
                 items,
