@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
     params.set("updatedAt[gte]", lastSync.toISOString());
     params.set("limit", "50");
 
-    const ordersUrl = `${DD_STORE_API}/orders?${params.toString()}`;
+    const ordersUrl = `${DD_ADMIN_API}/orders?${params.toString()}`;
     console.log(`[dd-polling] Fetching orders: ${ordersUrl}`);
 
     const ordersRes = await fetch(ordersUrl, { headers: ddHeaders });
