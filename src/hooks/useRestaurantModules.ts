@@ -22,7 +22,7 @@ const SECTION_TO_MODULE: Record<string, string> = {
   "config-pagamentos-online": "pagamentos_online",
   "config-regioes": "delivery",
   "integracoes": "delivery",
-  "config-totem": "totem",
+  // "config-totem" removed — always visible, gated inside component
 };
 
 // Sections that are always available (basic config)
