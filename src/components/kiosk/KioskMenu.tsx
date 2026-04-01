@@ -204,7 +204,7 @@ function KioskProductCard({ product, primaryColor, onSelect, featured }: { produ
     <button
       onClick={() => onSelect(product)}
       className={`flex flex-col bg-card rounded-2xl border overflow-hidden text-left transition-all hover:shadow-xl active:scale-[0.97] group ${featured ? "ring-2" : ""}`}
-      style={featured ? { ringColor: primaryColor } : undefined}
+      style={featured ? { boxShadow: `0 0 0 2px ${primaryColor}` } : undefined}
     >
       {product.image_url ? (
         <div className="relative w-full aspect-[4/3] overflow-hidden">

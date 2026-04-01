@@ -145,7 +145,7 @@ export function KioskPayment({
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
-        .insert(orderData)
+        .insert([orderData] as any)
         .select()
         .single();
 
