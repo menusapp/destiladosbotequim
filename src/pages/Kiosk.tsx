@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
+import { resolveSlug } from "@/lib/slugResolver";
 import { supabase } from "@/integrations/supabase/client";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "@/components/ui/sonner";
@@ -25,7 +26,8 @@ export interface KioskCustomer {
 const INACTIVITY_TIMEOUT_MS = 120_000; // 2 minutes
 
 export default function Kiosk() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug: pathSlug } = useParams<{ slug: string }>();
+  const slug = resolveSlug(pathSlug);
   const [step, setStep] = useState<KioskStep>("idle");
   const [restaurant, setRestaurant] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);
