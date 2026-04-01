@@ -1,79 +1,116 @@
 
 
-# Corrigir 3 Problemas da Integracao Delivery Direto
+# Corrigir Integracao DD: Mudar de admin-api para store-api
 
-## Diagnostico dos Logs
+## Problema Raiz
 
-### Problema 1: dd-order-action retorna 404
-Os logs mostram que `PUT /admin-api/v1/orders/69572037` retorna **HTML 404** dizendo "loja nao encontrada". A pagina HTML generica do DD indica que esse endpoint **nao existe** nesse formato. A API Admin do DD tem DOIS endpoints de pedidos:
-- `GET /admin-api/v1/orders` (lista - funciona)
-- `PUT /admin-api/v1/orders/{id}` (status - retorna 404)
+O codigo usa a `admin-api` do Delivery Direto que e uma API interna/KDS. A API correta documentada e a **store-api** (`/store-api/v1/`). Por isso:
 
-Solucao: Usar o endpoint **KDS** do DD que documentado na OpenAPI: `PUT /admin-api/v1/kds/orders/{id}` com body `{ "status": "APPROVED" }` - que serve exatamente para atualizar status de pedidos. Se este tambem falhar, existe tambem o endpoint generico `/admin-api/v1/orders` com PUT.
+1. **Itens vazios**: A admin-api lista pedidos sem itens. A store-api retorna pedidos COM itens completos (`items[].item.name`, `items[].item.customCode`, `items[].totalPrice`, etc.)
+2. **Status nao sincroniza**: `PUT /admin-api/v1/orders/{id}` e `PUT /admin-api/v1/kds/orders/{id}` retornam 404. A store-api usa endpoints de acao: `POST /orders/{id}/approve`, `POST /orders/{id}/cancel`, etc.
+3. **Pagamento generico**: A admin-api nao retorna `payment.type` e `payment.paymentDetails.type` corretamente. A store-api retorna o objeto `payment` completo.
 
-Adicionalmente, o `dd_order_id` salvo e o `orderNumber` (69572037) que coincide com o `id` nesse caso. Precisamos logar o resultado para confirmar qual ID usar.
+## Evidencias da Documentacao Oficial
 
-### Problema 2: Itens vazios e pagamento generico
-O log trunca a resposta em 500 caracteres - mostra apenas ate `total.requiredChange`. Os campos `items`, `payment`, `customer` estao APOS os 500 chars e nunca sao logados.
+A store-api (https://developers.deliverydireto.com.br/store-api/docs/) documenta:
 
-O codigo busca `ddOrder.items || ddOrder.orderItems` mas o nome do campo real pode ser diferente (ex: `cart`, `orderProducts`, ou estar dentro de outro objeto).
+**Autenticacao**: `POST /store-api/token` com `client_credentials` ou `password` grant
 
-Solucao: 
-1. Logar `Object.keys(ddOrder)` para descobrir os nomes exatos dos campos
-2. Logar o primeiro pedido completo (ate 3000 chars) para ver items e payment
-3. Adicionar fallback para todos os nomes possiveis de campos
+**Pedido com itens**: Resposta do pedido inclui:
+```text
+{
+  "items": [{
+    "itemId": 123,
+    "amount": 3,
+    "totalPrice": { "value": 1000, "currency": "BRL" },
+    "item": {
+      "name": "Refrigerante Light",
+      "customCode": "001",
+      "price": { "value": 1000, "currency": "BRL" }
+    }
+  }],
+  "payment": {
+    "type": "ONLINE" | "OFFLINE",
+    "paymentDetails": { "type": "CREDITCARD" | "PIX" | "CASH" | ... }
+  }
+}
+```
 
-### Problema 3: Valores em centavos
-O `deliveryFee.value: 300` = R$3,00, mas a logica de divisao por 100 so aplica se `> 100`. Valores como 300 (R$3,00) passam por ser `>100`, mas valores menores (ex: delivery fee de R$0,50 = 50) nao seriam divididos. A logica precisa ser mais robusta - todos os valores `Money` do DD estao em centavos, sem excecao.
+**Cancelamento**: `DELETE /store-api/v1/customers/me/orders/{id}`
 
----
+**Acoes de status** (padrao Open Delivery):
+```text
+POST /store-api/v1/orders/{id}/approve
+POST /store-api/v1/orders/{id}/start-production
+POST /store-api/v1/orders/{id}/ready-for-pickup
+POST /store-api/v1/orders/{id}/dispatch
+POST /store-api/v1/orders/{id}/deliver
+POST /store-api/v1/orders/{id}/cancel   (body: { statusReason })
+```
 
 ## Alteracoes
 
-### 1. `supabase/functions/dd-polling/index.ts`
+### 1. `supabase/functions/dd-auth/index.ts`
 
-**Logging expandido** (linha 140):
-- Mudar de 500 para 3000 caracteres no log da resposta
-- Adicionar log dos campos do primeiro pedido: `Object.keys(ordersList[0])` 
-- Adicionar log especifico dos items e payment do primeiro pedido
+- Mudar token endpoint de `/admin-api/token` para `/store-api/token`
+- Manter `client_credentials` grant (nao precisa username/password para token de loja)
+- Manter headers `X-DeliveryDireto-Client-Id` e `X-DeliveryDireto-Id`
+- Atualizar refresh_token para usar `/store-api/token` tambem
+- Manter fluxo connect com `password` grant como fallback caso `client_credentials` nao funcione
 
-**Nomes de campos para items** (linhas 274-275):
-- Adicionar fallbacks: `ddOrder.items || ddOrder.orderItems || ddOrder.cart || ddOrder.products || ddOrder.orderProducts || []`
-- Se nenhum campo de items existir, logar warning: `"[dd-polling] No items field found. Order keys: ${Object.keys(ddOrder)}"`
+### 2. `supabase/functions/dd-polling/index.ts` -- Rewrite completo da logica
 
-**Nomes de campos para payment** (linhas 233-234):
-- Adicionar fallbacks: `ddOrder.payment || ddOrder.payments?.[0] || ddOrder.paymentMethod || ddOrder.paymentDetails || {}`
-- Se o campo de payment for um array, iterar e mapear cada um
+**Base URL**: Mudar de `admin-api` para `store-api`
 
-**Valores em centavos** (linha 242):
-- Remover a condicional `> 100`. TODOS os campos do tipo `Money` (`{value, currency}`) do DD sao em centavos - dividir por 100 sempre
-- Aplicar a mesma logica para precos de items
+**Listagem de pedidos**: Usar `GET /store-api/v1/customers/me/orders?limit=30` (retorna pedidos com itens inclusos) OU tentar `GET /store-api/v1/orders?updatedAt[gte]=...` se disponivel para tokens de loja
 
-### 2. `supabase/functions/dd-order-action/index.ts`
+**Para cada novo pedido, buscar detalhe**: `GET /store-api/v1/orders/{id}` que retorna items completos
 
-**Endpoint correto** (linha 92):
-- Tentar primeiro: `PUT /admin-api/v1/kds/orders/{id}` (endpoint KDS documentado na OpenAPI)
-- Se retornar 404, tentar fallback: `PUT /admin-api/v1/orders/{id}` 
-- Logar a URL exata e resposta completa para debug
+**Buscar itens separadamente se necessario**: `GET /store-api/v1/orders/{id}/items`
 
-**Logging melhorado**:
-- Logar URL completa, headers (sem token), e body antes da requisicao
-- Logar resposta completa (nao truncada)
+**Pagamento correto** (baseado na documentacao):
+```text
+payment.type === "ONLINE" -> "Pago Delivery Direto"
+payment.type === "OFFLINE":
+  paymentDetails.type === "CASH" -> "Dinheiro"
+  paymentDetails.type === "CREDITCARD" -> "Cartao de Credito" + brand
+  paymentDetails.type === "DEBITCARD" -> "Cartao de Debito" + brand
+  paymentDetails.type === "PIX" -> "PIX"
+  paymentDetails.type === "MEAL_VOUCHER" -> "Vale Refeicao"
+```
 
-### 3. Deploy e verificacao
+**Itens com matching por customCode**:
+- `item.item.customCode` -> comparar com `products.pdv_code`
+- `item.item.name` -> fallback por nome
+- `item.totalPrice.value / 100` -> preco unitario
 
-Deploy de ambas as funcoes e verificar nos logs:
-- Quais campos de items e payment realmente existem no pedido DD
-- Se o endpoint KDS funciona para atualizar status
+**Valores em centavos**: Todos os campos `Money` ({value, currency}) dividir value por 100
 
----
+### 3. `supabase/functions/dd-order-action/index.ts` -- Endpoints corretos
+
+Substituir `PUT /admin-api/v1/kds/orders/{id}` por endpoints de acao da store-api:
+
+```text
+accept     -> POST /store-api/v1/orders/{id}/approve
+ready      -> POST /store-api/v1/orders/{id}/ready-for-pickup
+dispatch   -> POST /store-api/v1/orders/{id}/dispatch
+deliver    -> POST /store-api/v1/orders/{id}/deliver
+reject     -> POST /store-api/v1/orders/{id}/cancel  (body: { statusReason: reason })
+```
+
+Mesmos headers de autenticacao. Nao precisa de body exceto para cancel.
+
+### 4. Nenhuma alteracao em UI
+
+Os componentes `OrderDetailModal.tsx`, `UnifiedOrdersTab.tsx`, e `printOrder.ts` ja foram corrigidos anteriormente e funcionam. Apenas as Edge Functions mudam.
 
 ## Arquivos Alterados
 
 | Arquivo | Descricao |
 |---------|-----------|
-| `supabase/functions/dd-polling/index.ts` | Logging expandido, fallbacks para items/payment, centavos corrigido |
-| `supabase/functions/dd-order-action/index.ts` | Usar endpoint KDS, fallback, logging melhorado |
+| `supabase/functions/dd-auth/index.ts` | Token endpoint: admin-api -> store-api |
+| `supabase/functions/dd-polling/index.ts` | API surface: admin-api -> store-api, items inclusos, payment correto |
+| `supabase/functions/dd-order-action/index.ts` | PUT generico -> POST /orders/{id}/approve etc |
 
-Nenhuma funcionalidade existente alterada. Apos deploy, sera necessario fazer um pedido teste para ver os logs completos e ajustar os nomes dos campos se necessario.
+Nenhuma funcionalidade existente alterada. iFood, pedidos locais, PDV, mesas -- tudo permanece identico.
 
