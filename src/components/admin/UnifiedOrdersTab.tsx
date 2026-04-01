@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package,
-  Clock, Printer, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone
+  Clock, Printer, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { format, startOfDay, endOfDay } from "date-fns";
@@ -56,6 +56,8 @@ interface Order {
   ifood_order_id?: string;
   dd_source?: boolean;
   dd_order_id?: string;
+  dd_scheduled_for?: string;
+  cancellation_reason?: string;
 }
 
 interface UnifiedOrdersTabProps {
@@ -76,6 +78,9 @@ const PAYMENT_LABELS: Record<string, { icon: React.ReactNode; label: string }> =
   "pix": { icon: <Smartphone className="w-3 h-3" />, label: "PIX" },
   "online": { icon: <Smartphone className="w-3 h-3" />, label: "Pago Online" },
   "Pago pelo iFood": { icon: <Smartphone className="w-3 h-3" />, label: "Pago pelo iFood" },
+  "Pago Delivery Direto": { icon: <Smartphone className="w-3 h-3" />, label: "Pago DD" },
+  "Cartão": { icon: <CreditCard className="w-3 h-3" />, label: "Cartão" },
+  "Vale Refeição": { icon: <CreditCard className="w-3 h-3" />, label: "Vale Refeição" },
 };
 
 const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, showPrepTimer = true }: UnifiedOrdersTabProps) => {
@@ -209,7 +214,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
       .eq("restaurant_id", restaurantId)
       .neq("order_type", "local")
       .gte("created_at", dateRange.from.toISOString())
@@ -322,6 +327,12 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
               )}
               {order.dd_source && (
                 <Badge className="bg-[#0066CC] text-white text-[10px] px-1.5 py-0 border-0">Delivery Direto</Badge>
+              )}
+              {order.dd_scheduled_for && (
+                <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 border-0 gap-0.5">
+                  <CalendarClock className="w-2.5 h-2.5" />
+                  Agendado {new Date(order.dd_scheduled_for).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </Badge>
               )}
            </div>
           <p className="text-sm font-semibold truncate">{order.customer_name}</p>

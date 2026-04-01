@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { restaurant_id, dd_order_id, action } = await req.json();
+    const { restaurant_id, dd_order_id, action, reason } = await req.json();
     console.log(`[dd-order-action] action=${action}, dd_order_id=${dd_order_id}, restaurant_id=${restaurant_id}`);
 
     if (!restaurant_id || !dd_order_id || !action) {
@@ -65,12 +65,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Map action to DD API endpoint
-    const actionMap: Record<string, { endpoint: string; method: string; localStatus: string }> = {
-      accept: { endpoint: `/orders/${dd_order_id}/confirm`, method: "POST", localStatus: "accepted" },
-      reject: { endpoint: `/orders/${dd_order_id}/cancel`, method: "POST", localStatus: "cancelled" },
-      ready: { endpoint: `/orders/${dd_order_id}/ready`, method: "POST", localStatus: "ready" },
-      dispatch: { endpoint: `/orders/${dd_order_id}/dispatch`, method: "POST", localStatus: "out_for_delivery" },
+    // Map action to DD API status (using PUT /orders/{id} with status body)
+    const actionMap: Record<string, { ddStatus: string; localStatus: string }> = {
+      accept: { ddStatus: "APPROVED", localStatus: "accepted" },
+      reject: { ddStatus: "CANCELLED", localStatus: "cancelled" },
+      ready: { ddStatus: "READY", localStatus: "ready" },
+      dispatch: { ddStatus: "DISPATCHED", localStatus: "out_for_delivery" },
+      deliver: { ddStatus: "DONE", localStatus: "delivered" },
     };
 
     const actionConfig = actionMap[action];
@@ -80,16 +81,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`[dd-order-action] Calling DD API: ${actionConfig.method} ${actionConfig.endpoint}`);
+    // Build request body
+    const body: Record<string, string> = { status: actionConfig.ddStatus };
+    if (action === "reject" && reason) {
+      body.statusReason = reason;
+    }
 
-    const apiRes = await fetch(`${DD_API_BASE}${actionConfig.endpoint}`, {
-      method: actionConfig.method,
+    console.log(`[dd-order-action] Calling DD API: PUT /orders/${dd_order_id} with body:`, JSON.stringify(body));
+
+    const apiRes = await fetch(`${DD_API_BASE}/orders/${dd_order_id}`, {
+      method: "PUT",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${accessToken}`,
         "X-DeliveryDireto-Client-Id": DD_CLIENT_ID,
         "X-DeliveryDireto-Id": config.store_id,
       },
+      body: JSON.stringify(body),
     });
 
     const apiText = await apiRes.text();
@@ -101,10 +109,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Update local order status
+    // Update local order status + cancellation reason
+    const updateData: Record<string, any> = {
+      status: actionConfig.localStatus,
+      updated_at: new Date().toISOString(),
+    };
+    if (action === "reject" && reason) {
+      updateData.cancellation_reason = reason;
+    }
+
     const { error: updateError } = await supabase
       .from("orders")
-      .update({ status: actionConfig.localStatus, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq("dd_order_id", dd_order_id);
 
     if (updateError) {

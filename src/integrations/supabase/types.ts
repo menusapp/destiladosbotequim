@@ -2374,6 +2374,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          cancellation_reason: string | null
           comanda_id: string | null
           coupon_code: string | null
           coupon_discount: number | null
@@ -2381,6 +2382,7 @@ export type Database = {
           customer_cpf: string
           customer_name: string
           dd_order_id: string | null
+          dd_scheduled_for: string | null
           dd_source: boolean | null
           delivery_address: string | null
           delivery_city: string | null
@@ -2408,6 +2410,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          cancellation_reason?: string | null
           comanda_id?: string | null
           coupon_code?: string | null
           coupon_discount?: number | null
@@ -2415,6 +2418,7 @@ export type Database = {
           customer_cpf: string
           customer_name: string
           dd_order_id?: string | null
+          dd_scheduled_for?: string | null
           dd_source?: boolean | null
           delivery_address?: string | null
           delivery_city?: string | null
@@ -2442,6 +2446,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          cancellation_reason?: string | null
           comanda_id?: string | null
           coupon_code?: string | null
           coupon_discount?: number | null
@@ -2449,6 +2454,7 @@ export type Database = {
           customer_cpf?: string
           customer_name?: string
           dd_order_id?: string | null
+          dd_scheduled_for?: string | null
           dd_source?: boolean | null
           delivery_address?: string | null
           delivery_city?: string | null

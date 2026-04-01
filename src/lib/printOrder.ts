@@ -17,7 +17,6 @@ interface PrintOrderData {
   tableNumber?: number;
   items: PrintOrderItem[];
   subtotal: number;
-  // Delivery-specific
   deliveryAddress?: string;
   deliveryPhone?: string;
   paymentType?: string;
@@ -40,6 +39,8 @@ export const printOrder = async (
     payment_type?: string;
     notes?: string;
     tables?: { table_number: number } | null;
+    dd_scheduled_for?: string;
+    cancellation_reason?: string;
     order_items: {
       id: string;
       quantity: number;
@@ -115,6 +116,19 @@ export const printOrder = async (
     originLabel = "PEDIDO ONLINE - ENTREGA";
   }
 
+  // Scheduled order section
+  let scheduledSection = "";
+  if (order.dd_scheduled_for) {
+    const scheduledDate = new Date(order.dd_scheduled_for).toLocaleString("pt-BR", {
+      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+    });
+    scheduledSection = `
+      <div class="scheduled-alert">
+        ⏰ PEDIDO AGENDADO PARA: ${scheduledDate}
+      </div>
+    `;
+  }
+
   // Build items HTML
   const itemsHtml = items
     .map((item) => {
@@ -179,6 +193,16 @@ export const printOrder = async (
     `
     : "";
 
+  // Cancellation reason
+  const cancelSection = order.cancellation_reason
+    ? `
+      <div class="line"></div>
+      <div class="section">
+        <p><strong>MOTIVO CANCELAMENTO:</strong> ${order.cancellation_reason}</p>
+      </div>
+    `
+    : "";
+
   const html = `
     <html>
     <head>
@@ -209,6 +233,15 @@ export const printOrder = async (
           padding: 4px;
           border: 1px solid #000;
           margin: 6px 0;
+        }
+        .scheduled-alert {
+          font-size: 14px;
+          font-weight: bold;
+          text-align: center;
+          padding: 6px 4px;
+          border: 2px solid #000;
+          margin: 6px 0;
+          background: #f0f0f0;
         }
         .item { margin: 4px 0; }
         .item-row {
@@ -247,6 +280,7 @@ export const printOrder = async (
       <div class="line"></div>
       
       <div class="origin">${originLabel}</div>
+      ${scheduledSection}
       
       <div class="section">
         <p><strong>Pedido:</strong> #${order.id.slice(0, 8)}</p>
@@ -267,6 +301,7 @@ export const printOrder = async (
       
       ${deliverySection}
       ${notesSection}
+      ${cancelSection}
       
       <div class="line"></div>
       <div class="footer">
