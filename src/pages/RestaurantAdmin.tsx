@@ -75,7 +75,7 @@ const RestaurantAdmin = () => {
     orderId: string;
     customerName: string;
     total: number;
-    orderType: 'local' | 'delivery';
+    orderType: 'local' | 'delivery' | 'balcao';
     tableNumber?: number;
     deliveryType?: 'delivery' | 'pickup';
     items?: Array<{name: string; quantity: number}>;
