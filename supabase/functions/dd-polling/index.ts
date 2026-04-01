@@ -126,20 +126,36 @@ Deno.serve(async (req) => {
     
     // Handle various response shapes from DD API
     let ordersList: any[] = [];
-    if (Array.isArray(ordersData)) {
+    if (ordersData?.data?.orders && Array.isArray(ordersData.data.orders)) {
+      ordersList = ordersData.data.orders;
+    } else if (Array.isArray(ordersData)) {
       ordersList = ordersData;
-    } else if (ordersData && typeof ordersData === "object") {
-      ordersList = ordersData.data || ordersData.orders || ordersData.items || ordersData.results || [];
-      if (!Array.isArray(ordersList)) {
-        ordersList = [];
-      }
+    } else if (ordersData?.data && Array.isArray(ordersData.data)) {
+      ordersList = ordersData.data;
+    } else if (ordersData?.orders && Array.isArray(ordersData.orders)) {
+      ordersList = ordersData.orders;
     }
     console.log(`[dd-polling] Found ${ordersList.length} orders from DD API`);
+
+    const statusMap: Record<string, string> = {
+      "WAITING": "pending",
+      "APPROVED": "accepted",
+      "PREPARING": "preparing",
+      "READY": "ready",
+      "DISPATCHED": "out_for_delivery",
+      "DONE": "delivered",
+      "CANCELLED": "cancelled",
+      // Fallbacks for alternative naming
+      "PLACED": "pending",
+      "CONFIRMED": "accepted",
+      "DELIVERED": "delivered",
+    };
 
     let newOrdersCount = 0;
 
     for (const ddOrder of ordersList) {
-      const ddOrderId = String(ddOrder.id || ddOrder.order_id);
+      const ddOrderId = String(ddOrder.id || ddOrder.order_id || ddOrder.orderNumber || "");
+      if (!ddOrderId) continue;
 
       // Check if already imported
       const { data: existing } = await supabase
@@ -151,15 +167,6 @@ Deno.serve(async (req) => {
 
       if (existing) {
         // Update status if changed
-        const statusMap: Record<string, string> = {
-          "PLACED": "pending",
-          "CONFIRMED": "accepted",
-          "PREPARING": "preparing",
-          "READY": "ready",
-          "DISPATCHED": "out_for_delivery",
-          "DELIVERED": "delivered",
-          "CANCELLED": "cancelled",
-        };
         const ddStatus = ddOrder.status || "";
         const mappedStatus = statusMap[ddStatus] || null;
         if (mappedStatus) {
@@ -175,30 +182,26 @@ Deno.serve(async (req) => {
       // New order - insert
       const customer = ddOrder.customer || {};
       const customerName = customer.name || "Cliente Delivery Direto";
-      const customerPhone = customer.phone || "";
-      const customerCpf = customer.cpf || customer.document || "";
+      const customerPhone = customer.phone || customer.phones?.[0] || "";
+      const customerCpf = customer.cpf || customer.document || customer.taxPayerIdentificationNumber || "";
 
-      const deliveryMethod = ddOrder.delivery_method || ddOrder.deliveryMethod || "";
-      const deliveryType = deliveryMethod === "PICKUP" ? "retirada" : "delivery";
+      const deliveryMethod = ddOrder.type || ddOrder.delivery_method || ddOrder.deliveryMethod || "";
+      const deliveryType = (deliveryMethod === "TAKEOUT" || deliveryMethod === "PICKUP") ? "retirada" : "delivery";
 
-      const addr = ddOrder.delivery_address || ddOrder.deliveryAddress || null;
+      const addr = ddOrder.delivery_address || ddOrder.deliveryAddress || ddOrder.address || null;
       const deliveryAddress = addr
-        ? `${addr.street || ""}, ${addr.number || ""} - ${addr.neighborhood || ""}, ${addr.city || ""}`
+        ? `${addr.street || addr.streetName || ""}, ${addr.number || ""} - ${addr.neighborhood || addr.district || ""}, ${addr.city || ""}`
         : null;
 
-      const payment = ddOrder.payment || {};
-      const paymentType = payment.prepaid ? "Pago pelo Delivery Direto" : (payment.method || "Delivery Direto");
+      const payment = ddOrder.payment || ddOrder.payments?.[0] || {};
+      const paymentType = payment.prepaid ? "Pago pelo Delivery Direto" : (payment.method || payment.name || "Delivery Direto");
 
-      const statusMap2: Record<string, string> = {
-        "PLACED": "pending",
-        "CONFIRMED": "accepted",
-        "PREPARING": "preparing",
-        "READY": "ready",
-        "DISPATCHED": "out_for_delivery",
-        "DELIVERED": "delivered",
-        "CANCELLED": "cancelled",
-      };
-      const orderStatus = statusMap2[ddOrder.status || "PLACED"] || "pending";
+      const orderStatus = statusMap[ddOrder.status || "WAITING"] || "pending";
+
+      // Handle price - try multiple possible structures
+      const totalObj = ddOrder.total || {};
+      const orderTotal = totalObj.subTotal?.value || totalObj.orderAmount || ddOrder.subTotal || ddOrder.totalPrice || 0;
+      const deliveryFee = totalObj.deliveryFee?.value || ddOrder.delivery_fee || ddOrder.deliveryFee || 0;
 
       const { data: newOrder, error: orderError } = await supabase
         .from("orders")
@@ -214,8 +217,8 @@ Deno.serve(async (req) => {
           status: orderStatus,
           dd_source: true,
           dd_order_id: ddOrderId,
-          delivery_fee: ddOrder.delivery_fee || ddOrder.deliveryFee || 0,
-          notes: ddOrder.observations || null,
+          delivery_fee: deliveryFee,
+          notes: ddOrder.observations || ddOrder.note || null,
         })
         .select("id")
         .single();
@@ -226,14 +229,14 @@ Deno.serve(async (req) => {
       }
 
       // Insert items
-      const items = ddOrder.items || [];
+      const items = ddOrder.items || ddOrder.orderItems || [];
       if (items.length > 0 && newOrder) {
         const orderItems = items.map((item: any) => ({
           order_id: newOrder.id,
           product_id: null,
           quantity: item.quantity || 1,
-          price_at_order: item.unit_price || item.unitPrice || item.price || 0,
-          notes: item.observations || item.name || null,
+          price_at_order: item.unit_price || item.unitPrice || item.price || item.totalPrice || 0,
+          notes: item.observations || item.name || item.productName || null,
         }));
 
         const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
