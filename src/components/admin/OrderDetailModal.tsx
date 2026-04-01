@@ -183,10 +183,11 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       // Function always returns 200, check response body for errors
       if (res.data?.error) {
         console.error("DD action error:", res.data.error);
+        // DD rejected — do NOT treat as success, do NOT update locally
         return { 
-          ok: res.data?.local_updated === true, 
+          ok: false, 
           errorMsg: res.data.error,
-          localUpdated: res.data?.local_updated === true,
+          localUpdated: false,
         };
       }
       
