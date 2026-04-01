@@ -1104,7 +1104,7 @@ const Comanda = () => {
 
       {/* Footer fixo com botão de ação */}
       {(showSendOrderButton || showBillButton) && (
-        <div className="shrink-0 border-t bg-background p-4">
+        <div className="shrink-0 border-t bg-background p-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
           <div className="container mx-auto">
             {showSendOrderButton && (
               <Button 
