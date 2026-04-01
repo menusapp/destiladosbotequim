@@ -39,6 +39,7 @@ const WhatsAppSettings = lazy(() => import("@/components/admin/settings/WhatsApp
 const OnlinePaymentsSettings = lazy(() => import("@/components/admin/settings/OnlinePaymentsSettings"));
 const BackupSettings = lazy(() => import("@/components/admin/settings/BackupSettings"));
 const KioskSettings = lazy(() => import("@/components/admin/settings/KioskSettings"));
+const KioskUpsellScreen = lazy(() => import("@/components/admin/settings/KioskUpsellScreen"));
 
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { useRestaurantModules } from "@/hooks/useRestaurantModules";
@@ -194,7 +195,8 @@ const RestaurantAdmin = () => {
   }, [reservationNotification]);
   
   useInactivityLogout();
-  const { isSectionAllowed, hasActiveSubscription } = useRestaurantModules(restaurant?.id || null);
+  const { isSectionAllowed, hasActiveSubscription, allowedModules } = useRestaurantModules(restaurant?.id || null);
+  const isTotemUnlocked = allowedModules === null || (Array.isArray(allowedModules) && allowedModules.includes("totem"));
 
   // Force "modulos" section when no active subscription
   useEffect(() => {
@@ -795,7 +797,9 @@ const RestaurantAdmin = () => {
       case "config-whatsapp":
         return <WhatsAppSettings restaurantId={restaurant.id} />;
       case "config-totem":
-        return <KioskSettings restaurantId={restaurant.id} />;
+        return isTotemUnlocked
+          ? <KioskSettings restaurantId={restaurant.id} />
+          : <KioskUpsellScreen />;
       case "config-backup":
         return <BackupSettings restaurantId={restaurant.id} />;
       default:

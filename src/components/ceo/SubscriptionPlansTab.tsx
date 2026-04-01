@@ -25,6 +25,7 @@ const ALL_MODULES = [
   { id: "fiscal", label: "Fiscal / NF-e" },
   { id: "pagamentos_online", label: "Pagamentos Online" },
   { id: "reservas", label: "Reservas" },
+  { id: "totem", label: "Totem / Autoatendimento" },
 ];
 
 interface Plan {
