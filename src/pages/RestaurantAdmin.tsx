@@ -185,8 +185,8 @@ const RestaurantAdmin = () => {
   }, [notificationQueue]);
   
   useEffect(() => {
-    billNotificationRef.current = billNotification;
-  }, [billNotification]);
+    billNotificationQueueRef.current = billNotificationQueue;
+  }, [billNotificationQueue]);
 
   useEffect(() => {
     reservationNotificationRef.current = reservationNotification;
