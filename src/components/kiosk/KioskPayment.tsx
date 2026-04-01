@@ -48,8 +48,8 @@ export function KioskPayment({
   const getOrderTypeFields = () => {
     switch (consumptionMode) {
       case "counter":
-        // Counter pickup: local order, pickup type
-        return { order_type: "local", delivery_type: "pickup" };
+        // Counter pickup: new 'balcao' type, same flow as viagem
+        return { order_type: "balcao", delivery_type: "pickup" };
       case "table":
         // Table service: local order
         return { order_type: "local", delivery_type: "local" };
