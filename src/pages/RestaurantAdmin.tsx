@@ -794,6 +794,8 @@ const RestaurantAdmin = () => {
         return <PrintersSettings restaurantId={restaurant.id} />;
       case "config-whatsapp":
         return <WhatsAppSettings restaurantId={restaurant.id} />;
+      case "config-totem":
+        return <KioskSettings restaurantId={restaurant.id} />;
       case "config-backup":
         return <BackupSettings restaurantId={restaurant.id} />;
       default:
