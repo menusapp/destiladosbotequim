@@ -71,13 +71,14 @@ Deno.serve(async (req) => {
     const actionMap: Record<string, { ddStatus: string; localStatus: string }> = {
       accept:   { ddStatus: "APPROVED",   localStatus: "accepted" },
       dispatch: { ddStatus: "IN_TRANSIT", localStatus: "out_for_delivery" },
+      ready:    { ddStatus: "APPROVED",   localStatus: "ready" },
       deliver:  { ddStatus: "DONE",       localStatus: "delivered" },
       reject:   { ddStatus: "REJECTED",   localStatus: "cancelled" },
     };
 
     const actionConfig = actionMap[action];
     if (!actionConfig) {
-      return new Response(JSON.stringify({ error: `Ação inválida: ${action}. Ações válidas: accept, dispatch, deliver, reject` }), {
+      return new Response(JSON.stringify({ error: `Ação inválida: ${action}. Ações válidas: accept, dispatch, ready, deliver, reject` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -99,6 +100,7 @@ Deno.serve(async (req) => {
 
     console.log(`[dd-order-action] PUT ${statusUrl}`);
     console.log(`[dd-order-action] Body: ${JSON.stringify(body)}`);
+    console.log(`[dd-order-action] Current order status in ERP, target DD status: ${actionConfig.ddStatus}`);
 
     const apiRes = await fetch(statusUrl, {
       method: "PUT",
@@ -110,7 +112,7 @@ Deno.serve(async (req) => {
     console.log(`[dd-order-action] Response: status=${apiRes.status}, body=${apiText.substring(0, 500)}`);
 
     if (!apiRes.ok && apiRes.status !== 204 && apiRes.status !== 202) {
-      // If /orders/{id}/status fails with 404, try fallback PUT /orders/{id}
+      // If /orders/{id}/status fails with 404/405, try fallback PUT /orders/{id}
       if (apiRes.status === 404 || apiRes.status === 405) {
         console.log(`[dd-order-action] /status route returned ${apiRes.status}, trying fallback PUT /orders/${dd_order_id}`);
         const fallbackUrl = `${DD_ADMIN_API}/orders/${dd_order_id}`;
@@ -123,12 +125,23 @@ Deno.serve(async (req) => {
         console.log(`[dd-order-action] Fallback response: status=${fallbackRes.status}, body=${fallbackText.substring(0, 500)}`);
 
         if (!fallbackRes.ok && fallbackRes.status !== 204 && fallbackRes.status !== 202) {
-          return new Response(JSON.stringify({ error: `Erro na API DD: ${fallbackRes.status} - ${fallbackText.substring(0, 200)}` }), {
+          const errorMsg = `DD API ${fallbackRes.status}: ${fallbackText.substring(0, 200)}`;
+          console.error(`[dd-order-action] Both routes failed: ${errorMsg}`);
+          return new Response(JSON.stringify({ error: errorMsg }), {
             status: fallbackRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+      } else if (apiRes.status === 400 || apiRes.status === 422) {
+        // Status transition not allowed by DD API — return clear error
+        const errorMsg = `Delivery Direto não permitiu esta ação (${apiRes.status}): ${apiText.substring(0, 200)}`;
+        console.error(`[dd-order-action] ${errorMsg}`);
+        return new Response(JSON.stringify({ error: errorMsg }), {
+          status: apiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       } else {
-        return new Response(JSON.stringify({ error: `Erro na API DD: ${apiRes.status} - ${apiText.substring(0, 200)}` }), {
+        const errorMsg = `DD API ${apiRes.status}: ${apiText.substring(0, 200)}`;
+        console.error(`[dd-order-action] ${errorMsg}`);
+        return new Response(JSON.stringify({ error: errorMsg }), {
           status: apiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

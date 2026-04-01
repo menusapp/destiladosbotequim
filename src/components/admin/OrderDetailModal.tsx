@@ -206,6 +206,10 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       return;
     }
 
+    // Optimistic UI: update local state immediately
+    const previousStatus = order.status;
+    setOrder(prev => ({ ...prev, status: newStatus, ...(newStatus === "cancelled" && reason ? { cancellation_reason: reason } : {}) }));
+
     try {
       // Sync with iFood
       if (order.ifood_source && order.ifood_order_id) {
@@ -234,14 +238,12 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       }
 
       // Sync with Delivery Direto
-      await syncDDStatus(newStatus, reason);
-
-      // Update local status
-      const updateData: Record<string, any> = {};
-      if (newStatus === "cancelled" && reason) {
-        updateData.cancellation_reason = reason;
+      const ddResult = await syncDDStatus(newStatus, reason);
+      if (!ddResult.ok) {
+        toast.warning(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}. Status local será atualizado.`);
       }
 
+      // Update local status in DB
       const { error } = await supabase.rpc("admin_update_order_status", { p_order_id: order.id, p_new_status: newStatus, p_restaurant_id: restaurantId });
       if (error) throw error;
 
@@ -263,7 +265,12 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       toast.success("Status atualizado!");
       onStatusUpdate();
       onClose();
-    } catch (error) { console.error("Erro ao atualizar status:", error); toast.error("Erro ao atualizar status"); }
+    } catch (error) {
+      // Revert optimistic update
+      setOrder(prev => ({ ...prev, status: previousStatus }));
+      console.error("Erro ao atualizar status:", error);
+      toast.error("Erro ao atualizar status");
+    }
   };
 
   const handleCancelOrder = async () => {

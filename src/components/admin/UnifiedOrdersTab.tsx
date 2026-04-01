@@ -166,6 +166,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   }, [restaurantId]);
 
   // Delivery Direto polling every 30 seconds
+  // NOTE: No separate DD toast here — realtime channel already triggers fetchOrders
+  // and the standard NewOrderNotification handles the notification pill.
   useEffect(() => {
     const SUPABASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
     let active = true;
@@ -181,8 +183,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
         if (res.ok) {
           const data = await res.json();
           if (data.new_orders > 0) {
+            // Just refetch — the standard notification system handles the alert
             fetchOrders();
-            toast.info(`${data.new_orders} novo(s) pedido(s) do Delivery Direto!`);
           }
         } else {
           await res.text(); // consume body
