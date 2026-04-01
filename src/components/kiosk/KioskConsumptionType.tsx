@@ -37,7 +37,13 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
   ];
 
   const canProceed = () => {
+    if (subStep === "main") {
+      // Only allow proceeding from main if a non-dine_in option is selected
+      return consumptionMode === "takeaway" || consumptionMode === "delivery";
+    }
+    // In dine_in_sub, need a mode selected and table number if table
     if (consumptionMode === "table" && !tableNumber.trim()) return false;
+    if (consumptionMode !== "counter" && consumptionMode !== "table") return false;
     return true;
   };
 
@@ -46,6 +52,7 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
       setSubStep("dine_in_sub");
       return;
     }
+    // Directly set the mode for takeaway/delivery
     onChangeMode(key as ConsumptionMode);
   };
 
@@ -60,6 +67,8 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
     }
     onBack();
   };
+
+  console.log("[KioskConsumptionType] subStep:", subStep, "consumptionMode:", consumptionMode, "canProceed:", canProceed());
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -144,7 +153,7 @@ export function KioskConsumptionType({ primaryColor, consumptionMode, tableNumbe
             onClick={onNext}
             className="w-full h-14 text-lg font-bold rounded-xl text-white"
             style={{ backgroundColor: primaryColor }}
-            disabled={subStep === "main" || !canProceed()}
+            disabled={!canProceed()}
           >
             Continuar
           </Button>
