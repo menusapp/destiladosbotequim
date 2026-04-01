@@ -954,16 +954,68 @@ const RestaurantAdmin = () => {
           </div>
         )}
         
-        {/* Global Bill Notification */}
-        {billNotification && (
-          <NewBillNotification
-            billId={billNotification.billId}
-            tableNumber={billNotification.tableNumber}
-            total={billNotification.total}
-            customerName={billNotification.customerName}
-            onView={handleViewBill}
-            onDismiss={() => setBillNotification(null)}
-          />
+        {/* Global Bill Notifications - cascade like orders */}
+        {billNotificationQueue.length > 0 && (
+          <div className="fixed top-4 left-4 z-[100]">
+            {!billCascadeExpanded ? (
+              <div
+                className="relative cursor-pointer"
+                onClick={() => setBillCascadeExpanded(true)}
+                style={{ height: `${68 + Math.min(billNotificationQueue.length - 1, 2) * 8}px` }}
+              >
+                {billNotificationQueue.slice(0, 3).map((notification, index) => (
+                  <div
+                    key={notification.billId}
+                    className="absolute left-0 transition-all duration-200"
+                    style={{
+                      top: `${index * 8}px`,
+                      zIndex: 100 - index,
+                      transform: `scale(${1 - index * 0.03})`,
+                      opacity: index === 0 ? 1 : 0.85,
+                    }}
+                  >
+                    <NewBillNotification
+                      billId={notification.billId}
+                      tableNumber={notification.tableNumber}
+                      total={notification.total}
+                      customerName={notification.customerName}
+                      onView={() => handleViewBill(notification)}
+                      onDismiss={() => setBillNotificationQueue(prev => prev.filter(b => b.billId !== notification.billId))}
+                      onStopSound={() => setSoundMuted(true)}
+                    />
+                  </div>
+                ))}
+                {billNotificationQueue.length > 3 && (
+                  <div className="absolute left-2" style={{ top: `${3 * 8 + 4}px`, zIndex: 96 }}>
+                    <span className="inline-block px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-bold shadow">
+                      +{billNotificationQueue.length - 3}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-[70vh] overflow-y-auto pr-1">
+                <button
+                  onClick={() => setBillCascadeExpanded(false)}
+                  className="self-end mb-1 text-xs text-amber-600 hover:text-amber-800 font-medium"
+                >
+                  Recolher
+                </button>
+                {billNotificationQueue.map((notification) => (
+                  <NewBillNotification
+                    key={notification.billId}
+                    billId={notification.billId}
+                    tableNumber={notification.tableNumber}
+                    total={notification.total}
+                    customerName={notification.customerName}
+                    onView={() => handleViewBill(notification)}
+                    onDismiss={() => setBillNotificationQueue(prev => prev.filter(b => b.billId !== notification.billId))}
+                    onStopSound={() => setSoundMuted(true)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Global Reservation Notification */}
