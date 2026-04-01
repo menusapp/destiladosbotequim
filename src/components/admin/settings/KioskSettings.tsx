@@ -113,7 +113,7 @@ export default function KioskSettings({ restaurantId }: Props) {
     if (!config) return;
     setSaving(true);
     try {
-      const { id, ...updates } = config;
+      const { id: _id, ...updates } = config;
       const { error } = await supabase
         .from("kiosk_config")
         .update({ ...updates, updated_at: new Date().toISOString() })
