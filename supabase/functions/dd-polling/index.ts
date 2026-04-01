@@ -111,8 +111,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    const ordersData = await ordersRes.json();
-    const ordersList = Array.isArray(ordersData) ? ordersData : (ordersData.data || ordersData.orders || []);
+    const ordersText = await ordersRes.text();
+    console.log(`[dd-polling] Raw response (first 500 chars): ${ordersText.substring(0, 500)}`);
+    
+    let ordersData: any;
+    try {
+      ordersData = JSON.parse(ordersText);
+    } catch {
+      console.error("[dd-polling] Failed to parse response as JSON");
+      return new Response(JSON.stringify({ new_orders: 0, error: "Invalid JSON from DD API" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    // Handle various response shapes from DD API
+    let ordersList: any[] = [];
+    if (Array.isArray(ordersData)) {
+      ordersList = ordersData;
+    } else if (ordersData && typeof ordersData === "object") {
+      ordersList = ordersData.data || ordersData.orders || ordersData.items || ordersData.results || [];
+      if (!Array.isArray(ordersList)) {
+        ordersList = [];
+      }
+    }
     console.log(`[dd-polling] Found ${ordersList.length} orders from DD API`);
 
     let newOrdersCount = 0;
