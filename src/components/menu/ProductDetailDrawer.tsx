@@ -323,7 +323,7 @@ export const ProductDetailDrawer = ({
         </div>
 
         {/* Bottom Actions */}
-        <div className="border-t border-border p-4 bg-background my-0 mb-[60px]">
+        <div className="border-t border-border p-4 bg-background my-0 mb-0">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-3 bg-accent rounded-xl px-4 py-2">
               <button
