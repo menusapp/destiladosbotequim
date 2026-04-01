@@ -979,8 +979,10 @@ const Menu = () => {
     ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : allProducts;
 
+  const cartItemCount = getTotalItemCount();
+
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
       <div className="relative">
         <div className="h-48 overflow-hidden relative">
           {restaurant.banner_url ? (

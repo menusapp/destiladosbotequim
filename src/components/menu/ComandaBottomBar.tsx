@@ -1,5 +1,4 @@
 import { Receipt } from "lucide-react";
-import { useEffect, useState } from "react";
 
 interface ComandaBottomBarProps {
   total: number;
@@ -7,50 +6,34 @@ interface ComandaBottomBarProps {
   status?: string;
   isVisible?: boolean;
   hasSubmittedOrders: boolean;
+  cartItemCount: number;
   onViewComanda: () => void;
 }
 
 export const ComandaBottomBar = ({
   total,
   primaryColor,
-  status,
   isVisible = true,
-  hasSubmittedOrders,
+  cartItemCount,
   onViewComanda,
 }: ComandaBottomBarProps) => {
-  const [prevTotal, setPrevTotal] = useState(total);
-  const [shouldAnimate, setShouldAnimate] = useState(false);
+  const showValue = cartItemCount > 0 && total > 0;
 
-  useEffect(() => {
-    if (total !== prevTotal && total > 0) {
-      setShouldAnimate(true);
-      setPrevTotal(total);
-      
-      const timer = setTimeout(() => {
-        setShouldAnimate(false);
-      }, 600);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [total, prevTotal]);
-
-  const leftText = hasSubmittedOrders ? "Enviar Pedido" : "Enviar Pedido";
   return (
     <div 
-      className={`fixed bottom-0 left-0 right-0 z-[60] bg-white border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
+      className={`fixed bottom-0 left-0 right-0 z-[60] bg-background border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.08)] transition-transform duration-300 ${
         isVisible ? 'translate-y-0' : 'translate-y-full'
       }`}
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="px-4 py-3 flex items-center justify-between gap-4">
-        {/* Texto dinâmico à esquerda */}
         <span className="text-sm font-medium text-foreground">
-          {leftText}
+          {cartItemCount > 0 ? "Enviar Pedido" : "Ver Comanda"}
         </span>
 
-        {/* Botão Ver comanda à direita */}
         <button
           onClick={onViewComanda}
-          className="flex items-center gap-3 h-12 px-4 rounded-lg transition-all flex-shrink-0"
+          className="flex items-center gap-3 h-12 px-4 rounded-lg flex-shrink-0"
           style={{
             backgroundColor: primaryColor,
             color: "white",
@@ -60,14 +43,14 @@ export const ComandaBottomBar = ({
             <Receipt className="w-4 h-4" />
             <span className="text-sm font-medium whitespace-nowrap">Ver Comanda</span>
           </div>
-          <div className="h-4 w-px bg-white/30" />
-          <span 
-            className={`text-sm font-semibold whitespace-nowrap transition-all duration-300 ${
-              shouldAnimate ? 'scale-110 animate-pulse' : 'scale-100'
-            }`}
-          >
-            R$ {total.toFixed(2)}
-          </span>
+          {showValue && (
+            <>
+              <div className="h-4 w-px bg-white/30" />
+              <span className="text-sm font-semibold whitespace-nowrap">
+                R$ {total.toFixed(2)}
+              </span>
+            </>
+          )}
         </button>
       </div>
     </div>
