@@ -1,4 +1,5 @@
 import { Receipt } from "lucide-react";
+import { createPortal } from "react-dom";
 
 interface ComandaBottomBarProps {
   total: number;
