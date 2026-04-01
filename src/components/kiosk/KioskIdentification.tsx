@@ -91,12 +91,14 @@ export function KioskIdentification({ restaurant, onIdentified, onBack }: Props)
 
     const phoneRaw = phone.replace(/\D/g, "") || undefined;
     // Save new customer
-    await supabase.from("customers").insert({
-      restaurant_id: restaurant.id,
-      cpf: raw,
-      name: name.trim(),
-      phone: phoneRaw,
-    });
+    if (restaurant?.id) {
+      await supabase.from("customers").insert({
+        restaurant_id: restaurant.id,
+        cpf: raw,
+        name: name.trim(),
+        phone: phoneRaw,
+      });
+    }
 
     onIdentified({ name: name.trim(), cpf: raw, phone: phoneRaw, isExisting: false });
   };

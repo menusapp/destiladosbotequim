@@ -115,11 +115,19 @@ export default function Kiosk() {
   // Product extras loader
   const openProduct = useCallback(async (product: Product) => {
     setSelectedProduct(product);
-    const { data } = await supabase
-      .from("product_extras")
-      .select("*")
-      .eq("product_id", product.id);
-    setProductExtras(data || []);
+    try {
+      const { data, error } = await supabase
+        .from("product_extras")
+        .select("*")
+        .eq("product_id", product.id);
+      if (error) {
+        console.error("[Kiosk] Erro ao carregar extras:", error);
+      }
+      setProductExtras(data || []);
+    } catch (err) {
+      console.error("[Kiosk] Exceção ao carregar extras:", err);
+      setProductExtras([]);
+    }
     setStep("product");
   }, []);
 
