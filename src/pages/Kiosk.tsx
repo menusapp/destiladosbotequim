@@ -115,7 +115,7 @@ export default function Kiosk() {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, pathSlug]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
