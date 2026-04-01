@@ -30,7 +30,6 @@ export default function Kiosk() {
   const [step, setStep] = useState<KioskStep>("idle");
   const [restaurant, setRestaurant] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customer, setCustomer] = useState<KioskCustomer | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -123,7 +122,7 @@ export default function Kiosk() {
     };
   }, [resetInactivityTimer]);
 
-  // Fetch restaurant + categories + featured
+  // Fetch restaurant + categories
   const fetchData = useCallback(async () => {
     console.log("[Kiosk] slug bruto (pathParam):", pathSlug, "| slug resolvido:", slug);
     if (!slug) {
@@ -144,7 +143,6 @@ export default function Kiosk() {
         setLoading(false);
         return;
       }
-      console.log("[Kiosk] Restaurante carregado:", r.name, r.id);
       setRestaurant(r);
 
       const { data: kConf } = await supabase
@@ -170,22 +168,9 @@ export default function Kiosk() {
 
       const filtered = (cats || []).map((cat: any) => ({
         ...cat,
-        products: (cat.products || []).filter((p: any) => p.available && !p.is_featured),
+        products: (cat.products || []).filter((p: any) => p.available),
       })).filter((cat: any) => cat.products.length > 0);
       setCategories(filtered);
-
-      // Fetch featured products (same logic as delivery menu)
-      console.log("[Kiosk] Loading featured products...");
-      const { data: featuredData } = await supabase
-        .from("products")
-        .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, categories!inner(restaurant_id)")
-        .eq("categories.restaurant_id", r.id)
-        .eq("is_featured", true)
-        .eq("available", true)
-        .order("featured_display_order");
-
-      console.log("[Kiosk] Featured products loaded:", featuredData?.length || 0);
-      setFeaturedProducts(featuredData || []);
     } catch (err) {
       console.error("[Kiosk] Erro crítico no bootstrap:", err);
       toast.error("Erro ao carregar dados do restaurante");
@@ -310,8 +295,6 @@ export default function Kiosk() {
           customerName={customer?.name || ""}
           onCancel={resetSession}
           restaurant={restaurant}
-          featuredProducts={featuredProducts}
-          featuredTitle={restaurant?.featured_section_title || "Destaques"}
         />
       )}
 

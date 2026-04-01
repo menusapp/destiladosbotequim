@@ -44,27 +44,23 @@ export function KioskPayment({
 
   const canFinalize = paymentMethod !== "dinheiro" || !cashPaid || parseFloat(cashPaid) >= finalTotal;
 
-  /**
-   * Order type mapping rules:
-   * - counter (balcão): order_type='delivery', delivery_type='pickup' → goes to Pedidos tab
-   * - takeaway (viagem): order_type='delivery', delivery_type='takeaway' → goes to Pedidos tab
-   * - delivery (entrega): order_type='delivery', delivery_type='delivery' → goes to Pedidos tab
-   * - table (mesa): order_type='local', delivery_type='local' → goes to PDV/mesa flow
-   * 
-   * All totem orders are tagged with order_channel='totem'
-   */
+  // Determine order_type and delivery_type based on consumptionMode
   const getOrderTypeFields = () => {
     switch (consumptionMode) {
       case "counter":
-        return { order_type: "delivery", delivery_type: "pickup" };
+        // Counter pickup: local order, pickup type
+        return { order_type: "local", delivery_type: "pickup" };
+      case "table":
+        // Table service: local order
+        return { order_type: "local", delivery_type: "local" };
       case "takeaway":
+        // Takeaway: delivery type with takeaway subtype
         return { order_type: "delivery", delivery_type: "takeaway" };
       case "delivery":
+        // Delivery
         return { order_type: "delivery", delivery_type: "delivery" };
-      case "table":
-        return { order_type: "local", delivery_type: "local" };
       default:
-        return { order_type: "delivery", delivery_type: "pickup" };
+        return { order_type: "local", delivery_type: "local" };
     }
   };
 
@@ -90,21 +86,11 @@ export function KioskPayment({
       if (consumptionMode === "table" && tableNumber) {
         const { data: table } = await supabase
           .from("tables")
-          .select("id, is_occupied")
+          .select("id")
           .eq("restaurant_id", restaurant.id)
           .eq("table_number", parseInt(tableNumber))
           .maybeSingle();
         tableId = table?.id || null;
-
-        // Occupy the table if free
-        if (table && !table.is_occupied) {
-          console.log("[Kiosk] Occupying table:", tableNumber);
-          await supabase.from("tables").update({
-            is_occupied: true,
-            occupied_at: new Date().toISOString(),
-            occupied_by: customer.name,
-          }).eq("id", table.id);
-        }
       }
 
       const notes = [
@@ -116,7 +102,6 @@ export function KioskPayment({
         order_type, delivery_type, order_channel: "totem",
         consumptionMode, tableId, tableNumber,
         finalTotal, couponDiscount, pointsDiscount,
-        destination: consumptionMode === "table" ? "PDV/Mesa" : "Pedidos",
       });
 
       const orderData = {
@@ -149,7 +134,7 @@ export function KioskPayment({
         throw orderError;
       }
 
-      console.log("[Kiosk] Order created:", order.id, "→", consumptionMode === "table" ? "PDV" : "Pedidos");
+      console.log("[Kiosk] Order created:", order.id);
 
       // Insert order items
       for (const item of cart) {

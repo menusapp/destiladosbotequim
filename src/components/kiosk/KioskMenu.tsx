@@ -15,11 +15,9 @@ interface Props {
   customerName: string;
   onCancel: () => void;
   restaurant?: any;
-  featuredProducts?: Product[];
-  featuredTitle?: string;
 }
 
-export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant, featuredProducts = [], featuredTitle = "Destaques" }: Props) {
+export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant }: Props) {
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || "");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -34,8 +32,6 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
   const filteredProducts = searchQuery
     ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : null;
-
-  console.log("[KioskMenu] Featured products:", featuredProducts.length, "Categories:", categories.length);
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -124,83 +120,46 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
                 {filteredProducts.length === 0 && <p className="text-center text-muted-foreground text-lg py-12">Nenhum produto encontrado</p>}
               </>
             ) : (
-              <>
-                {/* Featured products section */}
-                {featuredProducts.length > 0 && (
-                  <div className="mb-8">
-                    <h3 className="text-xl md:text-2xl font-bold text-foreground mb-4">⭐ {featuredTitle}</h3>
-                    <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
-                      {featuredProducts.map(p => (
-                        <div
-                          key={p.id}
-                          onClick={() => onSelectProduct(p)}
-                          className="flex-none w-44 bg-card rounded-2xl border shadow-sm cursor-pointer active:scale-95 transition-all hover:shadow-md overflow-hidden"
-                        >
-                          <div className="relative aspect-square overflow-hidden">
-                            {p.image_url ? (
-                              <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-white text-2xl font-bold" style={{ backgroundColor: primaryColor }}>
-                                {p.name.charAt(0)}
-                              </div>
-                            )}
-                            {p.promotional_price != null && (
-                              <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">PROMO</span>
-                            )}
-                          </div>
-                          <div className="p-3">
-                            <h4 className="text-sm font-semibold text-foreground line-clamp-2 mb-1">{p.name}</h4>
-                            <div className="flex items-center gap-1">
-                              {p.promotional_price != null && (
-                                <span className="text-xs line-through text-muted-foreground">R$ {p.price.toFixed(2)}</span>
-                              )}
-                              <span className="font-bold text-base" style={{ color: primaryColor }}>
-                                R$ {(p.promotional_price ?? p.price).toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+              categories.map(cat => (
+                <div key={cat.id} id={`kiosk-cat-${cat.id}`} className="mb-8">
+                  <div className="flex items-center gap-3 mb-4">
+                    {(cat as any).image_url && (
+                      <img src={(cat as any).image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                    )}
+                    <h3 className="text-xl md:text-2xl font-bold text-foreground">{cat.name}</h3>
                   </div>
-                )}
-
-                {categories.map(cat => (
-                  <div key={cat.id} id={`kiosk-cat-${cat.id}`} className="mb-8">
-                    <div className="flex items-center gap-3 mb-4">
-                      {(cat as any).image_url && (
-                        <img src={(cat as any).image_url} alt="" className="h-10 w-10 rounded-xl object-cover" />
-                      )}
-                      <h3 className="text-xl md:text-2xl font-bold text-foreground">{cat.name}</h3>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                      {cat.products.map(p => (
-                        <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                    {cat.products.map(p => (
+                      <KioskProductCard key={p.id} product={p} primaryColor={primaryColor} onSelect={onSelectProduct} />
+                    ))}
                   </div>
-                ))}
-              </>
+                </div>
+              ))
             )}
           </div>
         </ScrollArea>
       </div>
 
-      {/* Cart FAB - bottom right floating button */}
+      {/* Cart FAB */}
       {cartCount > 0 && (
-        <button
-          onClick={onOpenCart}
-          className="fixed bottom-6 right-6 flex items-center gap-3 px-5 py-4 rounded-2xl text-white font-bold shadow-2xl transition-transform active:scale-95 z-50"
-          style={{ backgroundColor: primaryColor }}
-        >
-          <div className="relative">
-            <ShoppingCart className="h-6 w-6" />
-            <span className="absolute -top-2 -right-2 bg-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" style={{ color: primaryColor }}>
-              {cartCount}
-            </span>
-          </div>
-          <span className="text-base">R$ {cartTotal.toFixed(2)}</span>
-        </button>
+        <div className="border-t bg-card p-3 md:p-4 shrink-0">
+          <button
+            onClick={onOpenCart}
+            className="w-full flex items-center justify-between px-6 py-4 rounded-2xl text-white text-lg font-bold shadow-xl transition-transform active:scale-[0.98]"
+            style={{ backgroundColor: primaryColor }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <ShoppingCart className="h-6 w-6" />
+                <span className="absolute -top-2 -right-2 bg-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" style={{ color: primaryColor }}>
+                  {cartCount}
+                </span>
+              </div>
+              <span>Ver Pedido</span>
+            </div>
+            <span>R$ {cartTotal.toFixed(2)}</span>
+          </button>
+        </div>
       )}
     </div>
   );
