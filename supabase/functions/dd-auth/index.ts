@@ -37,22 +37,22 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Step 1: Authenticate with DD API using JSON (per official docs)
+      // Step 1: Authenticate with DD API using form-urlencoded (OAuth2 standard)
       console.log("[dd-auth] Requesting token from Delivery Direto...");
       const tokenRes = await fetch(`${DD_API_BASE}/token`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
           "X-DeliveryDireto-Client-Id": DD_CLIENT_ID,
           "X-DeliveryDireto-Id": store_id,
         },
-        body: JSON.stringify({
+        body: new URLSearchParams({
           grant_type: "password",
           client_id: DD_CLIENT_ID,
           client_secret: DD_CLIENT_SECRET,
-          username,
-          password,
-        }),
+          username: username.trim(),
+          password: password.trim(),
+        }).toString(),
       });
 
       const tokenText = await tokenRes.text();
