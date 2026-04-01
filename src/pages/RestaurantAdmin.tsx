@@ -195,7 +195,8 @@ const RestaurantAdmin = () => {
   }, [reservationNotification]);
   
   useInactivityLogout();
-  const { isSectionAllowed, hasActiveSubscription } = useRestaurantModules(restaurant?.id || null);
+  const { isSectionAllowed, hasActiveSubscription, allowedModules } = useRestaurantModules(restaurant?.id || null);
+  const isTotemUnlocked = allowedModules === null || (Array.isArray(allowedModules) && allowedModules.includes("totem"));
 
   // Force "modulos" section when no active subscription
   useEffect(() => {
