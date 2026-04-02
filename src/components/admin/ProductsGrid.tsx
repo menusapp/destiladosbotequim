@@ -189,6 +189,9 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     fetchProducts();
     fetchStockItems();
     fetchComplementCategories();
+    // Check if kiosk module is enabled
+    supabase.from("kiosk_config").select("enabled").eq("restaurant_id", restaurantId).maybeSingle()
+      .then(({ data }) => setKioskEnabled(data?.enabled || false));
 
     let debounceTimer: ReturnType<typeof setTimeout>;
     const channel = supabase
