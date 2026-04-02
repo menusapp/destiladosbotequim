@@ -71,13 +71,17 @@ export default function DeliveryMenu() {
 
       const { data: featuredData } = await supabase
         .from("products")
-        .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, categories!inner(restaurant_id)")
+        .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, visibility_channels, categories!inner(restaurant_id)")
         .eq("categories.restaurant_id", restaurantData.id)
         .eq("is_featured", true)
         .eq("available", true)
         .order("featured_display_order");
 
-      setFeaturedProducts(featuredData || []);
+      const filteredFeatured = (featuredData || []).filter((p: any) => {
+        const channels = p.visibility_channels || ['all'];
+        return channels.includes('all') || channels.includes('delivery');
+      });
+      setFeaturedProducts(filteredFeatured);
     } catch (error) {
       console.error("Error fetching restaurant:", error);
       toast.error("Erro ao carregar cardápio");
