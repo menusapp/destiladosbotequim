@@ -2893,6 +2893,7 @@ export type Database = {
           price: number
           promotional_price: number | null
           updated_at: string | null
+          visibility_channels: string[] | null
         }
         Insert: {
           available?: boolean | null
@@ -2924,6 +2925,7 @@ export type Database = {
           price: number
           promotional_price?: number | null
           updated_at?: string | null
+          visibility_channels?: string[] | null
         }
         Update: {
           available?: boolean | null
@@ -2955,6 +2957,7 @@ export type Database = {
           price?: number
           promotional_price?: number | null
           updated_at?: string | null
+          visibility_channels?: string[] | null
         }
         Relationships: [
           {
