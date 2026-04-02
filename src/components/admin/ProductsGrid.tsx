@@ -434,6 +434,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       category_id: productCategoryId, image_url: imageUrl,
       prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : null,
       pdv_code: pdvCode || null,
+      visibility_channels: visibilityChannels,
       fiscal_ncm: fiscalNcm || null, fiscal_exception: fiscalException || null, fiscal_cest: fiscalCest || null,
       fiscal_cfop: fiscalCfop || null, fiscal_icms_csosn: fiscalIcmsCsosn || null, fiscal_icms_origin: fiscalIcmsOrigin || "0",
       fiscal_pis_cst: fiscalPisCst || null, fiscal_pis_aliquota: fiscalPisAliquota ? parseFloat(fiscalPisAliquota) : null,
