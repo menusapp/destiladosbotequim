@@ -651,7 +651,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           </div>
 
           {/* Search Results (scrollable) */}
-          {(orderSearchTerm.length >= 2 || orderSearchDate) && (
+          {(orderSearchTerm.length >= 2) && (
             <div className="mb-2 flex-shrink-0">
               {filteredOrders.length === 0 && orderSearchTerm.length >= 2 ? (
                 <p className="text-sm text-muted-foreground text-center py-3">Nenhum pedido encontrado</p>
