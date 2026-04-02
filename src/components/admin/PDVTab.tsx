@@ -620,30 +620,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                 </Button>
               )}
             </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("h-9 px-3 text-xs whitespace-nowrap", orderSearchDate && "text-primary border-primary")}>
-                  <CalendarIcon className="w-3.5 h-3.5 mr-1.5" />
-                  {orderSearchDate ? format(orderSearchDate, "dd/MM/yyyy") : "Data"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={orderSearchDate}
-                  onSelect={setOrderSearchDate}
-                  locale={ptBR}
-                  className={cn("p-3 pointer-events-auto")}
-                />
-                {orderSearchDate && (
-                  <div className="p-2 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setOrderSearchDate(undefined)}>
-                      Limpar data
-                    </Button>
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
           </div>
 
           {/* Search Results (scrollable) */}

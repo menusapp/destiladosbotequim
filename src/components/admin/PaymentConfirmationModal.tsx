@@ -24,6 +24,7 @@ interface Order {
   table_id?: string;
   order_type?: string;
   restaurant_id?: string;
+  customer_name?: string;
   order_items: OrderItem[];
 }
 
