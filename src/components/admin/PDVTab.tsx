@@ -746,9 +746,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                         <DropdownMenuItem onClick={() => handleCopyLink(table)}>
                           <Link2 className="w-4 h-4 mr-2" /> Copiar Link
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleTableSelect(table)}>
-                          <ShoppingCart className="w-4 h-4 mr-2" /> Criar Pedido
-                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleClearTable(table)}
                           className="text-destructive focus:text-destructive"
