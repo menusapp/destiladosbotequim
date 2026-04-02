@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Banknote, CreditCard, QrCode, Loader2 } from "lucide-react";
+import { ArrowLeft, Banknote, CreditCard, QrCode, Loader2, ChevronLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { CartItem } from "@/types/menu";
