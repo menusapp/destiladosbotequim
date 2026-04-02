@@ -215,6 +215,20 @@ export const TableDetailView = () => {
 
       if (error) throw error;
       toast.success("Status atualizado!");
+
+      // Auto-print on accept if enabled
+      if (newStatus === "accepted") {
+        const autoPrintEnabled = localStorage.getItem("pdv_auto_print") === "true";
+        if (autoPrintEnabled) {
+          const order = allOrders.find(o => o.id === orderId);
+          if (order) {
+            try {
+              await printOrderForThermal(order);
+            } catch { /* ignore print errors */ }
+          }
+        }
+      }
+
       fetchTableData();
     } catch (error) {
       console.error("Erro ao atualizar status:", error);
