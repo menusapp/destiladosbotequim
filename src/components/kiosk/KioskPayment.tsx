@@ -33,6 +33,8 @@ export function KioskPayment({
   appliedCoupon, couponDiscount = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01, deliveryAddress,
 }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [cashPaid, setCashPaid] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
