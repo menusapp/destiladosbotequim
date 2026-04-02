@@ -566,119 +566,12 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
         </CardContent>
       </Card>
 
-      {/* Message Templates */}
+      {/* Message Templates — Reservations Only */}
       <Card>
         <CardHeader>
           <CardTitle>Templates de Mensagens</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <p className="text-sm text-muted-foreground">
-            Variáveis disponíveis: <code className="bg-muted px-1 rounded">{'{nome}'}</code>, 
-            <code className="bg-muted px-1 rounded ml-1">{'{pedido}'}</code>, 
-            <code className="bg-muted px-1 rounded ml-1">{'{tempo}'}</code>,
-            <code className="bg-muted px-1 rounded ml-1">{'{endereco}'}</code>
-          </p>
-
-          {/* Delivery Section */}
-          <div className="space-y-4">
-            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">📦 Entrega</h4>
-            
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Pedido Aceito
-              </Label>
-              <Textarea
-                value={messages.accepted}
-                onChange={(e) => setMessages(prev => ({ ...prev, accepted: e.target.value }))}
-                rows={3}
-                placeholder="Mensagem quando o pedido for aceito..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Wifi className="h-4 w-4 text-blue-600" />
-                Saiu para Entrega
-              </Label>
-              <Textarea
-                value={messages.out_for_delivery}
-                onChange={(e) => setMessages(prev => ({ ...prev, out_for_delivery: e.target.value }))}
-                rows={3}
-                placeholder="Mensagem quando sair para entrega..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-purple-600" />
-                Pedido Entregue
-              </Label>
-              <Textarea
-                value={messages.delivered}
-                onChange={(e) => setMessages(prev => ({ ...prev, delivered: e.target.value }))}
-                rows={3}
-                placeholder="Mensagem quando o pedido for entregue..."
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Pickup Section */}
-          <div className="space-y-4">
-            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">🏪 Retirada</h4>
-            
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-orange-600" />
-                Pronto para Retirada
-              </Label>
-              <Textarea
-                value={messages.ready_for_pickup}
-                onChange={(e) => setMessages(prev => ({ ...prev, ready_for_pickup: e.target.value }))}
-                rows={3}
-                placeholder="Mensagem quando o pedido estiver pronto para retirada..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Pedido Retirado
-              </Label>
-              <Textarea
-                value={messages.picked_up}
-                onChange={(e) => setMessages(prev => ({ ...prev, picked_up: e.target.value }))}
-                rows={3}
-                placeholder="Mensagem quando o cliente retirar o pedido..."
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Cancellation Section */}
-          <div className="space-y-4">
-            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">❌ Cancelamento</h4>
-            
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-red-600" />
-                Pedido Cancelado
-              </Label>
-              <Textarea
-                value={messages.cancelled}
-                onChange={(e) => setMessages(prev => ({ ...prev, cancelled: e.target.value }))}
-                rows={3}
-                placeholder="Mensagem quando o pedido for cancelado..."
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Reservations Section */}
           <div className="space-y-4">
             <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">📅 Reservas</h4>
             

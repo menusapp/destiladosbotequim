@@ -120,6 +120,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [visibilityChannels, setVisibilityChannels] = useState<string[]>(["all"]);
+  const [kioskEnabled, setKioskEnabled] = useState(false);
   
   const debouncedSearch = useDebounce(searchQuery, 300);
 
