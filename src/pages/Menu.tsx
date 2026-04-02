@@ -191,7 +191,11 @@ const Menu = () => {
       if (restaurantData.featured_section_enabled) {
         const allProducts = restaurantData.categories?.flatMap((cat: any) => cat.products) || [];
         const featured = allProducts
-          .filter((p: any) => p.is_featured && p.available)
+          .filter((p: any) => {
+            if (!p.is_featured || !p.available) return false;
+            const channels = p.visibility_channels || ['all'];
+            return channels.includes('all') || channels.includes('mesa');
+          })
           .sort((a: any, b: any) => (a.featured_display_order || 0) - (b.featured_display_order || 0));
         setFeaturedProducts(featured);
       } else {

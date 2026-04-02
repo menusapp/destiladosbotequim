@@ -750,7 +750,25 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                       </CardContent>
                     </Card>
 
-                    {/* CMV Summary */}
+                    {/* Visibility Channels */}
+                    <Card className="border-border/50">
+                      <CardContent className="pt-5 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                          Visibilidade por Canal
+                        </div>
+                        <Select value={visibilityChannels[0] || "all"} onValueChange={(v) => setVisibilityChannels([v])}>
+                          <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Ativo em todos</SelectItem>
+                            <SelectItem value="delivery">Apenas Delivery</SelectItem>
+                            <SelectItem value="mesa">Apenas Mesas</SelectItem>
+                            {kioskEnabled && <SelectItem value="totem">Apenas Totem</SelectItem>}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">Define em quais canais este produto aparece</p>
+                      </CardContent>
+                    </Card>
+
                     {(fixedCost > 0 || variationCosts.length > 0) && (
                       <Card className="border-primary/20 bg-primary/5">
                         <CardContent className="pt-5">

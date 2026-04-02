@@ -60,7 +60,12 @@ export default function DeliveryMenu() {
       // Filtrar produtos em destaque para não aparecerem duplicados nas categorias
       const filteredCategories = (categoriesData || []).map((cat: any) => ({
         ...cat,
-        products: (cat.products || []).filter((p: any) => p.available && !p.is_featured)
+        products: (cat.products || []).filter((p: any) => {
+          if (!p.available) return false;
+          if (p.is_featured) return false;
+          const channels = p.visibility_channels || ['all'];
+          return channels.includes('all') || channels.includes('delivery');
+        })
       })).filter((cat: any) => cat.products.length > 0);
       setCategories(filteredCategories);
 
