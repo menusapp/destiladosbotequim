@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { printOrder as printOrderThermal } from "@/lib/printOrder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -214,6 +215,20 @@ export const TableDetailView = () => {
 
       if (error) throw error;
       toast.success("Status atualizado!");
+
+      // Auto-print on accept if enabled
+      if (newStatus === "accepted") {
+        const autoPrintEnabled = localStorage.getItem("pdv_auto_print") === "true";
+        if (autoPrintEnabled) {
+          const order = allOrders.find(o => o.id === orderId);
+          if (order) {
+            try {
+              await printOrderForThermal(order);
+            } catch { /* ignore print errors */ }
+          }
+        }
+      }
+
       fetchTableData();
     } catch (error) {
       console.error("Erro ao atualizar status:", error);
@@ -239,27 +254,35 @@ export const TableDetailView = () => {
     }
   };
 
-  const printOrder = (order: Order) => {
-    const printContent = `
-      PEDIDO #${order.id.slice(0, 8)}
-      Mesa ${tableNumber}
-      Cliente: ${order.customer_name}
-      ${new Date(order.created_at).toLocaleString("pt-BR")}
-      
-      ${order.order_items.map(item => `
-        ${item.quantity}x ${item.products?.name || "Produto"}
-        ${item.order_item_extras.map(e => `  + ${e.product_extras?.name || "Extra"}`).join("\n")}
-        ${item.notes ? `  Obs: ${item.notes}` : ""}
-      `).join("\n")}
-      
-      ${order.notes ? `Observações: ${order.notes}` : ""}
-    `;
+  const printOrderForThermal = async (order: Order) => {
+    const thermalOrder = {
+      id: order.id,
+      created_at: order.created_at,
+      customer_name: order.customer_name,
+      order_type: "local" as const,
+      tables: { table_number: tableNumber },
+      notes: order.notes,
+      order_items: order.order_items.map(item => ({
+        id: item.id,
+        quantity: item.quantity,
+        price_at_order: item.price_at_order,
+        notes: item.notes,
+        products: item.products,
+        order_item_extras: item.order_item_extras.map(e => ({
+          price_at_order: e.price_at_order,
+          product_extras: e.product_extras,
+        })),
+      })),
+    };
+    await printOrderThermal(thermalOrder, restaurantId);
+  };
 
-    const printWindow = window.open("", "", "width=300,height=600");
-    if (printWindow) {
-      printWindow.document.write(`<pre style="font-family: monospace; font-size: 12px;">${printContent}</pre>`);
-      printWindow.document.close();
-      printWindow.print();
+  const printOrder = async (order: Order) => {
+    try {
+      await printOrderForThermal(order);
+    } catch (err) {
+      console.error("Erro ao imprimir:", err);
+      toast.error("Erro ao imprimir pedido");
     }
   };
 

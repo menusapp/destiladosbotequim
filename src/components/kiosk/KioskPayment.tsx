@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Banknote, CreditCard, QrCode, Loader2 } from "lucide-react";
+import { ArrowLeft, Banknote, CreditCard, QrCode, Loader2, ChevronLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { CartItem } from "@/types/menu";
@@ -33,6 +33,8 @@ export function KioskPayment({
   appliedCoupon, couponDiscount = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01, deliveryAddress,
 }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [cashPaid, setCashPaid] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,8 +44,6 @@ export function KioskPayment({
   const changeAmount = paymentMethod === "cash" && cashPaid
     ? Math.max(0, parseFloat(cashPaid) - finalTotal)
     : 0;
-
-  const canFinalize = paymentMethod !== "cash" || !cashPaid || parseFloat(cashPaid) >= finalTotal;
 
   // Determine order_type and delivery_type based on consumptionMode
   const getOrderTypeFields = () => {
@@ -116,6 +116,7 @@ export function KioskPayment({
         delivery_type,
         order_channel: "totem",
         payment_type: paymentMethod,
+        payment_brand: selectedBrand || null,
         status: "pending",
         payment_status: "pending",
         notes,
@@ -268,17 +269,42 @@ export function KioskPayment({
     }
   };
 
+  const CARD_BRANDS = [
+    { code: "visa", name: "Visa" },
+    { code: "mastercard", name: "Mastercard" },
+    { code: "elo", name: "Elo" },
+    { code: "hipercard", name: "Hipercard" },
+    { code: "amex", name: "American Express" },
+    { code: "diners", name: "Diners Club" },
+    { code: "outros", name: "Outros" },
+  ];
+
+  const needsBrand = (key: string) => key === "credit_card" || key === "debit_card";
+
   const allMethods = [
     { key: "cash", label: "Dinheiro", icon: Banknote, configKey: "payment_cash" as const },
-    { key: "credit_card", label: "Cartão de Crédito", icon: CreditCard, sublabel: "Pague na maquininha", configKey: "payment_card" as const },
-    { key: "debit_card", label: "Cartão de Débito", icon: CreditCard, sublabel: "Pague na maquininha", configKey: "payment_card" as const },
+    { key: "credit_card", label: "Cartão de Crédito", icon: CreditCard, sublabel: "Selecione a bandeira", configKey: "payment_card" as const },
+    { key: "debit_card", label: "Cartão de Débito", icon: CreditCard, sublabel: "Selecione a bandeira", configKey: "payment_card" as const },
     { key: "pix", label: "PIX", icon: QrCode, sublabel: "Pagamento via PIX", configKey: "payment_pix" as const },
   ];
 
-  // Deduplicate: payment_card covers both credit and debit, only show them if card is enabled
   const methods = kioskConfig
     ? allMethods.filter(m => kioskConfig[m.configKey] !== false)
     : allMethods;
+
+  const handleMethodSelect = (key: string) => {
+    setPaymentMethod(key);
+    setSelectedBrand("");
+    if (needsBrand(key)) {
+      setShowBrandPicker(true);
+    } else {
+      setShowBrandPicker(false);
+    }
+  };
+
+  const canFinalizePayment = paymentMethod !== "" && 
+    (!needsBrand(paymentMethod) || selectedBrand !== "") &&
+    (paymentMethod !== "cash" || !cashPaid || parseFloat(cashPaid) >= finalTotal);
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -300,28 +326,61 @@ export function KioskPayment({
           )}
         </div>
 
-        <div className="space-y-3 mb-8">
-          {methods.map(m => (
-            <button
-              key={m.key}
-              onClick={() => setPaymentMethod(m.key)}
-              className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
-                paymentMethod === m.key ? "shadow-lg" : "border-muted hover:border-muted-foreground/30"
-              }`}
-              style={paymentMethod === m.key ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
-            >
-              <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: paymentMethod === m.key ? primaryColor : undefined }}>
-                <m.icon className="h-6 w-6" style={{ color: paymentMethod === m.key ? "#fff" : undefined }} />
-              </div>
-              <div className="text-left">
-                <span className="text-lg font-bold text-foreground">{m.label}</span>
-                {m.sublabel && <p className="text-sm text-muted-foreground">{m.sublabel}</p>}
-              </div>
+        {showBrandPicker ? (
+          <div className="space-y-4 mb-8">
+            <button onClick={() => setShowBrandPicker(false)} className="flex items-center gap-2 text-muted-foreground">
+              <ChevronLeft className="h-5 w-5" />
+              <span className="text-sm font-medium">Voltar</span>
             </button>
-          ))}
-        </div>
+            <p className="text-lg font-bold text-foreground">
+              Selecione a bandeira — {paymentMethod === "credit_card" ? "Crédito" : "Débito"}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {CARD_BRANDS.map(brand => (
+                <button
+                  key={brand.code}
+                  onClick={() => { setSelectedBrand(brand.code); setShowBrandPicker(false); }}
+                  className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all ${
+                    selectedBrand === brand.code ? "shadow-lg" : "border-muted hover:border-muted-foreground/30"
+                  }`}
+                  style={selectedBrand === brand.code ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
+                >
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-semibold text-foreground">{brand.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 mb-8">
+            {methods.map(m => (
+              <button
+                key={m.key}
+                onClick={() => handleMethodSelect(m.key)}
+                className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+                  paymentMethod === m.key ? "shadow-lg" : "border-muted hover:border-muted-foreground/30"
+                }`}
+                style={paymentMethod === m.key ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
+              >
+                <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: paymentMethod === m.key ? primaryColor : undefined }}>
+                  <m.icon className="h-6 w-6" style={{ color: paymentMethod === m.key ? "#fff" : undefined }} />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="text-lg font-bold text-foreground">{m.label}</span>
+                  {needsBrand(m.key) && selectedBrand && paymentMethod === m.key ? (
+                    <p className="text-sm font-medium" style={{ color: primaryColor }}>
+                      {CARD_BRANDS.find(b => b.code === selectedBrand)?.name || selectedBrand}
+                    </p>
+                  ) : m.sublabel ? (
+                    <p className="text-sm text-muted-foreground">{m.sublabel}</p>
+                  ) : null}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
 
-        {paymentMethod === "cash" && (
+        {paymentMethod === "cash" && !showBrandPicker && (
           <div className="space-y-3">
             <Label className="text-lg">Troco para quanto?</Label>
             <Input
@@ -347,7 +406,7 @@ export function KioskPayment({
             onClick={handleFinalize}
             className="w-full h-14 text-lg font-bold rounded-xl text-white"
             style={{ backgroundColor: primaryColor }}
-            disabled={submitting || !canFinalize}
+            disabled={submitting || !canFinalizePayment}
           >
             {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" />Finalizando...</> : "Finalizar Pedido"}
           </Button>

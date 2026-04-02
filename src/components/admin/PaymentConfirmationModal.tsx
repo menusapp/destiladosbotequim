@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Printer, ShoppingCart, Percent, Banknote, CreditCard, Smartphone, Utensils, X, ArrowLeft, Check } from "lucide-react";
+import { ShoppingCart, Percent, Banknote, CreditCard, Smartphone, Utensils, X, ArrowLeft, Check } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -218,7 +218,12 @@ export const PaymentConfirmationModal = ({
 
       const { error } = await supabase
         .from("orders")
-        .update({ payment_type: paymentDisplayStr, payment_brand: primaryBrand })
+        .update({ 
+          payment_type: paymentDisplayStr, 
+          payment_brand: primaryBrand,
+          status: "paid",
+          paid_at: new Date().toISOString(),
+        })
         .eq("id", order.id);
 
       if (error) throw error;

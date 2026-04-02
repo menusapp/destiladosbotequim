@@ -2465,6 +2465,7 @@ export type Database = {
           online_payment_id: string | null
           order_channel: string | null
           order_type: string | null
+          paid_at: string | null
           payment_brand: string | null
           payment_status: string | null
           payment_type: string | null
@@ -2502,6 +2503,7 @@ export type Database = {
           online_payment_id?: string | null
           order_channel?: string | null
           order_type?: string | null
+          paid_at?: string | null
           payment_brand?: string | null
           payment_status?: string | null
           payment_type?: string | null
@@ -2539,6 +2541,7 @@ export type Database = {
           online_payment_id?: string | null
           order_channel?: string | null
           order_type?: string | null
+          paid_at?: string | null
           payment_brand?: string | null
           payment_status?: string | null
           payment_type?: string | null
