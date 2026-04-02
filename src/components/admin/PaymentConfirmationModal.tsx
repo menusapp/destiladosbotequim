@@ -254,10 +254,20 @@ export const PaymentConfirmationModal = ({
         .maybeSingle();
 
       if (cashSession) {
+        // Build a clean description without UUID
+        const customerLabel = (order as any).customer_name || "Cliente";
+        const shortId = order.id.slice(0, 6);
+
         await supabase.from("cash_movements")
           .delete()
           .eq("cash_session_id", cashSession.id)
-          .like("description", `Pedido Local #${order.id}%`);
+          .like("description", `%#${order.id}%`);
+
+        // Also clean up old format descriptions
+        await supabase.from("cash_movements")
+          .delete()
+          .eq("cash_session_id", cashSession.id)
+          .like("description", `Pedido Local #${shortId}%`);
 
         for (const payment of selectedPayments) {
           await supabase.from("cash_movements").insert({
@@ -267,7 +277,7 @@ export const PaymentConfirmationModal = ({
             amount: payment.amount,
             payment_method: payment.methodType,
             category: "Pedido",
-            description: `Pedido Local #${order.id} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
+            description: `Pedido Local - ${customerLabel} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
             created_by: "Sistema",
           });
         }

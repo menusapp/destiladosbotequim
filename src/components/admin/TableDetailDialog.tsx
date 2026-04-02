@@ -307,6 +307,7 @@ export const TableDetailDialog = ({
       table_id: table?.id,
       order_type: "local",
       restaurant_id: restaurantId,
+      customer_name: comanda.customer_name,
       order_items: allItems,
       _comanda_id: comanda.id,
       _comanda_order_ids: orderIds,
