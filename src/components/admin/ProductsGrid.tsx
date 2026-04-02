@@ -515,6 +515,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
     setPdvCode((product as any).pdv_code || "");
+    setVisibilityChannels((product as any).visibility_channels || ["all"]);
 
     // Load fiscal fields
     setFiscalNcm((product as any).fiscal_ncm || "");
