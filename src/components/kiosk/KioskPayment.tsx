@@ -328,28 +328,61 @@ export function KioskPayment({
           )}
         </div>
 
-        <div className="space-y-3 mb-8">
-          {methods.map(m => (
-            <button
-              key={m.key}
-              onClick={() => setPaymentMethod(m.key)}
-              className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
-                paymentMethod === m.key ? "shadow-lg" : "border-muted hover:border-muted-foreground/30"
-              }`}
-              style={paymentMethod === m.key ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
-            >
-              <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: paymentMethod === m.key ? primaryColor : undefined }}>
-                <m.icon className="h-6 w-6" style={{ color: paymentMethod === m.key ? "#fff" : undefined }} />
-              </div>
-              <div className="text-left">
-                <span className="text-lg font-bold text-foreground">{m.label}</span>
-                {m.sublabel && <p className="text-sm text-muted-foreground">{m.sublabel}</p>}
-              </div>
+        {showBrandPicker ? (
+          <div className="space-y-4 mb-8">
+            <button onClick={() => setShowBrandPicker(false)} className="flex items-center gap-2 text-muted-foreground">
+              <ChevronLeft className="h-5 w-5" />
+              <span className="text-sm font-medium">Voltar</span>
             </button>
-          ))}
-        </div>
+            <p className="text-lg font-bold text-foreground">
+              Selecione a bandeira — {paymentMethod === "credit_card" ? "Crédito" : "Débito"}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {CARD_BRANDS.map(brand => (
+                <button
+                  key={brand.code}
+                  onClick={() => { setSelectedBrand(brand.code); setShowBrandPicker(false); }}
+                  className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all ${
+                    selectedBrand === brand.code ? "shadow-lg" : "border-muted hover:border-muted-foreground/30"
+                  }`}
+                  style={selectedBrand === brand.code ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
+                >
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-semibold text-foreground">{brand.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 mb-8">
+            {methods.map(m => (
+              <button
+                key={m.key}
+                onClick={() => handleMethodSelect(m.key)}
+                className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+                  paymentMethod === m.key ? "shadow-lg" : "border-muted hover:border-muted-foreground/30"
+                }`}
+                style={paymentMethod === m.key ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
+              >
+                <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: paymentMethod === m.key ? primaryColor : undefined }}>
+                  <m.icon className="h-6 w-6" style={{ color: paymentMethod === m.key ? "#fff" : undefined }} />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="text-lg font-bold text-foreground">{m.label}</span>
+                  {needsBrand(m.key) && selectedBrand && paymentMethod === m.key ? (
+                    <p className="text-sm font-medium" style={{ color: primaryColor }}>
+                      {CARD_BRANDS.find(b => b.code === selectedBrand)?.name || selectedBrand}
+                    </p>
+                  ) : m.sublabel ? (
+                    <p className="text-sm text-muted-foreground">{m.sublabel}</p>
+                  ) : null}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
 
-        {paymentMethod === "cash" && (
+        {paymentMethod === "cash" && !showBrandPicker && (
           <div className="space-y-3">
             <Label className="text-lg">Troco para quanto?</Label>
             <Input
