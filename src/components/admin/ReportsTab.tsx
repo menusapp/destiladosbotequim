@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, DollarSign, TrendingUp, Users, CreditCard, FileText } from "lucide-react";
+import { Calendar as CalendarIcon, DollarSign, TrendingUp, Users, CreditCard, FileText, Download } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { format, startOfDay, endOfDay, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -495,6 +495,61 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
 
   const dreValues = calculateDREValues();
 
+  const handleExportPDF = () => {
+    const { startDate, endDate } = getDateRange();
+    const periodLabel = dateFilter === "today" ? "Hoje" : dateFilter === "yesterday" ? "Ontem" : dateFilter === "7days" ? "7 Dias" : dateFilter === "30days" ? "30 Dias" : `${format(startDate, "dd/MM/yyyy", { locale: ptBR })} - ${format(endDate, "dd/MM/yyyy", { locale: ptBR })}`;
+
+    const rows = [
+      { label: "Receita Bruta", value: dreValues.grossRevenue, bold: true },
+      { label: "   (-) CMV dos Produtos", value: dreValues.cmv },
+      { label: "Lucro Bruto", value: dreValues.grossProfit, bold: true },
+      { label: "   Saídas do Caixa", value: dreValues.operationalExpenses },
+      { label: "   Custo Fixo (proporcional)", value: dreValues.fixedCost },
+      { label: "   Custo Variável", value: dreValues.variableCost },
+      { label: "   CMO - Mão de Obra (proporcional)", value: dreValues.laborCost },
+      { label: "Lucro Operacional", value: dreValues.operationalProfit, bold: true, highlight: true },
+    ];
+
+    if (dreValues.grossRevenue > 0) {
+      rows.push({ label: "Margem Operacional", value: parseFloat(((dreValues.operationalProfit / dreValues.grossRevenue) * 100).toFixed(1)), bold: false, isPercentage: true } as any);
+    }
+
+    const html = `
+      <html><head><title>DRE - ${periodLabel}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; color: #1a1a1a; }
+        h1 { font-size: 22px; margin-bottom: 4px; }
+        .period { font-size: 13px; color: #666; margin-bottom: 24px; }
+        .stats { display: flex; gap: 24px; margin-bottom: 28px; }
+        .stat { border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px 16px; min-width: 140px; }
+        .stat-value { font-size: 20px; font-weight: 700; }
+        .stat-label { font-size: 11px; color: #888; margin-top: 2px; }
+        table { width: 100%; border-collapse: collapse; }
+        td { padding: 10px 16px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .bold td { font-weight: 700; background: #f9f9f9; }
+        .highlight td { font-size: 16px; background: #f0f7ff; }
+        .right { text-align: right; font-variant-numeric: tabular-nums; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <h1>Demonstrativo de Resultados (DRE)</h1>
+      <p class="period">Período: ${periodLabel}</p>
+      <div class="stats">
+        <div class="stat"><div class="stat-value">R$ ${stats.salesToday.toFixed(2).replace(".",",")}</div><div class="stat-label">Vendas · ${stats.ordersCount} pedidos</div></div>
+        <div class="stat"><div class="stat-value">R$ ${stats.averageTicket.toFixed(2).replace(".",",")}</div><div class="stat-label">Ticket Médio</div></div>
+        <div class="stat"><div class="stat-value">${stats.mesasAtendidas}</div><div class="stat-label">Mesas Atendidas</div></div>
+      </div>
+      <table>${rows.map(r => `<tr class="${r.bold ? 'bold' : ''} ${(r as any).highlight ? 'highlight' : ''}"><td>${r.label}</td><td class="right">${(r as any).isPercentage ? r.value + '%' : 'R$ ' + r.value.toFixed(2).replace(".",",")}</td></tr>`).join('')}</table>
+      <p style="margin-top:24px;font-size:11px;color:#aaa;">Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+      </body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 300);
+    }
+  };
+
   if (loading) {
     return <div className="p-6 text-muted-foreground">Carregando...</div>;
   }
@@ -506,6 +561,10 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           <h2 className="text-2xl font-semibold tracking-[-0.025em]">Relatório DRE</h2>
           <p className="text-sm text-muted-foreground font-light">Visualize métricas e análises do seu negócio</p>
         </div>
+        <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2">
+          <Download className="h-4 w-4" />
+          Exportar PDF
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

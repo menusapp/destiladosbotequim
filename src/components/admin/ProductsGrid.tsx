@@ -120,6 +120,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [visibilityChannels, setVisibilityChannels] = useState<string[]>(["all"]);
+  const [kioskEnabled, setKioskEnabled] = useState(false);
   
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -187,6 +189,9 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     fetchProducts();
     fetchStockItems();
     fetchComplementCategories();
+    // Check if kiosk module is enabled
+    supabase.from("kiosk_config").select("enabled").eq("restaurant_id", restaurantId).maybeSingle()
+      .then(({ data }) => setKioskEnabled(data?.enabled || false));
 
     let debounceTimer: ReturnType<typeof setTimeout>;
     const channel = supabase
@@ -429,6 +434,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       category_id: productCategoryId, image_url: imageUrl,
       prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : null,
       pdv_code: pdvCode || null,
+      visibility_channels: visibilityChannels,
       fiscal_ncm: fiscalNcm || null, fiscal_exception: fiscalException || null, fiscal_cest: fiscalCest || null,
       fiscal_cfop: fiscalCfop || null, fiscal_icms_csosn: fiscalIcmsCsosn || null, fiscal_icms_origin: fiscalIcmsOrigin || "0",
       fiscal_pis_cst: fiscalPisCst || null, fiscal_pis_aliquota: fiscalPisAliquota ? parseFloat(fiscalPisAliquota) : null,
@@ -509,6 +515,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
     setPdvCode((product as any).pdv_code || "");
+    setVisibilityChannels((product as any).visibility_channels || ["all"]);
 
     // Load fiscal fields
     setFiscalNcm((product as any).fiscal_ncm || "");
@@ -586,6 +593,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setSelectedExtraStockItem(""); setExtraIngredientQuantity("");
     setEditingProduct(null); setLinkedGroups([]); setSelectedComplementCategory("");
     setGroupIsRequired(false); setGroupMinSelection("0"); setGroupMaxSelection(""); setExtraIsRequired(false);
+    setVisibilityChannels(["all"]);
     setFiscalNcm(""); setFiscalException(""); setFiscalCest(""); setFiscalCfop("");
     setFiscalIcmsCsosn(""); setFiscalIcmsOrigin("0"); setFiscalPisCst(""); setFiscalPisAliquota("");
     setFiscalCofinsCst(""); setFiscalCofinsAliquota(""); setFiscalIbsAliquota(""); setFiscalCbsAliquota("");
@@ -742,7 +750,25 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                       </CardContent>
                     </Card>
 
-                    {/* CMV Summary */}
+                    {/* Visibility Channels */}
+                    <Card className="border-border/50">
+                      <CardContent className="pt-5 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                          Visibilidade por Canal
+                        </div>
+                        <Select value={visibilityChannels[0] || "all"} onValueChange={(v) => setVisibilityChannels([v])}>
+                          <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Ativo em todos</SelectItem>
+                            <SelectItem value="delivery">Apenas Delivery</SelectItem>
+                            <SelectItem value="mesa">Apenas Mesas</SelectItem>
+                            {kioskEnabled && <SelectItem value="totem">Apenas Totem</SelectItem>}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">Define em quais canais este produto aparece</p>
+                      </CardContent>
+                    </Card>
+
                     {(fixedCost > 0 || variationCosts.length > 0) && (
                       <Card className="border-primary/20 bg-primary/5">
                         <CardContent className="pt-5">

@@ -177,7 +177,11 @@ const Menu = () => {
         .map((cat: any) => ({ 
           ...cat, 
           products: (cat.products || [])
-            .filter((p: Product) => p.available && !p.is_featured)
+            .filter((p: Product) => {
+              if (!p.available || p.is_featured) return false;
+              const channels = (p as any).visibility_channels || ['all'];
+              return channels.includes('all') || channels.includes('mesa');
+            })
             .sort((a: Product, b: Product) => a.name.localeCompare(b.name)) 
         }))
         .filter((cat: Category) => cat.products.length > 0);
@@ -187,7 +191,11 @@ const Menu = () => {
       if (restaurantData.featured_section_enabled) {
         const allProducts = restaurantData.categories?.flatMap((cat: any) => cat.products) || [];
         const featured = allProducts
-          .filter((p: any) => p.is_featured && p.available)
+          .filter((p: any) => {
+            if (!p.is_featured || !p.available) return false;
+            const channels = p.visibility_channels || ['all'];
+            return channels.includes('all') || channels.includes('mesa');
+          })
           .sort((a: any, b: any) => (a.featured_display_order || 0) - (b.featured_display_order || 0));
         setFeaturedProducts(featured);
       } else {

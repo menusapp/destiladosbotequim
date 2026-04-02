@@ -171,7 +171,11 @@ export default function Kiosk() {
 
       const filtered = (cats || []).map((cat: any) => ({
         ...cat,
-        products: (cat.products || []).filter((p: any) => p.available),
+        products: (cat.products || []).filter((p: any) => {
+          if (!p.available) return false;
+          const channels = p.visibility_channels || ['all'];
+          return channels.includes('all') || channels.includes('totem');
+        }),
       })).filter((cat: any) => cat.products.length > 0);
       setCategories(filtered);
     } catch (err) {
