@@ -21,8 +21,13 @@ export function getSlugFromSubdomain(): string | null {
   for (const domain of MAIN_DOMAINS) {
     if (hostname.endsWith(`.${domain}`)) {
       const subdomain = hostname.replace(`.${domain}`, '');
-      // Ignore www and other system subdomains
-      if (subdomain && subdomain !== 'www' && !subdomain.includes('.')) {
+      // Ignore www, system subdomains, and Lovable preview subdomains
+      if (
+        subdomain &&
+        subdomain !== 'www' &&
+        !subdomain.includes('.') &&
+        !subdomain.startsWith('id-preview--')
+      ) {
         return subdomain;
       }
     }
