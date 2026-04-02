@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ImageIcon, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -18,6 +18,7 @@ interface Category {
   id: string;
   name: string;
   display_order: number;
+  image_url: string | null;
 }
 
 const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string; isRestaurantOpen: boolean }) => {
@@ -25,6 +26,9 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState("");
+  const [categoryImageUrl, setCategoryImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -45,6 +49,41 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
     setCategories(data || []);
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fileName = `category-${restaurantId}-${Date.now()}.${ext}`;
+      const filePath = `categories/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("products")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("products")
+        .getPublicUrl(filePath);
+
+      setCategoryImageUrl(urlData.publicUrl);
+      toast.success("Imagem carregada!");
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast.error("Erro ao enviar imagem");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -56,7 +95,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
     if (editingCategory) {
       const { error } = await supabase
         .from("categories")
-        .update({ name: categoryName })
+        .update({ name: categoryName, image_url: categoryImageUrl } as any)
         .eq("id", editingCategory.id);
 
       if (error) {
@@ -70,7 +109,8 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
         restaurant_id: restaurantId,
         name: categoryName,
         display_order: categories.length,
-      });
+        image_url: categoryImageUrl,
+      } as any);
 
       if (error) {
         toast.error("Erro ao criar categoria");
@@ -82,6 +122,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
 
     setDialogOpen(false);
     setCategoryName("");
+    setCategoryImageUrl(null);
     setEditingCategory(null);
     fetchCategories();
   };
@@ -120,6 +161,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
     }
     setEditingCategory(category);
     setCategoryName(category.name);
+    setCategoryImageUrl(category.image_url || null);
     setDialogOpen(true);
   };
 
@@ -136,6 +178,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
               }
               setEditingCategory(null); 
               setCategoryName(""); 
+              setCategoryImageUrl(null);
             }}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Categoria
@@ -148,7 +191,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
               </DialogTitle>
               <DialogDescription>
                 {editingCategory
-                  ? "Altere o nome da categoria"
+                  ? "Altere o nome e a imagem da categoria"
                   : "Crie uma nova categoria para organizar seus produtos"}
               </DialogDescription>
             </DialogHeader>
@@ -162,6 +205,46 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
                   placeholder="Ex: Pizzas, Bebidas, Sobremesas..."
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Imagem da Categoria (opcional — exibida no Totem)</Label>
+                <div className="flex items-center gap-3">
+                  {categoryImageUrl ? (
+                    <div className="relative h-20 w-20 rounded-xl overflow-hidden border">
+                      <img src={categoryImageUrl} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setCategoryImageUrl(null)}
+                        className="absolute top-0.5 right-0.5 bg-destructive text-white rounded-full h-5 w-5 flex items-center justify-center text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-20 w-20 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/30">
+                      <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageUpload}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ImageIcon className="h-4 w-4 mr-1" />}
+                      {uploading ? "Enviando..." : "Escolher imagem"}
+                    </Button>
+                  </div>
+                </div>
               </div>
               <Button type="submit" className="w-full">
                 {editingCategory ? "Atualizar" : "Criar"}
@@ -182,7 +265,16 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
               key={category.id}
               className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
             >
-              <p className="font-medium">{category.name}</p>
+              <div className="flex items-center gap-3">
+                {category.image_url ? (
+                  <img src={category.image_url} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                ) : (
+                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                )}
+                <p className="font-medium">{category.name}</p>
+              </div>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
