@@ -18,8 +18,7 @@ import {
   Search, ShoppingCart, UserPlus, X, Loader2, Settings,
   MoreVertical, QrCode, Link2, Eraser
 } from "lucide-react";
-import { format } from "date-fns";
-import { toast } from "@/components/ui/sonner";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import { Printer } from "lucide-react";
