@@ -45,8 +45,6 @@ export function KioskPayment({
     ? Math.max(0, parseFloat(cashPaid) - finalTotal)
     : 0;
 
-  const canFinalize = paymentMethod !== "cash" || !cashPaid || parseFloat(cashPaid) >= finalTotal;
-
   // Determine order_type and delivery_type based on consumptionMode
   const getOrderTypeFields = () => {
     switch (consumptionMode) {
