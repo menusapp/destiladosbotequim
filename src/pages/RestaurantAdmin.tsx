@@ -789,9 +789,12 @@ const RestaurantAdmin = () => {
       case "config-regioes":
         return <DeliveryZonesSettings restaurantId={restaurant.id} />;
       case "config-pagamentos":
-        return <PaymentMethodsSettings restaurantId={restaurant.id} />;
-      case "config-pagamentos-online":
-        return <OnlinePaymentsSettings restaurantId={restaurant.id} />;
+        return (
+          <div className="space-y-8">
+            <PaymentMethodsSettings restaurantId={restaurant.id} />
+            <OnlinePaymentsSettings restaurantId={restaurant.id} />
+          </div>
+        );
       case "config-impressoras":
         return <PrintersSettings restaurantId={restaurant.id} />;
       case "config-whatsapp":
