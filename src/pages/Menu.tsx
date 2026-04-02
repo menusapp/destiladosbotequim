@@ -177,7 +177,11 @@ const Menu = () => {
         .map((cat: any) => ({ 
           ...cat, 
           products: (cat.products || [])
-            .filter((p: Product) => p.available && !p.is_featured)
+            .filter((p: Product) => {
+              if (!p.available || p.is_featured) return false;
+              const channels = (p as any).visibility_channels || ['all'];
+              return channels.includes('all') || channels.includes('mesa');
+            })
             .sort((a: Product, b: Product) => a.name.localeCompare(b.name)) 
         }))
         .filter((cat: Category) => cat.products.length > 0);
