@@ -13,9 +13,10 @@ import { KioskCart } from "@/components/kiosk/KioskCart";
 import { KioskConsumptionType, ConsumptionMode } from "@/components/kiosk/KioskConsumptionType";
 import { KioskPayment } from "@/components/kiosk/KioskPayment";
 import { KioskConfirmation } from "@/components/kiosk/KioskConfirmation";
+import { KioskDeliveryAddress } from "@/components/kiosk/KioskDeliveryAddress";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 
-export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "payment" | "confirmation";
+export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "delivery_address" | "payment" | "confirmation";
 
 export interface KioskCustomer {
   name: string;
@@ -39,6 +40,7 @@ export default function Kiosk() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [kioskDisabled, setKioskDisabled] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState<string>("");
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Coupon & loyalty state
@@ -99,6 +101,7 @@ export default function Kiosk() {
     setCouponDiscount(0);
     setLoyaltyPoints(0);
     setLoyaltyPointsUsed(0);
+    setDeliveryAddress("");
   }, []);
 
   // Inactivity timer
@@ -231,6 +234,15 @@ export default function Kiosk() {
     }
   };
 
+  // After consumption type selection, route to address step if delivery, else payment
+  const handleConsumptionNext = () => {
+    if (consumptionMode === "delivery") {
+      setStep("delivery_address");
+    } else {
+      setStep("payment");
+    }
+  };
+
   if (loading || configLoading) {
     return (
       <KioskLayout primaryColor={primaryColor}>
@@ -337,8 +349,22 @@ export default function Kiosk() {
           onChangeMode={setConsumptionMode}
           onChangeTable={setTableNumber}
           onBack={() => setStep("cart")}
-          onNext={() => setStep("payment")}
+          onNext={handleConsumptionNext}
           kioskConfig={kioskConfig}
+        />
+      )}
+
+      {step === "delivery_address" && (
+        <KioskDeliveryAddress
+          primaryColor={primaryColor}
+          customerCpf={customer?.cpf || ""}
+          customerName={customer?.name || ""}
+          customerPhone={customer?.phone || ""}
+          onBack={() => setStep("consumption")}
+          onSelectAddress={(addr) => {
+            setDeliveryAddress(addr);
+            setStep("payment");
+          }}
         />
       )}
 
@@ -351,13 +377,14 @@ export default function Kiosk() {
           tableNumber={tableNumber}
           primaryColor={primaryColor}
           cartTotal={cartTotal}
-          onBack={() => setStep("consumption")}
+          onBack={() => consumptionMode === "delivery" ? setStep("delivery_address") : setStep("consumption")}
           onOrderCreated={(id) => { setOrderId(id); setStep("confirmation"); }}
           kioskConfig={kioskConfig}
           appliedCoupon={appliedCoupon}
           couponDiscount={couponDiscount}
           loyaltyPointsUsed={loyaltyPointsUsed}
           loyaltyRealPerPoint={loyaltyRealPerPoint}
+          deliveryAddress={deliveryAddress}
         />
       )}
 

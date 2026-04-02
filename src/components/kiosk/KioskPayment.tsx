@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Banknote, CreditCard, Loader2 } from "lucide-react";
+import { ArrowLeft, Banknote, CreditCard, QrCode, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { CartItem } from "@/types/menu";
@@ -25,39 +25,36 @@ interface Props {
   couponDiscount?: number;
   loyaltyPointsUsed?: number;
   loyaltyRealPerPoint?: number;
+  deliveryAddress?: string;
 }
 
 export function KioskPayment({
   cart, restaurant, customer, consumptionMode, tableNumber, primaryColor, cartTotal, onBack, onOrderCreated, kioskConfig,
-  appliedCoupon, couponDiscount = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01,
+  appliedCoupon, couponDiscount = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01, deliveryAddress,
 }: Props) {
-  const [paymentMethod, setPaymentMethod] = useState<"dinheiro" | "cartao" | "pix">("dinheiro");
+  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [cashPaid, setCashPaid] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const pointsDiscount = loyaltyPointsUsed * loyaltyRealPerPoint;
   const finalTotal = Math.max(0, cartTotal - couponDiscount - pointsDiscount);
 
-  const changeAmount = paymentMethod === "dinheiro" && cashPaid
+  const changeAmount = paymentMethod === "cash" && cashPaid
     ? Math.max(0, parseFloat(cashPaid) - finalTotal)
     : 0;
 
-  const canFinalize = paymentMethod !== "dinheiro" || !cashPaid || parseFloat(cashPaid) >= finalTotal;
+  const canFinalize = paymentMethod !== "cash" || !cashPaid || parseFloat(cashPaid) >= finalTotal;
 
   // Determine order_type and delivery_type based on consumptionMode
   const getOrderTypeFields = () => {
     switch (consumptionMode) {
       case "counter":
-        // Counter pickup: new 'balcao' type, same flow as viagem
         return { order_type: "balcao", delivery_type: "pickup" };
       case "table":
-        // Table service: local order
         return { order_type: "local", delivery_type: "local" };
       case "takeaway":
-        // Takeaway: delivery type with takeaway subtype
         return { order_type: "delivery", delivery_type: "takeaway" };
       case "delivery":
-        // Delivery
         return { order_type: "delivery", delivery_type: "delivery" };
       default:
         return { order_type: "local", delivery_type: "local" };
@@ -91,20 +88,26 @@ export function KioskPayment({
           .eq("table_number", parseInt(tableNumber))
           .maybeSingle();
         tableId = table?.id || null;
+
+        if (!tableId) {
+          toast.error(`Mesa ${tableNumber} não encontrada`);
+          setSubmitting(false);
+          return;
+        }
       }
 
       const notes = [
         `[TOTEM] ${getConsumptionLabel()}`,
-        paymentMethod === "dinheiro" && cashPaid ? `Troco para: R$ ${parseFloat(cashPaid).toFixed(2)}` : null,
+        paymentMethod === "cash" && cashPaid ? `Troco para: R$ ${parseFloat(cashPaid).toFixed(2)}` : null,
       ].filter(Boolean).join(" | ");
 
       console.log("[Kiosk] Creating order:", {
         order_type, delivery_type, order_channel: "totem",
-        consumptionMode, tableId, tableNumber,
-        finalTotal, couponDiscount, pointsDiscount,
+        consumptionMode, tableId, tableNumber, paymentMethod,
+        finalTotal, couponDiscount, pointsDiscount, deliveryAddress,
       });
 
-      const orderData = {
+      const orderData: any = {
         table_id: tableId,
         restaurant_id: restaurant.id,
         customer_name: customer.name,
@@ -112,7 +115,7 @@ export function KioskPayment({
         order_type,
         delivery_type,
         order_channel: "totem",
-        payment_type: paymentMethod === "cartao" ? "cartao_pendente" : paymentMethod,
+        payment_type: paymentMethod,
         status: "pending",
         payment_status: "pending",
         notes,
@@ -122,6 +125,10 @@ export function KioskPayment({
         loyalty_points_used: loyaltyPointsUsed,
         reward_discount: pointsDiscount,
       };
+
+      if (consumptionMode === "delivery" && deliveryAddress) {
+        orderData.delivery_address = deliveryAddress;
+      }
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -160,6 +167,39 @@ export function KioskPayment({
             product_extra_id: extra.id,
             price_at_order: extra.price,
           });
+        }
+      }
+
+      // For table orders: occupy the table and create comanda
+      if (consumptionMode === "table" && tableId) {
+        console.log("[Kiosk] Occupying table and creating comanda for table:", tableId);
+
+        // Mark table as occupied
+        await supabase.from("tables").update({
+          is_occupied: true,
+          occupied_at: new Date().toISOString(),
+          occupied_by: customer.name,
+        }).eq("id", tableId);
+
+        // Create comanda
+        const { data: comanda, error: comandaError } = await supabase
+          .from("comandas")
+          .insert({
+            restaurant_id: restaurant.id,
+            table_id: tableId,
+            customer_name: customer.name,
+            customer_cpf: customer.cpf || "000.000.000-00",
+            status: "active",
+          })
+          .select()
+          .single();
+
+        if (comandaError) {
+          console.error("[Kiosk] Comanda error:", comandaError);
+        } else {
+          console.log("[Kiosk] Comanda created:", comanda.id);
+          // Link the order to the comanda
+          await supabase.from("orders").update({ comanda_id: comanda.id }).eq("id", order.id);
         }
       }
 
@@ -229,10 +269,13 @@ export function KioskPayment({
   };
 
   const allMethods = [
-    { key: "dinheiro" as const, label: "Dinheiro", icon: Banknote, configKey: "payment_cash" as const },
-    { key: "cartao" as const, label: "Cartão", icon: CreditCard, sublabel: "Pague na maquininha", configKey: "payment_card" as const },
+    { key: "cash", label: "Dinheiro", icon: Banknote, configKey: "payment_cash" as const },
+    { key: "credit_card", label: "Cartão de Crédito", icon: CreditCard, sublabel: "Pague na maquininha", configKey: "payment_card" as const },
+    { key: "debit_card", label: "Cartão de Débito", icon: CreditCard, sublabel: "Pague na maquininha", configKey: "payment_card" as const },
+    { key: "pix", label: "PIX", icon: QrCode, sublabel: "Pagamento via PIX", configKey: "payment_pix" as const },
   ];
 
+  // Deduplicate: payment_card covers both credit and debit, only show them if card is enabled
   const methods = kioskConfig
     ? allMethods.filter(m => kioskConfig[m.configKey] !== false)
     : allMethods;
@@ -278,7 +321,7 @@ export function KioskPayment({
           ))}
         </div>
 
-        {paymentMethod === "dinheiro" && (
+        {paymentMethod === "cash" && (
           <div className="space-y-3">
             <Label className="text-lg">Troco para quanto?</Label>
             <Input

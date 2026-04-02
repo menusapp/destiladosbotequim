@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Product } from "@/types/menu";
-import { Search, ShoppingCart, X, LogOut, Star } from "lucide-react";
+import { Search, ShoppingCart, X, LogOut, Star, UtensilsCrossed } from "lucide-react";
 
 interface Props {
   categories: Category[];
@@ -91,38 +91,49 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
         {/* Categories sidebar */}
         {!filteredProducts && (
           <ScrollArea className="w-44 md:w-52 border-r bg-card/50 shrink-0">
-            <div className="flex flex-col p-2 gap-1">
+            <div className="flex flex-col p-2 gap-1.5">
               {hasFeatured && (
                 <button
                   onClick={() => scrollToCategory("__featured__")}
-                  className={`text-left px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                  className={`text-left rounded-xl text-sm font-medium transition-all flex flex-col items-center gap-1.5 p-2 ${
                     activeCategory === "__featured__"
                       ? "text-white shadow-md"
                       : "text-foreground hover:bg-muted"
                   }`}
                   style={activeCategory === "__featured__" ? { backgroundColor: primaryColor } : {}}
                 >
-                  <Star className="h-4 w-4 shrink-0" />
-                  <span className="line-clamp-2">{featuredSectionTitle}</span>
+                  <div className="h-14 w-full rounded-lg flex items-center justify-center bg-black/5">
+                    <Star className="h-6 w-6 shrink-0" />
+                  </div>
+                  <span className="line-clamp-2 text-center text-xs">{featuredSectionTitle}</span>
                 </button>
               )}
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => scrollToCategory(cat.id)}
-                  className={`text-left px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                    activeCategory === cat.id
-                      ? "text-white shadow-md"
-                      : "text-foreground hover:bg-muted"
-                  }`}
-                  style={activeCategory === cat.id ? { backgroundColor: primaryColor } : {}}
-                >
-                  {(cat as any).image_url && (
-                    <img src={(cat as any).image_url} alt="" className="h-8 w-8 rounded-lg object-cover shrink-0" />
-                  )}
-                  <span className="line-clamp-2">{cat.name}</span>
-                </button>
-              ))}
+              {categories.map(cat => {
+                const catImageUrl = (cat as any).image_url;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => scrollToCategory(cat.id)}
+                    className={`text-left rounded-xl text-sm font-medium transition-all flex flex-col items-center gap-1.5 p-2 ${
+                      activeCategory === cat.id
+                        ? "text-white shadow-md"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                    style={activeCategory === cat.id ? { backgroundColor: primaryColor } : {}}
+                  >
+                    {catImageUrl ? (
+                      <div className="h-14 w-full rounded-lg overflow-hidden">
+                        <img src={catImageUrl} alt="" className="h-full w-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="h-14 w-full rounded-lg flex items-center justify-center bg-black/5">
+                        <UtensilsCrossed className="h-6 w-6 shrink-0 text-muted-foreground" />
+                      </div>
+                    )}
+                    <span className="line-clamp-2 text-center text-xs">{cat.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </ScrollArea>
         )}
@@ -177,19 +188,23 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
         </ScrollArea>
       </div>
 
-      {/* Cart FAB */}
+      {/* Cart FAB — rectangular with label and total */}
       {cartCount > 0 && (
         <button
           onClick={onOpenCart}
-          className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl transition-transform active:scale-90"
+          className="fixed bottom-6 right-6 z-50 h-14 rounded-2xl flex items-center gap-2.5 px-5 text-white shadow-2xl transition-transform active:scale-95"
           style={{ backgroundColor: primaryColor }}
         >
           <div className="relative">
-            <ShoppingCart className="h-7 w-7" />
-            <span className="absolute -top-2 -right-3 bg-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center" style={{ color: primaryColor }}>
+            <ShoppingCart className="h-6 w-6" />
+            <span className="absolute -top-2 -right-2.5 bg-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center" style={{ color: primaryColor }}>
               {cartCount}
             </span>
           </div>
+          <span className="font-bold text-base">Carrinho</span>
+          {cartTotal > 0 && (
+            <span className="font-bold text-base">R$ {cartTotal.toFixed(2)}</span>
+          )}
         </button>
       )}
     </div>
