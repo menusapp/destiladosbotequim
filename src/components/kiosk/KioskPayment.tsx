@@ -271,17 +271,42 @@ export function KioskPayment({
     }
   };
 
+  const CARD_BRANDS = [
+    { code: "visa", name: "Visa" },
+    { code: "mastercard", name: "Mastercard" },
+    { code: "elo", name: "Elo" },
+    { code: "hipercard", name: "Hipercard" },
+    { code: "amex", name: "American Express" },
+    { code: "diners", name: "Diners Club" },
+    { code: "outros", name: "Outros" },
+  ];
+
+  const needsBrand = (key: string) => key === "credit_card" || key === "debit_card";
+
   const allMethods = [
     { key: "cash", label: "Dinheiro", icon: Banknote, configKey: "payment_cash" as const },
-    { key: "credit_card", label: "Cartão de Crédito", icon: CreditCard, sublabel: "Pague na maquininha", configKey: "payment_card" as const },
-    { key: "debit_card", label: "Cartão de Débito", icon: CreditCard, sublabel: "Pague na maquininha", configKey: "payment_card" as const },
+    { key: "credit_card", label: "Cartão de Crédito", icon: CreditCard, sublabel: "Selecione a bandeira", configKey: "payment_card" as const },
+    { key: "debit_card", label: "Cartão de Débito", icon: CreditCard, sublabel: "Selecione a bandeira", configKey: "payment_card" as const },
     { key: "pix", label: "PIX", icon: QrCode, sublabel: "Pagamento via PIX", configKey: "payment_pix" as const },
   ];
 
-  // Deduplicate: payment_card covers both credit and debit, only show them if card is enabled
   const methods = kioskConfig
     ? allMethods.filter(m => kioskConfig[m.configKey] !== false)
     : allMethods;
+
+  const handleMethodSelect = (key: string) => {
+    setPaymentMethod(key);
+    setSelectedBrand("");
+    if (needsBrand(key)) {
+      setShowBrandPicker(true);
+    } else {
+      setShowBrandPicker(false);
+    }
+  };
+
+  const canFinalizePayment = paymentMethod !== "" && 
+    (!needsBrand(paymentMethod) || selectedBrand !== "") &&
+    (paymentMethod !== "cash" || !cashPaid || parseFloat(cashPaid) >= finalTotal);
 
   return (
     <div className="flex flex-col h-screen bg-background">
