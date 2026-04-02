@@ -118,6 +118,7 @@ export function KioskPayment({
         delivery_type,
         order_channel: "totem",
         payment_type: paymentMethod,
+        payment_brand: selectedBrand || null,
         status: "pending",
         payment_status: "pending",
         notes,
