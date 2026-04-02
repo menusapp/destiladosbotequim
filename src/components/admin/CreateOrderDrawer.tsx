@@ -115,10 +115,17 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     toast.success(`${item.productName} adicionado!`);
   };
 
-  const handleCustomerSelect = (customer: { id: string; cpf: string; name: string; phone: string | null }) => {
+  const handleCustomerSelect = (customer: { id: string; cpf: string; name: string; phone: string | null; defaultAddress?: any }) => {
     setCustomerName(customer.name);
     setCustomerCpf(customer.cpf);
     setCustomerPhone(customer.phone || "");
+    // Auto-fill address if delivery and address available
+    if (customer.defaultAddress && orderType === "delivery") {
+      setDeliveryAddress(customer.defaultAddress.street + (customer.defaultAddress.number ? `, ${customer.defaultAddress.number}` : ""));
+      setDeliveryCep(customer.defaultAddress.zip_code || "");
+      setDeliveryNeighborhood(customer.defaultAddress.neighborhood || "");
+      setDeliveryCity(`${customer.defaultAddress.city} - ${customer.defaultAddress.state}`);
+    }
   };
 
   const handleCepLookup = async (cep: string) => {
