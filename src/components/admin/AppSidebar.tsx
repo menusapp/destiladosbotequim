@@ -20,7 +20,6 @@ import {
   MessageSquare,
   Megaphone,
   Gift,
-  Smartphone,
   FileText,
   Plug,
   HardDrive,
