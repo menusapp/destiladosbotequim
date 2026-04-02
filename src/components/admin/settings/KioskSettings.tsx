@@ -98,18 +98,23 @@ export default function KioskSettings({ restaurantId }: Props) {
 
   const handleSave = async () => {
     if (!localConfig || !config) return;
+    console.log("[KioskSettings] Salvando configurações:", JSON.stringify(localConfig));
     setSaving(true);
     try {
+      const payload = { ...localConfig, updated_at: new Date().toISOString() };
+      delete (payload as any).id;
+      console.log("[KioskSettings] Payload para upsert:", JSON.stringify(payload));
       const { error } = await supabase
         .from("kiosk_config")
-        .update({ ...localConfig, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq("id", config.id);
       if (error) throw error;
       setConfig({ ...localConfig });
       setHasChanges(false);
+      console.log("[KioskSettings] Configurações salvas com sucesso");
       toast.success("Configurações do Totem salvas!");
     } catch (err) {
-      console.error("[KioskSettings] Error saving:", err);
+      console.error("[KioskSettings] Erro ao salvar:", err);
       toast.error("Erro ao salvar configurações");
     } finally {
       setSaving(false);
