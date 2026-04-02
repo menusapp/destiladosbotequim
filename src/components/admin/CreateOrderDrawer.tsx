@@ -150,6 +150,29 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
   };
 
+  // CRM: Save/update customer data before creating orders
+  const upsertCustomerCRM = async () => {
+    const cpf = customerCpf?.replace(/\D/g, "");
+    if (!cpf || cpf.length < 11) return;
+    const name = customerName || "Cliente";
+    const phone = customerPhone || null;
+
+    const { data: existing } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("restaurant_id", restaurantId)
+      .eq("cpf", customerCpf)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from("customers").update({ name, phone }).eq("id", existing.id);
+    } else {
+      await supabase.from("customers").insert({
+        restaurant_id: restaurantId, cpf: customerCpf, name, phone,
+      });
+    }
+  };
+
   const handleSubmit = async () => {
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
     if (!customerName && orderType !== "mesa") { toast.error("Nome do cliente é obrigatório"); return; }
