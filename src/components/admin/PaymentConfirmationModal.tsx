@@ -218,7 +218,12 @@ export const PaymentConfirmationModal = ({
 
       const { error } = await supabase
         .from("orders")
-        .update({ payment_type: paymentDisplayStr, payment_brand: primaryBrand })
+        .update({ 
+          payment_type: paymentDisplayStr, 
+          payment_brand: primaryBrand,
+          status: "paid",
+          paid_at: new Date().toISOString(),
+        })
         .eq("id", order.id);
 
       if (error) throw error;

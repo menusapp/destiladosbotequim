@@ -408,7 +408,7 @@ export function KioskPayment({
             onClick={handleFinalize}
             className="w-full h-14 text-lg font-bold rounded-xl text-white"
             style={{ backgroundColor: primaryColor }}
-            disabled={submitting || !canFinalize}
+            disabled={submitting || !canFinalizePayment}
           >
             {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" />Finalizando...</> : "Finalizar Pedido"}
           </Button>
