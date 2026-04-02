@@ -10,7 +10,6 @@ import {
   Users,
   Settings,
   CircleDollarSign,
-  MessageCircle,
   Construction,
   ChevronDown,
   ChevronRight,
