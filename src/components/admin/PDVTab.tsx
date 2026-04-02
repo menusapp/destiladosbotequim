@@ -19,8 +19,7 @@ import {
   MoreVertical, QrCode, Link2, Eraser
 } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/sonner";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import { Printer } from "lucide-react";
