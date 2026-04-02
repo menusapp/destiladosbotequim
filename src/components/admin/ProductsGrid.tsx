@@ -593,6 +593,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setSelectedExtraStockItem(""); setExtraIngredientQuantity("");
     setEditingProduct(null); setLinkedGroups([]); setSelectedComplementCategory("");
     setGroupIsRequired(false); setGroupMinSelection("0"); setGroupMaxSelection(""); setExtraIsRequired(false);
+    setVisibilityChannels(["all"]);
     setFiscalNcm(""); setFiscalException(""); setFiscalCest(""); setFiscalCfop("");
     setFiscalIcmsCsosn(""); setFiscalIcmsOrigin("0"); setFiscalPisCst(""); setFiscalPisAliquota("");
     setFiscalCofinsCst(""); setFiscalCofinsAliquota(""); setFiscalIbsAliquota(""); setFiscalCbsAliquota("");
