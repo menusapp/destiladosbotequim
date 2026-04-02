@@ -735,7 +735,7 @@ const RestaurantAdmin = () => {
     "config-horario": () => import("@/components/admin/settings/BusinessHoursSettings"),
     "config-regioes": () => import("@/components/admin/settings/DeliveryZonesSettings"),
     "config-pagamentos": () => import("@/components/admin/settings/PaymentMethodsSettings"),
-    "config-pagamentos-online": () => import("@/components/admin/settings/OnlinePaymentsSettings"),
+    
     "config-impressoras": () => import("@/components/admin/settings/PrintersSettings"),
     "config-whatsapp": () => import("@/components/admin/settings/WhatsAppSettings"),
     "config-totem": () => import("@/components/admin/settings/KioskSettings"),
