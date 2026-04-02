@@ -115,10 +115,17 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     toast.success(`${item.productName} adicionado!`);
   };
 
-  const handleCustomerSelect = (customer: { id: string; cpf: string; name: string; phone: string | null }) => {
+  const handleCustomerSelect = (customer: { id: string; cpf: string; name: string; phone: string | null; defaultAddress?: any }) => {
     setCustomerName(customer.name);
     setCustomerCpf(customer.cpf);
     setCustomerPhone(customer.phone || "");
+    // Auto-fill address if delivery and address available
+    if (customer.defaultAddress && orderType === "delivery") {
+      setDeliveryAddress(customer.defaultAddress.street + (customer.defaultAddress.number ? `, ${customer.defaultAddress.number}` : ""));
+      setDeliveryCep(customer.defaultAddress.zip_code || "");
+      setDeliveryNeighborhood(customer.defaultAddress.neighborhood || "");
+      setDeliveryCity(`${customer.defaultAddress.city} - ${customer.defaultAddress.state}`);
+    }
   };
 
   const handleCepLookup = async (cep: string) => {
@@ -141,6 +148,29 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
+  };
+
+  // CRM: Save/update customer data before creating orders
+  const upsertCustomerCRM = async () => {
+    const cpf = customerCpf?.replace(/\D/g, "");
+    if (!cpf || cpf.length < 11) return;
+    const name = customerName || "Cliente";
+    const phone = customerPhone || null;
+
+    const { data: existing } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("restaurant_id", restaurantId)
+      .eq("cpf", customerCpf)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from("customers").update({ name, phone }).eq("id", existing.id);
+    } else {
+      await supabase.from("customers").insert({
+        restaurant_id: restaurantId, cpf: customerCpf, name, phone,
+      });
+    }
   };
 
   const handleSubmit = async () => {
@@ -178,6 +208,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
 
     setSubmitting(true);
     try {
+      // Save customer to CRM
+      await upsertCustomerCRM();
       if (orderType === "delivery") {
         if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
         const { data: order, error } = await supabase.from("orders").insert({
@@ -324,7 +356,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                   </TabsList>
                 </Tabs>
 
-                {/* Customer */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Cliente</Label>
@@ -332,11 +363,21 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       <UserPlus className="w-3.5 h-3.5 mr-1" /> Buscar
                     </Button>
                   </div>
+                  <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => {
+                    setCustomerCpf(e.target.value);
+                    const clean = e.target.value.replace(/\D/g, "");
+                    if (clean.length === 11) {
+                      supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", e.target.value).maybeSingle()
+                        .then(({ data }) => {
+                          if (data) {
+                            setCustomerName(data.name);
+                            setCustomerPhone(data.phone || "");
+                          }
+                        });
+                    }
+                  }} />
                   <Input placeholder="Nome do cliente" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                  {(orderType === "delivery") && (
-                    <Input placeholder="Telefone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
-                  )}
-                  <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => setCustomerCpf(e.target.value)} />
+                  <Input placeholder="Celular" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
                 </div>
 
                 {/* Type-specific fields */}

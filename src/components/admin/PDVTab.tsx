@@ -11,18 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import {
-  Search, Users, ShoppingCart, UserPlus, X, Loader2, Settings,
-  MoreVertical, QrCode, Link2, Eraser, CheckCircle, Package, CalendarIcon
+  Search, ShoppingCart, UserPlus, X, Loader2, Settings,
+  MoreVertical, QrCode, Link2, Eraser
 } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import { Printer } from "lucide-react";
@@ -353,12 +349,44 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     }
   };
 
+  // CRM: Save/update customer data before creating orders
+  const upsertCustomerCRM = async () => {
+    const cpf = customerCpf?.replace(/\D/g, "");
+    if (!cpf || cpf.length < 11) return;
+    const name = customerName || "Cliente PDV";
+    const phone = customerPhone || null;
+
+    const { data: existing } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("restaurant_id", restaurantId)
+      .eq("cpf", customerCpf)
+      .maybeSingle();
+
+    if (existing) {
+      // Update name/phone if changed
+      await supabase.from("customers").update({
+        name, phone,
+      }).eq("id", existing.id);
+    } else {
+      // Create new
+      await supabase.from("customers").insert({
+        restaurant_id: restaurantId,
+        cpf: customerCpf,
+        name,
+        phone,
+      });
+    }
+  };
+
   const handleSubmit = async () => {
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
     if (!customerName && orderType !== "mesa" && orderType !== "viagem") { toast.error("Nome do cliente é obrigatório"); return; }
 
     setSubmitting(true);
     try {
+      // Save customer to CRM
+      await upsertCustomerCRM();
       if (orderType === "delivery") {
         if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
         const { data: order, error } = await supabase.from("orders").insert({
@@ -620,34 +648,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                 </Button>
               )}
             </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("h-9 px-3 text-xs whitespace-nowrap", orderSearchDate && "text-primary border-primary")}>
-                  <CalendarIcon className="w-3.5 h-3.5 mr-1.5" />
-                  {orderSearchDate ? format(orderSearchDate, "dd/MM/yyyy") : "Data"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={orderSearchDate}
-                  onSelect={setOrderSearchDate}
-                  locale={ptBR}
-                  className={cn("p-3 pointer-events-auto")}
-                />
-                {orderSearchDate && (
-                  <div className="p-2 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setOrderSearchDate(undefined)}>
-                      Limpar data
-                    </Button>
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
           </div>
 
           {/* Search Results (scrollable) */}
-          {(orderSearchTerm.length >= 2 || orderSearchDate) && (
+          {(orderSearchTerm.length >= 2) && (
             <div className="mb-2 flex-shrink-0">
               {filteredOrders.length === 0 && orderSearchTerm.length >= 2 ? (
                 <p className="text-sm text-muted-foreground text-center py-3">Nenhum pedido encontrado</p>
@@ -746,9 +750,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                         <DropdownMenuItem onClick={() => handleCopyLink(table)}>
                           <Link2 className="w-4 h-4 mr-2" /> Copiar Link
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleTableSelect(table)}>
-                          <ShoppingCart className="w-4 h-4 mr-2" /> Criar Pedido
-                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleClearTable(table)}
                           className="text-destructive focus:text-destructive"
@@ -837,11 +838,22 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                     <UserPlus className="w-3 h-3 mr-1" /> Buscar
                   </Button>
                 </div>
+                <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => {
+                  setCustomerCpf(e.target.value);
+                  // Auto-lookup customer by CPF
+                  const clean = e.target.value.replace(/\D/g, "");
+                  if (clean.length === 11) {
+                    supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", e.target.value).maybeSingle()
+                      .then(({ data }) => {
+                        if (data) {
+                          setCustomerName(data.name);
+                          setCustomerPhone(data.phone || "");
+                        }
+                      });
+                  }
+                }} className="h-8 text-sm" />
                 <Input placeholder="Nome" value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-8 text-sm" />
-                {orderType === "delivery" && (
-                  <Input placeholder="Telefone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-8 text-sm" />
-                )}
-                <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => setCustomerCpf(e.target.value)} className="h-8 text-sm" />
+                <Input placeholder="Celular" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-8 text-sm" />
               </div>
 
               {/* Type-specific fields */}
