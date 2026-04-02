@@ -331,7 +331,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                   </TabsList>
                 </Tabs>
 
-                {/* Customer */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Cliente</Label>
@@ -339,11 +338,21 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       <UserPlus className="w-3.5 h-3.5 mr-1" /> Buscar
                     </Button>
                   </div>
+                  <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => {
+                    setCustomerCpf(e.target.value);
+                    const clean = e.target.value.replace(/\D/g, "");
+                    if (clean.length === 11) {
+                      supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", e.target.value).maybeSingle()
+                        .then(({ data }) => {
+                          if (data) {
+                            setCustomerName(data.name);
+                            setCustomerPhone(data.phone || "");
+                          }
+                        });
+                    }
+                  }} />
                   <Input placeholder="Nome do cliente" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                  {(orderType === "delivery") && (
-                    <Input placeholder="Telefone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
-                  )}
-                  <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => setCustomerCpf(e.target.value)} />
+                  <Input placeholder="Celular" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
                 </div>
 
                 {/* Type-specific fields */}
