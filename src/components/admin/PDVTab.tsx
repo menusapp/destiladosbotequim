@@ -834,11 +834,22 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                     <UserPlus className="w-3 h-3 mr-1" /> Buscar
                   </Button>
                 </div>
+                <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => {
+                  setCustomerCpf(e.target.value);
+                  // Auto-lookup customer by CPF
+                  const clean = e.target.value.replace(/\D/g, "");
+                  if (clean.length === 11) {
+                    supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", e.target.value).maybeSingle()
+                      .then(({ data }) => {
+                        if (data) {
+                          setCustomerName(data.name);
+                          setCustomerPhone(data.phone || "");
+                        }
+                      });
+                  }
+                }} className="h-8 text-sm" />
                 <Input placeholder="Nome" value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-8 text-sm" />
-                {orderType === "delivery" && (
-                  <Input placeholder="Telefone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-8 text-sm" />
-                )}
-                <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => setCustomerCpf(e.target.value)} className="h-8 text-sm" />
+                <Input placeholder="Celular" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-8 text-sm" />
               </div>
 
               {/* Type-specific fields */}
