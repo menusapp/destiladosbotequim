@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   Monitor, Copy, ExternalLink, Power, CreditCard, Banknote, QrCode, Smartphone,
   UtensilsCrossed, ShoppingBag, Truck, Store, Users, Gift, Tag, Percent, Timer, Loader2, Save,
@@ -98,12 +97,10 @@ export default function KioskSettings({ restaurantId }: Props) {
 
   const handleSave = async () => {
     if (!localConfig || !config) return;
-    console.log("[KioskSettings] Salvando configurações:", JSON.stringify(localConfig));
     setSaving(true);
     try {
       const payload = { ...localConfig, updated_at: new Date().toISOString() };
       delete (payload as any).id;
-      console.log("[KioskSettings] Payload para upsert:", JSON.stringify(payload));
       const { error } = await supabase
         .from("kiosk_config")
         .update(payload)
@@ -111,7 +108,6 @@ export default function KioskSettings({ restaurantId }: Props) {
       if (error) throw error;
       setConfig({ ...localConfig });
       setHasChanges(false);
-      console.log("[KioskSettings] Configurações salvas com sucesso");
       toast.success("Configurações do Totem salvas!");
     } catch (err) {
       console.error("[KioskSettings] Erro ao salvar:", err);
@@ -140,167 +136,156 @@ export default function KioskSettings({ restaurantId }: Props) {
   if (!localConfig) return null;
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-4">
       {/* Save button sticky */}
       {hasChanges && (
-        <div className="sticky top-0 z-10 bg-card border rounded-xl p-4 shadow-lg flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-card border rounded-xl p-3 shadow-lg flex items-center justify-between">
           <span className="text-sm font-medium text-muted-foreground">Você tem alterações não salvas</span>
-          <Button onClick={handleSave} disabled={saving} className="gap-2">
+          <Button onClick={handleSave} disabled={saving} size="sm" className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Salvar alterações
           </Button>
         </div>
       )}
 
-      {/* Status do Módulo */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Monitor className="h-5 w-5 text-primary" />
-              <div>
-                <CardTitle className="text-lg">Status do Totem</CardTitle>
-                <CardDescription>Ative ou desative o autoatendimento</CardDescription>
+      {/* Row 1: Status + Link */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Status */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Monitor className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Status do Totem</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={localConfig.enabled ? "default" : "secondary"} className="text-xs">
+                  {localConfig.enabled ? "Ativo" : "Inativo"}
+                </Badge>
+                <Switch
+                  checked={localConfig.enabled}
+                  onCheckedChange={(v) => updateLocal({ enabled: v })}
+                />
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge variant={localConfig.enabled ? "default" : "secondary"}>
-                {localConfig.enabled ? "Ativo" : "Inativo"}
-              </Badge>
-              <Switch
-                checked={localConfig.enabled}
-                onCheckedChange={(v) => updateLocal({ enabled: v })}
-              />
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Link do Totem */}
-      {localConfig.enabled && kioskUrl && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <ExternalLink className="h-5 w-5 text-primary" />
-              Link do Totem
-            </CardTitle>
-            <CardDescription>Use este link no navegador do totem/tablet</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Input value={kioskUrl} readOnly className="font-mono text-sm" />
-              <Button variant="outline" size="icon" onClick={copyLink}>
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" asChild>
-                <a href={kioskUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </Button>
+        </Card>
+
+        {/* Link */}
+        {localConfig.enabled && kioskUrl && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ExternalLink className="h-4 w-4 text-primary" />
+                Link do Totem
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex items-center gap-2">
+                <Input value={kioskUrl} readOnly className="font-mono text-xs h-8" />
+                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={copyLink}>
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" asChild>
+                  <a href={kioskUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Row 2: Order Types + Payments (side by side) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Tipos de Pedido</CardTitle>
+            <CardDescription className="text-xs">Opções de consumo disponíveis</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <ToggleRow icon={UtensilsCrossed} label="Comer no local" checked={localConfig.order_dine_in} onChange={(v) => updateLocal({ order_dine_in: v })} />
+            <ToggleRow icon={ShoppingBag} label="Para viagem" checked={localConfig.order_takeaway} onChange={(v) => updateLocal({ order_takeaway: v })} />
+            <ToggleRow icon={Store} label="Retirada no balcão" checked={localConfig.order_pickup} onChange={(v) => updateLocal({ order_pickup: v })} />
+            <ToggleRow icon={Truck} label="Entrega" checked={localConfig.order_delivery} onChange={(v) => updateLocal({ order_delivery: v })} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Formas de Pagamento</CardTitle>
+            <CardDescription className="text-xs">Meios aceitos no totem</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <ToggleRow icon={Banknote} label="Dinheiro" checked={localConfig.payment_cash} onChange={(v) => updateLocal({ payment_cash: v })} />
+            <ToggleRow icon={CreditCard} label="Cartão na maquininha" checked={localConfig.payment_card} onChange={(v) => updateLocal({ payment_card: v })} />
+            <ToggleRow icon={QrCode} label="PIX" checked={localConfig.payment_pix} onChange={(v) => updateLocal({ payment_pix: v })} />
+            <ToggleRow icon={Smartphone} label="Pagamento online" checked={localConfig.payment_online} onChange={(v) => updateLocal({ payment_online: v })} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 3: Identification + Loyalty + Timeout (3 cols) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              Identificação
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <ToggleRow icon={Users} label="Exigir CPF" checked={localConfig.require_cpf} onChange={(v) => updateLocal({ require_cpf: v })} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Gift className="h-4 w-4 text-primary" />
+              Fidelidade e Promoções
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <ToggleRow icon={Gift} label="Programa de fidelidade" checked={localConfig.loyalty_enabled} onChange={(v) => updateLocal({ loyalty_enabled: v })} />
+            <ToggleRow icon={Tag} label="Cupons de desconto" checked={localConfig.coupons_enabled} onChange={(v) => updateLocal({ coupons_enabled: v })} />
+            <ToggleRow icon={Percent} label="Promoções automáticas" checked={localConfig.promotions_enabled} onChange={(v) => updateLocal({ promotions_enabled: v })} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Timer className="h-4 w-4 text-primary" />
+              Timeout
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <Label className="text-xs">Segundos de inatividade</Label>
+              <Input
+                type="number"
+                value={localConfig.inactivity_timeout_seconds}
+                onChange={(e) => {
+                  const val = Math.max(30, parseInt(e.target.value) || 120);
+                  updateLocal({ inactivity_timeout_seconds: val });
+                }}
+                className="h-8 text-sm"
+                min={30}
+                max={600}
+              />
+              <p className="text-xs text-muted-foreground">
+                {Math.floor(localConfig.inactivity_timeout_seconds / 60)}m {localConfig.inactivity_timeout_seconds % 60}s
+              </p>
             </div>
           </CardContent>
         </Card>
-      )}
+      </div>
 
-      {/* Tipos de Pedido */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Tipos de Pedido</CardTitle>
-          <CardDescription>Quais opções de consumo o cliente pode escolher</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ToggleRow icon={UtensilsCrossed} label="Comer no local" description="Cliente consome no estabelecimento" checked={localConfig.order_dine_in} onChange={(v) => updateLocal({ order_dine_in: v })} />
-          <Separator />
-          <ToggleRow icon={ShoppingBag} label="Para viagem" description="Cliente retira e leva" checked={localConfig.order_takeaway} onChange={(v) => updateLocal({ order_takeaway: v })} />
-          <Separator />
-          <ToggleRow icon={Store} label="Retirada no balcão" description="Cliente retira no balcão" checked={localConfig.order_pickup} onChange={(v) => updateLocal({ order_pickup: v })} />
-          <Separator />
-          <ToggleRow icon={Truck} label="Entrega" description="Pedido para entrega (quando disponível)" checked={localConfig.order_delivery} onChange={(v) => updateLocal({ order_delivery: v })} />
-        </CardContent>
-      </Card>
-
-      {/* Formas de Pagamento */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Formas de Pagamento</CardTitle>
-          <CardDescription>Meios de pagamento aceitos no totem</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ToggleRow icon={Banknote} label="Dinheiro" description="Pagamento em espécie com cálculo de troco" checked={localConfig.payment_cash} onChange={(v) => updateLocal({ payment_cash: v })} />
-          <Separator />
-          <ToggleRow icon={CreditCard} label="Cartão na maquininha" description="Pagamento na maquininha ao lado do totem" checked={localConfig.payment_card} onChange={(v) => updateLocal({ payment_card: v })} />
-          <Separator />
-          <ToggleRow icon={QrCode} label="PIX" description="Pagamento via QR Code PIX" checked={localConfig.payment_pix} onChange={(v) => updateLocal({ payment_pix: v })} />
-          <Separator />
-          <ToggleRow icon={Smartphone} label="Pagamento online" description="Cartão online integrado (futura integração)" checked={localConfig.payment_online} onChange={(v) => updateLocal({ payment_online: v })} />
-        </CardContent>
-      </Card>
-
-      {/* Identificação do Cliente */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            Identificação do Cliente
-          </CardTitle>
-          <CardDescription>Configurações de CRM e identificação</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ToggleRow icon={Users} label="Exigir CPF" description="Obrigar identificação por CPF antes do pedido" checked={localConfig.require_cpf} onChange={(v) => updateLocal({ require_cpf: v })} />
-        </CardContent>
-      </Card>
-
-      {/* Fidelidade e Cupons */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Gift className="h-5 w-5 text-primary" />
-            Fidelidade e Promoções
-          </CardTitle>
-          <CardDescription>Recursos de engajamento no totem</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ToggleRow icon={Gift} label="Programa de fidelidade" description="Acumular e resgatar pontos no totem" checked={localConfig.loyalty_enabled} onChange={(v) => updateLocal({ loyalty_enabled: v })} />
-          <Separator />
-          <ToggleRow icon={Tag} label="Cupons de desconto" description="Permitir aplicar cupons no totem" checked={localConfig.coupons_enabled} onChange={(v) => updateLocal({ coupons_enabled: v })} />
-          <Separator />
-          <ToggleRow icon={Percent} label="Promoções automáticas" description="Exibir descontos e promoções vigentes" checked={localConfig.promotions_enabled} onChange={(v) => updateLocal({ promotions_enabled: v })} />
-        </CardContent>
-      </Card>
-
-      {/* Timeout */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Timer className="h-5 w-5 text-primary" />
-            Timeout de Inatividade
-          </CardTitle>
-          <CardDescription>Tempo para resetar sessão automaticamente</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <Label>Segundos de inatividade:</Label>
-            <Input
-              type="number"
-              value={localConfig.inactivity_timeout_seconds}
-              onChange={(e) => {
-                const val = Math.max(30, parseInt(e.target.value) || 120);
-                updateLocal({ inactivity_timeout_seconds: val });
-              }}
-              className="w-24"
-              min={30}
-              max={600}
-            />
-            <span className="text-sm text-muted-foreground">
-              ({Math.floor(localConfig.inactivity_timeout_seconds / 60)}m {localConfig.inactivity_timeout_seconds % 60}s)
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Bottom save button */}
-      <div className="flex justify-end pb-8">
-        <Button onClick={handleSave} disabled={saving || !hasChanges} size="lg" className="gap-2">
+      {/* Bottom save */}
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving || !hasChanges} size="sm" className="gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar alterações
         </Button>
@@ -310,18 +295,15 @@ export default function KioskSettings({ restaurantId }: Props) {
 }
 
 function ToggleRow({
-  icon: Icon, label, description, checked, onChange,
+  icon: Icon, label, checked, onChange,
 }: {
-  icon: any; label: string; description: string; checked: boolean; onChange: (v: boolean) => void;
+  icon: any; label: string; checked: boolean; onChange: (v: boolean) => void;
 }) {
   return (
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <div>
-          <p className="text-sm font-medium">{label}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+        <p className="text-sm">{label}</p>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
     </div>

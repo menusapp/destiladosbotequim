@@ -735,7 +735,7 @@ const RestaurantAdmin = () => {
     "config-horario": () => import("@/components/admin/settings/BusinessHoursSettings"),
     "config-regioes": () => import("@/components/admin/settings/DeliveryZonesSettings"),
     "config-pagamentos": () => import("@/components/admin/settings/PaymentMethodsSettings"),
-    "config-pagamentos-online": () => import("@/components/admin/settings/OnlinePaymentsSettings"),
+    
     "config-impressoras": () => import("@/components/admin/settings/PrintersSettings"),
     "config-whatsapp": () => import("@/components/admin/settings/WhatsAppSettings"),
     "config-totem": () => import("@/components/admin/settings/KioskSettings"),
@@ -789,9 +789,12 @@ const RestaurantAdmin = () => {
       case "config-regioes":
         return <DeliveryZonesSettings restaurantId={restaurant.id} />;
       case "config-pagamentos":
-        return <PaymentMethodsSettings restaurantId={restaurant.id} />;
-      case "config-pagamentos-online":
-        return <OnlinePaymentsSettings restaurantId={restaurant.id} />;
+        return (
+          <div className="space-y-8">
+            <PaymentMethodsSettings restaurantId={restaurant.id} />
+            <OnlinePaymentsSettings restaurantId={restaurant.id} />
+          </div>
+        );
       case "config-impressoras":
         return <PrintersSettings restaurantId={restaurant.id} />;
       case "config-whatsapp":

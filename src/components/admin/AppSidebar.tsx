@@ -10,7 +10,6 @@ import {
   Users,
   Settings,
   CircleDollarSign,
-  MessageCircle,
   Construction,
   ChevronDown,
   ChevronRight,
@@ -21,7 +20,6 @@ import {
   MessageSquare,
   Megaphone,
   Gift,
-  Smartphone,
   FileText,
   Plug,
   HardDrive,
@@ -99,12 +97,11 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
 
   const menuStructure = {
     configSubItems: [
-      { id: "config-dados", label: "Configurações Gerais", icon: Building2 },
+      { id: "config-dados", label: "Geral", icon: Building2 },
+      { id: "config-totem", label: "Totem", icon: Monitor },
       { id: "config-horario", label: "Horário de Funcionamento", icon: Clock },
       { id: "config-regioes", label: "Regiões de Entrega", icon: MapPin },
       { id: "config-pagamentos", label: "Formas de Pagamento", icon: CreditCard },
-      { id: "config-pagamentos-online", label: "Pagamentos Online", icon: Smartphone },
-      { id: "config-totem", label: "Totem", icon: Monitor },
       { id: "config-impressoras", label: "Impressoras", icon: Printer },
       { id: "config-whatsapp", label: "Automação WhatsApp", icon: MessageSquare },
       { id: "config-backup", label: "Backup e Restauração", icon: HardDrive },
