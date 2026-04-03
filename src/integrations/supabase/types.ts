@@ -2865,7 +2865,7 @@ export type Database = {
       products: {
         Row: {
           available: boolean | null
-          category_id: string
+          category_id: string | null
           created_at: string | null
           description: string | null
           featured_display_order: number | null
@@ -2892,12 +2892,13 @@ export type Database = {
           prep_time_minutes: number | null
           price: number
           promotional_price: number | null
+          restaurant_id: string
           updated_at: string | null
           visibility_channels: string[] | null
         }
         Insert: {
           available?: boolean | null
-          category_id: string
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           featured_display_order?: number | null
@@ -2924,12 +2925,13 @@ export type Database = {
           prep_time_minutes?: number | null
           price: number
           promotional_price?: number | null
+          restaurant_id: string
           updated_at?: string | null
           visibility_channels?: string[] | null
         }
         Update: {
           available?: boolean | null
-          category_id?: string
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           featured_display_order?: number | null
@@ -2956,6 +2958,7 @@ export type Database = {
           prep_time_minutes?: number | null
           price?: number
           promotional_price?: number | null
+          restaurant_id?: string
           updated_at?: string | null
           visibility_channels?: string[] | null
         }
@@ -2965,6 +2968,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
         ]

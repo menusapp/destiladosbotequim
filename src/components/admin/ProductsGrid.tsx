@@ -34,7 +34,7 @@ interface Product {
   description: string | null;
   price: number;
   promotional_price?: number | null;
-  category_id: string;
+  category_id: string | null;
   available: boolean;
   image_url: string | null;
   cost?: number;
@@ -221,11 +221,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   };
 
   const fetchProducts = async () => {
-    const { data: restaurantCategories } = await supabase.from("categories").select("id").eq("restaurant_id", restaurantId);
-    if (!restaurantCategories || restaurantCategories.length === 0) { setProducts([]); return; }
-
-    const categoryIds = restaurantCategories.map(c => c.id);
-    const { data } = await supabase.from("products").select("*").in("category_id", categoryIds);
+    const { data } = await supabase.from("products").select("*").eq("restaurant_id", restaurantId);
+    if (!data || data.length === 0) { setProducts([]); return; }
     if (!data || data.length === 0) { setProducts([]); return; }
 
     const productIds = data.map(p => p.id);
@@ -295,7 +292,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductDescription(product.description || "");
     setProductPrice(product.price.toString());
     setProductPromotionalPrice(product.promotional_price?.toString() || "");
-    setProductCategoryId(product.category_id);
+    setProductCategoryId(product.category_id || "__none");
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
     setPdvCode((product as any).pdv_code || "");
@@ -416,7 +413,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isRestaurantOpen) { toast.error("Feche o restaurante para modificar produtos"); return; }
-    if (!productCategoryId) { toast.error("Selecione uma categoria"); return; }
+    // category is now optional
 
     let imageUrl = productImageUrl;
     if (productImage) {
@@ -431,7 +428,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     const productData: any = {
       name: productName, description: productDescription, price: parseFloat(productPrice),
       promotional_price: productPromotionalPrice ? parseFloat(productPromotionalPrice) : null,
-      category_id: productCategoryId, image_url: imageUrl,
+      category_id: (productCategoryId && productCategoryId !== "__none") ? productCategoryId : null, image_url: imageUrl, restaurant_id: restaurantId,
       prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : null,
       pdv_code: pdvCode || null,
       visibility_channels: visibilityChannels,
@@ -511,7 +508,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductDescription(product.description || "");
     setProductPrice(product.price.toString());
     setProductPromotionalPrice(product.promotional_price?.toString() || "");
-    setProductCategoryId(product.category_id);
+    setProductCategoryId(product.category_id || "__none");
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
     setPdvCode((product as any).pdv_code || "");
@@ -695,10 +692,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                           <Textarea id="product-description" value={productDescription} onChange={(e) => setProductDescription(e.target.value)} placeholder="Descreva o produto..." rows={3} className="mt-1 resize-none" />
                         </div>
                         <div>
-                          <Label htmlFor="product-category">Categoria *</Label>
+                          <Label htmlFor="product-category">Categoria</Label>
                           <Select value={productCategoryId} onValueChange={setProductCategoryId}>
-                            <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue placeholder="Sem categoria" /></SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="__none">Sem categoria</SelectItem>
                               {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
                             </SelectContent>
                           </Select>
