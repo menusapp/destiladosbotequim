@@ -103,7 +103,7 @@ export const TableDetailDialog = ({
           order_items(
             id, quantity, price_at_order, notes,
             products(name),
-            order_item_extras(price_at_order, product_extra_id, product_extras(name))
+            order_item_extras(price_at_order, extra_name, product_extra_id, product_extras(name))
           )
         `)
         .eq("table_id", table.id)
@@ -480,6 +480,7 @@ export const TableDetailDialog = ({
           products: item.products,
           order_item_extras: (item.order_item_extras || []).map((e: any) => ({
             price_at_order: e.price_at_order,
+            extra_name: e.extra_name,
             product_extras: e.product_extras,
           })),
         })),
@@ -507,6 +508,7 @@ export const TableDetailDialog = ({
           products: item.products,
           order_item_extras: (item.order_item_extras || []).map((e: any) => ({
             price_at_order: e.price_at_order,
+            extra_name: e.extra_name,
             product_extras: e.product_extras,
           })),
         }))
@@ -571,7 +573,7 @@ export const TableDetailDialog = ({
         {item.order_item_extras?.length > 0 && (
           <div className="ml-4 space-y-0.5">
             {item.order_item_extras.map((extra: any, idx: number) => {
-              const extraName = extra.product_extras?.name || extra.extra_category_items?.name || "Adicional";
+              const extraName = extra.extra_name || extra.product_extras?.name || extra.extra_category_items?.name || "Adicional";
               return (
                 <div key={idx} className="text-[11px] text-muted-foreground flex justify-between">
                   <span>+ {extraName}</span>

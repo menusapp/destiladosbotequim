@@ -343,6 +343,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
             order_item_id: oi.id,
             product_extra_id: e.is_complement ? null : e.extraId,
             price_at_order: e.price,
+            extra_name: e.name,
           }))
         );
       }

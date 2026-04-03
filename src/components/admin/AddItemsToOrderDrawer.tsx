@@ -145,6 +145,7 @@ export const AddItemsToOrderDrawer = ({
           order_item_id: orderItem.id,
           product_extra_id: extra.extraId,
           price_at_order: extra.price,
+          extra_name: extra.name,
         }));
 
         const { error: extrasError } = await supabase

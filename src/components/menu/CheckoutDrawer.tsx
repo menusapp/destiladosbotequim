@@ -236,6 +236,7 @@ export const CheckoutDrawer = ({
             order_item_id: orderItem.id,
             product_extra_id: (extra as any).is_complement ? null : extra.id,
             price_at_order: (item.isRewardItem || item.isCouponFreeItem) ? 0 : extra.price,
+            extra_name: extra.name,
           });
         }
       }

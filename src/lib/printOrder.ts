@@ -47,7 +47,7 @@ export const printOrder = async (
       price_at_order: number;
       notes?: string;
       products: { name: string } | null;
-      order_item_extras: { price_at_order: number; product_extras: { name: string } | null }[];
+      order_item_extras: { price_at_order: number; extra_name?: string | null; product_extras: { name: string } | null }[];
     }[];
   },
   restaurantId: string
@@ -89,7 +89,7 @@ export const printOrder = async (
   // Calculate items
   const items = order.order_items.map((item) => {
     const extras = item.order_item_extras.map((e) => ({
-      name: e.product_extras?.name || "Extra",
+      name: e.extra_name || e.product_extras?.name || "Extra",
       price: e.price_at_order,
     }));
     return {

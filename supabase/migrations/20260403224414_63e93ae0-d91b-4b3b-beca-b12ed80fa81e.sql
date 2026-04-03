@@ -1,0 +1,1 @@
+ALTER TABLE public.order_item_extras ADD COLUMN IF NOT EXISTS extra_name text;

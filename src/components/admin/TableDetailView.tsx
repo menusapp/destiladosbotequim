@@ -42,6 +42,7 @@ interface ComandaWithDetails {
 
 interface OrderItemExtra {
   price_at_order: number;
+  extra_name?: string | null;
   product_extras: { name: string } | null;
 }
 
@@ -156,6 +157,7 @@ export const TableDetailView = () => {
             products (name),
             order_item_extras (
               price_at_order,
+              extra_name,
               product_extras (name)
             )
           )
@@ -270,6 +272,7 @@ export const TableDetailView = () => {
         products: item.products,
         order_item_extras: item.order_item_extras.map(e => ({
           price_at_order: e.price_at_order,
+          extra_name: e.extra_name,
           product_extras: e.product_extras,
         })),
       })),
@@ -483,7 +486,7 @@ export const TableDetailView = () => {
                                     )}
                                     {item.order_item_extras.map((extra, idx) => (
                                       <p key={idx} className="text-sm text-muted-foreground ml-4">
-                                        + {extra.product_extras?.name || "Extra"} (R$ {extra.price_at_order.toFixed(2)})
+                                        + {extra.extra_name || extra.product_extras?.name || "Extra"} (R$ {extra.price_at_order.toFixed(2)})
                                       </p>
                                     ))}
                                   </div>
@@ -540,7 +543,7 @@ export const TableDetailView = () => {
                           </p>
                           {item.order_item_extras.map((extra, idx) => (
                             <p key={idx} className="text-muted-foreground ml-4">
-                              + {extra.product_extras?.name || "Extra"}
+                              + {extra.extra_name || extra.product_extras?.name || "Extra"}
                             </p>
                           ))}
                           {item.notes && (

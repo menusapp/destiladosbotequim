@@ -18,6 +18,7 @@ import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 
 interface OrderItemExtra {
   price_at_order: number;
+  extra_name?: string | null;
   product_extras: { name: string } | null;
 }
 
@@ -78,7 +79,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const refreshOrder = useCallback(async () => {
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
       .eq("id", order.id)
       .single();
     if (!error && data) {
@@ -484,7 +485,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                         <TableCell className="text-right">R$ {item.price_at_order.toFixed(2)}</TableCell>
                         <TableCell>
                           {item.order_item_extras.length > 0 ? (
-                            <div className="text-xs space-y-1">{item.order_item_extras.map((extra, idx) => (<div key={idx}>+ {extra.product_extras?.name} (R$ {extra.price_at_order.toFixed(2)})</div>))}</div>
+                            <div className="text-xs space-y-1">{item.order_item_extras.map((extra, idx) => (<div key={idx}>+ {extra.extra_name || extra.product_extras?.name || "Extra"} (R$ {extra.price_at_order.toFixed(2)})</div>))}</div>
                           ) : "—"}
                         </TableCell>
                         <TableCell className="text-right font-medium">R$ {itemSubtotal.toFixed(2)}</TableCell>
