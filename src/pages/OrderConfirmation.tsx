@@ -10,13 +10,21 @@ import { format } from "date-fns";
 import { Clock, Phone, CheckCircle2, Package, Truck, MapPin, XCircle } from "lucide-react";
 import { ReviewModal } from "@/components/menu/ReviewModal";
 
+interface OrderItemExtra {
+  price_at_order: number;
+  extra_name?: string | null;
+  product_extras: { name: string } | null;
+}
+
 interface OrderItem {
   id: string;
   quantity: number;
   price_at_order: number;
+  notes?: string | null;
   products: {
     name: string;
   };
+  order_item_extras: OrderItemExtra[];
 }
 
 interface Order {
