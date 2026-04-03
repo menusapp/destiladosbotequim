@@ -721,6 +721,9 @@ export const CheckoutDrawer = ({
             submitting={submitting}
             deliveryZone={deliveryZone}
             activeRewardDiscount={activeRewardDiscount}
+            isRestaurantOpen={restaurant.is_open !== false}
+            scheduledFor={scheduledFor}
+            onScheduledForChange={setScheduledFor}
           />
         );
     }
