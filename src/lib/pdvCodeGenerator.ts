@@ -13,39 +13,37 @@ export async function generateNextPdvCode(restaurantId: string): Promise<string>
     .eq("restaurant_id", restaurantId);
   const categoryIds = (categories || []).map((c: any) => c.id);
 
-  const promises: Promise<any>[] = [
-    supabase
-      .from("extra_category_items")
-      .select("pdv_code, extra_categories!inner(restaurant_id)")
-      .eq("extra_categories.restaurant_id", restaurantId)
-      .not("pdv_code", "is", null) as any,
-  ];
+  const results: any[] = [];
+
+  // extra_category_items
+  const eciRes = await supabase
+    .from("extra_category_items")
+    .select("pdv_code, extra_categories!inner(restaurant_id)")
+    .eq("extra_categories.restaurant_id", restaurantId)
+    .not("pdv_code", "is", null);
+  results.push(eciRes);
 
   if (categoryIds.length > 0) {
-    promises.push(
-      supabase
-        .from("products")
-        .select("pdv_code")
-        .in("category_id", categoryIds)
-        .not("pdv_code", "is", null)
-    );
-    // Also fetch product_extras pdv_codes via product_id
+    const prodRes = await supabase
+      .from("products")
+      .select("pdv_code")
+      .in("category_id", categoryIds)
+      .not("pdv_code", "is", null);
+    results.push(prodRes);
+
     const { data: productIds } = await supabase
       .from("products")
       .select("id")
       .in("category_id", categoryIds);
     if (productIds && productIds.length > 0) {
-      promises.push(
-        supabase
-          .from("product_extras")
-          .select("pdv_code")
-          .in("product_id", productIds.map((p: any) => p.id))
-          .not("pdv_code", "is", null)
-      );
+      const extrasRes = await supabase
+        .from("product_extras")
+        .select("pdv_code")
+        .in("product_id", productIds.map((p: any) => p.id))
+        .not("pdv_code", "is", null);
+      results.push(extrasRes);
     }
   }
-
-  const results = await Promise.all(promises);
 
   const usedCodes = new Set<number>();
 
