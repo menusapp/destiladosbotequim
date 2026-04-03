@@ -104,6 +104,7 @@ interface LinkedComplementGroup {
 interface IngredientVariation {
   id: string;
   name: string;
+  description?: string;
   price: number;
   ingredients: ProductIngredient[];
 }
