@@ -1046,6 +1046,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                                 <p className="font-medium">{extra.name} — R$ {extra.price.toFixed(2)}</p>
                                 {extra.is_required && <Badge variant="default" className="text-[10px] h-5">Obrigatório</Badge>}
                               </div>
+                              {extra.description && <p className="text-xs text-muted-foreground/70 italic">{extra.description}</p>}
                               <p className="text-xs text-muted-foreground">{extra.ingredients?.length || 0} insumo(s)</p>
                             </div>
                             <Button type="button" variant="destructive" size="sm" onClick={() => handleRemoveExtra(extra.id)}>Remover</Button>
