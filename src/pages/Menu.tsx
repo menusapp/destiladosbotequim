@@ -1204,7 +1204,7 @@ const Menu = () => {
       {/* Barra de comanda - sempre visível no modo consumo local quando cliente está logado */}
       {customerName && (
         <ComandaBottomBar
-          total={comandaTotal}
+          total={getCartTotal()}
           primaryColor={primaryColor}
           status={comandaStatus}
           isVisible={showComandaBar && !showProductDialog}
