@@ -2782,6 +2782,7 @@ export type Database = {
           max_selection: number | null
           min_selection: number | null
           name: string
+          pdv_code: string | null
           price: number
           product_id: string
           updated_at: string | null
@@ -2795,6 +2796,7 @@ export type Database = {
           max_selection?: number | null
           min_selection?: number | null
           name: string
+          pdv_code?: string | null
           price?: number
           product_id: string
           updated_at?: string | null
@@ -2808,6 +2810,7 @@ export type Database = {
           max_selection?: number | null
           min_selection?: number | null
           name?: string
+          pdv_code?: string | null
           price?: number
           product_id?: string
           updated_at?: string | null

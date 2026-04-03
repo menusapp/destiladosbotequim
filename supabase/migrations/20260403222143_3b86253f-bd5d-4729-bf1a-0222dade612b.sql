@@ -1,0 +1,1 @@
+ALTER TABLE public.product_extras ADD COLUMN IF NOT EXISTS pdv_code varchar(10) DEFAULT NULL;
