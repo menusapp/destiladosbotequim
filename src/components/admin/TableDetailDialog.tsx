@@ -373,9 +373,95 @@ export const TableDetailDialog = ({
     refetchSplits();
   };
 
-  const handleSplitPaid = () => {
+  const handleSplitPaid = async () => {
     setPayingSplit(null);
-    refetchSplits();
+    await refetchSplits();
+
+    // After refetch, check if all splits for ANY comanda are fully paid → auto-close
+    // We need fresh data, so query directly
+    if (!table || !orders || orders.length === 0) return;
+
+    const orderIds = orders.map(o => o.id);
+    const { data: freshSplits } = await supabase
+      .from("order_item_splits" as any)
+      .select("*")
+      .in("order_id", orderIds);
+
+    if (!freshSplits || freshSplits.length === 0) return;
+
+    const splitsTyped = freshSplits as unknown as Split[];
+
+    // Check each comanda
+    for (const comanda of (comandas || [])) {
+      const comandaOrders = ordersByComanda.get(comanda.id) || [];
+      if (comandaOrders.length === 0) continue;
+
+      const comandaOrderIds = new Set(comandaOrders.map(o => o.id));
+      const comandaSplits = splitsTyped.filter(s => comandaOrderIds.has(s.order_id));
+      if (comandaSplits.length === 0) continue;
+
+      // Check: all items in the comanda must have splits, and all splits must be paid
+      const allItems = comandaOrders.flatMap((o: any) => o.order_items || []);
+      const allItemsHaveSplits = allItems.every((item: any) => {
+        const itemSplits = comandaSplits.filter(s => s.order_item_id === item.id);
+        return itemSplits.length > 0 && itemSplits.every(s => s.status === "paid");
+      });
+
+      if (!allItemsHaveSplits) continue;
+
+      // All splits paid for this comanda — auto-close using existing flow
+      const orderIdsToClose = comandaOrders.map((o: any) => o.id);
+
+      // Deduct stock for pending orders and mark delivered
+      for (const oid of orderIdsToClose) {
+        const { data: orderData } = await supabase.from("orders")
+          .select("id, status, order_items(id)")
+          .eq("id", oid)
+          .single();
+
+        if (orderData && ["pending"].includes(orderData.status)) {
+          for (const oi of (orderData.order_items || [])) {
+            await supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: oi.id });
+          }
+        }
+        await supabase.from("orders").update({ status: "delivered" }).eq("id", oid);
+      }
+
+      // Close comanda
+      await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() }).eq("id", comanda.id);
+      await supabase.from("bills").update({ status: "paid", paid_at: new Date().toISOString() })
+        .eq("comanda_id", comanda.id).in("status", ["requested", "on_the_way"]);
+
+      // Create a bill record for the split payment
+      const comandaTotal = comandaOrders.reduce((sum: number, o: any) => sum + getOrderTotal(o), 0);
+      await supabase.from("bills").insert({
+        table_id: table.id,
+        comanda_id: comanda.id,
+        status: "paid",
+        paid_at: new Date().toISOString(),
+        subtotal: comandaTotal,
+        service_fee: 0,
+        total_amount: comandaTotal,
+        payment_method: "Dividido",
+      });
+
+      toast.success("Conta paga e mesa liberada!");
+    }
+
+    // Check if any active comandas remain
+    const { data: remaining } = await supabase
+      .from("comandas").select("id").eq("table_id", table.id).eq("status", "active");
+
+    if (!remaining || remaining.length === 0) {
+      await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table.id);
+      onTableCleared();
+    } else {
+      await supabase.from("tables").update({ occupied_by: `${remaining.length} cliente${remaining.length !== 1 ? "s" : ""}` }).eq("id", table.id);
+    }
+
+    refetchComandas();
+    refetchOrders();
+    refetchBills();
   };
 
   const printSingleOrder = async (order: any) => {
