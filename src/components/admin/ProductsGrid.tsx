@@ -400,8 +400,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const handleAddExtra = () => {
     if (!extraName || !extraPrice) { toast.error("Preencha nome e preço do complemento"); return; }
     if (extras.some(e => e.name.toLowerCase() === extraName.toLowerCase())) { toast.error("Já existe um complemento com este nome"); return; }
-    setExtras([...extras, { id: crypto.randomUUID(), name: extraName, price: parseFloat(extraPrice), ingredients: [...extraIngredients], is_required: extraIsRequired }]);
-    setExtraName(""); setExtraPrice(""); setExtraIngredients([]); setExtraIsRequired(false);
+    setExtras([...extras, { id: crypto.randomUUID(), name: extraName, description: extraDescription || undefined, price: parseFloat(extraPrice), ingredients: [...extraIngredients], is_required: extraIsRequired }]);
+    setExtraName(""); setExtraDescription(""); setExtraPrice(""); setExtraIngredients([]); setExtraIsRequired(false);
   };
 
   const handleLinkComplementCategory = async () => {
