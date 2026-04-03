@@ -20,6 +20,7 @@ export interface ProductExtra {
   min_selection?: number;
   max_selection?: number;
   extra_category_id?: string;
+  extra_category_name?: string;
 }
 
 export interface Category {
