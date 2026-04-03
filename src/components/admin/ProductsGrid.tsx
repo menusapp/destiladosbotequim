@@ -149,7 +149,6 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const [variationDescription, setVariationDescription] = useState("");
   const [variationPrice, setVariationPrice] = useState("");
   const [variationIngredients, setVariationIngredients] = useState<ProductIngredient[]>([]);
-  const [variationIngredients, setVariationIngredients] = useState<ProductIngredient[]>([]);
   const [selectedVariationStockItem, setSelectedVariationStockItem] = useState("");
   const [variationIngredientQuantity, setVariationIngredientQuantity] = useState("");
   const [variationIsRequired, setVariationIsRequired] = useState(true);
