@@ -10,13 +10,21 @@ import { format } from "date-fns";
 import { Clock, Phone, CheckCircle2, Package, Truck, MapPin, XCircle } from "lucide-react";
 import { ReviewModal } from "@/components/menu/ReviewModal";
 
+interface OrderItemExtra {
+  price_at_order: number;
+  extra_name?: string | null;
+  product_extras: { name: string } | null;
+}
+
 interface OrderItem {
   id: string;
   quantity: number;
   price_at_order: number;
+  notes?: string | null;
   products: {
     name: string;
   };
+  order_item_extras: OrderItemExtra[];
 }
 
 interface Order {
@@ -114,14 +122,16 @@ export default function OrderConfirmation() {
             id,
             quantity,
             price_at_order,
-            products (name)
+            notes,
+            products (name),
+            order_item_extras (price_at_order, extra_name, product_extras(name))
           )
         `)
         .eq("id", orderId)
         .single();
 
       if (orderError) throw orderError;
-      setOrder(orderData);
+      setOrder(orderData as any);
 
       // Buscar dados do restaurante usando restaurant_id direto do pedido
       const { data: restaurantData, error: restaurantError } = await supabase
@@ -198,14 +208,16 @@ export default function OrderConfirmation() {
                 id,
                 quantity,
                 price_at_order,
-                products (name)
+                notes,
+                products (name),
+                order_item_extras (price_at_order, extra_name, product_extras(name))
               )
             `)
             .eq("id", orderId)
             .single();
 
           if (fullOrder) {
-            setOrder(fullOrder as Order);
+            setOrder(fullOrder as any);
           }
 
           // Notificações de mudança de status
@@ -247,10 +259,10 @@ export default function OrderConfirmation() {
 
   const calculateSubtotal = () => {
     if (!order) return 0;
-    return (order.order_items ?? []).reduce(
-      (sum, item) => sum + item.price_at_order * item.quantity,
-      0
-    );
+    return (order.order_items ?? []).reduce((sum, item) => {
+      const extrasTotal = (item.order_item_extras ?? []).reduce((s, e) => s + e.price_at_order, 0);
+      return sum + (item.price_at_order + extrasTotal) * item.quantity;
+    }, 0);
   };
 
   const calculateServiceFee = () => {
@@ -399,14 +411,29 @@ export default function OrderConfirmation() {
               <CardTitle>Detalhes do Pedido</CardTitle>
             </CardHeader>
             <CardContent>
-              {(order.order_items ?? []).map((item) => (
-                <div key={item.id} className="flex justify-between mb-2">
-                  <span>
-                    {item.quantity}x {item.products?.name}
-                  </span>
-                  <span>R$ {(item.price_at_order * item.quantity).toFixed(2)}</span>
-                </div>
-              ))}
+              {(order.order_items ?? []).map((item) => {
+                const extrasTotal = (item.order_item_extras ?? []).reduce((s, e) => s + e.price_at_order, 0);
+                const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
+                return (
+                  <div key={item.id} className="mb-3">
+                    <div className="flex justify-between">
+                      <span className="font-medium">
+                        {item.quantity}x {item.products?.name}
+                      </span>
+                      <span>R$ {itemTotal.toFixed(2)}</span>
+                    </div>
+                    {item.notes && (
+                      <p className="text-sm text-muted-foreground italic ml-4">Obs: {item.notes}</p>
+                    )}
+                    {(item.order_item_extras ?? []).map((extra, idx) => (
+                      <div key={idx} className="flex justify-between text-sm text-muted-foreground ml-4">
+                        <span>+ {extra.extra_name || extra.product_extras?.name || "Extra"}</span>
+                        <span>R$ {extra.price_at_order.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
               <Separator className="my-4" />
               <div className="space-y-2">
                 <div className="flex justify-between">
