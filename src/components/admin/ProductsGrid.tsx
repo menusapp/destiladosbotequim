@@ -519,7 +519,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     }
 
     for (const extra of extras) {
-      const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: extra.name, price: extra.price, is_required: extra.is_required || false }).select().single();
+      const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: extra.name, description: extra.description || null, price: extra.price, is_required: extra.is_required || false }).select().single();
       if (newExtra && extra.ingredients && extra.ingredients.length > 0) {
         await supabase.from("product_extra_ingredients").insert(extra.ingredients.map(ing => ({ product_extra_id: newExtra.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
       }
