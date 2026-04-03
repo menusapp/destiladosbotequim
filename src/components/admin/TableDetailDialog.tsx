@@ -700,6 +700,15 @@ export const TableDetailDialog = ({
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0"
+                                    title="Imprimir pedido"
+                                    onClick={() => printSingleOrder(order)}
+                                  >
+                                    <Printer className="w-4 h-4 text-muted-foreground" />
+                                  </Button>
                                   <span className="text-sm font-bold">R$ {getOrderTotal(order).toFixed(2)}</span>
                                   {order.status === "pending" && (
                                     <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleAcceptOrder(order.id)}>
