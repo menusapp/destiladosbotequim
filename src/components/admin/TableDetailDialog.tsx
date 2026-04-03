@@ -679,6 +679,9 @@ export const TableDetailDialog = ({
                         {comandaOrders.length > 0 && (
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold">R$ {comandaTotal.toFixed(2)}</span>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Imprimir comanda" onClick={() => printFullComanda(comanda)}>
+                              <Printer className="w-4 h-4" />
+                            </Button>
                             <Button size="sm" variant="outline" onClick={() => handlePayComanda(comanda)}>
                               <CreditCard className="w-3.5 h-3.5 mr-1" /> Pagar
                             </Button>
