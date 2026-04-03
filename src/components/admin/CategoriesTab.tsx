@@ -59,25 +59,30 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
     }
 
     setUploading(true);
+    const bucket = "product-images";
+    const ext = file.name.split(".").pop();
+    const fileName = `category-${restaurantId}-${Date.now()}.${ext}`;
+    const filePath = `categories/${fileName}`;
+    console.log("[CategoryUpload] bucket:", bucket, "path:", filePath, "file:", file.name, "type:", file.type);
     try {
-      const ext = file.name.split(".").pop();
-      const fileName = `category-${restaurantId}-${Date.now()}.${ext}`;
-      const filePath = `categories/${fileName}`;
-
       const { error: uploadError } = await supabase.storage
-        .from("products")
+        .from(bucket)
         .upload(filePath, file, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("[CategoryUpload] upload failed:", JSON.stringify(uploadError));
+        throw uploadError;
+      }
 
       const { data: urlData } = supabase.storage
-        .from("products")
+        .from(bucket)
         .getPublicUrl(filePath);
 
+      console.log("[CategoryUpload] publicUrl:", urlData.publicUrl);
       setCategoryImageUrl(urlData.publicUrl);
       toast.success("Imagem carregada!");
     } catch (err) {
-      console.error("Upload error:", err);
+      console.error("[CategoryUpload] error:", err);
       toast.error("Erro ao enviar imagem");
     } finally {
       setUploading(false);
