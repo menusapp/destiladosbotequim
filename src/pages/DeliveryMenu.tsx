@@ -237,13 +237,13 @@ export default function DeliveryMenu() {
     // Buscar extras diretos do produto
     const { data: extrasData } = await supabase
       .from("product_extras")
-      .select("id, name, price, is_required, min_selection, max_selection, extra_category_id")
+      .select("id, name, description, price, is_required, min_selection, max_selection, extra_category_id")
       .eq("product_id", product.id);
 
     // Buscar complementos vinculados via product_complement_groups
     const { data: complementGroups } = await supabase
       .from("product_complement_groups")
-      .select("*, extra_categories(id, name, extra_category_items(id, name, price))")
+      .select("*, extra_categories(id, name, extra_category_items(id, name, description, price))")
       .eq("product_id", product.id)
       .order("display_order");
 
@@ -253,6 +253,7 @@ export default function DeliveryMenu() {
       return items.map((item: any) => ({
         id: item.id,
         name: item.name,
+        description: item.description || null,
         price: item.price,
         is_required: group.is_required || false,
         min_selection: group.min_selection || 0,
