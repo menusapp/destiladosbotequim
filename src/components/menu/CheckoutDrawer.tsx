@@ -87,6 +87,7 @@ export const CheckoutDrawer = ({
   const [submitting, setSubmitting] = useState(false);
   const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
   const [activeRewardDiscount, setActiveRewardDiscount] = useState<DiscountReward | null>(null);
+  const [scheduledFor, setScheduledFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -194,6 +195,7 @@ export const CheckoutDrawer = ({
         online_payment_id: onlinePaymentId || paymentData?.onlinePaymentId || null,
         reward_discount: rewardDiscount,
         reward_id: activeRewardDiscount?.id || null,
+        dd_scheduled_for: scheduledFor ? new Date(`${scheduledFor}`).toISOString() : null,
       };
 
       const { data: order, error: orderError } = await supabase
@@ -720,6 +722,9 @@ export const CheckoutDrawer = ({
             submitting={submitting}
             deliveryZone={deliveryZone}
             activeRewardDiscount={activeRewardDiscount}
+            isRestaurantOpen={restaurant.is_open !== false}
+            scheduledFor={scheduledFor}
+            onScheduledForChange={setScheduledFor}
           />
         );
     }

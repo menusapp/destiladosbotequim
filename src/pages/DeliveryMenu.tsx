@@ -10,7 +10,7 @@ import { CartBottomBar } from "@/components/menu/CartBottomBar";
 import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
 import { CheckoutDrawer } from "@/components/menu/CheckoutDrawer";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
-import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
+import { Clock } from "lucide-react";
 import { DeliveryBottomNav } from "@/components/menu/DeliveryBottomNav";
 import { PedidosHistory } from "@/components/menu/PedidosHistory";
 import { ProfileView } from "@/components/menu/ProfileView";
@@ -335,9 +335,6 @@ export default function DeliveryMenu() {
     );
   }
 
-  if (!restaurant.is_open) {
-    return <RestaurantClosedScreen restaurantName={restaurant.name} logoUrl={restaurant.logo_url} primaryColor={restaurant.primary_color} />;
-  }
 
   const primaryColor = restaurant.primary_color || "#fe9516";
   const allProducts = categories.flatMap((c) => c.products);
@@ -401,6 +398,16 @@ export default function DeliveryMenu() {
               deliveryFee={0}
             />
           </div>
+
+          {/* Restaurant closed banner */}
+          {!restaurant.is_open && (
+            <div className="mx-4 mt-2 mb-1 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-3">
+              <Clock className="w-5 h-5 text-amber-600 shrink-0" />
+              <p className="text-sm text-amber-800">
+                Restaurante fechado no momento. Você pode agendar seu pedido para quando estivermos abertos.
+              </p>
+            </div>
+          )}
 
           {searchQuery.trim() ? (
             <div className="px-4 py-6">

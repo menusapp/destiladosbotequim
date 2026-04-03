@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+
 import { CartItem } from "@/types/menu";
-import { MapPin, CreditCard, Clock, Gift, CheckCircle2 } from "lucide-react";
+import { MapPin, CreditCard, Clock, Gift, CheckCircle2, CalendarClock } from "lucide-react";
 import { DiscountReward } from "./LoyaltyRewardNotification";
 
 interface DeliveryZone {
@@ -27,6 +28,9 @@ interface SummaryStepProps {
   submitting: boolean;
   deliveryZone?: DeliveryZone | null;
   activeRewardDiscount?: DiscountReward | null;
+  isRestaurantOpen?: boolean;
+  scheduledFor: string | null;
+  onScheduledForChange: (value: string | null) => void;
 }
 
 export const SummaryStep = ({
@@ -43,6 +47,9 @@ export const SummaryStep = ({
   submitting,
   deliveryZone,
   activeRewardDiscount,
+  isRestaurantOpen = true,
+  scheduledFor,
+  onScheduledForChange,
 }: SummaryStepProps) => {
   const subtotal = cart.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
@@ -296,11 +303,109 @@ export const SummaryStep = ({
         </Card>
       )}
 
+      {/* Scheduling Section */}
+      {!isRestaurantOpen && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2 text-amber-800">
+              <CalendarClock className="w-4 h-4" />
+              Agendar pedido (obrigatório)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-amber-700">
+              O restaurante está fechado. Escolha uma data e horário para receber seu pedido.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={scheduledFor ? scheduledFor.split("T")[0] : ""}
+                min={new Date().toISOString().split("T")[0]}
+                onChange={(e) => {
+                  const time = scheduledFor ? scheduledFor.split("T")[1] || "12:00" : "12:00";
+                  onScheduledForChange(e.target.value ? `${e.target.value}T${time}` : null);
+                }}
+              />
+              <input
+                type="time"
+                className="w-28 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={scheduledFor ? scheduledFor.split("T")[1] || "12:00" : ""}
+                onChange={(e) => {
+                  const date = scheduledFor ? scheduledFor.split("T")[0] : new Date().toISOString().split("T")[0];
+                  onScheduledForChange(e.target.value ? `${date}T${e.target.value}` : null);
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Optional scheduling when open */}
+      {isRestaurantOpen && (
+        <div className="text-center">
+          {!scheduledFor ? (
+            <button
+              type="button"
+              className="text-sm text-muted-foreground underline"
+              onClick={() => {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                onScheduledForChange(`${tomorrow.toISOString().split("T")[0]}T12:00`);
+              }}
+            >
+              Agendar para outro horário?
+            </button>
+          ) : (
+            <Card className="border-primary/20">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4" />
+                    Pedido agendado
+                  </span>
+                  <button
+                    type="button"
+                    className="text-xs text-destructive underline"
+                    onClick={() => onScheduledForChange(null)}
+                  >
+                    Remover agendamento
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={scheduledFor.split("T")[0]}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => {
+                      const time = scheduledFor.split("T")[1] || "12:00";
+                      onScheduledForChange(e.target.value ? `${e.target.value}T${time}` : null);
+                    }}
+                  />
+                  <input
+                    type="time"
+                    className="w-28 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={scheduledFor.split("T")[1] || "12:00"}
+                    onChange={(e) => {
+                      const date = scheduledFor.split("T")[0];
+                      onScheduledForChange(e.target.value ? `${date}T${e.target.value}` : null);
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Estimated Time */}
-      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Clock className="w-4 h-4" />
-        <span>Tempo estimado: {estimatedTime}-{estimatedTime + 15} minutos</span>
-      </div>
+      {isRestaurantOpen && !scheduledFor && (
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Clock className="w-4 h-4" />
+          <span>Tempo estimado: {estimatedTime}-{estimatedTime + 15} minutos</span>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-2 pt-4">
@@ -310,10 +415,10 @@ export const SummaryStep = ({
         <Button
           onClick={onConfirm}
           className="flex-1"
-          disabled={submitting}
+          disabled={submitting || (!isRestaurantOpen && !scheduledFor)}
           style={{ backgroundColor: restaurant.primary_color, color: "white" }}
         >
-          {submitting ? "Finalizando..." : "Finalizar Pedido"}
+          {submitting ? "Finalizando..." : (scheduledFor ? "Agendar Pedido" : "Finalizar Pedido")}
         </Button>
       </div>
     </div>
