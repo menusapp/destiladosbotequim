@@ -399,6 +399,16 @@ export default function DeliveryMenu() {
             />
           </div>
 
+          {/* Restaurant closed banner */}
+          {!restaurant.is_open && (
+            <div className="mx-4 mt-2 mb-1 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-3">
+              <Clock className="w-5 h-5 text-amber-600 shrink-0" />
+              <p className="text-sm text-amber-800">
+                Restaurante fechado no momento. Você pode agendar seu pedido para quando estivermos abertos.
+              </p>
+            </div>
+          )}
+
           {searchQuery.trim() ? (
             <div className="px-4 py-6">
               <h2 className="text-lg font-semibold mb-4">Resultados da busca</h2>
