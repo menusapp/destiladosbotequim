@@ -34,7 +34,7 @@ interface Product {
   description: string | null;
   price: number;
   promotional_price?: number | null;
-  category_id: string;
+  category_id: string | null;
   available: boolean;
   image_url: string | null;
   cost?: number;
