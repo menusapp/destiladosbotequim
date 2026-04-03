@@ -696,6 +696,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                           <Select value={productCategoryId} onValueChange={setProductCategoryId}>
                             <SelectTrigger className="mt-1"><SelectValue placeholder="Sem categoria" /></SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="__none">Sem categoria</SelectItem>
                               {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
                             </SelectContent>
                           </Select>
