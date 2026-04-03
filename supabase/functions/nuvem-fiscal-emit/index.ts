@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { order_id, restaurant_id, fiscal_note_id } = await req.json();
+    const { order_id, restaurant_id, fiscal_note_id, customer_cnpj, customer_razao_social } = await req.json();
 
     if (!order_id || !restaurant_id) {
       return jsonResponse({ error: "order_id e restaurant_id são obrigatórios" }, 400);
