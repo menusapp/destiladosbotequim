@@ -63,6 +63,7 @@ interface PaymentMethod {
 
 interface OrderItemExtra {
   price_at_order: number;
+  extra_name: string | null;
   product_extras: {
     name: string;
   } | null;
@@ -529,7 +530,7 @@ const Comanda = () => {
             order_items(
               id, quantity, price_at_order, notes,
               products(name, prep_time_minutes),
-              order_item_extras(price_at_order, product_extras(name))
+              order_item_extras(price_at_order, extra_name, product_extras(name))
             )
           `)
           .eq("comanda_id", comandaId);
@@ -543,7 +544,7 @@ const Comanda = () => {
             order_items(
               id, quantity, price_at_order, notes,
               products(name, prep_time_minutes),
-              order_item_extras(price_at_order, product_extras(name))
+              order_item_extras(price_at_order, extra_name, product_extras(name))
             )
           `)
           .eq("table_id", tableData.id)
@@ -1133,10 +1134,11 @@ const Comanda = () => {
                           </p>
                           {item.order_item_extras && item.order_item_extras.length > 0 && (
                             <div className="text-xs text-muted-foreground mt-1">
-                              + {item.order_item_extras
-                                  .filter(e => e.product_extras?.name)
-                                  .map(e => e.product_extras.name)
-                                  .join(', ')}
+                              {item.order_item_extras
+                                .filter(e => e.extra_name || e.product_extras?.name)
+                                .map((e, i) => (
+                                  <span key={i}>+ {e.extra_name || e.product_extras?.name}{i < item.order_item_extras.filter(ex => ex.extra_name || ex.product_extras?.name).length - 1 ? ', ' : ''}</span>
+                                ))}
                             </div>
                           )}
                           {item.notes && (

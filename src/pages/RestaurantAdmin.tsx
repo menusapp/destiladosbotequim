@@ -282,7 +282,7 @@ const RestaurantAdmin = () => {
                   order_items(
                     price_at_order,
                     quantity,
-                    order_item_extras(price_at_order)
+                    order_item_extras(price_at_order, extra_name, product_extras(name))
                   )
                 `)
                 .eq('id', orderId)

@@ -442,7 +442,7 @@ export const TableDetailDialog = ({
         subtotal: comandaTotal,
         service_fee: 0,
         total_amount: comandaTotal,
-        payment_method: "Dividido",
+        payment_method: null,
       });
 
       toast.success("Conta paga e mesa liberada!");
