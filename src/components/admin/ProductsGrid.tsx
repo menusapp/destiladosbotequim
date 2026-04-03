@@ -706,9 +706,9 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                           <Textarea id="product-description" value={productDescription} onChange={(e) => setProductDescription(e.target.value)} placeholder="Descreva o produto..." rows={3} className="mt-1 resize-none" />
                         </div>
                         <div>
-                          <Label htmlFor="product-category">Categoria *</Label>
+                          <Label htmlFor="product-category">Categoria</Label>
                           <Select value={productCategoryId} onValueChange={setProductCategoryId}>
-                            <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue placeholder="Sem categoria" /></SelectTrigger>
                             <SelectContent>
                               {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
                             </SelectContent>
