@@ -21,10 +21,29 @@ export function KioskProductDetail({ product, extras, primaryColor, onAdd, onBac
   const [notes, setNotes] = useState("");
   const [quantity, setQuantity] = useState(1);
 
-  const { requiredExtras, optionalExtras } = useMemo(() => ({
-    requiredExtras: extras.filter(e => e.is_required),
-    optionalExtras: extras.filter(e => !e.is_required),
-  }), [extras]);
+  const { requiredExtras, optionalExtrasGrouped } = useMemo(() => {
+    const required = extras.filter(e => e.is_required);
+    const optional = extras.filter(e => !e.is_required);
+    const grouped: { categoryName: string; items: ProductExtra[] }[] = [];
+    const uncategorized: ProductExtra[] = [];
+    const categoryMap = new Map<string, ProductExtra[]>();
+    for (const ext of optional) {
+      const catName = ext.extra_category_name;
+      if (catName) {
+        if (!categoryMap.has(catName)) categoryMap.set(catName, []);
+        categoryMap.get(catName)!.push(ext);
+      } else {
+        uncategorized.push(ext);
+      }
+    }
+    for (const [name, items] of categoryMap) {
+      grouped.push({ categoryName: name, items });
+    }
+    if (uncategorized.length > 0) {
+      grouped.push({ categoryName: "Adicionais", items: uncategorized });
+    }
+    return { requiredExtras: required, optionalExtrasGrouped: grouped };
+  }, [extras]);
 
   const hasRequired = requiredExtras.length > 0;
   const minRequired = hasRequired ? (requiredExtras[0]?.min_selection || 1) : 0;
