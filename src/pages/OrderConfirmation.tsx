@@ -122,7 +122,9 @@ export default function OrderConfirmation() {
             id,
             quantity,
             price_at_order,
-            products (name)
+            notes,
+            products (name),
+            order_item_extras (price_at_order, extra_name, product_extras(name))
           )
         `)
         .eq("id", orderId)
