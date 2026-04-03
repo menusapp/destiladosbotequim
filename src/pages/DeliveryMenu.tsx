@@ -335,9 +335,6 @@ export default function DeliveryMenu() {
     );
   }
 
-  if (!restaurant.is_open) {
-    return <RestaurantClosedScreen restaurantName={restaurant.name} logoUrl={restaurant.logo_url} primaryColor={restaurant.primary_color} />;
-  }
 
   const primaryColor = restaurant.primary_color || "#fe9516";
   const allProducts = categories.flatMap((c) => c.products);

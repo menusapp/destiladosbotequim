@@ -1036,15 +1036,6 @@ const Menu = () => {
     );
   }
 
-  if (restaurant && !restaurant.is_open) {
-    return (
-      <RestaurantClosedScreen 
-        restaurantName={restaurant.name}
-        logoUrl={restaurant.logo_url}
-        primaryColor={restaurant.primary_color || "#fe9516"}
-      />
-    );
-  }
 
   if (!restaurant) {
     return (
