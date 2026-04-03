@@ -75,6 +75,7 @@ interface ProductIngredient {
 interface ProductExtra {
   id: string;
   name: string;
+  description?: string;
   price: number;
   ingredients?: ProductIngredient[];
   is_required?: boolean;
