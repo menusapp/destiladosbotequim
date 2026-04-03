@@ -375,6 +375,23 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
   const handleRemoveVariation = (id: string) => { setVariations(variations.filter(v => v.id !== id)); };
 
+  const handleDuplicateVariation = (id: string) => {
+    const original = variations.find(v => v.id === id);
+    if (!original) return;
+    const copy = { ...original, id: crypto.randomUUID(), name: `${original.name} (cópia)`, ingredients: original.ingredients.map(i => ({ ...i, id: crypto.randomUUID() })) };
+    setVariations([...variations, copy]);
+    toast.success("Variação duplicada");
+  };
+
+  const handleEditVariation = (id: string) => {
+    const v = variations.find(v => v.id === id);
+    if (!v) return;
+    setVariationName(v.name);
+    setVariationPrice(v.price > 0 ? String(v.price) : "");
+    setVariationIngredients(v.ingredients.map(i => ({ ...i })));
+    setVariations(variations.filter(vr => vr.id !== id));
+  };
+
   const handleAddExtra = () => {
     if (!extraName || !extraPrice) { toast.error("Preencha nome e preço do complemento"); return; }
     if (extras.some(e => e.name.toLowerCase() === extraName.toLowerCase())) { toast.error("Já existe um complemento com este nome"); return; }
