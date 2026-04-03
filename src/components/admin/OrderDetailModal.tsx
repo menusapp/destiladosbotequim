@@ -357,6 +357,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
 
   const handleChangePaymentConfirm = async () => {
     setShowChangePaymentModal(false);
+    await refreshOrder();
     onStatusUpdate();
     toast.success("Forma de pagamento atualizada!");
   };
