@@ -340,7 +340,23 @@ const Menu = () => {
     }
   }, [cart, tableId, customerName, checkOpenComanda]);
 
-  // Realtime subscription para pedidos da mesa (subscription já existe nas linhas 279-285)
+  // Realtime subscription para pedidos da mesa e status do restaurante
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    const channel = supabase
+      .channel('menu-restaurant-status')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'restaurants',
+        filter: `id=eq.${restaurant.id}`,
+      }, (payload) => {
+        const updated = payload.new as any;
+        setRestaurant((prev: any) => prev ? { ...prev, ...updated } : null);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [restaurant?.id]);
 
 
   // ⚡ Mostrar dialog de login APENAS quando dados estiverem carregados E não tiver avaliação pendente
