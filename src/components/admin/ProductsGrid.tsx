@@ -902,6 +902,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                             <Input placeholder="Nome (ex: Batata P)" value={variationName} onChange={(e) => setVariationName(e.target.value)} />
                             <Input type="number" step="0.01" placeholder="Preço adicional" value={variationPrice} onChange={(e) => setVariationPrice(e.target.value)} />
                           </div>
+                          <Input placeholder="Descrição (opcional)" value={variationDescription} onChange={(e) => setVariationDescription(e.target.value)} className="text-xs h-8" />
                           <div className="flex gap-2">
                             <Select value={selectedVariationStockItem} onValueChange={setSelectedVariationStockItem}>
                               <SelectTrigger className="flex-1"><SelectValue placeholder="Insumo" /></SelectTrigger>
