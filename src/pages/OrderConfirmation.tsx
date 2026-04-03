@@ -259,10 +259,10 @@ export default function OrderConfirmation() {
 
   const calculateSubtotal = () => {
     if (!order) return 0;
-    return (order.order_items ?? []).reduce(
-      (sum, item) => sum + item.price_at_order * item.quantity,
-      0
-    );
+    return (order.order_items ?? []).reduce((sum, item) => {
+      const extrasTotal = (item.order_item_extras ?? []).reduce((s, e) => s + e.price_at_order, 0);
+      return sum + (item.price_at_order + extrasTotal) * item.quantity;
+    }, 0);
   };
 
   const calculateServiceFee = () => {
