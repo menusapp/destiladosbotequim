@@ -167,6 +167,7 @@ export function KioskPayment({
             order_item_id: orderItem.id,
             product_extra_id: extra.id,
             price_at_order: extra.price,
+            extra_name: extra.name,
           });
         }
       }

@@ -330,7 +330,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       if (error) throw error;
       if (item.extras.length > 0) {
         await supabase.from("order_item_extras").insert(
-          item.extras.map(e => ({ order_item_id: oi.id, product_extra_id: e.extraId, price_at_order: e.price }))
+          item.extras.map(e => ({ order_item_id: oi.id, product_extra_id: e.extraId, price_at_order: e.price, extra_name: e.name }))
         );
       }
     }
