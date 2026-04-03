@@ -13,7 +13,7 @@ import { ComandaBottomBar } from "@/components/menu/ComandaBottomBar";
 import { CartDrawer } from "@/components/menu/CartDrawer";
 import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
-import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
+import { Clock } from "lucide-react";
 import { ReviewModal } from "@/components/menu/ReviewModal";
 import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
 

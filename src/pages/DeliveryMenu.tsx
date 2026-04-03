@@ -10,7 +10,7 @@ import { CartBottomBar } from "@/components/menu/CartBottomBar";
 import { ProductDetailDrawer } from "@/components/menu/ProductDetailDrawer";
 import { CheckoutDrawer } from "@/components/menu/CheckoutDrawer";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
-import RestaurantClosedScreen from "@/components/menu/RestaurantClosedScreen";
+import { Clock } from "lucide-react";
 import { DeliveryBottomNav } from "@/components/menu/DeliveryBottomNav";
 import { PedidosHistory } from "@/components/menu/PedidosHistory";
 import { ProfileView } from "@/components/menu/ProfileView";
