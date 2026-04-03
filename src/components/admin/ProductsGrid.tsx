@@ -924,7 +924,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                                 <div key={v.id} className="p-3 bg-muted/30 rounded-lg border">
                                   <div className="flex items-center justify-between mb-1">
                                     <div><span className="font-medium">{v.name}</span><span className="text-sm text-muted-foreground ml-2">{v.price > 0 ? `+R$ ${v.price.toFixed(2)}` : "Incluído"}</span></div>
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveVariation(v.id)}><Trash2 className="h-4 w-4" /></Button>
+                                    <div className="flex items-center gap-1">
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleDuplicateVariation(v.id)} title="Duplicar variação"><Copy className="h-4 w-4" /></Button>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleEditVariation(v.id)} title="Editar variação"><Pencil className="h-4 w-4" /></Button>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveVariation(v.id)} title="Excluir variação"><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
                                   </div>
                                   <div className="text-xs text-muted-foreground">{v.ingredients.map(i => `${i.stock_item_name} — ${i.quantity}${i.stock_item_unit}`).join(", ")}</div>
                                   {vc && (
