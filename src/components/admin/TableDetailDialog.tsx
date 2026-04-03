@@ -24,13 +24,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { SplitPaymentDialog } from "./SplitPaymentDialog";
 import { SplitPaymentSelect } from "./SplitPaymentSelect";
+import { printOrder as printOrderThermal } from "@/lib/printOrder";
 
 interface TableDetailDialogProps {
   restaurantId: string;
@@ -377,6 +378,67 @@ export const TableDetailDialog = ({
     refetchSplits();
   };
 
+  const printSingleOrder = async (order: any) => {
+    try {
+      const thermalOrder = {
+        id: order.id,
+        created_at: order.created_at,
+        customer_name: order.customer_name,
+        order_type: "local" as const,
+        tables: { table_number: table!.table_number },
+        order_items: (order.order_items || []).map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity,
+          price_at_order: item.price_at_order,
+          notes: item.notes,
+          products: item.products,
+          order_item_extras: (item.order_item_extras || []).map((e: any) => ({
+            price_at_order: e.price_at_order,
+            product_extras: e.product_extras,
+          })),
+        })),
+      };
+      await printOrderThermal(thermalOrder, restaurantId);
+    } catch {
+      toast.error("Erro ao imprimir pedido");
+    }
+  };
+
+  const printFullComanda = async (comanda: any) => {
+    try {
+      const comandaOrders = ordersByComanda.get(comanda.id) || [];
+      if (comandaOrders.length === 0) {
+        toast.error("Nenhum pedido para imprimir");
+        return;
+      }
+      // Consolidate all items from all orders into one virtual order
+      const allItems = comandaOrders.flatMap((o: any) =>
+        (o.order_items || []).map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity,
+          price_at_order: item.price_at_order,
+          notes: item.notes,
+          products: item.products,
+          order_item_extras: (item.order_item_extras || []).map((e: any) => ({
+            price_at_order: e.price_at_order,
+            product_extras: e.product_extras,
+          })),
+        }))
+      );
+      const virtualOrder = {
+        id: comandaOrders[0].id,
+        created_at: comandaOrders[0].created_at,
+        customer_name: comanda.customer_name,
+        order_type: "local" as const,
+        tables: { table_number: table!.table_number },
+        order_items: allItems,
+      };
+      await printOrderThermal(virtualOrder, restaurantId);
+    } catch {
+      toast.error("Erro ao imprimir comanda");
+    }
+  };
+
   const occupiedTime = table?.occupied_at
     ? Math.floor((Date.now() - new Date(table.occupied_at).getTime()) / 60000)
     : 0;
@@ -393,7 +455,6 @@ export const TableDetailDialog = ({
         <div className="flex justify-between text-xs items-start">
           <span className="flex-1">
             {item.quantity}x {item.products?.name || "Produto"}
-            {item.notes && <span className="text-muted-foreground ml-1">({item.notes})</span>}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
             <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
@@ -412,6 +473,13 @@ export const TableDetailDialog = ({
             )}
           </div>
         </div>
+
+        {/* Notes */}
+        {item.notes && (
+          <div className="text-[11px] text-muted-foreground italic ml-4">
+            Obs: {item.notes}
+          </div>
+        )}
 
         {/* Extras */}
         {item.order_item_extras?.length > 0 && (
@@ -611,6 +679,9 @@ export const TableDetailDialog = ({
                         {comandaOrders.length > 0 && (
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold">R$ {comandaTotal.toFixed(2)}</span>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Imprimir comanda" onClick={() => printFullComanda(comanda)}>
+                              <Printer className="w-4 h-4" />
+                            </Button>
                             <Button size="sm" variant="outline" onClick={() => handlePayComanda(comanda)}>
                               <CreditCard className="w-3.5 h-3.5 mr-1" /> Pagar
                             </Button>
@@ -632,6 +703,15 @@ export const TableDetailDialog = ({
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0"
+                                    title="Imprimir pedido"
+                                    onClick={() => printSingleOrder(order)}
+                                  >
+                                    <Printer className="w-4 h-4 text-muted-foreground" />
+                                  </Button>
                                   <span className="text-sm font-bold">R$ {getOrderTotal(order).toFixed(2)}</span>
                                   {order.status === "pending" && (
                                     <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleAcceptOrder(order.id)}>

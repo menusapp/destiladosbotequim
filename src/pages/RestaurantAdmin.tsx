@@ -399,13 +399,24 @@ const RestaurantAdmin = () => {
             .single();
             
           if (tableData?.restaurant_id === restaurantId && bill.status === 'requested') {
-            // Buscar nome do cliente da comanda ativa
-            const { data: comandaData } = await supabase
-              .from('comandas')
-              .select('customer_name')
-              .eq('table_id', bill.table_id)
-              .eq('status', 'active')
-              .maybeSingle();
+            // Buscar nome do cliente da comanda que solicitou a conta
+            let customerName = 'Cliente';
+            if (bill.comanda_id) {
+              const { data: comandaData } = await supabase
+                .from('comandas')
+                .select('customer_name')
+                .eq('id', bill.comanda_id)
+                .maybeSingle();
+              if (comandaData?.customer_name) customerName = comandaData.customer_name;
+            } else {
+              const { data: comandaData } = await supabase
+                .from('comandas')
+                .select('customer_name')
+                .eq('table_id', bill.table_id)
+                .eq('status', 'active')
+                .maybeSingle();
+              if (comandaData?.customer_name) customerName = comandaData.customer_name;
+            }
             
             // Mostrar notificação pop-up
             setBillNotificationQueue(prev => {
@@ -414,7 +425,7 @@ const RestaurantAdmin = () => {
                 billId: billId,
                 tableNumber: tableData.table_number,
                 total: bill.total_amount,
-                customerName: comandaData?.customer_name || 'Cliente',
+                customerName,
               }];
             });
             
