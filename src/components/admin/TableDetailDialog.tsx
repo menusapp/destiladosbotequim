@@ -31,6 +31,7 @@ import { ptBR } from "date-fns/locale";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { SplitPaymentDialog } from "./SplitPaymentDialog";
 import { SplitPaymentSelect } from "./SplitPaymentSelect";
+import { printOrder as printOrderThermal } from "@/lib/printOrder";
 
 interface TableDetailDialogProps {
   restaurantId: string;
