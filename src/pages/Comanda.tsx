@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Receipt, Clock, CreditCard, Banknote, Smartphone, ShoppingCart, Utensils, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Receipt, Clock, CreditCard, Banknote, Smartphone, ShoppingCart, Utensils, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -1030,9 +1030,24 @@ const Comanda = () => {
                           </div>
                         )}
                       </div>
-                      <p className="font-semibold" style={{ color: restaurantColor }}>
-                        R$ {itemTotal.toFixed(2)}
-                      </p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <p className="font-semibold" style={{ color: restaurantColor }}>
+                          R$ {itemTotal.toFixed(2)}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setCart(prev => {
+                              const updated = prev.filter(c => c.id !== item.id);
+                              sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(updated));
+                              return updated;
+                            });
+                          }}
+                          className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive transition-colors"
+                          title="Remover item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
