@@ -215,15 +215,18 @@ export const ProductDetailDrawer = ({
                       return (
                         <label
                           key={extra.id}
-                          className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                            isSelected
-                              ? "border-primary bg-accent/50"
-                              : "border-border hover:border-border/60"
-                          }`}
+                          className="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
+                          style={{
+                            backgroundColor: isSelected ? `${primaryColor}12` : 'transparent',
+                            borderColor: isSelected ? `${primaryColor}40` : 'hsl(var(--border))',
+                          }}
                         >
-                          <RadioGroupItem value={extra.id} className="text-primary" />
+                          <RadioGroupItem value={extra.id} style={{ color: primaryColor }} />
                           <div className="flex-1">
                             <p className="font-medium text-foreground">{extra.name}</p>
+                            {extra.description && (
+                              <p className="text-xs text-muted-foreground leading-tight mt-0.5">{extra.description}</p>
+                            )}
                           </div>
                           <p className="font-bold text-sm" style={{ color: primaryColor }}>
                             + R$ {extra.price.toFixed(2)}
