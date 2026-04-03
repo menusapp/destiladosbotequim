@@ -249,50 +249,78 @@ export const PaymentConfirmationModal = ({
 
       if (error) throw error;
 
+      // --- Bills: update existing or insert new ---
       if (order.table_id) {
         const comandaId = (order as any)._comanda_id || (order as any).comanda_id || null;
-        const { error: billError } = await supabase.from("bills").insert({
-          table_id: order.table_id,
-          comanda_id: comandaId,
+        const billPayload = {
           subtotal: subtotal,
           service_fee: feeAmount,
           total_amount: grossTotal,
           payment_method: billPaymentMethod,
           status: "paid",
           paid_at: paidAt,
-        });
-        if (billError) console.error("Erro ao criar conta:", billError);
+        };
+
+        // Try to find existing bill for this order's table/comanda
+        let existingBillQuery = supabase.from("bills").select("id").eq("table_id", order.table_id);
+        if (comandaId) {
+          existingBillQuery = existingBillQuery.eq("comanda_id", comandaId);
+        }
+        const { data: existingBills } = await existingBillQuery.order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+        if (existingBills) {
+          // Update existing bill
+          const { error: billError } = await supabase.from("bills").update(billPayload).eq("id", existingBills.id);
+          if (billError) console.error("Erro ao atualizar conta:", billError);
+          else console.info("[payment-change] bill atualizado", existingBills.id);
+        } else {
+          // Insert new bill
+          const { error: billError } = await supabase.from("bills").insert({
+            table_id: order.table_id,
+            comanda_id: comandaId,
+            ...billPayload,
+          });
+          if (billError) console.error("Erro ao criar conta:", billError);
+        }
       }
 
+      // --- Cash movements: clean up ALL related entries (any session) and re-create in current ---
+      const restId = order.restaurant_id || restaurantId;
+      const customerLabel = (order as any).customer_name || "Cliente";
+
+      // Delete old cash movements for this order across ALL sessions
+      await supabase.from("cash_movements")
+        .delete()
+        .eq("restaurant_id", restId)
+        .like("description", `%${customerLabel}%`)
+        .like("description", `%Pedido Local%`);
+
+      // Also clean up by order id pattern
+      const shortId = order.id.slice(0, 6);
+      await supabase.from("cash_movements")
+        .delete()
+        .eq("restaurant_id", restId)
+        .like("description", `%#${order.id}%`);
+      await supabase.from("cash_movements")
+        .delete()
+        .eq("restaurant_id", restId)
+        .like("description", `%#${shortId}%`);
+
+      // Re-create in current open session
       const { data: cashSession } = await supabase
         .from("cash_register_sessions")
         .select("id")
-        .eq("restaurant_id", order.restaurant_id || restaurantId)
+        .eq("restaurant_id", restId)
         .eq("status", "open")
         .order("opened_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (cashSession) {
-        // Build a clean description without UUID
-        const customerLabel = (order as any).customer_name || "Cliente";
-        const shortId = order.id.slice(0, 6);
-
-        await supabase.from("cash_movements")
-          .delete()
-          .eq("cash_session_id", cashSession.id)
-          .like("description", `%#${order.id}%`);
-
-        // Also clean up old format descriptions
-        await supabase.from("cash_movements")
-          .delete()
-          .eq("cash_session_id", cashSession.id)
-          .like("description", `Pedido Local #${shortId}%`);
-
         for (const payment of selectedPayments) {
           await supabase.from("cash_movements").insert({
             cash_session_id: cashSession.id,
-            restaurant_id: order.restaurant_id || restaurantId,
+            restaurant_id: restId,
             movement_type: "entrada",
             amount: payment.amount,
             payment_method: payment.methodType,
