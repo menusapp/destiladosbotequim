@@ -87,6 +87,7 @@ export const CheckoutDrawer = ({
   const [submitting, setSubmitting] = useState(false);
   const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
   const [activeRewardDiscount, setActiveRewardDiscount] = useState<DiscountReward | null>(null);
+  const [scheduledFor, setScheduledFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
