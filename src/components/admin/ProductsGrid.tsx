@@ -75,6 +75,7 @@ interface ProductIngredient {
 interface ProductExtra {
   id: string;
   name: string;
+  description?: string;
   price: number;
   ingredients?: ProductIngredient[];
   is_required?: boolean;
@@ -104,6 +105,7 @@ interface LinkedComplementGroup {
 interface IngredientVariation {
   id: string;
   name: string;
+  description?: string;
   price: number;
   ingredients: ProductIngredient[];
 }
@@ -144,6 +146,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   
   const [variations, setVariations] = useState<IngredientVariation[]>([]);
   const [variationName, setVariationName] = useState("");
+  const [variationDescription, setVariationDescription] = useState("");
   const [variationPrice, setVariationPrice] = useState("");
   const [variationIngredients, setVariationIngredients] = useState<ProductIngredient[]>([]);
   const [selectedVariationStockItem, setSelectedVariationStockItem] = useState("");
@@ -154,6 +157,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   
   const [extras, setExtras] = useState<ProductExtra[]>([]);
   const [extraName, setExtraName] = useState("");
+  const [extraDescription, setExtraDescription] = useState("");
   const [extraPrice, setExtraPrice] = useState("");
   const [extraIngredients, setExtraIngredients] = useState<ProductIngredient[]>([]);
   const [selectedExtraStockItem, setSelectedExtraStockItem] = useState("");
@@ -313,10 +317,10 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit
       })) || [];
       if (extra.is_required && ings.length > 0) {
-        variationsFromDB.push({ id: crypto.randomUUID(), name: extra.name, price: extra.price, ingredients: ings });
+        variationsFromDB.push({ id: crypto.randomUUID(), name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings });
         if (variationsFromDB.length === 1) { setVariationMinSelection(extra.min_selection?.toString() || "1"); setVariationMaxSelection(extra.max_selection?.toString() || "1"); setVariationIsRequired(true); }
       } else {
-        extrasFromDB.push({ id: crypto.randomUUID(), name: extra.name, price: extra.price, ingredients: ings, is_required: extra.is_required });
+        extrasFromDB.push({ id: crypto.randomUUID(), name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings, is_required: extra.is_required });
       }
     });
 
@@ -369,8 +373,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const handleAddVariation = () => {
     if (!variationName) { toast.error("Informe o nome da variação"); return; }
     if (variationIngredients.length === 0) { toast.error("Adicione pelo menos um insumo à variação"); return; }
-    setVariations([...variations, { id: crypto.randomUUID(), name: variationName, price: parseFloat(variationPrice) || 0, ingredients: [...variationIngredients] }]);
-    setVariationName(""); setVariationPrice(""); setVariationIngredients([]);
+    setVariations([...variations, { id: crypto.randomUUID(), name: variationName, description: variationDescription || undefined, price: parseFloat(variationPrice) || 0, ingredients: [...variationIngredients] }]);
+    setVariationName(""); setVariationDescription(""); setVariationPrice(""); setVariationIngredients([]);
   };
 
   const handleRemoveVariation = (id: string) => { setVariations(variations.filter(v => v.id !== id)); };
@@ -387,6 +391,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     const v = variations.find(v => v.id === id);
     if (!v) return;
     setVariationName(v.name);
+    setVariationDescription(v.description || "");
     setVariationPrice(v.price > 0 ? String(v.price) : "");
     setVariationIngredients(v.ingredients.map(i => ({ ...i })));
     setVariations(variations.filter(vr => vr.id !== id));
@@ -395,8 +400,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const handleAddExtra = () => {
     if (!extraName || !extraPrice) { toast.error("Preencha nome e preço do complemento"); return; }
     if (extras.some(e => e.name.toLowerCase() === extraName.toLowerCase())) { toast.error("Já existe um complemento com este nome"); return; }
-    setExtras([...extras, { id: crypto.randomUUID(), name: extraName, price: parseFloat(extraPrice), ingredients: [...extraIngredients], is_required: extraIsRequired }]);
-    setExtraName(""); setExtraPrice(""); setExtraIngredients([]); setExtraIsRequired(false);
+    setExtras([...extras, { id: crypto.randomUUID(), name: extraName, description: extraDescription || undefined, price: parseFloat(extraPrice), ingredients: [...extraIngredients], is_required: extraIsRequired }]);
+    setExtraName(""); setExtraDescription(""); setExtraPrice(""); setExtraIngredients([]); setExtraIsRequired(false);
   };
 
   const handleLinkComplementCategory = async () => {
@@ -506,7 +511,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
     if (ingredientType === "variable" && variations.length > 0) {
       for (const variation of variations) {
-        const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: variation.name, price: variation.price, is_required: true, min_selection: parseInt(variationMinSelection) || 1, max_selection: parseInt(variationMaxSelection) || 1 }).select().single();
+        const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: variation.name, description: variation.description || null, price: variation.price, is_required: true, min_selection: parseInt(variationMinSelection) || 1, max_selection: parseInt(variationMaxSelection) || 1 }).select().single();
         if (newExtra && variation.ingredients.length > 0) {
           await supabase.from("product_extra_ingredients").insert(variation.ingredients.map(ing => ({ product_extra_id: newExtra.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
         }
@@ -514,7 +519,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     }
 
     for (const extra of extras) {
-      const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: extra.name, price: extra.price, is_required: extra.is_required || false }).select().single();
+      const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: extra.name, description: extra.description || null, price: extra.price, is_required: extra.is_required || false }).select().single();
       if (newExtra && extra.ingredients && extra.ingredients.length > 0) {
         await supabase.from("product_extra_ingredients").insert(extra.ingredients.map(ing => ({ product_extra_id: newExtra.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
       }
@@ -586,10 +591,10 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit
       })) || [];
       if (extra.is_required && ings.length > 0) {
-        variationsFromDB.push({ id: extra.id, name: extra.name, price: extra.price, ingredients: ings });
+        variationsFromDB.push({ id: extra.id, name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings });
         if (variationsFromDB.length === 1) { setVariationMinSelection(extra.min_selection?.toString() || "1"); setVariationMaxSelection(extra.max_selection?.toString() || "1"); setVariationIsRequired(true); }
       } else {
-        extrasFromDB.push({ id: extra.id, name: extra.name, price: extra.price, ingredients: ings, is_required: extra.is_required });
+        extrasFromDB.push({ id: extra.id, name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings, is_required: extra.is_required });
       }
     });
 
@@ -622,9 +627,9 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setDialogOpen(false); setProductName(""); setProductDescription(""); setProductPrice(""); setProductPromotionalPrice("");
     setProductCategoryId(""); setProductImage(null); setProductImageUrl(null); setProductPrepTime(""); setPdvCode("");
     setIngredientType("fixed"); setIngredients([]); setVariations([]);
-    setVariationName(""); setVariationPrice(""); setVariationIngredients([]);
+    setVariationName(""); setVariationDescription(""); setVariationPrice(""); setVariationIngredients([]);
     setVariationIsRequired(true); setVariationMinSelection("1"); setVariationMaxSelection("1");
-    setExtras([]); setExtraName(""); setExtraPrice(""); setExtraIngredients([]);
+    setExtras([]); setExtraName(""); setExtraDescription(""); setExtraPrice(""); setExtraIngredients([]);
     setSelectedStockItem(""); setIngredientQuantity("");
     setSelectedExtraStockItem(""); setExtraIngredientQuantity("");
     setEditingProduct(null); setLinkedGroups([]); setSelectedComplementCategory("");
@@ -897,6 +902,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                             <Input placeholder="Nome (ex: Batata P)" value={variationName} onChange={(e) => setVariationName(e.target.value)} />
                             <Input type="number" step="0.01" placeholder="Preço adicional" value={variationPrice} onChange={(e) => setVariationPrice(e.target.value)} />
                           </div>
+                          <Input placeholder="Descrição (opcional)" value={variationDescription} onChange={(e) => setVariationDescription(e.target.value)} className="text-xs h-8" />
                           <div className="flex gap-2">
                             <Select value={selectedVariationStockItem} onValueChange={setSelectedVariationStockItem}>
                               <SelectTrigger className="flex-1"><SelectValue placeholder="Insumo" /></SelectTrigger>
@@ -931,6 +937,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                                     </div>
                                   </div>
                                   <div className="text-xs text-muted-foreground">{v.ingredients.map(i => `${i.stock_item_name} — ${i.quantity}${i.stock_item_unit}`).join(", ")}</div>
+                                  {v.description && <p className="text-xs text-muted-foreground/70 italic mt-0.5">{v.description}</p>}
                                   {vc && (
                                     <div className="mt-2 pt-2 border-t text-xs grid grid-cols-3 gap-2">
                                       <span>Custo: <b>R$ {vc.cost.toFixed(2)}</b></span>
@@ -1005,6 +1012,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                         <Input placeholder="Nome do complemento" value={extraName} onChange={(e) => setExtraName(e.target.value)} />
                         <Input type="number" step="0.01" placeholder="Preço" value={extraPrice} onChange={(e) => setExtraPrice(e.target.value)} />
                       </div>
+                      <Input placeholder="Descrição (opcional)" value={extraDescription} onChange={(e) => setExtraDescription(e.target.value)} className="text-xs h-8" />
                       <div className="flex items-center gap-2">
                         <input type="checkbox" id="extra-required" checked={extraIsRequired} onChange={(e) => setExtraIsRequired(e.target.checked)} className="rounded border-input" />
                         <Label htmlFor="extra-required" className="text-xs">Obrigatório</Label>
@@ -1038,6 +1046,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                                 <p className="font-medium">{extra.name} — R$ {extra.price.toFixed(2)}</p>
                                 {extra.is_required && <Badge variant="default" className="text-[10px] h-5">Obrigatório</Badge>}
                               </div>
+                              {extra.description && <p className="text-xs text-muted-foreground/70 italic">{extra.description}</p>}
                               <p className="text-xs text-muted-foreground">{extra.ingredients?.length || 0} insumo(s)</p>
                             </div>
                             <Button type="button" variant="destructive" size="sm" onClick={() => handleRemoveExtra(extra.id)}>Remover</Button>
