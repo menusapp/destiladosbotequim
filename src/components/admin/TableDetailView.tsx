@@ -541,7 +541,7 @@ export const TableDetailView = () => {
                           </p>
                           {item.order_item_extras.map((extra, idx) => (
                             <p key={idx} className="text-muted-foreground ml-4">
-                              + {extra.product_extras?.name || "Extra"}
+                              + {extra.extra_name || extra.product_extras?.name || "Extra"}
                             </p>
                           ))}
                           {item.notes && (
