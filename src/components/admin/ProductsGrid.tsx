@@ -413,7 +413,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isRestaurantOpen) { toast.error("Feche o restaurante para modificar produtos"); return; }
-    if (!productCategoryId) { toast.error("Selecione uma categoria"); return; }
+    // category is now optional
 
     let imageUrl = productImageUrl;
     if (productImage) {
