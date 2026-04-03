@@ -1012,6 +1012,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                         <Input placeholder="Nome do complemento" value={extraName} onChange={(e) => setExtraName(e.target.value)} />
                         <Input type="number" step="0.01" placeholder="Preço" value={extraPrice} onChange={(e) => setExtraPrice(e.target.value)} />
                       </div>
+                      <Input placeholder="Descrição (opcional)" value={extraDescription} onChange={(e) => setExtraDescription(e.target.value)} className="text-xs h-8" />
                       <div className="flex items-center gap-2">
                         <input type="checkbox" id="extra-required" checked={extraIsRequired} onChange={(e) => setExtraIsRequired(e.target.checked)} className="rounded border-input" />
                         <Label htmlFor="extra-required" className="text-xs">Obrigatório</Label>
