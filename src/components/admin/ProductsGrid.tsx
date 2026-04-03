@@ -937,6 +937,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                                     </div>
                                   </div>
                                   <div className="text-xs text-muted-foreground">{v.ingredients.map(i => `${i.stock_item_name} — ${i.quantity}${i.stock_item_unit}`).join(", ")}</div>
+                                  {v.description && <p className="text-xs text-muted-foreground/70 italic mt-0.5">{v.description}</p>}
                                   {vc && (
                                     <div className="mt-2 pt-2 border-t text-xs grid grid-cols-3 gap-2">
                                       <span>Custo: <b>R$ {vc.cost.toFixed(2)}</b></span>
