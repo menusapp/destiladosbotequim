@@ -1,22 +1,54 @@
 
 
-## Plan: Softer selection styling + show descriptions in ProductDetailDrawer
+## Plan: Show menu when closed + allow only scheduled orders
+
+### What changes
+
+**Current behavior**: When restaurant is closed (`is_open = false`), Menu.tsx and DeliveryMenu.tsx show a full-screen "Estamos Fechados" blocking page. No menu is visible.
+
+**New behavior**: Show the full menu normally. Add a banner at the top saying the restaurant is closed. Block immediate orders but allow scheduled orders (using `dd_scheduled_for`).
 
 ### Changes
 
-**1. `src/types/menu.ts`** — Add `description?: string | null` to `ProductExtra` interface.
+**1. Remove the closed-screen early return in `Menu.tsx` and `DeliveryMenu.tsx`**
+- Delete the `if (!restaurant.is_open) return <RestaurantClosedScreen />` blocks
+- Instead, pass `isOpen` state down to components that need it
 
-**2. `src/components/menu/ProductDetailDrawer.tsx`** — Two changes:
-- **Softer selection colors**: Replace `border-primary bg-accent/50` with a subtle tint using `primaryColor` at ~8% opacity for background and ~30% opacity for border. This applies to all 3 label blocks (required radio, required checkbox, optional checkbox).
-- **Show description**: Below each extra's name, render `extra.description` in small muted text (`text-xs text-muted-foreground`) when present.
+**2. Add a "Restaurant Closed" banner**
+- In both `Menu.tsx` and `DeliveryMenu.tsx`, when `!restaurant.is_open`, render a dismissible banner at the top of the menu (below header) with a Clock icon and text like "Restaurante fechado no momento. Você pode agendar seu pedido para quando estivermos abertos."
+- Use a soft yellow/amber background for visibility without being intrusive
 
-**3. `src/pages/Menu.tsx`** (line 966) — Add `description` to the select query for `product_extras`. Also add `description` to the `extra_category_items` select (line 972) and map it through in the complement conversion (line 980).
+**3. Add scheduling UI to `CheckoutDrawer.tsx` (SummaryStep)**
+- When `!restaurant.is_open`:
+  - Replace the "Finalizar Pedido" button behavior: require scheduling
+  - Add a date/time picker (date input + time input) for the customer to choose when they want the order
+  - Validate that the selected time is in the future
+  - Store the chosen datetime in `dd_scheduled_for` on the order insert (in `handleFinishOrder`)
+- When restaurant IS open:
+  - Optionally show a toggle "Agendar para outro horário?" that reveals the same date/time picker (nice-to-have, can keep current flow unchanged)
 
-**4. `src/pages/DeliveryMenu.tsx`** (line 240) — Same: add `description` to both `product_extras` and `extra_category_items` select queries, and map it in complement conversion.
+**4. Update `handleFinishOrder` in `CheckoutDrawer.tsx`**
+- Accept `scheduledFor?: string` parameter
+- When `scheduledFor` is provided, add `dd_scheduled_for: scheduledFor` to `orderData`
+- Set status to `"pending"` as normal (kitchen handles it when the time comes)
 
-**5. `src/pages/Kiosk.tsx`** (line 196) — Already uses `select("*")` so description is fetched automatically. No change needed.
+**5. Update `SummaryStep.tsx`**
+- Add props: `isRestaurantOpen: boolean`, `scheduledFor: string | null`, `onScheduledForChange: (date: string | null) => void`
+- When `!isRestaurantOpen`: show mandatory scheduling section with date + time inputs
+- When `isRestaurantOpen`: optionally show a "Agendar pedido?" toggle
+- Disable "Finalizar Pedido" if restaurant is closed and no schedule is selected
 
-### Visual result
-- Selected items get a very light tint of the restaurant's primary color instead of the hard orange
-- Descriptions appear as small gray text below each variation/complement name, only when present
+**6. Comanda flow (`Menu.tsx` local/table mode)**
+- When restaurant is closed and mode is `"local"` (table ordering via QR): also show the banner but still allow adding items to cart
+- On the ComandaBottomBar or cart submission, apply the same scheduling requirement
+
+### Files modified
+- `src/pages/Menu.tsx` — remove closed screen, add banner, pass `isOpen` to checkout
+- `src/pages/DeliveryMenu.tsx` — same
+- `src/components/menu/CheckoutDrawer.tsx` — add scheduling state, pass to SummaryStep, include in order insert
+- `src/components/menu/checkout/SummaryStep.tsx` — add scheduling UI (date+time picker)
+- `src/components/menu/RestaurantClosedScreen.tsx` — no longer used as blocking screen (can keep file for reference or remove)
+
+### No database changes needed
+The `dd_scheduled_for` column already exists on the `orders` table.
 
