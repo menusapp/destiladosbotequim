@@ -158,6 +158,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   
   const [extras, setExtras] = useState<ProductExtra[]>([]);
   const [extraName, setExtraName] = useState("");
+  const [extraDescription, setExtraDescription] = useState("");
   const [extraPrice, setExtraPrice] = useState("");
   const [extraIngredients, setExtraIngredients] = useState<ProductIngredient[]>([]);
   const [selectedExtraStockItem, setSelectedExtraStockItem] = useState("");
