@@ -48,6 +48,9 @@ export const SummaryStep = ({
   submitting,
   deliveryZone,
   activeRewardDiscount,
+  isRestaurantOpen = true,
+  scheduledFor,
+  onScheduledForChange,
 }: SummaryStepProps) => {
   const subtotal = cart.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
