@@ -138,23 +138,28 @@ export function KioskProductDetail({ product, extras, primaryColor, onAdd, onBac
             </div>
           )}
 
-          {/* Optional extras */}
-          {optionalExtras.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-bold mb-1 text-foreground">Adicionais</h3>
+          {/* Optional extras - grouped by category */}
+          {optionalExtrasGrouped.map((group, gi) => (
+            <div key={gi} className="mb-6">
+              <h3 className="text-lg font-bold mb-1 text-foreground">{group.categoryName}</h3>
               <div className="space-y-2">
-                {optionalExtras.map(ext => (
+                {group.items.map(ext => (
                   <label key={ext.id} className="flex items-center justify-between p-4 rounded-xl border cursor-pointer hover:bg-muted transition-colors">
                     <div className="flex items-center gap-3">
                       <Checkbox checked={selectedExtras.includes(ext.id)} onCheckedChange={() => toggleExtra(ext.id, false)} />
-                      <span className="text-base">{ext.name}</span>
+                      <div>
+                        <span className="text-base">{ext.name}</span>
+                        {ext.description && (
+                          <p className="text-xs text-muted-foreground leading-tight mt-0.5">{ext.description}</p>
+                        )}
+                      </div>
                     </div>
                     {ext.price > 0 && <span className="text-base font-medium" style={{ color: primaryColor }}>+ R$ {ext.price.toFixed(2)}</span>}
                   </label>
                 ))}
               </div>
             </div>
-          )}
+          ))}
 
           {/* Notes */}
           <div className="mb-6">
