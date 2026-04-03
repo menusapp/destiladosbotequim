@@ -412,6 +412,13 @@ export const TableDetailDialog = ({
           </div>
         </div>
 
+        {/* Notes */}
+        {item.notes && (
+          <div className="text-[11px] text-muted-foreground italic ml-4">
+            Obs: {item.notes}
+          </div>
+        )}
+
         {/* Extras */}
         {item.order_item_extras?.length > 0 && (
           <div className="ml-4 space-y-0.5">
