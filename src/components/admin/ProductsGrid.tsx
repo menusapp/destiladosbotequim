@@ -391,6 +391,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     const v = variations.find(v => v.id === id);
     if (!v) return;
     setVariationName(v.name);
+    setVariationDescription(v.description || "");
     setVariationPrice(v.price > 0 ? String(v.price) : "");
     setVariationIngredients(v.ingredients.map(i => ({ ...i })));
     setVariations(variations.filter(vr => vr.id !== id));
