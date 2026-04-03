@@ -373,8 +373,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const handleAddVariation = () => {
     if (!variationName) { toast.error("Informe o nome da variação"); return; }
     if (variationIngredients.length === 0) { toast.error("Adicione pelo menos um insumo à variação"); return; }
-    setVariations([...variations, { id: crypto.randomUUID(), name: variationName, price: parseFloat(variationPrice) || 0, ingredients: [...variationIngredients] }]);
-    setVariationName(""); setVariationPrice(""); setVariationIngredients([]);
+    setVariations([...variations, { id: crypto.randomUUID(), name: variationName, description: variationDescription || undefined, price: parseFloat(variationPrice) || 0, ingredients: [...variationIngredients] }]);
+    setVariationName(""); setVariationDescription(""); setVariationPrice(""); setVariationIngredients([]);
   };
 
   const handleRemoveVariation = (id: string) => { setVariations(variations.filter(v => v.id !== id)); };
