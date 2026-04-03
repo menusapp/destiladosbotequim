@@ -47,7 +47,7 @@ export const printOrder = async (
       price_at_order: number;
       notes?: string;
       products: { name: string } | null;
-      order_item_extras: { price_at_order: number; product_extras: { name: string } | null }[];
+      order_item_extras: { price_at_order: number; extra_name?: string | null; product_extras: { name: string } | null }[];
     }[];
   },
   restaurantId: string
