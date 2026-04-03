@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, FileText, Loader2, MapPin, UtensilsCrossed, Truck } from "lucide-react";
+import { CalendarIcon, FileText, Loader2, MapPin, UtensilsCrossed, Truck, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/components/ui/sonner";
@@ -47,6 +47,10 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
   const [deliveryChecks, setDeliveryChecks] = useState<Record<string, boolean>>({});
   const [deliveryCpfs, setDeliveryCpfs] = useState<Record<string, string>>({});
   const [deliveryAddresses, setDeliveryAddresses] = useState<Record<string, string>>({});
+  // Company (CNPJ) info state per order
+  const [companyChecks, setCompanyChecks] = useState<Record<string, boolean>>({});
+  const [companyCnpjs, setCompanyCnpjs] = useState<Record<string, string>>({});
+  const [companyNames, setCompanyNames] = useState<Record<string, string>>({});
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
     const today = new Date();
     return {
@@ -145,10 +149,19 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
     const isDelivery = deliveryChecks[orderId];
     const cpf = deliveryCpfs[orderId]?.replace(/\D/g, "") || "";
     const address = deliveryAddresses[orderId] || "";
+    const isCompany = companyChecks[orderId];
+    const cnpj = companyCnpjs[orderId]?.replace(/\D/g, "") || "";
+    const companyName = companyNames[orderId] || "";
 
     // If marked as delivery, CPF is mandatory
     if (isDelivery && (!cpf || cpf.length !== 11)) {
       toast.error("Para nota de entrega, o CPF do cliente é obrigatório e deve ter 11 dígitos.");
+      return;
+    }
+
+    // If marked as company, CNPJ is mandatory
+    if (isCompany && (!cnpj || cnpj.length !== 14)) {
+      toast.error("Para nota empresarial, o CNPJ deve ter 14 dígitos.");
       return;
     }
 
@@ -169,12 +182,17 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
 
       // Call nuvem-fiscal-emit edge function
       toast.info("Enviando nota para emissão...");
+      const emitBody: any = {
+        order_id: orderId,
+        restaurant_id: restaurantId,
+        fiscal_note_id: noteData.id,
+      };
+      if (isCompany && cnpj) {
+        emitBody.customer_cnpj = cnpj;
+        emitBody.customer_razao_social = companyName || "EMPRESA";
+      }
       const { data: emitResult, error: emitError } = await supabase.functions.invoke("nuvem-fiscal-emit", {
-        body: {
-          order_id: orderId,
-          restaurant_id: restaurantId,
-          fiscal_note_id: noteData.id,
-        },
+        body: emitBody,
       });
 
       if (emitError) {
@@ -321,6 +339,47 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
                           value={deliveryAddresses[order.id] || ""}
                           onChange={(e) => setDeliveryAddresses(prev => ({ ...prev, [order.id]: e.target.value }))}
                           placeholder="Endereço de entrega"
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Company (CNPJ) checkbox */}
+                  <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
+                    <Checkbox
+                      id={`company-${order.id}`}
+                      checked={companyChecks[order.id] || false}
+                      onCheckedChange={(checked) => {
+                        setCompanyChecks(prev => ({ ...prev, [order.id]: !!checked }));
+                      }}
+                    />
+                    <Label htmlFor={`company-${order.id}`} className="text-sm flex items-center gap-1.5 cursor-pointer">
+                      <Building2 className="w-3.5 h-3.5" />
+                      Nota para empresa (CNPJ)
+                    </Label>
+                  </div>
+
+                  {companyChecks[order.id] && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-6">
+                      <div className="space-y-1">
+                        <Label className="text-xs">CNPJ da Empresa *</Label>
+                        <Input
+                          value={companyCnpjs[order.id] || ""}
+                          onChange={(e) => setCompanyCnpjs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                          placeholder="00.000.000/0000-00"
+                          className="h-8 text-sm"
+                        />
+                        {(!companyCnpjs[order.id] || companyCnpjs[order.id].replace(/\D/g, "").length !== 14) && (
+                          <p className="text-xs text-destructive">CNPJ deve ter 14 dígitos.</p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Razão Social</Label>
+                        <Input
+                          value={companyNames[order.id] || ""}
+                          onChange={(e) => setCompanyNames(prev => ({ ...prev, [order.id]: e.target.value }))}
+                          placeholder="Nome da empresa"
                           className="h-8 text-sm"
                         />
                       </div>

@@ -425,12 +425,34 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       imageUrl = publicUrl;
     }
 
+    // Auto-generate PDV code for new products if not manually set
+    let finalPdvCode = pdvCode || null;
+    if (!editingProduct && !pdvCode) {
+      const { data: existingProducts } = await supabase
+        .from("products")
+        .select("pdv_code")
+        .eq("restaurant_id", restaurantId)
+        .not("pdv_code", "is", null)
+        .order("pdv_code", { ascending: false });
+      
+      let nextNumber = 1;
+      if (existingProducts && existingProducts.length > 0) {
+        for (const p of existingProducts) {
+          const num = parseInt(p.pdv_code, 10);
+          if (!isNaN(num) && num >= nextNumber) {
+            nextNumber = num + 1;
+          }
+        }
+      }
+      finalPdvCode = String(nextNumber).padStart(3, "0");
+    }
+
     const productData: any = {
       name: productName, description: productDescription, price: parseFloat(productPrice),
       promotional_price: productPromotionalPrice ? parseFloat(productPromotionalPrice) : null,
       category_id: (productCategoryId && productCategoryId !== "__none") ? productCategoryId : null, image_url: imageUrl, restaurant_id: restaurantId,
       prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : null,
-      pdv_code: pdvCode || null,
+      pdv_code: finalPdvCode,
       visibility_channels: visibilityChannels,
       fiscal_ncm: fiscalNcm || null, fiscal_exception: fiscalException || null, fiscal_cest: fiscalCest || null,
       fiscal_cfop: fiscalCfop || null, fiscal_icms_csosn: fiscalIcmsCsosn || null, fiscal_icms_origin: fiscalIcmsOrigin || "0",

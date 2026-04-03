@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { order_id, restaurant_id, fiscal_note_id } = await req.json();
+    const { order_id, restaurant_id, fiscal_note_id, customer_cnpj, customer_razao_social } = await req.json();
 
     if (!order_id || !restaurant_id) {
       return jsonResponse({ error: "order_id e restaurant_id são obrigatórios" }, 400);
@@ -382,8 +382,18 @@ Deno.serve(async (req) => {
       },
     };
 
-    // Add customer CPF if available
-    if (order.customer_cpf) {
+    // Add customer identification: CNPJ (company) takes priority over CPF
+    if (customer_cnpj) {
+      const cnpjClean = customer_cnpj.replace(/\D/g, "");
+      if (cnpjClean.length === 14) {
+        nfcePayload.infNFe.dest = {
+          CNPJ: cnpjClean,
+          xNome: customer_razao_social || "EMPRESA",
+          indIEDest: 9,
+        };
+        console.log("[NuvemFiscal] Nota para empresa CNPJ:", cnpjClean);
+      }
+    } else if (order.customer_cpf) {
       const cpfClean = order.customer_cpf.replace(/\D/g, "");
       if (cpfClean.length === 11) {
         nfcePayload.infNFe.dest = {
