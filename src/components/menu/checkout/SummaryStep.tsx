@@ -29,6 +29,9 @@ interface SummaryStepProps {
   submitting: boolean;
   deliveryZone?: DeliveryZone | null;
   activeRewardDiscount?: DiscountReward | null;
+  isRestaurantOpen?: boolean;
+  scheduledFor: string | null;
+  onScheduledForChange: (value: string | null) => void;
 }
 
 export const SummaryStep = ({
