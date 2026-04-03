@@ -627,9 +627,9 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setDialogOpen(false); setProductName(""); setProductDescription(""); setProductPrice(""); setProductPromotionalPrice("");
     setProductCategoryId(""); setProductImage(null); setProductImageUrl(null); setProductPrepTime(""); setPdvCode("");
     setIngredientType("fixed"); setIngredients([]); setVariations([]);
-    setVariationName(""); setVariationPrice(""); setVariationIngredients([]);
+    setVariationName(""); setVariationDescription(""); setVariationPrice(""); setVariationIngredients([]);
     setVariationIsRequired(true); setVariationMinSelection("1"); setVariationMaxSelection("1");
-    setExtras([]); setExtraName(""); setExtraPrice(""); setExtraIngredients([]);
+    setExtras([]); setExtraName(""); setExtraDescription(""); setExtraPrice(""); setExtraIngredients([]);
     setSelectedStockItem(""); setIngredientQuantity("");
     setSelectedExtraStockItem(""); setExtraIngredientQuantity("");
     setEditingProduct(null); setLinkedGroups([]); setSelectedComplementCategory("");
