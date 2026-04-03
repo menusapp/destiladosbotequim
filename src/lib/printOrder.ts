@@ -89,7 +89,7 @@ export const printOrder = async (
   // Calculate items
   const items = order.order_items.map((item) => {
     const extras = item.order_item_extras.map((e) => ({
-      name: e.product_extras?.name || "Extra",
+      name: e.extra_name || e.product_extras?.name || "Extra",
       price: e.price_at_order,
     }));
     return {
