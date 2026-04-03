@@ -1195,6 +1195,7 @@ export type Database = {
         Row: {
           category_id: string
           created_at: string | null
+          description: string | null
           id: string
           name: string
           pdv_code: string | null
@@ -1204,6 +1205,7 @@ export type Database = {
         Insert: {
           category_id: string
           created_at?: string | null
+          description?: string | null
           id?: string
           name: string
           pdv_code?: string | null
@@ -1213,6 +1215,7 @@ export type Database = {
         Update: {
           category_id?: string
           created_at?: string | null
+          description?: string | null
           id?: string
           name?: string
           pdv_code?: string | null
@@ -2772,6 +2775,7 @@ export type Database = {
       product_extras: {
         Row: {
           created_at: string | null
+          description: string | null
           extra_category_id: string | null
           id: string
           is_required: boolean | null
@@ -2784,6 +2788,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
           extra_category_id?: string | null
           id?: string
           is_required?: boolean | null
@@ -2796,6 +2801,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          description?: string | null
           extra_category_id?: string | null
           id?: string
           is_required?: boolean | null
