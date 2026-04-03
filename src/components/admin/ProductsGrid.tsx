@@ -428,7 +428,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     const productData: any = {
       name: productName, description: productDescription, price: parseFloat(productPrice),
       promotional_price: productPromotionalPrice ? parseFloat(productPromotionalPrice) : null,
-      category_id: productCategoryId, image_url: imageUrl,
+      category_id: productCategoryId || null, image_url: imageUrl, restaurant_id: restaurantId,
       prep_time_minutes: productPrepTime ? parseInt(productPrepTime) : null,
       pdv_code: pdvCode || null,
       visibility_channels: visibilityChannels,
