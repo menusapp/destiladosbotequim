@@ -271,8 +271,10 @@ const RestaurantAdmin = () => {
             if (notifiedOrdersRef.current.has(orderId)) return;
 
             // Buscar detalhes completos do pedido para calcular total
-            // Pequeno delay para garantir que order_items já foram inseridos (race condition)
-            const fetchOrderWithRetry = async (retries = 3): Promise<any> => {
+            // Delay inicial para garantir que order_items e extras já foram inseridos (race condition)
+            await new Promise(r => setTimeout(r, 1500));
+            
+            const fetchOrderWithRetry = async (retries = 4): Promise<any> => {
               const { data: orderData } = await supabase
                 .from('orders')
                 .select(`
@@ -286,9 +288,9 @@ const RestaurantAdmin = () => {
                 .eq('id', orderId)
                 .single();
               
-              // Se não tem itens e ainda tem retries, esperar e tentar novamente
+              // Se não tem itens, esperar e tentar novamente
               if (orderData && (!orderData.order_items || orderData.order_items.length === 0) && retries > 0) {
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 800));
                 return fetchOrderWithRetry(retries - 1);
               }
               return orderData;
@@ -297,10 +299,11 @@ const RestaurantAdmin = () => {
             const orderData = await fetchOrderWithRetry();
 
             if (orderData) {
-              const total = orderData.order_items.reduce((sum: number, item: any) => {
+              const itemsTotal = orderData.order_items.reduce((sum: number, item: any) => {
                 const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
                 return sum + (item.price_at_order + extrasTotal) * item.quantity;
               }, 0);
+              const total = itemsTotal + (orderData.delivery_fee || 0);
 
               // Buscar número da mesa para pedidos locais
               let tableNumber: number | undefined;
