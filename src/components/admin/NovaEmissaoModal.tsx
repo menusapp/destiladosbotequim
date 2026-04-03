@@ -384,7 +384,7 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
                         />
                       </div>
                     </div>
-                  )
+                  )}
 
                   <div className="flex justify-end">
                     <Button
