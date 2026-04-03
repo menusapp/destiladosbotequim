@@ -317,7 +317,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit
       })) || [];
       if (extra.is_required && ings.length > 0) {
-        variationsFromDB.push({ id: crypto.randomUUID(), name: extra.name, price: extra.price, ingredients: ings });
+        variationsFromDB.push({ id: crypto.randomUUID(), name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings });
         if (variationsFromDB.length === 1) { setVariationMinSelection(extra.min_selection?.toString() || "1"); setVariationMaxSelection(extra.max_selection?.toString() || "1"); setVariationIsRequired(true); }
       } else {
         extrasFromDB.push({ id: crypto.randomUUID(), name: extra.name, price: extra.price, ingredients: ings, is_required: extra.is_required });
