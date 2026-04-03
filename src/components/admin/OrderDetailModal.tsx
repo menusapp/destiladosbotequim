@@ -484,7 +484,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                         <TableCell className="text-right">R$ {item.price_at_order.toFixed(2)}</TableCell>
                         <TableCell>
                           {item.order_item_extras.length > 0 ? (
-                            <div className="text-xs space-y-1">{item.order_item_extras.map((extra, idx) => (<div key={idx}>+ {extra.product_extras?.name} (R$ {extra.price_at_order.toFixed(2)})</div>))}</div>
+                            <div className="text-xs space-y-1">{item.order_item_extras.map((extra, idx) => (<div key={idx}>+ {extra.extra_name || extra.product_extras?.name || "Extra"} (R$ {extra.price_at_order.toFixed(2)})</div>))}</div>
                           ) : "—"}
                         </TableCell>
                         <TableCell className="text-right font-medium">R$ {itemSubtotal.toFixed(2)}</TableCell>
