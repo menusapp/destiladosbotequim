@@ -1170,15 +1170,15 @@ const Comanda = () => {
         <div className="shrink-0 border-t bg-background p-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
           <div className="container mx-auto">
             {showSendOrderButton && (
-              <Button 
+                <Button 
                 className="w-full text-white" 
                 size="lg"
                 onClick={handleSendOrder}
-                disabled={submitting}
+                disabled={submitting || !isRestaurantOpen}
                 style={{ backgroundColor: restaurantColor }}
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
-                {submitting ? "Enviando..." : `Enviar Pedido · R$ ${totals.cartSubtotal.toFixed(2)}`}
+                {!isRestaurantOpen ? "Restaurante Fechado" : (submitting ? "Enviando..." : `Enviar Pedido · R$ ${totals.cartSubtotal.toFixed(2)}`)}
               </Button>
             )}
             {showBillButton && (
