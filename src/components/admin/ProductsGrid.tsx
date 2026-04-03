@@ -320,7 +320,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         variationsFromDB.push({ id: crypto.randomUUID(), name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings });
         if (variationsFromDB.length === 1) { setVariationMinSelection(extra.min_selection?.toString() || "1"); setVariationMaxSelection(extra.max_selection?.toString() || "1"); setVariationIsRequired(true); }
       } else {
-        extrasFromDB.push({ id: crypto.randomUUID(), name: extra.name, price: extra.price, ingredients: ings, is_required: extra.is_required });
+        extrasFromDB.push({ id: crypto.randomUUID(), name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings, is_required: extra.is_required });
       }
     });
 
