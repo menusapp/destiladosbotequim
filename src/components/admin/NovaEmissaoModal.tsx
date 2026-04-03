@@ -47,6 +47,10 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
   const [deliveryChecks, setDeliveryChecks] = useState<Record<string, boolean>>({});
   const [deliveryCpfs, setDeliveryCpfs] = useState<Record<string, string>>({});
   const [deliveryAddresses, setDeliveryAddresses] = useState<Record<string, string>>({});
+  // Company (CNPJ) info state per order
+  const [companyChecks, setCompanyChecks] = useState<Record<string, boolean>>({});
+  const [companyCnpjs, setCompanyCnpjs] = useState<Record<string, string>>({});
+  const [companyNames, setCompanyNames] = useState<Record<string, string>>({});
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
     const today = new Date();
     return {
