@@ -15,6 +15,7 @@ export interface ProductExtra {
   id: string;
   name: string;
   price: number;
+  description?: string | null;
   is_required?: boolean;
   min_selection?: number;
   max_selection?: number;
