@@ -662,6 +662,10 @@ const Comanda = () => {
 
   const handleSendOrder = async () => {
     if (submitting) return;
+    if (!isRestaurantOpen) {
+      toast.error("Restaurante fechado no momento. Não é possível enviar pedidos.");
+      return;
+    }
     if (cart.length === 0) {
       toast.error("Carrinho vazio");
       return;
