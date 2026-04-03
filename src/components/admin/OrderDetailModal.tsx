@@ -18,6 +18,7 @@ import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 
 interface OrderItemExtra {
   price_at_order: number;
+  extra_name?: string | null;
   product_extras: { name: string } | null;
 }
 
