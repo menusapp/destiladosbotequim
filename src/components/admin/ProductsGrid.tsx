@@ -222,10 +222,21 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
   const fetchProducts = async () => {
     const { data: restaurantCategories } = await supabase.from("categories").select("id").eq("restaurant_id", restaurantId);
-    if (!restaurantCategories || restaurantCategories.length === 0) { setProducts([]); return; }
+    const categoryIds = (restaurantCategories || []).map(c => c.id);
 
-    const categoryIds = restaurantCategories.map(c => c.id);
-    const { data } = await supabase.from("products").select("*").in("category_id", categoryIds);
+    // Fetch products in categories + uncategorized products for this restaurant
+    const queries = [];
+    if (categoryIds.length > 0) {
+      queries.push(supabase.from("products").select("*").in("category_id", categoryIds));
+    }
+    queries.push(supabase.from("products").select("*").is("category_id", null).eq("restaurant_id", restaurantId));
+    
+    const results = await Promise.all(queries);
+    const allProducts = results.flatMap(r => r.data || []);
+    // Deduplicate by id
+    const seen = new Set<string>();
+    const data = allProducts.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+    if (data.length === 0) { setProducts([]); return; }
     if (!data || data.length === 0) { setProducts([]); return; }
 
     const productIds = data.map(p => p.id);
