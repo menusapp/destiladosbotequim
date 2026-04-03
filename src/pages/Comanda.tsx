@@ -471,6 +471,7 @@ const Comanda = () => {
       setRestaurantColor(restData.primary_color || "#FF6B35");
       setRestaurantId(restData.id);
       setBillRequestEnabled(restData.bill_request_enabled ?? true);
+      setIsRestaurantOpen(restData.is_open ?? true);
 
       // Buscar mesa DO RESTAURANTE ESPECÍFICO
       const tableResult = await supabase
