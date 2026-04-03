@@ -394,10 +394,10 @@ export const SummaryStep = ({
         <Button
           onClick={onConfirm}
           className="flex-1"
-          disabled={submitting || (!isRestaurantOpen && !scheduledFor)}
+          disabled={submitting || !isRestaurantOpen}
           style={{ backgroundColor: restaurant.primary_color, color: "white" }}
         >
-          {submitting ? "Finalizando..." : (scheduledFor ? "Agendar Pedido" : "Finalizar Pedido")}
+          {submitting ? "Finalizando..." : (!isRestaurantOpen ? "Restaurante Fechado" : (scheduledFor ? "Agendar Pedido" : "Finalizar Pedido"))}
         </Button>
       </div>
     </div>
