@@ -2865,7 +2865,7 @@ export type Database = {
       products: {
         Row: {
           available: boolean | null
-          category_id: string
+          category_id: string | null
           created_at: string | null
           description: string | null
           featured_display_order: number | null
@@ -2897,7 +2897,7 @@ export type Database = {
         }
         Insert: {
           available?: boolean | null
-          category_id: string
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           featured_display_order?: number | null
@@ -2929,7 +2929,7 @@ export type Database = {
         }
         Update: {
           available?: boolean | null
-          category_id?: string
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           featured_display_order?: number | null
