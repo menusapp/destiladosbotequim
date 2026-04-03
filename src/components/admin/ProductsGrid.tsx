@@ -508,7 +508,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductDescription(product.description || "");
     setProductPrice(product.price.toString());
     setProductPromotionalPrice(product.promotional_price?.toString() || "");
-    setProductCategoryId(product.category_id);
+    setProductCategoryId(product.category_id || "__none");
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
     setPdvCode((product as any).pdv_code || "");
