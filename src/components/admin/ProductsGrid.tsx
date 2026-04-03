@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Trash2, Package, DollarSign, Image, Clock, Tag, Barcode, Settings2, Layers, Copy, Pencil } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { generateNextPdvCode } from "@/lib/pdvCodeGenerator";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -450,23 +451,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     // Auto-generate PDV code for new products if not manually set
     let finalPdvCode = pdvCode || null;
     if (!editingProduct && !pdvCode) {
-      const { data: existingProducts } = await supabase
-        .from("products")
-        .select("pdv_code")
-        .eq("restaurant_id", restaurantId)
-        .not("pdv_code", "is", null)
-        .order("pdv_code", { ascending: false });
-      
-      let nextNumber = 1;
-      if (existingProducts && existingProducts.length > 0) {
-        for (const p of existingProducts) {
-          const num = parseInt(p.pdv_code, 10);
-          if (!isNaN(num) && num >= nextNumber) {
-            nextNumber = num + 1;
-          }
-        }
-      }
-      finalPdvCode = String(nextNumber).padStart(3, "0");
+      finalPdvCode = await generateNextPdvCode(restaurantId);
     }
 
     const productData: any = {
