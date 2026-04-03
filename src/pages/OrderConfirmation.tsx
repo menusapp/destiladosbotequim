@@ -208,14 +208,16 @@ export default function OrderConfirmation() {
                 id,
                 quantity,
                 price_at_order,
-                products (name)
+                notes,
+                products (name),
+                order_item_extras (price_at_order, extra_name, product_extras(name))
               )
             `)
             .eq("id", orderId)
             .single();
 
           if (fullOrder) {
-            setOrder(fullOrder as Order);
+            setOrder(fullOrder as any);
           }
 
           // Notificações de mudança de status
