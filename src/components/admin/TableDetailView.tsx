@@ -272,6 +272,7 @@ export const TableDetailView = () => {
         products: item.products,
         order_item_extras: item.order_item_extras.map(e => ({
           price_at_order: e.price_at_order,
+          extra_name: e.extra_name,
           product_extras: e.product_extras,
         })),
       })),
