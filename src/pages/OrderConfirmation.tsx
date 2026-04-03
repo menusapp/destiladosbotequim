@@ -411,14 +411,29 @@ export default function OrderConfirmation() {
               <CardTitle>Detalhes do Pedido</CardTitle>
             </CardHeader>
             <CardContent>
-              {(order.order_items ?? []).map((item) => (
-                <div key={item.id} className="flex justify-between mb-2">
-                  <span>
-                    {item.quantity}x {item.products?.name}
-                  </span>
-                  <span>R$ {(item.price_at_order * item.quantity).toFixed(2)}</span>
-                </div>
-              ))}
+              {(order.order_items ?? []).map((item) => {
+                const extrasTotal = (item.order_item_extras ?? []).reduce((s, e) => s + e.price_at_order, 0);
+                const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
+                return (
+                  <div key={item.id} className="mb-3">
+                    <div className="flex justify-between">
+                      <span className="font-medium">
+                        {item.quantity}x {item.products?.name}
+                      </span>
+                      <span>R$ {itemTotal.toFixed(2)}</span>
+                    </div>
+                    {item.notes && (
+                      <p className="text-sm text-muted-foreground italic ml-4">Obs: {item.notes}</p>
+                    )}
+                    {(item.order_item_extras ?? []).map((extra, idx) => (
+                      <div key={idx} className="flex justify-between text-sm text-muted-foreground ml-4">
+                        <span>+ {extra.extra_name || extra.product_extras?.name || "Extra"}</span>
+                        <span>R$ {extra.price_at_order.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
               <Separator className="my-4" />
               <div className="space-y-2">
                 <div className="flex justify-between">
