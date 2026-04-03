@@ -40,7 +40,7 @@ interface PaymentConfirmationModalProps {
   order: Order;
   restaurantId: string;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }
 
 const METHOD_ICONS: Record<string, any> = {
@@ -216,16 +216,36 @@ export const PaymentConfirmationModal = ({
 
       // Get the primary brand code (first payment with a brand)
       const primaryBrand = selectedPayments.find(p => p.brandCode)?.brandCode || null;
+      const targetOrderIds = Array.isArray((order as any)._comanda_order_ids) && (order as any)._comanda_order_ids.length > 0
+        ? (order as any)._comanda_order_ids
+        : [order.id];
+      const paidAt = new Date().toISOString();
+      const paymentPayload = {
+        payment_type: paymentDisplayStr,
+        payment_brand: primaryBrand,
+        payment_status: "paid",
+        paid_at: paidAt,
+      };
 
-      const { error } = await supabase
-        .from("orders")
-        .update({ 
-          payment_type: paymentDisplayStr, 
-          payment_brand: primaryBrand,
-          status: "paid",
-          paid_at: new Date().toISOString(),
-        })
-        .eq("id", order.id);
+      console.info("[payment-confirmation] salvando pagamento", {
+        orderId: order.id,
+        targetOrderIds,
+        paymentDisplayStr,
+        billPaymentMethod,
+        primaryBrand,
+        total,
+        selectedPayments,
+      });
+
+      const { error } = targetOrderIds.length === 1
+        ? await supabase
+            .from("orders")
+            .update(paymentPayload)
+            .eq("id", targetOrderIds[0])
+        : await supabase
+            .from("orders")
+            .update(paymentPayload)
+            .in("id", targetOrderIds);
 
       if (error) throw error;
 
@@ -239,7 +259,7 @@ export const PaymentConfirmationModal = ({
           total_amount: grossTotal,
           payment_method: billPaymentMethod,
           status: "paid",
-          paid_at: new Date().toISOString(),
+          paid_at: paidAt,
         });
         if (billError) console.error("Erro ao criar conta:", billError);
       }
@@ -283,11 +303,15 @@ export const PaymentConfirmationModal = ({
         }
       }
 
+      await onConfirm();
       toast.success("Pagamento confirmado!");
-      onConfirm();
     } catch (error) {
-      console.error("Erro ao confirmar pagamento:", error);
-      toast.error("Erro ao confirmar pagamento");
+      console.error("[payment-confirmation] erro ao confirmar pagamento", {
+        orderId: order.id,
+        comandaId: (order as any)._comanda_id || null,
+        error,
+      });
+      toast.error(error instanceof Error ? error.message : "Erro ao confirmar pagamento");
     }
   };
 
