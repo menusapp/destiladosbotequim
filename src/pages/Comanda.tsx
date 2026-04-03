@@ -453,7 +453,7 @@ const Comanda = () => {
       
       const restResult = await supabase
         .from("restaurants")
-        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled, show_prep_timer")
+        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled, show_prep_timer, is_open")
         .eq("slug", restaurantSlug)
         .maybeSingle();
 
