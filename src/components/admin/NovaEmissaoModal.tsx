@@ -345,6 +345,47 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
                     </div>
                   )}
 
+                  {/* Company (CNPJ) checkbox */}
+                  <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
+                    <Checkbox
+                      id={`company-${order.id}`}
+                      checked={companyChecks[order.id] || false}
+                      onCheckedChange={(checked) => {
+                        setCompanyChecks(prev => ({ ...prev, [order.id]: !!checked }));
+                      }}
+                    />
+                    <Label htmlFor={`company-${order.id}`} className="text-sm flex items-center gap-1.5 cursor-pointer">
+                      <Building2 className="w-3.5 h-3.5" />
+                      Nota para empresa (CNPJ)
+                    </Label>
+                  </div>
+
+                  {companyChecks[order.id] && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-6">
+                      <div className="space-y-1">
+                        <Label className="text-xs">CNPJ da Empresa *</Label>
+                        <Input
+                          value={companyCnpjs[order.id] || ""}
+                          onChange={(e) => setCompanyCnpjs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                          placeholder="00.000.000/0000-00"
+                          className="h-8 text-sm"
+                        />
+                        {(!companyCnpjs[order.id] || companyCnpjs[order.id].replace(/\D/g, "").length !== 14) && (
+                          <p className="text-xs text-destructive">CNPJ deve ter 14 dígitos.</p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Razão Social</Label>
+                        <Input
+                          value={companyNames[order.id] || ""}
+                          onChange={(e) => setCompanyNames(prev => ({ ...prev, [order.id]: e.target.value }))}
+                          placeholder="Nome da empresa"
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    </div>
+                  )
+
                   <div className="flex justify-end">
                     <Button
                       size="sm"
