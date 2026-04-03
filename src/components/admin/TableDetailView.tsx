@@ -467,13 +467,25 @@ export const TableDetailView = () => {
                                   </Badge>
                                 )}
                                 {order.order_items.map((item) => (
-                                  <div key={item.id} className="flex justify-between">
-                                    <span>
-                                      {item.quantity}x {item.products?.name || "Produto"}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                      R$ {(item.price_at_order * item.quantity).toFixed(2)}
-                                    </span>
+                                  <div key={item.id}>
+                                    <div className="flex justify-between">
+                                      <span>
+                                        {item.quantity}x {item.products?.name || "Produto"}
+                                      </span>
+                                      <span className="text-muted-foreground">
+                                        R$ {(item.price_at_order * item.quantity).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    {item.notes && (
+                                      <p className="text-sm text-muted-foreground italic ml-4">
+                                        Obs: {item.notes}
+                                      </p>
+                                    )}
+                                    {item.order_item_extras.map((extra, idx) => (
+                                      <p key={idx} className="text-sm text-muted-foreground ml-4">
+                                        + {extra.product_extras?.name || "Extra"} (R$ {extra.price_at_order.toFixed(2)})
+                                      </p>
+                                    ))}
                                   </div>
                                 ))}
                               </div>

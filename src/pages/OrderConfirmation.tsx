@@ -169,7 +169,7 @@ export default function OrderConfirmation() {
       .from("restaurant_reviews")
       .select("id")
       .eq("order_id", orderId)
-      .single();
+      .maybeSingle();
     
     setHasReviewed(!!data);
   };

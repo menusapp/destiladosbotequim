@@ -414,7 +414,7 @@ const RestaurantAdmin = () => {
                 billId: billId,
                 tableNumber: tableData.table_number,
                 total: bill.total_amount,
-                customerName: comandaData?.customer_name || 'Cliente',
+                customerName,
               }];
             });
             

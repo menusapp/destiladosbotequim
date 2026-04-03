@@ -393,7 +393,6 @@ export const TableDetailDialog = ({
         <div className="flex justify-between text-xs items-start">
           <span className="flex-1">
             {item.quantity}x {item.products?.name || "Produto"}
-            {item.notes && <span className="text-muted-foreground ml-1">({item.notes})</span>}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
             <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
