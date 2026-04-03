@@ -126,7 +126,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
       }
       toast.success("Item atualizado!");
     } else {
-      const { data: newItem, error } = await supabase.from("extra_category_items").insert({ category_id: selectedCategoryId, name: itemName, price: parseFloat(itemPrice) || 0, pdv_code: itemPdvCode || null } as any).select().single();
+      // Auto-generate PDV code if not manually set
+      const finalPdvCode = itemPdvCode || await generateNextPdvCode(restaurantId);
+      const { data: newItem, error } = await supabase.from("extra_category_items").insert({ category_id: selectedCategoryId, name: itemName, price: parseFloat(itemPrice) || 0, pdv_code: finalPdvCode } as any).select().single();
       if (error) { toast.error("Erro ao criar item"); return; }
       if (newItem && itemIngredients.length > 0) {
         await supabase.from("extra_category_item_ingredients").insert(itemIngredients.map(ing => ({ category_item_id: newItem.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
