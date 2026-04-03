@@ -132,6 +132,7 @@ const Comanda = () => {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [billRequestEnabled, setBillRequestEnabled] = useState(true);
+  const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
 
   useEffect(() => {
     fetchData();
@@ -453,7 +454,7 @@ const Comanda = () => {
       
       const restResult = await supabase
         .from("restaurants")
-        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled, show_prep_timer")
+        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled, show_prep_timer, is_open")
         .eq("slug", restaurantSlug)
         .maybeSingle();
 
@@ -471,6 +472,7 @@ const Comanda = () => {
       setRestaurantColor(restData.primary_color || "#FF6B35");
       setRestaurantId(restData.id);
       setBillRequestEnabled(restData.bill_request_enabled ?? true);
+      setIsRestaurantOpen(restData.is_open ?? true);
 
       // Buscar mesa DO RESTAURANTE ESPECÍFICO
       const tableResult = await supabase
@@ -661,6 +663,10 @@ const Comanda = () => {
 
   const handleSendOrder = async () => {
     if (submitting) return;
+    if (!isRestaurantOpen) {
+      toast.error("Restaurante fechado no momento. Não é possível enviar pedidos.");
+      return;
+    }
     if (cart.length === 0) {
       toast.error("Carrinho vazio");
       return;
@@ -1165,15 +1171,15 @@ const Comanda = () => {
         <div className="shrink-0 border-t bg-background p-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
           <div className="container mx-auto">
             {showSendOrderButton && (
-              <Button 
+                <Button 
                 className="w-full text-white" 
                 size="lg"
                 onClick={handleSendOrder}
-                disabled={submitting}
+                disabled={submitting || !isRestaurantOpen}
                 style={{ backgroundColor: restaurantColor }}
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
-                {submitting ? "Enviando..." : `Enviar Pedido · R$ ${totals.cartSubtotal.toFixed(2)}`}
+                {!isRestaurantOpen ? "Restaurante Fechado" : (submitting ? "Enviando..." : `Enviar Pedido · R$ ${totals.cartSubtotal.toFixed(2)}`)}
               </Button>
             )}
             {showBillButton && (

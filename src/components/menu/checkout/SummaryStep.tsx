@@ -303,40 +303,19 @@ export const SummaryStep = ({
         </Card>
       )}
 
-      {/* Scheduling Section */}
+      {/* Restaurant Closed - Block orders */}
       {!isRestaurantOpen && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-destructive/30 bg-destructive/5">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2 text-amber-800">
+            <CardTitle className="text-base flex items-center gap-2 text-destructive">
               <CalendarClock className="w-4 h-4" />
-              Agendar pedido (obrigatório)
+              Restaurante fechado
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-amber-700">
-              O restaurante está fechado. Escolha uma data e horário para receber seu pedido.
+          <CardContent>
+            <p className="text-sm text-destructive/80">
+              O restaurante está fechado no momento. Não é possível realizar pedidos agora.
             </p>
-            <div className="flex gap-2">
-              <input
-                type="date"
-                className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={scheduledFor ? scheduledFor.split("T")[0] : ""}
-                min={new Date().toISOString().split("T")[0]}
-                onChange={(e) => {
-                  const time = scheduledFor ? scheduledFor.split("T")[1] || "12:00" : "12:00";
-                  onScheduledForChange(e.target.value ? `${e.target.value}T${time}` : null);
-                }}
-              />
-              <input
-                type="time"
-                className="w-28 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={scheduledFor ? scheduledFor.split("T")[1] || "12:00" : ""}
-                onChange={(e) => {
-                  const date = scheduledFor ? scheduledFor.split("T")[0] : new Date().toISOString().split("T")[0];
-                  onScheduledForChange(e.target.value ? `${date}T${e.target.value}` : null);
-                }}
-              />
-            </div>
           </CardContent>
         </Card>
       )}
@@ -415,10 +394,10 @@ export const SummaryStep = ({
         <Button
           onClick={onConfirm}
           className="flex-1"
-          disabled={submitting || (!isRestaurantOpen && !scheduledFor)}
+          disabled={submitting || !isRestaurantOpen}
           style={{ backgroundColor: restaurant.primary_color, color: "white" }}
         >
-          {submitting ? "Finalizando..." : (scheduledFor ? "Agendar Pedido" : "Finalizar Pedido")}
+          {submitting ? "Finalizando..." : (!isRestaurantOpen ? "Restaurante Fechado" : (scheduledFor ? "Agendar Pedido" : "Finalizar Pedido"))}
         </Button>
       </div>
     </div>

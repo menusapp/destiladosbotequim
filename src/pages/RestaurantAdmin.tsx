@@ -527,10 +527,27 @@ const RestaurantAdmin = () => {
       )
       .subscribe();
 
+    // Realtime para status is_open do restaurante (sincronizar entre contas)
+    const restaurantChannel = supabase
+      .channel('restaurant-status-sync')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'restaurants',
+        filter: `id=eq.${restaurantId}`,
+      }, (payload) => {
+        const updated = payload.new as any;
+        if (updated.is_open !== undefined) {
+          setRestaurant(prev => prev ? { ...prev, is_open: updated.is_open } : null);
+        }
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(billsChannel);
       supabase.removeChannel(reservationsChannel);
+      supabase.removeChannel(restaurantChannel);
     };
   };
 

@@ -340,7 +340,23 @@ const Menu = () => {
     }
   }, [cart, tableId, customerName, checkOpenComanda]);
 
-  // Realtime subscription para pedidos da mesa (subscription já existe nas linhas 279-285)
+  // Realtime subscription para pedidos da mesa e status do restaurante
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    const channel = supabase
+      .channel('menu-restaurant-status')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'restaurants',
+        filter: `id=eq.${restaurant.id}`,
+      }, (payload) => {
+        const updated = payload.new as any;
+        setRestaurant((prev: any) => prev ? { ...prev, ...updated } : null);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [restaurant?.id]);
 
 
   // ⚡ Mostrar dialog de login APENAS quando dados estiverem carregados E não tiver avaliação pendente
@@ -1111,10 +1127,10 @@ const Menu = () => {
 
       {/* Restaurant closed banner */}
       {!restaurant.is_open && (
-        <div className="shrink-0 mx-4 mt-2 mb-1 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-3">
-          <Clock className="w-5 h-5 text-amber-600 shrink-0" />
-          <p className="text-sm text-amber-800">
-            Restaurante fechado no momento. Você pode agendar seu pedido para quando estivermos abertos.
+        <div className="shrink-0 mx-4 mt-2 mb-1 px-4 py-3 rounded-lg bg-destructive/5 border border-destructive/20 flex items-center gap-3">
+          <Clock className="w-5 h-5 text-destructive shrink-0" />
+          <p className="text-sm text-destructive/80">
+            Restaurante fechado no momento. Não é possível realizar pedidos.
           </p>
         </div>
       )}
