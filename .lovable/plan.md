@@ -1,54 +1,50 @@
 
 
-## Plan: Show menu when closed + allow only scheduled orders
+# Plan: Fix 3 Issues — Complement Names & Payment Errors
 
-### What changes
+## Diagnosis
 
-**Current behavior**: When restaurant is closed (`is_open = false`), Menu.tsx and DeliveryMenu.tsx show a full-screen "Estamos Fechados" blocking page. No menu is visible.
+### Issue 1 — Comanda "Itens Pedidos" shows empty complement names
+**Root cause**: `Comanda.tsx` lines 530-532 query `order_item_extras(price_at_order, product_extras(name))` — missing the `extra_name` column. The rendering at line 1137 filters `e.product_extras?.name` which is null for complement-category extras (they have `product_extra_id: null`). The `extra_name` field exists in the DB and IS being saved correctly, but the query doesn't fetch it.
 
-**New behavior**: Show the full menu normally. Add a banner at the top saying the restaurant is closed. Block immediate orders but allow scheduled orders (using `dd_scheduled_for`).
+**Fix**: Add `extra_name` to both order queries (lines 532, 546). Update the `OrderItemExtra` interface to include `extra_name`. Update rendering to use `extra_name` as primary source with `product_extras?.name` as fallback.
 
-### Changes
+### Issue 2 — Delivery shows "+Extra" instead of real complement name
+**Root cause**: The data is being saved correctly (`extra_name: extra.name` in CheckoutDrawer). The admin queries and rendering in `OrderDetailModal` and `UnifiedOrdersTab` already use `extra_name`. This issue is likely caused by **old records** that were inserted before the `extra_name` column was added and populated. For those records, `extra_name` is null and `product_extra_id` is null (for complements), so it falls back to `"Extra"`.
 
-**1. Remove the closed-screen early return in `Menu.tsx` and `DeliveryMenu.tsx`**
-- Delete the `if (!restaurant.is_open) return <RestaurantClosedScreen />` blocks
-- Instead, pass `isOpen` state down to components that need it
+**Fix**: Run a migration to backfill `extra_name` for records where it's still null but `product_extra_id` is not null (can derive from `product_extras.name`). For complement extras where `product_extra_id` IS null and `extra_name` IS null, these are unrecoverable — the fallback text should be the category name or remain as-is. Additionally, the `NewOrderNotification` in `RestaurantAdmin.tsx` should also include `extra_name` in its query.
 
-**2. Add a "Restaurant Closed" banner**
-- In both `Menu.tsx` and `DeliveryMenu.tsx`, when `!restaurant.is_open`, render a dismissible banner at the top of the menu (below header) with a Clock icon and text like "Restaurante fechado no momento. Você pode agendar seu pedido para quando estivermos abertos."
-- Use a soft yellow/amber background for visibility without being intrusive
+### Issue 3 — Payment confirmation errors
+**Root cause**: The `bills` table has a CHECK constraint (`bills_payment_method_check`) that only allows: `pix`, `card`, `credit`, `debit`, `cash`, `meal_voucher`, or NULL. Two places violate this:
+1. **Split payment closure** in `TableDetailDialog.tsx` line 445 inserts `payment_method: "Dividido"` — violates constraint.
+2. The `PaymentConfirmationModal` correctly uses `methodType` for bills, so that part is fine. But any custom or concatenated values would fail.
 
-**3. Add scheduling UI to `CheckoutDrawer.tsx` (SummaryStep)**
-- When `!restaurant.is_open`:
-  - Replace the "Finalizar Pedido" button behavior: require scheduling
-  - Add a date/time picker (date input + time input) for the customer to choose when they want the order
-  - Validate that the selected time is in the future
-  - Store the chosen datetime in `dd_scheduled_for` on the order insert (in `handleFinishOrder`)
-- When restaurant IS open:
-  - Optionally show a toggle "Agendar para outro horário?" that reveals the same date/time picker (nice-to-have, can keep current flow unchanged)
+**Fix**: Update the CHECK constraint to also allow `"Dividido"` (or use null for split payments). Alternatively, map `"Dividido"` to null and store the detail elsewhere.
 
-**4. Update `handleFinishOrder` in `CheckoutDrawer.tsx`**
-- Accept `scheduledFor?: string` parameter
-- When `scheduledFor` is provided, add `dd_scheduled_for: scheduledFor` to `orderData`
-- Set status to `"pending"` as normal (kitchen handles it when the time comes)
+---
 
-**5. Update `SummaryStep.tsx`**
-- Add props: `isRestaurantOpen: boolean`, `scheduledFor: string | null`, `onScheduledForChange: (date: string | null) => void`
-- When `!isRestaurantOpen`: show mandatory scheduling section with date + time inputs
-- When `isRestaurantOpen`: optionally show a "Agendar pedido?" toggle
-- Disable "Finalizar Pedido" if restaurant is closed and no schedule is selected
+## Changes
 
-**6. Comanda flow (`Menu.tsx` local/table mode)**
-- When restaurant is closed and mode is `"local"` (table ordering via QR): also show the banner but still allow adding items to cart
-- On the ComandaBottomBar or cart submission, apply the same scheduling requirement
+### File 1: `src/pages/Comanda.tsx`
+- Add `extra_name` to `OrderItemExtra` interface (line 64-69)
+- Add `extra_name` to both order queries (lines 532, 546)
+- Update rendering at lines 1136-1139 to use `extra_name || product_extras?.name` instead of filtering only on `product_extras?.name`
 
-### Files modified
-- `src/pages/Menu.tsx` — remove closed screen, add banner, pass `isOpen` to checkout
-- `src/pages/DeliveryMenu.tsx` — same
-- `src/components/menu/CheckoutDrawer.tsx` — add scheduling state, pass to SummaryStep, include in order insert
-- `src/components/menu/checkout/SummaryStep.tsx` — add scheduling UI (date+time picker)
-- `src/components/menu/RestaurantClosedScreen.tsx` — no longer used as blocking screen (can keep file for reference or remove)
+### File 2: `src/components/admin/TableDetailDialog.tsx`
+- Change `payment_method: "Dividido"` to `payment_method: null` (line 445), since the split payment detail is already tracked in `order_item_splits`
 
-### No database changes needed
-The `dd_scheduled_for` column already exists on the `orders` table.
+### File 3: Database Migration
+- Expand `bills_payment_method_check` constraint to also allow `'voucher'` (for consistency with `SplitPaymentSelect`) — or simply drop the constraint entirely since payment methods are now dynamic per restaurant
+- Backfill `extra_name` for `order_item_extras` records where `extra_name IS NULL AND product_extra_id IS NOT NULL`
+
+### File 4: `src/pages/RestaurantAdmin.tsx` (notification query)
+- Ensure the notification order query includes `extra_name` in the `order_item_extras` select
+
+---
+
+## Safety
+- No changes to delivery creation flow, fiscal emission, iFood, or Delivery Direto
+- The Comanda query change only adds a field — no data modification
+- The bills constraint change is additive (more values allowed)
+- The backfill migration only updates null `extra_name` fields — never overwrites existing data
 
