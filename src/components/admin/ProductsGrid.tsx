@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Trash2, Package, DollarSign, Image, Clock, Tag, Barcode, Settings2, Layers } from "lucide-react";
+import { Plus, Search, Trash2, Package, DollarSign, Image, Clock, Tag, Barcode, Settings2, Layers, Copy, Pencil } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -374,6 +374,23 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   };
 
   const handleRemoveVariation = (id: string) => { setVariations(variations.filter(v => v.id !== id)); };
+
+  const handleDuplicateVariation = (id: string) => {
+    const original = variations.find(v => v.id === id);
+    if (!original) return;
+    const copy = { ...original, id: crypto.randomUUID(), name: `${original.name} (cópia)`, ingredients: original.ingredients.map(i => ({ ...i, id: crypto.randomUUID() })) };
+    setVariations([...variations, copy]);
+    toast.success("Variação duplicada");
+  };
+
+  const handleEditVariation = (id: string) => {
+    const v = variations.find(v => v.id === id);
+    if (!v) return;
+    setVariationName(v.name);
+    setVariationPrice(v.price > 0 ? String(v.price) : "");
+    setVariationIngredients(v.ingredients.map(i => ({ ...i })));
+    setVariations(variations.filter(vr => vr.id !== id));
+  };
 
   const handleAddExtra = () => {
     if (!extraName || !extraPrice) { toast.error("Preencha nome e preço do complemento"); return; }
@@ -907,7 +924,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                                 <div key={v.id} className="p-3 bg-muted/30 rounded-lg border">
                                   <div className="flex items-center justify-between mb-1">
                                     <div><span className="font-medium">{v.name}</span><span className="text-sm text-muted-foreground ml-2">{v.price > 0 ? `+R$ ${v.price.toFixed(2)}` : "Incluído"}</span></div>
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveVariation(v.id)}><Trash2 className="h-4 w-4" /></Button>
+                                    <div className="flex items-center gap-1">
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleDuplicateVariation(v.id)} title="Duplicar variação"><Copy className="h-4 w-4" /></Button>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleEditVariation(v.id)} title="Editar variação"><Pencil className="h-4 w-4" /></Button>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveVariation(v.id)} title="Excluir variação"><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
                                   </div>
                                   <div className="text-xs text-muted-foreground">{v.ingredients.map(i => `${i.stock_item_name} — ${i.quantity}${i.stock_item_unit}`).join(", ")}</div>
                                   {vc && (
