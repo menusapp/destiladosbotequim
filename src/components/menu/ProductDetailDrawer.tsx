@@ -41,10 +41,33 @@ export const ProductDetailDrawer = ({
   const notesRef = useRef<HTMLTextAreaElement>(null);
 
   // Separar extras obrigatórios dos opcionais
-  const { requiredExtras, optionalExtras } = useMemo(() => {
+  const { requiredExtras, optionalExtrasGrouped } = useMemo(() => {
     const required = extras.filter(e => e.is_required);
     const optional = extras.filter(e => !e.is_required);
-    return { requiredExtras: required, optionalExtras: optional };
+    
+    // Group optional extras by category name
+    const grouped: { categoryName: string; items: ProductExtra[] }[] = [];
+    const uncategorized: ProductExtra[] = [];
+    const categoryMap = new Map<string, ProductExtra[]>();
+    
+    for (const ext of optional) {
+      const catName = ext.extra_category_name;
+      if (catName) {
+        if (!categoryMap.has(catName)) categoryMap.set(catName, []);
+        categoryMap.get(catName)!.push(ext);
+      } else {
+        uncategorized.push(ext);
+      }
+    }
+    
+    for (const [name, items] of categoryMap) {
+      grouped.push({ categoryName: name, items });
+    }
+    if (uncategorized.length > 0) {
+      grouped.push({ categoryName: "Complementos", items: uncategorized });
+    }
+    
+    return { requiredExtras: required, optionalExtrasGrouped: grouped };
   }, [extras]);
 
   // Verificar se há extras obrigatórios e se foram selecionados
@@ -270,14 +293,14 @@ export const ProductDetailDrawer = ({
             </div>
           )}
 
-          {/* Extras Opcionais */}
-          {optionalExtras.length > 0 && (
-            <div className="mb-6">
+          {/* Extras Opcionais - Agrupados por categoria */}
+          {optionalExtrasGrouped.length > 0 && optionalExtrasGrouped.map((group, gi) => (
+            <div key={gi} className="mb-6">
               <h3 className="font-bold text-foreground mb-3">
-                Complementos
+                {group.categoryName}
               </h3>
               <div className="space-y-3">
-                {optionalExtras.map((extra) => {
+                {group.items.map((extra) => {
                   const isSelected = selectedExtras.includes(extra.id);
                   return (
                     <label
@@ -307,7 +330,7 @@ export const ProductDetailDrawer = ({
                 })}
               </div>
             </div>
-          )}
+          ))}
 
           {/* Notes */}
           <div className="mb-6">

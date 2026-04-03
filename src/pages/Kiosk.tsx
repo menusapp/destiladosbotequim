@@ -191,12 +191,35 @@ export default function Kiosk() {
   const openProduct = useCallback(async (product: Product) => {
     setSelectedProduct(product);
     try {
-      const { data, error } = await supabase
+      const { data: extrasData, error } = await supabase
         .from("product_extras")
         .select("*")
         .eq("product_id", product.id);
       if (error) console.error("[Kiosk] Erro ao carregar extras:", error);
-      setProductExtras(data || []);
+
+      // Buscar complementos vinculados via product_complement_groups
+      const { data: complementGroups } = await supabase
+        .from("product_complement_groups")
+        .select("*, extra_categories(id, name, extra_category_items(id, name, description, price))")
+        .eq("product_id", product.id)
+        .order("display_order");
+
+      const complementExtras: ProductExtra[] = (complementGroups || []).flatMap((group: any) => {
+        const items = group.extra_categories?.extra_category_items || [];
+        return items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description || null,
+          price: item.price,
+          is_required: group.is_required || false,
+          min_selection: group.min_selection || 0,
+          max_selection: group.max_selection || undefined,
+          extra_category_id: group.extra_category_id,
+          extra_category_name: group.extra_categories?.name || undefined,
+        }));
+      });
+
+      setProductExtras([...(extrasData || []), ...complementExtras]);
     } catch (err) {
       console.error("[Kiosk] Exceção ao carregar extras:", err);
       setProductExtras([]);

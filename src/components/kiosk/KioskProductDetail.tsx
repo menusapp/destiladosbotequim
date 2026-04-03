@@ -21,10 +21,29 @@ export function KioskProductDetail({ product, extras, primaryColor, onAdd, onBac
   const [notes, setNotes] = useState("");
   const [quantity, setQuantity] = useState(1);
 
-  const { requiredExtras, optionalExtras } = useMemo(() => ({
-    requiredExtras: extras.filter(e => e.is_required),
-    optionalExtras: extras.filter(e => !e.is_required),
-  }), [extras]);
+  const { requiredExtras, optionalExtrasGrouped } = useMemo(() => {
+    const required = extras.filter(e => e.is_required);
+    const optional = extras.filter(e => !e.is_required);
+    const grouped: { categoryName: string; items: ProductExtra[] }[] = [];
+    const uncategorized: ProductExtra[] = [];
+    const categoryMap = new Map<string, ProductExtra[]>();
+    for (const ext of optional) {
+      const catName = ext.extra_category_name;
+      if (catName) {
+        if (!categoryMap.has(catName)) categoryMap.set(catName, []);
+        categoryMap.get(catName)!.push(ext);
+      } else {
+        uncategorized.push(ext);
+      }
+    }
+    for (const [name, items] of categoryMap) {
+      grouped.push({ categoryName: name, items });
+    }
+    if (uncategorized.length > 0) {
+      grouped.push({ categoryName: "Adicionais", items: uncategorized });
+    }
+    return { requiredExtras: required, optionalExtrasGrouped: grouped };
+  }, [extras]);
 
   const hasRequired = requiredExtras.length > 0;
   const minRequired = hasRequired ? (requiredExtras[0]?.min_selection || 1) : 0;
@@ -119,23 +138,28 @@ export function KioskProductDetail({ product, extras, primaryColor, onAdd, onBac
             </div>
           )}
 
-          {/* Optional extras */}
-          {optionalExtras.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-bold mb-1 text-foreground">Adicionais</h3>
+          {/* Optional extras - grouped by category */}
+          {optionalExtrasGrouped.map((group, gi) => (
+            <div key={gi} className="mb-6">
+              <h3 className="text-lg font-bold mb-1 text-foreground">{group.categoryName}</h3>
               <div className="space-y-2">
-                {optionalExtras.map(ext => (
+                {group.items.map(ext => (
                   <label key={ext.id} className="flex items-center justify-between p-4 rounded-xl border cursor-pointer hover:bg-muted transition-colors">
                     <div className="flex items-center gap-3">
                       <Checkbox checked={selectedExtras.includes(ext.id)} onCheckedChange={() => toggleExtra(ext.id, false)} />
-                      <span className="text-base">{ext.name}</span>
+                      <div>
+                        <span className="text-base">{ext.name}</span>
+                        {ext.description && (
+                          <p className="text-xs text-muted-foreground leading-tight mt-0.5">{ext.description}</p>
+                        )}
+                      </div>
                     </div>
                     {ext.price > 0 && <span className="text-base font-medium" style={{ color: primaryColor }}>+ R$ {ext.price.toFixed(2)}</span>}
                   </label>
                 ))}
               </div>
             </div>
-          )}
+          ))}
 
           {/* Notes */}
           <div className="mb-6">
