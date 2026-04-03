@@ -131,7 +131,7 @@ export default function OrderConfirmation() {
         .single();
 
       if (orderError) throw orderError;
-      setOrder(orderData);
+      setOrder(orderData as any);
 
       // Buscar dados do restaurante usando restaurant_id direto do pedido
       const { data: restaurantData, error: restaurantError } = await supabase
