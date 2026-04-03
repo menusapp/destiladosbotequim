@@ -195,6 +195,7 @@ export const CheckoutDrawer = ({
         online_payment_id: onlinePaymentId || paymentData?.onlinePaymentId || null,
         reward_discount: rewardDiscount,
         reward_id: activeRewardDiscount?.id || null,
+        dd_scheduled_for: scheduledFor ? new Date(`${scheduledFor}`).toISOString() : null,
       };
 
       const { data: order, error: orderError } = await supabase
