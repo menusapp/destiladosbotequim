@@ -156,6 +156,7 @@ export const TableDetailView = () => {
             products (name),
             order_item_extras (
               price_at_order,
+              extra_name,
               product_extras (name)
             )
           )
