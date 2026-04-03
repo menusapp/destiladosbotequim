@@ -1030,9 +1030,24 @@ const Comanda = () => {
                           </div>
                         )}
                       </div>
-                      <p className="font-semibold" style={{ color: restaurantColor }}>
-                        R$ {itemTotal.toFixed(2)}
-                      </p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <p className="font-semibold" style={{ color: restaurantColor }}>
+                          R$ {itemTotal.toFixed(2)}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setCart(prev => {
+                              const updated = prev.filter(c => c.id !== item.id);
+                              sessionStorage.setItem(`cart_${tableNumber}`, JSON.stringify(updated));
+                              return updated;
+                            });
+                          }}
+                          className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive transition-colors"
+                          title="Remover item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
