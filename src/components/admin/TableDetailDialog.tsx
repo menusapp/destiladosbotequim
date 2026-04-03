@@ -571,7 +571,7 @@ export const TableDetailDialog = ({
         {item.order_item_extras?.length > 0 && (
           <div className="ml-4 space-y-0.5">
             {item.order_item_extras.map((extra: any, idx: number) => {
-              const extraName = extra.product_extras?.name || extra.extra_category_items?.name || "Adicional";
+              const extraName = extra.extra_name || extra.product_extras?.name || extra.extra_category_items?.name || "Adicional";
               return (
                 <div key={idx} className="text-[11px] text-muted-foreground flex justify-between">
                   <span>+ {extraName}</span>
