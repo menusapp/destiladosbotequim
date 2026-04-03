@@ -293,14 +293,14 @@ export const ProductDetailDrawer = ({
             </div>
           )}
 
-          {/* Extras Opcionais */}
-          {optionalExtras.length > 0 && (
-            <div className="mb-6">
+          {/* Extras Opcionais - Agrupados por categoria */}
+          {optionalExtrasGrouped.length > 0 && optionalExtrasGrouped.map((group, gi) => (
+            <div key={gi} className="mb-6">
               <h3 className="font-bold text-foreground mb-3">
-                Complementos
+                {group.categoryName}
               </h3>
               <div className="space-y-3">
-                {optionalExtras.map((extra) => {
+                {group.items.map((extra) => {
                   const isSelected = selectedExtras.includes(extra.id);
                   return (
                     <label
@@ -330,7 +330,7 @@ export const ProductDetailDrawer = ({
                 })}
               </div>
             </div>
-          )}
+          ))}
 
           {/* Notes */}
           <div className="mb-6">
