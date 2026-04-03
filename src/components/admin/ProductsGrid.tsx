@@ -511,7 +511,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
     if (ingredientType === "variable" && variations.length > 0) {
       for (const variation of variations) {
-        const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: variation.name, price: variation.price, is_required: true, min_selection: parseInt(variationMinSelection) || 1, max_selection: parseInt(variationMaxSelection) || 1 }).select().single();
+        const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: variation.name, description: variation.description || null, price: variation.price, is_required: true, min_selection: parseInt(variationMinSelection) || 1, max_selection: parseInt(variationMaxSelection) || 1 }).select().single();
         if (newExtra && variation.ingredients.length > 0) {
           await supabase.from("product_extra_ingredients").insert(variation.ingredients.map(ing => ({ product_extra_id: newExtra.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
         }
