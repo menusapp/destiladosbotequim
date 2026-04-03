@@ -378,6 +378,67 @@ export const TableDetailDialog = ({
     refetchSplits();
   };
 
+  const printSingleOrder = async (order: any) => {
+    try {
+      const thermalOrder = {
+        id: order.id,
+        created_at: order.created_at,
+        customer_name: order.customer_name,
+        order_type: "local" as const,
+        tables: { table_number: table!.table_number },
+        order_items: (order.order_items || []).map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity,
+          price_at_order: item.price_at_order,
+          notes: item.notes,
+          products: item.products,
+          order_item_extras: (item.order_item_extras || []).map((e: any) => ({
+            price_at_order: e.price_at_order,
+            product_extras: e.product_extras,
+          })),
+        })),
+      };
+      await printOrderThermal(thermalOrder, restaurantId);
+    } catch {
+      toast.error("Erro ao imprimir pedido");
+    }
+  };
+
+  const printFullComanda = async (comanda: any) => {
+    try {
+      const comandaOrders = ordersByComanda.get(comanda.id) || [];
+      if (comandaOrders.length === 0) {
+        toast.error("Nenhum pedido para imprimir");
+        return;
+      }
+      // Consolidate all items from all orders into one virtual order
+      const allItems = comandaOrders.flatMap((o: any) =>
+        (o.order_items || []).map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity,
+          price_at_order: item.price_at_order,
+          notes: item.notes,
+          products: item.products,
+          order_item_extras: (item.order_item_extras || []).map((e: any) => ({
+            price_at_order: e.price_at_order,
+            product_extras: e.product_extras,
+          })),
+        }))
+      );
+      const virtualOrder = {
+        id: comandaOrders[0].id,
+        created_at: comandaOrders[0].created_at,
+        customer_name: comanda.customer_name,
+        order_type: "local" as const,
+        tables: { table_number: table!.table_number },
+        order_items: allItems,
+      };
+      await printOrderThermal(virtualOrder, restaurantId);
+    } catch {
+      toast.error("Erro ao imprimir comanda");
+    }
+  };
+
   const occupiedTime = table?.occupied_at
     ? Math.floor((Date.now() - new Date(table.occupied_at).getTime()) / 60000)
     : 0;
