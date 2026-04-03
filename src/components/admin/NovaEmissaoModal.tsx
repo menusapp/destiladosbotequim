@@ -149,10 +149,19 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
     const isDelivery = deliveryChecks[orderId];
     const cpf = deliveryCpfs[orderId]?.replace(/\D/g, "") || "";
     const address = deliveryAddresses[orderId] || "";
+    const isCompany = companyChecks[orderId];
+    const cnpj = companyCnpjs[orderId]?.replace(/\D/g, "") || "";
+    const companyName = companyNames[orderId] || "";
 
     // If marked as delivery, CPF is mandatory
     if (isDelivery && (!cpf || cpf.length !== 11)) {
       toast.error("Para nota de entrega, o CPF do cliente é obrigatório e deve ter 11 dígitos.");
+      return;
+    }
+
+    // If marked as company, CNPJ is mandatory
+    if (isCompany && (!cnpj || cnpj.length !== 14)) {
+      toast.error("Para nota empresarial, o CNPJ deve ter 14 dígitos.");
       return;
     }
 
@@ -173,12 +182,17 @@ const NovaEmissaoModal = ({ open, onClose, restaurantId, onEmitted }: NovaEmissa
 
       // Call nuvem-fiscal-emit edge function
       toast.info("Enviando nota para emissão...");
+      const emitBody: any = {
+        order_id: orderId,
+        restaurant_id: restaurantId,
+        fiscal_note_id: noteData.id,
+      };
+      if (isCompany && cnpj) {
+        emitBody.customer_cnpj = cnpj;
+        emitBody.customer_razao_social = companyName || "EMPRESA";
+      }
       const { data: emitResult, error: emitError } = await supabase.functions.invoke("nuvem-fiscal-emit", {
-        body: {
-          order_id: orderId,
-          restaurant_id: restaurantId,
-          fiscal_note_id: noteData.id,
-        },
+        body: emitBody,
       });
 
       if (emitError) {
