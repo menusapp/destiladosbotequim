@@ -483,6 +483,43 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                 )}
                 </div>
 
+                {/* Discount */}
+                <div className="space-y-2">
+                  <Label>Desconto</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={discountType === "percentage" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setDiscountType("percentage")}
+                      className="gap-1"
+                    >
+                      <Percent className="w-3 h-3" /> %
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={discountType === "fixed" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setDiscountType("fixed")}
+                      className="gap-1"
+                    >
+                      <DollarSign className="w-3 h-3" /> R$
+                    </Button>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder={discountType === "percentage" ? "Ex: 10" : "Ex: 5.00"}
+                      value={discountValue}
+                      onChange={e => setDiscountValue(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                  {discountAmount > 0 && (
+                    <p className="text-xs text-green-600">Desconto: -R$ {discountAmount.toFixed(2)}</p>
+                  )}
+                </div>
+
                 {/* Cart Summary */}
                 {cart.length > 0 && (
                   <div className="space-y-2 border-t pt-3">
@@ -507,9 +544,15 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                         </div>
                       );
                     })}
+                    {discountAmount > 0 && (
+                      <div className="flex items-center justify-between text-sm text-green-600">
+                        <span>Desconto</span>
+                        <span>-R$ {discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between font-bold text-sm pt-2 border-t">
                       <span>Total</span>
-                      <span>R$ {cartSubtotal.toFixed(2)}</span>
+                      <span>R$ {cartTotal.toFixed(2)}</span>
                     </div>
                   </div>
                 )}
