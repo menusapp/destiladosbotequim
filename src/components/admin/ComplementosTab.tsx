@@ -56,7 +56,12 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-  useEffect(() => { fetchCategories(); fetchStockItems(); }, [restaurantId]);
+  useEffect(() => { fetchCategories(); fetchStockItems(); fetchAllProducts(); }, [restaurantId]);
+
+  const fetchAllProducts = async () => {
+    const { data } = await supabase.from("products").select("id, name, category_id, categories!inner(restaurant_id)").eq("categories.restaurant_id", restaurantId).order("name");
+    setAllProducts((data || []).map((p: any) => ({ id: p.id, name: p.name })));
+  };
 
   const fetchStockItems = async () => {
     const { data } = await supabase.from("stock_items").select("id, name, unit, price_per_unit").eq("restaurant_id", restaurantId);
