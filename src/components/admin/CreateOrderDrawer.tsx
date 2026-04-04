@@ -112,6 +112,15 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     }, 0);
   }, [cart]);
 
+  const discountAmount = useMemo(() => {
+    const val = parseFloat(discountValue) || 0;
+    if (val <= 0) return 0;
+    if (discountType === "percentage") return Math.min(cartSubtotal * (val / 100), cartSubtotal);
+    return Math.min(val, cartSubtotal);
+  }, [discountValue, discountType, cartSubtotal]);
+
+  const cartTotal = cartSubtotal - discountAmount;
+
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
