@@ -5,27 +5,89 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
+const PAYMENT_BASE_LABELS: Record<string, string> = {
   cash: "Dinheiro",
+  dinheiro: "Dinheiro",
   credit: "Crédito",
   credit_card_online: "Crédito",
+  credito: "Crédito",
+  "crédito": "Crédito",
   debit: "Débito",
+  debito: "Débito",
+  "débito": "Débito",
+  card: "Crédito",
   pix: "PIX",
   pix_online: "PIX",
   meal_voucher: "Vale Refeição",
+  "vale refeição": "Vale Refeição",
   pending: "Pendente",
-  dinheiro: "Dinheiro",
-  credito: "Crédito",
-  debito: "Débito",
   ifood_online: "iFood Online",
-  "Pago pelo iFood": "iFood Online",
-  Outros: "Outros",
+  "pago pelo ifood": "iFood Online",
+  "pago delivery direto": "Pago DD",
+  online: "Pago Online",
+  outros: "Outros",
 };
 
+/**
+ * Normaliza a exibição de formas de pagamento no frontend.
+ * 
+ * Aceita qualquer formato salvo no backend (cash, credit, credito-Visa, Crédito - Mastercard, etc.)
+ * e retorna uma string padronizada para exibição.
+ * 
+ * Exemplos:
+ *   "cash" → "Dinheiro"
+ *   "credit" → "Crédito"
+ *   "credito-Visa" → "Crédito - Visa"
+ *   "Crédito - Mastercard" → "Crédito - Mastercard"
+ *   "debit" → "Débito"
+ *   "Débito - Elo" → "Débito - Elo"
+ * 
+ * NÃO altera nada no backend — apenas camada de exibição.
+ */
 export function formatPaymentMethod(method: string | null | undefined): string {
   if (!method) return "—";
-  // Strip brand suffix for display normalization: "Crédito - Visa" stays as-is (already readable)
-  const label = PAYMENT_METHOD_LABELS[method] || PAYMENT_METHOD_LABELS[method.toLowerCase()];
-  if (label) return label;
+
+  // Already well-formatted with " - " brand separator? Normalize base only.
+  if (method.includes(" - ")) {
+    const [base, ...brandParts] = method.split(" - ");
+    const brand = brandParts.join(" - ").trim();
+    const normalizedBase = PAYMENT_BASE_LABELS[base.trim().toLowerCase()] || base.trim();
+    if (process.env.NODE_ENV === "development") {
+      console.info("[PaymentDisplay] input:", method, "→", `${normalizedBase} - ${brand}`);
+    }
+    return brand ? `${normalizedBase} - ${brand}` : normalizedBase;
+  }
+
+  // Handle internal format with hyphen separator: "credito-Visa", "debito-Elo"
+  if (method.includes("-") && !method.startsWith("pix")) {
+    const [base, ...brandParts] = method.split("-");
+    const brand = brandParts.join("-").trim();
+    const normalizedBase = PAYMENT_BASE_LABELS[base.trim().toLowerCase()] || base.trim();
+    if (brand) {
+      if (process.env.NODE_ENV === "development") {
+        console.info("[PaymentDisplay] input:", method, "→", `${normalizedBase} - ${brand}`);
+      }
+      return `${normalizedBase} - ${brand}`;
+    }
+  }
+
+  // Direct lookup (case-insensitive)
+  const label = PAYMENT_BASE_LABELS[method.toLowerCase()];
+  if (label) {
+    if (process.env.NODE_ENV === "development") {
+      console.info("[PaymentDisplay] input:", method, "→", label);
+    }
+    return label;
+  }
+
+  // If starts with known Portuguese prefix, return as-is (already formatted)
+  const lm = method.toLowerCase();
+  if (lm.startsWith("crédito") || lm.startsWith("débito") || lm.startsWith("vale")) {
+    return method;
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    console.info("[PaymentDisplay] input:", method, "→ passthrough:", method);
+  }
   return method;
 }

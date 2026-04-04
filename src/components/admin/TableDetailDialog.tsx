@@ -602,7 +602,7 @@ export const TableDetailDialog = ({
                 {split.status === "paid" ? (
                   <Badge variant="outline" className="text-[9px] h-4 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border-green-300">
                     <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
-                    {split.payment_type}
+                    {formatPaymentMethod(split.payment_type)}
                   </Badge>
                 ) : (
                   <Button

@@ -561,7 +561,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                   <div className="flex items-center gap-2">
                     {order.payment_type && order.payment_type !== "pending" ? (
                       <>
-                        <p className="font-medium">{order.payment_type}</p>
+                        <p className="font-medium">{formatPaymentMethod(order.payment_type)}</p>
                         <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" onClick={() => setShowChangePaymentModal(true)}>
                           <RefreshCw className="w-3 h-3" /> Alterar
                         </Button>
