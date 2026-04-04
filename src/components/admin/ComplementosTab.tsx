@@ -320,13 +320,37 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
       {/* Category Dialog */}
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingCategory ? "Editar Categoria" : "Nova Categoria de Complementos"}</DialogTitle>
             <DialogDescription>Categorias agrupam complementos similares (ex: Tamanhos, Molhos)</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div><Label htmlFor="category-name">Nome da Categoria *</Label><Input id="category-name" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Ex: Tamanhos, Molhos, Acompanhamentos" /></div>
+
+            <div className="space-y-2">
+              <Label>Produtos vinculados ({selectedProductIds.size} selecionados)</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar produtos..." value={productSearchQuery} onChange={(e) => setProductSearchQuery(e.target.value)} className="pl-9" />
+              </div>
+              <ScrollArea className="max-h-48 border rounded-lg">
+                <div className="p-2 space-y-1">
+                  {allProducts
+                    .filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
+                    .map(product => (
+                      <label key={product.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer text-sm">
+                        <Checkbox
+                          checked={selectedProductIds.has(product.id)}
+                          onCheckedChange={() => toggleProductSelection(product.id)}
+                        />
+                        <span>{product.name}</span>
+                      </label>
+                    ))}
+                </div>
+              </ScrollArea>
+            </div>
+
             <Button onClick={handleSaveCategory} className="w-full">{editingCategory ? "Atualizar" : "Criar Categoria"}</Button>
           </div>
         </DialogContent>
