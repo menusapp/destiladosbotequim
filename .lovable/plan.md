@@ -1,50 +1,54 @@
 
 
-# Plan: Fix 3 Issues — Complement Names & Payment Errors
+# Plan: 5 Fixes — Stock Scroll, Payment Brand, PDV Extras, PDV Discount, Report Consistency
 
-## Diagnosis
+## 1. Stock Movements — Internal Scroll
+**File**: `src/components/admin/StockMovementsTab.tsx`
+- Wrap the table (line 250) in a `max-h-[60vh] overflow-y-auto` container
+- Make `TableHeader` sticky with `sticky top-0 bg-background z-10`
 
-### Issue 1 — Comanda "Itens Pedidos" shows empty complement names
-**Root cause**: `Comanda.tsx` lines 530-532 query `order_item_extras(price_at_order, product_extras(name))` — missing the `extra_name` column. The rendering at line 1137 filters `e.product_extras?.name` which is null for complement-category extras (they have `product_extra_id: null`). The `extra_name` field exists in the DB and IS being saved correctly, but the query doesn't fetch it.
+## 2. Payment Brand Display in Order Lists
+**Problem**: `UnifiedOrdersTab` and `OrderDetailModal` fetch `payment_type` but not `payment_brand`. The PDV saves brand correctly (`payment_brand: "visa"`) but display ignores it.
 
-**Fix**: Add `extra_name` to both order queries (lines 532, 546). Update the `OrderItemExtra` interface to include `extra_name`. Update rendering to use `extra_name` as primary source with `product_extras?.name` as fallback.
+**Files**:
+- `src/components/admin/UnifiedOrdersTab.tsx`: Add `payment_brand` to the Order interface and fetch query (line 221). Update `getPaymentDisplay` to combine: if `payment_brand` exists and `payment_type` doesn't already contain the brand, append it (e.g. `"Crédito"` + `"visa"` → pass `"Crédito - Visa"` to `formatPaymentMethod`).
+- `src/components/admin/OrderDetailModal.tsx`: Same — add `payment_brand` to interface/query and display combined value.
+- `src/lib/utils.ts`: Add helper `formatPaymentWithBrand(type, brand)` that combines type+brand before calling `formatPaymentMethod`.
 
-### Issue 2 — Delivery shows "+Extra" instead of real complement name
-**Root cause**: The data is being saved correctly (`extra_name: extra.name` in CheckoutDrawer). The admin queries and rendering in `OrderDetailModal` and `UnifiedOrdersTab` already use `extra_name`. This issue is likely caused by **old records** that were inserted before the `extra_name` column was added and populated. For those records, `extra_name` is null and `product_extra_id` is null (for complements), so it falls back to `"Extra"`.
+## 3. PDV Orders — Extras Missing in Cash Register
+**Problem**: PDV orders (all types) insert with `payment_type` already set. The DB trigger `add_local_order_to_cash_register` fires on UPDATE (when `payment_type` transitions from null to a value). Since PDV sets it on INSERT, trigger never fires for mesa orders. Also delivery PDV orders get `status: "preparing"` immediately, but the delivery trigger looks for `delivered`/`picked_up`.
 
-**Fix**: Run a migration to backfill `extra_name` for records where it's still null but `product_extra_id` is not null (can derive from `product_extras.name`). For complement extras where `product_extra_id` IS null and `extra_name` IS null, these are unrecoverable — the fallback text should be the category name or remain as-is. Additionally, the `NewOrderNotification` in `RestaurantAdmin.tsx` should also include `extra_name` in its query.
+**Fix in `src/components/admin/CreateOrderDrawer.tsx`**:
+- For **mesa** orders: Insert with `payment_type: null`, insert order items+extras, then UPDATE with real `payment_type`. This fires the trigger which now sees items+extras.
+- For **delivery/retirada**: Already work correctly (trigger fires on status change to delivered/picked_up). No change needed.
 
-### Issue 3 — Payment confirmation errors
-**Root cause**: The `bills` table has a CHECK constraint (`bills_payment_method_check`) that only allows: `pix`, `card`, `credit`, `debit`, `cash`, `meal_voucher`, or NULL. Two places violate this:
-1. **Split payment closure** in `TableDetailDialog.tsx` line 445 inserts `payment_method: "Dividido"` — violates constraint.
-2. The `PaymentConfirmationModal` correctly uses `methodType` for bills, so that part is fine. But any custom or concatenated values would fail.
+## 4. PDV Drawer — Discount Field
+**File**: `src/components/admin/CreateOrderDrawer.tsx`
+- Add state: `discountType` ("percentage" | "fixed"), `discountValue` (number)
+- Add UI section in the form (between payment and cart summary): toggle for % vs R$, input for value
+- Calculate `discountAmount` from subtotal
+- Show discount line in cart summary, update total display
+- Save to `coupon_discount` column on order insert (already exists in DB and used by reports)
 
-**Fix**: Update the CHECK constraint to also allow `"Dividido"` (or use null for split payments). Alternatively, map `"Dividido"` to null and store the detail elsewhere.
+## 5. Reports Consistency — Overview vs DRE
+**Problem**: Overview uses `useOrderMetrics` which filters delivery orders by `created_at`. DRE (`ReportsTab`) filters delivery orders by `updated_at` (line 135). Orders created on one day but delivered on another appear in different date ranges.
 
----
+**Fix in `src/components/admin/ReportsTab.tsx`**:
+- Change delivery orders query (line 135) from `updated_at` to `created_at` to match `useOrderMetrics`
+- Both will now use: delivery by `created_at`, bills by `paid_at`, counter_orders by `finalized_at`
+- Also add `order_type: "balcao"` orders to the delivery query (line 133 already has `in("order_type", ["delivery", "balcao"])`) — this matches `useOrderMetrics` which only queries `order_type: "delivery"`. Need to align: make ReportsTab also only count `order_type: "delivery"` for delivery total, and handle `balcao` via counter_orders (same as useOrderMetrics). Actually looking closer, ReportsTab queries `in("order_type", ["delivery", "balcao"])` while useOrderMetrics only queries `order_type: "delivery"`. The "balcao" orders get double-counted if they also appear in counter_orders. Fix: Remove "balcao" from ReportsTab delivery query to match useOrderMetrics.
 
-## Changes
-
-### File 1: `src/pages/Comanda.tsx`
-- Add `extra_name` to `OrderItemExtra` interface (line 64-69)
-- Add `extra_name` to both order queries (lines 532, 546)
-- Update rendering at lines 1136-1139 to use `extra_name || product_extras?.name` instead of filtering only on `product_extras?.name`
-
-### File 2: `src/components/admin/TableDetailDialog.tsx`
-- Change `payment_method: "Dividido"` to `payment_method: null` (line 445), since the split payment detail is already tracked in `order_item_splits`
-
-### File 3: Database Migration
-- Expand `bills_payment_method_check` constraint to also allow `'voucher'` (for consistency with `SplitPaymentSelect`) — or simply drop the constraint entirely since payment methods are now dynamic per restaurant
-- Backfill `extra_name` for `order_item_extras` records where `extra_name IS NULL AND product_extra_id IS NOT NULL`
-
-### File 4: `src/pages/RestaurantAdmin.tsx` (notification query)
-- Ensure the notification order query includes `extra_name` in the `order_item_extras` select
-
----
+## Files Modified
+1. `src/components/admin/StockMovementsTab.tsx` — scroll container
+2. `src/lib/utils.ts` — `formatPaymentWithBrand` helper
+3. `src/components/admin/UnifiedOrdersTab.tsx` — payment_brand in query + display
+4. `src/components/admin/OrderDetailModal.tsx` — payment_brand in query + display
+5. `src/components/admin/CreateOrderDrawer.tsx` — fix mesa order trigger timing, add discount UI
+6. `src/components/admin/ReportsTab.tsx` — align date field and order_type filter with useOrderMetrics
 
 ## Safety
-- No changes to delivery creation flow, fiscal emission, iFood, or Delivery Direto
-- The Comanda query change only adds a field — no data modification
-- The bills constraint change is additive (more values allowed)
-- The backfill migration only updates null `extra_name` fields — never overwrites existing data
+- No DB schema changes
+- No changes to triggers, fiscal, or checkout flows
+- PDV fix only changes INSERT/UPDATE ordering for mesa orders
+- Report fix only aligns query filters — same data sources
 
