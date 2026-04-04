@@ -92,15 +92,44 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const handleSaveCategory = async () => {
     if (!categoryName.trim()) { toast.error("Digite o nome da categoria"); return; }
+    let categoryId = editingCategory?.id;
     if (editingCategory) {
       const { error } = await supabase.from("extra_categories").update({ name: categoryName }).eq("id", editingCategory.id);
       if (error) { toast.error("Erro ao atualizar categoria"); return; }
-      toast.success("Categoria atualizada!");
     } else {
-      const { error } = await supabase.from("extra_categories").insert({ name: categoryName, restaurant_id: restaurantId });
-      if (error) { toast.error("Erro ao criar categoria"); return; }
-      toast.success("Categoria criada!");
+      const { data, error } = await supabase.from("extra_categories").insert({ name: categoryName, restaurant_id: restaurantId }).select().single();
+      if (error || !data) { toast.error("Erro ao criar categoria"); return; }
+      categoryId = data.id;
     }
+
+    // Sync product links
+    if (categoryId) {
+      const productsToAdd = [...selectedProductIds].filter(id => !originalProductIds.has(id));
+      const productsToRemove = [...originalProductIds].filter(id => !selectedProductIds.has(id));
+
+      // Remove deselected
+      if (productsToRemove.length > 0) {
+        await supabase.from("product_extras").delete().eq("extra_category_id", categoryId).in("product_id", productsToRemove);
+      }
+
+      // Add newly selected — fetch category items first
+      if (productsToAdd.length > 0) {
+        const { data: catItems } = await supabase.from("extra_category_items").select("id, name, price").eq("category_id", categoryId);
+        if (catItems && catItems.length > 0) {
+          const inserts = productsToAdd.flatMap(productId =>
+            catItems.map(item => ({
+              product_id: productId,
+              extra_category_id: categoryId,
+              name: item.name,
+              price: item.price,
+            }))
+          );
+          await supabase.from("product_extras").insert(inserts);
+        }
+      }
+    }
+
+    toast.success(editingCategory ? "Categoria atualizada!" : "Categoria criada!");
     resetCategoryForm(); fetchCategories();
   };
 
