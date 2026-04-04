@@ -73,6 +73,59 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [selectedTableId, setSelectedTableId] = useState("");
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [discountValue, setDiscountValue] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState("");
+  const [deliveryFeeAuto, setDeliveryFeeAuto] = useState<number | null>(null);
+
+  // Fetch delivery config for auto fee calculation
+  const { data: deliveryConfig } = useQuery({
+    queryKey: ["delivery-config-pdv", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("delivery_config")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
+      return data;
+    },
+    enabled: open,
+  });
+
+  const { data: deliveryZones } = useQuery({
+    queryKey: ["delivery-zones-pdv", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("delivery_zones")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true);
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Auto-calculate delivery fee based on neighborhood
+  useEffect(() => {
+    if (orderType !== "delivery" || !deliveryNeighborhood) {
+      setDeliveryFeeAuto(null);
+      return;
+    }
+    const normalizedNeighborhood = deliveryNeighborhood.toLowerCase().trim();
+    const matchingZone = deliveryZones?.find(zone =>
+      zone.neighborhoods?.some((n: string) => n.toLowerCase().trim() === normalizedNeighborhood)
+    );
+    if (matchingZone) {
+      setDeliveryFeeAuto(matchingZone.delivery_fee || 0);
+      setDeliveryFee((matchingZone.delivery_fee || 0).toFixed(2));
+    } else if (deliveryConfig?.delivery_fee) {
+      setDeliveryFeeAuto(deliveryConfig.delivery_fee);
+      setDeliveryFee(deliveryConfig.delivery_fee.toFixed(2));
+    } else {
+      setDeliveryFeeAuto(null);
+    }
+  }, [deliveryNeighborhood, deliveryZones, deliveryConfig, orderType]);
+
+  const resolvedDeliveryFee = orderType === "delivery" ? (parseFloat(deliveryFee) || 0) : 0;
+
 
   const { data: products } = useQuery({
     queryKey: ["products-create-order", restaurantId],
