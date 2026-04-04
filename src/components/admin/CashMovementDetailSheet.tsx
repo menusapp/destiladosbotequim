@@ -29,6 +29,7 @@ interface OrderDetail {
   delivery_address: string | null;
   payment_method: string | null;
   payment_type: string | null;
+  payment_brand: string | null;
   notes: string | null;
   delivery_fee: number | null;
   coupon_discount: number | null;
@@ -43,6 +44,7 @@ interface OrderDetail {
     notes: string | null;
     products: { name: string } | null;
     order_item_extras: {
+      extra_name: string | null;
       price_at_order: number;
       product_extras: { name: string } | null;
     }[];
@@ -114,7 +116,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
       if (bill.comanda_id) {
         const { data: orders } = await supabase
           .from("orders")
-          .select(`*, order_items(*, products(name), order_item_extras(*, product_extras(name))), tables(table_number, table_name)`)
+          .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name))), tables(table_number, table_name)`)
           .eq("comanda_id", bill.comanda_id)
           .limit(1)
           .maybeSingle();
@@ -145,7 +147,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
       // Fallback: try orders by table_id
       const { data: tableOrders } = await supabase
         .from("orders")
-        .select(`*, order_items(*, products(name), order_item_extras(*, product_extras(name))), tables(table_number, table_name)`)
+        .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name))), tables(table_number, table_name)`)
         .eq("table_id", bill.table_id)
         .in("status", ["delivered", "picked_up", "accepted", "preparing", "ready"])
         .order("created_at", { ascending: false })
@@ -190,8 +192,8 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
             {extras.length > 0 && (
               <div className="mt-1 space-y-0.5">
                 {extras.map((e, i) => (
-                  <p key={i} className="text-xs text-muted-foreground pl-4">
-                    + {e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
+                   <p key={i} className="text-xs text-muted-foreground pl-4">
+                    + {e.extra_name || e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
                   </p>
                 ))}
               </div>
@@ -304,7 +306,10 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
           {(orderDetail.payment_method || orderDetail.payment_type) && (
             <div className="flex items-center gap-2 text-sm">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{formatPaymentMethod(orderDetail.payment_method || orderDetail.payment_type)}</span>
+              <span className="text-muted-foreground">
+                {formatPaymentMethod(orderDetail.payment_method || orderDetail.payment_type)}
+                {orderDetail.payment_brand && ` - ${orderDetail.payment_brand}`}
+              </span>
             </div>
           )}
         </div>
