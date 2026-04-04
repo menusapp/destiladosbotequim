@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Bell, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Bell, ChevronDown, ChevronUp, X, XCircle } from "lucide-react";
 
 interface OrderItem {
   name: string;
@@ -18,6 +19,7 @@ interface NewOrderNotificationProps {
   onView: () => void;
   onDismiss: () => void;
   onStopSound?: () => void;
+  onReject?: (reason: string) => void;
 }
 
 export const NewOrderNotification = ({
@@ -31,8 +33,11 @@ export const NewOrderNotification = ({
   onView,
   onDismiss,
   onStopSound,
+  onReject,
 }: NewOrderNotificationProps) => {
   const [expanded, setExpanded] = useState(false);
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const getTypeLabel = () => {
     if (orderType === 'balcao') return 'Balcão';
@@ -42,6 +47,7 @@ export const NewOrderNotification = ({
   };
 
   const title = `${getTypeLabel()} — ${customerName}`;
+  const canReject = onReject && (orderType === 'local' || orderType === 'balcao');
 
   // Compact pill (collapsed)
   if (!expanded) {
@@ -59,6 +65,53 @@ export const NewOrderNotification = ({
         </div>
         <span className="text-sm font-bold text-orange-900 flex-shrink-0">R$ {total.toFixed(2)}</span>
         <ChevronDown className="w-4 h-4 text-orange-400 flex-shrink-0" />
+      </div>
+    );
+  }
+
+  // Reject confirmation
+  if (showRejectConfirm) {
+    return (
+      <div className="w-80 rounded-xl bg-red-50 border border-red-200 shadow-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-red-200">
+          <div className="flex items-center gap-2">
+            <XCircle className="w-5 h-5 text-red-600" />
+            <p className="text-sm font-semibold text-red-900">Recusar Pedido</p>
+          </div>
+          <button onClick={() => setShowRejectConfirm(false)} className="p-1 rounded hover:bg-red-100">
+            <X className="w-4 h-4 text-red-500" />
+          </button>
+        </div>
+        <div className="px-4 py-3 space-y-3">
+          <p className="text-xs text-red-700">{title} — #{orderId.slice(0, 8)}</p>
+          <Input
+            placeholder="Motivo (opcional)"
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+            className="text-sm"
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              className="flex-1"
+              onClick={() => {
+                onReject?.(rejectReason || "Recusado pelo operador");
+                setShowRejectConfirm(false);
+              }}
+            >
+              Confirmar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowRejectConfirm(false)}
+            >
+              Voltar
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -116,6 +169,16 @@ export const NewOrderNotification = ({
           >
             Aceitar
           </Button>
+          {canReject && (
+            <Button
+              onClick={() => setShowRejectConfirm(true)}
+              size="sm"
+              variant="destructive"
+              className="gap-1"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+            </Button>
+          )}
           {onStopSound && (
             <Button
               onClick={onStopSound}
