@@ -295,17 +295,29 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           comandaId = nc?.id || null;
         }
 
+        // Insert order with null payment_type first (trigger fires on UPDATE)
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "local", table_id: tableId,
           comanda_id: comandaId, status: "pending",
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
-          notes: notes || null, payment_type: resolvedPaymentType,
-          payment_brand: resolvedPaymentBrand,
+          notes: notes || null, payment_type: null,
+          payment_brand: null,
+          coupon_discount: discountAmount > 0 ? discountAmount : null,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
+
+        // Insert items+extras first so trigger sees them
         await insertOrderItems(order.id);
+
+        // Now UPDATE payment_type to fire the add_local_order_to_cash_register trigger
+        if (resolvedPaymentType) {
+          await supabase.from("orders").update({
+            payment_type: resolvedPaymentType,
+            payment_brand: resolvedPaymentBrand,
+          }).eq("id", order.id);
+        }
       }
 
       // Deduct stock for non-mesa PDV orders
