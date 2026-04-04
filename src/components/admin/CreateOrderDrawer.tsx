@@ -288,6 +288,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
           coupon_discount: discountAmount > 0 ? discountAmount : null,
+          delivery_fee: resolvedDeliveryFeeVal > 0 ? resolvedDeliveryFeeVal : null,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
