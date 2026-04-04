@@ -470,6 +470,22 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                     <Input placeholder="Rua" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
                     <Input placeholder="Bairro" value={deliveryNeighborhood} onChange={e => setDeliveryNeighborhood(e.target.value)} />
                     <Input placeholder="Cidade" value={deliveryCity} onChange={e => setDeliveryCity(e.target.value)} />
+                    
+                    <Label>Taxa de Entrega (R$)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={deliveryFee}
+                      onChange={e => setDeliveryFee(e.target.value)}
+                    />
+                    {deliveryFeeAuto !== null && (
+                      <p className="text-xs text-muted-foreground">Taxa calculada automaticamente pelo bairro/configuração</p>
+                    )}
+                    {deliveryFeeAuto === null && !deliveryFee && (
+                      <p className="text-xs text-amber-600">Nenhuma configuração de entrega encontrada. Insira manualmente.</p>
+                    )}
                   </div>
                 )}
 
