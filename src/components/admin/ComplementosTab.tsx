@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Edit2, Trash2, Package, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { generateNextPdvCode } from "@/lib/pdvCodeGenerator";
 import {
@@ -23,6 +25,7 @@ interface StockItem { id: string; name: string; unit: string; price_per_unit: nu
 interface CategoryItemIngredient { id: string; stock_item_id: string; quantity: number; stock_item_name?: string; stock_item_unit?: string; stock_item_price?: number; }
 interface CategoryItem { id: string; name: string; price: number; pdv_code?: string; ingredients: CategoryItemIngredient[]; }
 interface ComplementCategory { id: string; name: string; items: CategoryItem[]; }
+interface SimpleProduct { id: string; name: string; }
 interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; }
 
 const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProps) => {
@@ -40,6 +43,10 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
   const [deletingCategory, setDeletingCategory] = useState<ComplementCategory | null>(null);
 
   const [categoryName, setCategoryName] = useState("");
+  const [allProducts, setAllProducts] = useState<SimpleProduct[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [originalProductIds, setOriginalProductIds] = useState<Set<string>>(new Set());
+  const [productSearchQuery, setProductSearchQuery] = useState("");
   const [itemName, setItemName] = useState("");
   const [itemPrice, setItemPrice] = useState("");
   const [itemPdvCode, setItemPdvCode] = useState("");
@@ -49,7 +56,12 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-  useEffect(() => { fetchCategories(); fetchStockItems(); }, [restaurantId]);
+  useEffect(() => { fetchCategories(); fetchStockItems(); fetchAllProducts(); }, [restaurantId]);
+
+  const fetchAllProducts = async () => {
+    const { data } = await supabase.from("products").select("id, name, category_id, categories!inner(restaurant_id)").eq("categories.restaurant_id", restaurantId).order("name");
+    setAllProducts((data || []).map((p: any) => ({ id: p.id, name: p.name })));
+  };
 
   const fetchStockItems = async () => {
     const { data } = await supabase.from("stock_items").select("id, name, unit, price_per_unit").eq("restaurant_id", restaurantId);
@@ -80,15 +92,44 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const handleSaveCategory = async () => {
     if (!categoryName.trim()) { toast.error("Digite o nome da categoria"); return; }
+    let categoryId = editingCategory?.id;
     if (editingCategory) {
       const { error } = await supabase.from("extra_categories").update({ name: categoryName }).eq("id", editingCategory.id);
       if (error) { toast.error("Erro ao atualizar categoria"); return; }
-      toast.success("Categoria atualizada!");
     } else {
-      const { error } = await supabase.from("extra_categories").insert({ name: categoryName, restaurant_id: restaurantId });
-      if (error) { toast.error("Erro ao criar categoria"); return; }
-      toast.success("Categoria criada!");
+      const { data, error } = await supabase.from("extra_categories").insert({ name: categoryName, restaurant_id: restaurantId }).select().single();
+      if (error || !data) { toast.error("Erro ao criar categoria"); return; }
+      categoryId = data.id;
     }
+
+    // Sync product links
+    if (categoryId) {
+      const productsToAdd = [...selectedProductIds].filter(id => !originalProductIds.has(id));
+      const productsToRemove = [...originalProductIds].filter(id => !selectedProductIds.has(id));
+
+      // Remove deselected
+      if (productsToRemove.length > 0) {
+        await supabase.from("product_extras").delete().eq("extra_category_id", categoryId).in("product_id", productsToRemove);
+      }
+
+      // Add newly selected — fetch category items first
+      if (productsToAdd.length > 0) {
+        const { data: catItems } = await supabase.from("extra_category_items").select("id, name, price").eq("category_id", categoryId);
+        if (catItems && catItems.length > 0) {
+          const inserts = productsToAdd.flatMap(productId =>
+            catItems.map(item => ({
+              product_id: productId,
+              extra_category_id: categoryId,
+              name: item.name,
+              price: item.price,
+            }))
+          );
+          await supabase.from("product_extras").insert(inserts);
+        }
+      }
+    }
+
+    toast.success(editingCategory ? "Categoria atualizada!" : "Categoria criada!");
     resetCategoryForm(); fetchCategories();
   };
 
@@ -145,9 +186,16 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
     toast.success("Item excluído!"); fetchCategories();
   };
 
-  const openEditCategory = (category: ComplementCategory) => {
+  const openEditCategory = async (category: ComplementCategory) => {
     if (isRestaurantOpen) { toast.error("Feche o restaurante para editar"); return; }
-    setEditingCategory(category); setCategoryName(category.name); setCategoryDialogOpen(true);
+    setEditingCategory(category); setCategoryName(category.name);
+    // Load linked products
+    const { data: linkedExtras } = await supabase.from("product_extras").select("product_id").eq("extra_category_id", category.id);
+    const linkedIds = new Set((linkedExtras || []).map((e: any) => e.product_id as string));
+    setSelectedProductIds(linkedIds);
+    setOriginalProductIds(new Set(linkedIds));
+    setProductSearchQuery("");
+    setCategoryDialogOpen(true);
   };
 
   const openNewCategory = () => {
@@ -167,7 +215,16 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
     resetItemForm(); setSelectedCategoryId(categoryId); setItemDialogOpen(true);
   };
 
-  const resetCategoryForm = () => { setCategoryDialogOpen(false); setEditingCategory(null); setCategoryName(""); };
+  const resetCategoryForm = () => {
+    setCategoryDialogOpen(false); setEditingCategory(null); setCategoryName("");
+    setSelectedProductIds(new Set()); setOriginalProductIds(new Set()); setProductSearchQuery("");
+  };
+
+  const toggleProductSelection = (productId: string) => {
+    const newSet = new Set(selectedProductIds);
+    if (newSet.has(productId)) newSet.delete(productId); else newSet.add(productId);
+    setSelectedProductIds(newSet);
+  };
   const resetItemForm = () => {
     setItemDialogOpen(false); setEditingItem(null); setSelectedCategoryId(null);
     setItemName(""); setItemPrice(""); setItemPdvCode(""); setItemIngredients([]);
@@ -263,13 +320,37 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
       {/* Category Dialog */}
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingCategory ? "Editar Categoria" : "Nova Categoria de Complementos"}</DialogTitle>
             <DialogDescription>Categorias agrupam complementos similares (ex: Tamanhos, Molhos)</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div><Label htmlFor="category-name">Nome da Categoria *</Label><Input id="category-name" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Ex: Tamanhos, Molhos, Acompanhamentos" /></div>
+
+            <div className="space-y-2">
+              <Label>Produtos vinculados ({selectedProductIds.size} selecionados)</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar produtos..." value={productSearchQuery} onChange={(e) => setProductSearchQuery(e.target.value)} className="pl-9" />
+              </div>
+              <ScrollArea className="max-h-48 border rounded-lg">
+                <div className="p-2 space-y-1">
+                  {allProducts
+                    .filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
+                    .map(product => (
+                      <label key={product.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer text-sm">
+                        <Checkbox
+                          checked={selectedProductIds.has(product.id)}
+                          onCheckedChange={() => toggleProductSelection(product.id)}
+                        />
+                        <span>{product.name}</span>
+                      </label>
+                    ))}
+                </div>
+              </ScrollArea>
+            </div>
+
             <Button onClick={handleSaveCategory} className="w-full">{editingCategory ? "Atualizar" : "Criar Categoria"}</Button>
           </div>
         </DialogContent>
