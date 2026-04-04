@@ -310,7 +310,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const renderOrderCard = (order: Order) => {
     const total = calculateTotal(order);
     const elapsed = getElapsedMinutes(order.created_at);
-    const payment = getPaymentDisplay(order.payment_type);
+    const payment = getPaymentDisplay(order.payment_type, order.payment_brand);
     return (
       <Card
         key={order.id}

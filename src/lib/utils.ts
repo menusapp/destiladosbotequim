@@ -91,3 +91,26 @@ export function formatPaymentMethod(method: string | null | undefined): string {
   }
   return method;
 }
+
+/**
+ * Combina payment_type + payment_brand para exibição padronizada.
+ * Ex: formatPaymentWithBrand("credit", "visa") → "Crédito - Visa"
+ *     formatPaymentWithBrand("Crédito - Visa", null) → "Crédito - Visa" (já formatado)
+ */
+export function formatPaymentWithBrand(type: string | null | undefined, brand: string | null | undefined): string {
+  if (!type) return "—";
+  // If already contains brand info (e.g. "Crédito - Visa"), just normalize
+  if (type.includes(" - ") || type.includes("-")) {
+    return formatPaymentMethod(type);
+  }
+  const formatted = formatPaymentMethod(type);
+  if (brand) {
+    // Capitalize brand name
+    const brandName = brand.charAt(0).toUpperCase() + brand.slice(1);
+    // Don't duplicate if formatted already contains brand
+    if (!formatted.toLowerCase().includes(brand.toLowerCase())) {
+      return `${formatted} - ${brandName}`;
+    }
+  }
+  return formatted;
+}
