@@ -593,7 +593,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           <div className="border-t p-4 flex items-center justify-between">
             <div className="text-sm">
               <ShoppingCart className="w-4 h-4 inline mr-1" />
-              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartSubtotal.toFixed(2)}</span>
+              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
             </div>
             <Button onClick={handleSubmit} disabled={submitting || cart.length === 0}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
