@@ -615,6 +615,12 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                         </div>
                       );
                     })}
+                    {resolvedDeliveryFeeVal > 0 && (
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>Taxa de entrega</span>
+                        <span>R$ {resolvedDeliveryFeeVal.toFixed(2)}</span>
+                      </div>
+                    )}
                     {discountAmount > 0 && (
                       <div className="flex items-center justify-between text-sm text-green-600">
                         <span>Desconto</span>
