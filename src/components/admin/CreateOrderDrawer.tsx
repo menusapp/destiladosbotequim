@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2, Plus, CreditCard } from "lucide-react";
+import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2, Plus, CreditCard, Percent, DollarSign } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
@@ -71,6 +71,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentBrand, setPaymentBrand] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
+  const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
+  const [discountValue, setDiscountValue] = useState("");
 
   const { data: products } = useQuery({
     queryKey: ["products-create-order", restaurantId],
@@ -110,6 +112,15 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     }, 0);
   }, [cart]);
 
+  const discountAmount = useMemo(() => {
+    const val = parseFloat(discountValue) || 0;
+    if (val <= 0) return 0;
+    if (discountType === "percentage") return Math.min(cartSubtotal * (val / 100), cartSubtotal);
+    return Math.min(val, cartSubtotal);
+  }, [discountValue, discountType, cartSubtotal]);
+
+  const cartTotal = cartSubtotal - discountAmount;
+
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
@@ -148,6 +159,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
+    setDiscountType("percentage"); setDiscountValue("");
   };
 
   // CRM: Save/update customer data before creating orders
@@ -220,6 +232,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
+          coupon_discount: discountAmount > 0 ? discountAmount : null,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
@@ -232,6 +245,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           customer_cpf: customerCpf || "000.000.000-00",
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
+          coupon_discount: discountAmount > 0 ? discountAmount : null,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
@@ -281,17 +295,29 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           comandaId = nc?.id || null;
         }
 
+        // Insert order with null payment_type first (trigger fires on UPDATE)
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "local", table_id: tableId,
           comanda_id: comandaId, status: "pending",
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
-          notes: notes || null, payment_type: resolvedPaymentType,
-          payment_brand: resolvedPaymentBrand,
+          notes: notes || null, payment_type: null,
+          payment_brand: null,
+          coupon_discount: discountAmount > 0 ? discountAmount : null,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
+
+        // Insert items+extras first so trigger sees them
         await insertOrderItems(order.id);
+
+        // Now UPDATE payment_type to fire the add_local_order_to_cash_register trigger
+        if (resolvedPaymentType) {
+          await supabase.from("orders").update({
+            payment_type: resolvedPaymentType,
+            payment_brand: resolvedPaymentBrand,
+          }).eq("id", order.id);
+        }
       }
 
       // Deduct stock for non-mesa PDV orders
@@ -457,6 +483,43 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                 )}
                 </div>
 
+                {/* Discount */}
+                <div className="space-y-2">
+                  <Label>Desconto</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={discountType === "percentage" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setDiscountType("percentage")}
+                      className="gap-1"
+                    >
+                      <Percent className="w-3 h-3" /> %
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={discountType === "fixed" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setDiscountType("fixed")}
+                      className="gap-1"
+                    >
+                      <DollarSign className="w-3 h-3" /> R$
+                    </Button>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder={discountType === "percentage" ? "Ex: 10" : "Ex: 5.00"}
+                      value={discountValue}
+                      onChange={e => setDiscountValue(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                  {discountAmount > 0 && (
+                    <p className="text-xs text-green-600">Desconto: -R$ {discountAmount.toFixed(2)}</p>
+                  )}
+                </div>
+
                 {/* Cart Summary */}
                 {cart.length > 0 && (
                   <div className="space-y-2 border-t pt-3">
@@ -481,9 +544,15 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                         </div>
                       );
                     })}
+                    {discountAmount > 0 && (
+                      <div className="flex items-center justify-between text-sm text-green-600">
+                        <span>Desconto</span>
+                        <span>-R$ {discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between font-bold text-sm pt-2 border-t">
                       <span>Total</span>
-                      <span>R$ {cartSubtotal.toFixed(2)}</span>
+                      <span>R$ {cartTotal.toFixed(2)}</span>
                     </div>
                   </div>
                 )}
@@ -524,7 +593,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           <div className="border-t p-4 flex items-center justify-between">
             <div className="text-sm">
               <ShoppingCart className="w-4 h-4 inline mr-1" />
-              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartSubtotal.toFixed(2)}</span>
+              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
             </div>
             <Button onClick={handleSubmit} disabled={submitting || cart.length === 0}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}

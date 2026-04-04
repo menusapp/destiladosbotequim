@@ -247,9 +247,9 @@ export default function StockMovementsTab({ restaurantId }: StockMovementsTabPro
               Nenhuma movimentação encontrada para o período selecionado
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
                     <TableHead>Data/Hora</TableHead>
                     <TableHead>Insumo</TableHead>

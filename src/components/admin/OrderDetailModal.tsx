@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { formatPaymentMethod } from "@/lib/utils";
+import { formatPaymentWithBrand } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,7 @@ interface Order {
   delivery_phone?: string;
   notes?: string;
   payment_type?: string;
+  payment_brand?: string;
   table_id?: string;
   tables?: { table_number: number };
   order_items: OrderItem[];
@@ -80,7 +81,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const refreshOrder = useCallback(async () => {
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
       .eq("id", order.id)
       .single();
     if (!error && data) {
@@ -562,7 +563,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                   <div className="flex items-center gap-2">
                     {order.payment_type && order.payment_type !== "pending" ? (
                       <>
-                        <p className="font-medium">{formatPaymentMethod(order.payment_type)}</p>
+                        <p className="font-medium">{formatPaymentWithBrand(order.payment_type, order.payment_brand)}</p>
                         <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" onClick={() => setShowChangePaymentModal(true)}>
                           <RefreshCw className="w-3 h-3" /> Alterar
                         </Button>

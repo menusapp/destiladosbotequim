@@ -12,7 +12,7 @@ import {
   Clock, Printer, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { formatPaymentMethod } from "@/lib/utils";
+import { formatPaymentWithBrand } from "@/lib/utils";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { OrderDetailModal } from "./OrderDetailModal";
@@ -48,6 +48,7 @@ interface Order {
   delivery_phone?: string;
   notes?: string;
   payment_type?: string;
+  payment_brand?: string;
   table_id?: string;
   tables?: { table_number: number };
   order_items: OrderItem[];
@@ -218,7 +219,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
       .eq("restaurant_id", restaurantId)
       .in("order_type", ["delivery", "balcao"])
       .gte("created_at", dateRange.from.toISOString())
@@ -287,12 +288,11 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     return "Retirada";
   };
 
-  const getPaymentDisplay = (paymentType?: string) => {
+  const getPaymentDisplay = (paymentType?: string, paymentBrand?: string) => {
     if (!paymentType || paymentType === "pending") {
       return { label: "Falta pagamento", className: "text-red-600 bg-red-50 dark:bg-red-950/30", icon: <AlertTriangle className="w-3 h-3" /> };
     }
-    const formatted = formatPaymentMethod(paymentType);
-    // Determine icon based on formatted label
+    const formatted = formatPaymentWithBrand(paymentType, paymentBrand);
     let icon: React.ReactNode = <CreditCard className="w-3 h-3" />;
     if (formatted === "Dinheiro") icon = <Banknote className="w-3 h-3" />;
     else if (formatted === "PIX" || formatted.startsWith("Pago")) icon = <Smartphone className="w-3 h-3" />;
@@ -310,7 +310,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const renderOrderCard = (order: Order) => {
     const total = calculateTotal(order);
     const elapsed = getElapsedMinutes(order.created_at);
-    const payment = getPaymentDisplay(order.payment_type);
+    const payment = getPaymentDisplay(order.payment_type, order.payment_brand);
     return (
       <Card
         key={order.id}
