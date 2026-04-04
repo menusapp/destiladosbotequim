@@ -172,16 +172,10 @@ export function KioskPayment({
         }
       }
 
-      // For table orders: occupy the table and create comanda
+      // For table orders: create comanda but DON'T occupy the table yet
+      // Table will be occupied when operator accepts the order in PDV
       if (consumptionMode === "table" && tableId) {
-        console.log("[Kiosk] Occupying table and creating comanda for table:", tableId);
-
-        // Mark table as occupied
-        await supabase.from("tables").update({
-          is_occupied: true,
-          occupied_at: new Date().toISOString(),
-          occupied_by: customer.name,
-        }).eq("id", tableId);
+        console.log("[Kiosk] Creating comanda for table (table stays available until operator accepts):", tableId);
 
         // Create comanda
         const { data: comanda, error: comandaError } = await supabase

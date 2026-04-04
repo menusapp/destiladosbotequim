@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2, Plus, CreditCard, Percent, DollarSign } from "lucide-react";
+import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2, Plus, CreditCard, Percent, DollarSign, MapPin } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
@@ -73,6 +73,58 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [selectedTableId, setSelectedTableId] = useState("");
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [discountValue, setDiscountValue] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState("");
+  const [deliveryFeeAuto, setDeliveryFeeAuto] = useState<number | null>(null);
+
+  // Fetch delivery config for auto fee calculation
+  const { data: deliveryConfig } = useQuery({
+    queryKey: ["delivery-config-pdv", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("delivery_config")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
+      return data;
+    },
+    enabled: open,
+  });
+
+  const { data: deliveryZones } = useQuery({
+    queryKey: ["delivery-zones-pdv", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("delivery_zones")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true);
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Auto-calculate delivery fee based on neighborhood
+  useEffect(() => {
+    if (orderType !== "delivery" || !deliveryNeighborhood) {
+      setDeliveryFeeAuto(null);
+      return;
+    }
+    const normalizedNeighborhood = deliveryNeighborhood.toLowerCase().trim();
+    const matchingZone = deliveryZones?.find(zone =>
+      zone.neighborhoods?.some((n: string) => n.toLowerCase().trim() === normalizedNeighborhood)
+    );
+    if (matchingZone) {
+      setDeliveryFeeAuto(matchingZone.delivery_fee || 0);
+      setDeliveryFee((matchingZone.delivery_fee || 0).toFixed(2));
+    } else if (deliveryConfig?.delivery_fee) {
+      setDeliveryFeeAuto(deliveryConfig.delivery_fee);
+      setDeliveryFee(deliveryConfig.delivery_fee.toFixed(2));
+    } else {
+      setDeliveryFeeAuto(null);
+    }
+  }, [deliveryNeighborhood, deliveryZones, deliveryConfig, orderType]);
+
+
 
   const { data: products } = useQuery({
     queryKey: ["products-create-order", restaurantId],
@@ -119,7 +171,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     return Math.min(val, cartSubtotal);
   }, [discountValue, discountType, cartSubtotal]);
 
-  const cartTotal = cartSubtotal - discountAmount;
+  const resolvedDeliveryFeeVal = orderType === "delivery" ? (parseFloat(deliveryFee) || 0) : 0;
+  const cartTotal = cartSubtotal - discountAmount + resolvedDeliveryFeeVal;
 
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
@@ -160,6 +213,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
     setDiscountType("percentage"); setDiscountValue("");
+    setDeliveryFee(""); setDeliveryFeeAuto(null);
   };
 
   // CRM: Save/update customer data before creating orders
@@ -233,6 +287,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
           coupon_discount: discountAmount > 0 ? discountAmount : null,
+          delivery_fee: resolvedDeliveryFeeVal > 0 ? resolvedDeliveryFeeVal : null,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
@@ -414,6 +469,22 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                     <Input placeholder="Rua" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
                     <Input placeholder="Bairro" value={deliveryNeighborhood} onChange={e => setDeliveryNeighborhood(e.target.value)} />
                     <Input placeholder="Cidade" value={deliveryCity} onChange={e => setDeliveryCity(e.target.value)} />
+                    
+                    <Label>Taxa de Entrega (R$)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={deliveryFee}
+                      onChange={e => setDeliveryFee(e.target.value)}
+                    />
+                    {deliveryFeeAuto !== null && (
+                      <p className="text-xs text-muted-foreground">Taxa calculada automaticamente pelo bairro/configuração</p>
+                    )}
+                    {deliveryFeeAuto === null && !deliveryFee && (
+                      <p className="text-xs text-amber-600">Nenhuma configuração de entrega encontrada. Insira manualmente.</p>
+                    )}
                   </div>
                 )}
 
@@ -544,6 +615,12 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                         </div>
                       );
                     })}
+                    {resolvedDeliveryFeeVal > 0 && (
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>Taxa de entrega</span>
+                        <span>R$ {resolvedDeliveryFeeVal.toFixed(2)}</span>
+                      </div>
+                    )}
                     {discountAmount > 0 && (
                       <div className="flex items-center justify-between text-sm text-green-600">
                         <span>Desconto</span>

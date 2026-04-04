@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil, Trash2, ImageIcon, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ImageIcon, Loader2, Search } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +23,12 @@ interface Category {
   image_url: string | null;
 }
 
+interface ProductInfo {
+  id: string;
+  name: string;
+  category_id: string | null;
+}
+
 const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string; isRestaurantOpen: boolean }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -29,6 +37,11 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
   const [categoryImageUrl, setCategoryImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Product management inside category
+  const [allProducts, setAllProducts] = useState<ProductInfo[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [productSearch, setProductSearch] = useState("");
 
   useEffect(() => {
     fetchCategories();
@@ -49,6 +62,37 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
     setCategories(data || []);
   };
 
+  const fetchProducts = async () => {
+    const { data } = await supabase
+      .from("products")
+      .select("id, name, category_id")
+      .eq("categories.restaurant_id", restaurantId)
+      .order("name");
+    
+    // Fallback: fetch all products that belong to categories of this restaurant
+    const { data: cats } = await supabase.from("categories").select("id").eq("restaurant_id", restaurantId);
+    const catIds = (cats || []).map(c => c.id);
+    
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, name, category_id")
+      .in("category_id", catIds.length > 0 ? catIds : ["__none__"])
+      .order("name");
+    
+    // Also get products without category
+    const { data: orphans } = await supabase
+      .from("products")
+      .select("id, name, category_id")
+      .is("category_id", null)
+      .order("name");
+    
+    const all = [...(products || []), ...(orphans || [])];
+    // Deduplicate
+    const seen = new Set<string>();
+    const unique = all.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+    setAllProducts(unique);
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -63,22 +107,17 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
     const ext = file.name.split(".").pop();
     const fileName = `category-${restaurantId}-${Date.now()}.${ext}`;
     const filePath = `categories/${fileName}`;
-    console.log("[CategoryUpload] bucket:", bucket, "path:", filePath, "file:", file.name, "type:", file.type);
     try {
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, { upsert: true });
 
-      if (uploadError) {
-        console.error("[CategoryUpload] upload failed:", JSON.stringify(uploadError));
-        throw uploadError;
-      }
+      if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
         .from(bucket)
         .getPublicUrl(filePath);
 
-      console.log("[CategoryUpload] publicUrl:", urlData.publicUrl);
       setCategoryImageUrl(urlData.publicUrl);
       toast.success("Imagem carregada!");
     } catch (err) {
@@ -97,6 +136,8 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
       return;
     }
 
+    let categoryId = editingCategory?.id;
+
     if (editingCategory) {
       const { error } = await supabase
         .from("categories")
@@ -107,28 +148,46 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
         toast.error("Erro ao atualizar categoria");
         return;
       }
-
-      toast.success("Categoria atualizada!");
     } else {
-      const { error } = await supabase.from("categories").insert({
+      const { data, error } = await supabase.from("categories").insert({
         restaurant_id: restaurantId,
         name: categoryName,
         display_order: categories.length,
         image_url: categoryImageUrl,
-      } as any);
+      } as any).select().single();
 
       if (error) {
         toast.error("Erro ao criar categoria");
         return;
       }
-
-      toast.success("Categoria criada!");
+      categoryId = data?.id;
     }
 
+    // Update product assignments
+    if (categoryId) {
+      // Products that should belong to this category
+      const toAdd = Array.from(selectedProductIds);
+      // Products that were in this category but are now unchecked
+      const toRemove = allProducts
+        .filter(p => p.category_id === categoryId && !selectedProductIds.has(p.id))
+        .map(p => p.id);
+
+      if (toAdd.length > 0) {
+        await supabase.from("products").update({ category_id: categoryId }).in("id", toAdd);
+      }
+      if (toRemove.length > 0) {
+        // Set to null (uncategorized)
+        await supabase.from("products").update({ category_id: null } as any).in("id", toRemove);
+      }
+    }
+
+    toast.success(editingCategory ? "Categoria atualizada!" : "Categoria criada!");
     setDialogOpen(false);
     setCategoryName("");
     setCategoryImageUrl(null);
     setEditingCategory(null);
+    setSelectedProductIds(new Set());
+    setProductSearch("");
     fetchCategories();
   };
 
@@ -170,11 +229,48 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
     setDialogOpen(true);
   };
 
+  // When dialog opens, fetch products and pre-select ones in this category
+  useEffect(() => {
+    if (dialogOpen) {
+      fetchProducts().then(() => {
+        if (editingCategory) {
+          const inCategory = allProducts.filter(p => p.category_id === editingCategory.id).map(p => p.id);
+          setSelectedProductIds(new Set(inCategory));
+        } else {
+          setSelectedProductIds(new Set());
+        }
+      });
+    }
+  }, [dialogOpen, editingCategory?.id]);
+
+  // Re-select when allProducts loads
+  useEffect(() => {
+    if (dialogOpen && editingCategory && allProducts.length > 0) {
+      const inCategory = allProducts.filter(p => p.category_id === editingCategory.id).map(p => p.id);
+      setSelectedProductIds(new Set(inCategory));
+    }
+  }, [allProducts]);
+
+  const filteredProducts = productSearch
+    ? allProducts.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()))
+    : allProducts;
+
+  const toggleProduct = (productId: string) => {
+    setSelectedProductIds(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId); else next.add(productId);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Categorias do Cardápio</h3>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) { setProductSearch(""); }
+        }}>
           <DialogTrigger asChild>
             <Button onClick={() => { 
               if (isRestaurantOpen) {
@@ -189,15 +285,15 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
               Nova Categoria
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingCategory ? "Editar Categoria" : "Nova Categoria"}
               </DialogTitle>
               <DialogDescription>
                 {editingCategory
-                  ? "Altere o nome e a imagem da categoria"
-                  : "Crie uma nova categoria para organizar seus produtos"}
+                  ? "Altere o nome, imagem e produtos da categoria"
+                  : "Crie uma nova categoria e vincule produtos"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -251,6 +347,47 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
                   </div>
                 </div>
               </div>
+
+              {/* Products in this category */}
+              <div className="space-y-2">
+                <Label>Produtos desta categoria</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar produto..."
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                    className="pl-9 h-8 text-sm"
+                  />
+                </div>
+                <ScrollArea className="h-48 border rounded-lg">
+                  <div className="p-2 space-y-1">
+                    {filteredProducts.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">Nenhum produto encontrado</p>
+                    ) : (
+                      filteredProducts.map(product => (
+                        <label
+                          key={product.id}
+                          className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={selectedProductIds.has(product.id)}
+                            onCheckedChange={() => toggleProduct(product.id)}
+                          />
+                          <span className="text-sm flex-1">{product.name}</span>
+                          {product.category_id && product.category_id !== editingCategory?.id && (
+                            <span className="text-[10px] text-muted-foreground">
+                              (outra cat.)
+                            </span>
+                          )}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+                <p className="text-xs text-muted-foreground">{selectedProductIds.size} produto(s) selecionado(s)</p>
+              </div>
+
               <Button type="submit" className="w-full">
                 {editingCategory ? "Atualizar" : "Criar"}
               </Button>

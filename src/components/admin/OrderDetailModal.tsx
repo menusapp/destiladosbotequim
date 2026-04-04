@@ -266,10 +266,23 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
 
       sendWhatsAppNotification(newStatus);
       if (newStatus === 'accepted') {
+        // Occupy table for kiosk/local orders on accept
+        if (order.order_type === 'local' && order.table_id) {
+          await supabase.from("tables").update({
+            is_occupied: true,
+            occupied_at: new Date().toISOString(),
+            occupied_by: order.customer_name,
+          }).eq("id", order.table_id);
+        }
         try {
           const { data: printerConfig } = await supabase.from('printer_settings').select('auto_print_orders').eq('restaurant_id', restaurantId).maybeSingle();
           if (printerConfig?.auto_print_orders) await printOrder(order, restaurantId);
         } catch (printErr) { console.error('Auto-print error:', printErr); }
+      }
+      // If cancelling a local/kiosk order that hasn't been accepted, keep table available
+      if (newStatus === 'cancelled' && order.order_type === 'local' && order.table_id && previousStatus === 'pending') {
+        // Table was never occupied, no need to free it
+        console.log("[OrderDetail] Cancelled pending local order, table stays available");
       }
       if (newStatus === 'delivered' || newStatus === 'picked_up') {
         supabase.functions.invoke('marketing-trigger', { body: { orderId: order.id, restaurantId } });
