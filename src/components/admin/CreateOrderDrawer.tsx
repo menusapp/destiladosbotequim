@@ -172,7 +172,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     return Math.min(val, cartSubtotal);
   }, [discountValue, discountType, cartSubtotal]);
 
-  const cartTotal = cartSubtotal - discountAmount;
+  const resolvedDeliveryFeeVal = orderType === "delivery" ? (parseFloat(deliveryFee) || 0) : 0;
+  const cartTotal = cartSubtotal - discountAmount + resolvedDeliveryFeeVal;
 
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
