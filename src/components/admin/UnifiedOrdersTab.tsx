@@ -320,7 +320,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
         <CardContent className="p-3 space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="font-bold text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
-            {showPrepTimer && (
+            {showPrepTimer && !['delivered', 'picked_up', 'cancelled'].includes(order.status) && (
               <Badge className={`text-[10px] px-1.5 py-0 ${getElapsedColor(elapsed)}`}>
                 {elapsed}min
               </Badge>
