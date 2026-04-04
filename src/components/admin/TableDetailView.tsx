@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatPaymentMethod } from "@/lib/utils";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { printOrder as printOrderThermal } from "@/lib/printOrder";
@@ -466,7 +467,7 @@ export const TableDetailView = () => {
                               <div key={order.id} className="text-sm space-y-1">
                                 {order.payment_type && (
                                   <Badge variant="outline" className="text-[10px] mb-1 border-green-500 text-green-700 dark:text-green-400">
-                                    Pago - {order.payment_type}
+                                    Pago - {formatPaymentMethod(order.payment_type)}
                                   </Badge>
                                 )}
                                 {order.order_items.map((item) => (
