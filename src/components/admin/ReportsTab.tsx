@@ -130,9 +130,9 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           .eq("tables.restaurant_id", restaurantId).eq("status", "paid")
           .gte("paid_at", startDate.toISOString()).lte("paid_at", endDate.toISOString()),
         supabase.from("orders").select(`id, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(quantity, price_at_order, order_item_extras(price_at_order))`)
-          .eq("restaurant_id", restaurantId).in("order_type", ["delivery", "balcao"])
+          .eq("restaurant_id", restaurantId).eq("order_type", "delivery")
           .in("status", ["delivered", "picked_up"])
-          .gte("updated_at", startDate.toISOString()).lte("updated_at", endDate.toISOString()),
+          .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
         supabase.from("counter_orders").select("id, total_amount, payment_method")
           .eq("restaurant_id", restaurantId).eq("status", "paid")
           .gte("finalized_at", startDate.toISOString()).lte("finalized_at", endDate.toISOString()),
