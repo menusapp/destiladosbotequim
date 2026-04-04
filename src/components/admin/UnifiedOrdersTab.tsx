@@ -48,6 +48,7 @@ interface Order {
   delivery_phone?: string;
   notes?: string;
   payment_type?: string;
+  payment_brand?: string;
   table_id?: string;
   tables?: { table_number: number };
   order_items: OrderItem[];
