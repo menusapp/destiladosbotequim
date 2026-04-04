@@ -288,12 +288,11 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     return "Retirada";
   };
 
-  const getPaymentDisplay = (paymentType?: string) => {
+  const getPaymentDisplay = (paymentType?: string, paymentBrand?: string) => {
     if (!paymentType || paymentType === "pending") {
       return { label: "Falta pagamento", className: "text-red-600 bg-red-50 dark:bg-red-950/30", icon: <AlertTriangle className="w-3 h-3" /> };
     }
-    const formatted = formatPaymentMethod(paymentType);
-    // Determine icon based on formatted label
+    const formatted = formatPaymentWithBrand(paymentType, paymentBrand);
     let icon: React.ReactNode = <CreditCard className="w-3 h-3" />;
     if (formatted === "Dinheiro") icon = <Banknote className="w-3 h-3" />;
     else if (formatted === "PIX" || formatted.startsWith("Pago")) icon = <Smartphone className="w-3 h-3" />;
