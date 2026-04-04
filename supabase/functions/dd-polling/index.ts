@@ -506,6 +506,20 @@ Deno.serve(async (req) => {
         // Only keep real observations in notes (not variations)
         const itemNotes = item.observations || item.comments || "";
 
+        // ── FIX: Avoid double-counting variation prices ──────────────────
+        // DD's totalPrice/unitPrice already includes variation surcharges.
+        // Since we persist variations as separate extras, subtract their
+        // prices from the base to avoid counting them twice.
+        const totalExtrasPrice = collectedExtras.reduce((sum, e) => sum + e.price, 0);
+        const adjustedUnitPrice = totalExtrasPrice > 0 ? Math.max(0, unitPrice - totalExtrasPrice) : unitPrice;
+
+        // Also look up the ERP base price for validation logging
+        const erpBasePrice = matchedProductId
+          ? productsList.find((p: any) => p.id === matchedProductId)?.price || 0
+          : 0;
+
+        console.log(`[dd-polling]   PRICING: DD unitPrice=R$${unitPrice.toFixed(2)}, extrasTotal=R$${totalExtrasPrice.toFixed(2)}, adjustedBase=R$${adjustedUnitPrice.toFixed(2)}, erpBase=R$${erpBasePrice.toFixed(2)}`);
+        console.log(`[dd-polling]   SUBTOTAL CHECK: adjustedBase(${adjustedUnitPrice.toFixed(2)}) + extras(${totalExtrasPrice.toFixed(2)}) = R$${(adjustedUnitPrice + totalExtrasPrice).toFixed(2)}`);
         console.log(`[dd-polling]   FINAL: product_id=${matchedProductId || "NULL"}, rule=${matchRule}, extras=${collectedExtras.length}, notes="${itemNotes}"`);
 
         insertItems.push({
@@ -513,7 +527,7 @@ Deno.serve(async (req) => {
             order_id: newOrder.id,
             product_id: matchedProductId,
             quantity,
-            price_at_order: unitPrice,
+            price_at_order: adjustedUnitPrice,
             notes: matchedProductId ? (itemNotes || null) : `[DD] ${itemName}${itemNotes ? ` - ${itemNotes}` : ""}`,
           },
           extras: collectedExtras,
