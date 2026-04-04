@@ -112,19 +112,32 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
         await supabase.from("product_extras").delete().eq("extra_category_id", categoryId).in("product_id", productsToRemove);
       }
 
-      // Add newly selected — fetch category items first
+      // Add newly selected — fetch category items WITH ingredients
       if (productsToAdd.length > 0) {
-        const { data: catItems } = await supabase.from("extra_category_items").select("id, name, price").eq("category_id", categoryId);
+        const { data: catItems } = await supabase
+          .from("extra_category_items")
+          .select("id, name, price, extra_category_item_ingredients(id, stock_item_id, quantity)")
+          .eq("category_id", categoryId);
         if (catItems && catItems.length > 0) {
-          const inserts = productsToAdd.flatMap(productId =>
-            catItems.map(item => ({
-              product_id: productId,
-              extra_category_id: categoryId,
-              name: item.name,
-              price: item.price,
-            }))
-          );
-          await supabase.from("product_extras").insert(inserts);
+          for (const productId of productsToAdd) {
+            for (const item of catItems) {
+              const { data: newExtra } = await supabase.from("product_extras").insert({
+                product_id: productId,
+                extra_category_id: categoryId,
+                name: item.name,
+                price: item.price,
+              }).select("id").single();
+
+              if (newExtra && item.extra_category_item_ingredients && item.extra_category_item_ingredients.length > 0) {
+                const ingredientInserts = item.extra_category_item_ingredients.map((ing: any) => ({
+                  product_extra_id: newExtra.id,
+                  stock_item_id: ing.stock_item_id,
+                  quantity: ing.quantity,
+                }));
+                await supabase.from("product_extra_ingredients").insert(ingredientInserts);
+              }
+            }
+          }
         }
       }
     }
