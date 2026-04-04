@@ -124,7 +124,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     }
   }, [deliveryNeighborhood, deliveryZones, deliveryConfig, orderType]);
 
-  const resolvedDeliveryFee = orderType === "delivery" ? (parseFloat(deliveryFee) || 0) : 0;
 
 
   const { data: products } = useQuery({
