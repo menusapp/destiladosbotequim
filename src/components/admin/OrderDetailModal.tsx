@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { formatPaymentMethod } from "@/lib/utils";
+import { formatPaymentWithBrand } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
