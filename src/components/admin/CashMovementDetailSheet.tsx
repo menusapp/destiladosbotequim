@@ -192,8 +192,8 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
             {extras.length > 0 && (
               <div className="mt-1 space-y-0.5">
                 {extras.map((e, i) => (
-                  <p key={i} className="text-xs text-muted-foreground pl-4">
-                    + {e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
+                   <p key={i} className="text-xs text-muted-foreground pl-4">
+                    + {e.extra_name || e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
                   </p>
                 ))}
               </div>
