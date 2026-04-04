@@ -186,9 +186,16 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
     toast.success("Item excluído!"); fetchCategories();
   };
 
-  const openEditCategory = (category: ComplementCategory) => {
+  const openEditCategory = async (category: ComplementCategory) => {
     if (isRestaurantOpen) { toast.error("Feche o restaurante para editar"); return; }
-    setEditingCategory(category); setCategoryName(category.name); setCategoryDialogOpen(true);
+    setEditingCategory(category); setCategoryName(category.name);
+    // Load linked products
+    const { data: linkedExtras } = await supabase.from("product_extras").select("product_id").eq("extra_category_id", category.id);
+    const linkedIds = new Set((linkedExtras || []).map((e: any) => e.product_id as string));
+    setSelectedProductIds(linkedIds);
+    setOriginalProductIds(new Set(linkedIds));
+    setProductSearchQuery("");
+    setCategoryDialogOpen(true);
   };
 
   const openNewCategory = () => {
@@ -208,7 +215,16 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
     resetItemForm(); setSelectedCategoryId(categoryId); setItemDialogOpen(true);
   };
 
-  const resetCategoryForm = () => { setCategoryDialogOpen(false); setEditingCategory(null); setCategoryName(""); };
+  const resetCategoryForm = () => {
+    setCategoryDialogOpen(false); setEditingCategory(null); setCategoryName("");
+    setSelectedProductIds(new Set()); setOriginalProductIds(new Set()); setProductSearchQuery("");
+  };
+
+  const toggleProductSelection = (productId: string) => {
+    const newSet = new Set(selectedProductIds);
+    if (newSet.has(productId)) newSet.delete(productId); else newSet.add(productId);
+    setSelectedProductIds(newSet);
+  };
   const resetItemForm = () => {
     setItemDialogOpen(false); setEditingItem(null); setSelectedCategoryId(null);
     setItemName(""); setItemPrice(""); setItemPdvCode(""); setItemIngredients([]);
