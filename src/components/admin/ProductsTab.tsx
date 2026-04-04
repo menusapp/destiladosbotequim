@@ -207,12 +207,12 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       const { data: restaurantCategories } = await supabase
         .from("categories").select("id").eq("restaurant_id", restaurantId);
       if (!restaurantCategories || restaurantCategories.length === 0) { setProducts([]); return; }
-      const { data, error } = await supabase.from("products").select("*").in("category_id", restaurantCategories.map(c => c.id));
+      const { data, error } = await supabase.from("products").select("*").in("category_id", restaurantCategories.map(c => c.id)).order("name");
       if (error) { toast.error("Erro ao carregar produtos"); return; }
       setProducts(data || []);
       return;
     }
-    const { data, error } = await supabase.from("products").select("*").in("category_id", catIds);
+    const { data, error } = await supabase.from("products").select("*").in("category_id", catIds).order("name");
     if (error) { toast.error("Erro ao carregar produtos"); return; }
     setProducts(data || []);
   };
