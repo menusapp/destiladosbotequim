@@ -71,6 +71,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentBrand, setPaymentBrand] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
+  const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
+  const [discountValue, setDiscountValue] = useState("");
 
   const { data: products } = useQuery({
     queryKey: ["products-create-order", restaurantId],
