@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Edit2, Trash2, Package, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { generateNextPdvCode } from "@/lib/pdvCodeGenerator";
 import {
