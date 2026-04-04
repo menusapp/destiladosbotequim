@@ -939,6 +939,13 @@ const RestaurantAdmin = () => {
                       }}
                       onDismiss={() => setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId))}
                       onStopSound={() => setSoundMuted(true)}
+                      onReject={async (reason) => {
+                        try {
+                          await supabase.rpc("admin_update_order_status", { p_order_id: notification.orderId, p_new_status: "cancelled", p_restaurant_id: restaurant?.id });
+                          await supabase.from("orders").update({ cancellation_reason: reason }).eq("id", notification.orderId);
+                          setNotificationQueue(prev => prev.filter(n => n.orderId !== notification.orderId));
+                        } catch (e) { console.error("Reject error:", e); }
+                      }}
                     />
                   </div>
                 ))}
