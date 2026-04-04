@@ -232,6 +232,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
+          coupon_discount: discountAmount > 0 ? discountAmount : null,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
