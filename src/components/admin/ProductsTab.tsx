@@ -184,7 +184,8 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     const { data } = await supabase
       .from("stock_items")
       .select("id, name, unit, price_per_unit")
-      .eq("restaurant_id", restaurantId);
+      .eq("restaurant_id", restaurantId)
+      .order("name");
     setStockItems(data || []);
   };
 
