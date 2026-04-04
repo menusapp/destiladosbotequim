@@ -43,6 +43,10 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
   const [deletingCategory, setDeletingCategory] = useState<ComplementCategory | null>(null);
 
   const [categoryName, setCategoryName] = useState("");
+  const [allProducts, setAllProducts] = useState<SimpleProduct[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [originalProductIds, setOriginalProductIds] = useState<Set<string>>(new Set());
+  const [productSearchQuery, setProductSearchQuery] = useState("");
   const [itemName, setItemName] = useState("");
   const [itemPrice, setItemPrice] = useState("");
   const [itemPdvCode, setItemPdvCode] = useState("");
