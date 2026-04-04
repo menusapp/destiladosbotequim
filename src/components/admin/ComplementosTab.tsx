@@ -334,7 +334,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Buscar produtos..." value={productSearchQuery} onChange={(e) => setProductSearchQuery(e.target.value)} className="pl-9" />
               </div>
-              <ScrollArea className="max-h-48 border rounded-lg">
+              <ScrollArea className="h-48 border rounded-lg">
                 <div className="p-2 space-y-1">
                   {allProducts
                     .filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
