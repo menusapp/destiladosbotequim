@@ -12,6 +12,7 @@ import {
   Clock, Printer, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { formatPaymentMethod } from "@/lib/utils";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { OrderDetailModal } from "./OrderDetailModal";
