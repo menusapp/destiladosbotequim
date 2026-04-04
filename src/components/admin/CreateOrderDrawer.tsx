@@ -214,6 +214,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
     setDiscountType("percentage"); setDiscountValue("");
+    setDeliveryFee(""); setDeliveryFeeAuto(null);
   };
 
   // CRM: Save/update customer data before creating orders
