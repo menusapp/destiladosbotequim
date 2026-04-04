@@ -29,6 +29,7 @@ interface OrderDetail {
   delivery_address: string | null;
   payment_method: string | null;
   payment_type: string | null;
+  payment_brand: string | null;
   notes: string | null;
   delivery_fee: number | null;
   coupon_discount: number | null;
@@ -43,6 +44,7 @@ interface OrderDetail {
     notes: string | null;
     products: { name: string } | null;
     order_item_extras: {
+      extra_name: string | null;
       price_at_order: number;
       product_extras: { name: string } | null;
     }[];
