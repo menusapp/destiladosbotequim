@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2, Plus, CreditCard, Percent, DollarSign } from "lucide-react";
+import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2, Plus, CreditCard, Percent, DollarSign, MapPin } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
