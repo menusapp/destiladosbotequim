@@ -291,11 +291,12 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     if (!paymentType || paymentType === "pending") {
       return { label: "Falta pagamento", className: "text-red-600 bg-red-50 dark:bg-red-950/30", icon: <AlertTriangle className="w-3 h-3" /> };
     }
-    const info = PAYMENT_LABELS[paymentType];
-    if (info) {
-      return { label: info.label, className: "text-green-700 bg-green-50 dark:bg-green-950/30", icon: info.icon };
-    }
-    return { label: paymentType, className: "text-green-700 bg-green-50 dark:bg-green-950/30", icon: <CreditCard className="w-3 h-3" /> };
+    const formatted = formatPaymentMethod(paymentType);
+    // Determine icon based on formatted label
+    let icon: React.ReactNode = <CreditCard className="w-3 h-3" />;
+    if (formatted === "Dinheiro") icon = <Banknote className="w-3 h-3" />;
+    else if (formatted === "PIX" || formatted.startsWith("Pago")) icon = <Smartphone className="w-3 h-3" />;
+    return { label: formatted, className: "text-green-700 bg-green-50 dark:bg-green-950/30", icon };
   };
 
   const kanbanColumns = [
