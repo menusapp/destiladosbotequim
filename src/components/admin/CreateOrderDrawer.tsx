@@ -245,6 +245,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           customer_cpf: customerCpf || "000.000.000-00",
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
+          coupon_discount: discountAmount > 0 ? discountAmount : null,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
