@@ -210,8 +210,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
                   ))}
                 </div>
               );
-            })()
-            )}
+            })()}
             {item.notes && <p className="text-xs text-muted-foreground mt-1 italic pl-4">Obs: {item.notes}</p>}
           </div>
         );
