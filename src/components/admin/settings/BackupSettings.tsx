@@ -41,6 +41,7 @@ const BACKUP_TABLES_FULL = [
   "coupons", "reservation_tables", "reservation_hours", "printer_settings",
   "card_fees_config", "fixed_costs", "variable_costs", "labor_costs",
   "product_variations", "kiosk_config", "extra_category_item_ingredients",
+  "product_ingredients", "product_extra_ingredients",
 ] as const;
 
 const BACKUP_TABLES_ESSENTIAL = [
