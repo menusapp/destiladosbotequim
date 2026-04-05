@@ -284,8 +284,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
             .from("customer_addresses")
             .select("id")
             .eq("customer_cpf", cleanCpf)
-            .eq("street", deliveryAddress)
-            .eq("number", deliveryNumber || "S/N");
+            .eq("street", deliveryAddress);
           if (!existing || existing.length === 0) {
             let city = deliveryCity || "";
             let state = "SP";
@@ -299,8 +298,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
               customer_name: customerName || "Cliente PDV",
               customer_phone: customerPhone || "0",
               street: deliveryAddress,
-              number: deliveryNumber || "S/N",
-              complement: deliveryComplement || null,
+              number: "S/N",
               neighborhood: deliveryNeighborhood || "",
               city,
               state,
