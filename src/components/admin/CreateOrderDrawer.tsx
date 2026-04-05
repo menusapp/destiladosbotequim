@@ -241,7 +241,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
 
   const handleSubmit = async () => {
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
-    if (!customerName && orderType !== "mesa") { toast.error("Nome do cliente é obrigatório"); return; }
 
     // Resolve payment type
     let resolvedPaymentType: string | null = null;
