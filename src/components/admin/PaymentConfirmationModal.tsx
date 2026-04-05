@@ -250,6 +250,7 @@ export const PaymentConfirmationModal = ({
       if (error) throw error;
 
       // --- Bills: update existing or insert new ---
+      let resolvedBillId: string | null = null;
       if (order.table_id) {
         const comandaId = (order as any)._comanda_id || (order as any).comanda_id || null;
         const billPayload = {
@@ -272,15 +273,21 @@ export const PaymentConfirmationModal = ({
           // Update existing bill
           const { error: billError } = await supabase.from("bills").update(billPayload).eq("id", existingBills.id);
           if (billError) console.error("Erro ao atualizar conta:", billError);
-          else console.info("[payment-change] bill atualizado", existingBills.id);
+          else {
+            console.info("[payment-change] bill atualizado", existingBills.id);
+            resolvedBillId = existingBills.id;
+          }
         } else {
           // Insert new bill
-          const { error: billError } = await supabase.from("bills").insert({
+          const { data: newBill, error: billError } = await supabase.from("bills").insert({
             table_id: order.table_id,
             comanda_id: comandaId,
             ...billPayload,
-          });
+          }).select("id").single();
           if (billError) console.error("Erro ao criar conta:", billError);
+          else if (newBill) {
+            resolvedBillId = newBill.id;
+          }
         }
       }
 
@@ -327,6 +334,7 @@ export const PaymentConfirmationModal = ({
             category: "Pedido",
             description: `Pedido Local - ${customerLabel} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
             created_by: "Sistema",
+            bill_id: resolvedBillId,
           });
         }
       }
