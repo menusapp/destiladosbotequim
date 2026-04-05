@@ -72,7 +72,7 @@ export const AddItemsToOrderDrawer = ({
           id, name, display_order,
           products (
             id, name, description, price, promotional_price, available, image_url,
-            product_extras (id, name, price, is_required, min_selection, max_selection)
+            product_extras (id, name, price, is_required, min_selection, max_selection, extra_category_id, extra_categories(name))
           )
         `)
         .eq("restaurant_id", restaurantId)
