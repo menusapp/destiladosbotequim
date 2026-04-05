@@ -3,10 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "@/components/ui/sonner";
-import { Download, Upload, Cloud, HardDrive, AlertTriangle, CheckCircle, Loader2, Trash2 } from "lucide-react";
+import { Download, Upload, Cloud, HardDrive, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +40,7 @@ const BACKUP_TABLES_FULL = [
   "whatsapp_config", "fiscal_configs", "loyalty_programs", "loyalty_program_rewards",
   "coupons", "reservation_tables", "reservation_hours", "printer_settings",
   "card_fees_config", "fixed_costs", "variable_costs", "labor_costs",
+  "product_variations", "kiosk_config", "extra_category_item_ingredients",
 ] as const;
 
 const BACKUP_TABLES_ESSENTIAL = [
@@ -50,10 +51,45 @@ const BACKUP_TABLES_ESSENTIAL = [
   "coupons", "reservation_tables", "reservation_hours", "printer_settings",
 ] as const;
 
+// FK mapping: for each table, which columns reference other tables' IDs
+const FK_MAP: Record<string, Record<string, string>> = {
+  products: { category_id: "categories" },
+  product_extras: { product_id: "products", extra_category_id: "extra_categories" },
+  extra_category_items: { category_id: "extra_categories" },
+  extra_category_item_ingredients: { category_item_id: "extra_category_items", stock_item_id: "stock_items" },
+  stock_items: { stock_category_id: "stock_categories" },
+  product_variations: { product_id: "products" },
+  loyalty_program_rewards: { program_id: "loyalty_programs", reward_product_id: "products", reward_extra_id: "product_extras" },
+  coupons: { target_product_id: "products", target_product_extra_id: "product_extras", target_extra_id: "extra_category_items" },
+  delivery_zones: {},
+  business_hours: {},
+};
+
+// Singleton config tables (one row per restaurant, use delete+insert)
+const SINGLETON_TABLES = [
+  "delivery_config", "whatsapp_config", "fiscal_configs", "kiosk_config", "printer_settings",
+  "card_fees_config",
+];
+
+// Restoration phases in dependency order
+const RESTORE_PHASES: { label: string; tables: string[] }[] = [
+  { label: "Limpando dados existentes...", tables: [] },
+  { label: "Restaurando categorias e grupos...", tables: ["categories", "extra_categories", "stock_categories", "suppliers"] },
+  { label: "Restaurando produtos, insumos e mesas...", tables: ["products", "stock_items", "tables", "payment_methods"] },
+  { label: "Restaurando complementos e variações...", tables: ["product_extras", "extra_category_items", "delivery_zones", "product_variations"] },
+  { label: "Restaurando ingredientes de complementos...", tables: ["extra_category_item_ingredients"] },
+  { label: "Restaurando programas de fidelidade...", tables: ["loyalty_programs"] },
+  { label: "Restaurando recompensas e cupons...", tables: ["loyalty_program_rewards", "coupons"] },
+  { label: "Restaurando configurações...", tables: ["business_hours", "delivery_config", "whatsapp_config", "fiscal_configs", "kiosk_config", "printer_settings", "reservation_hours", "reservation_tables"] },
+  { label: "Restaurando custos, clientes e taxas...", tables: ["fixed_costs", "variable_costs", "labor_costs", "card_fees_config", "customers"] },
+];
+
 export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
   const [downloading, setDownloading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [restoreStatus, setRestoreStatus] = useState("");
+  const [restoreProgress, setRestoreProgress] = useState(0);
   const [cloudBackups, setCloudBackups] = useState<{ name: string; created_at: string }[]>([]);
   const [loadingCloud, setLoadingCloud] = useState(true);
   const [backupPreview, setBackupPreview] = useState<BackupPreview | null>(null);
@@ -97,7 +133,6 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
   const fetchBackupData = async (tables: readonly string[]) => {
     const data: Record<string, any[]> = {};
 
-    // Fetch categories first to get IDs for products
     const { data: categories } = await supabase
       .from("categories")
       .select("*")
@@ -107,7 +142,7 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
     const categoryIds = (categories || []).map(c => c.id);
 
     for (const table of tables) {
-      if (table === "categories") continue; // Already fetched
+      if (table === "categories") continue;
       if (table === "products" && categoryIds.length > 0) {
         const { data: products } = await supabase
           .from("products")
@@ -142,8 +177,46 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
         }
         continue;
       }
+      if (table === "extra_category_item_ingredients") {
+        const itemIds = (data.extra_category_items || []).map(i => i.id);
+        if (itemIds.length > 0) {
+          const { data: ingredients } = await supabase
+            .from("extra_category_item_ingredients")
+            .select("*")
+            .in("category_item_id", itemIds);
+          data.extra_category_item_ingredients = ingredients || [];
+        } else {
+          data.extra_category_item_ingredients = [];
+        }
+        continue;
+      }
+      if (table === "product_variations") {
+        const productIds = (data.products || []).map(p => p.id);
+        if (productIds.length > 0) {
+          const { data: variations } = await supabase
+            .from("product_variations" as any)
+            .select("*")
+            .in("product_id", productIds);
+          data.product_variations = variations || [];
+        } else {
+          data.product_variations = [];
+        }
+        continue;
+      }
+      if (table === "loyalty_program_rewards") {
+        const programIds = (data.loyalty_programs || []).map(p => p.id);
+        if (programIds.length > 0) {
+          const { data: rewards } = await supabase
+            .from("loyalty_program_rewards")
+            .select("*")
+            .in("program_id", programIds);
+          data.loyalty_program_rewards = rewards || [];
+        } else {
+          data.loyalty_program_rewards = [];
+        }
+        continue;
+      }
 
-      // Default: fetch by restaurant_id
       try {
         const { data: tableData } = await supabase
           .from(table as any)
@@ -164,7 +237,7 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
       const data = await fetchBackupData(BACKUP_TABLES_FULL);
 
       const backup = {
-        version: "1.0",
+        version: "2.0",
         type: "full",
         restaurant_id: restaurantId,
         created_at: new Date().toISOString(),
@@ -174,7 +247,6 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
       const fileName = `backup_${restaurantId}_${format(new Date(), "yyyy-MM-dd_HH-mm")}.json`;
 
-      // Try File System Access API first
       if (supportsFileSystemAccess) {
         try {
           const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
@@ -182,7 +254,7 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
           const writable = await fileHandle.createWritable();
           await writable.write(blob);
           await writable.close();
-          
+
           const now = new Date().toISOString();
           localStorage.setItem(`lastBackup_${restaurantId}`, now);
           setLastBackupDate(now);
@@ -190,7 +262,6 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
           setDownloading(false);
           return;
         } catch (fsErr: any) {
-          // User cancelled or API failed — fall through to normal download
           if (fsErr.name === 'AbortError') {
             setDownloading(false);
             return;
@@ -198,7 +269,6 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
         }
       }
 
-      // Fallback: normal download
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -224,7 +294,7 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
       const data = await fetchBackupData(BACKUP_TABLES_ESSENTIAL);
 
       const backup = {
-        version: "1.0",
+        version: "2.0",
         type: "essential",
         restaurant_id: restaurantId,
         created_at: new Date().toISOString(),
@@ -278,13 +348,12 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
       const text = await file.text();
       const backup = JSON.parse(text);
 
-      if (!backup.version || !backup.data || !backup.restaurant_id) {
+      if (!backup.data || !backup.restaurant_id) {
         toast.error("Arquivo de backup inválido");
         setUploading(false);
         return;
       }
 
-      // Generate preview
       const preview: BackupPreview = {
         date: backup.created_at || "Desconhecida",
         products: backup.data.products?.length || 0,
@@ -308,113 +377,170 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
     if (!pendingRestore) return;
     setRestoring(true);
     setShowConfirmRestore(false);
+    setRestoreProgress(0);
+    setRestoreStatus("Iniciando restauração...");
 
     try {
-      const data = pendingRestore.data;
+      const backupData = pendingRestore.data;
+      const idMap: Record<string, string> = {};
+      const counts: Record<string, number> = {};
+      const totalPhases = RESTORE_PHASES.length;
 
-      // Restore in order: categories first, then products, etc.
-      // Delete existing data first
-      if (data.categories?.length > 0) {
-        // Delete existing products and categories
+      // Helper: remap a record's FKs and generate new ID
+      const remapRecord = (record: any, tableName: string): any => {
+        const mapped = { ...record };
+        // Generate new ID
+        const oldId = mapped.id;
+        const newId = crypto.randomUUID();
+        idMap[oldId] = newId;
+        mapped.id = newId;
+        // Set restaurant_id to current
+        if ('restaurant_id' in mapped) {
+          mapped.restaurant_id = restaurantId;
+        }
+        // Remap foreign keys
+        const fks = FK_MAP[tableName];
+        if (fks) {
+          for (const [col, _refTable] of Object.entries(fks)) {
+            if (mapped[col] && idMap[mapped[col]]) {
+              mapped[col] = idMap[mapped[col]];
+            } else if (mapped[col] && !idMap[mapped[col]]) {
+              // FK points to an ID not in our map — set to null to avoid FK violation
+              mapped[col] = null;
+            }
+          }
+        }
+        // Remove timestamps to let DB set defaults
+        delete mapped.created_at;
+        delete mapped.updated_at;
+        return mapped;
+      };
+
+      // Helper: insert records for a table in batches
+      const insertTable = async (tableName: string, records: any[]) => {
+        if (!records || records.length === 0) return;
+        const isSingleton = SINGLETON_TABLES.includes(tableName);
+
+        if (isSingleton) {
+          // Delete existing config for this restaurant first
+          try {
+            await supabase.from(tableName as any).delete().eq("restaurant_id", restaurantId);
+          } catch { /* table may not exist or no rows */ }
+        }
+
+        for (const record of records) {
+          const mapped = remapRecord(record, tableName);
+          try {
+            await supabase.from(tableName as any).insert(mapped);
+          } catch (err) {
+            console.warn(`Failed to insert into ${tableName}:`, err);
+          }
+        }
+        counts[tableName] = records.length;
+      };
+
+      // Phase 0: Clean existing data (reverse dependency order)
+      setRestoreStatus(RESTORE_PHASES[0].label);
+      setRestoreProgress(Math.round((1 / totalPhases) * 100));
+
+      // Delete in reverse dependency order
+      const cleanupOrder = [
+        "extra_category_item_ingredients",
+        "product_variations",
+        "loyalty_program_rewards",
+        "coupons",
+        "product_extras",
+        "extra_category_items",
+        "products",
+        "stock_items",
+        "categories",
+        "extra_categories",
+        "stock_categories",
+        "suppliers",
+        "tables",
+        "payment_methods",
+        "loyalty_programs",
+        "delivery_zones",
+        "business_hours",
+        "fixed_costs",
+        "variable_costs",
+        "labor_costs",
+        "customers",
+        "reservation_tables",
+        "reservation_hours",
+      ];
+
+      for (const table of cleanupOrder) {
+        if (backupData[table]?.length > 0) {
+          try {
+            // For tables with restaurant_id
+            await supabase.from(table as any).delete().eq("restaurant_id", restaurantId);
+          } catch {
+            // For tables without restaurant_id or other issues, skip
+          }
+        }
+      }
+
+      // Also clean products by category (in case restaurant_id isn't on products)
+      try {
         const { data: existingCats } = await supabase
           .from("categories")
           .select("id")
           .eq("restaurant_id", restaurantId);
-
         if (existingCats?.length) {
           const catIds = existingCats.map(c => c.id);
-          // Delete product extras first
-          const { data: existingProducts } = await supabase
+          const { data: existingProds } = await supabase
             .from("products")
             .select("id")
             .in("category_id", catIds);
-          if (existingProducts?.length) {
-            const prodIds = existingProducts.map(p => p.id);
+          if (existingProds?.length) {
+            const prodIds = existingProds.map(p => p.id);
             await supabase.from("product_extras").delete().in("product_id", prodIds);
             await supabase.from("products").delete().in("category_id", catIds);
           }
           await supabase.from("categories").delete().eq("restaurant_id", restaurantId);
         }
+      } catch { /* ignore */ }
 
-        // Insert categories with new IDs mapped
-        for (const cat of data.categories) {
-          await supabase.from("categories").insert({
-            id: cat.id,
-            name: cat.name,
-            restaurant_id: restaurantId,
-            display_order: cat.display_order,
-          });
+      // Phases 1-8: Insert in dependency order
+      for (let i = 1; i < RESTORE_PHASES.length; i++) {
+        const phase = RESTORE_PHASES[i];
+        setRestoreStatus(phase.label);
+        setRestoreProgress(Math.round(((i + 1) / totalPhases) * 100));
+
+        for (const tableName of phase.tables) {
+          const records = backupData[tableName];
+          if (records && records.length > 0) {
+            await insertTable(tableName, records);
+          }
         }
       }
 
-      if (data.products?.length > 0) {
-        for (const prod of data.products) {
-          await supabase.from("products").insert({
-            ...prod,
-            id: prod.id,
-          });
-        }
-      }
+      // Build summary
+      const summaryParts: string[] = [];
+      if (counts.categories) summaryParts.push(`${counts.categories} categorias`);
+      if (counts.products) summaryParts.push(`${counts.products} produtos`);
+      if (counts.product_extras) summaryParts.push(`${counts.product_extras} complementos`);
+      if (counts.customers) summaryParts.push(`${counts.customers} clientes`);
+      if (counts.tables) summaryParts.push(`${counts.tables} mesas`);
+      if (counts.stock_items) summaryParts.push(`${counts.stock_items} insumos`);
+      if (counts.suppliers) summaryParts.push(`${counts.suppliers} fornecedores`);
+      if (counts.loyalty_programs) summaryParts.push(`${counts.loyalty_programs} programas de fidelidade`);
+      if (counts.coupons) summaryParts.push(`${counts.coupons} cupons`);
 
-      if (data.product_extras?.length > 0) {
-        for (const extra of data.product_extras) {
-          await supabase.from("product_extras").insert({
-            ...extra,
-            id: extra.id,
-          });
-        }
-      }
+      const summary = summaryParts.length > 0
+        ? `Restauração concluída: ${summaryParts.join(", ")}.`
+        : "Restauração concluída (nenhum dado para importar).";
 
-      // Restore customers
-      if (data.customers?.length > 0) {
-        await supabase.from("customers").delete().eq("restaurant_id", restaurantId);
-        for (const customer of data.customers) {
-          await supabase.from("customers").insert({
-            ...customer,
-            restaurant_id: restaurantId,
-          });
-        }
-      }
-
-      // Restore tables
-      if (data.tables?.length > 0) {
-        await supabase.from("tables").delete().eq("restaurant_id", restaurantId);
-        for (const table of data.tables) {
-          await supabase.from("tables").insert({
-            ...table,
-            restaurant_id: restaurantId,
-          });
-        }
-      }
-
-      // Restore stock items
-      if (data.stock_items?.length > 0) {
-        await supabase.from("stock_items").delete().eq("restaurant_id", restaurantId);
-        for (const item of data.stock_items) {
-          await supabase.from("stock_items").insert({
-            ...item,
-            restaurant_id: restaurantId,
-          });
-        }
-      }
-
-      // Restore suppliers
-      if (data.suppliers?.length > 0) {
-        await supabase.from("suppliers").delete().eq("restaurant_id", restaurantId);
-        for (const supplier of data.suppliers) {
-          await supabase.from("suppliers").insert({
-            ...supplier,
-            restaurant_id: restaurantId,
-          });
-        }
-      }
-
-      toast.success("Backup restaurado com sucesso!");
+      setRestoreStatus("✅ " + summary);
+      setRestoreProgress(100);
+      toast.success(summary);
       setPendingRestore(null);
       setBackupPreview(null);
     } catch (err) {
       console.error("Restore error:", err);
       toast.error("Erro ao restaurar backup");
+      setRestoreStatus("❌ Erro durante a restauração");
     } finally {
       setRestoring(false);
     }
@@ -439,7 +565,6 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Backup path preference */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Pasta padrão para backup (lembrete)</label>
             <Input
@@ -544,7 +669,32 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
             />
           </div>
 
-          {backupPreview && (
+          {restoring && (
+            <div className="space-y-3 p-4 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-sm font-medium">{restoreStatus}</span>
+              </div>
+              <Progress value={restoreProgress} className="h-2" />
+              <p className="text-xs text-muted-foreground">{restoreProgress}% concluído</p>
+            </div>
+          )}
+
+          {!restoring && restoreStatus && restoreStatus.startsWith("✅") && (
+            <div className="flex items-start gap-2 p-3 bg-green-500/10 rounded-lg text-sm text-green-700 dark:text-green-400">
+              <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <p>{restoreStatus.replace("✅ ", "")}</p>
+            </div>
+          )}
+
+          {!restoring && restoreStatus && restoreStatus.startsWith("❌") && (
+            <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-lg text-sm text-destructive">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <p>{restoreStatus.replace("❌ ", "")}</p>
+            </div>
+          )}
+
+          {backupPreview && !restoring && (
             <div className="p-4 border border-border rounded-lg space-y-3">
               <h4 className="font-semibold text-sm">Preview do Backup</h4>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
@@ -573,13 +723,21 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
                   <span className="font-medium">{backupPreview.stockItems}</span>
                 </div>
               </div>
+
+              {pendingRestore?.restaurant_id !== restaurantId && (
+                <div className="flex items-start gap-2 p-3 bg-yellow-500/10 rounded-lg text-sm text-yellow-700 dark:text-yellow-400">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <p>Este backup é de outro restaurante. Os IDs serão remapeados automaticamente para evitar conflitos.</p>
+                </div>
+              )}
+
               <Button
                 onClick={() => setShowConfirmRestore(true)}
                 disabled={restoring}
                 variant="destructive"
                 className="w-full"
               >
-                {restoring ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                <Upload className="h-4 w-4 mr-2" />
                 Restaurar Backup
               </Button>
             </div>
