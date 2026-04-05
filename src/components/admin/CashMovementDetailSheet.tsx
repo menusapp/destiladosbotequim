@@ -71,7 +71,7 @@ interface CounterOrderDetail {
     products: { name: string } | null;
     counter_order_item_extras: {
       price_at_order: number;
-      product_extras: { name: string } | null;
+      product_extras: { name: string; extra_categories: { name: string } | null } | null;
     }[];
   }[];
   tables?: { table_number: number; table_name: string | null } | null;
