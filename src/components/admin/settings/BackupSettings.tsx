@@ -41,6 +41,7 @@ const BACKUP_TABLES_FULL = [
   "coupons", "reservation_tables", "reservation_hours", "printer_settings",
   "card_fees_config", "fixed_costs", "variable_costs", "labor_costs",
   "product_variations", "kiosk_config", "extra_category_item_ingredients",
+  "product_ingredients", "product_extra_ingredients",
 ] as const;
 
 const BACKUP_TABLES_ESSENTIAL = [
@@ -57,6 +58,8 @@ const FK_MAP: Record<string, Record<string, string>> = {
   product_extras: { product_id: "products", extra_category_id: "extra_categories" },
   extra_category_items: { category_id: "extra_categories" },
   extra_category_item_ingredients: { category_item_id: "extra_category_items", stock_item_id: "stock_items" },
+  product_ingredients: { product_id: "products", stock_item_id: "stock_items" },
+  product_extra_ingredients: { product_extra_id: "product_extras", stock_item_id: "stock_items" },
   stock_items: { stock_category_id: "stock_categories" },
   product_variations: { product_id: "products" },
   loyalty_program_rewards: { program_id: "loyalty_programs", reward_product_id: "products", reward_extra_id: "product_extras" },
@@ -77,7 +80,7 @@ const RESTORE_PHASES: { label: string; tables: string[] }[] = [
   { label: "Restaurando categorias e grupos...", tables: ["categories", "extra_categories", "stock_categories", "suppliers"] },
   { label: "Restaurando produtos, insumos e mesas...", tables: ["products", "stock_items", "tables", "payment_methods"] },
   { label: "Restaurando complementos e variações...", tables: ["product_extras", "extra_category_items", "delivery_zones", "product_variations"] },
-  { label: "Restaurando ingredientes de complementos...", tables: ["extra_category_item_ingredients"] },
+  { label: "Restaurando vínculos de insumos...", tables: ["product_ingredients", "product_extra_ingredients", "extra_category_item_ingredients"] },
   { label: "Restaurando programas de fidelidade...", tables: ["loyalty_programs"] },
   { label: "Restaurando recompensas e cupons...", tables: ["loyalty_program_rewards", "coupons"] },
   { label: "Restaurando configurações...", tables: ["business_hours", "delivery_config", "whatsapp_config", "fiscal_configs", "kiosk_config", "printer_settings", "reservation_hours", "reservation_tables"] },
@@ -203,8 +206,34 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
         }
         continue;
       }
+      if (table === "product_ingredients") {
+        const productIds = (data.products || []).map((p: any) => p.id);
+        if (productIds.length > 0) {
+          const { data: ingredients } = await supabase
+            .from("product_ingredients")
+            .select("*")
+            .in("product_id", productIds);
+          data.product_ingredients = ingredients || [];
+        } else {
+          data.product_ingredients = [];
+        }
+        continue;
+      }
+      if (table === "product_extra_ingredients") {
+        const extraIds = (data.product_extras || []).map((e: any) => e.id);
+        if (extraIds.length > 0) {
+          const { data: ingredients } = await supabase
+            .from("product_extra_ingredients")
+            .select("*")
+            .in("product_extra_id", extraIds);
+          data.product_extra_ingredients = ingredients || [];
+        } else {
+          data.product_extra_ingredients = [];
+        }
+        continue;
+      }
       if (table === "loyalty_program_rewards") {
-        const programIds = (data.loyalty_programs || []).map(p => p.id);
+        const programIds = (data.loyalty_programs || []).map((p: any) => p.id);
         if (programIds.length > 0) {
           const { data: rewards } = await supabase
             .from("loyalty_program_rewards")
@@ -445,6 +474,8 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
 
       // Delete in reverse dependency order
       const cleanupOrder = [
+        "product_ingredients",
+        "product_extra_ingredients",
         "extra_category_item_ingredients",
         "product_variations",
         "loyalty_program_rewards",
@@ -481,7 +512,7 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
         }
       }
 
-      // Also clean products by category (in case restaurant_id isn't on products)
+      // Also clean products/ingredients by category (tables without restaurant_id)
       try {
         const { data: existingCats } = await supabase
           .from("categories")
@@ -495,6 +526,17 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
             .in("category_id", catIds);
           if (existingProds?.length) {
             const prodIds = existingProds.map(p => p.id);
+            // Clean product ingredients (no restaurant_id)
+            await supabase.from("product_ingredients").delete().in("product_id", prodIds);
+            // Clean product extras and their ingredients
+            const { data: existingExtras } = await supabase
+              .from("product_extras")
+              .select("id")
+              .in("product_id", prodIds);
+            if (existingExtras?.length) {
+              const extraIds = existingExtras.map(e => e.id);
+              await supabase.from("product_extra_ingredients").delete().in("product_extra_id", extraIds);
+            }
             await supabase.from("product_extras").delete().in("product_id", prodIds);
             await supabase.from("products").delete().in("category_id", catIds);
           }
@@ -524,6 +566,8 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
       if (counts.customers) summaryParts.push(`${counts.customers} clientes`);
       if (counts.tables) summaryParts.push(`${counts.tables} mesas`);
       if (counts.stock_items) summaryParts.push(`${counts.stock_items} insumos`);
+      const totalIngredientLinks = (counts.product_ingredients || 0) + (counts.product_extra_ingredients || 0) + (counts.extra_category_item_ingredients || 0);
+      if (totalIngredientLinks) summaryParts.push(`${totalIngredientLinks} vínculos de insumos`);
       if (counts.suppliers) summaryParts.push(`${counts.suppliers} fornecedores`);
       if (counts.loyalty_programs) summaryParts.push(`${counts.loyalty_programs} programas de fidelidade`);
       if (counts.coupons) summaryParts.push(`${counts.coupons} cupons`);
