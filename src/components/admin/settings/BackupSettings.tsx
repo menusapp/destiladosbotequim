@@ -566,6 +566,8 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
       if (counts.customers) summaryParts.push(`${counts.customers} clientes`);
       if (counts.tables) summaryParts.push(`${counts.tables} mesas`);
       if (counts.stock_items) summaryParts.push(`${counts.stock_items} insumos`);
+      const totalIngredientLinks = (counts.product_ingredients || 0) + (counts.product_extra_ingredients || 0) + (counts.extra_category_item_ingredients || 0);
+      if (totalIngredientLinks) summaryParts.push(`${totalIngredientLinks} vínculos de insumos`);
       if (counts.suppliers) summaryParts.push(`${counts.suppliers} fornecedores`);
       if (counts.loyalty_programs) summaryParts.push(`${counts.loyalty_programs} programas de fidelidade`);
       if (counts.coupons) summaryParts.push(`${counts.coupons} cupons`);
