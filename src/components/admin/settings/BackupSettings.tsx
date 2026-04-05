@@ -80,7 +80,7 @@ const RESTORE_PHASES: { label: string; tables: string[] }[] = [
   { label: "Restaurando categorias e grupos...", tables: ["categories", "extra_categories", "stock_categories", "suppliers"] },
   { label: "Restaurando produtos, insumos e mesas...", tables: ["products", "stock_items", "tables", "payment_methods"] },
   { label: "Restaurando complementos e variações...", tables: ["product_extras", "extra_category_items", "delivery_zones", "product_variations"] },
-  { label: "Restaurando ingredientes de complementos...", tables: ["extra_category_item_ingredients"] },
+  { label: "Restaurando vínculos de insumos...", tables: ["product_ingredients", "product_extra_ingredients", "extra_category_item_ingredients"] },
   { label: "Restaurando programas de fidelidade...", tables: ["loyalty_programs"] },
   { label: "Restaurando recompensas e cupons...", tables: ["loyalty_program_rewards", "coupons"] },
   { label: "Restaurando configurações...", tables: ["business_hours", "delivery_config", "whatsapp_config", "fiscal_configs", "kiosk_config", "printer_settings", "reservation_hours", "reservation_tables"] },
