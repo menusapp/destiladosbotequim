@@ -295,7 +295,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       } else if (orderType === "retirada") {
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
-          status: "preparing", customer_name: customerName,
+          status: "preparing", customer_name: customerName || "Cliente PDV",
           customer_cpf: customerCpf || "000.000.000-00",
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
