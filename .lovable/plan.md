@@ -1,50 +1,50 @@
 
+Diagnóstico
+- Os logs atuais não mostram erro de JavaScript dos complementos; só aviso de websocket do Vite, sem relação com esse bug.
+- O “0 insumos” não vem da aba Complementos em si. Ele aparece no editor do produto porque `src/components/admin/ProductsGrid.tsx` lê os complementos do produto por `product_extras -> product_extra_ingredients`.
+- Em `src/components/admin/ComplementosTab.tsx`, hoje a cópia dos insumos só acontece para `productsToAdd`.
+- Se o produto já estava vinculado antes, ou se depois o item/categoria foi editado, os `product_extras` antigos continuam sem `product_extra_ingredients`.
+- Resultado: na categoria os insumos estão corretos em `extra_category_item_ingredients`, mas dentro do produto os clones continuam vazios, então aparece “0 insumos” e o estoque não baixa.
 
-# Plan: Corrigir insumos não vinculados ao atribuir categorias de complementos em massa
+Plano seguro
+1. `src/components/admin/ComplementosTab.tsx`
+   - Extrair um helper de sincronização da categoria.
+   - Esse helper vai:
+     - buscar `extra_category_items` com `extra_category_item_ingredients`
+     - localizar os produtos vinculados à categoria
+     - apagar apenas os `product_extra_ingredients` e `product_extras` daquela `extra_category_id`
+     - recriar os `product_extras`
+     - recriar os `product_extra_ingredients`
+   - Em vez de “adicionar só os novos”, a categoria será reconstruída inteira para os produtos vinculados. Isso é mais estável e também corrige os que já estão quebrados.
 
-## Causa raiz
+2. Ainda em `ComplementosTab.tsx`
+   - Chamar esse helper em:
+     - `handleSaveCategory`
+     - `handleSaveItem`
+     - `handleDeleteItem`
+   - Assim, qualquer alteração no item, preço ou insumos da categoria propaga para todos os produtos vinculados sem precisar entrar produto por produto.
 
-Quando a aba **Complementos** (ou **Categorias**) vincula uma categoria de complementos a múltiplos produtos, ela cria registros em `product_extras` mas **não copia os ingredientes** (`extra_category_item_ingredients`) para `product_extra_ingredients`.
+3. Reparo dos dados já quebrados
+   - Criar uma migração de reparo única para reconstruir os `product_extras` com `extra_category_id is not null` usando as categorias atuais.
+   - Escopo restrito:
+     - corrige apenas complementos vinculados por categoria
+     - não toca extras avulsos (`extra_category_id` nulo)
+     - não toca ingredientes fixos do produto
+     - não mexe em iFood, Delivery Direto, fiscal, nem cardápio delivery
 
-A dedução de estoque (`deduct_stock_for_order_item`) segue o caminho:
-```text
-order_item_extras → product_extras → product_extra_ingredients → stock_items
-```
-Como `product_extra_ingredients` está vazio para esses extras, nada é deduzido.
+4. Estabilidade
+   - Não vou mexer no layout do produto.
+   - Não vou alterar `ProductsGrid.tsx` além do necessário para leitura já existente; com os dados corretos, o “0 insumos” desaparece sozinho.
+   - A correção fica isolada no fluxo de sincronização da aba Complementos + reparo de dados atuais.
 
-## O que será feito
+QA após implementar
+- Abrir uma categoria em Complementos e validar que os itens têm insumos.
+- Abrir um produto já vinculado e confirmar que os complementos não aparecem mais como “0 insumos”.
+- Fazer um pedido PDV com os complementos afetados e confirmar baixa em `stock_movements`.
+- Editar um insumo na categoria, salvar e reabrir o produto para validar sincronização automática.
+- Confirmar que extras avulsos e produtos sem categoria vinculada continuam intactos.
 
-### Arquivo: `src/components/admin/ComplementosTab.tsx`
-
-Na lógica de "Add newly selected" (linhas 115-128):
-
-1. Buscar `extra_category_items` **com** `extra_category_item_ingredients` (ingredientes)
-2. Após inserir cada `product_extras`, buscar os IDs gerados
-3. Para cada `product_extra` criado, inserir os `product_extra_ingredients` correspondentes copiando `stock_item_id` e `quantity` da `extra_category_item_ingredients`
-
-```text
-Para cada produto novo selecionado:
-  Para cada item da categoria:
-    → INSERT product_extras (retorna novo ID)
-    → Para cada ingrediente do item (extra_category_item_ingredients):
-        → INSERT product_extra_ingredients {
-            product_extra_id: novo_id,
-            stock_item_id: ingrediente.stock_item_id,
-            quantity: ingrediente.quantity
-          }
-```
-
-### Arquivo: `src/components/admin/CategoriesTab.tsx`
-
-Aplicar a mesma correção na lógica de vinculação de produtos que existe nesta aba — também não copia `product_extra_ingredients`.
-
-### Nenhuma alteração em:
-- Banco de dados (schema inalterado)
-- Fluxo de delivery, iFood, DD, fiscal
-- `ProductsTab` (já funciona corretamente via "Carregar de categoria")
-- RPC `deduct_stock_for_order_item` (lógica correta, só faltavam os dados)
-
-## Impacto
-- Produtos que **já foram vinculados** em massa continuarão sem insumos até serem re-vinculados (desmarcar e marcar novamente)
-- Novos vínculos passarão a ter os insumos corretos automaticamente
-
+Impacto esperado
+- Corrige o problema atual dos dados quebrados.
+- Evita que o bug volte quando a categoria for editada no futuro.
+- Mantém o restante do sistema isolado, com risco baixo porque tudo será filtrado por `extra_category_id`.
