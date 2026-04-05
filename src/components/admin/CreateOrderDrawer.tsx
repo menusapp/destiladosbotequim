@@ -279,7 +279,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
-          status: "preparing", customer_name: customerName,
+          status: "preparing", customer_name: customerName || "Cliente PDV",
           customer_cpf: customerCpf || "000.000.000-00",
           delivery_phone: customerPhone,
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
