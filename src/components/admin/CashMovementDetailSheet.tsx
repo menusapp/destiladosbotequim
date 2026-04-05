@@ -147,7 +147,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
       // Fallback: try orders by table_id
       const { data: tableOrders } = await supabase
         .from("orders")
-        .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name))), tables(table_number, table_name)`)
+        .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name, extra_categories(name)))), tables(table_number, table_name)`)
         .eq("table_id", bill.table_id)
         .in("status", ["delivered", "picked_up", "accepted", "preparing", "ready"])
         .order("created_at", { ascending: false })
