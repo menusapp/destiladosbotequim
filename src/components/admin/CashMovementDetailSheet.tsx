@@ -131,7 +131,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
       // Try finding counter_orders for this table around the bill's creation time
       const { data: counterOrders } = await supabase
         .from("counter_orders")
-        .select(`*, counter_order_items(*, products(name), counter_order_item_extras(*, product_extras(name))), tables(table_number, table_name)`)
+        .select(`*, counter_order_items(*, products(name), counter_order_item_extras(*, product_extras(name, extra_categories(name)))), tables(table_number, table_name)`)
         .eq("table_id", bill.table_id)
         .eq("status", "paid")
         .order("finalized_at", { ascending: false })
