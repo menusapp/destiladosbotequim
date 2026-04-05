@@ -335,6 +335,7 @@ export const PaymentConfirmationModal = ({
             category: "Pedido",
             description: `Pedido Local - ${customerLabel} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
             created_by: "Sistema",
+            bill_id: resolvedBillId,
           });
         }
       }
