@@ -512,7 +512,7 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
         }
       }
 
-      // Also clean products by category (in case restaurant_id isn't on products)
+      // Also clean products/ingredients by category (tables without restaurant_id)
       try {
         const { data: existingCats } = await supabase
           .from("categories")
@@ -526,6 +526,17 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
             .in("category_id", catIds);
           if (existingProds?.length) {
             const prodIds = existingProds.map(p => p.id);
+            // Clean product ingredients (no restaurant_id)
+            await supabase.from("product_ingredients").delete().in("product_id", prodIds);
+            // Clean product extras and their ingredients
+            const { data: existingExtras } = await supabase
+              .from("product_extras")
+              .select("id")
+              .in("product_id", prodIds);
+            if (existingExtras?.length) {
+              const extraIds = existingExtras.map(e => e.id);
+              await supabase.from("product_extra_ingredients").delete().in("product_extra_id", extraIds);
+            }
             await supabase.from("product_extras").delete().in("product_id", prodIds);
             await supabase.from("products").delete().in("category_id", catIds);
           }
