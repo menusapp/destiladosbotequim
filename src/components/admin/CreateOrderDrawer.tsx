@@ -276,7 +276,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       // Save customer to CRM
       await upsertCustomerCRM();
       if (orderType === "delivery") {
-        if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
+        
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
           status: "preparing", customer_name: customerName,
