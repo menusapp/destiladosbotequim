@@ -271,7 +271,7 @@ export default function DeliveryMenu() {
       }));
     });
 
-    const allExtras = [...(extrasData || []), ...complementExtras];
+    const allExtras = [...extrasWithCategoryName, ...complementExtras];
     setProductExtras(allExtras);
     setSelectedProduct(product);
   };

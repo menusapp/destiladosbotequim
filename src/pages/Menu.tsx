@@ -1013,7 +1013,7 @@ const Menu = () => {
       }));
     });
 
-    const allExtras = [...(extrasData || []), ...complementExtras];
+    const allExtras = [...extrasWithCategoryName, ...complementExtras];
     setSelectedProduct(product);
     setProductExtras(allExtras);
     setShowProductDialog(true);
