@@ -474,6 +474,8 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
 
       // Delete in reverse dependency order
       const cleanupOrder = [
+        "product_ingredients",
+        "product_extra_ingredients",
         "extra_category_item_ingredients",
         "product_variations",
         "loyalty_program_rewards",
