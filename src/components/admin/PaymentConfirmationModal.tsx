@@ -250,6 +250,7 @@ export const PaymentConfirmationModal = ({
       if (error) throw error;
 
       // --- Bills: update existing or insert new ---
+      let resolvedBillId: string | null = null;
       if (order.table_id) {
         const comandaId = (order as any)._comanda_id || (order as any).comanda_id || null;
         const billPayload = {
@@ -267,8 +268,6 @@ export const PaymentConfirmationModal = ({
           existingBillQuery = existingBillQuery.eq("comanda_id", comandaId);
         }
         const { data: existingBills } = await existingBillQuery.order("created_at", { ascending: false }).limit(1).maybeSingle();
-
-        let resolvedBillId: string | null = null;
 
         if (existingBills) {
           // Update existing bill
