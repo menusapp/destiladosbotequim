@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,7 @@ interface ProductExtra {
   id: string;
   name: string;
   price: number;
+  extra_category_name?: string;
 }
 
 interface Product {
@@ -45,6 +46,24 @@ const ProductDetailDialog = ({
 }: ProductDetailDialogProps) => {
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+
+  // Group extras by category
+  const groupedExtras = useMemo(() => {
+    const groups: { categoryName: string; items: ProductExtra[] }[] = [];
+    const map = new Map<string, ProductExtra[]>();
+
+    for (const extra of extras) {
+      const catName = extra.extra_category_name || "Adicionais";
+      if (!map.has(catName)) map.set(catName, []);
+      map.get(catName)!.push(extra);
+    }
+
+    for (const [categoryName, items] of map) {
+      groups.push({ categoryName, items });
+    }
+
+    return groups;
+  }, [extras]);
 
   if (!product) return null;
 
@@ -111,11 +130,11 @@ const ProductDetailDialog = ({
               </p>
             </div>
 
-            {extras.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold">Adicionais</h4>
+            {groupedExtras.length > 0 && groupedExtras.map((group) => (
+              <div key={group.categoryName} className="space-y-2">
+                <h4 className="text-sm font-semibold text-foreground">{group.categoryName}</h4>
                 <div className="space-y-2">
-                  {extras.map((extra) => {
+                  {group.items.map((extra) => {
                     const isSelected = selectedExtras.includes(extra.id);
                     return (
                       <label
@@ -142,7 +161,7 @@ const ProductDetailDialog = ({
                   })}
                 </div>
               </div>
-            )}
+            ))}
 
             {selectedExtras.length > 0 && (
               <div 
