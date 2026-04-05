@@ -241,7 +241,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
 
   const handleSubmit = async () => {
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
-    if (!customerName && orderType !== "mesa") { toast.error("Nome do cliente é obrigatório"); return; }
 
     // Resolve payment type
     let resolvedPaymentType: string | null = null;
@@ -277,10 +276,10 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       // Save customer to CRM
       await upsertCustomerCRM();
       if (orderType === "delivery") {
-        if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
+        
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
-          status: "preparing", customer_name: customerName,
+          status: "preparing", customer_name: customerName || "Cliente PDV",
           customer_cpf: customerCpf || "000.000.000-00",
           delivery_phone: customerPhone,
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
@@ -296,7 +295,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       } else if (orderType === "retirada") {
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
-          status: "preparing", customer_name: customerName,
+          status: "preparing", customer_name: customerName || "Cliente PDV",
           customer_cpf: customerCpf || "000.000.000-00",
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
