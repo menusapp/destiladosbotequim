@@ -15,6 +15,8 @@ interface ProductExtra {
   is_required?: boolean;
   min_selection?: number;
   max_selection?: number;
+  extra_category_id?: string;
+  extra_categories?: { name: string } | null;
 }
 
 interface Product {
