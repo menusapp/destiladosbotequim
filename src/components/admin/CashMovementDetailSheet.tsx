@@ -189,14 +189,28 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
               <span className="font-medium">{item.quantity}x {item.products?.name || "Produto"}</span>
               <span className="font-medium">R$ {(itemTotal + extrasTotal).toFixed(2)}</span>
             </div>
-            {extras.length > 0 && (
-              <div className="mt-1 space-y-0.5">
-                {extras.map((e, i) => (
-                   <p key={i} className="text-xs text-muted-foreground pl-4">
-                    + {e.extra_name || e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
-                  </p>
-                ))}
-              </div>
+            {extras.length > 0 && (() => {
+              const grouped: Record<string, typeof extras> = {};
+              extras.forEach((e) => {
+                const catName = e.product_extras?.extra_categories?.name || "Outros";
+                if (!grouped[catName]) grouped[catName] = [];
+                grouped[catName].push(e);
+              });
+              return (
+                <div className="mt-1 space-y-1">
+                  {Object.entries(grouped).map(([cat, items]) => (
+                    <div key={cat}>
+                      <p className="text-xs font-medium text-muted-foreground pl-4">{cat}</p>
+                      {items.map((e, i) => (
+                        <p key={i} className="text-xs text-muted-foreground pl-6">
+                          + {e.extra_name || e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
+                        </p>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
             )}
             {item.notes && <p className="text-xs text-muted-foreground mt-1 italic pl-4">Obs: {item.notes}</p>}
           </div>
