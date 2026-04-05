@@ -275,6 +275,44 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     try {
       // Save customer to CRM
       await upsertCustomerCRM();
+
+      // Save delivery address to CRM if applicable
+      if (orderType === "delivery" && customerCpf && deliveryAddress) {
+        try {
+          const cleanCpf = customerCpf.replace(/\D/g, "");
+          const { data: existing } = await supabase
+            .from("customer_addresses")
+            .select("id")
+            .eq("customer_cpf", cleanCpf)
+            .eq("street", deliveryAddress)
+            .eq("number", deliveryNumber || "S/N");
+          if (!existing || existing.length === 0) {
+            let city = deliveryCity || "";
+            let state = "SP";
+            if (deliveryCity?.includes(" - ")) {
+              const parts = deliveryCity.split(" - ");
+              city = parts[0].trim();
+              state = parts[1]?.trim() || "SP";
+            }
+            await supabase.from("customer_addresses").insert({
+              customer_cpf: cleanCpf,
+              customer_name: customerName || "Cliente PDV",
+              customer_phone: customerPhone || "0",
+              street: deliveryAddress,
+              number: deliveryNumber || "S/N",
+              complement: deliveryComplement || null,
+              neighborhood: deliveryNeighborhood || "",
+              city,
+              state,
+              zip_code: deliveryCep || "00000-000",
+              is_default: false,
+            });
+          }
+        } catch (e) {
+          console.warn("Erro ao salvar endereço no CRM:", e);
+        }
+      }
+
       if (orderType === "delivery") {
         
         const { data: order, error } = await supabase.from("orders").insert({
