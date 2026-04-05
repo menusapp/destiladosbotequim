@@ -31,7 +31,7 @@ export const CategoryProducts = memo(({
       {/* Horizontal scrolling category nav */}
       {showNav && categories.length > 0 && (
         <div
-          className="sticky top-0 z-30 bg-background border-b border-border px-3 py-1.5 flex gap-1.5 overflow-x-auto category-scroll-bar"
+          className="sticky top-0 z-30 bg-background border-b border-border px-3 py-3 my-1 flex gap-1.5 overflow-x-auto category-scroll-bar"
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
@@ -43,7 +43,7 @@ export const CategoryProducts = memo(({
             <button
               key={cat.id}
               onClick={() => handleCategoryClick(cat.id)}
-              className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap"
+              className="flex-shrink-0 px-3 py-2 rounded-full text-xs font-medium transition-colors whitespace-nowrap"
               style={
                 activeCategory === cat.id
                   ? { backgroundColor: primaryColor, color: "#fff" }
