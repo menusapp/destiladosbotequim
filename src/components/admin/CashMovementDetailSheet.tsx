@@ -46,7 +46,7 @@ interface OrderDetail {
     order_item_extras: {
       extra_name: string | null;
       price_at_order: number;
-      product_extras: { name: string } | null;
+      product_extras: { name: string; extra_categories: { name: string } | null } | null;
     }[];
   }[];
   tables?: { table_number: number; table_name: string | null } | null;
@@ -71,7 +71,7 @@ interface CounterOrderDetail {
     products: { name: string } | null;
     counter_order_item_extras: {
       price_at_order: number;
-      product_extras: { name: string } | null;
+      product_extras: { name: string; extra_categories: { name: string } | null } | null;
     }[];
   }[];
   tables?: { table_number: number; table_name: string | null } | null;
@@ -116,7 +116,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
       if (bill.comanda_id) {
         const { data: orders } = await supabase
           .from("orders")
-          .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name))), tables(table_number, table_name)`)
+          .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name, extra_categories(name)))), tables(table_number, table_name)`)
           .eq("comanda_id", bill.comanda_id)
           .limit(1)
           .maybeSingle();
@@ -131,7 +131,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
       // Try finding counter_orders for this table around the bill's creation time
       const { data: counterOrders } = await supabase
         .from("counter_orders")
-        .select(`*, counter_order_items(*, products(name), counter_order_item_extras(*, product_extras(name))), tables(table_number, table_name)`)
+        .select(`*, counter_order_items(*, products(name), counter_order_item_extras(*, product_extras(name, extra_categories(name)))), tables(table_number, table_name)`)
         .eq("table_id", bill.table_id)
         .eq("status", "paid")
         .order("finalized_at", { ascending: false })
@@ -147,7 +147,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
       // Fallback: try orders by table_id
       const { data: tableOrders } = await supabase
         .from("orders")
-        .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name))), tables(table_number, table_name)`)
+        .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name, extra_categories(name)))), tables(table_number, table_name)`)
         .eq("table_id", bill.table_id)
         .in("status", ["delivered", "picked_up", "accepted", "preparing", "ready"])
         .order("created_at", { ascending: false })
@@ -189,15 +189,28 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
               <span className="font-medium">{item.quantity}x {item.products?.name || "Produto"}</span>
               <span className="font-medium">R$ {(itemTotal + extrasTotal).toFixed(2)}</span>
             </div>
-            {extras.length > 0 && (
-              <div className="mt-1 space-y-0.5">
-                {extras.map((e, i) => (
-                   <p key={i} className="text-xs text-muted-foreground pl-4">
-                    + {e.extra_name || e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
-                  </p>
-                ))}
-              </div>
-            )}
+            {extras.length > 0 && (() => {
+              const grouped: Record<string, typeof extras> = {};
+              extras.forEach((e) => {
+                const catName = e.product_extras?.extra_categories?.name || "Outros";
+                if (!grouped[catName]) grouped[catName] = [];
+                grouped[catName].push(e);
+              });
+              return (
+                <div className="mt-1 space-y-1">
+                  {Object.entries(grouped).map(([cat, items]) => (
+                    <div key={cat}>
+                      <p className="text-xs font-medium text-muted-foreground pl-4">{cat}</p>
+                      {items.map((e, i) => (
+                        <p key={i} className="text-xs text-muted-foreground pl-6">
+                          + {e.extra_name || e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
+                        </p>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             {item.notes && <p className="text-xs text-muted-foreground mt-1 italic pl-4">Obs: {item.notes}</p>}
           </div>
         );
@@ -217,15 +230,28 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
               <span className="font-medium">{item.quantity}x {item.products?.name || "Produto"}</span>
               <span className="font-medium">R$ {(itemTotal + extrasTotal).toFixed(2)}</span>
             </div>
-            {extras.length > 0 && (
-              <div className="mt-1 space-y-0.5">
-                {extras.map((e, i) => (
-                  <p key={i} className="text-xs text-muted-foreground pl-4">
-                    + {e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
-                  </p>
-                ))}
-              </div>
-            )}
+            {extras.length > 0 && (() => {
+              const grouped: Record<string, typeof extras> = {};
+              extras.forEach((e) => {
+                const catName = e.product_extras?.extra_categories?.name || "Outros";
+                if (!grouped[catName]) grouped[catName] = [];
+                grouped[catName].push(e);
+              });
+              return (
+                <div className="mt-1 space-y-1">
+                  {Object.entries(grouped).map(([cat, items]) => (
+                    <div key={cat}>
+                      <p className="text-xs font-medium text-muted-foreground pl-4">{cat}</p>
+                      {items.map((e, i) => (
+                        <p key={i} className="text-xs text-muted-foreground pl-6">
+                          + {e.product_extras?.name || "Extra"} (R$ {e.price_at_order.toFixed(2)})
+                        </p>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             {item.notes && <p className="text-xs text-muted-foreground mt-1 italic pl-4">Obs: {item.notes}</p>}
           </div>
         );
