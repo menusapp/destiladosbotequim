@@ -116,7 +116,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
       if (bill.comanda_id) {
         const { data: orders } = await supabase
           .from("orders")
-          .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name))), tables(table_number, table_name)`)
+          .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name, extra_categories(name)))), tables(table_number, table_name)`)
           .eq("comanda_id", bill.comanda_id)
           .limit(1)
           .maybeSingle();
