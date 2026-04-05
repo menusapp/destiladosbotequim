@@ -206,8 +206,34 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
         }
         continue;
       }
+      if (table === "product_ingredients") {
+        const productIds = (data.products || []).map((p: any) => p.id);
+        if (productIds.length > 0) {
+          const { data: ingredients } = await supabase
+            .from("product_ingredients")
+            .select("*")
+            .in("product_id", productIds);
+          data.product_ingredients = ingredients || [];
+        } else {
+          data.product_ingredients = [];
+        }
+        continue;
+      }
+      if (table === "product_extra_ingredients") {
+        const extraIds = (data.product_extras || []).map((e: any) => e.id);
+        if (extraIds.length > 0) {
+          const { data: ingredients } = await supabase
+            .from("product_extra_ingredients")
+            .select("*")
+            .in("product_extra_id", extraIds);
+          data.product_extra_ingredients = ingredients || [];
+        } else {
+          data.product_extra_ingredients = [];
+        }
+        continue;
+      }
       if (table === "loyalty_program_rewards") {
-        const programIds = (data.loyalty_programs || []).map(p => p.id);
+        const programIds = (data.loyalty_programs || []).map((p: any) => p.id);
         if (programIds.length > 0) {
           const { data: rewards } = await supabase
             .from("loyalty_program_rewards")
