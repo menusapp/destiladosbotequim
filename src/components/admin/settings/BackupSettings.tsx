@@ -58,6 +58,8 @@ const FK_MAP: Record<string, Record<string, string>> = {
   product_extras: { product_id: "products", extra_category_id: "extra_categories" },
   extra_category_items: { category_id: "extra_categories" },
   extra_category_item_ingredients: { category_item_id: "extra_category_items", stock_item_id: "stock_items" },
+  product_ingredients: { product_id: "products", stock_item_id: "stock_items" },
+  product_extra_ingredients: { product_extra_id: "product_extras", stock_item_id: "stock_items" },
   stock_items: { stock_category_id: "stock_categories" },
   product_variations: { product_id: "products" },
   loyalty_program_rewards: { program_id: "loyalty_programs", reward_product_id: "products", reward_extra_id: "product_extras" },
