@@ -263,36 +263,45 @@ export const PDVProductDrawer = ({
             </div>
           )}
 
-          {/* Extras Opcionais */}
-          {optionalExtras.length > 0 && (
-            <div className="mb-6">
-              <h3 className="font-bold text-foreground mb-3">Complementos</h3>
-              <div className="space-y-2">
-                {optionalExtras.map((extra) => {
-                  const isSelected = selectedExtras.includes(extra.id);
-                  return (
-                    <label
-                      key={extra.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                        isSelected
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => handleExtraToggle(extra.id, false)}
-                      />
-                      <span className="flex-1 font-medium text-foreground">{extra.name}</span>
-                      <span className="font-bold text-sm text-primary">
-                        + R$ {extra.price.toFixed(2)}
-                      </span>
-                    </label>
-                  );
-                })}
+          {/* Extras Opcionais agrupados por categoria */}
+          {optionalExtras.length > 0 && (() => {
+            const grouped: Record<string, { name: string; items: ProductExtra[] }> = {};
+            optionalExtras.forEach((extra) => {
+              const catName = extra.extra_categories?.name || "Complementos";
+              const catId = extra.extra_category_id || "outros";
+              if (!grouped[catId]) grouped[catId] = { name: catName, items: [] };
+              grouped[catId].items.push(extra);
+            });
+            return Object.entries(grouped).map(([catId, group]) => (
+              <div key={catId} className="mb-6">
+                <h3 className="font-bold text-foreground mb-3">{group.name}</h3>
+                <div className="space-y-2">
+                  {group.items.map((extra) => {
+                    const isSelected = selectedExtras.includes(extra.id);
+                    return (
+                      <label
+                        key={extra.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleExtraToggle(extra.id, false)}
+                        />
+                        <span className="flex-1 font-medium text-foreground">{extra.name}</span>
+                        <span className="font-bold text-sm text-primary">
+                          + R$ {extra.price.toFixed(2)}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            ));
+          })()}
 
           {/* Observações */}
           <div>
