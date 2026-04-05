@@ -268,19 +268,27 @@ export const PaymentConfirmationModal = ({
         }
         const { data: existingBills } = await existingBillQuery.order("created_at", { ascending: false }).limit(1).maybeSingle();
 
+        let resolvedBillId: string | null = null;
+
         if (existingBills) {
           // Update existing bill
           const { error: billError } = await supabase.from("bills").update(billPayload).eq("id", existingBills.id);
           if (billError) console.error("Erro ao atualizar conta:", billError);
-          else console.info("[payment-change] bill atualizado", existingBills.id);
+          else {
+            console.info("[payment-change] bill atualizado", existingBills.id);
+            resolvedBillId = existingBills.id;
+          }
         } else {
           // Insert new bill
-          const { error: billError } = await supabase.from("bills").insert({
+          const { data: newBill, error: billError } = await supabase.from("bills").insert({
             table_id: order.table_id,
             comanda_id: comandaId,
             ...billPayload,
-          });
+          }).select("id").single();
           if (billError) console.error("Erro ao criar conta:", billError);
+          else if (newBill) {
+            resolvedBillId = newBill.id;
+          }
         }
       }
 
