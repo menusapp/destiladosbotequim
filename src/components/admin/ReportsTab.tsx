@@ -244,9 +244,16 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         }
       };
 
-      // Somar bills por payment_method
+      // Somar bills — desagregar payment_splits quando disponível
       paidBills?.forEach((bill: any) => {
-        addToPaymentTotal(bill.payment_method, Number(bill.total_amount));
+        const splits = bill.payment_splits;
+        if (Array.isArray(splits) && splits.length > 0) {
+          for (const split of splits) {
+            addToPaymentTotal(split.method || split.display, Number(split.amount || 0));
+          }
+        } else {
+          addToPaymentTotal(bill.payment_method, Number(bill.total_amount));
+        }
       });
 
       // Somar counter_orders por payment_method

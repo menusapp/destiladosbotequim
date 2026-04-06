@@ -548,11 +548,15 @@ export const PaymentConfirmationModal = ({
           </Button>
           <Button
             onClick={handleConfirmPayment}
-            disabled={remaining > 0.01}
+            disabled={remaining > 0.01 || confirming}
             className="flex-1 gap-2 h-12 text-base font-bold"
           >
-            <Check className="w-5 h-5" />
-            Confirmar Pagamento
+            {confirming ? (
+              <span className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" />
+            ) : (
+              <Check className="w-5 h-5" />
+            )}
+            {confirming ? "Processando..." : "Confirmar Pagamento"}
           </Button>
         </div>
       </DialogContent>
