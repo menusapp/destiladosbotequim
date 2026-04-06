@@ -242,6 +242,12 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const handleSubmit = async () => {
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
 
+    // Validate delivery address for delivery orders
+    if (orderType === "delivery" && !deliveryAddress.trim()) {
+      toast.error("Informe o endereço de entrega");
+      return;
+    }
+
     // Resolve payment type
     let resolvedPaymentType: string | null = null;
     let resolvedPaymentBrand: string | null = null;
