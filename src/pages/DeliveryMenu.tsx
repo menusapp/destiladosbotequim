@@ -80,13 +80,7 @@ export default function DeliveryMenu() {
       })).filter((cat: any) => cat.products.length > 0);
       setCategories(filteredCategories);
 
-      const { data: featuredData } = await supabase
-        .from("products")
-        .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, visibility_channels, categories!inner(restaurant_id)")
-        .eq("categories.restaurant_id", restaurantData.id)
-        .eq("is_featured", true)
-        .eq("available", true)
-        .order("featured_display_order");
+      const featuredData = featuredResult.data;
 
       const filteredFeatured = (featuredData || []).filter((p: any) => {
         const channels = p.visibility_channels || ['all'];
