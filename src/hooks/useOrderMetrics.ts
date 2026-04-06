@@ -92,7 +92,7 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
           .gte("created_at", start).lte("created_at", end),
         // Local bills paid (exclude zero-amount bills)
         supabase.from("bills")
-          .select("id, total_amount, payment_method, paid_at, table_id, tables!inner(restaurant_id)")
+          .select("id, total_amount, payment_method, payment_splits, paid_at, table_id, tables!inner(restaurant_id)")
           .eq("tables.restaurant_id", restaurantId)
           .eq("status", "paid")
           .gt("total_amount", 0)
