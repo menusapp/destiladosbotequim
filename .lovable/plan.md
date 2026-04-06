@@ -1,66 +1,51 @@
 
 
-# Plan: Otimizar pagamento de comanda + Corrigir pagamentos divididos nos relatórios
+# Fix: Mesa não libera após pagamento da última comanda
 
-## Diagnóstico
+## Causa raiz
 
-### Correção 1 — Performance do pagamento
-O `handlePaymentConfirmed` em `TableDetailDialog.tsx` (linhas 321-365) executa tudo sequencialmente:
-- Loop sequencial por cada order: fetch status → RPC deduct_stock → update status (3 calls por pedido)
-- Depois: update comanda, update bills, fetch remaining comandas, update table
-- Total para 3 pedidos: ~12 chamadas sequenciais
+Na otimização anterior, três operações foram colocadas em `Promise.all` (linhas 352-361):
+1. Fechar a comanda atual (`status: "closed"`)
+2. Atualizar bills para `paid`
+3. Buscar comandas ativas restantes
 
-O `handleConfirmPayment` em `PaymentConfirmationModal.tsx` (linhas 202-351) também é sequencial:
-- Update orders → find bill → update/insert bill → delete cash_movements (3 calls) → find cash session → insert movements em loop
+O problema: a operação 3 roda **ao mesmo tempo** que a operação 1. Quando a query de "comandas ativas" executa, a comanda atual ainda não foi fechada — então ela aparece como ativa, e o código conclui que ainda há comandas na mesa → não libera a mesa.
 
-### Correção 2 — Pagamentos divididos nos relatórios
-Quando há pagamento misto, o `PaymentConfirmationModal` salva `payment_method: null` no bill (linha 215: `uniqueTypes.length === 1 ? uniqueTypes[0] : null`). O `normalizeMethod` no `ReportsTab` retorna `null` para isso, e `addToPaymentTotal` ignora — resultado: valor some dos relatórios.
+## Correção
 
-No `useOrderMetrics`, a lógica é diferente: usa `addMethodRevenue` que trata `null` como "Outros". Mas para bills com `payment_method: null` de pagamento misto, o valor total vai todo para "Outros" em vez de ser desagregado.
+Separar em dois passos:
+1. **Primeiro** (em paralelo): fechar comanda + atualizar bills — seguro pois são tabelas diferentes
+2. **Depois** (sequencial): buscar comandas ativas restantes e decidir se libera a mesa
 
-**Solução**: Adicionar coluna `payment_splits jsonb` na tabela `bills`. Salvar os detalhes de cada parte do pagamento. Nos relatórios, quando `payment_splits` existir, iterar sobre ele em vez de usar `payment_method`.
+Mudança apenas nas linhas 352-368 de `TableDetailDialog.tsx`. Nenhuma outra alteração.
 
-## Mudanças
+## Código
 
-### 1. Migration — Adicionar coluna `payment_splits` na tabela `bills`
-```sql
-ALTER TABLE public.bills ADD COLUMN payment_splits jsonb DEFAULT NULL;
+```typescript
+// Step 1: Close comanda + update bills in parallel (safe, different tables)
+await Promise.all([
+  comandaId
+    ? supabase.from("comandas").update({ status: "closed", closed_at: now }).eq("id", comandaId)
+    : Promise.resolve(),
+  comandaId
+    ? supabase.from("bills").update({ status: "paid", paid_at: now })
+        .eq("comanda_id", comandaId).in("status", ["requested", "on_the_way"])
+    : Promise.resolve(),
+]);
+
+// Step 2: AFTER closing, check remaining active comandas
+const remainingRes = await supabase
+  .from("comandas").select("id").eq("table_id", table!.id).eq("status", "active");
+
+const remainingCmdas = remainingRes.data || [];
+if (remainingCmdas.length === 0) {
+  await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table!.id);
+} else {
+  await supabase.from("tables").update({ occupied_by: `${remainingCmdas.length} cliente${remainingCmdas.length !== 1 ? "s" : ""}` }).eq("id", table!.id);
+}
 ```
-Formato: `[{"method": "cash", "display": "Dinheiro", "amount": 50.00}, {"method": "credit", "display": "Crédito - Visa", "amount": 58.60, "brand": "visa"}]`
 
-### 2. `PaymentConfirmationModal.tsx` — Salvar payment_splits + otimizar
-- Construir array `payment_splits` a partir de `selectedPayments`
-- Salvar no bill: `payment_splits` com detalhes, `payment_method` mantém o tipo único ou `null` para misto (backward compat)
-- Paralelizar: cash_movements cleanup (3 deletes) com `Promise.all`
-- Paralelizar: cash_movements inserts com `Promise.all`
-- Adicionar `loading` state no botão "Confirmar Pagamento" (desabilitar imediatamente ao clicar)
-
-### 3. `TableDetailDialog.tsx` — Otimizar `handlePaymentConfirmed`
-- Paralelizar stock deduction + status update por order usando `Promise.all`
-- Paralelizar: close comanda + update bills + check remaining em grupo
-- Paralelizar: `refetchComandas()`, `refetchOrders()`, `refetchBills()` não precisam ser sequenciais (já são independentes, mas ficam mais claros)
-
-### 4. `useOrderMetrics.ts` — Desagregar payment_splits
-- No fetch de `bills`, adicionar `payment_splits` ao select
-- Em `addMethodRevenue`: quando o bill tem `payment_splits` (array JSON), iterar sobre cada split e somar ao método correto em vez de usar `payment_method`
-
-### 5. `ReportsTab.tsx` — Desagregar payment_splits no DRE
-- No fetch de `bills`, adicionar `payment_splits` ao select
-- Em `addToPaymentTotal` para bills: se `payment_splits` existir e for array, iterar sobre cada split e somar ao método correto. Caso contrário, usar `payment_method` como antes (backward compat com registros antigos)
-
-## Arquivos modificados
-| Arquivo | Mudança |
-|---------|---------|
-| Migration SQL | Adicionar `payment_splits jsonb` em `bills` |
-| `src/components/admin/PaymentConfirmationModal.tsx` | Salvar splits, loading state, paralelizar cleanup |
-| `src/components/admin/TableDetailDialog.tsx` | Paralelizar operações no pagamento |
-| `src/hooks/useOrderMetrics.ts` | Ler e desagregar `payment_splits` |
-| `src/components/admin/ReportsTab.tsx` | Ler e desagregar `payment_splits` |
-
-## O que NÃO muda
-- Lógica de negócio do pagamento (ordem de operações, validações)
-- Fluxo de delivery, iFood, Delivery Direto, fiscal
-- Schema de outras tabelas
-- Registros existentes (payment_splits = null, lidos pelo fallback)
-- Split por item (SplitPaymentDialog) — funcionalidade diferente
+## Impacto
+- Zero risco — restaura o comportamento original (sequencial) apenas para a verificação de mesa
+- Mantém paralelização segura entre fechar comanda e atualizar bills
 
