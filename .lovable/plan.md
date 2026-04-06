@@ -1,51 +1,85 @@
 
 
-# Plan: Remove Dark Mode + Reorganize Order Detail Modal
+# Plan: Revisão de Segurança, Performance e Estabilidade para Produção
 
-## Correction 1 — Remove Dark Mode
+## Resumo da auditoria
 
-**Files to modify:**
+Após análise completa do código, a situação atual é:
+- **RLS**: Todas as 77 tabelas têm RLS ativado, porém TODAS usam políticas `USING (true) / WITH CHECK (true)` — acesso totalmente aberto. Isso é intencional dado que o sistema usa autenticação via `localStorage` (anon role), mas tabelas sensíveis de outros restaurantes ficam expostas.
+- **Secrets hardcoded**: Nenhuma chave privada hardcoded no frontend — apenas `SUPABASE_URL` e `ANON_KEY` (correto).
+- **Performance**: `staleTime` global de 5 min já configurado. Realtime channels têm cleanup adequado. Sem duplicatas óbvias.
+- **Console.logs**: ~370 ocorrências em 12 arquivos (Menu.tsx, Comanda.tsx, Kiosk.tsx, RestaurantAdmin.tsx são os piores).
+- **Edge Functions**: Todas têm try/catch e CORS. Boa cobertura de erros.
 
-1. **`src/components/ThemeProvider.tsx`** — Force `forcedTheme="light"` and `enableSystem={false}` so the theme is always light regardless of OS preference.
+## Mudanças propostas (cirúrgicas, sem risco)
 
-2. **`src/components/admin/AdminHeader.tsx`** — Remove the theme toggle button (Moon/Sun icon, lines ~155-167). Remove `useTheme` import and `theme`/`setTheme` usage.
+### 1. Segurança — RLS com escopo por restaurant_id
 
-3. **`src/index.css`** — Keep the `.dark` block as-is (it won't be applied since theme is forced to light, and `chart.tsx` references it). No CSS changes needed.
+**PROBLEMA CRÍTICO**: Qualquer usuário anônimo pode ler/escrever em tabelas de QUALQUER restaurante. Na prática, alguém poderia listar pedidos, clientes, configurações fiscais e financeiras de restaurantes concorrentes usando a anon key.
 
-No other files use `setTheme` or `useTheme`.
+**Abordagem conservadora**: Em vez de criar políticas `restaurant_id = ?` (que quebraria o sistema que opera como anon sem contexto de restaurante), vou documentar este risco como comentários no código e NÃO alterar as políticas RLS. A razão: toda a arquitetura depende de queries client-side com filtro `restaurant_id` e roles `anon`. Mudar RLS agora exigiria refatoração arquitetural completa do sistema de autenticação.
 
-## Correction 2 — Reorganize Order Detail Modal with Collapsible Sections
+**Ação**: Adicionar comentário de segurança no `client.ts` e no `ProtectedRoute.tsx` documentando este risco para futura refatoração.
 
-**File:** `src/components/admin/OrderDetailModal.tsx`
+### 2. Limpeza — Console.logs de debug (~370 ocorrências)
 
-The current modal is a `Dialog` (`max-w-4xl`). The user refers to it as a "drawer do PDV" but it's actually a centered Dialog. The plan reorganizes it with collapsible sections.
+Remover console.logs de debug em:
+- `src/pages/Menu.tsx` (~30 logs com emojis 🔍⭐📦🔒💰)
+- `src/pages/Comanda.tsx` (~25 logs com emojis)  
+- `src/pages/Kiosk.tsx` (~5 logs)
+- `src/pages/RestaurantAdmin.tsx` (~5 logs)
+- `src/components/kiosk/KioskPayment.tsx` (~5 logs)
+- `src/components/menu/CheckoutDrawer.tsx` (~3 logs)
+- `src/components/menu/checkout/PaymentStep.tsx` (1 log)
+- `src/components/admin/settings/WhatsAppSettings.tsx` (1 log)
+- `src/components/admin/OrderDetailModal.tsx` (1 log)
+- `src/hooks/useMenuInactivityLogout.tsx` (2 logs)
+- `src/lib/performanceMonitor.ts` (remover auto-print em produção)
 
-**Changes:**
+Manter todos os `console.error` e `console.warn` (úteis para diagnóstico).
 
-1. **Add imports:** `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` from `@/components/ui/collapsible`, `Separator` from `@/components/ui/separator`, `ChevronDown` icon.
+### 3. Performance — Otimização de queries no DeliveryMenu
 
-2. **Replace the Card-based layout** (lines ~406-607) with collapsible sections:
+O `DeliveryMenu.tsx` faz queries sequenciais (restaurante → categorias → produtos destacados). Consolidar com `Promise.all` onde as queries são independentes.
 
-   - **Resumo do Pedido** (always visible, not collapsible): Order number, origin, status badge, elapsed time, date, total, payment method. Compact summary at the top.
+### 4. Estabilidade — Loading states
 
-   - **Ações do Pedido** (always visible): Keep all action buttons as-is.
+Verificar e melhorar loading states nos componentes principais que usam fetch direto (sem TanStack Query) e podem ficar em tela branca:
+- `DeliveryMenu.tsx`: já tem `loading` state mas não mostra skeleton
+- `Kiosk.tsx`: idem
 
-   - **Itens Pedidos** (collapsible, open by default): The items table with extras, subtotals, delivery fee, discounts, grand total.
+### 5. Formulários — Validação no CreateOrderDrawer
 
-   - **Cliente** (collapsible, closed by default): Name, phone, address, CPF.
+O `CreateOrderDrawer.tsx` permite submeter pedido delivery sem endereço preenchido. Adicionar validação mínima antes do submit.
 
-   - **Detalhes** (collapsible, closed by default): Origin, date, table, scheduled time, cancellation reason.
+## Arquivos a modificar
 
-   - **Pagamento** (collapsible, closed by default): Payment confirmation button when payment is pending.
+| Arquivo | Mudança |
+|---------|---------|
+| `src/pages/Menu.tsx` | Remover ~30 console.logs de debug |
+| `src/pages/Comanda.tsx` | Remover ~25 console.logs de debug |
+| `src/pages/Kiosk.tsx` | Remover ~5 console.logs |
+| `src/pages/RestaurantAdmin.tsx` | Remover ~5 console.logs |
+| `src/components/kiosk/KioskPayment.tsx` | Remover ~5 console.logs |
+| `src/components/menu/CheckoutDrawer.tsx` | Remover ~3 console.logs |
+| `src/components/menu/checkout/PaymentStep.tsx` | Remover 1 console.log |
+| `src/components/admin/settings/WhatsAppSettings.tsx` | Remover 1 console.log |
+| `src/components/admin/OrderDetailModal.tsx` | Remover 1 console.log |
+| `src/hooks/useMenuInactivityLogout.tsx` | Remover 2 console.logs |
+| `src/lib/performanceMonitor.ts` | Condicionar auto-print a `import.meta.env.DEV` |
+| `src/pages/DeliveryMenu.tsx` | Consolidar queries com Promise.all |
+| `src/components/admin/CreateOrderDrawer.tsx` | Validação de endereço em pedido delivery |
 
-3. **Add `Separator`** between each section.
+## O que NÃO muda
 
-4. **Increase padding** from default to `p-6` on the dialog content.
+- Nenhuma política RLS existente (risco de quebrar fluxos)
+- Nenhum fluxo de pedidos, fiscal, iFood, DD, WhatsApp
+- Nenhuma Edge Function
+- Nenhum schema de banco
+- Nenhum canal realtime
+- Login do restaurante, staff e CEO
 
-5. **Each collapsible section** uses a clickable header with `ChevronDown` that rotates when open, consistent UX pattern.
+## Risco documentado (sem ação agora)
 
-## What does NOT change
-- Order status flow, iFood/DD sync, WhatsApp, printing, stock restoration
-- Cancel dialog, payment modals, add items drawer
-- Any business logic
+As políticas RLS `USING (true)` permitem que qualquer pessoa com a anon key acesse dados de qualquer restaurante. Isso é uma limitação arquitetural do sistema de autenticação baseado em localStorage. A correção exigiria migrar para Supabase Auth com custom claims ou implementar um middleware de validação. Será documentado no código.
 
