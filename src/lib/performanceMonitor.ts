@@ -36,8 +36,8 @@ Queries na inicialização: ${queryCount}
   `.trim());
 }
 
-// Auto-print after initial load settles
-if (typeof window !== 'undefined') {
+// Auto-print after initial load settles (dev only)
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   window.addEventListener('load', () => {
     setTimeout(printPerformanceReport, 3000);
   });

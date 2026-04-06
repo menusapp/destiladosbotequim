@@ -49,13 +49,24 @@ export default function DeliveryMenu() {
       if (restaurantError) throw restaurantError;
       setRestaurant(restaurantData);
 
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("categories")
-        .select("*, products(*)")
-        .eq("restaurant_id", restaurantData.id)
-        .order("display_order");
+      // Fetch categories+products and featured products in parallel
+      const [categoriesResult, featuredResult] = await Promise.all([
+        supabase
+          .from("categories")
+          .select("*, products(*)")
+          .eq("restaurant_id", restaurantData.id)
+          .order("display_order"),
+        supabase
+          .from("products")
+          .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, visibility_channels, categories!inner(restaurant_id)")
+          .eq("categories.restaurant_id", restaurantData.id)
+          .eq("is_featured", true)
+          .eq("available", true)
+          .order("featured_display_order"),
+      ]);
 
-      if (categoriesError) throw categoriesError;
+      if (categoriesResult.error) throw categoriesResult.error;
+      const categoriesData = categoriesResult.data;
       
       // Filtrar produtos em destaque para não aparecerem duplicados nas categorias
       const filteredCategories = (categoriesData || []).map((cat: any) => ({
