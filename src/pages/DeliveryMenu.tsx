@@ -133,7 +133,6 @@ export default function DeliveryMenu() {
         table: 'restaurants',
         filter: `slug=eq.${restaurantSlug}`
       }, (payload) => {
-        console.log('🏪 Restaurante atualizado em tempo real!', payload);
         const updatedRestaurant = payload.new as any;
         
         setRestaurant((prev: any) => ({
@@ -148,7 +147,6 @@ export default function DeliveryMenu() {
         schema: 'public',
         table: 'products'
       }, () => {
-        console.log('Produtos atualizados! Recarregando...');
         fetchRestaurantData();
       })
       .subscribe();
@@ -170,7 +168,6 @@ export default function DeliveryMenu() {
         table: 'orders',
         filter: `customer_cpf=eq.${customerCPF},restaurant_id=eq.${restaurant.id}`
       }, (payload) => {
-        console.log('Pedido do cliente atualizado:', payload);
         
         const order = payload.new as any;
         // Silenciado - notificações de status removidas do cardápio do cliente

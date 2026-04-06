@@ -74,12 +74,6 @@ const Menu = () => {
   // Verificar se deve abrir modal de avaliação ao carregar
   useEffect(() => {
     const shouldShowReview = sessionStorage.getItem('shouldShowReview');
-    console.log('🔍 Verificando se deve mostrar review:', {
-      shouldShowReview,
-      reviewBillId: sessionStorage.getItem('reviewBillId'),
-      customerName,
-      showCustomerDialog
-    });
     
     if (shouldShowReview === 'true') {
       // BLOQUEAR dialog de login ANTES de tudo
@@ -88,7 +82,6 @@ const Menu = () => {
       const billId = sessionStorage.getItem('reviewBillId');
       const counterOrderId = sessionStorage.getItem('reviewCounterOrderId');
       
-      console.log('⭐ Preparando para abrir modal de avaliação!');
       
       // Limpar flags do sessionStorage
       sessionStorage.removeItem('shouldShowReview');
@@ -100,7 +93,6 @@ const Menu = () => {
       if (counterOrderId) setReviewCounterOrderId(counterOrderId);
       setReviewModalOpen(true);
       
-      console.log('✅ Modal de avaliação aberto!');
     }
   }, []); // Executar apenas UMA VEZ ao montar
 
@@ -138,7 +130,6 @@ const Menu = () => {
 
       // ⚡ Buscar tableId - suporta AMBOS: table_number (int) OU id (UUID)
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableNumber);
-      console.log('🔍 Buscando mesa:', { tableNumber, isUUID });
       
       let tableData;
       let tableError;
@@ -168,7 +159,6 @@ const Menu = () => {
         throw tableError;
       }
       
-      console.log('✅ Mesa encontrada:', tableData);
       setTableId(tableData.id);
 
       // ⚡ Processar categorias dos dados JÁ CARREGADOS (sem query adicional!)
@@ -244,7 +234,6 @@ const Menu = () => {
           .maybeSingle();
         
         if (clientComanda?.status === "closed") {
-          console.log('🔒 Comanda do cliente está fechada, resetando sessão');
           setHasOpenComanda(false);
           setComandaTotal(cartTotal);
           setComandaStatus("");
@@ -260,7 +249,6 @@ const Menu = () => {
           .limit(1);
         
         if (clientPaidBill && clientPaidBill.length > 0) {
-          console.log('💰 Conta desta comanda já foi paga, resetando sessão');
           setHasOpenComanda(false);
           setComandaTotal(cartTotal);
           setComandaStatus("");
@@ -363,27 +351,23 @@ const Menu = () => {
   useEffect(() => {
     // NÃO mostrar login se estiver mostrando avaliação
     if (blockLoginForReview || reviewModalOpen) {
-      console.log('🔒 Login bloqueado - avaliação em andamento');
       return;
     }
     
     if (!loading && restaurant && !customerName && !showCustomerDialog) {
       const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
       if (!savedName) {
-        console.log('✅ Dados carregados - mostrando dialog de login');
         setShowCustomerDialog(true);
       }
     }
   }, [loading, restaurant, customerName, tableNumber, showCustomerDialog, blockLoginForReview, reviewModalOpen]);
 
   useEffect(() => {
-    console.log('🔄 useEffect de inicialização executado');
     
     // 🚨 PRIMEIRA PRIORIDADE: Verificar se é um logout forçado
     const forceLogout = sessionStorage.getItem('forceLogout');
     
     if (forceLogout === 'true') {
-      console.log('🚪 Logout forçado detectado - limpando TUDO e bloqueando restauração!');
       
       // Remover flag
       sessionStorage.removeItem('forceLogout');
@@ -408,7 +392,6 @@ const Menu = () => {
       // Buscar dados do restaurante
       fetchData();
       
-      console.log('✅ Logout completo aplicado - cliente precisa fazer login novamente');
     }
     
     // Tentar restaurar sessão apenas se NÃO foi logout forçado
@@ -418,7 +401,6 @@ const Menu = () => {
       const savedTableId = sessionStorage.getItem(`table_id_${tableNumber}`);
       
       if (savedName && savedCPF) {
-        console.log('📦 Restaurando sessão:', { savedName, savedCPF, savedTableId });
         const savedCart = sessionStorage.getItem(`cart_${tableNumber}`);
         if (savedCart) setCart(JSON.parse(savedCart));
         setCustomerName(savedName);
@@ -426,7 +408,6 @@ const Menu = () => {
         if (savedTableId) setTableId(savedTableId);
         fetchData();
       } else {
-        console.log('🆕 Nova sessão - carregando dados primeiro');
         sessionStorage.removeItem(`cart_${tableNumber}`);
         sessionStorage.removeItem(`table_id_${tableNumber}`);
         setCart([]);
@@ -445,7 +426,6 @@ const Menu = () => {
         schema: 'public', 
         table: 'products'
       }, () => {
-        console.log('📦 Produtos atualizados em tempo real!');
         if (restaurantRef.current?.id) {
           fetchData();
         }
@@ -456,7 +436,6 @@ const Menu = () => {
         table: 'restaurants',
         filter: `slug=eq.${restaurantSlug}`
       }, (payload) => {
-        console.log('🏪 Restaurante atualizado em tempo real!', payload);
         const updatedRestaurant = payload.new as any;
         
         setRestaurant((prev: any) => ({...prev, ...updatedRestaurant}));
@@ -476,7 +455,6 @@ const Menu = () => {
         const currentTableId = tableIdRef.current;
         const currentCustomer = customerInfoRef.current;
         
-        console.log('📝 Pedido atualizado:', { order, oldOrder, currentTableId, currentCustomer });
         
         // Verificar se é pedido deste cliente nesta mesa
         if (currentTableId && order.table_id === currentTableId && currentCustomer) {
@@ -497,7 +475,6 @@ const Menu = () => {
         schema: 'public', 
         table: 'orders'
       }, () => {
-        console.log('📝 Novo pedido criado!');
         const currentTableId = tableIdRef.current;
         if (currentTableId) checkOpenComanda(currentTableId, cart);
       })
@@ -511,7 +488,6 @@ const Menu = () => {
         const oldBill = payload.old as any;
         
         const currentTableId = tableIdRef.current;
-        console.log('💳 Conta atualizada:', { bill, oldBill, currentTableId });
         
         // Verificar se a conta foi paga e pertence à mesa atual E à comanda do cliente
         if (currentTableId && bill.table_id === currentTableId) {
@@ -520,7 +496,6 @@ const Menu = () => {
           const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
           
           if (billBelongsToMe && bill.status === 'paid' && oldBill?.status !== 'paid') {
-            console.log('💰 Conta PAGA (UPDATE)! Iniciando avaliação e logout...');
             
             setReviewBillId(bill.id);
             setReviewModalOpen(true);
@@ -536,7 +511,6 @@ const Menu = () => {
         const bill = payload.new as any;
         
         const currentTableId = tableIdRef.current;
-        console.log('💳 Nova conta inserida:', { bill, currentTableId });
         
         // Quando garçom paga pelo PDV sem cliente pedir conta, INSERT já vem com status='paid'
         if (currentTableId && bill.table_id === currentTableId && bill.status === 'paid') {
@@ -545,7 +519,6 @@ const Menu = () => {
           const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
           
           if (billBelongsToMe) {
-            console.log('💰 Conta PAGA (INSERT direto)! Iniciando avaliação e logout...');
             
             setReviewBillId(bill.id);
             setReviewModalOpen(true);
@@ -567,7 +540,6 @@ const Menu = () => {
         // Se a mesa atual foi esvaziada (estava ocupada e agora está livre)
         if (currentTableId && table.id === currentTableId && currentCustomer) {
           if (oldTable?.is_occupied === true && table.is_occupied === false) {
-            console.log('🚪 Mesa esvaziada pelo admin! Fazendo logout...');
             
             // Silenciado para cliente
             
@@ -589,11 +561,9 @@ const Menu = () => {
         }
       })
       .subscribe((status) => {
-        console.log('📡 Status da subscrição Menu:', status);
       });
       
     return () => { 
-      console.log('🔌 Removendo canal de realtime');
       supabase.removeChannel(channel); 
     };
   }, [fetchData, restaurantSlug, tableNumber]);
@@ -614,7 +584,6 @@ const Menu = () => {
           .maybeSingle();
         
         if (!comanda || comanda.status === "closed") {
-          console.log('🔒 Comanda fechada ao voltar do background - logout');
           
           const { data: paidBill } = await supabase
             .from("bills")
@@ -649,7 +618,6 @@ const Menu = () => {
             .maybeSingle();
           
           if (table && !table.is_occupied) {
-            console.log('🔒 Mesa liberada ao voltar do background - logout');
             
             sessionStorage.removeItem(`customer_name_${tableNumber}`);
             sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
@@ -748,7 +716,6 @@ const Menu = () => {
   }, [tableId, customerName, customerCPF]);
 
   const handleCompleteLogout = useCallback(async () => {
-    console.log('🚪 Deslogando cliente completamente...');
     
     // IMPORTANTE: Fechar a comanda no banco ANTES de limpar a sessão
     const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
@@ -765,7 +732,6 @@ const Menu = () => {
         if (error) {
           console.error("Erro ao fechar comanda:", error);
         } else {
-          console.log('📋 Comanda fechada no banco:', comandaId);
         }
       } catch (err) {
         console.error("Erro ao fechar comanda:", err);
@@ -799,12 +765,10 @@ const Menu = () => {
     // Forçar dialog de login
     setShowCustomerDialog(true);
     
-    console.log('✅ Cliente deslogado com sucesso');
     // Silenciado
   }, [tableNumber]);
 
   const handleCustomerInfoSubmit = async (name: string, cpf: string, phone?: string) => {
-    console.log('👤 LOGIN INICIADO:', { name, cpf, phone, tableNumber, hasRestaurant: !!restaurant });
     
     // Validação de CPF
     if (!cpf || cpf.trim() === '') {
@@ -821,7 +785,6 @@ const Menu = () => {
 
     // Limpar CPF uma vez no início
     const cleanCpf = cpf.replace(/\D/g, '');
-    console.log('🔢 CPF limpo:', cleanCpf);
 
     try {
       // Check if customer exists in database - use saved name, ignore typed name
@@ -844,11 +807,9 @@ const Menu = () => {
           .eq("cpf", cleanCpf);
       }
       
-      console.log('👤 Nome final:', { existingCustomer: !!existingCustomer, finalName });
 
       // ⚡ Suportar AMBOS: table_number (int) OU id (UUID)
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableNumber);
-      console.log('🔍 Buscando mesa para login:', { tableNumber, isUUID });
       
       let tableData;
       let tableError;
@@ -879,7 +840,6 @@ const Menu = () => {
         return;
       }
       
-      console.log('✅ Mesa encontrada para login:', tableData);
 
       // Verificar se este cliente já tem comanda ativa nesta mesa
       const { data: existingComanda } = await supabase
@@ -895,7 +855,6 @@ const Menu = () => {
       if (existingComanda) {
         // Cliente já tem comanda ativa - usar a existente
         comandaId = existingComanda.id;
-        console.log('📋 Comanda existente encontrada:', comandaId);
       } else {
         // Criar nova comanda para este cliente (NÃO fechar as outras)
         const { data: newComanda, error: comandaError } = await supabase
@@ -914,7 +873,6 @@ const Menu = () => {
           console.error("Erro ao criar comanda:", comandaError);
         } else {
           comandaId = newComanda.id;
-          console.log('📋 Nova comanda criada:', comandaId);
         }
       }
 
@@ -941,7 +899,6 @@ const Menu = () => {
         .eq("id", tableData.id);
 
       if (updateError) throw updateError;
-      console.log('✅ Mesa ocupada com sucesso:', { clientCount, occupiedByText });
 
       // Salvar dados no sessionStorage
       sessionStorage.setItem(`customer_name_${tableNumber}`, finalName);
@@ -958,7 +915,6 @@ const Menu = () => {
       setTableId(tableData.id);
       setShowCustomerDialog(false);
       
-      console.log('✅ Cliente logado com sucesso!', { tableId: tableData.id, comandaId });
       // Silenciado - sem toast de boas-vindas
       
       // Carregar dados

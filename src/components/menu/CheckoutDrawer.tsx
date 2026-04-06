@@ -166,9 +166,7 @@ export const CheckoutDrawer = ({
       
       if (customerRecord?.phone) {
         phoneToUse = customerRecord.phone;
-        console.log("[WhatsApp] Usando telefone do cadastro:", phoneToUse);
       } else {
-        console.log("[WhatsApp] Usando telefone informado no pedido:", phoneToUse);
       }
 
       const orderData: any = {

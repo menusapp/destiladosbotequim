@@ -624,7 +624,6 @@ const RestaurantAdmin = () => {
 
         if (!updateError) {
           setRestaurant(prev => prev ? { ...prev, is_open: shouldBeOpen } : null);
-          console.log(`Status automatico: ${shouldBeOpen ? 'Aberto' : 'Fechado'}`);
         }
       }
     } catch (error) {
@@ -653,7 +652,6 @@ const RestaurantAdmin = () => {
   };
 
   const handleToggleRestaurant = async (isOpen: boolean) => {
-    console.log('Mudando status do restaurante:', { isOpen, restaurantId: restaurant!.id });
     
     const { error } = await supabase
       .from("restaurants")
@@ -666,7 +664,6 @@ const RestaurantAdmin = () => {
       return;
     }
 
-    console.log('Status do restaurante atualizado com sucesso!');
     setRestaurant({ ...restaurant!, is_open: isOpen });
     toast.success(isOpen ? "Restaurante aberto!" : "Restaurante fechado!");
   };

@@ -34,14 +34,12 @@ export const useMenuInactivityLogout = (
 
       // Se houver pedidos ativos ou contas não pagas, não deslogar
       if ((activeOrders && activeOrders.length > 0) || (unpaidBills && unpaidBills.length > 0)) {
-        console.log("Cliente tem pedidos/contas ativas, mantendo sessão");
         // Resetar o timer para verificar novamente daqui a 1 hora
         resetTimer();
         return;
       }
 
       // Se não houver pedidos/contas, deslogar
-      console.log("Nenhum pedido/conta ativo, deslogando por inatividade");
 
       // Liberar a mesa
       await supabase

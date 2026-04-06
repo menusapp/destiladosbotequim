@@ -191,22 +191,18 @@ const Comanda = () => {
           if (activeComanda) {
             comandaId = activeComanda.id;
             sessionStorage.setItem(`comanda_id_${tableNumber}`, comandaId);
-            console.log("🔑 Comanda encontrada e salva no sessionStorage:", comandaId);
           }
         }
       }
       
       // 🚨 Se não encontrou comanda_id, NÃO configurar realtime (evita fallback por table_id)
       if (!comandaId) {
-        console.log("⚠️ Sem comanda_id - realtime não configurado (cliente precisa fazer login)");
         return;
       }
       
-      console.log("🔔 Configurando realtime para Comanda - table_id:", tableData.id, "comanda_id:", comandaId);
       
       // Função para processar pagamento (seja UPDATE ou INSERT de bill paga)
       const handleBillPaid = (bill: any) => {
-        console.log("✅ Conta foi paga! Redirecionando...");
         toast.success("Conta paga! Obrigado pela preferência!");
         
         // Fechar comanda ativa
@@ -215,7 +211,6 @@ const Comanda = () => {
             status: "closed",
             closed_at: new Date().toISOString()
           }).eq("id", comandaId);
-          console.log("📋 Comanda fechada:", comandaId);
         }
         
         // Salvar informações para abrir modal de avaliação
@@ -251,11 +246,9 @@ const Comanda = () => {
             filter: billFilter,
           },
           (payload) => {
-            console.log("🔔 Conta ATUALIZADA em tempo real na Comanda:", payload);
             const bill = payload.new as any;
             
             if (bill?.status === "on_the_way") {
-              console.log("💳 Conta a caminho!");
               setBillOnTheWay(true);
               // Silenciado para cliente
             }
@@ -265,7 +258,6 @@ const Comanda = () => {
             }
             
             // Recarregar dados de qualquer forma
-            console.log("🔄 Recarregando dados da comanda...");
             fetchData();
           }
         )
@@ -278,7 +270,6 @@ const Comanda = () => {
             filter: billFilter,
           },
           (payload) => {
-            console.log("🔔 Nova conta CRIADA em tempo real na Comanda:", payload);
             const bill = payload.new as any;
             
             // Bill criada já como paga (pelo PDV sem cliente ter solicitado)
@@ -334,7 +325,6 @@ const Comanda = () => {
           }
         )
         .subscribe((status) => {
-          console.log('📡 Status da subscrição Comanda (Bills):', status);
         });
       
       // Configurar realtime para pedidos aceitos - SEMPRE por comanda_id
@@ -352,13 +342,11 @@ const Comanda = () => {
             filter: ordersFilter,
           },
           (payload) => {
-            console.log("Order atualizada em tempo real:", payload);
             // Atualiza dados para refletir status
             fetchData();
           }
         )
         .subscribe((status) => {
-          console.log("Orders channel status:", status);
         });
     };
     
@@ -366,11 +354,9 @@ const Comanda = () => {
     
     return () => {
       if (billChannel) {
-        console.log("Removendo bill channel");
         supabase.removeChannel(billChannel);
       }
       if (ordersChannel) {
-        console.log("Removendo orders channel");
         supabase.removeChannel(ordersChannel);
       }
     };
@@ -392,7 +378,6 @@ const Comanda = () => {
           .maybeSingle();
         
         if (!comanda || comanda.status === "closed") {
-          console.log('🔒 Comanda fechada ao voltar do background - redirecionando');
           
           const { data: paidBill } = await supabase
             .from("bills")
@@ -714,7 +699,6 @@ const Comanda = () => {
         
         if (existingComanda) {
           comandaId = existingComanda.id;
-          console.log('📋 Comanda existente encontrada (fallback):', comandaId);
         } else {
           // Criar nova comanda
           const { data: newComanda, error: comandaError } = await supabase
@@ -731,7 +715,6 @@ const Comanda = () => {
           
           if (!comandaError && newComanda) {
             comandaId = newComanda.id;
-            console.log('📋 Nova comanda criada (fallback):', comandaId);
           }
         }
         

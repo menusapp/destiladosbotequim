@@ -253,7 +253,6 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
         } catch (printErr) { console.error('Auto-print error:', printErr); }
       }
       if (newStatus === 'cancelled' && order.order_type === 'local' && order.table_id && previousStatus === 'pending') {
-        console.log("[OrderDetail] Cancelled pending local order, table stays available");
       }
       if (newStatus === 'delivered' || newStatus === 'picked_up') {
         supabase.functions.invoke('marketing-trigger', { body: { orderId: order.id, restaurantId } });
