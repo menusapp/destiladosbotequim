@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Moon, Sun, Store } from "lucide-react";
+import { Copy, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
