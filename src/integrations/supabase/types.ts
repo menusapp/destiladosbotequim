@@ -58,6 +58,7 @@ export type Database = {
           id: string
           paid_at: string | null
           payment_method: string | null
+          payment_splits: Json | null
           service_fee: number
           status: string | null
           subtotal: number
@@ -71,6 +72,7 @@ export type Database = {
           id?: string
           paid_at?: string | null
           payment_method?: string | null
+          payment_splits?: Json | null
           service_fee: number
           status?: string | null
           subtotal: number
@@ -84,6 +86,7 @@ export type Database = {
           id?: string
           paid_at?: string | null
           payment_method?: string | null
+          payment_splits?: Json | null
           service_fee?: number
           status?: string | null
           subtotal?: number

@@ -1,0 +1,1 @@
+ALTER TABLE public.bills ADD COLUMN payment_splits jsonb DEFAULT NULL;
