@@ -126,7 +126,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         supabase.from("fixed_costs").select("name, amount").eq("restaurant_id", restaurantId),
         supabase.from("variable_costs").select("name, type, amount, percentage").eq("restaurant_id", restaurantId),
         supabase.from("labor_costs").select("employee_name, salary").eq("restaurant_id", restaurantId),
-        supabase.from("bills").select(`id, total_amount, table_id, payment_method, tables!inner(restaurant_id)`)
+        supabase.from("bills").select(`id, total_amount, table_id, payment_method, payment_splits, tables!inner(restaurant_id)`)
           .eq("tables.restaurant_id", restaurantId).eq("status", "paid")
           .gte("paid_at", startDate.toISOString()).lte("paid_at", endDate.toISOString()),
         supabase.from("orders").select(`id, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(quantity, price_at_order, order_item_extras(price_at_order))`)
