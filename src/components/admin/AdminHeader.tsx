@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Moon, Sun, Store } from "lucide-react";
+import { Copy, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { useTheme } from "next-themes";
+
 import { RealtimeStatusIndicator } from "./RealtimeStatusIndicator";
 
 interface AdminHeaderProps {
@@ -38,7 +38,7 @@ export const AdminHeader = ({
   onIsOpenUpdate,
 }: AdminHeaderProps) => {
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
+  
   const [updatingOpen, setUpdatingOpen] = useState(false);
 
   const handleToggleOpen = async () => {
@@ -153,19 +153,6 @@ export const AdminHeader = ({
         />
       </div>
 
-      {/* Theme toggle */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8"
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      >
-        {theme === "dark" ? (
-          <Sun className="h-4 w-4" />
-        ) : (
-          <Moon className="h-4 w-4" />
-        )}
-      </Button>
 
       {/* User */}
       <DropdownMenu>
