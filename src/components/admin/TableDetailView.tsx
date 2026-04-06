@@ -219,8 +219,15 @@ export const TableDetailView = () => {
       if (error) throw error;
       toast.success("Status atualizado!");
 
-      // Auto-print on accept if enabled
+      // Mark table as occupied when accepting a table order
       if (newStatus === "accepted") {
+        await supabase.from("tables").update({
+          is_occupied: true,
+          occupied_at: new Date().toISOString(),
+          occupied_by: allOrders.find(o => o.id === orderId)?.customer_name || "Cliente",
+        }).eq("id", tableId);
+
+        // Auto-print on accept if enabled
         const autoPrintEnabled = localStorage.getItem("pdv_auto_print") === "true";
         if (autoPrintEnabled) {
           const order = allOrders.find(o => o.id === orderId);
