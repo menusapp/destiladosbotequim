@@ -348,8 +348,8 @@ export const TableDetailDialog = ({
     const comandaId = payingComanda._comanda_id;
     const now = new Date().toISOString();
 
-    // Close comanda + update bills + check remaining comandas in parallel
-    const [, , remainingRes] = await Promise.all([
+    // Step 1: Close comanda + update bills in parallel (safe, different tables)
+    await Promise.all([
       comandaId
         ? supabase.from("comandas").update({ status: "closed", closed_at: now }).eq("id", comandaId)
         : Promise.resolve(),
@@ -357,9 +357,11 @@ export const TableDetailDialog = ({
         ? supabase.from("bills").update({ status: "paid", paid_at: now })
             .eq("comanda_id", comandaId).in("status", ["requested", "on_the_way"])
         : Promise.resolve(),
-      supabase.from("comandas").select("id").eq("table_id", table!.id).eq("status", "active"),
     ]);
 
+    // Step 2: AFTER closing, check remaining active comandas
+    const remainingRes = await supabase
+      .from("comandas").select("id").eq("table_id", table!.id).eq("status", "active");
     const remainingCmdas = remainingRes.data || [];
     if (remainingCmdas.length === 0) {
       await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table!.id);
