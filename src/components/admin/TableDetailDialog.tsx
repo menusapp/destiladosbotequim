@@ -245,9 +245,20 @@ export const TableDetailDialog = ({
   };
 
   const handleAcceptOrder = async (orderId: string) => {
+    const acceptedOrder = orders?.find(o => o.id === orderId);
     await supabase.from("orders").update({ status: "accepted" }).eq("id", orderId);
+
+    if (table?.id) {
+      await supabase.from("tables").update({
+        is_occupied: true,
+        occupied_at: new Date().toISOString(),
+        occupied_by: acceptedOrder?.customer_name || "Cliente",
+      }).eq("id", table.id);
+    }
+
     toast.success("Pedido aceito!");
     refetchOrders();
+    onTableCleared();
   };
 
   const handleClearTable = async () => {
