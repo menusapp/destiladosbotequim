@@ -38,7 +38,7 @@ export const AdminHeader = ({
   onIsOpenUpdate,
 }: AdminHeaderProps) => {
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
+  
   const [updatingOpen, setUpdatingOpen] = useState(false);
 
   const handleToggleOpen = async () => {
