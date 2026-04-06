@@ -1,85 +1,66 @@
 
 
-# Plan: Revisão de Segurança, Performance e Estabilidade para Produção
+# Plan: Otimizar pagamento de comanda + Corrigir pagamentos divididos nos relatórios
 
-## Resumo da auditoria
+## Diagnóstico
 
-Após análise completa do código, a situação atual é:
-- **RLS**: Todas as 77 tabelas têm RLS ativado, porém TODAS usam políticas `USING (true) / WITH CHECK (true)` — acesso totalmente aberto. Isso é intencional dado que o sistema usa autenticação via `localStorage` (anon role), mas tabelas sensíveis de outros restaurantes ficam expostas.
-- **Secrets hardcoded**: Nenhuma chave privada hardcoded no frontend — apenas `SUPABASE_URL` e `ANON_KEY` (correto).
-- **Performance**: `staleTime` global de 5 min já configurado. Realtime channels têm cleanup adequado. Sem duplicatas óbvias.
-- **Console.logs**: ~370 ocorrências em 12 arquivos (Menu.tsx, Comanda.tsx, Kiosk.tsx, RestaurantAdmin.tsx são os piores).
-- **Edge Functions**: Todas têm try/catch e CORS. Boa cobertura de erros.
+### Correção 1 — Performance do pagamento
+O `handlePaymentConfirmed` em `TableDetailDialog.tsx` (linhas 321-365) executa tudo sequencialmente:
+- Loop sequencial por cada order: fetch status → RPC deduct_stock → update status (3 calls por pedido)
+- Depois: update comanda, update bills, fetch remaining comandas, update table
+- Total para 3 pedidos: ~12 chamadas sequenciais
 
-## Mudanças propostas (cirúrgicas, sem risco)
+O `handleConfirmPayment` em `PaymentConfirmationModal.tsx` (linhas 202-351) também é sequencial:
+- Update orders → find bill → update/insert bill → delete cash_movements (3 calls) → find cash session → insert movements em loop
 
-### 1. Segurança — RLS com escopo por restaurant_id
+### Correção 2 — Pagamentos divididos nos relatórios
+Quando há pagamento misto, o `PaymentConfirmationModal` salva `payment_method: null` no bill (linha 215: `uniqueTypes.length === 1 ? uniqueTypes[0] : null`). O `normalizeMethod` no `ReportsTab` retorna `null` para isso, e `addToPaymentTotal` ignora — resultado: valor some dos relatórios.
 
-**PROBLEMA CRÍTICO**: Qualquer usuário anônimo pode ler/escrever em tabelas de QUALQUER restaurante. Na prática, alguém poderia listar pedidos, clientes, configurações fiscais e financeiras de restaurantes concorrentes usando a anon key.
+No `useOrderMetrics`, a lógica é diferente: usa `addMethodRevenue` que trata `null` como "Outros". Mas para bills com `payment_method: null` de pagamento misto, o valor total vai todo para "Outros" em vez de ser desagregado.
 
-**Abordagem conservadora**: Em vez de criar políticas `restaurant_id = ?` (que quebraria o sistema que opera como anon sem contexto de restaurante), vou documentar este risco como comentários no código e NÃO alterar as políticas RLS. A razão: toda a arquitetura depende de queries client-side com filtro `restaurant_id` e roles `anon`. Mudar RLS agora exigiria refatoração arquitetural completa do sistema de autenticação.
+**Solução**: Adicionar coluna `payment_splits jsonb` na tabela `bills`. Salvar os detalhes de cada parte do pagamento. Nos relatórios, quando `payment_splits` existir, iterar sobre ele em vez de usar `payment_method`.
 
-**Ação**: Adicionar comentário de segurança no `client.ts` e no `ProtectedRoute.tsx` documentando este risco para futura refatoração.
+## Mudanças
 
-### 2. Limpeza — Console.logs de debug (~370 ocorrências)
+### 1. Migration — Adicionar coluna `payment_splits` na tabela `bills`
+```sql
+ALTER TABLE public.bills ADD COLUMN payment_splits jsonb DEFAULT NULL;
+```
+Formato: `[{"method": "cash", "display": "Dinheiro", "amount": 50.00}, {"method": "credit", "display": "Crédito - Visa", "amount": 58.60, "brand": "visa"}]`
 
-Remover console.logs de debug em:
-- `src/pages/Menu.tsx` (~30 logs com emojis 🔍⭐📦🔒💰)
-- `src/pages/Comanda.tsx` (~25 logs com emojis)  
-- `src/pages/Kiosk.tsx` (~5 logs)
-- `src/pages/RestaurantAdmin.tsx` (~5 logs)
-- `src/components/kiosk/KioskPayment.tsx` (~5 logs)
-- `src/components/menu/CheckoutDrawer.tsx` (~3 logs)
-- `src/components/menu/checkout/PaymentStep.tsx` (1 log)
-- `src/components/admin/settings/WhatsAppSettings.tsx` (1 log)
-- `src/components/admin/OrderDetailModal.tsx` (1 log)
-- `src/hooks/useMenuInactivityLogout.tsx` (2 logs)
-- `src/lib/performanceMonitor.ts` (remover auto-print em produção)
+### 2. `PaymentConfirmationModal.tsx` — Salvar payment_splits + otimizar
+- Construir array `payment_splits` a partir de `selectedPayments`
+- Salvar no bill: `payment_splits` com detalhes, `payment_method` mantém o tipo único ou `null` para misto (backward compat)
+- Paralelizar: cash_movements cleanup (3 deletes) com `Promise.all`
+- Paralelizar: cash_movements inserts com `Promise.all`
+- Adicionar `loading` state no botão "Confirmar Pagamento" (desabilitar imediatamente ao clicar)
 
-Manter todos os `console.error` e `console.warn` (úteis para diagnóstico).
+### 3. `TableDetailDialog.tsx` — Otimizar `handlePaymentConfirmed`
+- Paralelizar stock deduction + status update por order usando `Promise.all`
+- Paralelizar: close comanda + update bills + check remaining em grupo
+- Paralelizar: `refetchComandas()`, `refetchOrders()`, `refetchBills()` não precisam ser sequenciais (já são independentes, mas ficam mais claros)
 
-### 3. Performance — Otimização de queries no DeliveryMenu
+### 4. `useOrderMetrics.ts` — Desagregar payment_splits
+- No fetch de `bills`, adicionar `payment_splits` ao select
+- Em `addMethodRevenue`: quando o bill tem `payment_splits` (array JSON), iterar sobre cada split e somar ao método correto em vez de usar `payment_method`
 
-O `DeliveryMenu.tsx` faz queries sequenciais (restaurante → categorias → produtos destacados). Consolidar com `Promise.all` onde as queries são independentes.
+### 5. `ReportsTab.tsx` — Desagregar payment_splits no DRE
+- No fetch de `bills`, adicionar `payment_splits` ao select
+- Em `addToPaymentTotal` para bills: se `payment_splits` existir e for array, iterar sobre cada split e somar ao método correto. Caso contrário, usar `payment_method` como antes (backward compat com registros antigos)
 
-### 4. Estabilidade — Loading states
-
-Verificar e melhorar loading states nos componentes principais que usam fetch direto (sem TanStack Query) e podem ficar em tela branca:
-- `DeliveryMenu.tsx`: já tem `loading` state mas não mostra skeleton
-- `Kiosk.tsx`: idem
-
-### 5. Formulários — Validação no CreateOrderDrawer
-
-O `CreateOrderDrawer.tsx` permite submeter pedido delivery sem endereço preenchido. Adicionar validação mínima antes do submit.
-
-## Arquivos a modificar
-
+## Arquivos modificados
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Menu.tsx` | Remover ~30 console.logs de debug |
-| `src/pages/Comanda.tsx` | Remover ~25 console.logs de debug |
-| `src/pages/Kiosk.tsx` | Remover ~5 console.logs |
-| `src/pages/RestaurantAdmin.tsx` | Remover ~5 console.logs |
-| `src/components/kiosk/KioskPayment.tsx` | Remover ~5 console.logs |
-| `src/components/menu/CheckoutDrawer.tsx` | Remover ~3 console.logs |
-| `src/components/menu/checkout/PaymentStep.tsx` | Remover 1 console.log |
-| `src/components/admin/settings/WhatsAppSettings.tsx` | Remover 1 console.log |
-| `src/components/admin/OrderDetailModal.tsx` | Remover 1 console.log |
-| `src/hooks/useMenuInactivityLogout.tsx` | Remover 2 console.logs |
-| `src/lib/performanceMonitor.ts` | Condicionar auto-print a `import.meta.env.DEV` |
-| `src/pages/DeliveryMenu.tsx` | Consolidar queries com Promise.all |
-| `src/components/admin/CreateOrderDrawer.tsx` | Validação de endereço em pedido delivery |
+| Migration SQL | Adicionar `payment_splits jsonb` em `bills` |
+| `src/components/admin/PaymentConfirmationModal.tsx` | Salvar splits, loading state, paralelizar cleanup |
+| `src/components/admin/TableDetailDialog.tsx` | Paralelizar operações no pagamento |
+| `src/hooks/useOrderMetrics.ts` | Ler e desagregar `payment_splits` |
+| `src/components/admin/ReportsTab.tsx` | Ler e desagregar `payment_splits` |
 
 ## O que NÃO muda
-
-- Nenhuma política RLS existente (risco de quebrar fluxos)
-- Nenhum fluxo de pedidos, fiscal, iFood, DD, WhatsApp
-- Nenhuma Edge Function
-- Nenhum schema de banco
-- Nenhum canal realtime
-- Login do restaurante, staff e CEO
-
-## Risco documentado (sem ação agora)
-
-As políticas RLS `USING (true)` permitem que qualquer pessoa com a anon key acesse dados de qualquer restaurante. Isso é uma limitação arquitetural do sistema de autenticação baseado em localStorage. A correção exigiria migrar para Supabase Auth com custom claims ou implementar um middleware de validação. Será documentado no código.
+- Lógica de negócio do pagamento (ordem de operações, validações)
+- Fluxo de delivery, iFood, Delivery Direto, fiscal
+- Schema de outras tabelas
+- Registros existentes (payment_splits = null, lidos pelo fallback)
+- Split por item (SplitPaymentDialog) — funcionalidade diferente
 
