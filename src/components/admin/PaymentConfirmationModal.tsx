@@ -199,12 +199,15 @@ export const PaymentConfirmationModal = ({
     }
   };
 
+  const [confirming, setConfirming] = useState(false);
+
   const handleConfirmPayment = async () => {
     if (remaining > 0.01) {
       toast.error("Ainda falta pagar R$ " + remaining.toFixed(2));
       return;
     }
 
+    setConfirming(true);
     try {
       const allMethodNames = selectedPayments.map(p => p.method);
       const uniqueNames = [...new Set(allMethodNames)];
@@ -214,7 +217,14 @@ export const PaymentConfirmationModal = ({
       const uniqueTypes = [...new Set(allMethodTypes)];
       const billPaymentMethod = uniqueTypes.length === 1 ? uniqueTypes[0] : null;
 
-      // Get the primary brand code (first payment with a brand)
+      // Build payment_splits array for granular reporting
+      const paymentSplits = selectedPayments.map(p => ({
+        method: p.methodType,
+        display: p.method,
+        amount: p.amount,
+        ...(p.brandCode ? { brand: p.brandCode } : {}),
+      }));
+
       const primaryBrand = selectedPayments.find(p => p.brandCode)?.brandCode || null;
       const targetOrderIds = Array.isArray((order as any)._comanda_order_ids) && (order as any)._comanda_order_ids.length > 0
         ? (order as any)._comanda_order_ids
@@ -226,16 +236,6 @@ export const PaymentConfirmationModal = ({
         payment_status: "paid",
         paid_at: paidAt,
       };
-
-      console.info("[payment-confirmation] salvando pagamento", {
-        orderId: order.id,
-        targetOrderIds,
-        paymentDisplayStr,
-        billPaymentMethod,
-        primaryBrand,
-        total,
-        selectedPayments,
-      });
 
       const { error } = targetOrderIds.length === 1
         ? await supabase
@@ -258,11 +258,11 @@ export const PaymentConfirmationModal = ({
           service_fee: feeAmount,
           total_amount: grossTotal,
           payment_method: billPaymentMethod,
+          payment_splits: paymentSplits,
           status: "paid",
           paid_at: paidAt,
         };
 
-        // Try to find existing bill for this order's table/comanda
         let existingBillQuery = supabase.from("bills").select("id").eq("table_id", order.table_id);
         if (comandaId) {
           existingBillQuery = existingBillQuery.eq("comanda_id", comandaId);
@@ -270,48 +270,34 @@ export const PaymentConfirmationModal = ({
         const { data: existingBills } = await existingBillQuery.order("created_at", { ascending: false }).limit(1).maybeSingle();
 
         if (existingBills) {
-          // Update existing bill
           const { error: billError } = await supabase.from("bills").update(billPayload).eq("id", existingBills.id);
           if (billError) console.error("Erro ao atualizar conta:", billError);
-          else {
-            console.info("[payment-change] bill atualizado", existingBills.id);
-            resolvedBillId = existingBills.id;
-          }
+          else resolvedBillId = existingBills.id;
         } else {
-          // Insert new bill
           const { data: newBill, error: billError } = await supabase.from("bills").insert({
             table_id: order.table_id,
             comanda_id: comandaId,
             ...billPayload,
           }).select("id").single();
           if (billError) console.error("Erro ao criar conta:", billError);
-          else if (newBill) {
-            resolvedBillId = newBill.id;
-          }
+          else if (newBill) resolvedBillId = newBill.id;
         }
       }
 
-      // --- Cash movements: clean up ALL related entries (any session) and re-create in current ---
+      // --- Cash movements: clean up ALL related entries in parallel, then re-create ---
       const restId = order.restaurant_id || restaurantId;
       const customerLabel = (order as any).customer_name || "Cliente";
-
-      // Delete old cash movements for this order across ALL sessions
-      await supabase.from("cash_movements")
-        .delete()
-        .eq("restaurant_id", restId)
-        .like("description", `%${customerLabel}%`)
-        .like("description", `%Pedido Local%`);
-
-      // Also clean up by order id pattern
       const shortId = order.id.slice(0, 6);
-      await supabase.from("cash_movements")
-        .delete()
-        .eq("restaurant_id", restId)
-        .like("description", `%#${order.id}%`);
-      await supabase.from("cash_movements")
-        .delete()
-        .eq("restaurant_id", restId)
-        .like("description", `%#${shortId}%`);
+
+      // Parallel cleanup of old cash movements
+      await Promise.all([
+        supabase.from("cash_movements").delete().eq("restaurant_id", restId)
+          .like("description", `%${customerLabel}%`).like("description", `%Pedido Local%`),
+        supabase.from("cash_movements").delete().eq("restaurant_id", restId)
+          .like("description", `%#${order.id}%`),
+        supabase.from("cash_movements").delete().eq("restaurant_id", restId)
+          .like("description", `%#${shortId}%`),
+      ]);
 
       // Re-create in current open session
       const { data: cashSession } = await supabase
@@ -324,8 +310,9 @@ export const PaymentConfirmationModal = ({
         .maybeSingle();
 
       if (cashSession) {
-        for (const payment of selectedPayments) {
-          await supabase.from("cash_movements").insert({
+        // Insert all movements in parallel
+        await Promise.all(selectedPayments.map(payment =>
+          supabase.from("cash_movements").insert({
             cash_session_id: cashSession.id,
             restaurant_id: restId,
             movement_type: "entrada",
@@ -335,8 +322,8 @@ export const PaymentConfirmationModal = ({
             description: `Pedido Local - ${customerLabel} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
             created_by: "Sistema",
             bill_id: resolvedBillId,
-          });
-        }
+          })
+        ));
       }
 
       await onConfirm();
@@ -348,6 +335,8 @@ export const PaymentConfirmationModal = ({
         error,
       });
       toast.error(error instanceof Error ? error.message : "Erro ao confirmar pagamento");
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -559,11 +548,15 @@ export const PaymentConfirmationModal = ({
           </Button>
           <Button
             onClick={handleConfirmPayment}
-            disabled={remaining > 0.01}
+            disabled={remaining > 0.01 || confirming}
             className="flex-1 gap-2 h-12 text-base font-bold"
           >
-            <Check className="w-5 h-5" />
-            Confirmar Pagamento
+            {confirming ? (
+              <span className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full" />
+            ) : (
+              <Check className="w-5 h-5" />
+            )}
+            {confirming ? "Processando..." : "Confirmar Pagamento"}
           </Button>
         </div>
       </DialogContent>

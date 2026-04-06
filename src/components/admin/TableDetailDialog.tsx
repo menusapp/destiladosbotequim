@@ -322,38 +322,49 @@ export const TableDetailDialog = ({
     if (!payingComanda) return;
 
     const orderIds = payingComanda._comanda_order_ids || [payingComanda.id];
-    for (const oid of orderIds) {
-      // Check if this order is still pending (never went through accepted/preparing)
-      // If so, manually deduct stock before marking as delivered
-      const { data: orderData } = await supabase.from("orders")
-        .select("id, status, order_items(id)")
-        .eq("id", oid)
-        .single();
-      
-      if (orderData && ["pending"].includes(orderData.status)) {
-        // Deduct stock for items that were never deducted by trigger
-        for (const oi of (orderData.order_items || [])) {
-          await supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: oi.id });
+    
+    // Fetch all orders in parallel to check status
+    const orderDataResults = await Promise.all(
+      orderIds.map((oid: string) =>
+        supabase.from("orders").select("id, status, order_items(id)").eq("id", oid).single()
+      )
+    );
+
+    // Deduct stock for pending orders + mark all as delivered in parallel
+    await Promise.all(
+      orderDataResults.map(async ({ data: orderData }) => {
+        if (!orderData) return;
+        if (orderData.status === "pending") {
+          await Promise.all(
+            (orderData.order_items || []).map((oi: any) =>
+              supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: oi.id })
+            )
+          );
         }
-      }
-      
-      await supabase.from("orders").update({ status: "delivered" }).eq("id", oid);
-    }
+        await supabase.from("orders").update({ status: "delivered" }).eq("id", orderData.id);
+      })
+    );
 
     const comandaId = payingComanda._comanda_id;
-    if (comandaId) {
-      await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() }).eq("id", comandaId);
-      await supabase.from("bills").update({ status: "paid", paid_at: new Date().toISOString() })
-        .eq("comanda_id", comandaId).in("status", ["requested", "on_the_way"]);
-    }
+    const now = new Date().toISOString();
 
-    const { data: remaining } = await supabase
-      .from("comandas").select("id").eq("table_id", table!.id).eq("status", "active");
+    // Close comanda + update bills + check remaining comandas in parallel
+    const [, , remainingRes] = await Promise.all([
+      comandaId
+        ? supabase.from("comandas").update({ status: "closed", closed_at: now }).eq("id", comandaId)
+        : Promise.resolve(),
+      comandaId
+        ? supabase.from("bills").update({ status: "paid", paid_at: now })
+            .eq("comanda_id", comandaId).in("status", ["requested", "on_the_way"])
+        : Promise.resolve(),
+      supabase.from("comandas").select("id").eq("table_id", table!.id).eq("status", "active"),
+    ]);
 
-    if (!remaining || remaining.length === 0) {
+    const remainingCmdas = remainingRes.data || [];
+    if (remainingCmdas.length === 0) {
       await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table!.id);
     } else {
-      await supabase.from("tables").update({ occupied_by: `${remaining.length} cliente${remaining.length !== 1 ? "s" : ""}` }).eq("id", table!.id);
+      await supabase.from("tables").update({ occupied_by: `${remainingCmdas.length} cliente${remainingCmdas.length !== 1 ? "s" : ""}` }).eq("id", table!.id);
     }
 
     setPayingComanda(null);

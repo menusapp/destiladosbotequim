@@ -92,7 +92,7 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
           .gte("created_at", start).lte("created_at", end),
         // Local bills paid (exclude zero-amount bills)
         supabase.from("bills")
-          .select("id, total_amount, payment_method, paid_at, table_id, tables!inner(restaurant_id)")
+          .select("id, total_amount, payment_method, payment_splits, paid_at, table_id, tables!inner(restaurant_id)")
           .eq("tables.restaurant_id", restaurantId)
           .eq("status", "paid")
           .gt("total_amount", 0)
@@ -247,8 +247,17 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       };
 
       const methodTotals: Record<string, number> = {};
+      // Somar bills — desagregar payment_splits quando disponível
       paidBills.forEach((b: any) => {
-        addMethodRevenue(methodTotals, b.payment_method, Number(b.total_amount));
+        const splits = b.payment_splits;
+        if (Array.isArray(splits) && splits.length > 0) {
+          for (const split of splits) {
+            const m = normalizeMethod(split.display || split.method);
+            methodTotals[m] = (methodTotals[m] || 0) + Number(split.amount || 0);
+          }
+        } else {
+          addMethodRevenue(methodTotals, b.payment_method, Number(b.total_amount));
+        }
       });
       counterOrders.forEach((co: any) => {
         addMethodRevenue(methodTotals, co.payment_method, Number(co.total_amount));
