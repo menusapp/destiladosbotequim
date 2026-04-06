@@ -101,11 +101,6 @@ export function KioskPayment({
         paymentMethod === "cash" && cashPaid ? `Troco para: R$ ${parseFloat(cashPaid).toFixed(2)}` : null,
       ].filter(Boolean).join(" | ");
 
-      console.log("[Kiosk] Creating order:", {
-        order_type, delivery_type, order_channel: "totem",
-        consumptionMode, tableId, tableNumber, paymentMethod,
-        finalTotal, couponDiscount, pointsDiscount, deliveryAddress,
-      });
 
       const orderData: any = {
         table_id: tableId,
@@ -142,7 +137,6 @@ export function KioskPayment({
         throw orderError;
       }
 
-      console.log("[Kiosk] Order created:", order.id);
 
       // Insert order items
       for (const item of cart) {
@@ -175,7 +169,6 @@ export function KioskPayment({
       // For table orders: create comanda but DON'T occupy the table yet
       // Table will be occupied when operator accepts the order in PDV
       if (consumptionMode === "table" && tableId) {
-        console.log("[Kiosk] Creating comanda for table (table stays available until operator accepts):", tableId);
 
         // Create comanda
         const { data: comanda, error: comandaError } = await supabase
@@ -193,7 +186,6 @@ export function KioskPayment({
         if (comandaError) {
           console.error("[Kiosk] Comanda error:", comandaError);
         } else {
-          console.log("[Kiosk] Comanda created:", comanda.id);
           // Link the order to the comanda
           await supabase.from("orders").update({ comanda_id: comanda.id }).eq("id", order.id);
         }

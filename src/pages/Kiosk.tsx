@@ -127,7 +127,6 @@ export default function Kiosk() {
 
   // Fetch restaurant + categories
   const fetchData = useCallback(async () => {
-    console.log("[Kiosk] slug bruto (pathParam):", pathSlug, "| slug resolvido:", slug);
     if (!slug) {
       console.warn("[Kiosk] Slug ausente ou inválido — abortando bootstrap");
       setLoading(false);
@@ -155,7 +154,6 @@ export default function Kiosk() {
         .maybeSingle();
 
       if (kConf && !kConf.enabled) {
-        console.log("[Kiosk] Totem desativado para restaurante:", r.id);
         setKioskDisabled(true);
         setLoading(false);
         return;

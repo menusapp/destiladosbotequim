@@ -229,7 +229,6 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       );
       
       const data = await response.json();
-      console.log('Connect response:', data);
       
       if (data.qrString) {
         const imageUrl = await generateQrImage(data.qrString);
