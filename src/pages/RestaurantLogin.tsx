@@ -48,7 +48,8 @@ const Landing = () => {
           localStorage.setItem('ceo_access', 'true');
           navigate('/login/ceo');
         } else {
-        toast.error("Credenciais inválidas");
+          toast.error("Credenciais inválidas");
+        }
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer login");
