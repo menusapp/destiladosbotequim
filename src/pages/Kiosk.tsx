@@ -167,7 +167,9 @@ export default function Kiosk() {
 
       if (catsErr) console.error("[Kiosk] Erro ao carregar categorias:", catsErr);
 
-      const filtered = (cats || []).map((cat: any) => ({
+      const filtered = (cats || [])
+        .filter((cat: any) => cat.is_active !== false)
+        .map((cat: any) => ({
         ...cat,
         products: (cat.products || []).filter((p: any) => {
           if (!p.available) return false;
