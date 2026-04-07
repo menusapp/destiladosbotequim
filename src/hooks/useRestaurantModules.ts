@@ -37,11 +37,12 @@ const ALWAYS_AVAILABLE = [
 export function useRestaurantModules(restaurantId: string | null) {
   const [allowedModules, setAllowedModules] = useState<string[] | null>(null);
   const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(null);
+  const [isDelinquent, setIsDelinquent] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!restaurantId) {
-      setAllowedModules(null); // null = all access (no plan assigned)
+      setAllowedModules(null);
       setLoading(false);
       return;
     }
@@ -64,10 +65,18 @@ export function useRestaurantModules(restaurantId: string | null) {
         const plan = sub.subscription_plans as any;
         setAllowedModules(plan.features || []);
         setHasActiveSubscription(true);
+
+        // Check delinquency: if next_payment_at exists and is in the past
+        const nextPayment = (sub as any).next_payment_at;
+        if (nextPayment && new Date(nextPayment) < new Date()) {
+          setIsDelinquent(true);
+        } else {
+          setIsDelinquent(false);
+        }
       } else {
-        // No active subscription = full access (default behavior)
         setAllowedModules(null);
         setHasActiveSubscription(false);
+        setIsDelinquent(false);
       }
     } catch {
       setAllowedModules(null);
@@ -87,5 +96,5 @@ export function useRestaurantModules(restaurantId: string | null) {
     return allowedModules.includes(moduleId);
   };
 
-  return { allowedModules, loading, isSectionAllowed, hasActiveSubscription };
+  return { allowedModules, loading, isSectionAllowed, hasActiveSubscription, isDelinquent };
 }

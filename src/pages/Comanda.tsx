@@ -463,7 +463,7 @@ const Comanda = () => {
       // Buscar mesa DO RESTAURANTE ESPECÍFICO
       const tableResult = await supabase
         .from("tables")
-        .select("id")
+        .select("id, is_hidden")
         .eq("table_number", parseInt(tableNumber))
         .eq("restaurant_id", restData.id)
         .limit(1)
@@ -474,6 +474,12 @@ const Comanda = () => {
       
       if (!tableData) {
         toast.error("Mesa não encontrada");
+        return;
+      }
+
+      if (tableData.is_hidden) {
+        toast.error("Esta mesa está indisponível no momento");
+        setLoading(false);
         return;
       }
       

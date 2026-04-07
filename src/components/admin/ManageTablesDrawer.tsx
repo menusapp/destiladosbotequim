@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Users, ImageIcon, X, Check } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Pencil, Trash2, Users, ImageIcon, X, Check, EyeOff } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 interface TableRow {
@@ -19,6 +20,7 @@ interface TableRow {
   description: string | null;
   display_order: number | null;
   is_occupied: boolean | null;
+  is_hidden: boolean;
 }
 
 interface ManageTablesDrawerProps {
@@ -34,9 +36,10 @@ interface FormData {
   min_capacity: string;
   max_capacity: string;
   description: string;
+  is_hidden: boolean;
 }
 
-const emptyForm: FormData = { table_number: "", table_name: "", min_capacity: "1", max_capacity: "4", description: "" };
+const emptyForm: FormData = { table_number: "", table_name: "", min_capacity: "1", max_capacity: "4", description: "", is_hidden: false };
 
 export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesChanged }: ManageTablesDrawerProps) => {
   const [tables, setTables] = useState<TableRow[]>([]);
@@ -55,7 +58,7 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
     setLoading(true);
     const { data } = await supabase
       .from("tables")
-      .select("id, table_number, table_name, min_capacity, max_capacity, image_url, description, display_order, is_occupied")
+      .select("id, table_number, table_name, min_capacity, max_capacity, image_url, description, display_order, is_occupied, is_hidden")
       .eq("restaurant_id", restaurantId)
       .neq("table_number", 9999)
       .order("display_order")
@@ -80,6 +83,7 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
       min_capacity: String(table.min_capacity ?? 1),
       max_capacity: String(table.max_capacity ?? 4),
       description: table.description || "",
+      is_hidden: table.is_hidden ?? false,
     });
     setImageFile(null);
     setShowForm(true);
@@ -114,6 +118,7 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
       min_capacity: parseInt(form.min_capacity) || 1,
       max_capacity: parseInt(form.max_capacity) || 4,
       description: form.description || null,
+      is_hidden: form.is_hidden,
       restaurant_id: restaurantId,
     };
     if (imageUrl !== undefined) payload.image_url = imageUrl;
@@ -205,6 +210,14 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
                   <Input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="text-xs" />
                 </div>
 
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label className="text-xs font-medium">Mesa oculta</Label>
+                    <p className="text-[10px] text-muted-foreground">Mesas ocultas não aparecem em reservas nem aceitam pedidos via QR Code</p>
+                  </div>
+                  <Switch checked={form.is_hidden} onCheckedChange={(v) => setForm(f => ({ ...f, is_hidden: v }))} />
+                </div>
+
                 <Button onClick={handleSave} disabled={saving} className="w-full" size="sm">
                   <Check className="w-4 h-4 mr-1" />
                   {saving ? "Salvando..." : editingId ? "Salvar" : "Criar Mesa"}
@@ -237,7 +250,8 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Users className="w-3 h-3" />
                       <span>{table.min_capacity ?? 1}–{table.max_capacity ?? 4} pessoas</span>
-                      {table.is_occupied && <Badge variant="default" className="text-[9px] px-1 py-0">Ocupada</Badge>}
+                      {table.is_hidden && <Badge variant="outline" className="text-[9px] px-1 py-0">Oculta</Badge>}
+                      {table.is_occupied && !table.is_hidden && <Badge variant="default" className="text-[9px] px-1 py-0">Ocupada</Badge>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1">

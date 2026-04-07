@@ -46,6 +46,7 @@ interface TableData {
   occupied_at: string | null;
   min_capacity: number;
   max_capacity: number;
+  is_hidden: boolean;
   comandas?: { id: string; customer_name: string; customer_cpf: string }[];
 }
 
@@ -729,12 +730,13 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                 return (
                   <Card
                     key={table.id}
-                    className={`cursor-pointer transition-all hover:shadow-md relative ${
+                    className={`${table.is_hidden ? "opacity-60 cursor-not-allowed" : "cursor-pointer"} transition-all hover:shadow-md relative ${
                       isSelected ? "ring-2 ring-primary border-primary" :
-                      isOccupied ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-border"
+                      table.is_hidden ? "border-border bg-muted/30" :
+                      isOccupied ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-green-300 bg-green-50 dark:bg-green-950/20"
                     }`}
-                    onClick={() => handleTableClick(table)}
-                    onDoubleClick={() => handleTableSelect(table)}
+                    onClick={() => !table.is_hidden && handleTableClick(table)}
+                    onDoubleClick={() => !table.is_hidden && handleTableSelect(table)}
                   >
                     {/* Three-dot menu */}
                     <DropdownMenu>
@@ -762,7 +764,8 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
 
                     <CardContent className="p-4 text-center space-y-1">
                       <div className={`w-10 h-10 rounded-full mx-auto flex items-center justify-center text-white text-sm font-bold ${
-                        isOccupied ? "bg-green-500" : "bg-muted-foreground/40"
+                        table.is_hidden ? "bg-muted-foreground/40" :
+                        isOccupied ? "bg-red-500" : "bg-green-400"
                       }`}>
                         {table.table_number}
                       </div>
@@ -778,8 +781,8 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                           🕐 Reservado {reservationByTable.get(table.id)!.time}
                         </Badge>
                       )}
-                      <Badge variant={isOccupied ? "default" : "secondary"} className="text-[10px]">
-                        {isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
+                      <Badge variant={table.is_hidden ? "outline" : isOccupied ? "default" : "secondary"} className="text-[10px]">
+                        {table.is_hidden ? "Oculta" : isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
                       </Badge>
                       {isOccupied && occupiedSince && showPrepTimer && (
                         <p className="text-[10px] text-muted-foreground">Desde {occupiedSince}</p>

@@ -136,6 +136,7 @@ const Reservations = () => {
         .select("*")
         .eq("restaurant_id", restaurantData.id)
         .eq("is_available_for_reservation", true)
+        .eq("is_hidden", false)
         .neq("table_number", 9999)
         .order("display_order")
         .order("table_number");
