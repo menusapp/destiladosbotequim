@@ -111,7 +111,7 @@ const Menu = () => {
             id, name, display_order,
             products (
               id, name, description, price, promotional_price, available, image_url, 
-              is_featured, prep_time_minutes, featured_display_order,
+              is_featured, prep_time_minutes, featured_display_order, featured_active, featured_schedule,
               product_extras (id, name, price)
             )
           )
