@@ -1,94 +1,39 @@
 
 
-# Correção de RLS — restaurant_staff e online_payment_config
+# Correção da Integração Mercado Pago
 
-## Diagnóstico
+## Problemas identificados
 
-Ambas as tabelas têm uma única policy `block_direct_access` com `USING(false) / WITH CHECK(false)` que bloqueia **todas** as operações diretas (SELECT, INSERT, UPDATE, DELETE). Isso é intencional para segurança, pois o sistema opera com role `anon`.
+### Problema 1 — Pagamentos online não aparecem no cardápio
+O `PaymentStep.tsx` (linha 120-124) faz query direta em `online_payment_config` para verificar se pagamentos online estão habilitados. A tabela tem `block_direct_access` RLS, então retorna vazio — o cardápio nunca mostra as opções de Pix/Cartão online.
 
-O problema: **o código faz queries diretas** nessas tabelas em vez de usar as RPCs `SECURITY DEFINER` que já existem.
+O `OnlinePaymentStep.tsx` (linhas 133-137 e 374-378) também faz queries diretas para buscar `mp_public_key` — bloqueadas pela mesma RLS.
 
-### restaurant_staff — operações que falham
-
-| Arquivo | Operação | Linha | RPC existente |
-|---|---|---|---|
-| `StaffLogin.tsx` | `SELECT` (verificar se há staff) | ~38 | `admin_check_has_staff` |
-| `StaffLogin.tsx` | `INSERT` (criar primeiro staff) | ~95 | `admin_create_first_staff` |
-| `ContasTab.tsx` | `SELECT` (listar staff) | ~51 | **não existe** — criar |
-| `ContasTab.tsx` | `INSERT` (criar staff) | ~140 | **não existe** — criar |
-| `ContasTab.tsx` | `UPDATE` (editar staff) | ~114 | **não existe** — criar |
-| `ContasTab.tsx` | `UPDATE` (toggle ativo) | ~178 | **não existe** — criar |
-| `CEODashboard.tsx` | `INSERT` (criar admin ao registrar) | ~164 | **não existe** — criar |
-
-**Por que aparece "primeiro acesso"**: o `SELECT` na linha 38 do StaffLogin retorna vazio (bloqueado pela RLS), então `hasStaff = false` → `isFirstTime = true`.
-
-### online_payment_config — operações que falham
-
-| Arquivo | Operação | Linha | RPC existente |
-|---|---|---|---|
-| `OnlinePaymentsSettings.tsx` | `SELECT` (ler config) | ~55 | `admin_get_payment_config` |
-| `OnlinePaymentsSettings.tsx` | `UPSERT` (criar config) | ~86 | `admin_ensure_payment_config` |
-| `OnlinePaymentsSettings.tsx` | `UPDATE` (toggles) | ~130 | `admin_upsert_payment_config` |
-| `OnlinePaymentsSettings.tsx` | `UPDATE` (sandbox email) | ~151 | `admin_upsert_payment_config` |
-| `OnlinePaymentsSettings.tsx` | `DELETE` (desconectar) | ~170 | `admin_delete_payment_config` |
+### Problema 2 — OAuth pode não estar redirecionando corretamente
+O fluxo reportado ("conectou sem ir para a página do Mercado Pago") sugere que o redirect URI ou o `client_id` podem estar incorretos, ou o token já existia. Porém, o código do fluxo OAuth em si está correto — o edge function retorna `client_id` e o frontend redireciona para `auth.mercadopago.com.br`. Isso precisa ser verificado com teste real, mas não há bug de código evidente além da RLS.
 
 ## Solução
 
-A solução correta NÃO é alterar as policies RLS (que estão certas). É **migrar o código para usar as RPCs existentes** e criar novas RPCs para as operações do ContasTab/CEODashboard que não têm RPC ainda.
+### 1. PaymentStep.tsx — Usar RPC `get_public_payment_config`
+Substituir a query direta `supabase.from("online_payment_config").select(...)` pela RPC `get_public_payment_config` que já existe e retorna os campos necessários (`enabled`, `accept_pix`, `accept_card`, `enable_for_delivery`, `connection_status`, `mp_public_key`).
 
-### 1. Criar novas RPCs (migration SQL)
+### 2. OnlinePaymentStep.tsx — Usar RPC `get_public_payment_config`
+Substituir as 2 queries diretas que buscam `mp_public_key` pela mesma RPC.
 
-- `admin_list_staff(p_restaurant_id)` — retorna todos os staff do restaurante
-- `admin_upsert_staff(p_restaurant_id, p_id, p_username, p_password_hash, p_display_name, p_role, p_allowed_sections)` — cria ou atualiza staff
-- `admin_toggle_staff_active(p_staff_id, p_restaurant_id)` — toggle is_active
+### 3. Verificação do fluxo OAuth
+O fluxo OAuth em si (edge function + callback page) está correto. O problema de "não ir para a página do MP" pode ser porque o navegador já tinha uma sessão ativa no Mercado Pago e autorizou automaticamente. Isso é comportamento normal do MP quando o app já foi autorizado anteriormente.
 
-Todas com `SECURITY DEFINER` e `SET search_path = public`.
+## Arquivos a alterar
 
-### 2. Alterar StaffLogin.tsx
-
-- Linha 38: trocar `supabase.from("restaurant_staff").select(...)` por `supabase.rpc("admin_check_has_staff", { p_restaurant_id: restaurantId })`
-- Linha 95: trocar `supabase.from("restaurant_staff").insert(...)` por `supabase.rpc("admin_create_first_staff", { ... })`
-
-### 3. Alterar ContasTab.tsx
-
-- `fetchStaff`: trocar select direto por `supabase.rpc("admin_list_staff", { p_restaurant_id: restaurantId })`
-- `handleSubmit` (insert/update): trocar por `supabase.rpc("admin_upsert_staff", { ... })`
-- `handleToggleActive`: trocar por `supabase.rpc("admin_toggle_staff_active", { ... })`
-
-### 4. Alterar CEODashboard.tsx
-
-- Linha 164: trocar insert direto por `supabase.rpc("admin_create_first_staff", { ... })` (reutilizar a RPC existente, mas precisa remover a validação "staff já existe" pois no CEO é criação junto com restaurante)
-- Alternativa: criar RPC `admin_create_staff` sem essa restrição, ou ajustar `admin_create_first_staff` para ser mais flexível.
-
-### 5. Alterar OnlinePaymentsSettings.tsx
-
-- `fetchConfig`: usar `admin_get_payment_config`
-- `handleStartOAuth`: usar `admin_ensure_payment_config`
-- `handleToggle` e `handleSaveSandboxEmail`: usar `admin_upsert_payment_config`
-- `handleDisconnect`: usar `admin_delete_payment_config`
-
-## Arquivos impactados
-
-| Arquivo | Tipo |
+| Arquivo | Mudança |
 |---|---|
-| Migration SQL | Criar 3 novas RPCs |
-| `src/pages/StaffLogin.tsx` | Migrar 2 queries para RPCs |
-| `src/components/admin/ContasTab.tsx` | Migrar 4 queries para RPCs |
-| `src/pages/CEODashboard.tsx` | Migrar 1 query para RPC |
-| `src/components/admin/settings/OnlinePaymentsSettings.tsx` | Migrar 5 queries para RPCs |
+| `src/components/menu/checkout/PaymentStep.tsx` | Linha 120-124: trocar `from("online_payment_config")` por `rpc("get_public_payment_config")` |
+| `src/components/menu/checkout/OnlinePaymentStep.tsx` | Linhas 133-137 e 374-378: trocar queries diretas por `rpc("get_public_payment_config")` |
 
 ## O que NÃO muda
-
-- Policies RLS (ficam como estão — `block_direct_access`)
-- Edge functions
+- Edge functions (mercadopago-oauth, mercadopago-charge)
+- Policies RLS
+- Callback page (MercadoPagoCallback.tsx)
+- OnlinePaymentsSettings.tsx (já usa RPCs)
 - Fluxo de pedidos, estoque, fiscal
-- Nenhuma tabela aberta com `USING(true)`
-
-## Resultado esperado
-
-- Login do restaurante funciona normalmente (não aparece mais como "primeiro acesso")
-- Staff login funciona
-- Gestão de contas (ContasTab) funciona
-- Conexão com Mercado Pago funciona
-- Segurança mantida — acesso somente via RPCs SECURITY DEFINER
 
