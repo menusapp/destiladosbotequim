@@ -20,6 +20,7 @@ interface TableRow {
   description: string | null;
   display_order: number | null;
   is_occupied: boolean | null;
+  is_hidden: boolean;
 }
 
 interface ManageTablesDrawerProps {
