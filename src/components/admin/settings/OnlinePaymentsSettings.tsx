@@ -146,10 +146,11 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
     if (!config) return;
     setSavingSandboxEmail(true);
     try {
-      const { error } = await supabase
-        .from("online_payment_config")
-        .update({ mp_sandbox_payer_email: sandboxEmail.trim() || null } as any)
-        .eq("restaurant_id", restaurantId);
+      const { error } = await supabase.rpc("admin_upsert_payment_config", {
+        p_restaurant_id: restaurantId,
+        p_field: "mp_sandbox_payer_email",
+        p_value: sandboxEmail.trim() || null,
+      });
       if (error) throw error;
       setConfig({ ...config, mp_sandbox_payer_email: sandboxEmail.trim() || null });
       toast.success("Email de teste salvo!");
