@@ -96,5 +96,5 @@ export function useRestaurantModules(restaurantId: string | null) {
     return allowedModules.includes(moduleId);
   };
 
-  return { allowedModules, loading, isSectionAllowed, hasActiveSubscription };
+  return { allowedModules, loading, isSectionAllowed, hasActiveSubscription, isDelinquent };
 }
