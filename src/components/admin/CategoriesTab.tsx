@@ -22,6 +22,7 @@ interface Category {
   name: string;
   display_order: number;
   image_url: string | null;
+  is_active: boolean | null;
 }
 
 interface ProductInfo {
