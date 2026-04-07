@@ -140,10 +140,10 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleIfoodToggle = async (enabled: boolean) => {
-    await supabase
-      .from("ifood_config" as any)
-      .update({ enabled, updated_at: new Date().toISOString() } as any)
-      .eq("restaurant_id", restaurantId);
+    await supabase.rpc("admin_toggle_ifood", {
+      p_restaurant_id: restaurantId,
+      p_enabled: enabled,
+    });
     setIfoodConfig((prev) => (prev ? { ...prev, enabled } : null));
     toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
   };
