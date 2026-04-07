@@ -15,6 +15,7 @@ interface WebPrinterConfig {
   fontFamily: string;
   fontSize: number;
   fontBold: boolean;
+  printCopies: number;
 }
 
 const FONT_OPTIONS = [
