@@ -1,39 +1,110 @@
 
 
-# Correção da Integração Mercado Pago
+# Plano de Implementação — 4 Alterações
 
-## Problemas identificados
+## 1. Atualizar preços dos planos
 
-### Problema 1 — Pagamentos online não aparecem no cardápio
-O `PaymentStep.tsx` (linha 120-124) faz query direta em `online_payment_config` para verificar se pagamentos online estão habilitados. A tabela tem `block_direct_access` RLS, então retorna vazio — o cardápio nunca mostra as opções de Pix/Cartão online.
+Trocar os valores hardcoded nos arquivos:
 
-O `OnlinePaymentStep.tsx` (linhas 133-137 e 374-378) também faz queries diretas para buscar `mp_public_key` — bloqueadas pela mesma RLS.
+**`src/pages/LandingPage.tsx`** (linhas 57-76):
+- Básico: `"99"` → `"69,90"`, daily `"R$ 3,30/dia"` → `"R$ 2,33/dia"`
+- Intermediário: `"199"` → `"149,90"`, daily `"R$ 6,63/dia"` → `"R$ 5,00/dia"`
+- Avançado: `"349"` → `"249,90"`, daily `"R$ 11,63/dia"` → `"R$ 8,33/dia"`
 
-### Problema 2 — OAuth pode não estar redirecionando corretamente
-O fluxo reportado ("conectou sem ir para a página do Mercado Pago") sugere que o redirect URI ou o `client_id` podem estar incorretos, ou o token já existia. Porém, o código do fluxo OAuth em si está correto — o edge function retorna `client_id` e o frontend redireciona para `auth.mercadopago.com.br`. Isso precisa ser verificado com teste real, mas não há bug de código evidente além da RLS.
+Ajustar o formato de exibição pois atualmente mostra `R$ {plan.price}/mês` com o price sendo string inteira. Com os novos valores decimais, manter coerência visual (ex: "69,90" como string no campo price, ajustar template).
 
-## Solução
+## 2. Webhook de assinatura do Mercado Pago + controle de inadimplência
 
-### 1. PaymentStep.tsx — Usar RPC `get_public_payment_config`
-Substituir a query direta `supabase.from("online_payment_config").select(...)` pela RPC `get_public_payment_config` que já existe e retorna os campos necessários (`enabled`, `accept_pix`, `accept_card`, `enable_for_delivery`, `connection_status`, `mp_public_key`).
+**Problema**: Não existe hoje um webhook que processe pagamentos de assinatura (preapproval). O webhook existente (`mercadopago-webhook`) só trata `payment.updated/created` de pagamentos avulsos de pedidos.
 
-### 2. OnlinePaymentStep.tsx — Usar RPC `get_public_payment_config`
-Substituir as 2 queries diretas que buscam `mp_public_key` pela mesma RPC.
+**Solução**:
 
-### 3. Verificação do fluxo OAuth
-O fluxo OAuth em si (edge function + callback page) está correto. O problema de "não ir para a página do MP" pode ser porque o navegador já tinha uma sessão ativa no Mercado Pago e autorizou automaticamente. Isso é comportamento normal do MP quando o app já foi autorizado anteriormente.
+### 2a. Criar edge function `mercadopago-subscription-webhook`
+- Receber notificações do tipo `subscription_preapproval` e `subscription_authorized_payment`
+- Quando pagamento de assinatura for aprovado:
+  - Buscar o restaurante pelo `external_reference` ou `payer.email` configurado no plano do MP
+  - Ativar/criar `restaurant_subscriptions` com `status: active`, `last_payment_at: now()`, `next_payment_at: +30 dias`
+- Quando assinatura for cancelada ou pagamento falhar:
+  - Marcar `restaurant_subscriptions` como `suspended`
 
-## Arquivos a alterar
+### 2b. Adicionar coluna `mp_preapproval_id` na tabela `restaurant_subscriptions`
+- Para vincular a assinatura do MP ao registro local
+
+### 2c. Adicionar coluna `mp_payer_email` na tabela `restaurants`
+- Para identificar qual restaurante está pagando via MP
+
+### 2d. Controle de acesso por inadimplência
+No frontend, no `RestaurantAdmin.tsx` ou no hook de carregamento do restaurante:
+- Verificar se a assinatura ativa tem `next_payment_at < now()` (inadimplente)
+- Se inadimplente, mostrar tela de bloqueio com mensagem de regularização ao invés do painel admin
+- Não bloquear o cardápio digital público (apenas o painel admin)
+
+### 2e. Fluxo Landing → Registro
+Atualmente o link do MP leva direto para checkout do MP. Após pagar, não há callback que libere o registro. A solução:
+- O link de assinatura do MP deve incluir `back_url` apontando para a página de registro `/registro/{plano}`
+- O webhook do MP, ao confirmar pagamento, cria automaticamente a assinatura no banco
+
+**Nota**: Isso requer que os planos no Mercado Pago (`preapproval_plan_id`) sejam reconfigurados com os novos preços e com `external_reference` ou `back_url` corretos. Isso é feito no dashboard do Mercado Pago, não no código.
+
+## 3. Mesa visível/oculta
+
+### 3a. Migration SQL
+```sql
+ALTER TABLE tables ADD COLUMN is_hidden boolean NOT NULL DEFAULT false;
+```
+
+### 3b. `ManageTablesDrawer.tsx`
+- Adicionar `Switch` no formulário de edição de mesa com label "Mesa oculta"
+- Salvar `is_hidden` no payload de update/insert
+
+### 3c. `PDVTab.tsx`
+- Mesas com `is_hidden = true`:
+  - Exibir com o mesmo estilo visual de mesa livre (sem borda colorida, mesma tonalidade neutra)
+  - Mostrar "Oculta" ao invés de "Livre" no badge
+  - Não permitir clique para abrir comanda
+- Mesas ocultas aparecem na grid mas são claramente marcadas como inativas
+
+### 3d. Reservas e Cardápio
+- Queries de reservas: filtrar `is_hidden = false` para não exibir mesas ocultas como opção
+- QR Code de mesa oculta: na página `Comanda.tsx`, verificar `is_hidden` e mostrar mensagem "Mesa indisponível" se oculta
+
+### 3e. `TablesTab.tsx` (Reservas)
+- Filtrar mesas ocultas da lista de mesas disponíveis para reserva
+
+## 4. Cores das mesas no PDV
+
+### `PDVTab.tsx` (linhas 730-734 e 764-766)
+
+**Card da mesa** (borda/fundo):
+- Livre: `border-green-300 bg-green-50 dark:bg-green-950/20` (verde claro)
+- Ocupada: `border-red-300 bg-red-50 dark:bg-red-950/20` (vermelho claro)
+- Oculta: manter neutro como está atualmente (`border-border`)
+
+**Círculo do número** (linhas 764-766):
+- Livre: `bg-green-400`
+- Ocupada: `bg-red-500`
+- Oculta: `bg-muted-foreground/40` (como está hoje para "livre")
+
+Atualmente: ocupada = verde, livre = cinza. Mudar para: ocupada = vermelho, livre = verde, oculta = cinza.
+
+---
+
+## Arquivos impactados
 
 | Arquivo | Mudança |
 |---|---|
-| `src/components/menu/checkout/PaymentStep.tsx` | Linha 120-124: trocar `from("online_payment_config")` por `rpc("get_public_payment_config")` |
-| `src/components/menu/checkout/OnlinePaymentStep.tsx` | Linhas 133-137 e 374-378: trocar queries diretas por `rpc("get_public_payment_config")` |
+| `src/pages/LandingPage.tsx` | Preços dos planos |
+| `src/components/admin/PDVTab.tsx` | Cores das mesas + lógica de mesa oculta |
+| `src/components/admin/ManageTablesDrawer.tsx` | Switch de mesa oculta no form de edição |
+| `src/pages/Comanda.tsx` | Bloquear acesso a mesa oculta |
+| Migration SQL | `is_hidden` na tabela `tables`, `mp_preapproval_id` em `restaurant_subscriptions` |
+| `supabase/functions/mercadopago-subscription-webhook/index.ts` | Novo webhook para assinaturas |
+| `src/pages/RestaurantAdmin.tsx` | Bloqueio por inadimplência |
+| Reservas queries | Filtrar mesas ocultas |
 
 ## O que NÃO muda
-- Edge functions (mercadopago-oauth, mercadopago-charge)
-- Policies RLS
-- Callback page (MercadoPagoCallback.tsx)
-- OnlinePaymentsSettings.tsx (já usa RPCs)
-- Fluxo de pedidos, estoque, fiscal
+- Fluxo de pedidos existente
+- Webhook de pagamentos de pedidos (mercadopago-webhook)
+- Edge functions existentes
+- Estoque, fiscal, integrações
 
