@@ -82,17 +82,12 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
       // 1. Ensure a config row exists to use as state
       let configId = config?.id;
       if (!configId) {
-        const { data: newConfig, error: upsertError } = await supabase
-          .from("online_payment_config")
-          .upsert(
-            { restaurant_id: restaurantId, connection_status: "pending", provider: "mercadopago" },
-            { onConflict: "restaurant_id" }
-          )
-          .select("id")
-          .single();
+        const { data: newId, error: ensureError } = await supabase.rpc("admin_ensure_payment_config", {
+          p_restaurant_id: restaurantId,
+        });
 
-        if (upsertError) throw upsertError;
-        configId = newConfig.id;
+        if (ensureError) throw ensureError;
+        configId = newId;
       }
 
       // 2. Fetch client_id from edge function
