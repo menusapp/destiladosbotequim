@@ -244,7 +244,7 @@ const DestaquesTab = ({ restaurantId }: DestaquesTabProps) => {
       }
       const { error } = await supabase
         .from("products")
-        .update({ featured_schedule: scheduleData })
+        .update({ featured_schedule: scheduleData as unknown as any })
         .eq("id", scheduleProduct.id);
       if (error) throw error;
       setScheduleDialogOpen(false);
