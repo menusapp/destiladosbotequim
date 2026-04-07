@@ -367,11 +367,7 @@ export const OnlinePaymentStep = ({
             headers: { "Content-Type": "application/json" },
           });
           // Alternative: use the public key endpoint
-          const { data: config } = await supabase
-            .from("online_payment_config")
-            .select("mp_public_key")
-            .eq("restaurant_id", restaurantId)
-            .maybeSingle();
+          const { data: config } = await supabase.rpc("get_public_payment_config", { p_restaurant_id: restaurantId });
           if (config?.mp_public_key) {
             const binResponse = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${config.mp_public_key}&bins=${bin}`);
             const binData = await binResponse.json();
