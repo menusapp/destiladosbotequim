@@ -4145,6 +4145,10 @@ export type Database = {
         Args: { p_restaurant_id: string }
         Returns: string
       }
+      admin_get_fiscal_config: {
+        Args: { p_restaurant_id: string }
+        Returns: Json
+      }
       admin_get_payment_config: {
         Args: { p_restaurant_id: string }
         Returns: {
@@ -4181,6 +4185,10 @@ export type Database = {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_update_fiscal_config: {
+        Args: { p_restaurant_id: string; p_updates: Json }
+        Returns: undefined
+      }
       admin_update_order_status: {
         Args: {
           p_new_status: string
@@ -4207,6 +4215,10 @@ export type Database = {
           p_password_hash?: string
           p_username?: string
         }
+        Returns: undefined
+      }
+      admin_upsert_fiscal_config: {
+        Args: { p_data: Json; p_restaurant_id: string }
         Returns: undefined
       }
       admin_upsert_payment_config: {
