@@ -29,10 +29,7 @@ export const CEOCredentialsTab = () => {
   useEffect(() => { fetchUsers(); }, []);
 
   const fetchUsers = async () => {
-    const { data } = await (supabase as any)
-      .from("ceo_users")
-      .select("id, username, display_name, is_active, created_at")
-      .order("created_at", { ascending: true });
+    const { data } = await (supabase as any).rpc("admin_list_ceo_users");
     setUsers(data || []);
     setLoading(false);
   };
@@ -55,7 +52,7 @@ export const CEOCredentialsTab = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      let passwordHash = formPassword;
+      let passwordHash = "";
       if (formPassword) {
         const { data: hashData, error: hashError } = await supabase.functions.invoke("hash-password", {
           body: { password: formPassword },
@@ -65,17 +62,20 @@ export const CEOCredentialsTab = () => {
       }
 
       if (editingUser) {
-        const updateData: any = { username: formUsername, display_name: formDisplayName };
-        if (formPassword) updateData.password_hash = passwordHash;
-        const { error } = await (supabase as any).from("ceo_users").update(updateData).eq("id", editingUser.id);
+        const { error } = await (supabase as any).rpc("admin_upsert_ceo_user", {
+          p_id: editingUser.id,
+          p_username: formUsername,
+          p_display_name: formDisplayName,
+          p_password_hash: passwordHash || null,
+        });
         if (error) throw error;
         toast.success("Usuário atualizado!");
       } else {
         if (!formPassword) { toast.error("Senha é obrigatória"); return; }
-        const { error } = await (supabase as any).from("ceo_users").insert({
-          username: formUsername,
-          password_hash: passwordHash,
-          display_name: formDisplayName,
+        const { error } = await (supabase as any).rpc("admin_upsert_ceo_user", {
+          p_username: formUsername,
+          p_display_name: formDisplayName,
+          p_password_hash: passwordHash,
         });
         if (error) throw error;
         toast.success("Usuário criado!");
@@ -90,8 +90,8 @@ export const CEOCredentialsTab = () => {
   const handleDelete = async (user: CEOUser) => {
     if (users.length <= 1) { toast.error("Deve haver ao menos 1 usuário CEO"); return; }
     if (!confirm(`Excluir ${user.display_name}?`)) return;
-    const { error } = await (supabase as any).from("ceo_users").delete().eq("id", user.id);
-    if (error) { toast.error("Erro ao excluir"); return; }
+    const { error } = await (supabase as any).rpc("admin_delete_ceo_user", { p_id: user.id });
+    if (error) { toast.error(error.message || "Erro ao excluir"); return; }
     toast.success("Usuário excluído");
     fetchUsers();
   };

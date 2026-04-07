@@ -52,20 +52,21 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
 
   const fetchConfig = async () => {
     try {
-      const { data, error } = await supabase
-        .from("online_payment_config")
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .maybeSingle();
+      const { data, error } = await (supabase as any).rpc("admin_get_payment_config", {
+        p_restaurant_id: restaurantId,
+      });
 
       if (error) throw error;
 
-      if (data && data.mp_access_token && data.connection_status === "connected") {
-        setConfig(data as unknown as PaymentConfig);
+      // RPC returns array, get first row
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+
+      if (row && row.mp_access_token && row.connection_status === "connected") {
+        setConfig(row as PaymentConfig);
         setViewState("connected");
-        setSandboxEmail(data.mp_sandbox_payer_email || "");
-      } else if (data) {
-        setConfig(data as unknown as PaymentConfig);
+        setSandboxEmail(row.mp_sandbox_payer_email || "");
+      } else if (row) {
+        setConfig(row as PaymentConfig);
         setViewState("not_connected");
       } else {
         setConfig(null);
@@ -80,23 +81,14 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
   const handleStartOAuth = async () => {
     setStartingOAuth(true);
     try {
-      // 1. Ensure a config row exists to use as state
-      let configId = config?.id;
-      if (!configId) {
-        const { data: newConfig, error: upsertError } = await supabase
-          .from("online_payment_config")
-          .upsert(
-            { restaurant_id: restaurantId, connection_status: "pending", provider: "mercadopago" },
-            { onConflict: "restaurant_id" }
-          )
-          .select("id")
-          .single();
+      // Ensure a config row exists via RPC
+      const { data: configId, error: ensureError } = await (supabase as any).rpc("admin_ensure_payment_config", {
+        p_restaurant_id: restaurantId,
+      });
 
-        if (upsertError) throw upsertError;
-        configId = newConfig.id;
-      }
+      if (ensureError) throw ensureError;
 
-      // 2. Fetch client_id from edge function
+      // Fetch client_id from edge function
       const { data, error } = await supabase.functions.invoke("mercadopago-oauth", {
         method: "GET",
       });
@@ -104,7 +96,7 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
       if (error) throw error;
       if (!data?.client_id) throw new Error("client_id não disponível");
 
-      // 3. Redirect to Mercado Pago authorization
+      // Redirect to Mercado Pago authorization
       const redirectUri = `${window.location.origin}/admin/mercadopago/callback`;
       const authUrl = `https://auth.mercadopago.com.br/authorization?client_id=${data.client_id}&response_type=code&platform_id=mp&state=${configId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
@@ -121,20 +113,25 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
 
     setSavingToggles(true);
     try {
-      const updateData: Record<string, unknown> = { [field]: value };
-
-      if (field === "enable_for_delivery" && value) {
-        updateData.enabled = true;
-      }
-
-      const { error } = await supabase
-        .from("online_payment_config")
-        .update(updateData)
-        .eq("restaurant_id", restaurantId);
+      const { error } = await (supabase as any).rpc("admin_upsert_payment_config", {
+        p_restaurant_id: restaurantId,
+        p_field: field,
+        p_value: String(value),
+      });
 
       if (error) throw error;
 
-      setConfig({ ...config, [field]: value, ...(field === "enable_for_delivery" && value ? { enabled: true } : {}) });
+      // If enabling delivery, also enable main toggle
+      if (field === "enable_for_delivery" && value) {
+        await (supabase as any).rpc("admin_upsert_payment_config", {
+          p_restaurant_id: restaurantId,
+          p_field: "enabled",
+          p_value: "true",
+        });
+        setConfig({ ...config, [field]: value, enabled: true });
+      } else {
+        setConfig({ ...config, [field]: value });
+      }
       toast.success("Configuração atualizada!");
     } catch (error) {
       console.error("Error toggling:", error);
@@ -148,10 +145,11 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
     if (!config) return;
     setSavingSandboxEmail(true);
     try {
-      const { error } = await supabase
-        .from("online_payment_config")
-        .update({ mp_sandbox_payer_email: sandboxEmail.trim() || null } as any)
-        .eq("restaurant_id", restaurantId);
+      const { error } = await (supabase as any).rpc("admin_upsert_payment_config", {
+        p_restaurant_id: restaurantId,
+        p_field: "mp_sandbox_payer_email",
+        p_value: sandboxEmail.trim() || null,
+      });
       if (error) throw error;
       setConfig({ ...config, mp_sandbox_payer_email: sandboxEmail.trim() || null });
       toast.success("Email de teste salvo!");
@@ -167,10 +165,9 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
     if (!confirm("Tem certeza que deseja desconectar o Mercado Pago? Você precisará reconectar para voltar a receber pagamentos online.")) return;
     setDisconnecting(true);
     try {
-      const { error } = await supabase
-        .from("online_payment_config")
-        .delete()
-        .eq("restaurant_id", restaurantId);
+      const { error } = await (supabase as any).rpc("admin_delete_payment_config", {
+        p_restaurant_id: restaurantId,
+      });
       if (error) throw error;
       setConfig(null);
       setViewState("not_connected");

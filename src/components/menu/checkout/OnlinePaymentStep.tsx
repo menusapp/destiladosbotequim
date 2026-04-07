@@ -130,8 +130,8 @@ export const OnlinePaymentStep = ({
       }
 
       try {
-        const { data: config } = await supabase
-          .from("online_payment_config")
+        const { data: config } = await (supabase as any)
+          .from("online_payment_config_public")
           .select("mp_public_key")
           .eq("restaurant_id", restaurantId)
           .maybeSingle();
@@ -371,8 +371,8 @@ export const OnlinePaymentStep = ({
             headers: { "Content-Type": "application/json" },
           });
           // Alternative: use the public key endpoint
-          const { data: config } = await supabase
-            .from("online_payment_config")
+          const { data: config } = await (supabase as any)
+            .from("online_payment_config_public")
             .select("mp_public_key")
             .eq("restaurant_id", restaurantId)
             .maybeSingle();
