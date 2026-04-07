@@ -46,6 +46,7 @@ interface TableData {
   occupied_at: string | null;
   min_capacity: number;
   max_capacity: number;
+  is_hidden: boolean;
   comandas?: { id: string; customer_name: string; customer_cpf: string }[];
 }
 
