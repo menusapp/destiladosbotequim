@@ -83,6 +83,7 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
       min_capacity: String(table.min_capacity ?? 1),
       max_capacity: String(table.max_capacity ?? 4),
       description: table.description || "",
+      is_hidden: table.is_hidden ?? false,
     });
     setImageFile(null);
     setShowForm(true);
