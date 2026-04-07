@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, Search, ChevronDown } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1590,16 +1591,25 @@ const handleDelete = async (id: string) => {
               .map((product) => (
                 <div
                   key={product.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
+                  className={`flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors ${!product.available ? "opacity-50" : ""}`}
                 >
                   <div>
-                    <p className="font-medium">{product.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{product.name}</p>
+                      {!product.available && <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Esgotado</span>}
+                    </div>
                     <p className="text-sm text-muted-foreground">{product.description}</p>
                     <p className="text-sm font-semibold text-primary mt-1">
                       R$ {product.price.toFixed(2)}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={product.available}
+                      onCheckedChange={async (checked) => {
+                        await supabase.from("products").update({ available: checked }).eq("id", product.id);
+                      }}
+                    />
                     <Button
                       variant="outline"
                       size="sm"

@@ -167,7 +167,9 @@ export default function Kiosk() {
 
       if (catsErr) console.error("[Kiosk] Erro ao carregar categorias:", catsErr);
 
-      const filtered = (cats || []).map((cat: any) => ({
+      const filtered = (cats || [])
+        .filter((cat: any) => cat.is_active !== false)
+        .map((cat: any) => ({
         ...cat,
         products: (cat.products || []).filter((p: any) => {
           if (!p.available) return false;
@@ -191,37 +193,42 @@ export default function Kiosk() {
     try {
       const { data: extrasRaw, error } = await supabase
         .from("product_extras")
-        .select("id, name, description, price, is_required, min_selection, max_selection, extra_category_id, extra_categories(name)")
-        .eq("product_id", product.id);
+        .select("id, name, description, price, is_required, min_selection, max_selection, extra_category_id, extra_categories(name, is_active)")
+        .eq("product_id", product.id)
+        .neq("is_active", false);
       if (error) console.error("[Kiosk] Erro ao carregar extras:", error);
 
-      const extrasData = (extrasRaw || []).map((e: any) => ({
-        ...e,
-        extra_category_name: e.extra_categories?.name || undefined,
-        extra_categories: undefined,
-      }));
+      const extrasData = (extrasRaw || [])
+        .filter((e: any) => !e.extra_categories || e.extra_categories.is_active !== false)
+        .map((e: any) => ({
+          ...e,
+          extra_category_name: e.extra_categories?.name || undefined,
+          extra_categories: undefined,
+        }));
 
       // Buscar complementos vinculados via product_complement_groups
       const { data: complementGroups } = await supabase
         .from("product_complement_groups")
-        .select("*, extra_categories(id, name, extra_category_items(id, name, description, price))")
+        .select("*, extra_categories(id, name, is_active, extra_category_items(id, name, description, price, is_active))")
         .eq("product_id", product.id)
         .order("display_order");
 
-      const complementExtras: ProductExtra[] = (complementGroups || []).flatMap((group: any) => {
-        const items = group.extra_categories?.extra_category_items || [];
-        return items.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          description: item.description || null,
-          price: item.price,
-          is_required: group.is_required || false,
-          min_selection: group.min_selection || 0,
-          max_selection: group.max_selection || undefined,
-          extra_category_id: group.extra_category_id,
-          extra_category_name: group.extra_categories?.name || undefined,
-        }));
-      });
+      const complementExtras: ProductExtra[] = (complementGroups || [])
+        .filter((group: any) => group.extra_categories?.is_active !== false)
+        .flatMap((group: any) => {
+          const items = (group.extra_categories?.extra_category_items || []).filter((item: any) => item.is_active !== false);
+          return items.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description || null,
+            price: item.price,
+            is_required: group.is_required || false,
+            min_selection: group.min_selection || 0,
+            max_selection: group.max_selection || undefined,
+            extra_category_id: group.extra_category_id,
+            extra_category_name: group.extra_categories?.name || undefined,
+          }));
+        });
 
       setProductExtras([...(extrasData || []), ...complementExtras]);
     } catch (err) {

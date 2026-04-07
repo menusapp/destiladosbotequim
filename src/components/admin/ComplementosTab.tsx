@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
 import { generateNextPdvCode } from "@/lib/pdvCodeGenerator";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -23,8 +24,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 interface StockItem { id: string; name: string; unit: string; price_per_unit: number; }
 interface CategoryItemIngredient { id: string; stock_item_id: string; quantity: number; stock_item_name?: string; stock_item_unit?: string; stock_item_price?: number; }
-interface CategoryItem { id: string; name: string; price: number; pdv_code?: string; ingredients: CategoryItemIngredient[]; }
-interface ComplementCategory { id: string; name: string; items: CategoryItem[]; }
+interface CategoryItem { id: string; name: string; price: number; pdv_code?: string; ingredients: CategoryItemIngredient[]; is_active?: boolean | null; }
+interface ComplementCategory { id: string; name: string; items: CategoryItem[]; is_active?: boolean | null; }
 interface SimpleProduct { id: string; name: string; }
 interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; }
 
@@ -77,13 +78,13 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
       categoriesData.map(async (cat) => {
         const { data: itemsData } = await supabase.from("extra_category_items").select("*, extra_category_item_ingredients(*, stock_items(name, unit, price_per_unit))").eq("category_id", cat.id);
         const items = (itemsData || []).map((item: any) => ({
-          id: item.id, name: item.name, price: item.price, pdv_code: item.pdv_code || "",
+          id: item.id, name: item.name, price: item.price, pdv_code: item.pdv_code || "", is_active: (item as any).is_active,
           ingredients: (item.extra_category_item_ingredients || []).map((ing: any) => ({
             id: ing.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity,
             stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit,
           })),
         }));
-        return { id: cat.id, name: cat.name, items };
+        return { id: cat.id, name: cat.name, is_active: (cat as any).is_active, items };
       })
     );
     setCategories(categoriesWithItems);
@@ -358,7 +359,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
       ) : (
         <div className="space-y-4">
           {filteredCategories.map((category) => (
-            <Card key={category.id} className="overflow-hidden">
+            <Card key={category.id} className={`overflow-hidden ${category.is_active === false ? "opacity-50" : ""}`}>
               <Collapsible open={expandedCategories.has(category.id)} onOpenChange={() => toggleCategory(category.id)}>
                 <CollapsibleTrigger asChild>
                   <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-4">
@@ -367,8 +368,18 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                         {expandedCategories.has(category.id) ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                         <CardTitle className="text-lg">{category.name}</CardTitle>
                         <span className="text-sm text-muted-foreground">({category.items.length} {category.items.length === 1 ? "item" : "itens"})</span>
+                        {category.is_active === false && (
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Inativo</span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                          checked={category.is_active !== false}
+                          onCheckedChange={async (checked) => {
+                            await supabase.from("extra_categories").update({ is_active: checked } as any).eq("id", category.id);
+                            fetchCategories();
+                          }}
+                        />
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEditCategory(category); }}><Edit2 className="h-4 w-4" /></Button>
                         <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } setDeletingCategory(category); setDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4" /></Button>
                       </div>
@@ -381,23 +392,31 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                       {category.items.map((item) => {
                         const cost = calculateItemCost(item.ingredients);
                         return (
-                          <div key={item.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3">
-                                <span className="font-medium">{item.name}</span>
-                                <span className="text-primary font-semibold">R$ {item.price.toFixed(2)}</span>
-                                {item.pdv_code && <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">PDV: {item.pdv_code}</span>}
-                              </div>
+                          <div key={item.id} className={`flex items-center justify-between p-3 bg-muted/30 rounded-lg ${item.is_active === false ? "opacity-50" : ""}`}>
+                             <div className="flex-1">
+                               <div className="flex items-center gap-3">
+                                 <span className="font-medium">{item.name}</span>
+                                 <span className="text-primary font-semibold">R$ {item.price.toFixed(2)}</span>
+                                 {item.pdv_code && <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">PDV: {item.pdv_code}</span>}
+                                 {item.is_active === false && <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Inativo</span>}
+                               </div>
                               <div className="text-xs text-muted-foreground mt-1">
                                 {item.ingredients.length > 0 ? (
                                   <>{item.ingredients.map(ing => `${ing.stock_item_name} (${ing.quantity} ${ing.stock_item_unit})`).join(", ")}<span className="ml-2">• Custo: R$ {cost.toFixed(2)}</span></>
                                 ) : ("Sem insumos vinculados")}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => openEditItem(item, category.id)}><Edit2 className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="sm" onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } handleDeleteItem(item, category.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            </div>
+                             <div className="flex items-center gap-2">
+                               <Switch
+                                 checked={item.is_active !== false}
+                                 onCheckedChange={async (checked) => {
+                                   await supabase.from("extra_category_items").update({ is_active: checked } as any).eq("id", item.id);
+                                   fetchCategories();
+                                 }}
+                               />
+                               <Button variant="ghost" size="sm" onClick={() => openEditItem(item, category.id)}><Edit2 className="h-4 w-4" /></Button>
+                               <Button variant="ghost" size="sm" onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } handleDeleteItem(item, category.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                             </div>
                           </div>
                         );
                       })}

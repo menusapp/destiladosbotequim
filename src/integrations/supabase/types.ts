@@ -350,6 +350,7 @@ export type Database = {
           display_order: number | null
           id: string
           image_url: string | null
+          is_active: boolean | null
           name: string
           restaurant_id: string
           updated_at: string | null
@@ -359,6 +360,7 @@ export type Database = {
           display_order?: number | null
           id?: string
           image_url?: string | null
+          is_active?: boolean | null
           name: string
           restaurant_id: string
           updated_at?: string | null
@@ -368,6 +370,7 @@ export type Database = {
           display_order?: number | null
           id?: string
           image_url?: string | null
+          is_active?: boolean | null
           name?: string
           restaurant_id?: string
           updated_at?: string | null
@@ -1135,6 +1138,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_active: boolean | null
           name: string
           restaurant_id: string
           updated_at: string | null
@@ -1142,6 +1146,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          is_active?: boolean | null
           name: string
           restaurant_id: string
           updated_at?: string | null
@@ -1149,6 +1154,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          is_active?: boolean | null
           name?: string
           restaurant_id?: string
           updated_at?: string | null
@@ -1200,6 +1206,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          is_active: boolean | null
           name: string
           pdv_code: string | null
           price: number
@@ -1210,6 +1217,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_active?: boolean | null
           name: string
           pdv_code?: string | null
           price?: number
@@ -1220,6 +1228,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_active?: boolean | null
           name?: string
           pdv_code?: string | null
           price?: number
@@ -2784,6 +2793,7 @@ export type Database = {
           description: string | null
           extra_category_id: string | null
           id: string
+          is_active: boolean | null
           is_required: boolean | null
           max_selection: number | null
           min_selection: number | null
@@ -2798,6 +2808,7 @@ export type Database = {
           description?: string | null
           extra_category_id?: string | null
           id?: string
+          is_active?: boolean | null
           is_required?: boolean | null
           max_selection?: number | null
           min_selection?: number | null
@@ -2812,6 +2823,7 @@ export type Database = {
           description?: string | null
           extra_category_id?: string | null
           id?: string
+          is_active?: boolean | null
           is_required?: boolean | null
           max_selection?: number | null
           min_selection?: number | null
