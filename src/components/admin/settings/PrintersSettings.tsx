@@ -226,6 +226,20 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
             <Switch checked={webConfig.autoPrintReceipts} onCheckedChange={(checked) => setWebConfig(prev => ({ ...prev, autoPrintReceipts: checked }))} />
           </div>
 
+          <div className="space-y-2 max-w-xs">
+            <Label>Número de Vias</Label>
+            <p className="text-sm text-muted-foreground">Quantas cópias imprimir de cada pedido</p>
+            <Select value={String(webConfig.printCopies)} onValueChange={(value) => setWebConfig(prev => ({ ...prev, printCopies: parseInt(value) }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 via</SelectItem>
+                <SelectItem value="2">2 vias</SelectItem>
+                <SelectItem value="3">3 vias</SelectItem>
+                <SelectItem value="4">4 vias</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <Button variant="outline" onClick={testWebPrint} disabled={testing === 'web'}>
             <Printer className="h-4 w-4 mr-2" />
             {testing === 'web' ? 'Abrindo...' : 'Testar Impressão'}

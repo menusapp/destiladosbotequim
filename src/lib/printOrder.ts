@@ -318,39 +318,7 @@ export const printOrder = async (
       </style>
     </head>
     <body>
-      <div class="center">
-        <h1>${restaurantName || "Restaurante"}</h1>
-      </div>
-      <div class="line"></div>
-      
-      <div class="origin">${originLabel}</div>
-      ${scheduledSection}
-      
-      <div class="section">
-        <p><strong>Pedido:</strong> #${order.id.slice(0, 8)}</p>
-        <p><strong>Data:</strong> ${dateStr}</p>
-        <p><strong>Cliente:</strong> ${order.customer_name}</p>
-      </div>
-      
-      <div class="double-line"></div>
-      
-      ${itemsHtml}
-      
-      <div class="double-line"></div>
-      
-      <div class="total-row">
-        <span>TOTAL</span>
-        <span>R$ ${subtotal.toFixed(2)}</span>
-      </div>
-      
-      ${deliverySection}
-      ${notesSection}
-      ${cancelSection}
-      
-      <div class="line"></div>
-      <div class="footer">
-        <p>Impresso em ${new Date().toLocaleString("pt-BR")}</p>
-      </div>
+      ${allCopies}
     </body>
     </html>
   `;
