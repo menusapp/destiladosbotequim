@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Product } from "@/types/menu";
 import { Search, ShoppingCart, X, LogOut, Star, UtensilsCrossed } from "lucide-react";
+import { isFeaturedVisible } from "@/lib/featuredUtils";
 
 interface Props {
   categories: Category[];
