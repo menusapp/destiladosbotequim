@@ -18,6 +18,7 @@ import { ReservationsView } from "@/components/menu/ReservationsView";
 import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "@/components/ui/sonner";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
+import { isFeaturedVisible } from "@/lib/featuredUtils";
 
 export default function DeliveryMenu() {
   const { slug: restaurantSlug } = useParams<{ slug: string }>();
