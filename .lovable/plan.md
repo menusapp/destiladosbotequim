@@ -1,66 +1,23 @@
 
 
-# Ativação, Desativação e Programação de Produtos em Destaque
+# Reduzir tamanho dos switches de ativar/desativar
 
-## O que será feito
+## Abordagem
 
-Cada produto em destaque terá:
-1. **Toggle ativo/inativo** — desativar temporariamente sem remover dos destaques
-2. **Programação por dia e horário** — definir em quais dias da semana e horários o produto aparece como destaque (ex: só segunda a sexta das 11h às 15h)
+Usar classes CSS inline para reduzir o tamanho dos switches nos 3 arquivos admin, sem alterar o componente `Switch` global (que é usado em outros lugares do sistema).
 
-## Mudanças no banco de dados
+Aplicar `className="h-4 w-8 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-4"` em cada `<Switch>` nos arquivos de CategoriesTab, ProductsTab e ComplementosTab. Isso reduz o switch de 24x44px para 16x32px — visivelmente mais discreto.
 
-Adicionar 2 colunas na tabela `products`:
+## Arquivos a alterar
 
-```sql
-ALTER TABLE products ADD COLUMN featured_active boolean DEFAULT true;
-ALTER TABLE products ADD COLUMN featured_schedule jsonb DEFAULT null;
-```
-
-`featured_schedule` armazena um array como:
-```json
-[
-  { "day": 0, "start": "11:00", "end": "15:00" },
-  { "day": 1, "start": "11:00", "end": "15:00" },
-  ...
-]
-```
-Quando `null` = sempre visível (sem restrição de horário). Dia 0 = domingo, 6 = sábado.
-
-## Mudanças no admin (DestaquesTab.tsx)
-
-Para cada produto em destaque na lista, adicionar:
-- **Switch ativo/inativo** ao lado do nome — toggle rápido
-- **Botão "Programar"** que abre um dialog com:
-  - Checkboxes para cada dia da semana (Dom-Sáb)
-  - Campos de horário início/fim para cada dia selecionado
-  - Opção "Sempre visível" (limpa a programação)
-
-Badge visual indicando status: "Ativo", "Inativo", "Programado" com cores distintas.
-
-## Mudanças nos cardápios (Menu.tsx, DeliveryMenu.tsx, KioskMenu.tsx)
-
-Criar função utilitária `isFeaturedVisible(product)` que verifica:
-1. `is_featured === true`
-2. `featured_active === true` (ou null, para retrocompatibilidade)
-3. Se `featured_schedule` existe, verificar se dia/hora atual está dentro da programação
-
-Aplicar essa função nos filtros de featured products em todos os cardápios, substituindo o simples `p.is_featured`.
-
-## Arquivos impactados
-
-| Arquivo | Alteração |
+| Arquivo | Switches |
 |---|---|
-| Migration SQL | Adicionar `featured_active` e `featured_schedule` |
-| `src/components/admin/DestaquesTab.tsx` | Toggle ativo, dialog de programação, badges |
-| `src/lib/featuredUtils.ts` (novo) | Função `isFeaturedVisible()` |
-| `src/pages/Menu.tsx` | Usar `isFeaturedVisible` no filtro |
-| `src/pages/DeliveryMenu.tsx` | Usar `isFeaturedVisible` no filtro |
-| `src/components/kiosk/KioskMenu.tsx` | Usar `isFeaturedVisible` no filtro |
-| `src/types/menu.ts` | Adicionar `featured_active`, `featured_schedule` ao tipo |
+| `src/components/admin/CategoriesTab.tsx` | 1 (linha ~426) |
+| `src/components/admin/ProductsTab.tsx` | 1 (linha ~1607) |
+| `src/components/admin/ComplementosTab.tsx` | 2 (linhas ~376 e ~410) |
 
-## Retrocompatibilidade
-- `featured_active` default `true` — produtos existentes continuam visíveis
-- `featured_schedule` default `null` — sem programação = sempre visível
-- Zero impacto em produtos que não são destaque
+## O que NÃO muda
+- Componente `Switch` global (`src/components/ui/switch.tsx`)
+- Nenhum fluxo de pedidos, estoque, fiscal ou integrações
+- Nenhuma lógica de ativação/desativação — apenas visual
 
