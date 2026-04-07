@@ -2660,6 +2660,7 @@ export type Database = {
           font_size: number
           id: string
           paper_size: string
+          print_copies: number
           restaurant_id: string
           updated_at: string | null
         }
@@ -2672,6 +2673,7 @@ export type Database = {
           font_size?: number
           id?: string
           paper_size?: string
+          print_copies?: number
           restaurant_id: string
           updated_at?: string | null
         }
@@ -2684,6 +2686,7 @@ export type Database = {
           font_size?: number
           id?: string
           paper_size?: string
+          print_copies?: number
           restaurant_id?: string
           updated_at?: string | null
         }
