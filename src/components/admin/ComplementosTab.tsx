@@ -374,6 +374,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                       </div>
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <Switch
+                          className="h-4 w-8 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-4"
                           checked={category.is_active !== false}
                           onCheckedChange={async (checked) => {
                             await supabase.from("extra_categories").update({ is_active: checked } as any).eq("id", category.id);
@@ -408,6 +409,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                             </div>
                              <div className="flex items-center gap-2">
                                <Switch
+                                 className="h-4 w-8 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-4"
                                  checked={item.is_active !== false}
                                  onCheckedChange={async (checked) => {
                                    await supabase.from("extra_category_items").update({ is_active: checked } as any).eq("id", item.id);

@@ -1605,6 +1605,7 @@ const handleDelete = async (id: string) => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Switch
+                      className="h-4 w-8 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-4"
                       checked={product.available}
                       onCheckedChange={async (checked) => {
                         await supabase.from("products").update({ available: checked }).eq("id", product.id);
