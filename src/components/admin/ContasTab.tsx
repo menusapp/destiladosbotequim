@@ -190,6 +190,34 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
     fetchStaff();
   };
 
+  const handleDelete = async (member: StaffMember) => {
+    if (member.id === currentStaffId) {
+      toast.error("Você não pode excluir sua própria conta");
+      return;
+    }
+    if (member.role === "admin") {
+      toast.error("A conta admin não pode ser excluída");
+      return;
+    }
+
+    if (!window.confirm(`Tem certeza que deseja excluir a conta de "${member.display_name}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("admin_delete_staff", {
+      p_staff_id: member.id,
+      p_restaurant_id: restaurantId,
+    });
+
+    if (error) {
+      toast.error("Erro ao excluir conta");
+      return;
+    }
+
+    toast.success("Conta excluída com sucesso");
+    fetchStaff();
+  };
+
   const getRoleBadgeColor = (role: string) => {
     const colors: Record<string, string> = {
       admin: "bg-primary/10 text-primary",
