@@ -96,12 +96,12 @@ const DestaquesTab = ({ restaurantId }: DestaquesTabProps) => {
       setFeaturedProducts((featured || []).map(p => ({
         ...p,
         featured_active: p.featured_active ?? true,
-        featured_schedule: p.featured_schedule as FeaturedScheduleEntry[] | null,
+        featured_schedule: (p.featured_schedule as unknown as FeaturedScheduleEntry[]) || null,
       })));
       setAvailableProducts((all || []).map(p => ({
         ...p,
         featured_active: p.featured_active ?? true,
-        featured_schedule: p.featured_schedule as FeaturedScheduleEntry[] | null,
+        featured_schedule: (p.featured_schedule as unknown as FeaturedScheduleEntry[]) || null,
       })));
     } catch (error) {
       console.error("Erro ao buscar produtos:", error);
