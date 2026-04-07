@@ -57,6 +57,7 @@ export const printOrder = async (
   let fontFamily = "Arial Black";
   let fontSize = 12;
   let fontBold = true;
+  let printCopies = 1;
   try {
     const { data } = await supabase
       .from("printer_settings")
@@ -67,6 +68,7 @@ export const printOrder = async (
     if ((data as any)?.font_family) fontFamily = (data as any).font_family;
     if ((data as any)?.font_size) fontSize = (data as any).font_size;
     if ((data as any)?.font_bold !== undefined) fontBold = Boolean((data as any).font_bold);
+    if ((data as any)?.print_copies) printCopies = (data as any).print_copies;
   } catch {}
 
   // Fetch restaurant name
@@ -203,6 +205,48 @@ export const printOrder = async (
     `
     : "";
 
+  // Build copy content
+  const copyContent = `
+      <div class="center">
+        <h1>${restaurantName || "Restaurante"}</h1>
+      </div>
+      <div class="line"></div>
+      
+      <div class="origin">${originLabel}</div>
+      ${scheduledSection}
+      
+      <div class="section">
+        <p><strong>Pedido:</strong> #${order.id.slice(0, 8)}</p>
+        <p><strong>Data:</strong> ${dateStr}</p>
+        <p><strong>Cliente:</strong> ${order.customer_name}</p>
+      </div>
+      
+      <div class="double-line"></div>
+      
+      ${itemsHtml}
+      
+      <div class="double-line"></div>
+      
+      <div class="total-row">
+        <span>TOTAL</span>
+        <span>R$ ${subtotal.toFixed(2)}</span>
+      </div>
+      
+      ${deliverySection}
+      ${notesSection}
+      ${cancelSection}
+      
+      <div class="line"></div>
+      <div class="footer">
+        <p>Impresso em ${new Date().toLocaleString("pt-BR")}</p>
+      </div>
+  `;
+
+  const allCopies = Array.from({ length: printCopies }, (_, i) => {
+    const pageBreak = i > 0 ? 'style="page-break-before: always;"' : '';
+    return `<div class="copy" ${pageBreak}>${copyContent}</div>`;
+  }).join('\n');
+
   const html = `
     <html>
     <head>
@@ -274,39 +318,7 @@ export const printOrder = async (
       </style>
     </head>
     <body>
-      <div class="center">
-        <h1>${restaurantName || "Restaurante"}</h1>
-      </div>
-      <div class="line"></div>
-      
-      <div class="origin">${originLabel}</div>
-      ${scheduledSection}
-      
-      <div class="section">
-        <p><strong>Pedido:</strong> #${order.id.slice(0, 8)}</p>
-        <p><strong>Data:</strong> ${dateStr}</p>
-        <p><strong>Cliente:</strong> ${order.customer_name}</p>
-      </div>
-      
-      <div class="double-line"></div>
-      
-      ${itemsHtml}
-      
-      <div class="double-line"></div>
-      
-      <div class="total-row">
-        <span>TOTAL</span>
-        <span>R$ ${subtotal.toFixed(2)}</span>
-      </div>
-      
-      ${deliverySection}
-      ${notesSection}
-      ${cancelSection}
-      
-      <div class="line"></div>
-      <div class="footer">
-        <p>Impresso em ${new Date().toLocaleString("pt-BR")}</p>
-      </div>
+      ${allCopies}
     </body>
     </html>
   `;

@@ -15,6 +15,7 @@ interface WebPrinterConfig {
   fontFamily: string;
   fontSize: number;
   fontBold: boolean;
+  printCopies: number;
 }
 
 const FONT_OPTIONS = [
@@ -41,6 +42,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     fontFamily: 'Arial Black',
     fontSize: 12,
     fontBold: true,
+    printCopies: 1,
   });
 
   useEffect(() => {
@@ -62,6 +64,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           fontFamily: (data as any).font_family || 'Arial Black',
           fontSize: (data as any).font_size || 12,
           fontBold: (data as any).font_bold !== undefined ? Boolean((data as any).font_bold) : true,
+          printCopies: (data as any).print_copies || 1,
         });
       }
     } catch (error) {
@@ -82,6 +85,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           font_family: webConfig.fontFamily,
           font_size: webConfig.fontSize,
           font_bold: webConfig.fontBold,
+          print_copies: webConfig.printCopies,
           updated_at: new Date().toISOString(),
         } as any, { onConflict: 'restaurant_id' });
       if (error) throw error;
@@ -220,6 +224,20 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
               <p className="text-sm text-muted-foreground">Ao marcar uma conta como paga, abre automaticamente o diálogo de impressão do cupom</p>
             </div>
             <Switch checked={webConfig.autoPrintReceipts} onCheckedChange={(checked) => setWebConfig(prev => ({ ...prev, autoPrintReceipts: checked }))} />
+          </div>
+
+          <div className="space-y-2 max-w-xs">
+            <Label>Número de Vias</Label>
+            <p className="text-sm text-muted-foreground">Quantas cópias imprimir de cada pedido</p>
+            <Select value={String(webConfig.printCopies)} onValueChange={(value) => setWebConfig(prev => ({ ...prev, printCopies: parseInt(value) }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 via</SelectItem>
+                <SelectItem value="2">2 vias</SelectItem>
+                <SelectItem value="3">3 vias</SelectItem>
+                <SelectItem value="4">4 vias</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Button variant="outline" onClick={testWebPrint} disabled={testing === 'web'}>

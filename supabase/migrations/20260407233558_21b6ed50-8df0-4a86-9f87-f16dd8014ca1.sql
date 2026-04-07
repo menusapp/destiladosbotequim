@@ -1,0 +1,1 @@
+ALTER TABLE printer_settings ADD COLUMN print_copies integer NOT NULL DEFAULT 1;
