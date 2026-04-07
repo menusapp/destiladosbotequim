@@ -58,7 +58,7 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
     setLoading(true);
     const { data } = await supabase
       .from("tables")
-      .select("id, table_number, table_name, min_capacity, max_capacity, image_url, description, display_order, is_occupied")
+      .select("id, table_number, table_name, min_capacity, max_capacity, image_url, description, display_order, is_occupied, is_hidden")
       .eq("restaurant_id", restaurantId)
       .neq("table_number", 9999)
       .order("display_order")
