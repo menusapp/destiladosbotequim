@@ -868,22 +868,37 @@ const RestaurantAdmin = () => {
             onIsOpenUpdate={(isOpen) => setRestaurant({ ...restaurant, is_open: isOpen })}
           />
           <main className="flex-1 overflow-auto p-4">
-            <Suspense fallback={
-              <div className="space-y-6 p-2">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-48 animate-pulse rounded-md bg-muted" />
-                  <div className="h-8 w-32 animate-pulse rounded-md bg-muted" />
+            {isDelinquent ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+                <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <span className="text-3xl">⚠️</span>
                 </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="h-32 animate-pulse rounded-xl bg-muted" />
-                  ))}
-                </div>
-                <div className="h-64 animate-pulse rounded-xl bg-muted" />
+                <h2 className="text-xl font-bold text-foreground">Assinatura Inadimplente</h2>
+                <p className="text-muted-foreground max-w-md">
+                  Seu pagamento não foi identificado. Por favor, regularize sua assinatura para continuar usando o sistema.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Caso já tenha pago, aguarde alguns minutos para a confirmação automática.
+                </p>
               </div>
-            }>
-              {renderContent()}
-            </Suspense>
+            ) : (
+              <Suspense fallback={
+                <div className="space-y-6 p-2">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-48 animate-pulse rounded-md bg-muted" />
+                    <div className="h-8 w-32 animate-pulse rounded-md bg-muted" />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="h-32 animate-pulse rounded-xl bg-muted" />
+                    ))}
+                  </div>
+                  <div className="h-64 animate-pulse rounded-xl bg-muted" />
+                </div>
+              }>
+                {renderContent()}
+              </Suspense>
+            )}
           </main>
         </SidebarInset>
 
