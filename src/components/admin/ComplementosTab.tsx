@@ -406,10 +406,17 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                                 ) : ("Sem insumos vinculados")}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => openEditItem(item, category.id)}><Edit2 className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="sm" onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } handleDeleteItem(item, category.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            </div>
+                             <div className="flex items-center gap-2">
+                               <Switch
+                                 checked={item.is_active !== false}
+                                 onCheckedChange={async (checked) => {
+                                   await supabase.from("extra_category_items").update({ is_active: checked } as any).eq("id", item.id);
+                                   fetchCategories();
+                                 }}
+                               />
+                               <Button variant="ghost" size="sm" onClick={() => openEditItem(item, category.id)}><Edit2 className="h-4 w-4" /></Button>
+                               <Button variant="ghost" size="sm" onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } handleDeleteItem(item, category.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                             </div>
                           </div>
                         );
                       })}

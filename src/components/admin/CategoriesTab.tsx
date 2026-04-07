@@ -407,7 +407,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
           {categories.map((category) => (
             <div
               key={category.id}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
+              className={`flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors ${category.is_active === false ? "opacity-50" : ""}`}
             >
               <div className="flex items-center gap-3">
                 {category.image_url ? (
@@ -418,8 +418,18 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
                   </div>
                 )}
                 <p className="font-medium">{category.name}</p>
+                {category.is_active === false && (
+                  <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Inativo</span>
+                )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={category.is_active !== false}
+                  onCheckedChange={async (checked) => {
+                    await supabase.from("categories").update({ is_active: checked } as any).eq("id", category.id);
+                    fetchCategories();
+                  }}
+                />
                 <Button
                   variant="outline"
                   size="sm"
