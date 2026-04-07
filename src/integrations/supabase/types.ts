@@ -4148,6 +4148,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_upsert_payment_config: {
+        Args: { p_field: string; p_restaurant_id: string; p_value?: string }
+        Returns: undefined
+      }
       auto_release_idle_tables: { Args: never; Returns: undefined }
       auto_release_inactive_tables: { Args: never; Returns: undefined }
       check_product_availability: {
