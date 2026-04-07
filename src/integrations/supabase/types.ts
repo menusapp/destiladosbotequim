@@ -4160,6 +4160,10 @@ export type Database = {
         Args: { p_product_extra_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_delete_staff: {
+        Args: { p_restaurant_id: string; p_staff_id: string }
+        Returns: boolean
+      }
       admin_delete_stock_item: {
         Args: { p_restaurant_id: string; p_stock_item_id: string }
         Returns: undefined
