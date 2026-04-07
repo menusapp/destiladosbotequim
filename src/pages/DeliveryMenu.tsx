@@ -84,6 +84,7 @@ export default function DeliveryMenu() {
       const featuredData = featuredResult.data;
 
       const filteredFeatured = (featuredData || []).filter((p: any) => {
+        if (!isFeaturedVisible(p)) return false;
         const channels = p.visibility_channels || ['all'];
         return channels.includes('all') || channels.includes('delivery');
       });

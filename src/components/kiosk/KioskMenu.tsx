@@ -20,7 +20,7 @@ interface Props {
 
 export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant }: Props) {
   const featuredProducts = useMemo(() => {
-    return categories.flatMap(c => c.products).filter(p => p.is_featured || p.promotional_price != null);
+    return categories.flatMap(c => c.products).filter(p => (p.is_featured || p.promotional_price != null) && isFeaturedVisible(p));
   }, [categories]);
 
   const featuredSectionTitle = restaurant?.featured_section_title || "Destaques";

@@ -184,6 +184,7 @@ const Menu = () => {
         const featured = allProducts
           .filter((p: any) => {
             if (!p.is_featured || !p.available) return false;
+            if (!isFeaturedVisible(p)) return false;
             const channels = p.visibility_channels || ['all'];
             return channels.includes('all') || channels.includes('mesa');
           })
