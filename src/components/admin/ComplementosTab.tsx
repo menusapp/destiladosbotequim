@@ -359,7 +359,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
       ) : (
         <div className="space-y-4">
           {filteredCategories.map((category) => (
-            <Card key={category.id} className="overflow-hidden">
+            <Card key={category.id} className={`overflow-hidden ${category.is_active === false ? "opacity-50" : ""}`}>
               <Collapsible open={expandedCategories.has(category.id)} onOpenChange={() => toggleCategory(category.id)}>
                 <CollapsibleTrigger asChild>
                   <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-4">
@@ -368,8 +368,18 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                         {expandedCategories.has(category.id) ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                         <CardTitle className="text-lg">{category.name}</CardTitle>
                         <span className="text-sm text-muted-foreground">({category.items.length} {category.items.length === 1 ? "item" : "itens"})</span>
+                        {category.is_active === false && (
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Inativo</span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                          checked={category.is_active !== false}
+                          onCheckedChange={async (checked) => {
+                            await supabase.from("extra_categories").update({ is_active: checked } as any).eq("id", category.id);
+                            fetchCategories();
+                          }}
+                        />
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEditCategory(category); }}><Edit2 className="h-4 w-4" /></Button>
                         <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } setDeletingCategory(category); setDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4" /></Button>
                       </div>
