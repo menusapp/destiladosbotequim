@@ -36,9 +36,10 @@ interface FormData {
   min_capacity: string;
   max_capacity: string;
   description: string;
+  is_hidden: boolean;
 }
 
-const emptyForm: FormData = { table_number: "", table_name: "", min_capacity: "1", max_capacity: "4", description: "" };
+const emptyForm: FormData = { table_number: "", table_name: "", min_capacity: "1", max_capacity: "4", description: "", is_hidden: false };
 
 export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesChanged }: ManageTablesDrawerProps) => {
   const [tables, setTables] = useState<TableRow[]>([]);

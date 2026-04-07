@@ -56,19 +56,19 @@ const segments = [
 /* ── Plans (Básico, Intermediário, Avançado) ── */
 const plans = [
   {
-    name: "Básico", price: "99", daily: "R$ 3,30/dia", description: "Para começar a digitalizar", highlighted: false,
+    name: "Básico", price: "69,90", daily: "R$ 2,33/dia", description: "Para começar a digitalizar", highlighted: false,
     features: ["Cardápio digital ilimitado", "QR Code para mesas", "Pedidos em tempo real", "1 usuário administrador", "Suporte por email"],
     cta: "Começar Agora",
     mpLink: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=ce558ba8031d48e78c875adbe8af561a",
   },
   {
-    name: "Intermediário", price: "199", daily: "R$ 6,63/dia", description: "Para crescer com eficiência", highlighted: true,
+    name: "Intermediário", price: "149,90", daily: "R$ 5,00/dia", description: "Para crescer com eficiência", highlighted: true,
     features: ["Tudo do Básico", "Delivery completo", "Gestão de estoque & CMV", "Relatórios e DRE", "Programa de fidelidade", "Até 5 usuários", "Suporte prioritário"],
     cta: "Escolher Intermediário",
     mpLink: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=fe9ff4a87e634b86a493887ab8737b17",
   },
   {
-    name: "Avançado", price: "349", daily: "R$ 11,63/dia", description: "Solução completa", highlighted: false,
+    name: "Avançado", price: "249,90", daily: "R$ 8,33/dia", description: "Solução completa", highlighted: false,
     features: ["Tudo do Intermediário", "Marketing WhatsApp", "Remarketing automático", "Nota fiscal eletrônica", "Fluxo de caixa & DRE", "Reservas online", "Usuários ilimitados", "Suporte VIP"],
     cta: "Escolher Avançado",
     mpLink: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=e0f8cd5628974aa180490d2b6e9d78ea",
