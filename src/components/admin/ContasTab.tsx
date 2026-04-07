@@ -176,10 +176,10 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
       return;
     }
 
-    const { error } = await supabase
-      .from("restaurant_staff" as any)
-      .update({ is_active: !member.is_active })
-      .eq("id", member.id);
+    const { error } = await supabase.rpc("admin_toggle_staff_active", {
+      p_staff_id: member.id,
+      p_restaurant_id: restaurantId,
+    });
 
     if (error) {
       toast.error("Erro ao alterar status");

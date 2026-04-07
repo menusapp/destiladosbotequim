@@ -166,10 +166,9 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
     if (!confirm("Tem certeza que deseja desconectar o Mercado Pago? Você precisará reconectar para voltar a receber pagamentos online.")) return;
     setDisconnecting(true);
     try {
-      const { error } = await supabase
-        .from("online_payment_config")
-        .delete()
-        .eq("restaurant_id", restaurantId);
+      const { error } = await supabase.rpc("admin_delete_payment_config", {
+        p_restaurant_id: restaurantId,
+      });
       if (error) throw error;
       setConfig(null);
       setViewState("not_connected");

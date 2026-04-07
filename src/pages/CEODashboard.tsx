@@ -161,15 +161,14 @@ const CEODashboard = () => {
             "fiscal","modulos","config-dados","config-horario","config-regioes",
             "config-pagamentos","config-pagamentos-online","config-impressoras","config-whatsapp"
           ];
-          const { error: staffError } = await supabase.from("restaurant_staff" as any)
-            .insert({
-              restaurant_id: restaurant.id,
-              username: formUsername,
-              password_hash: hashedPassword,
-              display_name: "Administrador",
-              role: "admin",
-              allowed_sections: allSections,
-            } as any);
+          const { error: staffError } = await supabase.rpc("admin_create_staff", {
+            p_restaurant_id: restaurant.id,
+            p_username: formUsername,
+            p_password_hash: hashedPassword,
+            p_display_name: "Administrador",
+            p_role: "admin",
+            p_allowed_sections: JSON.stringify(allSections),
+          });
           if (staffError) console.error("Erro ao criar conta admin:", staffError);
         }
         toast.success("Restaurante criado com sucesso!");
