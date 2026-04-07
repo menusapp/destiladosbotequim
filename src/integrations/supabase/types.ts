@@ -4086,9 +4086,64 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      online_payment_config_public: {
+        Row: {
+          accept_card: boolean | null
+          accept_pix: boolean | null
+          connection_status: string | null
+          enable_for_delivery: boolean | null
+          enabled: boolean | null
+          id: string | null
+          mp_public_key: string | null
+          restaurant_id: string | null
+        }
+        Insert: {
+          accept_card?: boolean | null
+          accept_pix?: boolean | null
+          connection_status?: string | null
+          enable_for_delivery?: boolean | null
+          enabled?: boolean | null
+          id?: string | null
+          mp_public_key?: string | null
+          restaurant_id?: string | null
+        }
+        Update: {
+          accept_card?: boolean | null
+          accept_pix?: boolean | null
+          connection_status?: string | null
+          enable_for_delivery?: boolean | null
+          enabled?: boolean | null
+          id?: string | null
+          mp_public_key?: string | null
+          restaurant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "online_payment_config_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      admin_check_has_staff: {
+        Args: { p_restaurant_id: string }
+        Returns: boolean
+      }
+      admin_create_first_staff: {
+        Args: {
+          p_allowed_sections: string
+          p_display_name: string
+          p_password_hash: string
+          p_restaurant_id: string
+          p_role: string
+          p_username: string
+        }
+        Returns: undefined
+      }
       admin_delete_bill: {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
@@ -4101,12 +4156,17 @@ export type Database = {
         Args: { p_category_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_delete_ceo_user: { Args: { p_id: string }; Returns: undefined }
       admin_delete_order: {
         Args: { p_order_id: string; p_restaurant_id: string }
         Returns: undefined
       }
       admin_delete_order_and_bill: {
         Args: { p_order_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_payment_config: {
+        Args: { p_restaurant_id: string }
         Returns: undefined
       }
       admin_delete_product: {
@@ -4120,6 +4180,38 @@ export type Database = {
       admin_delete_stock_item: {
         Args: { p_restaurant_id: string; p_stock_item_id: string }
         Returns: undefined
+      }
+      admin_ensure_payment_config: {
+        Args: { p_restaurant_id: string }
+        Returns: string
+      }
+      admin_get_payment_config: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          accept_card: boolean
+          accept_pix: boolean
+          connected_at: string
+          connection_status: string
+          enable_for_delivery: boolean
+          enabled: boolean
+          id: string
+          mp_access_token: string
+          mp_public_key: string
+          mp_refresh_token: string
+          mp_sandbox_payer_email: string
+          provider: string
+          restaurant_id: string
+        }[]
+      }
+      admin_list_ceo_users: {
+        Args: never
+        Returns: {
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          username: string
+        }[]
       }
       admin_mark_bill_on_the_way: {
         Args: { p_bill_id: string; p_restaurant_id: string }
@@ -4145,6 +4237,15 @@ export type Database = {
           p_service_fee_enabled: boolean
           p_service_fee_percentage: number
           p_target_cmv_percentage: number
+        }
+        Returns: undefined
+      }
+      admin_upsert_ceo_user: {
+        Args: {
+          p_display_name?: string
+          p_id?: string
+          p_password_hash?: string
+          p_username?: string
         }
         Returns: undefined
       }
