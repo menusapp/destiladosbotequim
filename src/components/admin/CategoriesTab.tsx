@@ -424,6 +424,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
               </div>
               <div className="flex items-center gap-2">
                 <Switch
+                  className="h-4 w-8 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-4"
                   checked={category.is_active !== false}
                   onCheckedChange={async (checked) => {
                     await supabase.from("categories").update({ is_active: checked } as any).eq("id", category.id);
