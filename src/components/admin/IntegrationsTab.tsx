@@ -67,22 +67,18 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
 
   const fetchIfoodConfig = async () => {
     setIfoodLoading(true);
-    const { data } = await supabase
-      .from("ifood_config" as any)
-      .select("id, restaurant_id, enabled, merchant_id, token_expires_at, access_token")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
+    const { data } = await supabase.rpc("admin_get_ifood_config", {
+      p_restaurant_id: restaurantId,
+    });
     setIfoodConfig(data as unknown as IfoodConfig | null);
     setIfoodLoading(false);
   };
 
   const fetchDdConfig = async () => {
     setDdLoading(true);
-    const { data } = await supabase
-      .from("deliverydireto_config" as any)
-      .select("id, restaurant_id, enabled, store_id, username, access_token, token_expires_at")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
+    const { data } = await supabase.rpc("admin_get_dd_config", {
+      p_restaurant_id: restaurantId,
+    });
     setDdConfig(data as unknown as DDConfig | null);
     setDdLoading(false);
   };
