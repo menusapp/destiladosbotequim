@@ -165,6 +165,7 @@ const Menu = () => {
       // ⚡ Processar categorias dos dados JÁ CARREGADOS (sem query adicional!)
       // Filtrar produtos em destaque para não aparecerem duplicados nas categorias
       const sortedCategories = (restaurantData.categories || [])
+        .filter((cat: any) => cat.is_active !== false)
         .map((cat: any) => ({ 
           ...cat, 
           products: (cat.products || [])
