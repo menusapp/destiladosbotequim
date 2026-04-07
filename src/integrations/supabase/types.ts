@@ -4145,7 +4145,12 @@ export type Database = {
         Args: { p_restaurant_id: string }
         Returns: string
       }
+      admin_get_dd_config: { Args: { p_restaurant_id: string }; Returns: Json }
       admin_get_fiscal_config: {
+        Args: { p_restaurant_id: string }
+        Returns: Json
+      }
+      admin_get_ifood_config: {
         Args: { p_restaurant_id: string }
         Returns: Json
       }
@@ -4167,6 +4172,10 @@ export type Database = {
           restaurant_id: string
         }[]
       }
+      admin_get_whatsapp_status: {
+        Args: { p_restaurant_id: string }
+        Returns: Json
+      }
       admin_list_ceo_users: {
         Args: never
         Returns: {
@@ -4183,6 +4192,14 @@ export type Database = {
       }
       admin_mark_bill_paid: {
         Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_toggle_dd: {
+        Args: { p_enabled: boolean; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_toggle_ifood: {
+        Args: { p_enabled: boolean; p_restaurant_id: string }
         Returns: undefined
       }
       admin_update_fiscal_config: {

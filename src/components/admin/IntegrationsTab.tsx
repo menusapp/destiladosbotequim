@@ -67,22 +67,18 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
 
   const fetchIfoodConfig = async () => {
     setIfoodLoading(true);
-    const { data } = await supabase
-      .from("ifood_config" as any)
-      .select("id, restaurant_id, enabled, merchant_id, token_expires_at, access_token")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
+    const { data } = await supabase.rpc("admin_get_ifood_config", {
+      p_restaurant_id: restaurantId,
+    });
     setIfoodConfig(data as unknown as IfoodConfig | null);
     setIfoodLoading(false);
   };
 
   const fetchDdConfig = async () => {
     setDdLoading(true);
-    const { data } = await supabase
-      .from("deliverydireto_config" as any)
-      .select("id, restaurant_id, enabled, store_id, username, access_token, token_expires_at")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
+    const { data } = await supabase.rpc("admin_get_dd_config", {
+      p_restaurant_id: restaurantId,
+    });
     setDdConfig(data as unknown as DDConfig | null);
     setDdLoading(false);
   };
@@ -144,10 +140,10 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleIfoodToggle = async (enabled: boolean) => {
-    await supabase
-      .from("ifood_config" as any)
-      .update({ enabled, updated_at: new Date().toISOString() } as any)
-      .eq("restaurant_id", restaurantId);
+    await supabase.rpc("admin_toggle_ifood", {
+      p_restaurant_id: restaurantId,
+      p_enabled: enabled,
+    });
     setIfoodConfig((prev) => (prev ? { ...prev, enabled } : null));
     toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
   };
@@ -201,10 +197,10 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleDdToggle = async (enabled: boolean) => {
-    await supabase
-      .from("deliverydireto_config" as any)
-      .update({ enabled, updated_at: new Date().toISOString() } as any)
-      .eq("restaurant_id", restaurantId);
+    await supabase.rpc("admin_toggle_dd", {
+      p_restaurant_id: restaurantId,
+      p_enabled: enabled,
+    });
     setDdConfig((prev) => (prev ? { ...prev, enabled } : null));
     toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
   };
