@@ -57,6 +57,7 @@ export const printOrder = async (
   let fontFamily = "Arial Black";
   let fontSize = 12;
   let fontBold = true;
+  let printCopies = 1;
   try {
     const { data } = await supabase
       .from("printer_settings")
@@ -67,6 +68,7 @@ export const printOrder = async (
     if ((data as any)?.font_family) fontFamily = (data as any).font_family;
     if ((data as any)?.font_size) fontSize = (data as any).font_size;
     if ((data as any)?.font_bold !== undefined) fontBold = Boolean((data as any).font_bold);
+    if ((data as any)?.print_copies) printCopies = (data as any).print_copies;
   } catch {}
 
   // Fetch restaurant name
