@@ -115,18 +115,22 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
 
     setSavingToggles(true);
     try {
-      const updateData: Record<string, unknown> = { [field]: value };
-
-      if (field === "enable_for_delivery" && value) {
-        updateData.enabled = true;
-      }
-
-      const { error } = await supabase
-        .from("online_payment_config")
-        .update(updateData)
-        .eq("restaurant_id", restaurantId);
-
+      // Update the main field
+      const { error } = await supabase.rpc("admin_upsert_payment_config", {
+        p_restaurant_id: restaurantId,
+        p_field: field,
+        p_value: String(value),
+      });
       if (error) throw error;
+
+      // If enabling for delivery, also enable globally
+      if (field === "enable_for_delivery" && value) {
+        await supabase.rpc("admin_upsert_payment_config", {
+          p_restaurant_id: restaurantId,
+          p_field: "enabled",
+          p_value: "true",
+        });
+      }
 
       setConfig({ ...config, [field]: value, ...(field === "enable_for_delivery" && value ? { enabled: true } : {}) });
       toast.success("Configuração atualizada!");
