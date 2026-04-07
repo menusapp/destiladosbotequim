@@ -33,14 +33,14 @@ const StaffLogin = () => {
 
     // Load logo and check staff count in parallel
     const loadData = async () => {
-      const [logoRes, staffRes] = await Promise.all([
+      const [logoRes, hasStaffRes] = await Promise.all([
         supabase.from("restaurants").select("logo_url").eq("id", restaurantId).single(),
-        supabase.from("restaurant_staff").select("id").eq("restaurant_id", restaurantId).limit(1),
+        supabase.rpc("admin_check_has_staff", { p_restaurant_id: restaurantId }),
       ]);
 
       if (logoRes.data?.logo_url) setRestaurantLogo(logoRes.data.logo_url);
 
-      const hasStaff = staffRes.data && staffRes.data.length > 0;
+      const hasStaff = hasStaffRes.data === true;
       setIsFirstTime(!hasStaff);
       setCheckingStaff(false);
     };
