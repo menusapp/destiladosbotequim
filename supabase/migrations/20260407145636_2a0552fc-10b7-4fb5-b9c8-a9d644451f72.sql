@@ -1,0 +1,151 @@
+-- Fix 3 functions with mutable search paths
+
+-- 1. add_local_order_to_cash_register
+CREATE OR REPLACE FUNCTION public.add_local_order_to_cash_register()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = 'public'
+AS $function$
+DECLARE
+  v_restaurant_id uuid;
+  v_cash_session_id uuid;
+  v_bill_subtotal numeric;
+  v_service_fee numeric;
+  v_bill_total numeric;
+  v_service_fee_enabled boolean;
+  v_service_fee_percentage numeric;
+  v_existing_movement_id uuid;
+  v_table_number integer;
+BEGIN
+  IF (NEW.order_type IS NULL OR NEW.order_type = 'local')
+     AND NEW.table_id IS NOT NULL
+     AND NEW.payment_type IS NOT NULL
+     AND NEW.payment_type != 'pending'
+     AND (OLD.payment_type IS NULL OR OLD.payment_type = 'pending')
+  THEN
+    v_restaurant_id := NEW.restaurant_id;
+    SELECT service_fee_enabled, service_fee_percentage
+    INTO v_service_fee_enabled, v_service_fee_percentage
+    FROM restaurants WHERE id = v_restaurant_id;
+    SELECT id INTO v_cash_session_id
+    FROM cash_register_sessions
+    WHERE restaurant_id = v_restaurant_id AND status = 'open'
+    ORDER BY opened_at DESC LIMIT 1;
+    IF v_cash_session_id IS NULL THEN RETURN NEW; END IF;
+    SELECT id INTO v_existing_movement_id
+    FROM cash_movements
+    WHERE cash_session_id = v_cash_session_id
+      AND description LIKE 'Pedido Local #' || NEW.id::text || '%'
+    LIMIT 1;
+    IF v_existing_movement_id IS NOT NULL THEN
+      UPDATE cash_movements SET payment_method = NEW.payment_type WHERE id = v_existing_movement_id;
+      RETURN NEW;
+    END IF;
+    SELECT COALESCE(SUM(oi.price_at_order * oi.quantity + 
+      COALESCE((SELECT SUM(oie.price_at_order) FROM order_item_extras oie WHERE oie.order_item_id = oi.id), 0)), 0)
+    INTO v_bill_subtotal FROM order_items oi WHERE oi.order_id = NEW.id;
+    IF v_service_fee_enabled THEN
+      v_service_fee := v_bill_subtotal * (v_service_fee_percentage / 100);
+    ELSE
+      v_service_fee := 0;
+    END IF;
+    v_bill_total := v_bill_subtotal + v_service_fee;
+    SELECT table_number INTO v_table_number FROM tables WHERE id = NEW.table_id;
+    INSERT INTO cash_movements (
+      cash_session_id, restaurant_id, movement_type, amount,
+      payment_method, category, description, created_by
+    ) VALUES (
+      v_cash_session_id, v_restaurant_id, 'entrada', v_bill_total,
+      NEW.payment_type, 'Pedido',
+      'Pedido Local #' || NEW.id || ' - Mesa ' || COALESCE(v_table_number::text, '?') || 
+      ' - ' || COALESCE(NEW.customer_name, 'Cliente') || 
+      ' (Subtotal: R$ ' || ROUND(v_bill_subtotal, 2) || 
+      CASE WHEN v_service_fee > 0 THEN ' + Taxa: R$ ' || ROUND(v_service_fee, 2) ELSE '' END || ')',
+      'Sistema'
+    );
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+-- 2. process_order_stock_movement
+CREATE OR REPLACE FUNCTION public.process_order_stock_movement()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = 'public'
+AS $function$
+DECLARE
+  v_order_item RECORD;
+  v_ingredient RECORD;
+  v_extra_ingredient RECORD;
+  v_restaurant_id uuid;
+  v_already_deducted boolean;
+BEGIN
+  IF (NEW.status = 'accepted' AND (OLD.status IS NULL OR OLD.status != 'accepted'))
+     OR (NEW.status = 'preparing' AND (OLD.status IS NULL OR OLD.status NOT IN ('accepted', 'preparing', 'ready', 'delivered', 'picked_up', 'completed'))) THEN
+    SELECT EXISTS (
+      SELECT 1 FROM stock_movements WHERE order_id = NEW.id LIMIT 1
+    ) INTO v_already_deducted;
+    IF v_already_deducted THEN RETURN NEW; END IF;
+    v_restaurant_id := NEW.restaurant_id;
+    FOR v_order_item IN
+      SELECT oi.id, oi.quantity, oi.product_id FROM order_items oi WHERE oi.order_id = NEW.id
+    LOOP
+      FOR v_ingredient IN
+        SELECT pi.stock_item_id, pi.quantity FROM product_ingredients pi WHERE pi.product_id = v_order_item.product_id
+      LOOP
+        UPDATE stock_items SET current_quantity = current_quantity - (v_ingredient.quantity * v_order_item.quantity) WHERE id = v_ingredient.stock_item_id;
+        INSERT INTO stock_movements (stock_item_id, quantity, movement_type, order_id, reason)
+        VALUES (v_ingredient.stock_item_id, v_ingredient.quantity * v_order_item.quantity, 'saida', NEW.id, 'Venda - Pedido #' || NEW.id);
+      END LOOP;
+      FOR v_extra_ingredient IN
+        SELECT pei.stock_item_id, pei.quantity
+        FROM order_item_extras oie
+        JOIN product_extras pe ON pe.id = oie.product_extra_id
+        JOIN product_extra_ingredients pei ON pei.product_extra_id = pe.id
+        WHERE oie.order_item_id = v_order_item.id
+      LOOP
+        UPDATE stock_items SET current_quantity = current_quantity - (v_extra_ingredient.quantity * v_order_item.quantity) WHERE id = v_extra_ingredient.stock_item_id;
+        INSERT INTO stock_movements (stock_item_id, quantity, movement_type, order_id, reason)
+        VALUES (v_extra_ingredient.stock_item_id, v_extra_ingredient.quantity * v_order_item.quantity, 'saida', NEW.id, 'Venda (adicional) - Pedido #' || NEW.id);
+      END LOOP;
+    END LOOP;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+-- 3. revert_order_stock_movement
+CREATE OR REPLACE FUNCTION public.revert_order_stock_movement()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path = 'public'
+AS $function$
+DECLARE
+  v_movement RECORD;
+BEGIN
+  IF OLD.status NOT IN ('accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered') THEN
+    RETURN OLD;
+  END IF;
+  FOR v_movement IN
+    SELECT stock_item_id, quantity FROM stock_movements WHERE order_id = OLD.id AND movement_type = 'saida'
+  LOOP
+    UPDATE stock_items SET current_quantity = current_quantity + v_movement.quantity WHERE id = v_movement.stock_item_id;
+    INSERT INTO stock_movements (stock_item_id, quantity, movement_type, order_id, reason)
+    VALUES (v_movement.stock_item_id, v_movement.quantity, 'entrada', OLD.id, 'Cancelamento - Pedido #' || OLD.id);
+  END LOOP;
+  RETURN OLD;
+END;
+$function$;
+
+-- Try to move pg_net to extensions schema
+DO $$
+BEGIN
+  ALTER EXTENSION pg_net SET SCHEMA extensions;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Could not move pg_net to extensions schema: %', SQLERRM;
+END;
+$$;
