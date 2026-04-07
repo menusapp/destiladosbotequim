@@ -48,11 +48,9 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
 
   const fetchStaff = async () => {
     try {
-      const { data, error } = await supabase
-        .from("restaurant_staff" as any)
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .order("created_at", { ascending: true });
+      const { data, error } = await supabase.rpc("admin_list_staff", {
+        p_restaurant_id: restaurantId,
+      });
 
       if (error) throw error;
       setStaff((data as any[]) || []);
