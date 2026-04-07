@@ -3429,6 +3429,7 @@ export type Database = {
           expires_at: string | null
           id: string
           last_payment_at: string | null
+          mp_preapproval_id: string | null
           next_payment_at: string | null
           plan_id: string
           restaurant_id: string
@@ -3441,6 +3442,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           last_payment_at?: string | null
+          mp_preapproval_id?: string | null
           next_payment_at?: string | null
           plan_id: string
           restaurant_id: string
@@ -3453,6 +3455,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           last_payment_at?: string | null
+          mp_preapproval_id?: string | null
           next_payment_at?: string | null
           plan_id?: string
           restaurant_id?: string
@@ -3497,6 +3500,7 @@ export type Database = {
           loyalty_enabled: boolean | null
           loyalty_points_per_real: number | null
           loyalty_real_per_point: number | null
+          mp_payer_email: string | null
           municipio_codigo: string | null
           name: string
           pickup_time_minutes: number | null
@@ -3535,6 +3539,7 @@ export type Database = {
           loyalty_enabled?: boolean | null
           loyalty_points_per_real?: number | null
           loyalty_real_per_point?: number | null
+          mp_payer_email?: string | null
           municipio_codigo?: string | null
           name: string
           pickup_time_minutes?: number | null
@@ -3573,6 +3578,7 @@ export type Database = {
           loyalty_enabled?: boolean | null
           loyalty_points_per_real?: number | null
           loyalty_real_per_point?: number | null
+          mp_payer_email?: string | null
           municipio_codigo?: string | null
           name?: string
           pickup_time_minutes?: number | null
@@ -3871,6 +3877,7 @@ export type Database = {
           id: string
           image_url: string | null
           is_available_for_reservation: boolean | null
+          is_hidden: boolean
           is_occupied: boolean | null
           max_capacity: number | null
           min_capacity: number | null
@@ -3888,6 +3895,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_available_for_reservation?: boolean | null
+          is_hidden?: boolean
           is_occupied?: boolean | null
           max_capacity?: number | null
           min_capacity?: number | null
@@ -3905,6 +3913,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_available_for_reservation?: boolean | null
+          is_hidden?: boolean
           is_occupied?: boolean | null
           max_capacity?: number | null
           min_capacity?: number | null
