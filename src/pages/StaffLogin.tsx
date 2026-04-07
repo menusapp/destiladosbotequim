@@ -35,12 +35,12 @@ const StaffLogin = () => {
     const loadData = async () => {
       const [logoRes, staffRes] = await Promise.all([
         supabase.from("restaurants").select("logo_url").eq("id", restaurantId).single(),
-        supabase.from("restaurant_staff").select("id").eq("restaurant_id", restaurantId).limit(1),
+        (supabase as any).rpc("admin_check_has_staff", { p_restaurant_id: restaurantId }),
       ]);
 
       if (logoRes.data?.logo_url) setRestaurantLogo(logoRes.data.logo_url);
 
-      const hasStaff = staffRes.data && staffRes.data.length > 0;
+      const hasStaff = staffRes.data === true;
       setIsFirstTime(!hasStaff);
       setCheckingStaff(false);
     };
