@@ -592,6 +592,13 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     refetchTables();
   };
 
+  const handleToggleHidden = async (table: TableData) => {
+    const newHidden = !table.is_hidden;
+    await supabase.from("tables").update({ is_hidden: newHidden }).eq("id", table.id);
+    toast.success(newHidden ? `Mesa ${table.table_number} ocultada` : `Mesa ${table.table_number} visível`);
+    refetchTables();
+  };
+
   const handleTableClick = (table: TableData) => {
     setSelectedTableForDrawer(table);
   };
