@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, Users, ImageIcon, X, Check, EyeOff } from "lucide-react";
+
+import { Plus, Pencil, Trash2, Users, ImageIcon, X, Check } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 interface TableRow {
@@ -208,14 +208,6 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
                 <div>
                   <Label className="text-xs">Foto (opcional)</Label>
                   <Input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="text-xs" />
-                </div>
-
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <Label className="text-xs font-medium">Mesa oculta</Label>
-                    <p className="text-[10px] text-muted-foreground">Mesas ocultas não aparecem em reservas nem aceitam pedidos via QR Code</p>
-                  </div>
-                  <Switch checked={form.is_hidden} onCheckedChange={(v) => setForm(f => ({ ...f, is_hidden: v }))} />
                 </div>
 
                 <Button onClick={handleSave} disabled={saving} className="w-full" size="sm">

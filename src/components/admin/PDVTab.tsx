@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Search, ShoppingCart, UserPlus, X, Loader2, Settings,
-  MoreVertical, QrCode, Link2, Eraser
+  MoreVertical, QrCode, Link2, Eraser, Eye, EyeOff
 } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "@/components/ui/sonner";
@@ -592,6 +592,13 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     refetchTables();
   };
 
+  const handleToggleHidden = async (table: TableData) => {
+    const newHidden = !table.is_hidden;
+    await supabase.from("tables").update({ is_hidden: newHidden }).eq("id", table.id);
+    toast.success(newHidden ? `Mesa ${table.table_number} ocultada` : `Mesa ${table.table_number} visível`);
+    refetchTables();
+  };
+
   const handleTableClick = (table: TableData) => {
     setSelectedTableForDrawer(table);
   };
@@ -752,6 +759,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleCopyLink(table)}>
                           <Link2 className="w-4 h-4 mr-2" /> Copiar Link
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleToggleHidden(table)}>
+                          {table.is_hidden ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
+                          {table.is_hidden ? "Tornar Visível" : "Ocultar Mesa"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleClearTable(table)}
