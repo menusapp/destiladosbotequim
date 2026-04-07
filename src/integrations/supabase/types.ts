@@ -4104,6 +4104,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_create_staff: {
+        Args: {
+          p_allowed_sections: string
+          p_display_name: string
+          p_password_hash: string
+          p_restaurant_id: string
+          p_role: string
+          p_username: string
+        }
+        Returns: undefined
+      }
       admin_delete_bill: {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
@@ -4186,6 +4197,18 @@ export type Database = {
           username: string
         }[]
       }
+      admin_list_staff: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          allowed_sections: Json
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          role: string
+          username: string
+        }[]
+      }
       admin_mark_bill_on_the_way: {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
@@ -4201,6 +4224,10 @@ export type Database = {
       admin_toggle_ifood: {
         Args: { p_enabled: boolean; p_restaurant_id: string }
         Returns: undefined
+      }
+      admin_toggle_staff_active: {
+        Args: { p_restaurant_id: string; p_staff_id: string }
+        Returns: boolean
       }
       admin_update_fiscal_config: {
         Args: { p_restaurant_id: string; p_updates: Json }
@@ -4241,6 +4268,18 @@ export type Database = {
       admin_upsert_payment_config: {
         Args: { p_field: string; p_restaurant_id: string; p_value?: string }
         Returns: undefined
+      }
+      admin_upsert_staff: {
+        Args: {
+          p_allowed_sections?: string
+          p_display_name?: string
+          p_id?: string
+          p_password_hash?: string
+          p_restaurant_id: string
+          p_role?: string
+          p_username?: string
+        }
+        Returns: string
       }
       auto_release_idle_tables: { Args: never; Returns: undefined }
       auto_release_inactive_tables: { Args: never; Returns: undefined }
