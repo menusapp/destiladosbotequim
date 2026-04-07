@@ -118,6 +118,7 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
       min_capacity: parseInt(form.min_capacity) || 1,
       max_capacity: parseInt(form.max_capacity) || 4,
       description: form.description || null,
+      is_hidden: form.is_hidden,
       restaurant_id: restaurantId,
     };
     if (imageUrl !== undefined) payload.image_url = imageUrl;
