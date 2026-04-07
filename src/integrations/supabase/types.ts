@@ -4086,47 +4086,7 @@ export type Database = {
       }
     }
     Views: {
-      online_payment_config_public: {
-        Row: {
-          accept_card: boolean | null
-          accept_pix: boolean | null
-          connection_status: string | null
-          enable_for_delivery: boolean | null
-          enabled: boolean | null
-          id: string | null
-          mp_public_key: string | null
-          restaurant_id: string | null
-        }
-        Insert: {
-          accept_card?: boolean | null
-          accept_pix?: boolean | null
-          connection_status?: string | null
-          enable_for_delivery?: boolean | null
-          enabled?: boolean | null
-          id?: string | null
-          mp_public_key?: string | null
-          restaurant_id?: string | null
-        }
-        Update: {
-          accept_card?: boolean | null
-          accept_pix?: boolean | null
-          connection_status?: string | null
-          enable_for_delivery?: boolean | null
-          enabled?: boolean | null
-          id?: string | null
-          mp_public_key?: string | null
-          restaurant_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "online_payment_config_restaurant_id_fkey"
-            columns: ["restaurant_id"]
-            isOneToOne: true
-            referencedRelation: "restaurants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       admin_check_has_staff: {
@@ -4263,6 +4223,19 @@ export type Database = {
       deduct_stock_for_order_item: {
         Args: { p_order_item_id: string }
         Returns: undefined
+      }
+      get_public_payment_config: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          accept_card: boolean
+          accept_pix: boolean
+          connection_status: string
+          enable_for_delivery: boolean
+          enabled: boolean
+          id: string
+          mp_public_key: string
+          restaurant_id: string
+        }[]
       }
       get_restaurant_rating_stats: {
         Args: { p_restaurant_id: string }
