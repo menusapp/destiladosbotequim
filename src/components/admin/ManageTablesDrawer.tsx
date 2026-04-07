@@ -250,7 +250,8 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Users className="w-3 h-3" />
                       <span>{table.min_capacity ?? 1}–{table.max_capacity ?? 4} pessoas</span>
-                      {table.is_occupied && <Badge variant="default" className="text-[9px] px-1 py-0">Ocupada</Badge>}
+                      {table.is_hidden && <Badge variant="outline" className="text-[9px] px-1 py-0">Oculta</Badge>}
+                      {table.is_occupied && !table.is_hidden && <Badge variant="default" className="text-[9px] px-1 py-0">Ocupada</Badge>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
