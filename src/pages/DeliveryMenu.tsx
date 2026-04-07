@@ -70,7 +70,9 @@ export default function DeliveryMenu() {
       const categoriesData = categoriesResult.data;
       
       // Filtrar produtos em destaque para não aparecerem duplicados nas categorias
-      const filteredCategories = (categoriesData || []).map((cat: any) => ({
+      const filteredCategories = (categoriesData || [])
+        .filter((cat: any) => cat.is_active !== false)
+        .map((cat: any) => ({
         ...cat,
         products: (cat.products || []).filter((p: any) => {
           if (!p.available) return false;
