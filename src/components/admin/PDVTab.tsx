@@ -729,12 +729,13 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                 return (
                   <Card
                     key={table.id}
-                    className={`cursor-pointer transition-all hover:shadow-md relative ${
+                    className={`${table.is_hidden ? "opacity-60 cursor-not-allowed" : "cursor-pointer"} transition-all hover:shadow-md relative ${
                       isSelected ? "ring-2 ring-primary border-primary" :
-                      isOccupied ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-border"
+                      table.is_hidden ? "border-border bg-muted/30" :
+                      isOccupied ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-green-300 bg-green-50 dark:bg-green-950/20"
                     }`}
-                    onClick={() => handleTableClick(table)}
-                    onDoubleClick={() => handleTableSelect(table)}
+                    onClick={() => !table.is_hidden && handleTableClick(table)}
+                    onDoubleClick={() => !table.is_hidden && handleTableSelect(table)}
                   >
                     {/* Three-dot menu */}
                     <DropdownMenu>
