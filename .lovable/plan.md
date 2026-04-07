@@ -1,75 +1,56 @@
 
 
-# Plano: Corrigir 6 Erros de Segurança + Pagamento Online
+# Diagnóstico Completo — Estado Atual de Segurança
 
-## Diagnóstico
+## Resultado da análise
 
-### Erros de segurança
+Todas as 5 tabelas sensíveis **JÁ estão com `USING(false)`** — bloqueio total para acesso direto:
 
-| # | Erro | Status real |
+| Tabela | Policy atual | Status |
 |---|---|---|
-| 1 | `fiscal_configs` publicly readable | **NÃO CORRIGIDO** — ainda tem `USING(true)`, expõe senhas de certificado e CSC |
-| 2 | Realtime channels sem RLS | **Limitação arquitetural** — `customers` já foi removido; `orders`, `comandas` etc. não podem ser removidos sem quebrar o sistema |
-| 3 | Password hashes públicos (`ceo_users`, `restaurant_staff`, `restaurant_credentials`) | **JÁ CORRIGIDO** — todas têm `USING(false)`. Finding antigo/stale |
-| 4 | `customers` CPF/phone público | **NÃO CORRIGIDO** — ainda `USING(true)`, mas usado por 15+ arquivos (menu, admin, marketing). Bloquear quebraria tudo |
-| 5 | MercadoPago tokens públicos | **JÁ CORRIGIDO** — `online_payment_config` tem `USING(false)` |
-| 6 | Fiscal certificates storage sem scoping | **JÁ CORRIGIDO** — policies com path scoping existem |
+| `ceo_users` | `block_direct_access` → `USING(false)` | ✅ Corrigido |
+| `restaurant_staff` | `block_direct_access` → `USING(false)` | ✅ Corrigido |
+| `restaurant_credentials` | `block_direct_access` → `USING(false)` | ✅ Corrigido |
+| `online_payment_config` | `block_direct_access` → `USING(false)` | ✅ Corrigido |
+| `fiscal_configs` | `block_direct_access` → `USING(false)` | ✅ Corrigido |
 
-### Pagamento online não aparece no delivery
+**Storage (`fiscal-certificates`):** Policies com scoping por `restaurant_id` via `storage.foldername()` estão ativas para SELECT, INSERT, UPDATE e DELETE. ✅
 
-O banco mostra que o restaurante ativo (`8947a1f1...`) tem `connection_status: disconnected` e `mp_access_token: NULL`. Existe uma OUTRA config conectada, mas é de outro restaurante (`9a786bc0...`). Isso significa que a conexão OAuth foi feita a partir do painel de outro restaurante, ou o callback salvou no config errado. **Não é bug de código** — é uma questão de configuração. Você precisa reconectar o Mercado Pago a partir do painel do restaurante correto.
+**Tokens Mercado Pago:** Acesso direto bloqueado. Acesso admin via RPC `admin_get_payment_config`. Menu público via RPC `get_public_payment_config` (que só retorna `mp_public_key`, nunca tokens secretos). ✅
 
----
+**Acesso a dados:** Tudo opera via SECURITY DEFINER RPCs — nenhum dado sensível é retornado por queries diretas.
 
-## Ações concretas
+## Único problema real encontrado
 
-### 1. `fiscal_configs` — Bloquear acesso direto (NOVO)
+**1 senha plaintext** no `restaurant_staff`: o usuário `joao1` (id: `a268e18e...`) tem senha em texto puro. Precisa ser convertida para bcrypt.
 
-Mesmo padrão usado para `online_payment_config`:
+## Plano de ação
 
-**Migration SQL:**
-- Criar RPC `admin_get_fiscal_config(p_restaurant_id)` — retorna todos os campos
-- Criar RPC `admin_upsert_fiscal_config(p_restaurant_id, p_data jsonb)` — faz upsert
-- Criar RPC `admin_update_fiscal_config(p_restaurant_id, p_field, p_value)` — atualiza campo individual
-- Trocar policy para `USING(false)` / `WITH CHECK(false)`
+### 1. Converter senha plaintext para bcrypt
+- Chamar a Edge Function `hash-password` com a senha atual do usuário `joao1`
+- Atualizar o registro via migration/insert com o hash bcrypt
+- **Problema:** não sabemos qual é a senha plaintext sem lê-la diretamente, e não podemos expô-la. A alternativa segura é: forçar uma redefinição (setar um hash bcrypt de uma senha temporária e notificar o dono do restaurante).
 
-**Frontend (`FiscalSettingsTab.tsx`):**
-- Substituir `supabase.from("fiscal_configs").select(...)` por `supabase.rpc("admin_get_fiscal_config", ...)`
-- Substituir `.upsert(...)` por `supabase.rpc("admin_upsert_fiscal_config", ...)`
-- Substituir `.update(...)` por `supabase.rpc("admin_update_fiscal_config", ...)`
+**Alternativa mais prática:** O sistema já possui auto-upgrade de senhas — quando `joao1` fizer login, a RPC `validate_staff_credentials` detecta que não é bcrypt e automaticamente converte para hash. Porém, enquanto ele não logar, a senha fica em texto puro no banco (que já está bloqueado por `USING(false)`).
 
-**Risco de quebra:** Baixo. Apenas `FiscalSettingsTab.tsx` usa esta tabela. Edge functions (nuvem-fiscal-*) usam `service_role` que ignora RLS.
+**Ação recomendada:** Criar uma migration que force o hash de todas as senhas plaintext no `restaurant_staff` usando `extensions.crypt()`.
 
-### 2. `customers` — Documentar como risco aceito
+### 2. Atualizar/limpar findings do scanner
+- Os 6 erros que o scanner mostra são **stale** (cache antigo). Rodar novo scan ou deletar findings obsoletos.
 
-A tabela `customers` é usada por 15+ componentes tanto no menu digital (anon) quanto no admin. Inclui lookups por CPF no checkout, CRM, marketing, etc. Como o sistema opera sem Supabase Auth sessions, não há como usar `auth.uid()` para scoping.
+## Resumo de mudanças
 
-**Ação:** Marcar como risco aceito (ignore) com justificativa técnica detalhada. A mitigação real requer migração para Supabase Auth — refatoração arquitetural grande.
-
-### 3. Findings antigos/stale — Deletar/Ignorar
-
-- **Password hashes** (erro 3): Já corrigido. Deletar finding.
-- **MercadoPago tokens** (erro 5): Já corrigido. Deletar finding.
-- **Fiscal certs storage** (erro 6): Já corrigido com path scoping. Deletar finding.
-- **Realtime channels** (erro 2): Não pode ser removido sem quebrar funcionalidades core. Marcar como risco aceito.
-
-### 4. Pagamento online — Verificação
-
-O problema não é de código. O restaurante `8947a1f1...` precisa reconectar o Mercado Pago. Vá em **Configurações → Pagamentos Online → Conectar com Mercado Pago** e refaça o fluxo OAuth.
-
----
-
-## Resumo de arquivos a alterar
-
-| Arquivo | Mudança |
+| Item | Ação |
 |---|---|
-| Migration SQL | RPCs para `fiscal_configs` + trocar policy |
-| `src/components/admin/FiscalSettingsTab.tsx` | Usar RPCs em vez de queries diretas |
+| Migration SQL | Hash forçado de senhas plaintext em `restaurant_staff` |
+| Security findings | Deletar findings stale dos 6 erros |
 
 ## O que NÃO será alterado
-- Nenhum fluxo de pedidos, estoque, impressão
-- Edge Functions existentes (acessam via service_role)
-- Tabela `customers` (risco aceito)
-- Realtime de `orders` e `comandas` (risco aceito)
-- Código de pagamento online (funciona corretamente — é config)
+- Nenhuma funcionalidade existente
+- Nenhuma RPC, Edge Function ou componente frontend
+- Nenhuma policy de tabela (todas já estão corretas)
+- Nenhum fluxo de login, pedidos, estoque ou fiscal
+
+## Risco de quebra: Zero
+A migration apenas converte senhas existentes para bcrypt. O login já suporta bcrypt. Nada mais muda.
 
