@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, UserCheck, UserX } from "lucide-react";
+import { Plus, Edit, UserCheck, UserX, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_SECTIONS, STAFF_ROLES, ROLE_DEFAULT_SECTIONS, type StaffRole } from "@/lib/staffPermissions";
@@ -190,6 +190,34 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
     fetchStaff();
   };
 
+  const handleDelete = async (member: StaffMember) => {
+    if (member.id === currentStaffId) {
+      toast.error("Você não pode excluir sua própria conta");
+      return;
+    }
+    if (member.role === "admin") {
+      toast.error("A conta admin não pode ser excluída");
+      return;
+    }
+
+    if (!window.confirm(`Tem certeza que deseja excluir a conta de "${member.display_name}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("admin_delete_staff", {
+      p_staff_id: member.id,
+      p_restaurant_id: restaurantId,
+    });
+
+    if (error) {
+      toast.error("Erro ao excluir conta");
+      return;
+    }
+
+    toast.success("Conta excluída com sucesso");
+    fetchStaff();
+  };
+
   const getRoleBadgeColor = (role: string) => {
     const colors: Record<string, string> = {
       admin: "bg-primary/10 text-primary",
@@ -343,19 +371,30 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
                   <Edit className="h-4 w-4" />
                 </Button>
                 {member.role !== "admin" && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => handleToggleActive(member)}
-                    title={member.is_active ? "Desativar" : "Ativar"}
-                  >
-                    {member.is_active ? (
-                      <UserX className="h-4 w-4 text-destructive" />
-                    ) : (
-                      <UserCheck className="h-4 w-4 text-green-600" />
-                    )}
-                  </Button>
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleToggleActive(member)}
+                      title={member.is_active ? "Desativar" : "Ativar"}
+                    >
+                      {member.is_active ? (
+                        <UserX className="h-4 w-4 text-destructive" />
+                      ) : (
+                        <UserCheck className="h-4 w-4 text-green-600" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleDelete(member)}
+                      title="Excluir conta"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </>
                 )}
               </div>
             </CardContent>
