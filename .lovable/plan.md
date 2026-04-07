@@ -1,33 +1,47 @@
 
 
-# Adicionar configuração de número de cópias na impressão
+# Plano — Excluir contas + Seletor de vias + Resposta sobre CEP
 
-## O que muda
+## 1. Ícone de excluir contas na aba Contas
 
-### 1. Migration SQL
-Adicionar coluna `print_copies` na tabela `printer_settings`:
+### 1a. Criar RPC `admin_delete_staff`
+Migration SQL:
 ```sql
-ALTER TABLE printer_settings ADD COLUMN print_copies integer NOT NULL DEFAULT 1;
+CREATE OR REPLACE FUNCTION public.admin_delete_staff(p_staff_id uuid, p_restaurant_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  DELETE FROM restaurant_staff
+  WHERE id = p_staff_id AND restaurant_id = p_restaurant_id AND role != 'admin';
+  RETURN FOUND;
+END;
+$$;
 ```
 
-### 2. `PrintersSettings.tsx`
-- Adicionar `printCopies: number` ao state `WebPrinterConfig` (default: 1)
-- Adicionar um `Select` com opções 1, 2, 3, 4 vias entre os toggles de auto-print e o botão de teste
-- Salvar `print_copies` no `upsert`
-- Carregar `print_copies` no `loadWebConfig`
+### 1b. `ContasTab.tsx`
+- Importar `Trash2` do lucide-react
+- Adicionar função `handleDelete` que chama `supabase.rpc("admin_delete_staff", { p_staff_id, p_restaurant_id })`
+- Proteger: não permitir excluir conta admin nem a própria conta
+- Pedir confirmação antes de excluir
+- Adicionar botão `Trash2` ao lado dos botões Edit e Ativar/Desativar (apenas para contas não-admin)
 
-### 3. `printOrder.ts`
-- Ao buscar `printer_settings`, ler também `print_copies`
-- Após `printWindow.print()`, repetir o `print()` N-1 vezes com intervalo (ex: loop com `setTimeout` espaçado de 1s entre cada cópia)
-- Alternativa mais robusta: duplicar o conteúdo HTML N vezes com `page-break-before` entre cada cópia, assim o `print()` único já gera todas as vias de uma vez — evita múltiplos diálogos de impressão
+## 2. Seletor de número de vias
 
-**Abordagem escolhida**: Duplicar o HTML com page-break. Assim uma única chamada `window.print()` imprime todas as vias sem precisar de múltiplos diálogos.
+O seletor **já existe** em `PrintersSettings.tsx` (linhas 229-241), dentro do card "Configurações de Impressão". Está logo abaixo dos toggles de auto-print. Se não está aparecendo, pode ser um problema de scroll ou cache. Não há alteração de código necessária.
+
+## 3. Validação de CEP
+
+A validação de regiões de entrega por CEP no sistema é baseada na API **ViaCEP** (`https://viacep.com.br/ws/{cep}/json/`). É uma API pública e gratuita brasileira que retorna dados de endereço a partir do CEP (logradouro, bairro, cidade, UF). Usada em 6 arquivos do projeto para autocompletar endereços e validar CEPs.
+
+---
 
 ## Arquivos impactados
 
 | Arquivo | Mudança |
 |---|---|
-| Migration SQL | Adicionar coluna `print_copies` |
-| `src/components/admin/settings/PrintersSettings.tsx` | UI para escolher número de cópias |
-| `src/lib/printOrder.ts` | Duplicar conteúdo HTML para N vias com page-break |
+| Migration SQL | Criar RPC `admin_delete_staff` |
+| `src/components/admin/ContasTab.tsx` | Botão de excluir + lógica |
 
