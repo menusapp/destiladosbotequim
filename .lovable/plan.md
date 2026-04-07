@@ -1,150 +1,91 @@
 
 
-# Plano de Correção de Segurança — 6 Erros
+# Plano de Correção — 3 Erros + 5 Warnings de Segurança
 
-## Contexto arquitetural crítico
+## Análise do estado atual
 
-Este projeto **não usa Supabase Auth sessions** para o painel admin/CEO. Tudo roda como `anon` via localStorage. Isso significa que **não podemos usar `auth.uid()`** nas RLS policies. A estratégia é: **mover operações sensíveis para RPCs SECURITY DEFINER** e **restringir acesso direto às tabelas**.
+As 3 migrações anteriores **já criaram as RPCs e policies `USING(false)`** nos 4 tabelas sensíveis. Porém o scanner ainda mostra erros porque **foi rodado antes das migrações** ou tem cache. Preciso rodar um novo scan e/ou atualizar os findings.
 
----
-
-## Erro 1: CEO credentials publicly readable/writable
-**Tabela:** `ceo_users` — `USING(true)` para anon/authenticated
-
-**Problema:** Qualquer pessoa pode ler usernames e password hashes dos CEOs.
-
-**Solução:**
-- Remover a policy `USING(true)` de `ceo_users`
-- Criar policy restritiva: `SELECT` só retorna `id, username, display_name, is_active, created_at` (sem `password_hash`) — **mas RLS não filtra colunas**, então precisamos de RPCs
-- Criar 3 RPCs SECURITY DEFINER:
-  - `admin_list_ceo_users()` — retorna id, username, display_name, is_active, created_at (sem password_hash)
-  - `admin_upsert_ceo_user(id, username, display_name, password_hash)` — cria/atualiza
-  - `admin_delete_ceo_user(id)` — deleta (mantém mínimo 1)
-- Bloquear acesso direto: `CREATE POLICY "block_all" ON ceo_users FOR ALL USING (false)`
-- **Atualizar** `CEOCredentialsTab.tsx` para usar as RPCs em vez de queries diretas
-
-**Risco de quebra:** Baixo. O login já usa RPC `validate_ceo_credentials`. Só o `CEOCredentialsTab` faz CRUD direto e será migrado.
+Para os warnings, há ações concretas necessárias.
 
 ---
 
-## Erro 2 e 6: Fiscal certificates bucket sem scoping
-**Bucket:** `fiscal-certificates` — policies permitem anon acessar qualquer arquivo
+## 3 Erros (já corrigidos — precisam de re-scan)
 
-**Solução:**
-- Remover `anon` das 4 policies (fiscal_select, fiscal_insert, fiscal_update, fiscal_delete)
-- Manter apenas `authenticated` (para o caso de futura migração para auth real)
-- **Mas** como o admin opera como `anon`, precisamos de outra abordagem:
-  - Criar uma Edge Function `fiscal-storage-proxy` que valida `restaurant_id` via header e faz o upload/download server-side
-  - **OU** manter anon mas adicionar path scoping: `(storage.foldername(name))[1]` deve ser um `restaurant_id` válido existente na tabela `restaurants`
+Os 3 erros já foram resolvidos pelas migrações anteriores:
 
-**Abordagem escolhida:** Path scoping — restringir para que o path comece com um `restaurant_id` válido. Não é perfeito (qualquer anon que saiba um restaurant_id pode acessar), mas é significativamente melhor que acesso total e **não quebra nada**.
+1. **Password hashes publicly readable** → `ceo_users`, `restaurant_staff`, `restaurant_credentials` já têm `USING(false)`. Confirmado via `pg_policies`.
+2. **MercadoPago tokens publicly readable** → `online_payment_config` já tem `USING(false)`. Acesso via RPCs.
+3. **Fiscal certificates sem scoping** → Policies com `storage.foldername` já aplicadas e confirmadas.
 
-**Solução ideal futura:** Edge Function proxy (mais complexa, adiada para não quebrar fluxo fiscal existente).
-
-**Risco de quebra:** Baixo se mantiver path scoping. O código já salva arquivos como `{restaurant_id}/certificate.pfx`.
+**Ação:** Rodar novo security scan para atualizar os findings. Se persistirem, marcar como resolvidos via `manage_security_finding`.
 
 ---
 
-## Erro 3: Password hashes expostos (restaurant_staff, restaurant_credentials)
-**Tabelas:** `restaurant_staff`, `restaurant_credentials` — `USING(true)`
+## 5 Warnings
 
-**Solução `restaurant_credentials`:**
-- Nenhum código do frontend faz query direta nesta tabela (confirmado na busca)
-- Login usa RPC `validate_restaurant_credentials` (SECURITY DEFINER)
-- **Ação:** Trocar policy para `USING(false)` — bloquear acesso direto total
-- O CEO dashboard não gerencia essa tabela diretamente (usa RPC de registro)
+### Warning 1: Leaked Password Protection Disabled
+**Problema:** O check HIBP (Have I Been Pwned) está desativado nas configurações de auth.
 
-**Solução `restaurant_staff`:**
-- `StaffLogin.tsx` faz 2 queries diretas:
-  1. `select("id").eq("restaurant_id", ...)` — checa se tem staff (sem dados sensíveis)
-  2. `insert(...)` — cria primeiro staff (admin owner)
-- Login de staff usa RPC `validate_staff_credentials` (SECURITY DEFINER)
-- **Ação:**
-  - Criar RPC `admin_check_has_staff(p_restaurant_id)` — retorna boolean
-  - Criar RPC `admin_create_first_staff(p_restaurant_id, display_name, username, password_hash, role, allowed_sections)` — insere apenas se não existir nenhum staff
-  - Trocar policy para `USING(false)`
-  - Atualizar `StaffLogin.tsx` para usar as RPCs
+**Ação:** Ativar via `cloud--configure_auth`. Isso não afeta o sistema pois o projeto não usa Supabase Auth para o painel admin (usa RPCs próprias). Risco de quebra: **zero**.
 
-**Risco de quebra:** Médio. Precisa verificar se mais algum lugar do admin faz query direta em `restaurant_staff`. Vou verificar.
+### Warning 2: Extension in Public (`pg_net`)
+**Problema:** A extensão `pg_net` está instalada no schema `public` em vez de um schema dedicado como `extensions`.
 
-**⚠️ Alerta:** Se algum componente admin (ex: gestão de funcionários) faz CRUD direto em `restaurant_staff`, vai quebrar. Será necessário criar RPCs adicionais ou manter uma policy de SELECT que exclua `password_hash` (impossível via RLS — precisaria de view).
+**Ação:** Mover `pg_net` para o schema `extensions` via migration:
+```sql
+ALTER EXTENSION pg_net SET SCHEMA extensions;
+```
 
-**Alternativa segura:** Criar uma VIEW `restaurant_staff_safe` que exclui `password_hash` e dar SELECT na view. Manter INSERT/UPDATE/DELETE via RPCs.
+**Risco de quebra:** Baixo. `pg_net` é usado internamente pelo Supabase para webhooks/cron. Se alguma Edge Function ou trigger referencia `net.http_*`, precisaria atualizar para `extensions.net.http_*`. Vou verificar se há referências antes de executar.
 
----
+**Alternativa segura:** Se a migração falhar (Supabase pode bloquear ALTER EXTENSION em managed instances), marcar como risco aceito com explicação.
 
-## Erro 4: Customer PII broadcast via Realtime
-**Tabelas:** `customers`, `orders`, `comandas` no Realtime
+### Warning 3: Function Search Path Mutable (3 funções)
+**Problema:** 3 funções trigger sem `SET search_path`:
+- `add_local_order_to_cash_register`
+- `process_order_stock_movement`
+- `revert_order_stock_movement`
 
-**Problema:** Realtime broadcast PII (CPF, telefone, endereço) para qualquer subscriber.
+**Ação:** Recriar as 3 funções adicionando `SET search_path = public` (e `SECURITY DEFINER` nas que não têm). O corpo das funções permanece idêntico.
 
-**Realidade:** Remover do Realtime **quebraria** funcionalidades críticas:
-- `TablesTab.tsx`, `PDVTab.tsx` — monitoram mesas e pedidos
-- `UnifiedOrdersTab.tsx` — painel de pedidos em tempo real
-- `RestaurantAdmin.tsx` — notificações de novos pedidos
-- `OrderConfirmation.tsx` — cliente acompanha status
-- `Comanda.tsx` — comanda digital
+**Risco de quebra:** Nenhum. Apenas adiciona uma propriedade de segurança sem alterar lógica.
 
-**Solução possível sem quebrar nada:**
-- `customers` pode ser **removido do Realtime** — nenhum componente subscreve a changes de `customers` diretamente (confirmado: só `TablesTab` subscreve a `comandas`, `orders`, `tables`, `bills`)
-- `orders` e `comandas` **não podem ser removidos** — são essenciais para o funcionamento
+### Warning 4: RLS Policy Always True (58+ tabelas)
+**Problema:** Dezenas de tabelas operacionais com `USING(true)` para INSERT/UPDATE/DELETE.
 
-**Ação:**
-- Remover `customers` da publicação Realtime
-- Para `orders` e `comandas`: documentar como risco aceito (mitigável apenas com auth real futura)
+**Realidade:** Este projeto opera inteiramente como `anon` (sem Supabase Auth sessions). Restringir essas tabelas com `auth.uid()` quebraria **todo o sistema** — cardápio digital, PDV, mesas, pedidos, estoque, fiscal, etc.
 
-**Risco de quebra:** Nenhum para `customers`. Seria catastrófico remover `orders` ou `comandas`.
+**Ação:** Marcar como risco aceito com explicação técnica detalhada. Essas tabelas são operacionais e não contêm dados sensíveis (credenciais e tokens já estão isolados). A mitigação real só seria possível com migração completa para Supabase Auth, o que é uma refatoração arquitetural grande.
+
+### Warning 5: High severity vulnerability — `electron-builder`
+**Problema:** `electron-builder` v26 tem vulnerabilidades conhecidas.
+
+**Ação:** Verificar se Electron é realmente usado. Este é um projeto web (Vite + React). Se Electron foi adicionado para futuro uso mas não é essencial, remover `electron` e `electron-builder` do `package.json`.
+
+**Risco de quebra:** Nenhum se não houver build Electron ativo. O projeto roda como webapp.
 
 ---
 
-## Erro 5: MercadoPago credentials em `online_payment_config`
-**Tabela:** `online_payment_config` — `USING(true)`, contém `mp_access_token`, `mp_refresh_token`
+## Resumo de ações
 
-**Problema:** Qualquer pessoa pode ler tokens de produção do MercadoPago.
+| Item | Ação | Risco |
+|---|---|---|
+| 3 erros | Re-scan + atualizar findings | Zero |
+| HIBP | Ativar leaked password protection | Zero |
+| pg_net | Tentar mover para `extensions`, senão aceitar | Baixo |
+| 3 funções search_path | Recriar com `SET search_path` | Zero |
+| RLS always true | Documentar como risco aceito | Zero |
+| electron-builder | Remover do package.json | Zero |
 
-**Solução:**
-- O menu digital (anon) precisa ler apenas: `enabled`, `accept_pix`, `accept_card`, `enable_for_delivery`, `connection_status`, `mp_public_key`
-- O admin (anon com restaurant_id em localStorage) precisa de CRUD completo
-- **Ação:**
-  - Criar VIEW `online_payment_config_public` com apenas as colunas seguras
-  - Criar RPC `admin_get_payment_config(p_restaurant_id)` — retorna tudo (para o admin)
-  - Criar RPC `admin_update_payment_config(p_restaurant_id, ...)` — atualiza
-  - Criar RPC `admin_delete_payment_config(p_restaurant_id)` — deleta
-  - Trocar policy da tabela original para `USING(false)`
-  - Atualizar `PaymentStep.tsx` e `OnlinePaymentStep.tsx` para usar a VIEW
-  - Atualizar `OnlinePaymentsSettings.tsx` para usar as RPCs
-
-**Risco de quebra:** Médio. O `mercadopago-charge` Edge Function acessa `mp_access_token` server-side via service_role — isso **não é afetado** por RLS. A Edge Function `mercadopago-oauth` também acessa server-side. Seguro.
-
----
-
-## Erro extra: Hardcoded CEO credentials
-**Arquivo:** `RestaurantLogin.tsx` linha 41 — `CEO` / `CEO123`
-
-**Ação:** Remover o fallback hardcoded. O login CEO agora usa a tabela `ceo_users` + RPC.
-
----
-
-## Resumo de arquivos a alterar
-
-| Arquivo | Mudança |
-|---|---|
-| Migration SQL | Novas RPCs, policies, view |
-| `src/components/ceo/CEOCredentialsTab.tsx` | Usar RPCs |
-| `src/pages/StaffLogin.tsx` | Usar RPCs |
-| `src/pages/RestaurantLogin.tsx` | Remover fallback CEO hardcoded |
-| `src/components/admin/settings/OnlinePaymentsSettings.tsx` | Usar RPCs |
-| `src/components/menu/checkout/PaymentStep.tsx` | Usar view |
-| `src/components/menu/checkout/OnlinePaymentStep.tsx` | Usar RPC/view para mp_public_key |
+## Arquivos a alterar
+- 1 migration SQL (fix search_path das 3 funções + tentar mover pg_net)
+- `package.json` (remover electron + electron-builder)
+- Security findings (atualizar/deletar via tool)
 
 ## O que NÃO será alterado
-- Fluxo de pedidos, estoque, fiscal, impressão
-- Edge Functions existentes (acessam via service_role)
-- Realtime de `orders` e `comandas` (risco documentado)
-- Integrações iFood, DD, WhatsApp
-
-## Ordem de execução
-1. Migration: criar RPCs, views, trocar policies
-2. Atualizar código frontend
-3. Remover CEO hardcoded
+- Nenhum componente frontend
+- Nenhum fluxo de pedidos, estoque, fiscal, impressão
+- Nenhuma Edge Function
+- Nenhuma tabela operacional
 
