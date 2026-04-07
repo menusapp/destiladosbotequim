@@ -130,8 +130,8 @@ export const OnlinePaymentStep = ({
       }
 
       try {
-        const { data: config } = await supabase.rpc("get_public_payment_config", { p_restaurant_id: restaurantId });
-
+        const { data: configArr } = await supabase.rpc("get_public_payment_config", { p_restaurant_id: restaurantId });
+        const config = Array.isArray(configArr) && configArr.length > 0 ? configArr[0] : null;
         if (!config?.mp_public_key || isCancelled) return;
 
         secureFieldsRef.current.forEach((f) => {

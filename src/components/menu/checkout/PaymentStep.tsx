@@ -133,8 +133,9 @@ export const PaymentStep = ({
       }
 
       // Set online config if available and active
-      if (!onlineResult.error && onlineResult.data && onlineResult.data.enable_for_delivery && onlineResult.data.connection_status === "connected") {
-        setOnlineConfig(onlineResult.data as OnlinePaymentConfig);
+      const onlineData = !onlineResult.error && Array.isArray(onlineResult.data) && onlineResult.data.length > 0 ? onlineResult.data[0] : null;
+      if (onlineData && onlineData.enable_for_delivery && onlineData.connection_status === "connected") {
+        setOnlineConfig(onlineData as OnlinePaymentConfig);
       }
       
       setLoading(false);
