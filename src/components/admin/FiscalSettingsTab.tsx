@@ -82,30 +82,31 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
 
   const fetchConfig = async () => {
     try {
-      const { data, error } = await supabase.rpc("admin_get_fiscal_config", {
-        p_restaurant_id: restaurantId,
-      });
+      const { data, error } = await supabase
+        .from("fiscal_configs")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (data && typeof data === "object" && Object.keys(data).length > 0) {
-        const d = data as any;
+      if (data) {
         setConfig({
-          cnpj: d.cnpj || "", razao_social: d.razao_social || "",
-          nome_fantasia: d.nome_fantasia || "", inscricao_estadual: d.inscricao_estadual || "",
-          inscricao_municipal: d.inscricao_municipal || "",
-          email: d.email || "", telefone: d.telefone || "",
-          cep: d.cep || "", logradouro: d.logradouro || "",
-          numero: d.numero || "", complemento: d.complemento || "",
-          bairro: d.bairro || "", municipio_codigo: d.municipio_codigo || "",
-          municipio_nome: d.municipio_nome || "",
-          uf: d.uf || "SP", csc_id: d.csc_id || "",
-          csc_code: d.csc_code || "", certificate_password: d.certificate_password || "",
-          certificate_file_path: d.certificate_file_path || "",
+          cnpj: data.cnpj || "", razao_social: data.razao_social || "",
+          nome_fantasia: data.nome_fantasia || "", inscricao_estadual: data.inscricao_estadual || "",
+          inscricao_municipal: (data as any).inscricao_municipal || "",
+          email: data.email || "", telefone: data.telefone || "",
+          cep: data.cep || "", logradouro: data.logradouro || "",
+          numero: data.numero || "", complemento: data.complemento || "",
+          bairro: data.bairro || "", municipio_codigo: data.municipio_codigo || "",
+          municipio_nome: (data as any).municipio_nome || "",
+          uf: data.uf || "SP", csc_id: data.csc_id || "",
+          csc_code: data.csc_code || "", certificate_password: data.certificate_password || "",
+          certificate_file_path: data.certificate_file_path || "",
         });
-        setNuvemFiscalStatus(d.nuvem_fiscal_status || "pending");
-        if (d.certificate_file_path) {
-          setExistingFileName(d.certificate_file_path.split("/").pop() || null);
+        setNuvemFiscalStatus((data as any).nuvem_fiscal_status || "pending");
+        if (data.certificate_file_path) {
+          setExistingFileName(data.certificate_file_path.split("/").pop() || null);
         }
       }
     } catch (error) {
@@ -155,14 +156,14 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
       }
 
       const payload = {
+        restaurant_id: restaurantId,
         ...config,
         certificate_file_path: certificatePath,
       };
 
-      const { error } = await supabase.rpc("admin_upsert_fiscal_config", {
-        p_restaurant_id: restaurantId,
-        p_data: payload,
-      });
+      const { error } = await supabase
+        .from("fiscal_configs")
+        .upsert(payload, { onConflict: "restaurant_id" });
       if (error) throw error;
 
       setConfig((prev) => ({ ...prev, certificate_file_path: certificatePath }));
@@ -203,6 +204,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
   const handleDisconnect = async () => {
     setIsDisconnecting(true);
     try {
+      // 1. Call edge function to delete company from Nuvem Fiscal
       toast.info("Removendo empresa da Nuvem Fiscal...");
       try {
         const { data: nfData, error: nfError } = await supabase.functions.invoke(
@@ -218,18 +220,20 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
         console.error("Exception calling disconnect:", invokeErr);
       }
 
+      // 2. Remove certificate from storage
       await supabase.storage.from("fiscal-certificates").remove([`${restaurantId}/certificate.pfx`]);
 
-      const { error } = await supabase.rpc("admin_update_fiscal_config", {
-        p_restaurant_id: restaurantId,
-        p_updates: {
+      // 3. Clear local config
+      const { error } = await supabase
+        .from("fiscal_configs")
+        .update({
           nuvem_fiscal_status: "pending",
           csc_id: "",
           csc_code: "",
           certificate_password: "",
           certificate_file_path: "",
-        },
-      });
+        })
+        .eq("restaurant_id", restaurantId);
 
       if (error) throw error;
 
@@ -258,6 +262,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
 
   return (
     <div className="space-y-4">
+      {/* Status */}
       {nuvemFiscalStatus === "synced" ? (
         <Alert className="border-green-500/30 bg-green-50 dark:bg-green-950/30">
           <div className="flex items-center justify-between w-full">
@@ -300,7 +305,9 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
         </Alert>
       )}
 
+      {/* Two-column grid: Company Data + Fiscal Address */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Company Data */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">Dados da Empresa</CardTitle>
@@ -337,6 +344,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
           </CardContent>
         </Card>
 
+        {/* Fiscal Address */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">Endereço Fiscal</CardTitle>
@@ -382,6 +390,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
         </Card>
       </div>
 
+      {/* Digital Certificate — full width */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold">Certificado Digital (NFC-e)</CardTitle>
@@ -424,6 +433,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
         </CardContent>
       </Card>
 
+      {/* Save */}
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={isSubmitting}>
           {isSubmitting ? (

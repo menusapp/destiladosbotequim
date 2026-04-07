@@ -35,12 +35,12 @@ const StaffLogin = () => {
     const loadData = async () => {
       const [logoRes, staffRes] = await Promise.all([
         supabase.from("restaurants").select("logo_url").eq("id", restaurantId).single(),
-        (supabase as any).rpc("admin_check_has_staff", { p_restaurant_id: restaurantId }),
+        supabase.from("restaurant_staff").select("id").eq("restaurant_id", restaurantId).limit(1),
       ]);
 
       if (logoRes.data?.logo_url) setRestaurantLogo(logoRes.data.logo_url);
 
-      const hasStaff = staffRes.data === true;
+      const hasStaff = staffRes.data && staffRes.data.length > 0;
       setIsFirstTime(!hasStaff);
       setCheckingStaff(false);
     };
@@ -92,13 +92,14 @@ const StaffLogin = () => {
         "fidelidade", "integracoes", "configuracoes", "pdv", "custos", "modulos"
       ];
 
-      const { error: insertError } = await (supabase as any).rpc("admin_create_first_staff", {
-        p_restaurant_id: restaurantId,
-        p_display_name: newDisplayName.trim(),
-        p_username: newUsername.trim(),
-        p_password_hash: hashData.hash,
-        p_role: "admin",
-        p_allowed_sections: JSON.stringify(allSections),
+      const { error: insertError } = await supabase.from("restaurant_staff").insert({
+        restaurant_id: restaurantId,
+        display_name: newDisplayName.trim(),
+        username: newUsername.trim(),
+        password_hash: hashData.hash,
+        role: "admin",
+        is_active: true,
+        allowed_sections: allSections,
       });
 
       if (insertError) {

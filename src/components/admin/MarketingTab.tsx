@@ -28,14 +28,15 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
 
   const checkWhatsAppStatus = async () => {
     try {
-      const { data } = await supabase.rpc("admin_get_whatsapp_status", {
-        p_restaurant_id: restaurantId,
-      });
+      const { data } = await supabase
+        .from("whatsapp_config")
+        .select("enabled, instance_status")
+        .eq("restaurant_id", restaurantId)
+        .single();
 
       if (data) {
-        const config = data as any;
-        setWhatsappEnabled(config.enabled || false);
-        setWhatsappConnected(config.instance_status === "connected");
+        setWhatsappEnabled(data.enabled || false);
+        setWhatsappConnected(data.instance_status === "connected");
       } else {
         setWhatsappEnabled(false);
         setWhatsappConnected(false);
