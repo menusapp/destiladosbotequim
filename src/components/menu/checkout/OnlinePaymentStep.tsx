@@ -130,11 +130,8 @@ export const OnlinePaymentStep = ({
       }
 
       try {
-        const { data: config } = await (supabase as any)
-          .from("online_payment_config_public")
-          .select("mp_public_key")
-          .eq("restaurant_id", restaurantId)
-          .maybeSingle();
+        const { data: configArr } = await (supabase as any).rpc("get_public_payment_config", { p_restaurant_id: restaurantId });
+        const config = Array.isArray(configArr) && configArr.length > 0 ? configArr[0] : null;
 
         if (!config?.mp_public_key || isCancelled) return;
 
@@ -371,11 +368,8 @@ export const OnlinePaymentStep = ({
             headers: { "Content-Type": "application/json" },
           });
           // Alternative: use the public key endpoint
-          const { data: config } = await (supabase as any)
-            .from("online_payment_config_public")
-            .select("mp_public_key")
-            .eq("restaurant_id", restaurantId)
-            .maybeSingle();
+          const { data: configArr2 } = await (supabase as any).rpc("get_public_payment_config", { p_restaurant_id: restaurantId });
+          const config = Array.isArray(configArr2) && configArr2.length > 0 ? configArr2[0] : null;
           if (config?.mp_public_key) {
             const binResponse = await fetch(`https://api.mercadopago.com/v1/payment_methods/search?public_key=${config.mp_public_key}&bins=${bin}`);
             const binData = await binResponse.json();
