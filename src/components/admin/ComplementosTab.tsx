@@ -78,7 +78,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
       categoriesData.map(async (cat) => {
         const { data: itemsData } = await supabase.from("extra_category_items").select("*, extra_category_item_ingredients(*, stock_items(name, unit, price_per_unit))").eq("category_id", cat.id);
         const items = (itemsData || []).map((item: any) => ({
-          id: item.id, name: item.name, price: item.price, pdv_code: item.pdv_code || "",
+          id: item.id, name: item.name, price: item.price, pdv_code: item.pdv_code || "", is_active: (item as any).is_active,
           ingredients: (item.extra_category_item_ingredients || []).map((ing: any) => ({
             id: ing.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity,
             stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit,
