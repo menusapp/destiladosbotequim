@@ -763,7 +763,8 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
 
                     <CardContent className="p-4 text-center space-y-1">
                       <div className={`w-10 h-10 rounded-full mx-auto flex items-center justify-center text-white text-sm font-bold ${
-                        isOccupied ? "bg-green-500" : "bg-muted-foreground/40"
+                        table.is_hidden ? "bg-muted-foreground/40" :
+                        isOccupied ? "bg-red-500" : "bg-green-400"
                       }`}>
                         {table.table_number}
                       </div>
