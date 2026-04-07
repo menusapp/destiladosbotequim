@@ -92,14 +92,13 @@ const StaffLogin = () => {
         "fidelidade", "integracoes", "configuracoes", "pdv", "custos", "modulos"
       ];
 
-      const { error: insertError } = await supabase.from("restaurant_staff").insert({
-        restaurant_id: restaurantId,
-        display_name: newDisplayName.trim(),
-        username: newUsername.trim(),
-        password_hash: hashData.hash,
-        role: "admin",
-        is_active: true,
-        allowed_sections: allSections,
+      const { error: insertError } = await (supabase as any).rpc("admin_create_first_staff", {
+        p_restaurant_id: restaurantId,
+        p_display_name: newDisplayName.trim(),
+        p_username: newUsername.trim(),
+        p_password_hash: hashData.hash,
+        p_role: "admin",
+        p_allowed_sections: JSON.stringify(allSections),
       });
 
       if (insertError) {

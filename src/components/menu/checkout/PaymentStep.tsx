@@ -118,7 +118,7 @@ export const PaymentStep = ({
           .eq("restaurant_id", restaurantId)
           .eq("is_active", true),
         supabase
-          .from("online_payment_config")
+          .from("online_payment_config_public")
           .select("enabled, accept_pix, accept_card, enable_for_delivery, connection_status")
           .eq("restaurant_id", restaurantId)
           .maybeSingle(),

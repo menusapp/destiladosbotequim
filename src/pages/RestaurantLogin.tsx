@@ -38,11 +38,16 @@ const Landing = () => {
         }
         toast.success(`Bem-vindo ao ${restaurant_name}!`);
         navigate('/login/staff');
-      } else if (username.trim().toUpperCase() === "CEO" && password === "CEO123") {
-        // CEO master access - redirect to CEO user login
-        localStorage.setItem('ceo_access', 'true');
-        navigate('/login/ceo');
       } else {
+        // Try CEO credentials
+        const { data: ceoData, error: ceoError } = await (supabase as any).rpc('validate_ceo_credentials', {
+          p_username: username.trim(),
+          p_password: password,
+        });
+        if (!ceoError && ceoData && Array.isArray(ceoData) && ceoData.length > 0) {
+          localStorage.setItem('ceo_access', 'true');
+          navigate('/login/ceo');
+        } else {
         toast.error("Credenciais inválidas");
       }
     } catch (error: any) {
