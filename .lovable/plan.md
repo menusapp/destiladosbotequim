@@ -1,108 +1,66 @@
 
-# Fix: Mesa não fica ocupada ao aceitar pedido do totem no PDV
 
-## Diagnóstico real
+# Ativação, Desativação e Programação de Produtos em Destaque
 
-O problema não está mais no `TableDetailView.tsx`.
+## O que será feito
 
-Hoje existem dois caminhos diferentes no PDV para aceitar pedido de mesa:
+Cada produto em destaque terá:
+1. **Toggle ativo/inativo** — desativar temporariamente sem remover dos destaques
+2. **Programação por dia e horário** — definir em quais dias da semana e horários o produto aparece como destaque (ex: só segunda a sexta das 11h às 15h)
 
-1. `src/components/admin/TableDetailView.tsx`
-   - Já tem a lógica de marcar `tables.is_occupied = true` quando `newStatus === "accepted"`.
+## Mudanças no banco de dados
 
-2. `src/components/admin/TableDetailDialog.tsx`
-   - É o caminho principal usado no PDV ao abrir a mesa pelo drawer/modal.
-   - O botão **Aceitar** chama `handleAcceptOrder(order.id)`.
-   - Essa função hoje faz apenas:
-     - `orders.status = "accepted"`
-     - `toast.success`
-     - `refetchOrders()`
+Adicionar 2 colunas na tabela `products`:
 
-Ou seja: o pedido muda para aceito, mas a mesa nunca é atualizada para ocupada nesse fluxo. Por isso ela continua cinza/livre.
-
-## Correção mínima e segura
-
-### Arquivo a alterar
-- `src/components/admin/TableDetailDialog.tsx`
-
-### Ponto exato
-- Função `handleAcceptOrder`
-
-### Mudança
-Depois de aceitar o pedido, adicionar o update da mesa para:
-- `is_occupied: true`
-- `occupied_at: new Date().toISOString()`
-- `occupied_by`: nome do cliente do pedido aceito, com fallback `"Cliente"`
-
-## Implementação proposta
-
-Trocar a lógica atual de:
-
-```ts
-const handleAcceptOrder = async (orderId: string) => {
-  await supabase.from("orders").update({ status: "accepted" }).eq("id", orderId);
-  toast.success("Pedido aceito!");
-  refetchOrders();
-};
+```sql
+ALTER TABLE products ADD COLUMN featured_active boolean DEFAULT true;
+ALTER TABLE products ADD COLUMN featured_schedule jsonb DEFAULT null;
 ```
 
-por uma versão que:
-1. encontra o pedido em `orders`
-2. atualiza o status para `accepted`
-3. marca a mesa como ocupada
-4. faz os refetches
-
-Exemplo de comportamento:
-
-```ts
-const acceptedOrder = orders?.find(o => o.id === orderId);
-
-await supabase.from("orders").update({ status: "accepted" }).eq("id", orderId);
-
-if (table?.id) {
-  await supabase.from("tables").update({
-    is_occupied: true,
-    occupied_at: new Date().toISOString(),
-    occupied_by: acceptedOrder?.customer_name || "Cliente",
-  }).eq("id", table.id);
-}
+`featured_schedule` armazena um array como:
+```json
+[
+  { "day": 0, "start": "11:00", "end": "15:00" },
+  { "day": 1, "start": "11:00", "end": "15:00" },
+  ...
+]
 ```
+Quando `null` = sempre visível (sem restrição de horário). Dia 0 = domingo, 6 = sábado.
 
-## Análise de risco
+## Mudanças no admin (DestaquesTab.tsx)
 
-### Risco de quebra
-Baixo.
+Para cada produto em destaque na lista, adicionar:
+- **Switch ativo/inativo** ao lado do nome — toggle rápido
+- **Botão "Programar"** que abre um dialog com:
+  - Checkboxes para cada dia da semana (Dom-Sáb)
+  - Campos de horário início/fim para cada dia selecionado
+  - Opção "Sempre visível" (limpa a programação)
 
-### Por que é seguro
-- altera só o fluxo de aceite dentro do drawer de mesa do PDV
-- não mexe em delivery, iFood, Delivery Direto, fiscal ou pagamento
-- não muda schema
-- repete exatamente o mesmo padrão já usado em:
-  - `OrderDetailModal.tsx`
-  - `TableDetailView.tsx`
-  - criação manual de mesa no `PDVTab.tsx`
+Badge visual indicando status: "Ativo", "Inativo", "Programado" com cores distintas.
 
-### Cuidados para estabilidade
-- manter a lógica restrita ao `handleAcceptOrder`
-- não mover lógica para o totem
-- não mudar fluxo de pagamento/liberação de mesa
-- idealmente fazer `refetchOrders()` e `onTableCleared()`/refresh visual depois do update da mesa para evitar UI desatualizada
+## Mudanças nos cardápios (Menu.tsx, DeliveryMenu.tsx, KioskMenu.tsx)
 
-## O que não deve ser alterado
-- `KioskPayment.tsx`
-- `TableDetailView.tsx`
-- fluxo de pagamento da comanda
-- relatórios
-- qualquer integração externa
+Criar função utilitária `isFeaturedVisible(product)` que verifica:
+1. `is_featured === true`
+2. `featured_active === true` (ou null, para retrocompatibilidade)
+3. Se `featured_schedule` existe, verificar se dia/hora atual está dentro da programação
 
-## Resultado esperado
-Quando o pedido do totem for de mesa e o operador clicar em **Aceitar** no PDV drawer/modal da mesa:
-- o pedido vira `accepted`
-- a mesa passa para ocupada
-- a UI deve ficar verde como antes
+Aplicar essa função nos filtros de featured products em todos os cardápios, substituindo o simples `p.is_featured`.
 
-## Arquivo impactado
-- `src/components/admin/TableDetailDialog.tsx`
+## Arquivos impactados
 
-## Estimativa
-Baixa — ajuste pontual em uma única função.
+| Arquivo | Alteração |
+|---|---|
+| Migration SQL | Adicionar `featured_active` e `featured_schedule` |
+| `src/components/admin/DestaquesTab.tsx` | Toggle ativo, dialog de programação, badges |
+| `src/lib/featuredUtils.ts` (novo) | Função `isFeaturedVisible()` |
+| `src/pages/Menu.tsx` | Usar `isFeaturedVisible` no filtro |
+| `src/pages/DeliveryMenu.tsx` | Usar `isFeaturedVisible` no filtro |
+| `src/components/kiosk/KioskMenu.tsx` | Usar `isFeaturedVisible` no filtro |
+| `src/types/menu.ts` | Adicionar `featured_active`, `featured_schedule` ao tipo |
+
+## Retrocompatibilidade
+- `featured_active` default `true` — produtos existentes continuam visíveis
+- `featured_schedule` default `null` — sem programação = sempre visível
+- Zero impacto em produtos que não são destaque
+
