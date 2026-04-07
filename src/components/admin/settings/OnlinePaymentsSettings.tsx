@@ -52,13 +52,12 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
 
   const fetchConfig = async () => {
     try {
-      const { data, error } = await supabase
-        .from("online_payment_config")
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .maybeSingle();
+      const { data: rows, error } = await supabase.rpc("admin_get_payment_config", {
+        p_restaurant_id: restaurantId,
+      });
 
       if (error) throw error;
+      const data = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 
       if (data && data.mp_access_token && data.connection_status === "connected") {
         setConfig(data as unknown as PaymentConfig);
