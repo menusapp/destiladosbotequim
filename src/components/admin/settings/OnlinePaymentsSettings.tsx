@@ -52,13 +52,12 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
 
   const fetchConfig = async () => {
     try {
-      const { data, error } = await supabase
-        .from("online_payment_config")
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .maybeSingle();
+      const { data: rows, error } = await supabase.rpc("admin_get_payment_config", {
+        p_restaurant_id: restaurantId,
+      });
 
       if (error) throw error;
+      const data = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 
       if (data && data.mp_access_token && data.connection_status === "connected") {
         setConfig(data as unknown as PaymentConfig);
@@ -83,17 +82,12 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
       // 1. Ensure a config row exists to use as state
       let configId = config?.id;
       if (!configId) {
-        const { data: newConfig, error: upsertError } = await supabase
-          .from("online_payment_config")
-          .upsert(
-            { restaurant_id: restaurantId, connection_status: "pending", provider: "mercadopago" },
-            { onConflict: "restaurant_id" }
-          )
-          .select("id")
-          .single();
+        const { data: newId, error: ensureError } = await supabase.rpc("admin_ensure_payment_config", {
+          p_restaurant_id: restaurantId,
+        });
 
-        if (upsertError) throw upsertError;
-        configId = newConfig.id;
+        if (ensureError) throw ensureError;
+        configId = newId;
       }
 
       // 2. Fetch client_id from edge function
@@ -121,18 +115,22 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
 
     setSavingToggles(true);
     try {
-      const updateData: Record<string, unknown> = { [field]: value };
-
-      if (field === "enable_for_delivery" && value) {
-        updateData.enabled = true;
-      }
-
-      const { error } = await supabase
-        .from("online_payment_config")
-        .update(updateData)
-        .eq("restaurant_id", restaurantId);
-
+      // Update the main field
+      const { error } = await supabase.rpc("admin_upsert_payment_config", {
+        p_restaurant_id: restaurantId,
+        p_field: field,
+        p_value: String(value),
+      });
       if (error) throw error;
+
+      // If enabling for delivery, also enable globally
+      if (field === "enable_for_delivery" && value) {
+        await supabase.rpc("admin_upsert_payment_config", {
+          p_restaurant_id: restaurantId,
+          p_field: "enabled",
+          p_value: "true",
+        });
+      }
 
       setConfig({ ...config, [field]: value, ...(field === "enable_for_delivery" && value ? { enabled: true } : {}) });
       toast.success("Configuração atualizada!");
@@ -148,10 +146,11 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
     if (!config) return;
     setSavingSandboxEmail(true);
     try {
-      const { error } = await supabase
-        .from("online_payment_config")
-        .update({ mp_sandbox_payer_email: sandboxEmail.trim() || null } as any)
-        .eq("restaurant_id", restaurantId);
+      const { error } = await supabase.rpc("admin_upsert_payment_config", {
+        p_restaurant_id: restaurantId,
+        p_field: "mp_sandbox_payer_email",
+        p_value: sandboxEmail.trim() || null,
+      });
       if (error) throw error;
       setConfig({ ...config, mp_sandbox_payer_email: sandboxEmail.trim() || null });
       toast.success("Email de teste salvo!");
@@ -167,10 +166,9 @@ const OnlinePaymentsSettings = ({ restaurantId }: OnlinePaymentsSettingsProps) =
     if (!confirm("Tem certeza que deseja desconectar o Mercado Pago? Você precisará reconectar para voltar a receber pagamentos online.")) return;
     setDisconnecting(true);
     try {
-      const { error } = await supabase
-        .from("online_payment_config")
-        .delete()
-        .eq("restaurant_id", restaurantId);
+      const { error } = await supabase.rpc("admin_delete_payment_config", {
+        p_restaurant_id: restaurantId,
+      });
       if (error) throw error;
       setConfig(null);
       setViewState("not_connected");

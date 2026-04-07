@@ -48,11 +48,9 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
 
   const fetchStaff = async () => {
     try {
-      const { data, error } = await supabase
-        .from("restaurant_staff" as any)
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .order("created_at", { ascending: true });
+      const { data, error } = await supabase.rpc("admin_list_staff", {
+        p_restaurant_id: restaurantId,
+      });
 
       if (error) throw error;
       setStaff((data as any[]) || []);
@@ -111,10 +109,15 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           updateData.username = formUsername;
         }
 
-        const { error } = await supabase
-          .from("restaurant_staff" as any)
-          .update(updateData)
-          .eq("id", editingStaff.id);
+        const { error } = await supabase.rpc("admin_upsert_staff", {
+          p_restaurant_id: restaurantId,
+          p_id: editingStaff.id,
+          p_display_name: formDisplayName,
+          p_username: formUsername !== editingStaff.username ? formUsername : null,
+          p_password_hash: formPassword || null,
+          p_role: formRole,
+          p_allowed_sections: JSON.stringify(formRole === "admin" ? ALL_SECTIONS.map(s => s.id) : formSections),
+        });
 
         if (error) throw error;
 
@@ -137,19 +140,17 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           return;
         }
 
-        const { error } = await supabase
-          .from("restaurant_staff" as any)
-          .insert({
-            restaurant_id: restaurantId,
-            username: formUsername.trim(),
-            password_hash: formPassword,
-            display_name: formDisplayName,
-            role: formRole,
-            allowed_sections: formSections,
-          } as any);
+        const { error } = await supabase.rpc("admin_upsert_staff", {
+          p_restaurant_id: restaurantId,
+          p_username: formUsername.trim(),
+          p_password_hash: formPassword,
+          p_display_name: formDisplayName,
+          p_role: formRole,
+          p_allowed_sections: JSON.stringify(formSections),
+        });
 
         if (error) {
-          if (error.code === "23505") {
+          if (error.message?.includes("duplicate") || error.message?.includes("unique")) {
             toast.error("Já existe uma conta com este usuário");
             return;
           }
@@ -175,10 +176,10 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
       return;
     }
 
-    const { error } = await supabase
-      .from("restaurant_staff" as any)
-      .update({ is_active: !member.is_active })
-      .eq("id", member.id);
+    const { error } = await supabase.rpc("admin_toggle_staff_active", {
+      p_staff_id: member.id,
+      p_restaurant_id: restaurantId,
+    });
 
     if (error) {
       toast.error("Erro ao alterar status");
