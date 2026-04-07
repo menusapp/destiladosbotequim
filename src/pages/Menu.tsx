@@ -16,6 +16,7 @@ import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
 import { Clock } from "lucide-react";
 import { ReviewModal } from "@/components/menu/ReviewModal";
 import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
+import { isFeaturedVisible } from "@/lib/featuredUtils";
 
 const Menu = () => {
   const { slug: restaurantSlug, tableNumber } = useParams();
