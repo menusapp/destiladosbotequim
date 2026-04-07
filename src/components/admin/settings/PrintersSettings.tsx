@@ -42,6 +42,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     fontFamily: 'Arial Black',
     fontSize: 12,
     fontBold: true,
+    printCopies: 1,
   });
 
   useEffect(() => {
