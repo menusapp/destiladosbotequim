@@ -132,9 +132,10 @@ export const PaymentStep = ({
         setAvailableMethods(methods);
       }
 
-      // Set online config if available and active
-      if (!onlineResult.error && onlineResult.data && onlineResult.data.enable_for_delivery && onlineResult.data.connection_status === "connected") {
-        setOnlineConfig(onlineResult.data as OnlinePaymentConfig);
+      // Set online config if available and active (RPC returns array)
+      const onlineData = Array.isArray(onlineResult.data) && onlineResult.data.length > 0 ? onlineResult.data[0] : null;
+      if (!onlineResult.error && onlineData && onlineData.enable_for_delivery && onlineData.connection_status === "connected") {
+        setOnlineConfig(onlineData as OnlinePaymentConfig);
       }
       
       setLoading(false);
