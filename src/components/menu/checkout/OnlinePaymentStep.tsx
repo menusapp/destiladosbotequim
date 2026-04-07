@@ -131,7 +131,7 @@ export const OnlinePaymentStep = ({
 
       try {
         const { data: config } = await supabase
-          .from("online_payment_config")
+          .from("online_payment_config_public")
           .select("mp_public_key")
           .eq("restaurant_id", restaurantId)
           .maybeSingle();
