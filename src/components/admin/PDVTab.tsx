@@ -760,6 +760,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                         <DropdownMenuItem onClick={() => handleCopyLink(table)}>
                           <Link2 className="w-4 h-4 mr-2" /> Copiar Link
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleToggleHidden(table)}>
+                          {table.is_hidden ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
+                          {table.is_hidden ? "Tornar Visível" : "Ocultar Mesa"}
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleClearTable(table)}
                           className="text-destructive focus:text-destructive"
