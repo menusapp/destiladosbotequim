@@ -109,10 +109,15 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           updateData.username = formUsername;
         }
 
-        const { error } = await supabase
-          .from("restaurant_staff" as any)
-          .update(updateData)
-          .eq("id", editingStaff.id);
+        const { error } = await supabase.rpc("admin_upsert_staff", {
+          p_restaurant_id: restaurantId,
+          p_id: editingStaff.id,
+          p_display_name: formDisplayName,
+          p_username: formUsername !== editingStaff.username ? formUsername : null,
+          p_password_hash: formPassword || null,
+          p_role: formRole,
+          p_allowed_sections: JSON.stringify(formRole === "admin" ? ALL_SECTIONS.map(s => s.id) : formSections),
+        });
 
         if (error) throw error;
 
