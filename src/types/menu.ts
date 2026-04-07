@@ -9,7 +9,7 @@ export interface Product {
   prep_time_minutes?: number;
   is_featured?: boolean;
   featured_active?: boolean | null;
-  featured_schedule?: { day: number; start: string; end: string }[] | null;
+  featured_schedule?: any;
   featured_display_order?: number;
 }
 
