@@ -140,19 +140,17 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           return;
         }
 
-        const { error } = await supabase
-          .from("restaurant_staff" as any)
-          .insert({
-            restaurant_id: restaurantId,
-            username: formUsername.trim(),
-            password_hash: formPassword,
-            display_name: formDisplayName,
-            role: formRole,
-            allowed_sections: formSections,
-          } as any);
+        const { error } = await supabase.rpc("admin_upsert_staff", {
+          p_restaurant_id: restaurantId,
+          p_username: formUsername.trim(),
+          p_password_hash: formPassword,
+          p_display_name: formDisplayName,
+          p_role: formRole,
+          p_allowed_sections: JSON.stringify(formSections),
+        });
 
         if (error) {
-          if (error.code === "23505") {
+          if (error.message?.includes("duplicate") || error.message?.includes("unique")) {
             toast.error("Já existe uma conta com este usuário");
             return;
           }
