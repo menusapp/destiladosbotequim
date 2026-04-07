@@ -197,10 +197,10 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleDdToggle = async (enabled: boolean) => {
-    await supabase
-      .from("deliverydireto_config" as any)
-      .update({ enabled, updated_at: new Date().toISOString() } as any)
-      .eq("restaurant_id", restaurantId);
+    await supabase.rpc("admin_toggle_dd", {
+      p_restaurant_id: restaurantId,
+      p_enabled: enabled,
+    });
     setDdConfig((prev) => (prev ? { ...prev, enabled } : null));
     toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
   };
