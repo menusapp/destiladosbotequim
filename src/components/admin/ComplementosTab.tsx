@@ -392,13 +392,14 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                       {category.items.map((item) => {
                         const cost = calculateItemCost(item.ingredients);
                         return (
-                          <div key={item.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3">
-                                <span className="font-medium">{item.name}</span>
-                                <span className="text-primary font-semibold">R$ {item.price.toFixed(2)}</span>
-                                {item.pdv_code && <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">PDV: {item.pdv_code}</span>}
-                              </div>
+                          <div key={item.id} className={`flex items-center justify-between p-3 bg-muted/30 rounded-lg ${item.is_active === false ? "opacity-50" : ""}`}>
+                             <div className="flex-1">
+                               <div className="flex items-center gap-3">
+                                 <span className="font-medium">{item.name}</span>
+                                 <span className="text-primary font-semibold">R$ {item.price.toFixed(2)}</span>
+                                 {item.pdv_code && <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">PDV: {item.pdv_code}</span>}
+                                 {item.is_active === false && <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Inativo</span>}
+                               </div>
                               <div className="text-xs text-muted-foreground mt-1">
                                 {item.ingredients.length > 0 ? (
                                   <>{item.ingredients.map(ing => `${ing.stock_item_name} (${ing.quantity} ${ing.stock_item_unit})`).join(", ")}<span className="ml-2">• Custo: R$ {cost.toFixed(2)}</span></>
