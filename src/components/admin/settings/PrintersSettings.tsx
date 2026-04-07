@@ -64,6 +64,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           fontFamily: (data as any).font_family || 'Arial Black',
           fontSize: (data as any).font_size || 12,
           fontBold: (data as any).font_bold !== undefined ? Boolean((data as any).font_bold) : true,
+          printCopies: (data as any).print_copies || 1,
         });
       }
     } catch (error) {
