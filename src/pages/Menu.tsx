@@ -16,6 +16,7 @@ import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
 import { Clock } from "lucide-react";
 import { ReviewModal } from "@/components/menu/ReviewModal";
 import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
+import { isFeaturedVisible } from "@/lib/featuredUtils";
 
 const Menu = () => {
   const { slug: restaurantSlug, tableNumber } = useParams();
@@ -111,7 +112,7 @@ const Menu = () => {
             id, name, display_order,
             products (
               id, name, description, price, promotional_price, available, image_url, 
-              is_featured, prep_time_minutes, featured_display_order,
+              is_featured, prep_time_minutes, featured_display_order, featured_active, featured_schedule,
               product_extras (id, name, price)
             )
           )
@@ -183,6 +184,7 @@ const Menu = () => {
         const featured = allProducts
           .filter((p: any) => {
             if (!p.is_featured || !p.available) return false;
+            if (!isFeaturedVisible(p)) return false;
             const channels = p.visibility_channels || ['all'];
             return channels.includes('all') || channels.includes('mesa');
           })

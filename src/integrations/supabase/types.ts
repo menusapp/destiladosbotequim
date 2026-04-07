@@ -2883,7 +2883,9 @@ export type Database = {
           category_id: string | null
           created_at: string | null
           description: string | null
+          featured_active: boolean | null
           featured_display_order: number | null
+          featured_schedule: Json | null
           fiscal_aliquota_transparencia: number | null
           fiscal_beneficio_code: string | null
           fiscal_cbs_aliquota: number | null
@@ -2916,7 +2918,9 @@ export type Database = {
           category_id?: string | null
           created_at?: string | null
           description?: string | null
+          featured_active?: boolean | null
           featured_display_order?: number | null
+          featured_schedule?: Json | null
           fiscal_aliquota_transparencia?: number | null
           fiscal_beneficio_code?: string | null
           fiscal_cbs_aliquota?: number | null
@@ -2949,7 +2953,9 @@ export type Database = {
           category_id?: string | null
           created_at?: string | null
           description?: string | null
+          featured_active?: boolean | null
           featured_display_order?: number | null
+          featured_schedule?: Json | null
           fiscal_aliquota_transparencia?: number | null
           fiscal_beneficio_code?: string | null
           fiscal_cbs_aliquota?: number | null

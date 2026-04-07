@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Product } from "@/types/menu";
 import { Search, ShoppingCart, X, LogOut, Star, UtensilsCrossed } from "lucide-react";
+import { isFeaturedVisible } from "@/lib/featuredUtils";
 
 interface Props {
   categories: Category[];
@@ -19,7 +20,7 @@ interface Props {
 
 export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant }: Props) {
   const featuredProducts = useMemo(() => {
-    return categories.flatMap(c => c.products).filter(p => p.is_featured || p.promotional_price != null);
+    return categories.flatMap(c => c.products).filter(p => (p.is_featured || p.promotional_price != null) && isFeaturedVisible(p));
   }, [categories]);
 
   const featuredSectionTitle = restaurant?.featured_section_title || "Destaques";
