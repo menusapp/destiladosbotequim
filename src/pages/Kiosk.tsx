@@ -193,8 +193,9 @@ export default function Kiosk() {
     try {
       const { data: extrasRaw, error } = await supabase
         .from("product_extras")
-        .select("id, name, description, price, is_required, min_selection, max_selection, extra_category_id, extra_categories(name)")
-        .eq("product_id", product.id);
+        .select("id, name, description, price, is_required, min_selection, max_selection, extra_category_id, extra_categories(name, is_active)")
+        .eq("product_id", product.id)
+        .neq("is_active", false);
       if (error) console.error("[Kiosk] Erro ao carregar extras:", error);
 
       const extrasData = (extrasRaw || []).map((e: any) => ({

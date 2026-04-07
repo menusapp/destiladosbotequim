@@ -243,8 +243,9 @@ export default function DeliveryMenu() {
     // Buscar extras diretos do produto
     const { data: extrasData } = await supabase
       .from("product_extras")
-      .select("id, name, description, price, is_required, min_selection, max_selection, extra_category_id, extra_categories(name)")
-      .eq("product_id", product.id);
+      .select("id, name, description, price, is_required, min_selection, max_selection, extra_category_id, extra_categories(name, is_active)")
+      .eq("product_id", product.id)
+      .neq("is_active", false);
 
     // Map extra_category_name from joined data
     const extrasWithCategoryName = (extrasData || []).map((e: any) => ({
