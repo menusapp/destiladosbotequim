@@ -85,6 +85,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           font_family: webConfig.fontFamily,
           font_size: webConfig.fontSize,
           font_bold: webConfig.fontBold,
+          print_copies: webConfig.printCopies,
           updated_at: new Date().toISOString(),
         } as any, { onConflict: 'restaurant_id' });
       if (error) throw error;
