@@ -86,6 +86,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "clientes", label: "Clientes", icon: Users },
       { id: "fidelidade", label: "Fidelidade", icon: Gift },
       { id: "marketing", label: "Marketing", icon: Megaphone },
+      { id: "robo-menus", label: "Robô Menu's", icon: Bot },
     ],
     // Administrativo
     [
