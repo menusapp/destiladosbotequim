@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.dd-polling]
 verify_jwt = false
+
+[functions.whatsapp-notifications]
+verify_jwt = false
