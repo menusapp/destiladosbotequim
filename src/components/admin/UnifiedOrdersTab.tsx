@@ -9,8 +9,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package, Store,
-  Clock, Printer, Check, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock
+  Printer, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock,
+  MoreVertical, Loader2, Eye
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useOrderStatusAdvance, getNextStatus } from "@/hooks/useOrderStatusAdvance";
 import { toast } from "@/components/ui/sonner";
 import { formatPaymentWithBrand } from "@/lib/utils";
 import { format, startOfDay, endOfDay } from "date-fns";
@@ -92,6 +95,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("todos");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const { advanceStatus, loadingOrderId } = useOrderStatusAdvance(restaurantId);
   const [autoPrint, setAutoPrint] = useState(false);
   const [dateRange, setDateRange] = useState(() => ({
     from: startOfDay(new Date()),
@@ -307,17 +311,42 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     { key: "cancelled", title: "Cancelado", color: "bg-orange-300", count: groupedOrders.cancelled.length },
   ];
 
+  const handleQuickAdvance = async (e: React.MouseEvent, order: Order) => {
+    e.stopPropagation();
+    const next = getNextStatus(order);
+    if (!next) return;
+    const success = await advanceStatus(order, next.status);
+    if (success) fetchOrders();
+  };
+
+  const handleQuickPrint = async (e: React.MouseEvent, order: Order) => {
+    e.stopPropagation();
+    try { await printOrder(order as any, restaurantId); } catch (err: any) { toast.error(err.message || "Erro ao imprimir"); }
+  };
+
+  const handleQuickCancel = (e: React.MouseEvent, order: Order) => {
+    e.stopPropagation();
+    setSelectedOrder(order);
+  };
+
   const renderOrderCard = (order: Order) => {
     const total = calculateTotal(order);
+    const grandTotal = total + (order.delivery_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0);
     const elapsed = getElapsedMinutes(order.created_at);
     const payment = getPaymentDisplay(order.payment_type, order.payment_brand);
+    const next = getNextStatus(order);
+    const isAdvancing = loadingOrderId === order.id;
+    const deliveryAddress = order.delivery_address;
+    const addressSummary = deliveryAddress ? deliveryAddress.split(",").slice(0, 2).join(",") : null;
+
     return (
       <Card
         key={order.id}
-        className="cursor-pointer bg-card hover:shadow-md transition-all border border-border/50 hover:border-border"
+        className="cursor-pointer bg-card hover:shadow-md transition-all border border-border/50 hover:border-border min-h-[180px]"
         onClick={() => setSelectedOrder(order)}
       >
-        <CardContent className="p-3 space-y-1.5">
+        <CardContent className="p-3 space-y-1.5 flex flex-col h-full">
+          {/* Header */}
           <div className="flex items-center justify-between">
             <span className="font-bold text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
             {showPrepTimer && !['delivered', 'picked_up', 'cancelled'].includes(order.status) && (
@@ -326,29 +355,37 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
               </Badge>
             )}
           </div>
-           <div className="flex items-center gap-1.5">
-             {getOrderTypeIcon(order)}
-             <span className="text-xs font-medium">{getOrderTypeLabel(order)}</span>
-              {order.ifood_source && (
-                <Badge className="bg-[#EA1D2C] text-white text-[10px] px-1.5 py-0 border-0">iFood</Badge>
-              )}
-              {order.dd_source && (
-                <Badge className="bg-[#0066CC] text-white text-[10px] px-1.5 py-0 border-0">Delivery Direto</Badge>
-              )}
-              {order.dd_scheduled_for && (
-                <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 border-0 gap-0.5">
-                  <CalendarClock className="w-2.5 h-2.5" />
-                  Agendado {new Date(order.dd_scheduled_for).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                </Badge>
-              )}
-           </div>
-          <p className="text-sm font-semibold truncate">{order.customer_name}</p>
-          <div className="text-xs text-muted-foreground">
-            {order.order_items.slice(0, 2).map((item, i) => (
-              <p key={i}>{item.quantity}x {item.products?.name || "Produto"}</p>
-            ))}
-            {order.order_items.length > 2 && <p>+{order.order_items.length - 2} itens</p>}
+          {/* Type + Source badges */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {getOrderTypeIcon(order)}
+            <span className="text-xs font-medium">{getOrderTypeLabel(order)}</span>
+            {order.ifood_source && (
+              <Badge className="bg-[#EA1D2C] text-white text-[10px] px-1.5 py-0 border-0">iFood</Badge>
+            )}
+            {order.dd_source && (
+              <Badge className="bg-[#0066CC] text-white text-[10px] px-1.5 py-0 border-0">Delivery Direto</Badge>
+            )}
+            {order.dd_scheduled_for && (
+              <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 border-0 gap-0.5">
+                <CalendarClock className="w-2.5 h-2.5" />
+                Agendado {new Date(order.dd_scheduled_for).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </Badge>
+            )}
           </div>
+          {/* Customer */}
+          <p className="text-sm font-semibold truncate">{order.customer_name}</p>
+          {/* Items (show 3) */}
+          <div className="text-xs text-muted-foreground">
+            {order.order_items.slice(0, 3).map((item, i) => (
+              <p key={i} className="truncate">{item.quantity}x {item.products?.name || "Produto"}</p>
+            ))}
+            {order.order_items.length > 3 && <p className="text-muted-foreground">+{order.order_items.length - 3} itens</p>}
+          </div>
+          {/* Address summary for delivery */}
+          {addressSummary && order.delivery_type === "delivery" && (
+            <p className="text-[10px] text-muted-foreground truncate">📍 {addressSummary}</p>
+          )}
+          {/* Payment */}
           <div className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${payment.className}`}>
             {payment.icon}
             <span>{payment.label}</span>
@@ -358,12 +395,45 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
               Taxa entrega: R$ {order.delivery_fee!.toFixed(2)}
             </div>
           )}
+          {/* Total + time */}
           <div className="flex items-center justify-between pt-1 border-t border-border/30">
             <span className="text-xs text-muted-foreground">
               {format(new Date(order.created_at), "HH:mm")}
             </span>
-            <span className="font-bold text-sm">R$ {(total + (order.delivery_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0)).toFixed(2)}</span>
+            <span className="font-bold text-sm">R$ {grandTotal.toFixed(2)}</span>
           </div>
+          {/* Quick action footer */}
+          {next && !['delivered', 'picked_up', 'cancelled'].includes(order.status) && (
+            <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/30 mt-auto">
+              <Button
+                size="sm"
+                className="flex-1 h-7 text-xs gap-1"
+                disabled={isAdvancing}
+                onClick={(e) => handleQuickAdvance(e, order)}
+              >
+                {isAdvancing ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                {next.label}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={(e) => e.stopPropagation()}>
+                    <MoreVertical className="w-3.5 h-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[140px]">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}>
+                    <Eye className="w-3.5 h-3.5 mr-2" /> Ver detalhes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => handleQuickPrint(e, order)}>
+                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={(e) => handleQuickCancel(e, order)}>
+                    <XCircle className="w-3.5 h-3.5 mr-2" /> Cancelar pedido
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -374,7 +444,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
       {kanbanColumns.map(({ key, title, color, count }) => {
         const colOrders = groupedOrders[key as keyof typeof groupedOrders] || [];
         return (
-          <div key={key} className="min-w-[260px] flex-shrink-0 flex flex-col">
+          <div key={key} className="min-w-[280px] flex-shrink-0 flex flex-col">
             <div className={`${color} text-white px-3 py-2 rounded-t-lg flex items-center justify-between`}>
               <span className="font-semibold text-sm">{title}</span>
               <Badge variant="secondary" className="bg-white/20 text-white border-0 text-xs">{count}</Badge>
