@@ -128,36 +128,9 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     }, 0);
   };
 
-  const sendWhatsAppNotification = async (newStatus: string) => {
-    try {
-      if (!order.delivery_phone) return;
-      const { data: config } = await supabase.from('whatsapp_config').select('*').eq('restaurant_id', restaurantId).maybeSingle();
-      if (!config?.enabled || config?.instance_status !== 'connected') return;
-
-      let template: string | null = null;
-      let messageType = '';
-      if (newStatus === 'accepted' || newStatus === 'preparing') { template = config.message_accepted; messageType = 'accepted'; }
-      else if (newStatus === 'out_for_delivery') {
-        if (order.delivery_type === 'pickup') { template = config.message_ready_for_pickup; messageType = 'ready_for_pickup'; }
-        else { template = config.message_out_for_delivery; messageType = 'out_for_delivery'; }
-      } else if (newStatus === 'ready') { template = config.message_ready_for_pickup; messageType = 'ready_for_pickup'; }
-      else if (newStatus === 'delivered') { template = config.message_delivered; messageType = 'delivered'; }
-      else if (newStatus === 'picked_up') { template = config.message_picked_up; messageType = 'picked_up'; }
-      else if (newStatus === 'cancelled') { template = config.message_cancelled; messageType = 'cancelled'; }
-      if (!template) return;
-
-      const { data: restaurant } = await supabase.from('restaurants').select('prep_time_minutes').eq('id', restaurantId).single();
-      const tempoEstimado = restaurant?.prep_time_minutes?.toString() || '30';
-      const message = template.replace(/{nome}/g, order.customer_name || 'Cliente').replace(/{pedido}/g, order.id.slice(0, 8)).replace(/{tempo}/g, tempoEstimado);
-
-      await supabase.functions.invoke('whatsapp-send', { body: { restaurantId, phone: order.delivery_phone, message, orderId: order.id, messageType } });
-    } catch (error) { console.error('[WhatsApp][AUTO] Erro:', error); }
-  };
-
   const requiresPaymentForFinalization = (newStatus: string) => {
     if (order.ifood_source && order.payment_type === "Pago pelo iFood") return false;
     if (order.dd_source && order.payment_type === "Pago Delivery Direto") return false;
-
     const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
     if (isLocal) return false;
     return ["delivered", "picked_up"].includes(newStatus);
@@ -165,40 +138,6 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
 
   const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
   const isBalcao = order.order_type === "balcao";
-
-  const syncDDStatus = async (newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string; localUpdated?: boolean }> => {
-    if (!order.dd_source || !order.dd_order_id) return { ok: true };
-
-    const statusToAction: Record<string, string> = {
-      accepted: "accept", preparing: "accept", out_for_delivery: "dispatch",
-      ready: "ready", delivered: "deliver", picked_up: "deliver", cancelled: "cancel",
-    };
-
-    const ddAction = statusToAction[newStatus];
-    if (!ddAction) return { ok: true };
-
-    try {
-      const res = await supabase.functions.invoke("dd-order-action", {
-        body: { restaurant_id: restaurantId, dd_order_id: order.dd_order_id, action: ddAction, reason: reason || undefined },
-      });
-      
-      if (res.data?.error) {
-        console.error("DD action error:", res.data.error);
-        return { ok: false, errorMsg: res.data.error, localUpdated: false };
-      }
-      
-      if (res.error) {
-        const errMsg = typeof res.error === 'object' ? (res.error as any)?.message || JSON.stringify(res.error) : String(res.error);
-        console.error("DD invoke error:", res.error);
-        return { ok: false, errorMsg: errMsg };
-      }
-      
-      return { ok: true };
-    } catch (e) {
-      console.error("DD sync error:", e);
-      return { ok: false, errorMsg: (e as Error).message };
-    }
-  };
 
   const updateStatus = async (newStatus: string, reason?: string) => {
     if (requiresPaymentForFinalization(newStatus) && (!order.payment_type || order.payment_type === "pending")) {
@@ -210,62 +149,12 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     const previousStatus = order.status;
     setOrder(prev => ({ ...prev, status: newStatus, ...(newStatus === "cancelled" && reason ? { cancellation_reason: reason } : {}) }));
 
-    try {
-      if (order.ifood_source && order.ifood_order_id) {
-        const statusToAction: Record<string, string> = {
-          accepted: "confirm", preparing: "start_preparation", ready: "ready_to_pickup",
-          out_for_delivery: "dispatch", cancelled: "cancel",
-        };
-        const ifoodAction = statusToAction[newStatus];
-        if (ifoodAction) {
-          const { error: ifoodError } = await supabase.functions.invoke("ifood-order-action", {
-            body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: ifoodAction },
-          });
-          if (ifoodError) {
-            console.error("iFood action error:", ifoodError);
-            toast.error("Erro ao sincronizar com iFood, mas o status local será atualizado");
-          }
-        }
-      }
-
-      const ddResult = await syncDDStatus(newStatus, reason);
-      if (!ddResult.ok) {
-        setOrder(prev => ({ ...prev, status: previousStatus }));
-        toast.error(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}`);
-        return;
-      }
-
-      const { error } = await supabase.rpc("admin_update_order_status", { p_order_id: order.id, p_new_status: newStatus, p_restaurant_id: restaurantId });
-      if (error) throw error;
-
-      if (newStatus === "cancelled" && reason) {
-        await supabase.from("orders").update({ cancellation_reason: reason }).eq("id", order.id);
-      }
-
-      sendWhatsAppNotification(newStatus);
-      if (newStatus === 'accepted') {
-        if (order.order_type === 'local' && order.table_id) {
-          await supabase.from("tables").update({
-            is_occupied: true, occupied_at: new Date().toISOString(), occupied_by: order.customer_name,
-          }).eq("id", order.table_id);
-        }
-        try {
-          const { data: printerConfig } = await supabase.from('printer_settings').select('auto_print_orders').eq('restaurant_id', restaurantId).maybeSingle();
-          if (printerConfig?.auto_print_orders) await printOrder(order, restaurantId);
-        } catch (printErr) { console.error('Auto-print error:', printErr); }
-      }
-      if (newStatus === 'cancelled' && order.order_type === 'local' && order.table_id && previousStatus === 'pending') {
-      }
-      if (newStatus === 'delivered' || newStatus === 'picked_up') {
-        supabase.functions.invoke('marketing-trigger', { body: { orderId: order.id, restaurantId } });
-      }
-      toast.success("Status atualizado!");
+    const success = await advanceStatus(order, newStatus, reason);
+    if (success) {
       onStatusUpdate();
       onClose();
-    } catch (error) {
+    } else {
       setOrder(prev => ({ ...prev, status: previousStatus }));
-      console.error("Erro ao atualizar status:", error);
-      toast.error("Erro ao atualizar status");
     }
   };
 
