@@ -105,7 +105,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "config-regioes", label: "Regiões de Entrega", icon: MapPin },
       { id: "config-pagamentos", label: "Formas de Pagamento", icon: CreditCard },
       { id: "config-impressoras", label: "Impressoras", icon: Printer },
-      { id: "config-whatsapp", label: "Automação WhatsApp", icon: MessageSquare },
+      { id: "config-whatsapp", label: "Notificações WhatsApp", icon: MessageSquare },
       { id: "config-backup", label: "Backup e Restauração", icon: HardDrive },
     ],
   };
