@@ -250,6 +250,20 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       if (error) throw error;
       
       toast.success("Caixa aberto com sucesso!");
+
+      // Fire-and-forget: notify owner
+      supabase.functions.invoke("whatsapp-notifications", {
+        body: {
+          restaurant_id: restaurantId,
+          notification_type: "cashier_open",
+          context: {
+            operador: openedBy,
+            hora_abertura: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+            valor_inicial: openingBalance.toFixed(2),
+          },
+        },
+      }).catch(() => {});
+
       setOpenedBy("");
       setFullOpeningBalance("");
       setOpeningMode("full");
