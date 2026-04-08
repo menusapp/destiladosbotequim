@@ -803,6 +803,8 @@ const RestaurantAdmin = () => {
         return <FidelityTab restaurantId={restaurant.id} />;
       case "marketing":
         return <MarketingTab restaurantId={restaurant.id} onNavigateToWhatsApp={() => setActiveSection("config-whatsapp")} />;
+      case "robo-menus":
+        return <RoboMenusTab restaurantId={restaurant.id} />;
       case "fiscal":
         return <FiscalTab restaurantId={restaurant.id} />;
       case "integracoes":

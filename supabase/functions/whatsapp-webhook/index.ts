@@ -109,8 +109,34 @@ Deno.serve(async (req) => {
       }
 
       case 'messages.upsert': {
-        // Message received - could be used for auto-replies in the future
-        console.log(`[WEBHOOK] Message received on ${instanceName}`);
+        // Message received — trigger AI bot if not from self
+        const msgData = data?.message || data;
+        const fromMe = msgData?.key?.fromMe ?? msgData?.fromMe ?? false;
+        const messageText = msgData?.message?.conversation
+          || msgData?.message?.extendedTextMessage?.text
+          || msgData?.body
+          || '';
+        const remoteJid = msgData?.key?.remoteJid || '';
+        const customerPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
+
+        if (!fromMe && customerPhone && messageText) {
+          console.log(`[WEBHOOK] Incoming message on ${instanceName} from ${customerPhone}: ${messageText.slice(0, 50)}`);
+          // Fire-and-forget call to AI bot
+          fetch(`${supabaseUrl}/functions/v1/whatsapp-ai-bot`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseKey}`,
+            },
+            body: JSON.stringify({
+              restaurant_id: restaurantId,
+              customer_phone: customerPhone,
+              message_text: messageText,
+            }),
+          }).catch(err => console.error('[WEBHOOK] AI bot call failed:', err));
+        } else {
+          console.log(`[WEBHOOK] Message on ${instanceName} (fromMe=${fromMe}, skipped)`);
+        }
         break;
       }
 
