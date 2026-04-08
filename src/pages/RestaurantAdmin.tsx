@@ -40,6 +40,7 @@ const OnlinePaymentsSettings = lazy(() => import("@/components/admin/settings/On
 const BackupSettings = lazy(() => import("@/components/admin/settings/BackupSettings"));
 const KioskSettings = lazy(() => import("@/components/admin/settings/KioskSettings"));
 const KioskUpsellScreen = lazy(() => import("@/components/admin/settings/KioskUpsellScreen"));
+const RoboMenusTab = lazy(() => import("@/components/admin/RoboMenusTab"));
 
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { useRestaurantModules } from "@/hooks/useRestaurantModules";
