@@ -444,7 +444,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
       {kanbanColumns.map(({ key, title, color, count }) => {
         const colOrders = groupedOrders[key as keyof typeof groupedOrders] || [];
         return (
-          <div key={key} className="min-w-[260px] flex-shrink-0 flex flex-col">
+          <div key={key} className="min-w-[280px] flex-shrink-0 flex flex-col">
             <div className={`${color} text-white px-3 py-2 rounded-t-lg flex items-center justify-between`}>
               <span className="font-semibold text-sm">{title}</span>
               <Badge variant="secondary" className="bg-white/20 text-white border-0 text-xs">{count}</Badge>
