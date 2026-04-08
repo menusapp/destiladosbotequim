@@ -24,6 +24,7 @@ import {
   Plug,
   HardDrive,
   Monitor,
+  Bot,
 } from "lucide-react";
 import {
   Sidebar,
