@@ -1,72 +1,67 @@
 
 
-# Central de Notificações WhatsApp + Resumos do Caixa para o Dono
+# Atendente Virtual IA — Nova aba "Robô Menu's" + Renomear aba WhatsApp
 
 ## Resumo
-Reestruturar a aba "Automação WhatsApp" com duas sub-abas: "Para o Cliente" (notificações de status de pedido, avaliação, recuperação de carrinho) e "Para o Dono" (resumos de caixa e resumo diário). Criar tabelas, edge function centralizadora e integrar nos fluxos existentes.
+Criar nova aba independente "Robô Menu's" no menu lateral com toda a funcionalidade do Atendente Virtual IA. Renomear a aba existente "Automação WhatsApp" para "Notificações WhatsApp". Remover a sub-aba "Atendente Virtual" do WhatsAppSettings (se existir).
 
 ## Detalhes Técnicos
 
 ### 1. Migration SQL
+Criar 3 tabelas (mesmo plano anterior):
+- **`whatsapp_ai_config`** — is_active, accept_orders_via_whatsapp, personality, welcome_message_type, custom_welcome_message, instructions. UNIQUE(restaurant_id). RLS USING(true).
+- **`whatsapp_menu_options`** — position, label, action_type, custom_message, is_active. UNIQUE(restaurant_id, position). RLS USING(true).
+- **`whatsapp_conversations`** — customer_phone, current_step, order_draft jsonb, last_message_at. UNIQUE(restaurant_id, customer_phone). RLS USING(true).
 
-Criar duas tabelas novas:
+### 2. Edge Function `whatsapp-ai-bot`
+Mesmo plano: processa mensagens recebidas, mantém estado de conversa, usa Lovable AI para respostas naturais, envia via `whatsapp-send`.
 
-**`whatsapp_notification_configs`** — configuração por tipo de notificação (order_accepted, order_delivered, order_cancelled, cart_recovery, daily_summary, cashier_open, cashier_close). Campos: restaurant_id, notification_type, is_active, template_message, send_delay_minutes. UNIQUE(restaurant_id, notification_type). RLS com USING(true) (arquitetura anon).
+### 3. Webhook `whatsapp-webhook`
+Adicionar chamada ao bot no case `messages.upsert` (ignorar fromMe).
 
-**`owner_notification_config`** — dados do dono: owner_name, owner_phone, toggles receive_cashier_open/close/daily_summary, daily_summary_time. UNIQUE em restaurant_id.
+### 4. Nova aba no sidebar — `AppSidebar.tsx`
+Adicionar item no menu principal (não em configSubItems):
+```
+{ id: "robo-menus", label: "Robô Menu's", icon: Bot }
+```
+Posicionar após Marketing ou Fidelidade.
 
-Inserir templates padrão via trigger ou inserção manual ao criar config do restaurante (não necessário — o frontend fará upsert com defaults na primeira carga).
+### 5. Renomear aba — `AppSidebar.tsx`
+Mudar `config-whatsapp` label de `"Automação WhatsApp"` para `"Notificações WhatsApp"`.
 
-### 2. Edge Function `whatsapp-notifications`
+### 6. Novo componente `RoboMenusTab.tsx`
+Componente dedicado com toda a UI do Atendente Virtual:
+- Banners de aviso (WhatsApp desconectado / IA desativada)
+- Toggle "IA Ativa" + "Aceitar Pedidos via WhatsApp"
+- Grid 2x2 de personalidades
+- Radio group tipo de boas-vindas (4 opções)
+- Editor de menu numérico (lista editável com add/remove)
+- Textarea de instruções
+- Simulador de conversa (mini chat)
+- Botão "Salvar Alterações"
 
-Nova edge function que recebe `{ restaurant_id, notification_type, context }`:
+### 7. `RestaurantAdmin.tsx`
+- Importar lazy `RoboMenusTab`
+- Adicionar case `"robo-menus"` no switch de renderização
+- Manter `config-whatsapp` apontando para `WhatsAppSettings` (agora "Notificações WhatsApp")
 
-- Busca config da notificação em `whatsapp_notification_configs` — se `is_active = false`, retorna sem enviar
-- Busca template_message e substitui variáveis (`{{nome}}`, `{{numero_pedido}}`, `{{total}}`, etc.) com dados do `context`
-- Para tipos de cliente: envia para o telefone do cliente via `whatsapp-send` existente
-- Para tipos de dono (cashier_open, cashier_close, daily_summary): busca `owner_notification_config` e envia para `owner_phone`
-- Verifica se WhatsApp está conectado (`whatsapp_config.instance_status = 'connected'`) antes de enviar
-
-### 3. Integrar nos Fluxos Existentes
-
-**`useOrderStatusAdvance.ts`** — Após `sendWhatsAppNotification` existente (que já funciona para pedidos), adicionar chamada fire-and-forget para `whatsapp-notifications` com os tipos correspondentes. A lógica existente de WhatsApp para pedidos já funciona via `whatsapp_config` — a nova edge function será usada **apenas** para os novos tipos (avaliação pós-entrega, recuperação de carrinho, notificações do dono).
-
-**`FluxoCaixaTab.tsx`** — Após `handleOpenCashRegister` e `handleCloseCashRegister` com sucesso, invocar `whatsapp-notifications` com tipo `cashier_open` / `cashier_close` e context com dados do caixa (operador, valores, número de pedidos, ticket médio).
-
-### 4. Frontend — Reestruturar `WhatsAppSettings.tsx`
-
-Manter o bloco de Status da Conexão e Enable Automation no topo. Abaixo, adicionar `Tabs` com duas sub-abas:
-
-**Sub-aba "Para o Cliente"**:
-- Cards para cada tipo: Confirmação (order_accepted), Saída/Pronto (order_out_for_delivery), Cancelamento (order_cancelled), Pedir Avaliação (order_delivered), Recuperação de Carrinho (cart_recovery)
-- Cada card tem: toggle ativar/desativar, botão "Editar Template" que expande/abre inline textarea, variáveis disponíveis listadas
-- Recuperação de Carrinho: campo numérico para delay em minutos
-- Dados carregados/salvos em `whatsapp_notification_configs`
-
-**Sub-aba "Para o Dono"**:
-- Campos nome e telefone do dono (máscara)
-- Cards: Resumo Abertura Caixa, Resumo Fechamento Caixa, Resumo Diário
-- Cada card: toggle + template editável com variáveis
-- Resumo Diário: time picker para horário de envio
-- Salvar em `owner_notification_config`
-
-### 5. Página de Avaliação (já existe)
-
-A página de avaliação já existe em `OrderConfirmation.tsx` com `ReviewModal`. O link `{{link_avaliacao}}` apontará para `/{slug}/pedido-confirmado/{orderId}` que já tem o fluxo de review. Não precisa criar página nova.
+### 8. `supabase/config.toml`
+Adicionar `[functions.whatsapp-ai-bot]` com `verify_jwt = false`.
 
 ## Arquivos Impactados
 
 | Arquivo | Mudança |
 |---|---|
-| Migration SQL | Criar `whatsapp_notification_configs` e `owner_notification_config` |
-| `supabase/functions/whatsapp-notifications/index.ts` | **Novo** — edge function centralizadora |
-| `src/components/admin/settings/WhatsAppSettings.tsx` | Reestruturar com sub-abas Cliente/Dono |
-| `src/components/admin/FluxoCaixaTab.tsx` | Chamar whatsapp-notifications ao abrir/fechar caixa |
-| `src/hooks/useOrderStatusAdvance.ts` | Adicionar chamada para avaliação pós-entrega |
+| Migration SQL | Criar 3 tabelas + RLS |
+| `supabase/functions/whatsapp-ai-bot/index.ts` | **Novo** — cérebro do bot |
+| `supabase/functions/whatsapp-webhook/index.ts` | Chamar bot em `messages.upsert` |
+| `src/components/admin/RoboMenusTab.tsx` | **Novo** — UI completa do Atendente Virtual |
+| `src/components/admin/AppSidebar.tsx` | Adicionar "Robô Menu's" + renomear "Notificações WhatsApp" |
+| `src/pages/RestaurantAdmin.tsx` | Registrar nova aba |
+| `supabase/config.toml` | Registrar nova function |
 
 ## O que NÃO muda
+- `WhatsAppSettings.tsx` — permanece com sub-abas Cliente, Dono, Reservas
 - Fluxo de pedidos, fiscal, iFood, Delivery Direto
-- WhatsApp de reservas (continua na seção atual)
-- Edge functions existentes (whatsapp-send, whatsapp-instance)
-- Estrutura de tabelas existentes
+- Edge functions existentes
 
