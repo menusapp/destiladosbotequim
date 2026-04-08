@@ -1,72 +1,72 @@
 
 
-# Botões de Avanço de Status nos Cards de Pedido
+# Central de Notificações WhatsApp + Resumos do Caixa para o Dono
 
 ## Resumo
-Adicionar botões de ação rápida nos cards do kanban para avançar status sem abrir o modal de detalhes. Reutilizar toda a lógica existente do `OrderDetailModal` (iFood sync, DD sync, WhatsApp, auto-print, marketing trigger) extraindo-a para um hook compartilhado.
+Reestruturar a aba "Automação WhatsApp" com duas sub-abas: "Para o Cliente" (notificações de status de pedido, avaliação, recuperação de carrinho) e "Para o Dono" (resumos de caixa e resumo diário). Criar tabelas, edge function centralizadora e integrar nos fluxos existentes.
 
-## Arquitetura
+## Detalhes Técnicos
 
-### 1. Criar hook `useOrderStatusAdvance.ts`
-Extrair a lógica de `updateStatus` do `OrderDetailModal.tsx` para um hook reutilizável:
-- `sendWhatsAppNotification`
-- `syncDDStatus` + `syncIfoodStatus`
-- `requiresPaymentForFinalization`
-- Auto-print ao aceitar
-- Marketing trigger ao entregar/retirar
-- Mesa ocupada ao aceitar pedido local
-- Retorna `{ advanceStatus, isLoading }` — recebe `(orderId, newStatus, order, restaurantId)`
+### 1. Migration SQL
 
-### 2. Lógica de próximo status
-Função `getNextStatus(order)` que retorna `{ status, label }`:
+Criar duas tabelas novas:
 
-| Status atual | Delivery | Retirada/Viagem/Balcão | Mesa (local) |
-|---|---|---|---|
-| pending | accepted / "Aceitar" | accepted / "Aceitar" | accepted / "Aceitar" |
-| accepted | preparing / "Em Preparo" | preparing / "Em Preparo" | preparing / "Em Preparo" |
-| preparing | out_for_delivery / "Saiu p/ Entrega" | ready / "Pronto" | ready / "Pronto" |
-| ready | — | picked_up / "Retirado" | delivered / "Na Mesa" |
-| out_for_delivery | delivered / "Entregue" | — | — |
+**`whatsapp_notification_configs`** — configuração por tipo de notificação (order_accepted, order_delivered, order_cancelled, cart_recovery, daily_summary, cashier_open, cashier_close). Campos: restaurant_id, notification_type, is_active, template_message, send_delay_minutes. UNIQUE(restaurant_id, notification_type). RLS com USING(true) (arquitetura anon).
 
-### 3. Modificar `renderOrderCard` em `UnifiedOrdersTab.tsx`
+**`owner_notification_config`** — dados do dono: owner_name, owner_phone, toggles receive_cashier_open/close/daily_summary, daily_summary_time. UNIQUE em restaurant_id.
 
-**Card expandido**:
-- `min-h-[180px]` no card
-- Mostrar 3 itens (atualmente 2) com quantidade
-- Endereço resumido (bairro) para delivery
-- Método de pagamento + bandeira
+Inserir templates padrão via trigger ou inserção manual ao criar config do restaurante (não necessário — o frontend fará upsert com defaults na primeira carga).
 
-**Rodapé do card** (nova seção abaixo do total):
-- Botão primário com label do próximo status + loading state
-- `onClick` no botão chama `advanceStatus` do hook (com `e.stopPropagation()` para não abrir o modal)
-- Ícone `MoreVertical` ao lado que abre `DropdownMenu` com: "Ver detalhes", "Cancelar pedido", "Imprimir"
-- O clique no corpo do card continua abrindo o modal de detalhes
+### 2. Edge Function `whatsapp-notifications`
 
-**Auto-print**: Ao clicar "Aceitar" e `autoPrint` estar ativo, disparar `printOrder` automaticamente (já lido do state existente).
+Nova edge function que recebe `{ restaurant_id, notification_type, context }`:
 
-### 4. Adaptar `OrderDetailModal.tsx`
-- Importar e usar o mesmo hook `useOrderStatusAdvance` em vez da lógica inline
-- Manter todo o comportamento atual do modal intacto
+- Busca config da notificação em `whatsapp_notification_configs` — se `is_active = false`, retorna sem enviar
+- Busca template_message e substitui variáveis (`{{nome}}`, `{{numero_pedido}}`, `{{total}}`, etc.) com dados do `context`
+- Para tipos de cliente: envia para o telefone do cliente via `whatsapp-send` existente
+- Para tipos de dono (cashier_open, cashier_close, daily_summary): busca `owner_notification_config` e envia para `owner_phone`
+- Verifica se WhatsApp está conectado (`whatsapp_config.instance_status = 'connected'`) antes de enviar
 
-## Segurança e estabilidade
-- A função RPC `admin_update_order_status` já suporta todas as transições — não precisa de mudança no backend
-- Os triggers de banco (estoque, caixa) já disparam automaticamente na mudança de status
-- WhatsApp, iFood sync, DD sync e marketing trigger são chamados explicitamente no hook — mesma lógica do modal atual
-- Nenhuma migration SQL necessária
-- O `e.stopPropagation()` nos botões garante que o clique no card continua funcionando
+### 3. Integrar nos Fluxos Existentes
 
-## Arquivos impactados
+**`useOrderStatusAdvance.ts`** — Após `sendWhatsAppNotification` existente (que já funciona para pedidos), adicionar chamada fire-and-forget para `whatsapp-notifications` com os tipos correspondentes. A lógica existente de WhatsApp para pedidos já funciona via `whatsapp_config` — a nova edge function será usada **apenas** para os novos tipos (avaliação pós-entrega, recuperação de carrinho, notificações do dono).
+
+**`FluxoCaixaTab.tsx`** — Após `handleOpenCashRegister` e `handleCloseCashRegister` com sucesso, invocar `whatsapp-notifications` com tipo `cashier_open` / `cashier_close` e context com dados do caixa (operador, valores, número de pedidos, ticket médio).
+
+### 4. Frontend — Reestruturar `WhatsAppSettings.tsx`
+
+Manter o bloco de Status da Conexão e Enable Automation no topo. Abaixo, adicionar `Tabs` com duas sub-abas:
+
+**Sub-aba "Para o Cliente"**:
+- Cards para cada tipo: Confirmação (order_accepted), Saída/Pronto (order_out_for_delivery), Cancelamento (order_cancelled), Pedir Avaliação (order_delivered), Recuperação de Carrinho (cart_recovery)
+- Cada card tem: toggle ativar/desativar, botão "Editar Template" que expande/abre inline textarea, variáveis disponíveis listadas
+- Recuperação de Carrinho: campo numérico para delay em minutos
+- Dados carregados/salvos em `whatsapp_notification_configs`
+
+**Sub-aba "Para o Dono"**:
+- Campos nome e telefone do dono (máscara)
+- Cards: Resumo Abertura Caixa, Resumo Fechamento Caixa, Resumo Diário
+- Cada card: toggle + template editável com variáveis
+- Resumo Diário: time picker para horário de envio
+- Salvar em `owner_notification_config`
+
+### 5. Página de Avaliação (já existe)
+
+A página de avaliação já existe em `OrderConfirmation.tsx` com `ReviewModal`. O link `{{link_avaliacao}}` apontará para `/{slug}/pedido-confirmado/{orderId}` que já tem o fluxo de review. Não precisa criar página nova.
+
+## Arquivos Impactados
 
 | Arquivo | Mudança |
 |---|---|
-| `src/hooks/useOrderStatusAdvance.ts` | **Novo** — hook com lógica de avanço de status |
-| `src/components/admin/UnifiedOrdersTab.tsx` | Cards expandidos + botões de ação rápida no rodapé |
-| `src/components/admin/OrderDetailModal.tsx` | Refatorar para usar o hook compartilhado |
+| Migration SQL | Criar `whatsapp_notification_configs` e `owner_notification_config` |
+| `supabase/functions/whatsapp-notifications/index.ts` | **Novo** — edge function centralizadora |
+| `src/components/admin/settings/WhatsAppSettings.tsx` | Reestruturar com sub-abas Cliente/Dono |
+| `src/components/admin/FluxoCaixaTab.tsx` | Chamar whatsapp-notifications ao abrir/fechar caixa |
+| `src/hooks/useOrderStatusAdvance.ts` | Adicionar chamada para avaliação pós-entrega |
 
 ## O que NÃO muda
-- Backend / RPCs / triggers de banco
-- Fluxo de impressão, WhatsApp, iFood, DD
-- Layout do modal de detalhes
-- Polling de integrações
-- Realtime channels
+- Fluxo de pedidos, fiscal, iFood, Delivery Direto
+- WhatsApp de reservas (continua na seção atual)
+- Edge functions existentes (whatsapp-send, whatsapp-instance)
+- Estrutura de tabelas existentes
 
