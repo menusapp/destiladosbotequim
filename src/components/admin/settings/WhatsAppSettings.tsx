@@ -4,21 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import QRCode from "qrcode";
 import { 
-  MessageSquare, 
-  Wifi, 
-  WifiOff, 
-  QrCode, 
-  RefreshCw, 
-  Loader2,
-  CheckCircle2,
-  Smartphone,
-  Send
+  MessageSquare, WifiOff, QrCode, RefreshCw, Loader2,
+  CheckCircle2, Smartphone, Send, ChevronDown, User, Clock,
+  Bell, ShoppingCart, Star, XCircle, Truck, Phone
 } from "lucide-react";
 
 interface WhatsAppConfig {
@@ -40,6 +37,23 @@ interface WhatsAppConfig {
   message_reservation_cancelled: string | null;
 }
 
+interface NotificationConfig {
+  id?: string;
+  notification_type: string;
+  is_active: boolean;
+  template_message: string;
+  send_delay_minutes: number;
+}
+
+interface OwnerConfig {
+  owner_name: string;
+  owner_phone: string;
+  receive_cashier_open: boolean;
+  receive_cashier_close: boolean;
+  receive_daily_summary: boolean;
+  daily_summary_time: string;
+}
+
 const DEFAULT_MESSAGES = {
   accepted: "✅ Olá {nome}! Seu pedido #{pedido} foi aceito e está sendo preparado. Tempo estimado: {tempo} minutos.",
   out_for_delivery: "🚗 Seu pedido #{pedido} saiu para entrega! Em breve chegará no seu endereço.",
@@ -52,6 +66,71 @@ const DEFAULT_MESSAGES = {
   reservation_cancelled: "❌ Olá {nome}, infelizmente sua reserva para {data} às {horario} foi cancelada.\n\nEntre em contato conosco para mais informações ou faça uma nova reserva."
 };
 
+const CLIENT_NOTIFICATION_DEFAULTS: Record<string, { label: string; icon: any; template: string; variables: string; color: string }> = {
+  order_accepted: {
+    label: "Confirmação ao Cliente",
+    icon: CheckCircle2,
+    template: "✅ Olá {{nome}}! Seu pedido #{{numero_pedido}} foi aceito e está sendo preparado. Tempo estimado: {{tempo_estimado}} minutos.",
+    variables: "{{nome}}, {{numero_pedido}}, {{tempo_estimado}}",
+    color: "text-green-600",
+  },
+  order_out_for_delivery: {
+    label: "Aviso de Saída / Pronto",
+    icon: Truck,
+    template: "🚗 Olá {{nome}}! Seu pedido #{{numero_pedido}} saiu para entrega / está pronto para retirada!",
+    variables: "{{nome}}, {{numero_pedido}}",
+    color: "text-blue-600",
+  },
+  order_cancelled: {
+    label: "Aviso de Cancelamento",
+    icon: XCircle,
+    template: "❌ Olá {{nome}}, infelizmente seu pedido #{{numero_pedido}} foi cancelado. Motivo: {{motivo}}",
+    variables: "{{nome}}, {{numero_pedido}}, {{motivo}}",
+    color: "text-red-600",
+  },
+  order_delivered: {
+    label: "Pedir Avaliação",
+    icon: Star,
+    template: "🎉 Pedido #{{numero_pedido}} finalizado! Obrigado, {{nome}}! Avalie sua experiência: {{link_avaliacao}}",
+    variables: "{{nome}}, {{numero_pedido}}, {{link_avaliacao}}",
+    color: "text-yellow-600",
+  },
+  cart_recovery: {
+    label: "Recuperação de Carrinho",
+    icon: ShoppingCart,
+    template: "👋 Olá {{nome}}! Notamos que você não finalizou seu pedido. Volte e aproveite! {{link_carrinho}}",
+    variables: "{{nome}}, {{link_carrinho}}, {{cupom}}",
+    color: "text-purple-600",
+  },
+};
+
+const OWNER_NOTIFICATION_DEFAULTS: Record<string, { label: string; icon: any; template: string; variables: string; color: string; configField: keyof OwnerConfig }> = {
+  cashier_open: {
+    label: "Resumo de Abertura do Caixa",
+    icon: Bell,
+    template: "📂 Caixa aberto!\n\n👤 Operador: {{operador}}\n⏰ Horário: {{hora_abertura}}\n💰 Valor inicial: R$ {{valor_inicial}}",
+    variables: "{{operador}}, {{hora_abertura}}, {{valor_inicial}}",
+    color: "text-green-600",
+    configField: "receive_cashier_open",
+  },
+  cashier_close: {
+    label: "Resumo de Fechamento do Caixa",
+    icon: Bell,
+    template: "📊 Caixa fechado!\n\n👤 Operador: {{operador}}\n⏰ Horário: {{hora_fechamento}}\n💰 Abertura: R$ {{valor_abertura}}\n💰 Fechamento: R$ {{valor_fechamento}}\n📈 Faturamento: R$ {{faturamento_dia}}\n🧾 Pedidos: {{numero_pedidos}}\n🎯 Ticket médio: R$ {{ticket_medio}}\n📝 Obs: {{observacoes}}",
+    variables: "{{operador}}, {{hora_fechamento}}, {{valor_abertura}}, {{valor_fechamento}}, {{faturamento_dia}}, {{numero_pedidos}}, {{ticket_medio}}, {{observacoes}}",
+    color: "text-red-600",
+    configField: "receive_cashier_close",
+  },
+  daily_summary: {
+    label: "Resumo Diário",
+    icon: Clock,
+    template: "📊 Resumo do dia!\n\n📈 Faturamento: R$ {{faturamento_dia}}\n🧾 Pedidos: {{numero_pedidos}}\n🎯 Ticket médio: R$ {{ticket_medio}}",
+    variables: "{{faturamento_dia}}, {{numero_pedidos}}, {{ticket_medio}}",
+    color: "text-blue-600",
+    configField: "receive_daily_summary",
+  },
+};
+
 const SUPABASE_URL = "https://nrddbsudiphrvgfneqle.supabase.co";
 
 const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
@@ -59,7 +138,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [connectFlowActive, setConnectFlowActive] = useState(false); // Controls QR area visibility
+  const [connectFlowActive, setConnectFlowActive] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [config, setConfig] = useState<WhatsAppConfig | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -72,61 +151,45 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     cancelled: DEFAULT_MESSAGES.cancelled,
     reservation_created: DEFAULT_MESSAGES.reservation_created,
     reservation_confirmed: DEFAULT_MESSAGES.reservation_confirmed,
-    reservation_cancelled: DEFAULT_MESSAGES.reservation_cancelled
+    reservation_cancelled: DEFAULT_MESSAGES.reservation_cancelled,
   });
-  
+
+  // Notification configs state
+  const [clientNotifs, setClientNotifs] = useState<Record<string, NotificationConfig>>({});
+  const [ownerNotifs, setOwnerNotifs] = useState<Record<string, NotificationConfig>>({});
+  const [ownerConfig, setOwnerConfig] = useState<OwnerConfig>({
+    owner_name: "",
+    owner_phone: "",
+    receive_cashier_open: true,
+    receive_cashier_close: true,
+    receive_daily_summary: true,
+    daily_summary_time: "23:00",
+  });
+  const [savingNotifs, setSavingNotifs] = useState(false);
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrPollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Generate QR code image from string
   const generateQrImage = async (qrString: string): Promise<string | null> => {
     try {
-      if (qrString.startsWith('data:image')) {
-        return qrString;
-      }
-      if (qrString.length > 500 && !qrString.includes(' ')) {
-        return `data:image/png;base64,${qrString}`;
-      }
-      const dataUrl = await QRCode.toDataURL(qrString, {
-        width: 256,
-        margin: 2,
-        color: { dark: '#000000', light: '#ffffff' }
-      });
-      return dataUrl;
-    } catch (error) {
-      console.error('Error generating QR image:', error);
-      return null;
-    }
+      if (qrString.startsWith('data:image')) return qrString;
+      if (qrString.length > 500 && !qrString.includes(' ')) return `data:image/png;base64,${qrString}`;
+      return await QRCode.toDataURL(qrString, { width: 256, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
+    } catch { return null; }
   };
 
-  // Stop all polling
   const stopAllPolling = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-    if (qrPollIntervalRef.current) {
-      clearInterval(qrPollIntervalRef.current);
-      qrPollIntervalRef.current = null;
-    }
-    if (qrPollTimeoutRef.current) {
-      clearTimeout(qrPollTimeoutRef.current);
-      qrPollTimeoutRef.current = null;
-    }
+    if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+    if (qrPollIntervalRef.current) { clearInterval(qrPollIntervalRef.current); qrPollIntervalRef.current = null; }
+    if (qrPollTimeoutRef.current) { clearTimeout(qrPollTimeoutRef.current); qrPollTimeoutRef.current = null; }
   }, []);
 
-  // Fetch config on mount
   const fetchConfig = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('whatsapp_config')
-        .select('*')
-        .eq('restaurant_id', restaurantId)
-        .maybeSingle();
-
+      const { data, error } = await supabase.from('whatsapp_config').select('*').eq('restaurant_id', restaurantId).maybeSingle();
       if (error) throw error;
-
       if (data) {
         setConfig(data);
         setEnabled(data.enabled || false);
@@ -139,31 +202,87 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
           cancelled: data.message_cancelled || DEFAULT_MESSAGES.cancelled,
           reservation_created: data.message_reservation_created || DEFAULT_MESSAGES.reservation_created,
           reservation_confirmed: data.message_reservation_confirmed || DEFAULT_MESSAGES.reservation_confirmed,
-          reservation_cancelled: data.message_reservation_cancelled || DEFAULT_MESSAGES.reservation_cancelled
+          reservation_cancelled: data.message_reservation_cancelled || DEFAULT_MESSAGES.reservation_cancelled,
         });
       }
-    } catch (error) {
-      console.error('Error fetching config:', error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { console.error('Error fetching config:', error); }
+  }, [restaurantId]);
+
+  const fetchNotificationConfigs = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_notification_configs')
+        .select('*')
+        .eq('restaurant_id', restaurantId);
+
+      if (error) throw error;
+
+      const clientMap: Record<string, NotificationConfig> = {};
+      const ownerMap: Record<string, NotificationConfig> = {};
+
+      for (const row of (data || [])) {
+        const conf: NotificationConfig = {
+          id: row.id,
+          notification_type: row.notification_type,
+          is_active: row.is_active ?? true,
+          template_message: row.template_message || "",
+          send_delay_minutes: row.send_delay_minutes ?? 0,
+        };
+        if (['cashier_open', 'cashier_close', 'daily_summary'].includes(row.notification_type)) {
+          ownerMap[row.notification_type] = conf;
+        } else {
+          clientMap[row.notification_type] = conf;
+        }
+      }
+
+      // Fill defaults for missing types
+      for (const [type, def] of Object.entries(CLIENT_NOTIFICATION_DEFAULTS)) {
+        if (!clientMap[type]) {
+          clientMap[type] = { notification_type: type, is_active: true, template_message: def.template, send_delay_minutes: type === 'cart_recovery' ? 30 : 0 };
+        }
+      }
+      for (const [type, def] of Object.entries(OWNER_NOTIFICATION_DEFAULTS)) {
+        if (!ownerMap[type]) {
+          ownerMap[type] = { notification_type: type, is_active: true, template_message: def.template, send_delay_minutes: 0 };
+        }
+      }
+
+      setClientNotifs(clientMap);
+      setOwnerNotifs(ownerMap);
+    } catch (error) { console.error('Error fetching notification configs:', error); }
+  }, [restaurantId]);
+
+  const fetchOwnerConfig = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('owner_notification_config')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setOwnerConfig({
+          owner_name: data.owner_name || "",
+          owner_phone: data.owner_phone || "",
+          receive_cashier_open: data.receive_cashier_open ?? true,
+          receive_cashier_close: data.receive_cashier_close ?? true,
+          receive_daily_summary: data.receive_daily_summary ?? true,
+          daily_summary_time: data.daily_summary_time || "23:00",
+        });
+      }
+    } catch (error) { console.error('Error fetching owner config:', error); }
   }, [restaurantId]);
 
   useEffect(() => {
-    fetchConfig();
-    return () => {
-      stopAllPolling();
-    };
-  }, [fetchConfig, stopAllPolling]);
+    Promise.all([fetchConfig(), fetchNotificationConfigs(), fetchOwnerConfig()]).finally(() => setLoading(false));
+    return () => { stopAllPolling(); };
+  }, [fetchConfig, fetchNotificationConfigs, fetchOwnerConfig, stopAllPolling]);
 
-  // Check instance status
   const checkStatus = async (): Promise<{ status: string } | null> => {
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`
-      );
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
       const data = await response.json();
-      
       if (data.status === 'connected') {
         setConfig(prev => prev ? { ...prev, instance_status: 'connected' } : null);
         setQrCodeDataUrl(null);
@@ -172,267 +291,242 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       } else if (data.status === 'disconnected' || data.status === 'not_created') {
         setConfig(prev => prev ? { ...prev, instance_status: data.status } : null);
       }
-      
       return data;
-    } catch (error) {
-      console.error('Error checking status:', error);
-      return null;
-    }
+    } catch (error) { console.error('Error checking status:', error); return null; }
   };
 
-  // Poll for QR code if not received initially
   const pollForQrCode = useCallback(async () => {
     if (!connectFlowActive) return;
-    
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'qrcode' })
-        }
-      );
-      
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'qrcode' })
+      });
       const data = await response.json();
-      
       if (data.qrString) {
         const imageUrl = await generateQrImage(data.qrString);
         if (imageUrl) {
           setQrCodeDataUrl(imageUrl);
-          if (qrPollIntervalRef.current) {
-            clearInterval(qrPollIntervalRef.current);
-            qrPollIntervalRef.current = null;
-          }
+          if (qrPollIntervalRef.current) { clearInterval(qrPollIntervalRef.current); qrPollIntervalRef.current = null; }
         }
       }
-    } catch (error) {
-      console.error('Error polling for QR:', error);
-    }
+    } catch (error) { console.error('Error polling for QR:', error); }
   }, [restaurantId, connectFlowActive]);
 
-  // Create instance and get QR code
   const handleConnect = async () => {
     setConnecting(true);
     setConnectFlowActive(true);
     setQrCodeDataUrl(null);
     stopAllPolling();
-    
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'create' })
-        }
-      );
-      
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create' })
+      });
       const data = await response.json();
-      
       if (data.qrString) {
         const imageUrl = await generateQrImage(data.qrString);
         if (imageUrl) {
           setQrCodeDataUrl(imageUrl);
-          setConfig(prev => prev ? { 
-            ...prev, 
-            instance_name: data.instance_name,
-            instance_status: 'pending' 
-          } : null);
-          
-          
-        } else {
-          throw new Error('Falha ao gerar imagem do QR code');
-        }
+          setConfig(prev => prev ? { ...prev, instance_name: data.instance_name, instance_status: 'pending' } : null);
+        } else throw new Error('Falha ao gerar imagem do QR code');
       } else if (data.status === 'pending_qr') {
-        setConfig(prev => prev ? { 
-          ...prev, 
-          instance_name: data.instance_name,
-          instance_status: 'pending' 
-        } : null);
-        
-        toast({
-          title: "Aguardando QR Code",
-          description: "O QR code está sendo gerado..."
-        });
-        
-        // Poll for QR code every 3 seconds
+        setConfig(prev => prev ? { ...prev, instance_name: data.instance_name, instance_status: 'pending' } : null);
+        toast({ title: "Aguardando QR Code", description: "O QR code está sendo gerado..." });
         qrPollIntervalRef.current = setInterval(pollForQrCode, 3000);
-        
-        // Stop QR polling after 60 seconds with feedback
         qrPollTimeoutRef.current = setTimeout(() => {
-          if (qrPollIntervalRef.current) {
-            clearInterval(qrPollIntervalRef.current);
-            qrPollIntervalRef.current = null;
-          }
-          if (!qrCodeDataUrl) {
-            toast({
-              title: "Tempo esgotado",
-              description: "Não foi possível obter o QR Code. Clique em 'Tentar novamente'.",
-              variant: "destructive"
-            });
-          }
+          if (qrPollIntervalRef.current) { clearInterval(qrPollIntervalRef.current); qrPollIntervalRef.current = null; }
+          if (!qrCodeDataUrl) toast({ title: "Tempo esgotado", description: "Não foi possível obter o QR Code. Clique em 'Tentar novamente'.", variant: "destructive" });
         }, 60000);
-      } else if (data.error) {
-        throw new Error(data.error);
-      } else {
-        throw new Error('Resposta inesperada do servidor');
-      }
+      } else if (data.error) throw new Error(data.error);
+      else throw new Error('Resposta inesperada do servidor');
 
-      // Start polling for connection status
-      pollIntervalRef.current = setInterval(async () => {
-        const status = await checkStatus();
-        if (status?.status === 'connected') {
-          
-        }
-      }, 3000);
-
-      // Stop status polling after 2 minutes
-      setTimeout(() => {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-      }, 120000);
-      
+      pollIntervalRef.current = setInterval(async () => { await checkStatus(); }, 3000);
+      setTimeout(() => { if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; } }, 120000);
     } catch (error) {
       console.error('Error connecting:', error);
       setConnectFlowActive(false);
-      toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Falha ao conectar WhatsApp",
-        variant: "destructive"
-      });
-    } finally {
-      setConnecting(false);
-    }
+      toast({ title: "Erro", description: error instanceof Error ? error.message : "Falha ao conectar WhatsApp", variant: "destructive" });
+    } finally { setConnecting(false); }
   };
 
-  // Cancel connection flow
-  const handleCancelConnect = () => {
-    stopAllPolling();
-    setConnectFlowActive(false);
-    setQrCodeDataUrl(null);
-  };
+  const handleCancelConnect = () => { stopAllPolling(); setConnectFlowActive(false); setQrCodeDataUrl(null); };
 
-  // Disconnect instance
   const handleDisconnect = async () => {
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`,
-        { method: 'DELETE' }
-      );
-      
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`, { method: 'DELETE' });
       const data = await response.json();
-      
       if (data.success) {
-        setConfig(prev => prev ? { 
-          ...prev, 
-          instance_status: 'disconnected',
-          connected_phone: null,
-          connected_at: null
-        } : null);
-        setQrCodeDataUrl(null);
-        setConnectFlowActive(false);
-        stopAllPolling();
-        
-        
+        setConfig(prev => prev ? { ...prev, instance_status: 'disconnected', connected_phone: null, connected_at: null } : null);
+        setQrCodeDataUrl(null); setConnectFlowActive(false); stopAllPolling();
       }
     } catch (error) {
       console.error('Error disconnecting:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao desconectar",
-        variant: "destructive"
-      });
+      toast({ title: "Erro", description: "Falha ao desconectar", variant: "destructive" });
     }
   };
 
-  // Save settings
-  const handleSave = async () => {
+  const handleSaveReservations = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('whatsapp_config')
-        .upsert({
-          restaurant_id: restaurantId,
-          enabled,
-          message_accepted: messages.accepted,
-          message_out_for_delivery: messages.out_for_delivery,
-          message_delivered: messages.delivered,
-          message_ready_for_pickup: messages.ready_for_pickup,
-          message_picked_up: messages.picked_up,
-          message_cancelled: messages.cancelled,
-          message_reservation_created: messages.reservation_created,
-          message_reservation_confirmed: messages.reservation_confirmed,
-          message_reservation_cancelled: messages.reservation_cancelled,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'restaurant_id' });
-
+      const { error } = await supabase.from('whatsapp_config').upsert({
+        restaurant_id: restaurantId, enabled,
+        message_accepted: messages.accepted, message_out_for_delivery: messages.out_for_delivery,
+        message_delivered: messages.delivered, message_ready_for_pickup: messages.ready_for_pickup,
+        message_picked_up: messages.picked_up, message_cancelled: messages.cancelled,
+        message_reservation_created: messages.reservation_created,
+        message_reservation_confirmed: messages.reservation_confirmed,
+        message_reservation_cancelled: messages.reservation_cancelled,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'restaurant_id' });
       if (error) throw error;
-
-      
-      
       await fetchConfig();
+      toast({ title: "Salvo", description: "Configurações de reserva salvas" });
     } catch (error) {
       console.error('Error saving:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao salvar configurações",
-        variant: "destructive"
-      });
-    } finally {
-      setSaving(false);
-    }
+      toast({ title: "Erro", description: "Falha ao salvar configurações", variant: "destructive" });
+    } finally { setSaving(false); }
   };
 
-  // Send test message
+  const handleSaveNotificationConfigs = async (configs: Record<string, NotificationConfig>) => {
+    setSavingNotifs(true);
+    try {
+      const upserts = Object.values(configs).map(c => ({
+        restaurant_id: restaurantId,
+        notification_type: c.notification_type,
+        is_active: c.is_active,
+        template_message: c.template_message,
+        send_delay_minutes: c.send_delay_minutes,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error } = await supabase.from('whatsapp_notification_configs').upsert(upserts, { onConflict: 'restaurant_id,notification_type' });
+      if (error) throw error;
+      toast({ title: "Salvo", description: "Configurações de notificação salvas" });
+    } catch (error) {
+      console.error('Error saving notifs:', error);
+      toast({ title: "Erro", description: "Falha ao salvar", variant: "destructive" });
+    } finally { setSavingNotifs(false); }
+  };
+
+  const handleSaveOwnerConfig = async () => {
+    setSavingNotifs(true);
+    try {
+      // Save owner config
+      const { error: ownerError } = await supabase.from('owner_notification_config').upsert({
+        restaurant_id: restaurantId,
+        owner_name: ownerConfig.owner_name,
+        owner_phone: ownerConfig.owner_phone,
+        receive_cashier_open: ownerConfig.receive_cashier_open,
+        receive_cashier_close: ownerConfig.receive_cashier_close,
+        receive_daily_summary: ownerConfig.receive_daily_summary,
+        daily_summary_time: ownerConfig.daily_summary_time,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'restaurant_id' });
+      if (ownerError) throw ownerError;
+
+      // Save owner notification templates
+      await handleSaveNotificationConfigs(ownerNotifs);
+
+      toast({ title: "Salvo", description: "Configurações do dono salvas" });
+    } catch (error) {
+      console.error('Error saving owner config:', error);
+      toast({ title: "Erro", description: "Falha ao salvar", variant: "destructive" });
+    } finally { setSavingNotifs(false); }
+  };
+
   const handleTestMessage = async () => {
     const phone = prompt('Digite o número de telefone para teste (com DDD):');
     if (!phone) return;
-
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/whatsapp-send`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            restaurantId,
-            phone,
-            message: '🧪 Mensagem de teste do sistema Menus!',
-            messageType: 'test'
-          })
-        }
-      );
-
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-send`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantId, phone, message: '🧪 Mensagem de teste do sistema Menus!', messageType: 'test' })
+      });
       const data = await response.json();
-      
-      if (data.success) {
-        
-      } else {
-        throw new Error(data.error);
-      }
+      if (data.success) toast({ title: "Enviado", description: "Mensagem de teste enviada" });
+      else throw new Error(data.error);
     } catch (error) {
       console.error('Error sending test:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao enviar mensagem de teste",
-        variant: "destructive"
-      });
+      toast({ title: "Erro", description: "Falha ao enviar mensagem de teste", variant: "destructive" });
     }
   };
+
+  const toggleExpanded = (key: string) => setExpandedCards(prev => ({ ...prev, [key]: !prev[key] }));
 
   const isConnected = config?.instance_status === 'connected';
   const isPending = config?.instance_status === 'pending';
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   }
+
+  const renderNotificationCard = (
+    type: string,
+    def: { label: string; icon: any; variables: string; color: string },
+    configs: Record<string, NotificationConfig>,
+    setConfigs: React.Dispatch<React.SetStateAction<Record<string, NotificationConfig>>>,
+    showDelay?: boolean
+  ) => {
+    const conf = configs[type];
+    if (!conf) return null;
+    const Icon = def.icon;
+    const isExpanded = expandedCards[type] || false;
+
+    return (
+      <Card key={type}>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Icon className={`h-5 w-5 ${def.color}`} />
+              <span className="font-medium">{def.label}</span>
+            </div>
+            <Switch
+              checked={conf.is_active}
+              onCheckedChange={(checked) =>
+                setConfigs(prev => ({ ...prev, [type]: { ...prev[type], is_active: checked } }))
+              }
+            />
+          </div>
+
+          <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(type)}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between">
+                Editar Template
+                <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 pt-2">
+              <p className="text-xs text-muted-foreground">
+                Variáveis: {def.variables.split(', ').map(v => (
+                  <code key={v} className="bg-muted px-1 rounded mx-0.5">{v}</code>
+                ))}
+              </p>
+              <Textarea
+                value={conf.template_message}
+                onChange={(e) =>
+                  setConfigs(prev => ({ ...prev, [type]: { ...prev[type], template_message: e.target.value } }))
+                }
+                rows={4}
+              />
+              {showDelay && (
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Delay (min):</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="w-24"
+                    value={conf.send_delay_minutes}
+                    onChange={(e) =>
+                      setConfigs(prev => ({ ...prev, [type]: { ...prev[type], send_delay_minutes: parseInt(e.target.value) || 0 } }))
+                    }
+                  />
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -473,64 +567,43 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
                 </>
               )}
             </div>
-
             <div className="flex gap-2">
               {isConnected ? (
                 <>
                   <Button variant="outline" size="sm" onClick={handleTestMessage}>
-                    <Send className="h-4 w-4 mr-2" />
-                    Testar
+                    <Send className="h-4 w-4 mr-2" />Testar
                   </Button>
                   <Button variant="destructive" size="sm" onClick={handleDisconnect}>
-                    <WifiOff className="h-4 w-4 mr-2" />
-                    Desconectar
+                    <WifiOff className="h-4 w-4 mr-2" />Desconectar
                   </Button>
                 </>
               ) : (
                 <Button onClick={handleConnect} disabled={connecting}>
-                  {connecting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <QrCode className="h-4 w-4 mr-2" />
-                  )}
+                  {connecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <QrCode className="h-4 w-4 mr-2" />}
                   {connecting ? 'Gerando...' : 'Conectar WhatsApp'}
                 </Button>
               )}
             </div>
           </div>
 
-          {/* QR Code Display - Only show when user explicitly clicked Connect */}
           {connectFlowActive && !isConnected && (
             <div className="flex flex-col items-center gap-4 py-6 border rounded-lg bg-white">
               {qrCodeDataUrl ? (
                 <>
-                  <p className="text-sm text-muted-foreground">
-                    Escaneie o QR Code com seu WhatsApp
-                  </p>
-                  <img 
-                    src={qrCodeDataUrl} 
-                    alt="QR Code WhatsApp" 
-                    className="w-64 h-64"
-                  />
+                  <p className="text-sm text-muted-foreground">Escaneie o QR Code com seu WhatsApp</p>
+                  <img src={qrCodeDataUrl} alt="QR Code WhatsApp" className="w-64 h-64" />
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={handleConnect} disabled={connecting}>
-                      <RefreshCw className={`h-4 w-4 mr-2 ${connecting ? 'animate-spin' : ''}`} />
-                      Gerar novo QR Code
+                      <RefreshCw className={`h-4 w-4 mr-2 ${connecting ? 'animate-spin' : ''}`} />Gerar novo QR Code
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleCancelConnect}>
-                      Cancelar
-                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleCancelConnect}>Cancelar</Button>
                   </div>
                 </>
               ) : (
                 <div className="flex flex-col items-center gap-2 py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Gerando QR Code...
-                  </p>
-                  <Button variant="outline" size="sm" onClick={handleCancelConnect} className="mt-2">
-                    Cancelar
-                  </Button>
+                  <p className="text-sm text-muted-foreground">Gerando QR Code...</p>
+                  <Button variant="outline" size="sm" onClick={handleCancelConnect} className="mt-2">Cancelar</Button>
                 </div>
               )}
             </div>
@@ -540,96 +613,175 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
       {/* Enable Automation */}
       <Card>
-        <CardHeader>
-          <CardTitle>Ativar Automação</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Ativar Automação</CardTitle></CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <Label>Enviar mensagens automáticas</Label>
-              <p className="text-sm text-muted-foreground">
-                Notificar clientes automaticamente sobre o status dos pedidos
-              </p>
+              <p className="text-sm text-muted-foreground">Notificar automaticamente sobre pedidos e caixa</p>
             </div>
-            <Switch
-              checked={enabled}
-              onCheckedChange={setEnabled}
-              disabled={!isConnected}
-            />
+            <Switch checked={enabled} onCheckedChange={setEnabled} disabled={!isConnected} />
           </div>
-          {!isConnected && (
-            <p className="text-sm text-orange-600 mt-2">
-              ⚠️ Conecte o WhatsApp primeiro para ativar a automação
-            </p>
+          {!isConnected && <p className="text-sm text-orange-600 mt-2">⚠️ Conecte o WhatsApp primeiro para ativar a automação</p>}
+        </CardContent>
+      </Card>
+
+      {/* Sub-tabs: Cliente / Dono / Reservas */}
+      <Tabs defaultValue="cliente" className="w-full">
+        <TabsList className="grid grid-cols-3 w-full">
+          <TabsTrigger value="cliente">Para o Cliente</TabsTrigger>
+          <TabsTrigger value="dono">Para o Dono</TabsTrigger>
+          <TabsTrigger value="reservas">Reservas</TabsTrigger>
+        </TabsList>
+
+        {/* Cliente Tab */}
+        <TabsContent value="cliente" className="space-y-4 mt-4">
+          {Object.entries(CLIENT_NOTIFICATION_DEFAULTS).map(([type, def]) =>
+            renderNotificationCard(type, def, clientNotifs, setClientNotifs, type === 'cart_recovery')
           )}
-        </CardContent>
-      </Card>
-
-      {/* Message Templates — Reservations Only */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Templates de Mensagens</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">📅 Reservas</h4>
-            
-            <p className="text-sm text-muted-foreground">
-              Variáveis disponíveis: <code className="bg-muted px-1 rounded">{'{nome}'}</code>, 
-              <code className="bg-muted px-1 rounded ml-1">{'{mesa}'}</code>, 
-              <code className="bg-muted px-1 rounded ml-1">{'{data}'}</code>,
-              <code className="bg-muted px-1 rounded ml-1">{'{horario}'}</code>,
-              <code className="bg-muted px-1 rounded ml-1">{'{pessoas}'}</code>
-            </p>
-            
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-yellow-600" />
-                Reserva Criada (Pendente)
-              </Label>
-              <Textarea
-                value={messages.reservation_created}
-                onChange={(e) => setMessages(prev => ({ ...prev, reservation_created: e.target.value }))}
-                rows={4}
-                placeholder="Mensagem quando uma reserva for criada..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Reserva Confirmada
-              </Label>
-              <Textarea
-                value={messages.reservation_confirmed}
-                onChange={(e) => setMessages(prev => ({ ...prev, reservation_confirmed: e.target.value }))}
-                rows={4}
-                placeholder="Mensagem quando a reserva for confirmada..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-red-600" />
-                Reserva Cancelada
-              </Label>
-              <Textarea
-                value={messages.reservation_cancelled}
-                onChange={(e) => setMessages(prev => ({ ...prev, reservation_cancelled: e.target.value }))}
-                rows={3}
-                placeholder="Mensagem quando a reserva for cancelada..."
-              />
-            </div>
-          </div>
-
-          <Button onClick={handleSave} disabled={saving} className="w-full">
-            {saving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : null}
-            Salvar Configurações
+          <Button onClick={() => handleSaveNotificationConfigs(clientNotifs)} disabled={savingNotifs} className="w-full">
+            {savingNotifs && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Salvar Notificações do Cliente
           </Button>
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        {/* Dono Tab */}
+        <TabsContent value="dono" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><User className="h-5 w-5" />Dados do Dono</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nome do Dono</Label>
+                  <Input
+                    value={ownerConfig.owner_name}
+                    onChange={(e) => setOwnerConfig(prev => ({ ...prev, owner_name: e.target.value }))}
+                    placeholder="Nome completo"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />WhatsApp do Dono</Label>
+                  <Input
+                    value={ownerConfig.owner_phone}
+                    onChange={(e) => setOwnerConfig(prev => ({ ...prev, owner_phone: e.target.value.replace(/\D/g, '') }))}
+                    placeholder="5514999999999"
+                    maxLength={13}
+                  />
+                  <p className="text-xs text-muted-foreground">Com código do país: 55 + DDD + número</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {Object.entries(OWNER_NOTIFICATION_DEFAULTS).map(([type, def]) => {
+            const conf = ownerNotifs[type];
+            if (!conf) return null;
+            const Icon = def.icon;
+            const isExpanded = expandedCards[type] || false;
+            const ownerToggle = ownerConfig[def.configField] as boolean;
+
+            return (
+              <Card key={type}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-5 w-5 ${def.color}`} />
+                      <span className="font-medium">{def.label}</span>
+                    </div>
+                    <Switch
+                      checked={ownerToggle && conf.is_active}
+                      onCheckedChange={(checked) => {
+                        setOwnerConfig(prev => ({ ...prev, [def.configField]: checked }));
+                        setOwnerNotifs(prev => ({ ...prev, [type]: { ...prev[type], is_active: checked } }));
+                      }}
+                    />
+                  </div>
+
+                  {type === 'daily_summary' && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm whitespace-nowrap">Horário do envio:</Label>
+                      <Input
+                        type="time"
+                        className="w-32"
+                        value={ownerConfig.daily_summary_time}
+                        onChange={(e) => setOwnerConfig(prev => ({ ...prev, daily_summary_time: e.target.value }))}
+                      />
+                    </div>
+                  )}
+
+                  <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(type)}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full justify-between">
+                        Editar Template
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      <p className="text-xs text-muted-foreground">
+                        Variáveis: {def.variables.split(', ').map(v => (
+                          <code key={v} className="bg-muted px-1 rounded mx-0.5">{v}</code>
+                        ))}
+                      </p>
+                      <Textarea
+                        value={conf.template_message}
+                        onChange={(e) =>
+                          setOwnerNotifs(prev => ({ ...prev, [type]: { ...prev[type], template_message: e.target.value } }))
+                        }
+                        rows={4}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          <Button onClick={handleSaveOwnerConfig} disabled={savingNotifs} className="w-full">
+            {savingNotifs && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Salvar Configurações do Dono
+          </Button>
+        </TabsContent>
+
+        {/* Reservas Tab */}
+        <TabsContent value="reservas" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader><CardTitle>Templates de Reservas</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              <p className="text-sm text-muted-foreground">
+                Variáveis: <code className="bg-muted px-1 rounded">{'{nome}'}</code>,
+                <code className="bg-muted px-1 rounded ml-1">{'{mesa}'}</code>,
+                <code className="bg-muted px-1 rounded ml-1">{'{data}'}</code>,
+                <code className="bg-muted px-1 rounded ml-1">{'{horario}'}</code>,
+                <code className="bg-muted px-1 rounded ml-1">{'{pessoas}'}</code>
+              </p>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-yellow-600" />Reserva Criada (Pendente)
+                </Label>
+                <Textarea value={messages.reservation_created} onChange={(e) => setMessages(prev => ({ ...prev, reservation_created: e.target.value }))} rows={4} />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />Reserva Confirmada
+                </Label>
+                <Textarea value={messages.reservation_confirmed} onChange={(e) => setMessages(prev => ({ ...prev, reservation_confirmed: e.target.value }))} rows={4} />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-red-600" />Reserva Cancelada
+                </Label>
+                <Textarea value={messages.reservation_cancelled} onChange={(e) => setMessages(prev => ({ ...prev, reservation_cancelled: e.target.value }))} rows={3} />
+              </div>
+
+              <Button onClick={handleSaveReservations} disabled={saving} className="w-full">
+                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Salvar Configurações de Reservas
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

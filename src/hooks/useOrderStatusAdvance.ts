@@ -183,6 +183,23 @@ export function useOrderStatusAdvance(restaurantId: string) {
       // Marketing trigger on finalization
       if (newStatus === "delivered" || newStatus === "picked_up") {
         supabase.functions.invoke("marketing-trigger", { body: { orderId: order.id, restaurantId } });
+
+        // Review request via new notification system
+        if (order.delivery_phone) {
+          const slug = window.location.pathname.split('/')[1] || '';
+          supabase.functions.invoke("whatsapp-notifications", {
+            body: {
+              restaurant_id: restaurantId,
+              notification_type: "order_delivered",
+              context: {
+                nome: order.customer_name || "Cliente",
+                numero_pedido: order.id.slice(0, 8),
+                phone: order.delivery_phone,
+                link_avaliacao: `${window.location.origin}/${slug}/pedido-confirmado/${order.id}`,
+              },
+            },
+          }).catch(() => {});
+        }
       }
 
       toast.success("Status atualizado!");

@@ -250,6 +250,20 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       if (error) throw error;
       
       toast.success("Caixa aberto com sucesso!");
+
+      // Fire-and-forget: notify owner
+      supabase.functions.invoke("whatsapp-notifications", {
+        body: {
+          restaurant_id: restaurantId,
+          notification_type: "cashier_open",
+          context: {
+            operador: openedBy,
+            hora_abertura: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+            valor_inicial: openingBalance.toFixed(2),
+          },
+        },
+      }).catch(() => {});
+
       setOpenedBy("");
       setFullOpeningBalance("");
       setOpeningMode("full");
@@ -287,6 +301,29 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       if (error) throw error;
       
       toast.success("Caixa fechado com sucesso!");
+
+      // Fire-and-forget: notify owner with cash summary
+      const totalSales = movements.filter(m => m.movement_type === "entrada").reduce((s, m) => s + m.amount, 0);
+      const totalOrders = movements.filter(m => m.movement_type === "entrada").length;
+      const ticketMedio = totalOrders > 0 ? (totalSales / totalOrders) : 0;
+
+      supabase.functions.invoke("whatsapp-notifications", {
+        body: {
+          restaurant_id: restaurantId,
+          notification_type: "cashier_close",
+          context: {
+            operador: closedBy,
+            hora_fechamento: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+            valor_abertura: currentSession.opening_balance.toFixed(2),
+            valor_fechamento: parseFloat(closingBalance).toFixed(2),
+            faturamento_dia: totalSales.toFixed(2),
+            numero_pedidos: totalOrders.toString(),
+            ticket_medio: ticketMedio.toFixed(2),
+            observacoes: closeNotes || "Nenhuma",
+          },
+        },
+      }).catch(() => {});
+
       setClosedBy("");
       setClosingBalance("");
       setCloseNotes("");

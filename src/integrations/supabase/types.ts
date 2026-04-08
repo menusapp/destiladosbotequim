@@ -2609,6 +2609,53 @@ export type Database = {
           },
         ]
       }
+      owner_notification_config: {
+        Row: {
+          created_at: string
+          daily_summary_time: string
+          id: string
+          owner_name: string | null
+          owner_phone: string | null
+          receive_cashier_close: boolean
+          receive_cashier_open: boolean
+          receive_daily_summary: boolean
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_summary_time?: string
+          id?: string
+          owner_name?: string | null
+          owner_phone?: string | null
+          receive_cashier_close?: boolean
+          receive_cashier_open?: boolean
+          receive_daily_summary?: boolean
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_summary_time?: string
+          id?: string
+          owner_name?: string | null
+          owner_phone?: string | null
+          receive_cashier_close?: boolean
+          receive_cashier_open?: boolean
+          receive_daily_summary?: boolean
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_notification_config_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_methods: {
         Row: {
           accepted_brands: string[] | null
@@ -4091,6 +4138,47 @@ export type Database = {
             foreignKeyName: "whatsapp_config_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_notification_configs: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          notification_type: string
+          restaurant_id: string
+          send_delay_minutes: number
+          template_message: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notification_type: string
+          restaurant_id: string
+          send_delay_minutes?: number
+          template_message?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notification_type?: string
+          restaurant_id?: string
+          send_delay_minutes?: number
+          template_message?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_notification_configs_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
             referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
