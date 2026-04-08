@@ -4060,6 +4060,53 @@ export type Database = {
           },
         ]
       }
+      whatsapp_ai_config: {
+        Row: {
+          accept_orders_via_whatsapp: boolean | null
+          created_at: string | null
+          custom_welcome_message: string | null
+          id: string
+          instructions: string | null
+          is_active: boolean | null
+          personality: string | null
+          restaurant_id: string
+          updated_at: string | null
+          welcome_message_type: string | null
+        }
+        Insert: {
+          accept_orders_via_whatsapp?: boolean | null
+          created_at?: string | null
+          custom_welcome_message?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean | null
+          personality?: string | null
+          restaurant_id: string
+          updated_at?: string | null
+          welcome_message_type?: string | null
+        }
+        Update: {
+          accept_orders_via_whatsapp?: boolean | null
+          created_at?: string | null
+          custom_welcome_message?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean | null
+          personality?: string | null
+          restaurant_id?: string
+          updated_at?: string | null
+          welcome_message_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_ai_config_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_config: {
         Row: {
           api_token: string | null
@@ -4138,6 +4185,85 @@ export type Database = {
             foreignKeyName: "whatsapp_config_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: true
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_conversations: {
+        Row: {
+          created_at: string | null
+          current_step: string | null
+          customer_phone: string
+          id: string
+          last_message_at: string | null
+          order_draft: Json | null
+          restaurant_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_step?: string | null
+          customer_phone: string
+          id?: string
+          last_message_at?: string | null
+          order_draft?: Json | null
+          restaurant_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_step?: string | null
+          customer_phone?: string
+          id?: string
+          last_message_at?: string | null
+          order_draft?: Json | null
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_menu_options: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          custom_message: string | null
+          id: string
+          is_active: boolean | null
+          label: string
+          position: number
+          restaurant_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          custom_message?: string | null
+          id?: string
+          is_active?: boolean | null
+          label: string
+          position: number
+          restaurant_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          custom_message?: string | null
+          id?: string
+          is_active?: boolean | null
+          label?: string
+          position?: number
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_menu_options_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
             referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
