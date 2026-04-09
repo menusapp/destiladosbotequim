@@ -1,60 +1,85 @@
 
 
-# Campo de Desconto no PDV
+# Fix 3 Pendências: Desconto na Impressão, Total da Mesa e Caixa de Delivery
 
 ## Resumo
-Adicionar seção de desconto colapsável na PDVTab, acima do carrinho, com suporte a porcentagem/valor fixo, aplicação no total ou por produto, e campo de motivo. Usar a coluna `coupon_discount` existente (mesmo padrão do CreateOrderDrawer) para persistir o desconto.
-
-## Por que NÃO criar migration
-
-A tabela `orders` já possui `coupon_discount` (numeric, nullable) que é usada pelo `CreateOrderDrawer` para descontos manuais. Adicionar colunas extras (`manual_discount_type`, `manual_discount_target`, `manual_discount_notes`) seria redundante neste momento — o valor absoluto do desconto já é persistido e reconhecido por todos os relatórios (DRE, Overview, Caixa). O campo `notes` do pedido pode conter o motivo do desconto.
+Corrigir 3 bugs: (1) desconto não aparece na impressão, (2) desconto não subtrai do total da mesa, (3) movimentações de delivery no caixa mostram informações incompletas vs pedidos locais.
 
 ## Detalhes Técnicos
 
-### 1. Novos estados em `PDVTab.tsx`
+### 1. Impressão — Adicionar desconto no recibo (`src/lib/printOrder.ts`)
 
+**Problema**: A função `printOrder` não recebe nem exibe `coupon_discount`. O total impresso é sempre o subtotal bruto.
+
+**Solução**:
+- Adicionar `coupon_discount?: number` e `discount_notes?: string` (extraído de notes) ao tipo do parâmetro `order`
+- Na seção de total do HTML, entre a `double-line` e o `TOTAL`:
+  - Se `coupon_discount > 0`, exibir linha "Subtotal: R$ X.XX"
+  - Exibir linha "Desconto: - R$ X.XX"
+  - Extrair motivo do desconto de `notes` (regex `\[Desconto: (.+?)\]`) e exibir "Motivo: ..."
+  - TOTAL final = subtotal - coupon_discount
+
+### 2. Atualizar chamadas de `printOrder` para incluir `coupon_discount`
+
+**`PDVTab.tsx` (auto-print)**: O `printOrderObj` (linha 710-732) não inclui `coupon_discount`. Adicionar:
 ```
-discountExpanded: boolean (default false)
-discountType: 'percentage' | 'value' (default 'value')
-discountTarget: 'total' | productId (default 'total')
-discountValue: string (input text)
-discountNotes: string
+coupon_discount: calculatedDiscount > 0 ? calculatedDiscount : undefined
 ```
 
-`calculatedDiscount` como `useMemo`: se type=percentage e target=total, aplica % sobre subtotal; se target=productId, aplica % sobre (price+extras)*qty do item. Clamp para não exceder o valor alvo. Se type=value, usa o valor direto (clamped).
+**`OrderDetailModal.tsx` e `UnifiedOrdersTab.tsx`**: Esses passam o `order` diretamente da query. Verificar se a query já puxa `coupon_discount`. Se não, adicioná-lo ao select.
 
-### 2. UI — Seção de desconto
+**`useOrderStatusAdvance.ts`**: Mesmo — garantir que a query que carrega o order para auto-print inclui `coupon_discount`.
 
-Posicionar entre a seção de Pagamento e o Carrinho Summary. Visível apenas quando `cart.length > 0`.
+### 3. Total da mesa não subtrai desconto (`src/components/admin/TableDetailView.tsx`)
 
-- Header colapsável: "Desconto" + chevron
-- Toggle % / R$ (dois botões)
-- Select: "Total do pedido" + cada item do carrinho
-- Input numérico com valor
-- Input texto para motivo (opcional)
-- Preview: "- R$ X.XX" em verde
+**Problema**: O cálculo do total da comanda (linhas 182-187) só soma items × quantity + extras. Não subtrai `coupon_discount` do pedido.
 
-### 3. Ajuste no `handleSubmit`
+**Solução**:
+- Adicionar `coupon_discount` ao select da query de orders (linha 145-165)
+- Na interface `Order`, adicionar `coupon_discount?: number`
+- No cálculo do total (linha 182), subtrair `coupon_discount`:
+```typescript
+const total = comandaOrders.reduce((sum, order) => {
+  const itemsTotal = order.order_items.reduce((itemSum, item) => {
+    const extrasSum = item.order_item_extras.reduce((s, e) => s + e.price_at_order, 0);
+    return itemSum + (item.price_at_order + extrasSum) * item.quantity;
+  }, 0);
+  return sum + itemsTotal - (order.coupon_discount || 0);
+}, 0);
+```
+- Na UI de exibição dos pedidos, mostrar linha de desconto quando `coupon_discount > 0`
 
-Passar `coupon_discount: calculatedDiscount > 0 ? calculatedDiscount : null` em todos os inserts de pedido (delivery, retirada, viagem, mesa). Mesmo padrão do CreateOrderDrawer.
+### 4. Movimentações de delivery no caixa — Detalhes completos (Migration SQL)
 
-### 4. Ajuste no Cart Summary e Footer
+**Problema**: O trigger `add_delivery_order_to_cash_register` gera descrição simples como texto (sem `bill_id`). O `CashMovementDetailSheet` mostra detalhes só quando há `bill_id`. Para pedidos locais, o `PaymentConfirmationModal` cria bill + cash_movement com `bill_id`, permitindo o sheet enriquecido.
 
-Exibir linha de desconto entre Subtotal e Total quando desconto > 0. Footer mostra total final (subtotal - desconto).
+**Solução**: Atualizar o trigger `add_delivery_order_to_cash_register` via migration para:
+- Gerar descrição no mesmo formato dos pedidos locais: incluir lista de itens, subtotal, desconto, total
+- OU criar um `bill` automaticamente para delivery orders e linkar no `bill_id` do cash_movement
 
-### 5. Limpar no `clearForm`
+A abordagem mais limpa: modificar a `description` do trigger para incluir dados detalhados no mesmo formato texto que os pedidos locais usam. Incluir itens com quantidades e preços.
 
-Resetar todos os estados de desconto.
+Migration SQL atualiza o trigger para buscar items do pedido e montar descrição com:
+- Nome do cliente + CPF
+- Tipo (Entrega/Retirada)
+- Forma de pagamento
+- Lista de produtos (qty x nome = preço)
+- Subtotal, Taxa entrega, Desconto, Total
 
 ## Arquivos Impactados
 
 | Arquivo | Mudança |
 |---|---|
-| `src/components/admin/PDVTab.tsx` | Adicionar estados, UI de desconto, ajustar handleSubmit e cart summary |
+| `src/lib/printOrder.ts` | Adicionar suporte a `coupon_discount` no recibo |
+| `src/components/admin/PDVTab.tsx` | Passar `coupon_discount` ao auto-print |
+| `src/components/admin/TableDetailView.tsx` | Buscar e subtrair `coupon_discount` no total da mesa |
+| `src/components/admin/OrderDetailModal.tsx` | Incluir `coupon_discount` na query |
+| `src/components/admin/UnifiedOrdersTab.tsx` | Incluir `coupon_discount` na query |
+| `src/hooks/useOrderStatusAdvance.ts` | Incluir `coupon_discount` na query de auto-print |
+| Migration SQL | Atualizar trigger `add_delivery_order_to_cash_register` com descrição detalhada |
 
 ## O que NÃO muda
-- Sem migration — usa `coupon_discount` existente
-- Relatórios DRE, Overview, Caixa — já reconhecem `coupon_discount`
-- CreateOrderDrawer — não afetado
-- Backend / RPCs / triggers
-
+- Fluxo de criação de pedidos (handleSubmit)
+- PaymentConfirmationModal (local orders — já funciona)
+- Trigger `add_local_order_to_cash_register`
+- Fiscal, iFood, Delivery Direto
