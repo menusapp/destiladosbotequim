@@ -194,21 +194,43 @@ const LandingPage = () => {
             <p className="mt-3 text-xl text-muted-foreground max-w-xl mx-auto">Tudo o que você precisa num único lugar, sem ferramentas avulsas.</p>
           </ScrollReveal>
 
-          {/* Horizontal scroll */}
-          <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
-            {carouselItems.map((item, i) => (
-              <ScrollReveal key={item.title} delay={i * 80} className="snap-start shrink-0 w-[300px]">
-                <Card className="h-full border-border hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 group">
-                  <CardContent className="p-7">
-                    <div className="h-14 w-14 rounded-xl bg-primary/15 flex items-center justify-center mb-4 group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-300">
-                      <item.icon className="h-7 w-7 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-bold text-foreground mb-2">{item.title}</h3>
-                     <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
-                  </CardContent>
-                </Card>
-              </ScrollReveal>
-            ))}
+          {/* Horizontal scroll with arrows */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                const el = document.getElementById('funcoes-carousel');
+                if (el) el.scrollBy({ left: -320, behavior: 'smooth' });
+              }}
+              className="absolute -left-2 sm:-left-4 top-1/2 -translate-y-1/2 z-10 h-11 w-11 rounded-full bg-card border border-border shadow-lg flex items-center justify-center hover:bg-primary/10 hover:border-primary/30 transition-all"
+              aria-label="Anterior"
+            >
+              <ChevronRight className="h-5 w-5 text-foreground rotate-180" />
+            </button>
+            <button
+              onClick={() => {
+                const el = document.getElementById('funcoes-carousel');
+                if (el) el.scrollBy({ left: 320, behavior: 'smooth' });
+              }}
+              className="absolute -right-2 sm:-right-4 top-1/2 -translate-y-1/2 z-10 h-11 w-11 rounded-full bg-card border border-border shadow-lg flex items-center justify-center hover:bg-primary/10 hover:border-primary/30 transition-all"
+              aria-label="Próximo"
+            >
+              <ChevronRight className="h-5 w-5 text-foreground" />
+            </button>
+            <div id="funcoes-carousel" className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide px-2">
+              {carouselItems.map((item, i) => (
+                <ScrollReveal key={item.title} delay={i * 80} className="snap-start shrink-0 w-[300px]">
+                  <Card className="h-full border-border hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 group">
+                    <CardContent className="p-7">
+                      <div className="h-14 w-14 rounded-xl bg-primary/15 flex items-center justify-center mb-4 group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-300">
+                        <item.icon className="h-7 w-7 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-bold text-foreground mb-2">{item.title}</h3>
+                       <p className="text-base text-muted-foreground leading-relaxed">{item.desc}</p>
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+              ))}
+            </div>
           </div>
         </div>
       </section>
