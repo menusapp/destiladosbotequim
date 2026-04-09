@@ -727,7 +727,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           created_at: new Date().toISOString(),
           customer_name: customerName || "Cliente PDV",
           order_type: orderType === "mesa" ? "local" : "delivery",
-          delivery_type: orderType === "delivery" ? "delivery" : orderType === "retirada" ? "pickup" : orderType === "viagem" ? "takeaway" : undefined,
+          delivery_type: orderType === "delivery" ? "delivery" : orderType === "retirada" ? "pickup" : undefined,
           tables: table ? { table_number: table.table_number } : null,
           delivery_address: deliveryAddress || undefined,
           delivery_phone: customerPhone || undefined,
