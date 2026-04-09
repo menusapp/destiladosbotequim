@@ -1178,6 +1178,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                     <SelectItem value="credit">Crédito</SelectItem>
                     <SelectItem value="pix">Pix</SelectItem>
                     <SelectItem value="meal_voucher">Vale Refeição</SelectItem>
+                    <SelectItem value="employee_credit">Crédito de Funcionário</SelectItem>
                   </SelectContent>
                 </Select>
                 {(paymentType === "credit" || paymentType === "debit" || paymentType.startsWith("Crédito") || paymentType.startsWith("Débito")) && (
