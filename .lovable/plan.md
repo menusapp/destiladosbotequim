@@ -6,134 +6,50 @@ Criar tabela `employee_credits`, adicionar "Crédito de Funcionário" como opç�
 
 ## 1. Migration — Tabela `employee_credits`
 
-```sql
-CREATE TABLE employee_credits (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  restaurant_id uuid REFERENCES restaurants(id) ON DELETE CASCADE NOT NULL,
-  employee_name text NOT NULL,
-  employee_id text,
-  order_id uuid REFERENCES orders(id) ON DELETE SET NULL,
-  amount numeric(10,2) NOT NULL,
-  status text DEFAULT 'pending',
-  notes text,
-  due_date date,
-  paid_at timestamptz,
-  paid_amount numeric(10,2),
-  paid_method text,
-  created_at timestamptz DEFAULT now(),
-  created_by text
-);
+Criar tabela com campos: `employee_name`, `employee_id`, `order_id`, `amount`, `status` (pending/paid/cancelled), `notes`, `due_date`, `paid_at`, `paid_amount`, `paid_method`, `created_by`. RLS com política `anon` (padrão do projeto).
 
-CREATE INDEX idx_employee_credits_restaurant ON employee_credits(restaurant_id);
-CREATE INDEX idx_employee_credits_status ON employee_credits(restaurant_id, status);
+## 2. PDVTab — Novo método de pagamento
 
-ALTER TABLE employee_credits ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all for anon" ON employee_credits FOR ALL TO anon USING (true) WITH CHECK (true);
-```
-
-RLS usa `anon` com `USING(true)` porque o sistema opera sem sessão Supabase Auth (padrão do projeto).
-
-## 2. PDVTab — Adicionar "Crédito de Funcionário" como método
-
-No select de pagamento (linha ~1176), adicionar:
-```tsx
-<SelectItem value="employee_credit">Crédito de Funcionário</SelectItem>
-```
-
-Quando `paymentType === "employee_credit"`, exibir:
-- Input "Nome do Funcionário" com autocomplete (busca nomes distintos de `employee_credits` do restaurante)
+Adicionar `employee_credit` no select de pagamento. Quando selecionado, exibir:
+- Input "Nome do Funcionário" com autocomplete de nomes anteriores
 - Input "Observação" (opcional)
-- Aviso âmbar: "Este pedido será lançado como crédito pendente."
+- Aviso âmbar sobre crédito pendente
 
-Novos estados: `employeeCreditName`, `employeeCreditNotes`.
+No `handleSubmit`, após criar pedido, inserir registro em `employee_credits` com `status: 'pending'`.
 
-No `handleSubmit`, após criar o pedido com `payment_type: 'employee_credit'`, inserir registro em `employee_credits`:
-```ts
-if (paymentType === "employee_credit") {
-  await supabase.from("employee_credits").insert({
-    restaurant_id: restaurantId,
-    employee_name: employeeCreditName || customerName,
-    order_id: order.id,
-    amount: finalTotal,
-    status: "pending",
-    notes: employeeCreditNotes || null,
-    created_by: "Sistema PDV",
-  });
-}
-```
+## 3. Relatórios — Reconhecer nas métricas
 
-## 3. Relatórios — Integração nos métodos de pagamento
+- `useOrderMetrics.ts`: normalizar `employee_credit` → "Crédito Funcionário"
+- `OverviewTab.tsx`: cor laranja para o método
+- `ReportsTab.tsx`: adicionar no `paymentTotals` e `normalizeMethod`
 
-### useOrderMetrics.ts
-Na função `normalizeMethod`, adicionar:
-```ts
-if (method === "employee_credit") return "Crédito Funcionário";
-```
+## 4. Caixa — Linha separada no fechamento
 
-### OverviewTab.tsx
-Na função `getMethodColor`, adicionar:
-```ts
-if (method === "Crédito Funcionário") return "bg-orange-500";
-```
+No resumo do `FluxoCaixaTab`, somar movimentos com `payment_method` = `employee_credit` e exibir em linha separada com nota "não está no caixa físico".
 
-### ReportsTab.tsx
-No `paymentTotals` e `METHOD_TYPE_LABELS`, adicionar:
-```ts
-employee_credit: 0,
-// ...
-employee_credit: "Crédito de Funcionário",
-```
-Na função `normalizeMethod`, reconhecer `employee_credit`.
+## 5. Nova sub-aba "Créditos de Funcionários"
 
-## 4. Caixa — Identificação visual
+Criar `EmployeeCreditsTab.tsx` com:
+- Totalizadores: Pendente (vermelho), Pago (verde), Nº funcionários
+- Filtros: status, nome, período
+- Tabela com colunas: Funcionário, Data, Pedido, Valor, Vencimento, Status (badge)
+- Ações: "Marcar como Pago" (dialog com valor/método/data) e "Cancelar"
 
-No `FluxoCaixaTab.tsx`, os movimentos de `employee_credit` entram no caixa normalmente via trigger (delivery) ou modal (local). No resumo de fechamento do caixa, adicionar uma linha separada que soma movimentos com `payment_method` contendo `employee_credit`, com nota visual: "Não está fisicamente no caixa".
-
-Calcular a partir dos `movements` filtrados:
-```ts
-const employeeCreditTotal = movements
-  .filter(m => m.movement_type === "entrada" && m.payment_method?.includes("employee_credit"))
-  .reduce((sum, m) => sum + m.amount, 0);
-```
-
-Exibir no resumo antes do saldo esperado:
-```
-Crédito de Funcionário: R$ X,XX (não está no caixa físico)
-```
-
-## 5. Sub-aba "Créditos de Funcionários" nos Relatórios
-
-Criar `src/components/admin/EmployeeCreditsTab.tsx`:
-
-- **Totalizadores**: Total Pendente (vermelho), Total Pago (verde), Nº funcionários com crédito aberto
-- **Filtros**: status (todos/pendente/pago/cancelado), nome do funcionário, período
-- **Tabela**: Funcionário, Data, Pedido (link), Valor, Vencimento, Status (badge)
-- **Ações**: "Marcar como Pago" → Dialog com valor pago, método de quitação, data. "Cancelar" com confirmação.
-
-Registrar no `ReportsTab.tsx` como sub-aba usando `Tabs`:
-```tsx
-<TabsTrigger value="dre">DRE</TabsTrigger>
-<TabsTrigger value="employee_credits">Créditos Funcionários</TabsTrigger>
-```
-
-## 6. Limpar estados no `clearForm`
-
-Resetar `employeeCreditName` e `employeeCreditNotes`.
+Registrar como sub-aba dentro do `ReportsTab`.
 
 ## Arquivos impactados
 
 | Arquivo | Mudança |
 |---|---|
 | Migration SQL | Criar tabela `employee_credits` |
-| `src/components/admin/PDVTab.tsx` | Adicionar opção + campos + insert no submit |
-| `src/hooks/useOrderMetrics.ts` | Normalizar `employee_credit` |
-| `src/components/admin/OverviewTab.tsx` | Cor para "Crédito Funcionário" |
-| `src/components/admin/ReportsTab.tsx` | Normalizar + sub-aba |
-| `src/components/admin/FluxoCaixaTab.tsx` | Linha separada no resumo |
-| `src/components/admin/EmployeeCreditsTab.tsx` | **Novo** — gestão completa |
+| `PDVTab.tsx` | Opção + campos + insert |
+| `useOrderMetrics.ts` | Normalizar método |
+| `OverviewTab.tsx` | Cor do método |
+| `ReportsTab.tsx` | Normalizar + sub-aba |
+| `FluxoCaixaTab.tsx` | Linha separada no resumo |
+| `EmployeeCreditsTab.tsx` | **Novo** — gestão completa |
 
 ## O que NÃO muda
-- Fluxo iFood, Delivery Direto, fiscal, NFC-e
-- Triggers de caixa existentes (funcionam com qualquer `payment_type`)
+- iFood, Delivery Direto, fiscal, NFC-e
+- Triggers de caixa existentes
 - CreateOrderDrawer, PaymentConfirmationModal
-- Tabelas existentes (orders, bills, cash_movements)
