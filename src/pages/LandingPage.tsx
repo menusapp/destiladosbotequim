@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
+import { TypingEffect } from "@/components/landing/TypingEffect";
 import menusLogo from "@/assets/menus-logo.png";
 import heroDashboard from "@/assets/landing-hero-dashboard.jpg";
 import {
