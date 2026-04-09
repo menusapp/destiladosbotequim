@@ -41,6 +41,7 @@ export const printOrder = async (
     tables?: { table_number: number } | null;
     dd_scheduled_for?: string;
     cancellation_reason?: string;
+    coupon_discount?: number;
     order_items: {
       id: string;
       quantity: number;
