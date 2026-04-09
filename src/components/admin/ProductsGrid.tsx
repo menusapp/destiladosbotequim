@@ -465,6 +465,19 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       finalPdvCode = await generateNextPdvCode(restaurantId);
     }
 
+    // Validate PDV code uniqueness
+    if (finalPdvCode) {
+      const usedCodes = await getAllUsedPdvCodes(restaurantId);
+      const codeNum = parseInt(finalPdvCode, 10);
+      if (!isNaN(codeNum) && usedCodes.has(codeNum)) {
+        // If editing, check it's not our own code
+        if (!editingProduct || (editingProduct as any).pdv_code !== finalPdvCode) {
+          toast.error(`Código PDV '${finalPdvCode}' já está em uso por outro item`);
+          return;
+        }
+      }
+    }
+
     const productData: any = {
       name: productName, description: productDescription, price: parseFloat(productPrice),
       promotional_price: productPromotionalPrice ? parseFloat(productPromotionalPrice) : null,
