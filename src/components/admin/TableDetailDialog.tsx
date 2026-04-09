@@ -100,7 +100,7 @@ export const TableDetailDialog = ({
       const { data, error } = await supabase
         .from("orders")
         .select(`
-          id, status, customer_name, customer_cpf, comanda_id, created_at,
+          id, status, customer_name, customer_cpf, comanda_id, created_at, coupon_discount, notes,
           order_items(
             id, quantity, price_at_order, notes,
             products(name),
@@ -192,10 +192,11 @@ export const TableDetailDialog = ({
   });
 
   const getOrderTotal = (order: any) => {
-    return order.order_items?.reduce((sum: number, item: any) => {
+    const itemsTotal = order.order_items?.reduce((sum: number, item: any) => {
       const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
       return sum + (item.price_at_order + extrasTotal) * item.quantity;
     }, 0) || 0;
+    return itemsTotal - (order.coupon_discount || 0);
   };
 
   const getItemTotal = (item: any) => {
@@ -315,6 +316,7 @@ export const TableDetailDialog = ({
         .reduce((sum: number, s: Split) => sum + Number(s.value), 0);
     }
 
+    const totalDiscount = comandaOrders.reduce((sum: number, o: any) => sum + (o.coupon_discount || 0), 0);
     const virtualOrder = {
       id: comandaOrders[0].id,
       table_id: table?.id,
@@ -322,6 +324,7 @@ export const TableDetailDialog = ({
       restaurant_id: restaurantId,
       customer_name: comanda.customer_name,
       order_items: allItems,
+      coupon_discount: totalDiscount > 0 ? totalDiscount : undefined,
       _comanda_id: comanda.id,
       _comanda_order_ids: orderIds,
       _splits_paid_total: splitsPaidTotal,
@@ -497,6 +500,8 @@ export const TableDetailDialog = ({
         customer_name: order.customer_name,
         order_type: "local" as const,
         tables: { table_number: table!.table_number },
+        coupon_discount: order.coupon_discount || undefined,
+        notes: order.notes || undefined,
         order_items: (order.order_items || []).map((item: any) => ({
           id: item.id,
           quantity: item.quantity,
@@ -538,6 +543,7 @@ export const TableDetailDialog = ({
           })),
         }))
       );
+      const totalDiscount = comandaOrders.reduce((sum: number, o: any) => sum + (o.coupon_discount || 0), 0);
       const virtualOrder = {
         id: comandaOrders[0].id,
         created_at: comandaOrders[0].created_at,
@@ -545,6 +551,7 @@ export const TableDetailDialog = ({
         order_type: "local" as const,
         tables: { table_number: table!.table_number },
         order_items: allItems,
+        coupon_discount: totalDiscount > 0 ? totalDiscount : undefined,
       };
       await printOrderThermal(virtualOrder, restaurantId);
     } catch {
@@ -758,7 +765,14 @@ export const TableDetailDialog = ({
               {comandas && comandas.length > 0 ? (
                 comandas.map(comanda => {
                   const comandaOrders = ordersByComanda.get(comanda.id) || [];
-                  const comandaTotal = comandaOrders.reduce((sum, o) => sum + getOrderTotal(o), 0);
+                  const comandaItemsTotal = comandaOrders.reduce((sum, o) => {
+                    return sum + (o.order_items?.reduce((s: number, item: any) => {
+                      const ext = item.order_item_extras?.reduce((es: number, e: any) => es + e.price_at_order, 0) || 0;
+                      return s + (item.price_at_order + ext) * item.quantity;
+                    }, 0) || 0);
+                  }, 0);
+                  const comandaDiscount = comandaOrders.reduce((sum, o) => sum + (o.coupon_discount || 0), 0);
+                  const comandaTotal = comandaItemsTotal - comandaDiscount;
 
                   // Calculate splits totals for this comanda
                   const comandaOrderIds = new Set(comandaOrders.map(o => o.id));
@@ -826,6 +840,11 @@ export const TableDetailDialog = ({
                                     <Printer className="w-4 h-4 text-muted-foreground" />
                                   </Button>
                                   <span className="text-sm font-bold">R$ {getOrderTotal(order).toFixed(2)}</span>
+                                  {(order.coupon_discount || 0) > 0 && (
+                                    <Badge variant="outline" className="text-[9px] text-green-600 border-green-300">
+                                      -{((order.coupon_discount || 0)).toFixed(2)}
+                                    </Badge>
+                                  )}
                                   {order.status === "pending" && (
                                     <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleAcceptOrder(order.id)}>
                                       Aceitar

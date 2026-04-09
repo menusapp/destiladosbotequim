@@ -232,6 +232,7 @@ export type Database = {
           description: string
           id: string
           movement_type: string
+          order_id: string | null
           payment_method: string | null
           restaurant_id: string
         }
@@ -245,6 +246,7 @@ export type Database = {
           description: string
           id?: string
           movement_type: string
+          order_id?: string | null
           payment_method?: string | null
           restaurant_id: string
         }
@@ -258,6 +260,7 @@ export type Database = {
           description?: string
           id?: string
           movement_type?: string
+          order_id?: string | null
           payment_method?: string | null
           restaurant_id?: string
         }
@@ -274,6 +277,13 @@ export type Database = {
             columns: ["cash_session_id"]
             isOneToOne: false
             referencedRelation: "cash_register_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {

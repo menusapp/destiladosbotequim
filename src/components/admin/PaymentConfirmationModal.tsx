@@ -138,9 +138,10 @@ export const PaymentConfirmationModal = ({
   };
 
   const splitsPaidTotal = (order as any)._splits_paid_total || 0;
+  const couponDiscount = (order as any).coupon_discount || 0;
   const subtotal = calculateSubtotal();
   const feeAmount = serviceFeeEnabled ? (subtotal * serviceFeePercentage) / 100 : 0;
-  const grossTotal = subtotal + feeAmount;
+  const grossTotal = subtotal + feeAmount - couponDiscount;
   const total = Math.max(0, Math.round((grossTotal - splitsPaidTotal) * 100) / 100);
   const paidAmount = selectedPayments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, Math.round((total - paidAmount) * 100) / 100);
@@ -284,46 +285,48 @@ export const PaymentConfirmationModal = ({
         }
       }
 
-      // --- Cash movements: clean up ALL related entries in parallel, then re-create ---
-      const restId = order.restaurant_id || restaurantId;
-      const customerLabel = (order as any).customer_name || "Cliente";
-      const shortId = order.id.slice(0, 6);
+      // --- Cash movements: only for local/comanda orders ---
+      // Delivery/pickup/takeaway orders are handled by the DB trigger on finalization
+      const isDeliveryOrder = order.order_type === "delivery" || 
+        ["delivery", "pickup", "takeaway"].includes((order as any).delivery_type || "");
+      
+      if (!isDeliveryOrder) {
+        const restId = order.restaurant_id || restaurantId;
+        const customerLabel = (order as any).customer_name || "Cliente";
 
-      // Parallel cleanup of old cash movements
-      await Promise.all([
-        supabase.from("cash_movements").delete().eq("restaurant_id", restId)
-          .like("description", `%${customerLabel}%`).like("description", `%Pedido Local%`),
-        supabase.from("cash_movements").delete().eq("restaurant_id", restId)
-          .like("description", `%#${order.id}%`),
-        supabase.from("cash_movements").delete().eq("restaurant_id", restId)
-          .like("description", `%#${shortId}%`),
-      ]);
+        // Parallel cleanup of old cash movements for this order
+        await Promise.all([
+          supabase.from("cash_movements").delete().eq("restaurant_id", restId)
+            .like("description", `%${customerLabel}%`).like("description", `%Pedido Local%`),
+          supabase.from("cash_movements").delete().eq("restaurant_id", restId)
+            .like("description", `%#${order.id}%`),
+        ]);
 
-      // Re-create in current open session
-      const { data: cashSession } = await supabase
-        .from("cash_register_sessions")
-        .select("id")
-        .eq("restaurant_id", restId)
-        .eq("status", "open")
-        .order("opened_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        // Re-create in current open session
+        const { data: cashSession } = await supabase
+          .from("cash_register_sessions")
+          .select("id")
+          .eq("restaurant_id", restId)
+          .eq("status", "open")
+          .order("opened_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (cashSession) {
-        // Insert all movements in parallel
-        await Promise.all(selectedPayments.map(payment =>
-          supabase.from("cash_movements").insert({
-            cash_session_id: cashSession.id,
-            restaurant_id: restId,
-            movement_type: "entrada",
-            amount: payment.amount,
-            payment_method: payment.methodType,
-            category: "Pedido",
-            description: `Pedido Local - ${customerLabel} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
-            created_by: "Sistema",
-            bill_id: resolvedBillId,
-          })
-        ));
+        if (cashSession) {
+          await Promise.all(selectedPayments.map(payment =>
+            supabase.from("cash_movements").insert({
+              cash_session_id: cashSession.id,
+              restaurant_id: restId,
+              movement_type: "entrada",
+              amount: payment.amount,
+              payment_method: payment.methodType,
+              category: "Pedido",
+              description: `Pedido Local - ${customerLabel} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
+              created_by: "Sistema",
+              bill_id: resolvedBillId,
+            })
+          ));
+        }
       }
 
       await onConfirm();
@@ -378,6 +381,12 @@ export const PaymentConfirmationModal = ({
                   <Percent className="w-3 h-3" /> Taxa de serviço ({serviceFeePercentage}%):
                 </span>
                 <span className="font-medium">R$ {feeAmount.toFixed(2)}</span>
+              </div>
+            )}
+            {couponDiscount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Desconto:</span>
+                <span className="font-medium">- R$ {couponDiscount.toFixed(2)}</span>
               </div>
             )}
             {splitsPaidTotal > 0 && (
