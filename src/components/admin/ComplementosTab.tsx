@@ -202,9 +202,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
   const openEditCategory = async (category: ComplementCategory) => {
     if (isRestaurantOpen) { toast.error("Feche o restaurante para editar"); return; }
     setEditingCategory(category); setCategoryName(category.name);
-    // Load linked products
-    const { data: linkedExtras } = await supabase.from("product_extras").select("product_id").eq("extra_category_id", category.id);
-    const linkedIds = new Set((linkedExtras || []).map((e: any) => e.product_id as string));
+    // Load linked products from product_complement_groups
+    const { data: linkedGroups } = await supabase.from("product_complement_groups").select("product_id").eq("extra_category_id", category.id);
+    const linkedIds = new Set((linkedGroups || []).map((g: any) => g.product_id as string));
     setSelectedProductIds(linkedIds);
     setOriginalProductIds(new Set(linkedIds));
     setProductSearchQuery("");
