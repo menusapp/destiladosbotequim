@@ -15,8 +15,12 @@ import {
   ChevronRight,
   Building2,
   MessageSquare,
-  HardDrive,
+  Megaphone,
+  Gift,
+  FileText,
+  Plug,
   Monitor,
+  Bot,
   Bot,
 } from "lucide-react";
 import {
