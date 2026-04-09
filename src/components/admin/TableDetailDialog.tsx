@@ -827,6 +827,11 @@ export const TableDetailDialog = ({
                                     <Printer className="w-4 h-4 text-muted-foreground" />
                                   </Button>
                                   <span className="text-sm font-bold">R$ {getOrderTotal(order).toFixed(2)}</span>
+                                  {(order.coupon_discount || 0) > 0 && (
+                                    <Badge variant="outline" className="text-[9px] text-green-600 border-green-300">
+                                      -{((order.coupon_discount || 0)).toFixed(2)}
+                                    </Badge>
+                                  )}
                                   {order.status === "pending" && (
                                     <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleAcceptOrder(order.id)}>
                                       Aceitar
