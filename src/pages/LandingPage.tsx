@@ -119,7 +119,7 @@ const LandingPage = () => {
           <ScrollReveal delay={100}>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground tracking-[-0.03em] leading-[1.1]">
               O sistema completo para{" "}
-              <span className="text-primary">restaurantes</span>
+              <TypingEffect />
             </h1>
           </ScrollReveal>
 
