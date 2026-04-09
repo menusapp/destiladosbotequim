@@ -759,7 +759,14 @@ export const TableDetailDialog = ({
               {comandas && comandas.length > 0 ? (
                 comandas.map(comanda => {
                   const comandaOrders = ordersByComanda.get(comanda.id) || [];
-                  const comandaTotal = comandaOrders.reduce((sum, o) => sum + getOrderTotal(o), 0);
+                  const comandaItemsTotal = comandaOrders.reduce((sum, o) => {
+                    return sum + (o.order_items?.reduce((s: number, item: any) => {
+                      const ext = item.order_item_extras?.reduce((es: number, e: any) => es + e.price_at_order, 0) || 0;
+                      return s + (item.price_at_order + ext) * item.quantity;
+                    }, 0) || 0);
+                  }, 0);
+                  const comandaDiscount = comandaOrders.reduce((sum, o) => sum + (o.coupon_discount || 0), 0);
+                  const comandaTotal = comandaItemsTotal - comandaDiscount;
 
                   // Calculate splits totals for this comanda
                   const comandaOrderIds = new Set(comandaOrders.map(o => o.id));
