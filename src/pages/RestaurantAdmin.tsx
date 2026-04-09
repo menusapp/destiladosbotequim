@@ -31,6 +31,7 @@ const ContasTab = lazy(() => import("@/components/admin/ContasTab"));
 const IntegrationsTab = lazy(() => import("@/components/admin/IntegrationsTab"));
 const ModulosTab = lazy(() => import("@/components/admin/ModulosTab"));
 const CompanyDataSettings = lazy(() => import("@/components/admin/settings/CompanyDataSettings"));
+const WhatsAppSettings = lazy(() => import("@/components/admin/settings/WhatsAppSettings"));
 const KioskSettings = lazy(() => import("@/components/admin/settings/KioskSettings"));
 const KioskUpsellScreen = lazy(() => import("@/components/admin/settings/KioskUpsellScreen"));
 const RoboMenusTab = lazy(() => import("@/components/admin/RoboMenusTab"));
