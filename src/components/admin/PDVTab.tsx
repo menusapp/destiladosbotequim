@@ -1368,9 +1368,21 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                       </div>
                     );
                   })}
-                  <div className="flex items-center justify-between font-bold text-sm pt-2 border-t">
-                    <span>Total</span>
-                    <span>R$ {cartSubtotal.toFixed(2)}</span>
+                  <div className="pt-2 border-t space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Subtotal</span>
+                      <span>R$ {cartSubtotal.toFixed(2)}</span>
+                    </div>
+                    {calculatedDiscount > 0 && (
+                      <div className="flex items-center justify-between text-sm text-green-600">
+                        <span>Desconto</span>
+                        <span>- R$ {calculatedDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between font-bold text-sm">
+                      <span>Total</span>
+                      <span>R$ {cartTotal.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               )}
