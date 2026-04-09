@@ -155,6 +155,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       setFixedCosts(fixedData.data || []);
       setVariableCosts(variableData.data || []);
       setLaborCosts(laborData.data || []);
+      setPayrollRecovery((payrollCredits || []).reduce((sum, c) => sum + Number(c.paid_amount || 0), 0));
 
       let billsTotal = 0;
       let billsCount = 0;
