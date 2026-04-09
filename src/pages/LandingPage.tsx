@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -8,15 +7,15 @@ import { TypingEffect } from "@/components/landing/TypingEffect";
 import menusLogo from "@/assets/menus-logo.png";
 import heroDashboard from "@/assets/landing-hero-dashboard.jpg";
 import {
-  ArrowRight, Check, ChevronRight, ChevronLeft, Zap, Star,
+  ArrowRight, Check, ChevronRight, Zap, Star,
   QrCode, ShoppingCart, Utensils, Package,
-  BarChart3, Users, MessageSquare, Truck,
+  BarChart3, MessageSquare, Truck,
   Smartphone, TrendingUp, Megaphone, CreditCard,
-  Shield, Clock, Headphones, MapPin, Printer, Bot,
-  Wallet, BadgePercent,
-  AlertTriangle, DollarSign, LayoutGrid,
-  Timer, Receipt, CalendarCheck, BrainCircuit,
-  Pizza, Coffee, Beer, Sandwich, UtensilsCrossed, ChefHat,
+  Shield, Clock, Printer, Bot,
+  BadgePercent,
+  AlertTriangle, DollarSign,
+  Receipt, CalendarCheck,
+  Pizza, Coffee, Beer, Sandwich, ChefHat,
   CheckCircle2,
 } from "lucide-react";
 
