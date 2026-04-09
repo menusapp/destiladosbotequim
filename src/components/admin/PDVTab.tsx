@@ -125,6 +125,13 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   const [newAddrCity, setNewAddrCity] = useState("");
   const [newAddrState, setNewAddrState] = useState("");
 
+  // Discount states
+  const [discountExpanded, setDiscountExpanded] = useState(false);
+  const [discountType, setDiscountType] = useState<"percentage" | "value">("value");
+  const [discountTarget, setDiscountTarget] = useState("total");
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountNotes, setDiscountNotes] = useState("");
+
   // Auto-print toggle
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem("pdv_auto_print") === "true");
 
