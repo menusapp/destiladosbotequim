@@ -91,55 +91,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
     setLoading(false);
   };
 
-  // Helper: fully sync product_extras + product_extra_ingredients for a category
-  const syncCategoryToProducts = async (categoryId: string) => {
-    // 1. Fetch all category items with their ingredients
-    const { data: catItems } = await supabase
-      .from("extra_category_items")
-      .select("id, name, price, extra_category_item_ingredients(id, stock_item_id, quantity)")
-      .eq("category_id", categoryId);
-
-    // 2. Find all products currently linked to this category
-    const { data: existingExtras } = await supabase
-      .from("product_extras")
-      .select("id, product_id")
-      .eq("extra_category_id", categoryId);
-
-    if (!existingExtras || existingExtras.length === 0) return;
-
-    const linkedProductIds = [...new Set(existingExtras.map((e: any) => e.product_id as string))];
-    const existingExtraIds = existingExtras.map((e: any) => e.id as string);
-
-    // 3. Delete old product_extra_ingredients for these extras
-    if (existingExtraIds.length > 0) {
-      await supabase.from("product_extra_ingredients").delete().in("product_extra_id", existingExtraIds);
-      // 4. Delete old product_extras for this category
-      await supabase.from("product_extras").delete().eq("extra_category_id", categoryId);
-    }
-
-    // 5. Recreate product_extras + product_extra_ingredients for each product
-    if (!catItems || catItems.length === 0) return;
-
-    for (const productId of linkedProductIds) {
-      for (const item of catItems) {
-        const { data: newExtra } = await supabase.from("product_extras").insert({
-          product_id: productId,
-          extra_category_id: categoryId,
-          name: item.name,
-          price: item.price,
-        }).select("id").single();
-
-        if (newExtra && item.extra_category_item_ingredients && item.extra_category_item_ingredients.length > 0) {
-          const ingredientInserts = item.extra_category_item_ingredients.map((ing: any) => ({
-            product_extra_id: newExtra.id,
-            stock_item_id: ing.stock_item_id,
-            quantity: ing.quantity,
-          }));
-          await supabase.from("product_extra_ingredients").insert(ingredientInserts);
-        }
-      }
-    }
-  };
+  // (syncCategoryToProducts removed — linking now uses product_complement_groups)
 
   const handleSaveCategory = async () => {
     if (!categoryName.trim()) { toast.error("Digite o nome da categoria"); return; }
