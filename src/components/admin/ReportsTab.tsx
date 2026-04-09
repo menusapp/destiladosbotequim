@@ -727,6 +727,12 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
               <span>Lucro Bruto</span>
               <span className="text-primary tabular-nums">R$ {dreValues.grossProfit.toFixed(2)}</span>
             </div>
+            {dreValues.payrollRecovery > 0 && (
+              <div className="flex justify-between items-center px-4 py-2.5 border-b text-sm pl-8">
+                <span className="text-green-600 font-medium">(+) Descontos em Folha</span>
+                <span className="tabular-nums text-green-600 font-medium">+ R$ {dreValues.payrollRecovery.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center px-4 py-2 border-b text-sm pl-8">
               <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Despesas Operacionais</span>
               <span></span>
