@@ -110,7 +110,7 @@ const LandingPage = () => {
           <nav className="hidden md:flex items-center gap-8">
             {[
               { href: "#funcoes", label: "Funções" },
-              { href: "#features", label: "Funcionalidades" },
+              { href: "#features", label: "Vantagens" },
               { href: "#pricing", label: "Planos" },
               { href: "#faq", label: "FAQ" },
             ].map((l) => (
@@ -150,7 +150,7 @@ const LandingPage = () => {
           </ScrollReveal>
 
           <ScrollReveal delay={200}>
-            <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed font-light">
+            <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed font-normal sm:text-xl">
               Cardápio digital, pedidos online, delivery, estoque automático, financeiro, marketing e muito mais.
               <span className="font-medium text-foreground"> Tudo em uma só plataforma.</span>
             </p>
