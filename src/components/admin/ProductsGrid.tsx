@@ -330,10 +330,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     else { setIngredientType("fixed"); setIngredients(formattedIngredients); setVariations([]); }
     setExtras(extrasFromDB);
 
-    const { data: groupsData } = await supabase.from("product_complement_groups").select("*, extra_categories(id, name, extra_category_items(id, name, price))").eq("product_id", product.id);
-    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any) => ({
+    const { data: groupsData } = await supabase.from("product_complement_groups").select("*, extra_categories(id, name, extra_category_items(id, name, price))").eq("product_id", product.id).order("display_order");
+    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any, idx: number) => ({
       id: crypto.randomUUID(), extra_category_id: g.extra_category_id, category_name: g.extra_categories?.name || "",
       is_required: g.is_required || false, min_selection: g.min_selection || 0, max_selection: g.max_selection,
+      display_order: g.display_order ?? idx,
       items: g.extra_categories?.extra_category_items || []
     }));
     setLinkedGroups(formattedGroups);
