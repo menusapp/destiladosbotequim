@@ -417,9 +417,18 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setLinkedGroups([...linkedGroups, {
       id: crypto.randomUUID(), extra_category_id: selectedComplementCategory, category_name: category.name,
       is_required: groupIsRequired, min_selection: parseInt(groupMinSelection) || 0, max_selection: groupMaxSelection ? parseInt(groupMaxSelection) : null,
+      display_order: linkedGroups.length,
       items: itemsData || [],
     }]);
     setSelectedComplementCategory(""); setGroupIsRequired(false); setGroupMinSelection("0"); setGroupMaxSelection("");
+  };
+
+  const handleMoveLinkedGroup = (index: number, direction: 'up' | 'down') => {
+    const newGroups = [...linkedGroups];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newGroups.length) return;
+    [newGroups[index], newGroups[targetIndex]] = [newGroups[targetIndex], newGroups[index]];
+    setLinkedGroups(newGroups.map((g, i) => ({ ...g, display_order: i })));
   };
 
   const handleRemoveLinkedGroup = (id: string) => { setLinkedGroups(linkedGroups.filter(g => g.id !== id)); };
