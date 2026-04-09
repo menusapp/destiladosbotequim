@@ -1,67 +1,60 @@
 
 
-# Refatorar PDVTab — Layout maior + UX de cliente otimizada
+# Campo de Desconto no PDV
 
 ## Resumo
-Expandir o painel de criação de pedidos, aumentar espaçamento geral, e substituir os campos abertos de cliente/endereço por componentes compactos com botões "Buscar Cliente" e "Criar Novo" (inline colapsável). Para delivery, substituir campos de endereço por componente compacto com estado condicional baseado no cliente selecionado.
+Adicionar seção de desconto colapsável na PDVTab, acima do carrinho, com suporte a porcentagem/valor fixo, aplicação no total ou por produto, e campo de motivo. Usar a coluna `coupon_discount` existente (mesmo padrão do CreateOrderDrawer) para persistir o desconto.
+
+## Por que NÃO criar migration
+
+A tabela `orders` já possui `coupon_discount` (numeric, nullable) que é usada pelo `CreateOrderDrawer` para descontos manuais. Adicionar colunas extras (`manual_discount_type`, `manual_discount_target`, `manual_discount_notes`) seria redundante neste momento — o valor absoluto do desconto já é persistido e reconhecido por todos os relatórios (DRE, Overview, Caixa). O campo `notes` do pedido pode conter o motivo do desconto.
 
 ## Detalhes Técnicos
 
-### 1. Layout geral — `PDVTab.tsx`
+### 1. Novos estados em `PDVTab.tsx`
 
-**Painel direito**: expandir de `w-[420px]` para `w-[520px]`.
+```
+discountExpanded: boolean (default false)
+discountType: 'percentage' | 'value' (default 'value')
+discountTarget: 'total' | productId (default 'total')
+discountValue: string (input text)
+discountNotes: string
+```
 
-**Espaçamento**: dentro do `ScrollArea`, mudar `space-y-4` para `space-y-5`, inputs de `h-8` para `h-9`, gaps entre campos de `space-y-2` para `space-y-3`.
+`calculatedDiscount` como `useMemo`: se type=percentage e target=total, aplica % sobre subtotal; se target=productId, aplica % sobre (price+extras)*qty do item. Clamp para não exceder o valor alvo. Se type=value, usa o valor direto (clamped).
 
-### 2. Seção de Cliente (para Mesa, Retirada, Viagem)
+### 2. UI — Seção de desconto
 
-Substituir os 3 inputs abertos (CPF, Nome, Celular) + botão "Buscar" por:
+Posicionar entre a seção de Pagamento e o Carrinho Summary. Visível apenas quando `cart.length > 0`.
 
-- Container `border rounded-lg p-4 bg-muted/30` com título "Cliente"
-- Dois botões lado a lado: "Buscar Cliente" (abre `CustomerSelectDialog` existente) e "Criar Novo" (expande formulário inline)
-- Quando cliente selecionado: card compacto com nome, telefone e botão X para limpar
-- "Criar Novo": expande abaixo (com animação via Collapsible) os 3 campos (CPF, Nome, Celular) + botão "Salvar" que faz upsert no CRM e marca como selecionado
+- Header colapsável: "Desconto" + chevron
+- Toggle % / R$ (dois botões)
+- Select: "Total do pedido" + cada item do carrinho
+- Input numérico com valor
+- Input texto para motivo (opcional)
+- Preview: "- R$ X.XX" em verde
 
-Estado interno: `selectedCustomer: { name, cpf, phone } | null` e `showNewClientForm: boolean`.
+### 3. Ajuste no `handleSubmit`
 
-Ao selecionar via `CustomerSelectDialog` ou salvar novo cliente: fechar form, preencher `selectedCustomer`, popular os states existentes (`customerName`, `customerCpf`, `customerPhone`) para não quebrar o `handleSubmit`.
+Passar `coupon_discount: calculatedDiscount > 0 ? calculatedDiscount : null` em todos os inserts de pedido (delivery, retirada, viagem, mesa). Mesmo padrão do CreateOrderDrawer.
 
-### 3. Seção de Endereço (apenas Delivery)
+### 4. Ajuste no Cart Summary e Footer
 
-Substituir os 4 inputs abertos (CEP, Rua, Bairro, Cidade) por componente compacto:
+Exibir linha de desconto entre Subtotal e Total quando desconto > 0. Footer mostra total final (subtotal - desconto).
 
-- Container `border rounded-lg p-4 bg-muted/30` com título "Endereço de Entrega"
-- Sem cliente: texto italic "Selecione um cliente para ver os endereços salvos"
-- Com cliente mas sem endereço: border-dashed placeholder
-- Com endereço: card compacto mostrando rua, bairro, cidade + taxa de entrega calculada
-- Botão "Alterar endereço" que abre um Dialog com:
-  - Lista de endereços salvos do cliente (busca `customer_addresses` por CPF)
-  - Botão "Novo endereço" que mostra campos CEP, Rua, Número, Complemento, Bairro, Cidade
-  - CEP com auto-lookup via ViaCEP (lógica já existente)
-  - Ao confirmar: popula os states existentes (`deliveryAddress`, `deliveryNeighborhood`, etc.) e calcula taxa via `delivery_zones`
+### 5. Limpar no `clearForm`
 
-Auto-fill: quando `handleCustomerSelect` traz `defaultAddress`, já preencher o endereço selecionado automaticamente (lógica existente mantida).
-
-### 4. Novo estado e lógica
-
-Adicionar ao componente:
-- `selectedCustomer` state (derivado dos campos existentes)
-- `showNewClientForm` boolean
-- `showAddressDialog` boolean
-- `customerAddresses` query (busca por CPF quando cliente selecionado e orderType = delivery)
-
-Toda lógica de submit (`handleSubmit`, `upsertCustomerCRM`, `insertOrderItems`) permanece inalterada — os states `customerName`, `customerCpf`, `customerPhone`, `deliveryAddress`, etc. continuam sendo a fonte de verdade.
+Resetar todos os estados de desconto.
 
 ## Arquivos Impactados
 
 | Arquivo | Mudança |
 |---|---|
-| `src/components/admin/PDVTab.tsx` | Refatorar seções de cliente e endereço + expandir layout |
+| `src/components/admin/PDVTab.tsx` | Adicionar estados, UI de desconto, ajustar handleSubmit e cart summary |
 
 ## O que NÃO muda
-- `handleSubmit`, `upsertCustomerCRM`, `insertOrderItems` — mesma lógica
-- `CustomerSelectDialog` — reutilizado sem alteração
-- Mapa de mesas, realtime, busca de pedidos
-- `CreateOrderDrawer` — não é afetado (componente separado)
+- Sem migration — usa `coupon_discount` existente
+- Relatórios DRE, Overview, Caixa — já reconhecem `coupon_discount`
+- CreateOrderDrawer — não afetado
 - Backend / RPCs / triggers
 
