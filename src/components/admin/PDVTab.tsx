@@ -12,11 +12,15 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle
+} from "@/components/ui/dialog";
+import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Search, ShoppingCart, UserPlus, X, Loader2, Settings,
-  MoreVertical, QrCode, Link2, Eraser, Eye, EyeOff
+  MoreVertical, QrCode, Link2, Eraser, Eye, EyeOff, MapPin, Plus
 } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "@/components/ui/sonner";
@@ -50,6 +54,22 @@ interface TableData {
   comandas?: { id: string; customer_name: string; customer_cpf: string }[];
 }
 
+interface SelectedCustomer {
+  name: string;
+  cpf: string;
+  phone: string;
+}
+
+interface SelectedAddress {
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zip_code: string;
+}
+
 interface PDVTabProps {
   restaurantId: string;
   pendingTableToOpen?: string | null;
@@ -71,7 +91,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   const [orderSearchDate, setOrderSearchDate] = useState<Date | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
 
-  // Customer fields
+  // Customer fields (source of truth for submit)
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerCpf, setCustomerCpf] = useState("");
@@ -82,6 +102,27 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   const [notes, setNotes] = useState("");
   const [paymentType, setPaymentType] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
+
+  // New UX states
+  const [selectedCustomer, setSelectedCustomer] = useState<SelectedCustomer | null>(null);
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [newClientCpf, setNewClientCpf] = useState("");
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [savingNewClient, setSavingNewClient] = useState(false);
+
+  // Address UX states
+  const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null);
+  const [showAddressDialog, setShowAddressDialog] = useState(false);
+  const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false);
+  const [newAddrCep, setNewAddrCep] = useState("");
+  const [newAddrStreet, setNewAddrStreet] = useState("");
+  const [newAddrNumber, setNewAddrNumber] = useState("");
+  const [newAddrComplement, setNewAddrComplement] = useState("");
+  const [newAddrNeighborhood, setNewAddrNeighborhood] = useState("");
+  const [newAddrCity, setNewAddrCity] = useState("");
+  const [newAddrState, setNewAddrState] = useState("");
 
   // Auto-print toggle
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem("pdv_auto_print") === "true");
@@ -150,12 +191,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         .eq("order_type", "local");
 
       if (orderSearchDate) {
-        // When date is selected, show all orders from that day (any status)
         query = query
           .gte("created_at", startOfDay(orderSearchDate).toISOString())
           .lte("created_at", endOfDay(orderSearchDate).toISOString());
       } else {
-        // Default: only active orders
         query = query.in("status", ["pending", "accepted", "preparing", "ready", "delivered"]);
       }
 
@@ -192,9 +231,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   // Filter searchable orders based on search term and/or date
   const filteredOrders = useMemo(() => {
     if (!searchableOrders) return [];
-    // If date is selected but no search term, show all orders for that day
     if (orderSearchDate && orderSearchTerm.length < 2) return searchableOrders;
-    // If no date and no search term, show nothing
     if (orderSearchTerm.length < 2) return [];
     const term = orderSearchTerm.toLowerCase();
     return searchableOrders.filter((order: any) => {
@@ -296,32 +333,146 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     toast.success(`${item.productName} adicionado!`);
   };
 
+  // Sync selectedCustomer to source-of-truth states
+  const applyCustomer = (c: SelectedCustomer) => {
+    setSelectedCustomer(c);
+    setCustomerName(c.name);
+    setCustomerCpf(c.cpf);
+    setCustomerPhone(c.phone);
+    setShowNewClientForm(false);
+  };
+
+  const clearCustomer = () => {
+    setSelectedCustomer(null);
+    setCustomerName("");
+    setCustomerCpf("");
+    setCustomerPhone("");
+    setSelectedAddress(null);
+    setDeliveryAddress("");
+    setDeliveryCep("");
+    setDeliveryNeighborhood("");
+    setDeliveryCity("");
+  };
+
+  const applyAddress = (addr: SelectedAddress) => {
+    setSelectedAddress(addr);
+    setDeliveryAddress(`${addr.street}${addr.number ? `, ${addr.number}` : ""}`);
+    setDeliveryCep(addr.zip_code);
+    setDeliveryNeighborhood(addr.neighborhood);
+    setDeliveryCity(`${addr.city} - ${addr.state}`);
+  };
+
   const handleCustomerSelect = (customer: { id: string; cpf: string; name: string; phone: string | null; defaultAddress?: any }) => {
-    setCustomerName(customer.name);
-    setCustomerCpf(customer.cpf);
-    setCustomerPhone(customer.phone || "");
+    applyCustomer({ name: customer.name, cpf: customer.cpf, phone: customer.phone || "" });
     // Auto-fill address if delivery and address available
     if (customer.defaultAddress && orderType === "delivery") {
-      setDeliveryAddress(customer.defaultAddress.street + (customer.defaultAddress.number ? `, ${customer.defaultAddress.number}` : ""));
-      setDeliveryCep(customer.defaultAddress.zip_code || "");
-      setDeliveryNeighborhood(customer.defaultAddress.neighborhood || "");
-      setDeliveryCity(`${customer.defaultAddress.city} - ${customer.defaultAddress.state}`);
+      applyAddress({
+        street: customer.defaultAddress.street,
+        number: customer.defaultAddress.number || "",
+        complement: customer.defaultAddress.complement || "",
+        neighborhood: customer.defaultAddress.neighborhood || "",
+        city: customer.defaultAddress.city || "",
+        state: customer.defaultAddress.state || "",
+        zip_code: customer.defaultAddress.zip_code || "",
+      });
     }
   };
 
   const handleCepLookup = async (cep: string) => {
-    setDeliveryCep(cep);
     const clean = cep.replace(/\D/g, "");
     if (clean.length !== 8) return;
     try {
       const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
       const data = await res.json();
       if (!data.erro) {
-        setDeliveryAddress(data.logradouro || "");
-        setDeliveryNeighborhood(data.bairro || "");
-        setDeliveryCity(`${data.localidade} - ${data.uf}`);
+        return { street: data.logradouro || "", neighborhood: data.bairro || "", city: data.localidade || "", state: data.uf || "" };
       }
     } catch { /* ignore */ }
+    return null;
+  };
+
+  const handleSaveNewClient = async () => {
+    if (!newClientName.trim()) { toast.error("Nome é obrigatório"); return; }
+    setSavingNewClient(true);
+    try {
+      const cpf = newClientCpf.replace(/\D/g, "");
+      const finalCpf = cpf.length >= 11 ? newClientCpf : "000.000.000-00";
+
+      if (cpf.length >= 11) {
+        const { data: existing } = await supabase
+          .from("customers").select("id").eq("restaurant_id", restaurantId).eq("cpf", newClientCpf).maybeSingle();
+        if (existing) {
+          await supabase.from("customers").update({ name: newClientName, phone: newClientPhone || null }).eq("id", existing.id);
+        } else {
+          await supabase.from("customers").insert({ restaurant_id: restaurantId, cpf: finalCpf, name: newClientName, phone: newClientPhone || null });
+        }
+      }
+
+      applyCustomer({ name: newClientName, cpf: finalCpf, phone: newClientPhone });
+      setNewClientCpf("");
+      setNewClientName("");
+      setNewClientPhone("");
+      toast.success("Cliente salvo!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao salvar cliente");
+    } finally {
+      setSavingNewClient(false);
+    }
+  };
+
+  // Fetch customer addresses when opening address dialog
+  const fetchCustomerAddresses = async () => {
+    if (!selectedCustomer?.cpf || selectedCustomer.cpf === "000.000.000-00") {
+      setCustomerAddresses([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("customer_addresses")
+      .select("*")
+      .eq("customer_cpf", selectedCustomer.cpf)
+      .order("is_default", { ascending: false });
+    setCustomerAddresses(data || []);
+  };
+
+  const handleNewAddrCepLookup = async (cep: string) => {
+    setNewAddrCep(cep);
+    const result = await handleCepLookup(cep);
+    if (result) {
+      setNewAddrStreet(result.street);
+      setNewAddrNeighborhood(result.neighborhood);
+      setNewAddrCity(result.city);
+      setNewAddrState(result.state);
+    }
+  };
+
+  const handleSaveNewAddress = async () => {
+    if (!newAddrStreet.trim()) { toast.error("Rua é obrigatória"); return; }
+    const addr: SelectedAddress = {
+      street: newAddrStreet, number: newAddrNumber, complement: newAddrComplement,
+      neighborhood: newAddrNeighborhood, city: newAddrCity, state: newAddrState, zip_code: newAddrCep,
+    };
+
+    // Save to DB if customer has CPF
+    if (selectedCustomer && selectedCustomer.cpf !== "000.000.000-00") {
+      await supabase.from("customer_addresses").insert({
+        customer_cpf: selectedCustomer.cpf,
+        customer_name: selectedCustomer.name,
+        customer_phone: selectedCustomer.phone,
+        street: addr.street, number: addr.number, complement: addr.complement,
+        neighborhood: addr.neighborhood, city: addr.city, state: addr.state, zip_code: addr.zip_code,
+      });
+    }
+
+    applyAddress(addr);
+    setShowAddressDialog(false);
+    resetNewAddrForm();
+    toast.success("Endereço selecionado!");
+  };
+
+  const resetNewAddrForm = () => {
+    setShowNewAddressForm(false);
+    setNewAddrCep(""); setNewAddrStreet(""); setNewAddrNumber("");
+    setNewAddrComplement(""); setNewAddrNeighborhood(""); setNewAddrCity(""); setNewAddrState("");
   };
 
   const clearForm = () => {
@@ -329,6 +480,9 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentType(""); setSelectedTableId("");
+    setSelectedCustomer(null);
+    setSelectedAddress(null);
+    setShowNewClientForm(false);
   };
 
   const insertOrderItems = async (orderId: string) => {
@@ -366,12 +520,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
       .maybeSingle();
 
     if (existing) {
-      // Update name/phone if changed
       await supabase.from("customers").update({
         name, phone,
       }).eq("id", existing.id);
     } else {
-      // Create new
       await supabase.from("customers").insert({
         restaurant_id: restaurantId,
         cpf: customerCpf,
@@ -482,8 +634,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
 
       // Deduct stock for PDV orders that start in 'preparing' (trigger misses them)
       if (orderType !== "mesa") {
-        // For delivery/retirada/viagem, order starts at 'preparing' but items are inserted after
-        // The trigger fires on status change but items don't exist yet, so we manually deduct
         const lastOrder = await supabase.from("orders")
           .select("id, order_items(id)")
           .eq("restaurant_id", restaurantId)
@@ -568,7 +718,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     await supabase.from("bills").update({ status: "cancelled" })
       .eq("table_id", table.id).neq("status", "paid");
 
-    // Create paid bills for each active comanda to trigger customer logout via realtime
     const { data: activeComandas } = await supabase.from("comandas")
       .select("id").eq("table_id", table.id).eq("status", "active");
     if (activeComandas && activeComandas.length > 0) {
@@ -640,7 +789,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
       <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
         {/* Left: Tables Grid */}
         <div className="flex-1 flex flex-col min-h-0">
-          {/* Order Search Bar + Date Filter */}
+          {/* Order Search Bar */}
           <div className="flex gap-2 mb-2 flex-shrink-0">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -659,7 +808,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
             </div>
           </div>
 
-          {/* Search Results (scrollable) */}
+          {/* Search Results */}
           {(orderSearchTerm.length >= 2) && (
             <div className="mb-2 flex-shrink-0">
               {filteredOrders.length === 0 && orderSearchTerm.length >= 2 ? (
@@ -732,7 +881,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                 const isOccupied = table.is_occupied;
                 const comandaCount = table.comandas?.length || 0;
                 const isSelected = selectedTableId === table.id;
-                const pending = pendingByTable.get(table.id);
                 const occupiedSince = table.occupied_at ? format(new Date(table.occupied_at), "HH:mm") : null;
                 return (
                   <Card
@@ -786,7 +934,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                           🔔 Pedido Novo
                         </Badge>
                       )}
-                      {/* Reservation badge for non-occupied tables */}
                       {!isOccupied && reservationByTable.has(table.id) && (
                         <Badge className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100">
                           🕐 Reservado {reservationByTable.get(table.id)!.time}
@@ -798,13 +945,11 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                       {isOccupied && occupiedSince && showPrepTimer && (
                         <p className="text-[10px] text-muted-foreground">Desde {occupiedSince}</p>
                       )}
-                      {/* Always show customer names from active comandas */}
                       {isOccupied && table.comandas && table.comandas.length > 0 && (
                         <div className="text-[10px] text-muted-foreground truncate">
                           {table.comandas.map(c => c.customer_name).join(", ")}
                         </div>
                       )}
-                      {/* Always show item count from all active orders */}
                       {(() => {
                         const active = activeByTable.get(table.id);
                         if (!active || active.itemCount === 0) return null;
@@ -823,8 +968,8 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         </div>
 
         {/* Right: Order Creation Panel (always visible) */}
-        <div className="w-[420px] flex-shrink-0 border-l pl-4 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-3">
+        <div className="w-[520px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-lg">Novo Pedido</h3>
             {cart.length > 0 && (
               <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
@@ -834,7 +979,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           </div>
 
           <ScrollArea className="flex-1">
-            <div className="space-y-4 pr-2">
+            <div className="space-y-5 pr-3">
               {/* Order type tabs */}
               <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)}>
                 <TabsList className="w-full grid grid-cols-4">
@@ -845,48 +990,111 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                 </TabsList>
               </Tabs>
 
-              {/* Customer */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold">Cliente</Label>
-                  <Button variant="ghost" size="sm" onClick={() => setIsCustomerSelectOpen(true)} className="h-6 text-xs">
-                    <UserPlus className="w-3 h-3 mr-1" /> Buscar
-                  </Button>
-                </div>
-                <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => {
-                  setCustomerCpf(e.target.value);
-                  // Auto-lookup customer by CPF
-                  const clean = e.target.value.replace(/\D/g, "");
-                  if (clean.length === 11) {
-                    supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", e.target.value).maybeSingle()
-                      .then(({ data }) => {
-                        if (data) {
-                          setCustomerName(data.name);
-                          setCustomerPhone(data.phone || "");
-                        }
-                      });
-                  }
-                }} className="h-8 text-sm" />
-                <Input placeholder="Nome" value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-8 text-sm" />
-                <Input placeholder="Celular" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-8 text-sm" />
+              {/* Customer Section — Compact */}
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <p className="text-sm font-medium text-muted-foreground mb-3">Cliente</p>
+
+                {!selectedCustomer && (
+                  <>
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1" onClick={() => setIsCustomerSelectOpen(true)}>
+                        <Search className="w-4 h-4 mr-2" />
+                        Buscar Cliente
+                      </Button>
+                      <Button variant="outline" className="flex-1" onClick={() => setShowNewClientForm(!showNewClientForm)}>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Criar Novo
+                      </Button>
+                    </div>
+
+                    <Collapsible open={showNewClientForm} onOpenChange={setShowNewClientForm}>
+                      <CollapsibleContent className="mt-3 space-y-3">
+                        <div>
+                          <Label className="text-xs mb-1.5 block">CPF (opcional)</Label>
+                          <Input placeholder="000.000.000-00" value={newClientCpf} onChange={e => setNewClientCpf(e.target.value)} className="h-9 text-sm" />
+                        </div>
+                        <div>
+                          <Label className="text-xs mb-1.5 block">Nome</Label>
+                          <Input placeholder="Nome do cliente" value={newClientName} onChange={e => setNewClientName(e.target.value)} className="h-9 text-sm" />
+                        </div>
+                        <div>
+                          <Label className="text-xs mb-1.5 block">Celular</Label>
+                          <Input placeholder="(00) 00000-0000" value={newClientPhone} onChange={e => setNewClientPhone(e.target.value)} className="h-9 text-sm" />
+                        </div>
+                        <Button size="sm" onClick={handleSaveNewClient} disabled={savingNewClient} className="w-full">
+                          {savingNewClient ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                          Salvar Cliente
+                        </Button>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </>
+                )}
+
+                {selectedCustomer && (
+                  <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                    <div>
+                      <p className="text-sm font-medium">{selectedCustomer.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedCustomer.phone || "Sem telefone"}
+                        {selectedCustomer.cpf && selectedCustomer.cpf !== "000.000.000-00" && ` • ${selectedCustomer.cpf}`}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={clearCustomer} className="h-8 w-8 p-0">
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
-              {/* Type-specific fields */}
+              {/* Delivery Address Section */}
               {orderType === "delivery" && (
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Endereço</Label>
-                  <Input placeholder="CEP" value={deliveryCep} onChange={e => handleCepLookup(e.target.value)} className="h-8 text-sm" />
-                  <Input placeholder="Rua" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} className="h-8 text-sm" />
-                  <Input placeholder="Bairro" value={deliveryNeighborhood} onChange={e => setDeliveryNeighborhood(e.target.value)} className="h-8 text-sm" />
-                  <Input placeholder="Cidade" value={deliveryCity} onChange={e => setDeliveryCity(e.target.value)} className="h-8 text-sm" />
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">Endereço de Entrega</p>
+
+                  {!selectedCustomer && (
+                    <p className="text-sm text-muted-foreground italic">
+                      Selecione um cliente para ver os endereços salvos
+                    </p>
+                  )}
+
+                  {selectedCustomer && !selectedAddress && (
+                    <div className="border border-dashed rounded-lg p-3 text-center text-sm text-muted-foreground">
+                      Endereço do cliente buscado aparecerá aqui
+                    </div>
+                  )}
+
+                  {selectedAddress && (
+                    <div className="p-3 bg-background rounded-lg border text-sm">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium">{selectedAddress.street}{selectedAddress.number ? `, ${selectedAddress.number}` : ""}</p>
+                          <p className="text-muted-foreground">{selectedAddress.neighborhood} — {selectedAddress.city}{selectedAddress.state ? ` - ${selectedAddress.state}` : ""}</p>
+                          {selectedAddress.complement && <p className="text-muted-foreground text-xs">{selectedAddress.complement}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedCustomer && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => { fetchCustomerAddresses(); setShowAddressDialog(true); }}
+                    >
+                      {selectedAddress ? "Alterar endereço" : "Selecionar endereço"}
+                    </Button>
+                  )}
                 </div>
               )}
 
+              {/* Mesa selector */}
               {orderType === "mesa" && (
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Mesa</Label>
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold mb-1.5 block">Mesa</Label>
                   <Select value={selectedTableId} onValueChange={setSelectedTableId}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Selecione uma mesa" /></SelectTrigger>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione uma mesa" /></SelectTrigger>
                     <SelectContent>
                       {tables?.map(t => (
                         <SelectItem key={t.id} value={t.id}>
@@ -899,19 +1107,16 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
               )}
 
               {/* Notes */}
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Observações</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold mb-1.5 block">Observações</Label>
                 <Textarea placeholder="Observações..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[50px] text-sm" />
               </div>
 
               {/* Payment */}
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Pagamento</Label>
-                <Select value={paymentType} onValueChange={(v) => {
-                  // If switching away from card type, clear brand suffix
-                  setPaymentType(v);
-                }}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold mb-1.5 block">Pagamento</Label>
+                <Select value={paymentType} onValueChange={(v) => setPaymentType(v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Dinheiro</SelectItem>
                     <SelectItem value="debit">Débito</SelectItem>
@@ -920,15 +1125,12 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                     <SelectItem value="meal_voucher">Vale Refeição</SelectItem>
                   </SelectContent>
                 </Select>
-                {/* Card brand selection for credit/debit */}
                 {(paymentType === "credit" || paymentType === "debit" || paymentType.startsWith("Crédito") || paymentType.startsWith("Débito")) && (
                   <Select
-                    value={
-                      paymentType.includes(" - ") ? paymentType : ""
-                    }
+                    value={paymentType.includes(" - ") ? paymentType : ""}
                     onValueChange={(v) => setPaymentType(v)}
                   >
-                    <SelectTrigger className="h-8 text-sm">
+                    <SelectTrigger className="h-9 text-sm">
                       <SelectValue placeholder="Selecione a bandeira do cartão" />
                     </SelectTrigger>
                     <SelectContent>
@@ -954,19 +1156,18 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
               </div>
 
               {/* Products search + grid */}
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Produtos</Label>
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold mb-1.5 block">Produtos</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8 h-8 text-sm" />
+                  <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8 h-9 text-sm" />
                 </div>
-                <div className="grid grid-cols-2 gap-1.5 max-h-[240px] overflow-y-auto">
+                <div className="grid grid-cols-2 gap-2 max-h-[260px] overflow-y-auto">
                   {filteredProducts.map(product => (
                     <Card
                       key={product.id}
                       className="cursor-pointer hover:shadow-md transition-shadow"
                       onClick={async () => {
-                        // Fetch complements for this product
                         const { data: complementGroups } = await supabase
                           .from("product_complement_groups")
                           .select("extra_category_id, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
@@ -995,16 +1196,16 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                         setIsProductDrawerOpen(true);
                       }}
                     >
-                      <CardContent className="p-1.5 space-y-0.5">
+                      <CardContent className="p-2 space-y-0.5">
                         {product.image_url ? (
-                          <img src={product.image_url} alt={product.name} className="w-full h-12 object-cover rounded" />
+                          <img src={product.image_url} alt={product.name} className="w-full h-14 object-cover rounded" />
                         ) : (
-                          <div className="w-full h-12 bg-muted rounded flex items-center justify-center text-sm font-bold text-muted-foreground">
+                          <div className="w-full h-14 bg-muted rounded flex items-center justify-center text-sm font-bold text-muted-foreground">
                             {product.name.charAt(0)}
                           </div>
                         )}
-                        <p className="text-[11px] font-medium truncate">{product.name}</p>
-                        <p className="text-[11px] font-bold text-primary">R$ {product.price.toFixed(2)}</p>
+                        <p className="text-xs font-medium truncate">{product.name}</p>
+                        <p className="text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
                       </CardContent>
                     </Card>
                   ))}
@@ -1013,9 +1214,9 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
 
               {/* Cart Summary */}
               {cart.length > 0 && (
-                <div className="space-y-2 border-t pt-3">
+                <div className="space-y-2 border-t pt-4">
                   <h4 className="font-semibold text-sm flex items-center gap-1.5">
-                    <ShoppingCart className="w-3.5 h-3.5" /> Carrinho ({cart.length})
+                    <ShoppingCart className="w-4 h-4" /> Carrinho ({cart.length})
                   </h4>
                   {cart.map((item, i) => {
                     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
@@ -1075,6 +1276,87 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         onOpenChange={setIsCustomerSelectOpen}
         onSelect={handleCustomerSelect}
       />
+
+      {/* Address Dialog */}
+      <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Selecionar Endereço</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+            {customerAddresses.length > 0 && (
+              <div className="space-y-2">
+                {customerAddresses.map((addr: any) => (
+                  <div
+                    key={addr.id}
+                    className="p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => {
+                      applyAddress({
+                        street: addr.street, number: addr.number, complement: addr.complement || "",
+                        neighborhood: addr.neighborhood, city: addr.city, state: addr.state, zip_code: addr.zip_code,
+                      });
+                      setShowAddressDialog(false);
+                      toast.success("Endereço selecionado!");
+                    }}
+                  >
+                    <p className="text-sm font-medium">{addr.street}, {addr.number}</p>
+                    <p className="text-xs text-muted-foreground">{addr.neighborhood} — {addr.city} - {addr.state}</p>
+                    {addr.is_default && <Badge variant="secondary" className="text-[10px] mt-1">Padrão</Badge>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {customerAddresses.length === 0 && !showNewAddressForm && (
+              <p className="text-sm text-muted-foreground text-center py-2">Nenhum endereço salvo</p>
+            )}
+
+            <Button variant="outline" size="sm" className="w-full" onClick={() => setShowNewAddressForm(!showNewAddressForm)}>
+              <Plus className="w-4 h-4 mr-2" /> Novo endereço
+            </Button>
+
+            {showNewAddressForm && (
+              <div className="space-y-3 border-t pt-3">
+                <div>
+                  <Label className="text-xs mb-1.5 block">CEP</Label>
+                  <Input placeholder="00000-000" value={newAddrCep} onChange={e => handleNewAddrCepLookup(e.target.value)} className="h-9 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs mb-1.5 block">Rua</Label>
+                  <Input placeholder="Rua" value={newAddrStreet} onChange={e => setNewAddrStreet(e.target.value)} className="h-9 text-sm" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs mb-1.5 block">Número</Label>
+                    <Input placeholder="Nº" value={newAddrNumber} onChange={e => setNewAddrNumber(e.target.value)} className="h-9 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1.5 block">Complemento</Label>
+                    <Input placeholder="Apto, Bloco..." value={newAddrComplement} onChange={e => setNewAddrComplement(e.target.value)} className="h-9 text-sm" />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs mb-1.5 block">Bairro</Label>
+                  <Input placeholder="Bairro" value={newAddrNeighborhood} onChange={e => setNewAddrNeighborhood(e.target.value)} className="h-9 text-sm" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs mb-1.5 block">Cidade</Label>
+                    <Input placeholder="Cidade" value={newAddrCity} onChange={e => setNewAddrCity(e.target.value)} className="h-9 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1.5 block">Estado</Label>
+                    <Input placeholder="UF" value={newAddrState} onChange={e => setNewAddrState(e.target.value)} className="h-9 text-sm" />
+                  </div>
+                </div>
+                <Button size="sm" onClick={handleSaveNewAddress} className="w-full">
+                  Confirmar Endereço
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Table Detail Dialog */}
       <TableDetailDialog
