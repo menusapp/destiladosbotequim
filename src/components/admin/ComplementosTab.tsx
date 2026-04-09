@@ -105,59 +105,30 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
       categoryId = data.id;
     }
 
-    // Sync product links
+    // Sync product links via product_complement_groups
     if (categoryId) {
       const productsToAdd = [...selectedProductIds].filter(id => !originalProductIds.has(id));
       const productsToRemove = [...originalProductIds].filter(id => !selectedProductIds.has(id));
 
-      // Remove deselected — delete their product_extra_ingredients first, then product_extras
+      // Remove deselected products from product_complement_groups
       if (productsToRemove.length > 0) {
-        const { data: extrasToRemove } = await supabase
-          .from("product_extras")
-          .select("id")
+        await supabase.from("product_complement_groups").delete()
           .eq("extra_category_id", categoryId)
           .in("product_id", productsToRemove);
-        if (extrasToRemove && extrasToRemove.length > 0) {
-          const idsToRemove = extrasToRemove.map((e: any) => e.id);
-          await supabase.from("product_extra_ingredients").delete().in("product_extra_id", idsToRemove);
-        }
-        await supabase.from("product_extras").delete().eq("extra_category_id", categoryId).in("product_id", productsToRemove);
       }
 
-      // Add newly selected — create product_extras + ingredients
+      // Add newly selected products to product_complement_groups
       if (productsToAdd.length > 0) {
-        const { data: catItems } = await supabase
-          .from("extra_category_items")
-          .select("id, name, price, extra_category_item_ingredients(id, stock_item_id, quantity)")
-          .eq("category_id", categoryId);
-        if (catItems && catItems.length > 0) {
-          for (const productId of productsToAdd) {
-            for (const item of catItems) {
-              const { data: newExtra } = await supabase.from("product_extras").insert({
-                product_id: productId,
-                extra_category_id: categoryId,
-                name: item.name,
-                price: item.price,
-              }).select("id").single();
-
-              if (newExtra && item.extra_category_item_ingredients && item.extra_category_item_ingredients.length > 0) {
-                const ingredientInserts = item.extra_category_item_ingredients.map((ing: any) => ({
-                  product_extra_id: newExtra.id,
-                  stock_item_id: ing.stock_item_id,
-                  quantity: ing.quantity,
-                }));
-                await supabase.from("product_extra_ingredients").insert(ingredientInserts);
-              }
-            }
-          }
-        }
-      }
-
-      // Full sync for products that stayed linked (repairs broken data + propagates changes)
-      const productsStaying = [...selectedProductIds].filter(id => originalProductIds.has(id));
-      if (productsStaying.length > 0) {
-        // Sync all linked products (including staying ones) to fix broken ingredient data
-        await syncCategoryToProducts(categoryId);
+        // Get max display_order for each product to append at the end
+        const groupsInserts = productsToAdd.map(productId => ({
+          product_id: productId,
+          extra_category_id: categoryId!,
+          is_required: false,
+          min_selection: 0,
+          max_selection: null as number | null,
+          display_order: 999,
+        }));
+        await supabase.from("product_complement_groups").insert(groupsInserts);
       }
     }
 
