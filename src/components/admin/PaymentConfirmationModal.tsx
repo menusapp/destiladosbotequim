@@ -383,6 +383,12 @@ export const PaymentConfirmationModal = ({
                 <span className="font-medium">R$ {feeAmount.toFixed(2)}</span>
               </div>
             )}
+            {couponDiscount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Desconto:</span>
+                <span className="font-medium">- R$ {couponDiscount.toFixed(2)}</span>
+              </div>
+            )}
             {splitsPaidTotal > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Já pago via divisões:</span>

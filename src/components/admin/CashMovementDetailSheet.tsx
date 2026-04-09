@@ -4,9 +4,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, CreditCard, User, Package, FileText, Store, Truck, Monitor } from "lucide-react";
+import { MapPin, CreditCard, User, Package, FileText, Store, Truck, Monitor, Smartphone } from "lucide-react";
 import { format } from "date-fns";
 import { formatPaymentMethod } from "@/lib/utils";
+import { getOrderOriginLabel } from "@/lib/orderOrigin";
 
 interface CashMovement {
   id: string;
@@ -18,6 +19,7 @@ interface CashMovement {
   created_by: string;
   created_at: string;
   bill_id: string | null;
+  order_id: string | null;
 }
 
 interface OrderDetail {
@@ -37,6 +39,11 @@ interface OrderDetail {
   created_at: string;
   table_id: string | null;
   status: string;
+  pdv_source: boolean | null;
+  order_channel: string | null;
+  dd_source: boolean | null;
+  ifood_source: boolean | null;
+  delivery_phone: string | null;
   order_items: {
     id: string;
     quantity: number;
@@ -95,15 +102,36 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
       return;
     }
 
-    if (movement.bill_id) {
+    // Priority: order_id > bill_id > manual
+    if (movement.order_id) {
+      fetchOrderById(movement.order_id);
+    } else if (movement.bill_id) {
       fetchBillDetails(movement.bill_id);
     }
   }, [open, movement]);
 
+  const fetchOrderById = async (orderId: string) => {
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from("orders")
+        .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name, extra_categories(name)))), tables(table_number, table_name)`)
+        .eq("id", orderId)
+        .maybeSingle();
+
+      if (data) {
+        setOrderDetail(data as any);
+      }
+    } catch (err) {
+      console.error("Error fetching order by id:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchBillDetails = async (billId: string) => {
     setLoading(true);
     try {
-      // Try to find an order linked via the bill's comanda or table
       const { data: bill } = await supabase
         .from("bills")
         .select("*, tables(table_number, table_name), comanda_id")
@@ -112,7 +140,6 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
 
       if (!bill) { setLoading(false); return; }
 
-      // Try finding orders for this table that are linked to the bill's comanda
       if (bill.comanda_id) {
         const { data: orders } = await supabase
           .from("orders")
@@ -128,7 +155,6 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
         }
       }
 
-      // Try finding counter_orders for this table around the bill's creation time
       const { data: counterOrders } = await supabase
         .from("counter_orders")
         .select(`*, counter_order_items(*, products(name), counter_order_item_extras(*, product_extras(name, extra_categories(name)))), tables(table_number, table_name)`)
@@ -144,7 +170,6 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
         return;
       }
 
-      // Fallback: try orders by table_id
       const { data: tableOrders } = await supabase
         .from("orders")
         .select(`*, order_items(*, products(name), order_item_extras(extra_name, price_at_order, product_extras(name, extra_categories(name)))), tables(table_number, table_name)`)
@@ -164,15 +189,10 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
     }
   };
 
-  const getOriginLabel = (order: OrderDetail) => {
-    if (order.order_type === "delivery") {
-      return order.delivery_type === "pickup" ? "Retirada no Local" : "Delivery";
-    }
-    const tableName = order.tables?.table_name || `Mesa ${order.tables?.table_number || "?"}`;
-    return `${tableName} via QR Code`;
-  };
-
   const getOriginIcon = (order: OrderDetail) => {
+    if (order.ifood_source || order.dd_source) return <Truck className="h-4 w-4" />;
+    if (order.order_channel === "totem") return <Smartphone className="h-4 w-4" />;
+    if (order.pdv_source) return <Store className="h-4 w-4" />;
     if (order.order_type === "delivery") return <Truck className="h-4 w-4" />;
     return <Monitor className="h-4 w-4" />;
   };
@@ -266,12 +286,12 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Responsavel:</span>
+            <span className="text-muted-foreground">Responsável:</span>
             <span className="font-medium">{movement.created_by}</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <FileText className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Descricao:</span>
+            <span className="text-muted-foreground">Descrição:</span>
             <span className="font-medium">{movement.description}</span>
           </div>
           {movement.category && (
@@ -310,8 +330,23 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
     const discount = (orderDetail.coupon_discount || 0) + (orderDetail.loyalty_points_used || 0);
     const total = subtotal + deliveryFee - discount;
 
+    const originLabel = getOrderOriginLabel(orderDetail);
+
+    // Extract discount reason from notes
+    const discountReasonMatch = orderDetail.notes?.match(/\[Desconto: (.+?)\]/);
+    const discountReason = discountReasonMatch ? discountReasonMatch[1] : null;
+
     return (
       <div className="space-y-4 pt-2">
+        {/* PDV source indicator */}
+        {orderDetail.pdv_source && (
+          <div className="flex items-center gap-2 text-sm">
+            <Store className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Responsável:</span>
+            <span className="font-medium">Sistema</span>
+          </div>
+        )}
+
         {/* Cliente */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm">
@@ -319,9 +354,15 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
             <span className="font-medium">{orderDetail.customer_name}</span>
             {orderDetail.customer_cpf && <span className="text-xs text-muted-foreground">({orderDetail.customer_cpf})</span>}
           </div>
+          {orderDetail.delivery_phone && (
+            <div className="flex items-center gap-2 text-sm">
+              <Smartphone className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">{orderDetail.delivery_phone}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 text-sm">
             {getOriginIcon(orderDetail)}
-            <Badge variant="secondary" className="text-xs">{getOriginLabel(orderDetail)}</Badge>
+            <Badge variant="secondary" className="text-xs">{originLabel}</Badge>
           </div>
           {orderDetail.delivery_address && (
             <div className="flex items-start gap-2 text-sm">
@@ -354,8 +395,8 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
           <>
             <Separator />
             <div className="text-sm">
-              <p className="text-muted-foreground font-medium mb-1">Observacoes:</p>
-              <p className="italic">{orderDetail.notes}</p>
+              <p className="text-muted-foreground font-medium mb-1">Observações:</p>
+              <p className="italic">{orderDetail.notes.replace(/\[Desconto: .+?\]\s*/g, "").trim() || orderDetail.notes}</p>
             </div>
           </>
         )}
@@ -366,7 +407,12 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>R$ {subtotal.toFixed(2)}</span></div>
           {deliveryFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Taxa de entrega</span><span>R$ {deliveryFee.toFixed(2)}</span></div>}
-          {discount > 0 && <div className="flex justify-between text-emerald-600"><span>Desconto</span><span>-R$ {discount.toFixed(2)}</span></div>}
+          {discount > 0 && (
+            <div className="flex justify-between text-emerald-600">
+              <span>Desconto{discountReason ? ` (${discountReason})` : ""}</span>
+              <span>-R$ {discount.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between font-bold text-base pt-1 border-t">
             <span>Total</span><span>R$ {total.toFixed(2)}</span>
           </div>
@@ -388,7 +434,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Store className="h-4 w-4 text-muted-foreground" />
-            <Badge variant="secondary" className="text-xs">Balcao PDV - {tableName}</Badge>
+            <Badge variant="secondary" className="text-xs">Balcão PDV - {tableName}</Badge>
           </div>
           {counterDetail.payment_method && (
             <div className="flex items-center gap-2 text-sm">
@@ -411,7 +457,7 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
           <>
             <Separator />
             <div className="text-sm">
-              <p className="text-muted-foreground font-medium mb-1">Observacoes:</p>
+              <p className="text-muted-foreground font-medium mb-1">Observações:</p>
               <p className="italic">{counterDetail.notes}</p>
             </div>
           </>
@@ -431,9 +477,10 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
   };
 
   const hasBillDetail = movement?.bill_id;
-  const title = hasBillDetail
-    ? (orderDetail ? "Espelho do Pedido" : counterDetail ? "Espelho do Pedido (PDV)" : "Detalhes da Movimentacao")
-    : "Detalhes da Movimentacao";
+  const hasOrderDetail = movement?.order_id;
+  const title = hasOrderDetail || hasBillDetail
+    ? (orderDetail ? "Espelho do Pedido" : counterDetail ? "Espelho do Pedido (PDV)" : "Detalhes da Movimentação")
+    : "Detalhes da Movimentação";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -442,14 +489,14 @@ export default function CashMovementDetailSheet({ movement, open, onOpenChange }
           <SheetTitle>{title}</SheetTitle>
           {movement && (
             <p className="text-xs text-muted-foreground">
-              {format(new Date(movement.created_at), "dd/MM/yyyy 'as' HH:mm")}
+              {format(new Date(movement.created_at), "dd/MM/yyyy 'às' HH:mm")}
             </p>
           )}
         </SheetHeader>
         <ScrollArea className="h-[calc(100vh-100px)] mt-4 pr-2">
           {loading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">Carregando...</div>
-          ) : hasBillDetail ? (
+          ) : (hasOrderDetail || hasBillDetail) ? (
             orderDetail ? renderOrderDetail() : counterDetail ? renderCounterDetail() : renderManualMovement()
           ) : (
             renderManualMovement()
