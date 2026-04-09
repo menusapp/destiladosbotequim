@@ -603,16 +603,18 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     const { data: groupsData, error: groupsError } = await supabase
       .from("product_complement_groups")
       .select("*, extra_categories(id, name, extra_category_items(id, name, price))")
-      .eq("product_id", product.id);
+      .eq("product_id", product.id)
+      .order("display_order");
 
     if (groupsError) {
       console.error("Erro ao buscar complementos vinculados:", groupsError);
       toast.error("Erro ao carregar complementos do produto");
     }
 
-    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any) => ({
+    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any, idx: number) => ({
       id: g.id, extra_category_id: g.extra_category_id, category_name: g.extra_categories?.name || "",
       is_required: g.is_required || false, min_selection: g.min_selection || 0, max_selection: g.max_selection,
+      display_order: g.display_order ?? idx,
       items: g.extra_categories?.extra_category_items || []
     }));
 
