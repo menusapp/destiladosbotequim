@@ -717,7 +717,8 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           delivery_address: deliveryAddress || undefined,
           delivery_phone: customerPhone || undefined,
           payment_type: paymentType || undefined,
-          notes: notes || undefined,
+          notes: (notes || "") + (discountNotes ? ` [Desconto: ${discountNotes}]` : ""),
+          coupon_discount: calculatedDiscount > 0 ? calculatedDiscount : undefined,
           order_items: cart.map((item, i) => ({
             id: `item-${i}`,
             quantity: item.quantity,
