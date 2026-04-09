@@ -21,7 +21,6 @@ import {
   Plug,
   Monitor,
   Bot,
-  Bot,
 } from "lucide-react";
 import {
   Sidebar,
