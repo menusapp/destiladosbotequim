@@ -1,44 +1,40 @@
 
 
-## Plano: Limpar duplicações e simplificar a Landing Page
+## Plano: Fortalecer landing page com WhatsApp, screenshots reais, promessa forte e diferenciação
 
-### Problema
-A página tem conteúdo duplicado em várias seções e a área de features usa carrossel quando deveria mostrar tudo de uma vez em grid compacto.
+### Mudanças
 
----
+**1. Adicionar seção WhatsApp entre Financeiro e Features Grid (nova seção)**
+- Layout split-screen: texto à esquerda, imagem do WhatsApp (image-16.png) à direita
+- Título: "Marketing automático e central de alertas no WhatsApp"
+- Texto descritivo conforme solicitado
+- 4 bullets: Remarketing automático, Cupons personalizados, Notificações de pedido, Segmentação inteligente
+- Copiar image-16.png para `src/assets/landing-whatsapp.png`
 
-### 1. Remover duplicações no array `allFeatures`
+**2. Substituir mockups por screenshots reais**
+- Seção "Gestor de pedidos completo" (seção 3): trocar o mockup de cards de pedido pelo screenshot do PDV (image-17.png → `src/assets/landing-pdv.png`)
+- Seção "Visão completa do seu negócio" (seção 4): trocar o DRE mockup pelo screenshot do Relatório DRE (image-18.png → `src/assets/landing-dre.png`)
+- Ambas as imagens renderizadas como `<img>` com `rounded-2xl border shadow-xl`
 
-Reduzir de 20 itens para ~12, eliminando repetições:
-- **Remover**: "Sem comissão" (já tem "Delivery sem comissão"), "Delivery próprio" (idem), "IA integrada" (já tem "Robô IA Vendedor"), "Mais pedidos", "Mais rápido", "Mais lucro", "Organização" (são vagos e não agregam)
-- **Manter**: Cardápio, Delivery sem comissão, PDV, Robô IA, Estoque, Relatórios/DRE, NFC-e, Fidelidade/CRM, Marketing WhatsApp, Pagamento online, Impressão, Reservas
+**3. Fortalecer promessa no Hero**
+- Subtítulo atual genérico → trocar para algo com promessa direta de resultado:
+  - "Pare de perder pedidos. Aumente suas vendas sem pagar comissão. Automatize seu restaurante em minutos."
 
-### 2. Trocar carrossel por grid compacto
+**4. Adicionar diferenciação clara**
+- Após o hero badge "Usado por mais de 500 restaurantes", adicionar uma linha de diferenciadores compactos abaixo do subtítulo:
+  - "✓ Zero comissão por pedido  ✓ Robô IA que vende 24h  ✓ DRE automático  ✓ Parceiro de integração iFood"
 
-Substituir o scroll horizontal (seção 5) por um grid responsivo com cards pequenos:
-- Mobile: 2 colunas
-- Tablet: 3 colunas
-- Desktop: 4 colunas
-- Cards menores: ícone + título + descrição de 1 linha
-- Remover toda a lógica de scroll (ref, arrows, scrollCarousel function)
+**5. Fortalecer prova social com números mais impactantes**
+- Trocar textos dos depoimentos para incluir resultados mensuráveis (ex: "Triplicamos pedidos" → "Saí de 15 para 45 pedidos/dia no primeiro mês")
+- Manter a seção de métricas (500+, 50k+, etc.)
 
-### 3. Fundir "Oferta/Teste grátis" (seção 8) com "CTA Final" (seção 11)
+**6. Menção discreta ao iFood**
+- Na seção de segmentos ou no footer, adicionar um texto pequeno: "Parceiro de integração iFood" com ícone sutil
+- Alternativa: incluir no badge de diferenciadores do hero
 
-Ambas dizem "começar grátis / 7 dias / sem cartão". Remover a seção 11 (CTA Final) e manter apenas a seção 8 (Oferta) que é mais impactante com fundo laranja.
-
-### 4. Reduzir FAQs
-
-De 9 para 6 perguntas, removendo as mais óbvias ou redundantes:
-- Remover: "Preciso de equipamentos especiais?" (similar a "Preciso instalar app?"), "O sistema funciona offline?" (pouco relevante), "Quanto tempo leva para configurar?" (já dito no hero)
-
----
-
-### Resultado esperado
-- ~20% menos conteúdo vertical
-- Zero duplicação de mensagem
-- Features visíveis de uma vez sem scroll
-- Página mais limpa e objetiva
-
-### Arquivo modificado
-- `src/pages/LandingPage.tsx`
+### Arquivos modificados
+- `src/pages/LandingPage.tsx` — todas as mudanças acima
+- `src/assets/landing-whatsapp.png` — copiado de upload
+- `src/assets/landing-pdv.png` — copiado de upload
+- `src/assets/landing-dre.png` — copiado de upload
 
