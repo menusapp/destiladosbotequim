@@ -44,15 +44,12 @@ const plans = [
 
 /* ── FAQs ── */
 const faqs = [
-  { q: "Preciso instalar algum aplicativo?", a: "Não! O Menus App funciona 100% no navegador. Seus clientes acessam o cardápio pelo link ou QR Code sem baixar nada." },
+  { q: "Preciso instalar algum aplicativo?", a: "Não! O Menus App funciona 100% no navegador. Seus clientes acessam o cardápio pelo link ou QR Code sem baixar nada. Funciona em qualquer dispositivo." },
   { q: "Posso cancelar a qualquer momento?", a: "Sim, sem fidelidade e sem multa. Cancele quando quiser." },
   { q: "Como funciona o delivery?", a: "Você tem seu próprio sistema de delivery com zonas de entrega, taxas configuráveis e acompanhamento de pedidos. Zero comissão." },
   { q: "O sistema emite nota fiscal?", a: "Sim! No plano Avançado você tem emissão de NFC-e integrada diretamente ao SEFAZ." },
   { q: "Como funciona o Robô IA?", a: "O Robô IA conversa com seus clientes pelo WhatsApp, sugere produtos, tira dúvidas e finaliza pedidos automaticamente." },
   { q: "Como funciona o marketing por WhatsApp?", a: "Crie campanhas automáticas de remarketing. Cliente inativo recebe cupom, pedido confirmado dispara notificação — tudo sem você levantar um dedo." },
-  { q: "Preciso de equipamentos especiais?", a: "Não. Qualquer computador, tablet ou celular com navegador funciona." },
-  { q: "Quanto tempo leva para configurar?", a: "Menos de 2 minutos para criar a conta. Seu cardápio pode estar no ar no mesmo dia." },
-  { q: "O sistema funciona offline?", a: "O sistema precisa de internet, mas funciona em qualquer dispositivo com navegador — sem app para instalar." },
 ];
 
 /* ── Pain Points ── */
@@ -79,43 +76,25 @@ const painPoints = [
   },
 ];
 
-/* ── All Features (carousel) ── */
+/* ── All Features (grid) ── */
 const allFeatures = [
-  { icon: QrCode, title: "Cardápio personalizado", desc: "QR Code por mesa, sua marca e fotos em alta resolução." },
-  { icon: Truck, title: "Delivery sem comissão", desc: "Zonas de entrega, taxas configuráveis. Zero comissão." },
-  { icon: ShoppingCart, title: "PDV completo", desc: "Ponto de venda com atalhos, busca rápida e split." },
-  { icon: Bot, title: "Robô IA Vendedor", desc: "IA que conversa, sugere e fecha vendas no WhatsApp 24h." },
-  { icon: Package, title: "Estoque automático", desc: "Baixa automática, alertas e fichas técnicas." },
-  { icon: BarChart3, title: "Relatórios e DRE", desc: "Dashboard: vendas, DRE, fluxo de caixa e margens." },
-  { icon: Receipt, title: "Nota fiscal eletrônica", desc: "NFC-e integrada direto ao SEFAZ." },
-  { icon: BadgePercent, title: "Fidelidade e CRM", desc: "Programa de pontos, cupons e recompensas." },
-  { icon: Megaphone, title: "Marketing WhatsApp", desc: "Campanhas automáticas e remarketing." },
-  { icon: CreditCard, title: "Pagamento online", desc: "Pix e cartão integrados com Mercado Pago." },
-  { icon: Printer, title: "Impressão automática", desc: "Pedidos impressos direto na cozinha." },
-  { icon: CalendarCheck, title: "Reservas de mesas", desc: "Reservas online com gestão visual de mesas." },
-  { icon: DollarSign, title: "Sem comissão", desc: "Venda sem taxas sobre pedidos." },
-  { icon: TrendingUp, title: "Mais pedidos", desc: "Atendimento 24h automático." },
-  { icon: Timer, title: "Mais rápido", desc: "Setup em menos de 2 minutos." },
-  { icon: Wallet, title: "Mais lucro", desc: "Controle financeiro completo." },
-  { icon: LayoutGrid, title: "Organização", desc: "Tudo num só painel." },
-  { icon: BrainCircuit, title: "IA integrada", desc: "Robô que vende por você." },
-  { icon: MapPin, title: "Delivery próprio", desc: "Zonas e taxas configuráveis." },
-  { icon: Headphones, title: "Suporte dedicado", desc: "Time pronto para ajudar." },
+  { icon: QrCode, title: "Cardápio digital", desc: "QR Code, sua marca e fotos." },
+  { icon: Truck, title: "Delivery sem comissão", desc: "Zonas, taxas e zero comissão." },
+  { icon: ShoppingCart, title: "PDV completo", desc: "Atalhos, busca e split." },
+  { icon: Bot, title: "Robô IA Vendedor", desc: "Vende no WhatsApp 24h." },
+  { icon: Package, title: "Estoque automático", desc: "Baixa automática e alertas." },
+  { icon: BarChart3, title: "Relatórios e DRE", desc: "Vendas, fluxo e margens." },
+  { icon: Receipt, title: "NFC-e integrada", desc: "Nota fiscal direto ao SEFAZ." },
+  { icon: BadgePercent, title: "Fidelidade e CRM", desc: "Pontos, cupons e recompensas." },
+  { icon: Megaphone, title: "Marketing WhatsApp", desc: "Campanhas e remarketing." },
+  { icon: CreditCard, title: "Pagamento online", desc: "Pix e cartão integrados." },
+  { icon: Printer, title: "Impressão automática", desc: "Pedidos direto na cozinha." },
+  { icon: CalendarCheck, title: "Reservas de mesas", desc: "Reservas online e visual." },
 ];
 
 /* ── Component ── */
 const LandingPage = () => {
   const navigate = useNavigate();
-  const carouselRef = useRef<HTMLDivElement>(null);
-
-  const scrollCarousel = (direction: "left" | "right") => {
-    if (!carouselRef.current) return;
-    const scrollAmount = 320;
-    carouselRef.current.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
-  };
 
   return (
     <div className="min-h-screen bg-card overflow-x-hidden font-sans">
@@ -366,56 +345,29 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 5. TUDO QUE SEU RESTAURANTE PRECISA — CARROSSEL ═══ */}
+      {/* ═══ 5. TUDO QUE SEU RESTAURANTE PRECISA — GRID ═══ */}
       <section id="funcoes" className="py-16 sm:py-20 bg-background">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-10">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Funções</span>
             <h2 id="vantagens" className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Tudo que seu restaurante precisa</h2>
             <p className="mt-3 text-lg text-muted-foreground max-w-xl mx-auto">
-              Um sistema completo que substitui dezenas de ferramentas fragmentadas.
+              Um sistema completo que substitui dezenas de ferramentas.
             </p>
           </ScrollReveal>
 
-          <div className="relative">
-            {/* Left Arrow */}
-            <button
-              onClick={() => scrollCarousel("left")}
-              className="absolute -left-2 sm:-left-4 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full border border-border bg-card shadow-md flex items-center justify-center hover:bg-accent transition-colors"
-              aria-label="Anterior"
-            >
-              <ChevronLeft className="h-5 w-5 text-foreground" />
-            </button>
-
-            {/* Right Arrow */}
-            <button
-              onClick={() => scrollCarousel("right")}
-              className="absolute -right-2 sm:-right-4 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full border border-border bg-card shadow-md flex items-center justify-center hover:bg-accent transition-colors"
-              aria-label="Próximo"
-            >
-              <ChevronRight className="h-5 w-5 text-foreground" />
-            </button>
-
-            {/* Scrollable container */}
-            <div
-              ref={carouselRef}
-              className="flex gap-4 overflow-x-auto pb-4 px-6 snap-x snap-mandatory"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            >
-              <style>{`div::-webkit-scrollbar { display: none; }`}</style>
-              {allFeatures.map((f, i) => (
-                <div
-                  key={i}
-                  className="min-w-[260px] sm:min-w-[300px] snap-center flex-shrink-0 p-5 rounded-xl border border-border bg-card hover:shadow-md hover:border-primary/20 transition-all"
-                >
-                  <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {allFeatures.map((f, i) => (
+              <ScrollReveal key={i} delay={i * 50}>
+                <div className="p-4 rounded-xl border border-border bg-card hover:shadow-md hover:border-primary/20 transition-all h-full">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
                     <f.icon className="h-5 w-5 text-primary" />
                   </div>
-                  <h3 className="text-base font-bold text-foreground mb-1">{f.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                  <h3 className="text-sm font-bold text-foreground mb-1">{f.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
                 </div>
-              ))}
-            </div>
+              </ScrollReveal>
+            ))}
           </div>
         </div>
       </section>
@@ -613,26 +565,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 11. CTA FINAL ═══ */}
-      <section className="py-16 sm:py-20 bg-card">
-        <ScrollReveal>
-          <div className="max-w-3xl mx-auto px-4 text-center">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground mb-4 tracking-[-0.025em]">
-              Pronto para transformar seu restaurante?
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-              Comece hoje mesmo. Setup em menos de 2 minutos.
-            </p>
-            <Button size="lg" className="text-lg px-10 h-14 font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-[1.02] transition-all" onClick={() => navigate("/register")}>
-              Começar agora
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <p className="text-sm text-muted-foreground mt-3">
-              7 dias grátis • Sem cartão • Sem risco
-            </p>
-          </div>
-        </ScrollReveal>
-      </section>
 
       {/* ═══ FOOTER ═══ */}
       <footer className="border-t border-border bg-card py-10">
