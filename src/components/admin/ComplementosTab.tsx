@@ -138,7 +138,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const handleDeleteCategory = async () => {
     if (!deletingCategory) return;
-    // Delete product_extra_ingredients for all product_extras of this category
+    // Delete product_complement_groups for this category
+    await supabase.from("product_complement_groups").delete().eq("extra_category_id", deletingCategory.id);
+    // Delete legacy product_extras if any
     const { data: extrasToClean } = await supabase
       .from("product_extras")
       .select("id")
