@@ -34,15 +34,15 @@ const carouselItems = [
 
 /* ── Bento grid features ── */
 const bentoFeatures = [
-  { icon: QrCode, title: "Cardápio personalizado", desc: "QR Code por mesa, sua marca, cores e fotos em alta resolução.", span: "md:col-span-2" },
-  { icon: Users, title: "Fidelidade e CRM", desc: "Cadastro de clientes, programa de pontos, cupons e recompensas automáticas.", span: "" },
-  { icon: BrainCircuit, title: "Robô IA Vendedor", desc: "Inteligência artificial que atende, conversa e vende para seus clientes 24h, eliminando a necessidade de atendente humano.", span: "md:col-span-2" },
-  { icon: CreditCard, title: "Pagamento online", desc: "Pix e cartão de crédito integrados com Mercado Pago. Sem complicação.", span: "" },
-  { icon: Package, title: "Estoque automático", desc: "Baixa automática a cada venda. Alertas de estoque baixo e fichas técnicas.", span: "" },
-  { icon: BarChart3, title: "Relatórios e DRE", desc: "Dashboard completo: vendas, DRE automático, fluxo de caixa e margens.", span: "md:col-span-2" },
-  { icon: Receipt, title: "Nota fiscal eletrônica", desc: "Emissão de NFC-e integrada direto ao SEFAZ. Compliance sem dor de cabeça.", span: "" },
-  { icon: CalendarCheck, title: "Reservas de mesas", desc: "Sistema de reservas online com gestão visual de mesas e comandas digitais.", span: "" },
-  { icon: MessageSquare, title: "Marketing WhatsApp", desc: "Campanhas automáticas, remarketing por inatividade, cupons personalizados.", span: "md:col-span-2" },
+  { icon: QrCode, title: "Cardápio personalizado", desc: "QR Code por mesa, sua marca, cores e fotos em alta resolução." },
+  { icon: Users, title: "Fidelidade e CRM", desc: "Cadastro de clientes, programa de pontos, cupons e recompensas automáticas." },
+  { icon: BrainCircuit, title: "Robô IA Vendedor", desc: "Inteligência artificial que atende, conversa e vende para seus clientes 24h, eliminando a necessidade de atendente humano." },
+  { icon: CreditCard, title: "Pagamento online", desc: "Pix e cartão de crédito integrados com Mercado Pago. Sem complicação." },
+  { icon: Package, title: "Estoque automático", desc: "Baixa automática a cada venda. Alertas de estoque baixo e fichas técnicas." },
+  { icon: BarChart3, title: "Relatórios e DRE", desc: "Dashboard completo: vendas, DRE automático, fluxo de caixa e margens." },
+  { icon: Receipt, title: "Nota fiscal eletrônica", desc: "Emissão de NFC-e integrada direto ao SEFAZ. Compliance sem dor de cabeça." },
+  { icon: CalendarCheck, title: "Reservas de mesas", desc: "Sistema de reservas online com gestão visual de mesas e comandas digitais." },
+  { icon: MessageSquare, title: "Marketing WhatsApp", desc: "Campanhas automáticas, remarketing por inatividade, cupons personalizados." },
 ];
 
 /* ── Segments ── */
@@ -286,18 +286,16 @@ const LandingPage = () => {
             <p className="mt-4 text-xl text-white/60 max-w-2xl mx-auto">Um sistema completo que substitui dezenas de ferramentas fragmentadas.</p>
           </ScrollReveal>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-0 border border-white/10 rounded-2xl overflow-hidden aspect-auto md:aspect-square">
             {bentoFeatures.map((f, i) => (
-              <ScrollReveal key={f.title} delay={i * 60} className={f.span}>
-                <Card className="h-full border-white/10 bg-white/5 backdrop-blur-sm hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 group overflow-hidden">
-                  <CardContent className="p-7 sm:p-9">
-                    <div className="h-14 w-14 rounded-xl bg-primary/20 flex items-center justify-center mb-5 group-hover:bg-primary/30 group-hover:scale-110 transition-all duration-300">
-                      <f.icon className="h-7 w-7 text-primary" />
+              <ScrollReveal key={f.title} delay={i * 60} className="flex">
+                <div className="flex-1 border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 group p-7 sm:p-8 flex flex-col justify-center">
+                    <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center mb-4 group-hover:bg-primary/30 group-hover:scale-110 transition-all duration-300">
+                      <f.icon className="h-6 w-6 text-primary" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">{f.title}</h3>
-                    <p className="text-base text-white/60 leading-relaxed">{f.desc}</p>
-                  </CardContent>
-                </Card>
+                    <h3 className="text-lg font-bold text-white mb-1.5">{f.title}</h3>
+                    <p className="text-sm text-white/60 leading-relaxed">{f.desc}</p>
+                </div>
               </ScrollReveal>
             ))}
           </div>
