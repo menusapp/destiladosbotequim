@@ -671,12 +671,15 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           comandaId = nc?.id || null;
         }
 
+        const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
+        const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "local", table_id: tableId,
           comanda_id: comandaId, status: "pending",
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
-          notes: notes || null, payment_type: paymentType || null,
+          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
