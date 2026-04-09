@@ -228,10 +228,36 @@ export const printOrder = async (
       
       <div class="double-line"></div>
       
-      <div class="total-row">
-        <span>TOTAL</span>
-        <span>R$ ${subtotal.toFixed(2)}</span>
-      </div>
+      ${(() => {
+        const discount = order.coupon_discount || 0;
+        const finalTotal = subtotal - discount;
+        // Extract discount reason from notes
+        const discountReasonMatch = order.notes?.match(/\[Desconto: (.+?)\]/);
+        const discountReason = discountReasonMatch ? discountReasonMatch[1] : "";
+        if (discount > 0) {
+          return `
+            <div class="total-row" style="font-size:12px;">
+              <span>Subtotal</span>
+              <span>R$ ${subtotal.toFixed(2)}</span>
+            </div>
+            <div class="total-row" style="font-size:12px;">
+              <span>Desconto</span>
+              <span>- R$ ${discount.toFixed(2)}</span>
+            </div>
+            ${discountReason ? `<div style="font-size:10px;font-style:italic;margin-bottom:2px;">Motivo: ${discountReason}</div>` : ""}
+            <div class="total-row">
+              <span>TOTAL</span>
+              <span>R$ ${finalTotal.toFixed(2)}</span>
+            </div>
+          `;
+        }
+        return `
+          <div class="total-row">
+            <span>TOTAL</span>
+            <span>R$ ${subtotal.toFixed(2)}</span>
+          </div>
+        `;
+      })()}
       
       ${deliverySection}
       ${notesSection}

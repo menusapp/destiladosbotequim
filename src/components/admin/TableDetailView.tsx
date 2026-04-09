@@ -275,6 +275,7 @@ export const TableDetailView = () => {
       order_type: "local" as const,
       tables: { table_number: tableNumber },
       notes: order.notes,
+      coupon_discount: order.coupon_discount,
       order_items: order.order_items.map(item => ({
         id: item.id,
         quantity: item.quantity,
