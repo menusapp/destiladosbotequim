@@ -926,7 +926,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                           {variationIngredients.length > 0 && (
                             <div className="space-y-1">{variationIngredients.map((ing) => (
                               <div key={ing.id} className="flex items-center justify-between p-2 bg-background rounded text-xs">
-                                <span>{ing.stock_item_name} — {ing.quantity} {ing.stock_item_unit}</span>
+                                <span>{ing.stock_item_name} — {ing.quantity} {ing.stock_item_unit} — <b>R$ {((ing.stock_item_price || 0) * ing.quantity).toFixed(2)}</b></span>
                                 <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveVariationIngredient(ing.id)}><Trash2 className="h-3 w-3" /></Button>
                               </div>
                             ))}</div>
@@ -948,7 +948,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                                       <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveVariation(v.id)} title="Excluir variação"><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                   </div>
-                                  <div className="text-xs text-muted-foreground">{v.ingredients.map(i => `${i.stock_item_name} — ${i.quantity}${i.stock_item_unit}`).join(", ")}</div>
+                                  <div className="text-xs text-muted-foreground">{v.ingredients.map(i => `${i.stock_item_name} — ${i.quantity}${i.stock_item_unit} (R$ ${((i.stock_item_price || 0) * i.quantity).toFixed(2)})`).join(", ")}</div>
                                   {v.description && <p className="text-xs text-muted-foreground/70 italic mt-0.5">{v.description}</p>}
                                   {vc && (
                                     <div className="mt-2 pt-2 border-t text-xs grid grid-cols-3 gap-2">
