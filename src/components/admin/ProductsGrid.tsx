@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Trash2, Package, DollarSign, Image, Clock, Tag, Barcode, Settings2, Layers, Copy, Pencil, ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { generateNextPdvCode } from "@/lib/pdvCodeGenerator";
+import { generateNextPdvCode, getAllUsedPdvCodes } from "@/lib/pdvCodeGenerator";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
