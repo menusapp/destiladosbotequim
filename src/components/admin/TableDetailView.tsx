@@ -503,6 +503,18 @@ export const TableDetailView = () => {
                                     ))}
                                   </div>
                                 ))}
+                                {(() => {
+                                  const orderDiscount = order.coupon_discount || 0;
+                                  if (orderDiscount > 0) {
+                                    return (
+                                      <div className="flex justify-between text-sm text-green-600 font-medium mt-1">
+                                        <span>Desconto</span>
+                                        <span>- R$ {orderDiscount.toFixed(2)}</span>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             ))}
                           </div>
