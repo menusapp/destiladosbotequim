@@ -563,7 +563,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         <div class="stat"><div class="stat-value">R$ ${stats.averageTicket.toFixed(2).replace(".",",")}</div><div class="stat-label">Ticket Médio</div></div>
         <div class="stat"><div class="stat-value">${stats.mesasAtendidas}</div><div class="stat-label">Mesas Atendidas</div></div>
       </div>
-      <table>${rows.map(r => `<tr class="${r.bold ? 'bold' : ''} ${(r as any).highlight ? 'highlight' : ''}"><td>${r.label}</td><td class="right">${(r as any).isPercentage ? r.value + '%' : 'R$ ' + r.value.toFixed(2).replace(".",",")}</td></tr>`).join('')}</table>
+      <table>${rows.map(r => `<tr class="${r.bold ? 'bold' : ''} ${r.highlight ? 'highlight' : ''} ${r.positive ? 'positive' : ''}"><td>${r.label}</td><td class="right">${r.isPercentage ? r.value + '%' : (r.positive ? '+ ' : '') + 'R$ ' + r.value.toFixed(2).replace(".",",")}</td></tr>`).join('')}</table>
       <p style="margin-top:24px;font-size:11px;color:#aaa;">Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
       </body></html>`;
 
