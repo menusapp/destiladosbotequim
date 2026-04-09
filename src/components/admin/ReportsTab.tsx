@@ -126,6 +126,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         { data: comandasData },
         { data: paymentMethods },
         { data: cashMovements },
+        { data: payrollCredits },
       ] = await Promise.all([
         supabase.from("fixed_costs").select("name, amount").eq("restaurant_id", restaurantId),
         supabase.from("variable_costs").select("name, type, amount, percentage").eq("restaurant_id", restaurantId),
@@ -146,6 +147,9 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         supabase.from("cash_movements").select("amount")
           .eq("restaurant_id", restaurantId).eq("movement_type", "saida")
           .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+        supabase.from("employee_credits").select("paid_amount")
+          .eq("restaurant_id", restaurantId).eq("status", "paid").eq("paid_method", "payroll")
+          .gte("paid_at", startDate.toISOString()).lte("paid_at", endDate.toISOString()),
       ]);
 
       setFixedCosts(fixedData.data || []);
