@@ -21,7 +21,7 @@ import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Search, ShoppingCart, UserPlus, X, Loader2, Settings,
   MoreVertical, QrCode, Link2, Eraser, Eye, EyeOff, MapPin, Plus,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, AlertTriangle
 } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "@/components/ui/sonner";
@@ -131,6 +131,11 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   const [discountTarget, setDiscountTarget] = useState("total");
   const [discountValue, setDiscountValue] = useState("");
   const [discountNotes, setDiscountNotes] = useState("");
+
+  // Employee credit states
+  const [employeeCreditName, setEmployeeCreditName] = useState("");
+  const [employeeCreditNotes, setEmployeeCreditNotes] = useState("");
+  const [employeeNameSuggestions, setEmployeeNameSuggestions] = useState<string[]>([]);
 
   // Auto-print toggle
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem("pdv_auto_print") === "true");
@@ -525,6 +530,8 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     setDiscountTarget("total");
     setDiscountValue("");
     setDiscountNotes("");
+    setEmployeeCreditName("");
+    setEmployeeCreditNotes("");
   };
 
   const insertOrderItems = async (orderId: string) => {
@@ -684,6 +691,28 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
+      }
+
+      // Insert employee credit record if payment type is employee_credit
+      if (paymentType === "employee_credit") {
+        const lastOrder = await supabase.from("orders")
+          .select("id")
+          .eq("restaurant_id", restaurantId)
+          .eq("pdv_source", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        if (lastOrder.data) {
+          await supabase.from("employee_credits").insert({
+            restaurant_id: restaurantId,
+            employee_name: employeeCreditName || customerName || "Funcionário",
+            order_id: lastOrder.data.id,
+            amount: cartTotal,
+            status: "pending",
+            notes: employeeCreditNotes || null,
+            created_by: "Sistema PDV",
+          });
+        }
       }
 
       // Deduct stock for PDV orders that start in 'preparing' (trigger misses them)
@@ -1178,6 +1207,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                     <SelectItem value="credit">Crédito</SelectItem>
                     <SelectItem value="pix">Pix</SelectItem>
                     <SelectItem value="meal_voucher">Vale Refeição</SelectItem>
+                    <SelectItem value="employee_credit">Crédito de Funcionário</SelectItem>
                   </SelectContent>
                 </Select>
                 {(paymentType === "credit" || paymentType === "debit" || paymentType.startsWith("Crédito") || paymentType.startsWith("Débito")) && (
@@ -1207,6 +1237,34 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                       )}
                     </SelectContent>
                   </Select>
+                )}
+
+                {/* Employee Credit Fields */}
+                {paymentType === "employee_credit" && (
+                  <div className="space-y-2 border rounded-lg p-3 bg-amber-50/50">
+                    <div className="flex items-center gap-2 text-amber-700 text-xs font-medium">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Este pedido será lançado como crédito pendente.
+                    </div>
+                    <div>
+                      <Label className="text-xs">Nome do Funcionário *</Label>
+                      <Input
+                        placeholder="Nome do funcionário"
+                        value={employeeCreditName}
+                        onChange={e => setEmployeeCreditName(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Observação</Label>
+                      <Input
+                        placeholder="Observação (opcional)"
+                        value={employeeCreditNotes}
+                        onChange={e => setEmployeeCreditNotes(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
 

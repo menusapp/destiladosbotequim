@@ -215,6 +215,7 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
         if (method === "debit") return "Débito";
         if (method === "meal_voucher") return "Vale Refeição";
         if (method === "Pago pelo iFood" || method === "ifood_online") return "iFood Online";
+        if (method === "employee_credit") return "Crédito Funcionário";
 
         // Try payment_methods table lookup
         const byId = paymentMethods.find(p => p.id === method);

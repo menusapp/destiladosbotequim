@@ -590,6 +590,17 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                          <span>Saldo esperado:</span>
                          <span className="font-bold font-mono">R$ {calculateExpectedBalance().toFixed(2)}</span>
                        </div>
+                       {(() => {
+                         const empCreditTotal = movements
+                           .filter(m => m.movement_type === "entrada" && m.payment_method?.includes("employee_credit"))
+                           .reduce((sum, m) => sum + m.amount, 0);
+                         return empCreditTotal > 0 ? (
+                           <div className="flex justify-between text-amber-700">
+                             <span className="text-sm">Crédito de Funcionário:</span>
+                             <span className="font-bold font-mono text-sm">R$ {empCreditTotal.toFixed(2)} <span className="text-xs font-normal">(não está no caixa físico)</span></span>
+                           </div>
+                         ) : null;
+                       })()}
                      </div>
                     <div>
                       <Label>Responsável pelo fechamento</Label>

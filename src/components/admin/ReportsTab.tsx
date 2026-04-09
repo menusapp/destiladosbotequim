@@ -1,15 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar as CalendarIcon, DollarSign, TrendingUp, Users, CreditCard, FileText, Download } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { format, startOfDay, endOfDay, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
+
+const EmployeeCreditsTab = lazy(() => import("./EmployeeCreditsTab"));
 
 interface ReportsTabProps {
   restaurantId: string;
@@ -202,6 +205,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         debit: "Cartão de Débito",
         pix: "PIX",
         meal_voucher: "Vale Refeição",
+        employee_credit: "Crédito de Funcionário",
       };
 
       // Agregar valores diretamente por method_type
@@ -211,6 +215,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         debit: 0,
         pix: 0,
         meal_voucher: 0,
+        employee_credit: 0,
       };
 
       // Função para normalizar qualquer valor salvo → method_type
@@ -562,6 +567,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
   }
 
   return (
+    <Tabs defaultValue="dre" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="dre">DRE</TabsTrigger>
+        <TabsTrigger value="employee_credits">Créditos Funcionários</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="dre">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -742,5 +754,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         </CardContent>
       </Card>
     </div>
+      </TabsContent>
+
+      <TabsContent value="employee_credits">
+        <Suspense fallback={<div className="p-6 text-muted-foreground">Carregando...</div>}>
+          <EmployeeCreditsTab restaurantId={restaurantId} />
+        </Suspense>
+      </TabsContent>
+    </Tabs>
   );
 };

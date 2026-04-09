@@ -1144,6 +1144,72 @@ export type Database = {
           },
         ]
       }
+      employee_credits: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          due_date: string | null
+          employee_id: string | null
+          employee_name: string
+          id: string
+          notes: string | null
+          order_id: string | null
+          paid_amount: number | null
+          paid_at: string | null
+          paid_method: string | null
+          restaurant_id: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          employee_id?: string | null
+          employee_name: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          paid_amount?: number | null
+          paid_at?: string | null
+          paid_method?: string | null
+          restaurant_id: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          employee_id?: string | null
+          employee_name?: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          paid_amount?: number | null
+          paid_at?: string | null
+          paid_method?: string | null
+          restaurant_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_credits_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_credits_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extra_categories: {
         Row: {
           created_at: string | null
