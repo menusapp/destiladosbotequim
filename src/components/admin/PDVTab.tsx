@@ -584,7 +584,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
 
   const handleSubmit = async () => {
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
-    if (!customerName && orderType !== "mesa" && orderType !== "viagem") { toast.error("Nome do cliente é obrigatório"); return; }
+    if (!customerName && orderType !== "mesa") { toast.error("Nome do cliente é obrigatório"); return; }
 
     setSubmitting(true);
     try {
