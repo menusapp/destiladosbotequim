@@ -524,9 +524,10 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     // Save linked complement groups
     await supabase.from("product_complement_groups").delete().eq("product_id", productId);
     if (linkedGroups.length > 0) {
-      const groupsData = linkedGroups.map(group => ({
+      const groupsData = linkedGroups.map((group, index) => ({
         product_id: productId, extra_category_id: group.extra_category_id,
-        is_required: group.is_required, min_selection: group.min_selection, max_selection: group.max_selection
+        is_required: group.is_required, min_selection: group.min_selection, max_selection: group.max_selection,
+        display_order: index,
       }));
       const { error: groupError } = await supabase.from("product_complement_groups").insert(groupsData);
       if (groupError) {
