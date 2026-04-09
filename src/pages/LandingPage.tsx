@@ -286,15 +286,15 @@ const LandingPage = () => {
             <p className="mt-4 text-xl text-white/60 max-w-2xl mx-auto">Um sistema completo que substitui dezenas de ferramentas fragmentadas.</p>
           </ScrollReveal>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-0 border border-white/10 rounded-2xl overflow-hidden aspect-auto md:aspect-square">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-0 border border-white/20 rounded-2xl overflow-hidden max-w-5xl mx-auto">
             {bentoFeatures.map((f, i) => (
               <ScrollReveal key={f.title} delay={i * 60} className="flex">
-                <div className="flex-1 border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 group p-7 sm:p-8 flex flex-col justify-center">
-                    <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center mb-4 group-hover:bg-primary/30 group-hover:scale-110 transition-all duration-300">
-                      <f.icon className="h-6 w-6 text-primary" />
+                <div className="flex-1 border border-white/15 bg-white/10 backdrop-blur-sm hover:bg-white/15 transition-all duration-300 group p-5 sm:p-6 flex flex-col justify-center">
+                    <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center mb-3 group-hover:bg-primary/30 group-hover:scale-110 transition-all duration-300">
+                      <f.icon className="h-5 w-5 text-primary" />
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-1.5">{f.title}</h3>
-                    <p className="text-sm text-white/60 leading-relaxed">{f.desc}</p>
+                    <h3 className="text-base font-bold text-white mb-1">{f.title}</h3>
+                    <p className="text-sm text-white/70 leading-relaxed">{f.desc}</p>
                 </div>
               </ScrollReveal>
             ))}
