@@ -1393,7 +1393,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           <div className="border-t pt-3 mt-2 flex items-center justify-between">
             <div className="text-xs">
               <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
-              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartSubtotal.toFixed(2)}</span>
+              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
             </div>
             <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
