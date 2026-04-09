@@ -693,6 +693,28 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         await insertOrderItems(order.id);
       }
 
+      // Insert employee credit record if payment type is employee_credit
+      if (paymentType === "employee_credit") {
+        const lastOrder = await supabase.from("orders")
+          .select("id")
+          .eq("restaurant_id", restaurantId)
+          .eq("pdv_source", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        if (lastOrder.data) {
+          await supabase.from("employee_credits").insert({
+            restaurant_id: restaurantId,
+            employee_name: employeeCreditName || customerName || "Funcionário",
+            order_id: lastOrder.data.id,
+            amount: cartTotal,
+            status: "pending",
+            notes: employeeCreditNotes || null,
+            created_by: "Sistema PDV",
+          });
+        }
+      }
+
       // Deduct stock for PDV orders that start in 'preparing' (trigger misses them)
       if (orderType !== "mesa") {
         const lastOrder = await supabase.from("orders")
