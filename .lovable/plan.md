@@ -1,41 +1,50 @@
 
 
-# Corrigir código PDV duplicado + validação de unicidade
+# Consolidar configurações na aba "Geral"
 
-## Problema
-1. Ao duplicar produto, o código PDV é copiado, causando duplicidade (ex: Costela Burger e Picanha Burger ambos com "007")
-2. Não há validação que impeça salvar um código PDV já existente
+## Resumo
+Mover as seções Horário, Regiões, Pagamentos, Impressoras e Backup para dentro da aba "Geral" como sub-abas. Simultaneamente, fundir as sub-abas internas "Operacional", "Cadastro de Clientes" e "Cardápio" em uma única sub-aba "Operacional".
 
-## Correções
+## Mudanças
 
-### 1. Atualizar PDV do Picanha Burger no banco
-- Usar insert tool para `UPDATE products SET pdv_code = '033' WHERE id = '356c5e96-0a43-4f2a-8710-d4ce7507e132'` (próximo código livre após o max atual de 032)
+### 1. `AppSidebar.tsx` — Remover itens do submenu de Configurações
 
-### 2. `ProductsGrid.tsx` — Limpar PDV ao duplicar
-- Linha 304: trocar `setPdvCode((product as any).pdv_code || "")` para `setPdvCode("")`
-- Assim o produto duplicado vem sem código PDV e o auto-generate preenche ao salvar
+Remover do `configSubItems`:
+- `config-horario`
+- `config-regioes`
+- `config-pagamentos`
+- `config-impressoras`
+- `config-backup`
 
-### 3. `ProductsGrid.tsx` — Validar unicidade antes de salvar
-- No `handleSubmit`, após resolver o `finalPdvCode` (linha ~463-466), antes de inserir/atualizar:
-  - Se `finalPdvCode` não é null, chamar `getAllUsedPdvCodes(restaurantId)` e verificar se o código já existe
-  - Se editando, excluir o próprio produto da verificação
-  - Se duplicado, mostrar `toast.error("Código PDV 'XXX' já está em uso")` e retornar sem salvar
+Ficam apenas: **Geral**, **Totem** e **WhatsApp**.
 
-### 4. `ComplementosTab.tsx` — Mesma validação para itens de complemento
-- No `handleSaveItem`, antes de inserir/atualizar item com `pdv_code` manual:
-  - Verificar unicidade via `getAllUsedPdvCodes`
-  - Se editando, excluir o próprio item da checagem
-  - Se duplicado, mostrar toast de erro e retornar
+### 2. `CompanyDataSettings.tsx` — Adicionar sub-abas e fundir conteúdo
+
+**Novas sub-abas** (via TabsTrigger):
+- Identidade Visual (mantém)
+- Operacional (funde: Operacional + Cadastro de Clientes + Cardápio)
+- Horário de Funcionamento (importa `BusinessHoursSettings`)
+- Regiões de Entrega (importa `DeliveryZonesSettings`)
+- Formas de Pagamento (importa `PaymentMethodsSettings` + `OnlinePaymentsSettings`)
+- Impressoras (importa `PrintersSettings`)
+- Backup e Restauração (importa `BackupSettings`)
+
+**Remover** as TabsTrigger "Cadastro de Clientes" e "Cardápio". O conteúdo delas (campos de cadastro + botão pedir conta) vai para dentro da TabsContent "operational", empilhado após os cards de Taxa de Serviço e Tempo de Preparo.
+
+### 3. `RestaurantAdmin.tsx` — Limpar cases desnecessários
+
+Remover os `case` de `config-horario`, `config-regioes`, `config-pagamentos`, `config-impressoras`, `config-backup` do `renderContent` e do `lazyLoaders` — tudo agora é renderizado dentro de `CompanyDataSettings`.
 
 ## Arquivos impactados
 
 | Arquivo | Mudança |
 |---|---|
-| Dados (insert tool) | Atualizar pdv_code do Picanha Burger para 033 |
-| `ProductsGrid.tsx` | Limpar pdvCode ao duplicar + validação de unicidade no submit |
-| `ComplementosTab.tsx` | Validação de unicidade no save de item |
+| `AppSidebar.tsx` | Remover 5 sub-itens de config |
+| `CompanyDataSettings.tsx` | Importar 5 componentes de settings como sub-abas; fundir 3 sub-abas em 1 |
+| `RestaurantAdmin.tsx` | Remover cases/imports das 5 seções movidas |
 
 ## O que NÃO muda
-- `pdvCodeGenerator.ts` — já funciona corretamente
-- Fiscal, iFood, triggers de caixa, cardápio
+- Totem e WhatsApp continuam como itens separados no submenu
+- Nenhum componente de settings é deletado, apenas re-hospedado
+- PDV, fiscal, iFood, triggers de caixa
 
