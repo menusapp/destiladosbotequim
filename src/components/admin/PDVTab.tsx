@@ -82,7 +82,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   const queryClient = useQueryClient();
 
   // Order creation state
-  const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada" | "viagem">("mesa");
+  const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada">("mesa");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
