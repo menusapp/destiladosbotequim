@@ -518,16 +518,21 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
     const { startDate, endDate } = getDateRange();
     const periodLabel = dateFilter === "today" ? "Hoje" : dateFilter === "yesterday" ? "Ontem" : dateFilter === "7days" ? "7 Dias" : dateFilter === "30days" ? "30 Dias" : `${format(startDate, "dd/MM/yyyy", { locale: ptBR })} - ${format(endDate, "dd/MM/yyyy", { locale: ptBR })}`;
 
-    const rows = [
+    const rows: any[] = [
       { label: "Receita Bruta", value: dreValues.grossRevenue, bold: true },
       { label: "   (-) CMV dos Produtos", value: dreValues.cmv },
       { label: "Lucro Bruto", value: dreValues.grossProfit, bold: true },
+    ];
+    if (dreValues.payrollRecovery > 0) {
+      rows.push({ label: "   (+) Descontos em Folha", value: dreValues.payrollRecovery, positive: true });
+    }
+    rows.push(
       { label: "   Saídas do Caixa", value: dreValues.operationalExpenses },
       { label: "   Custo Fixo (proporcional)", value: dreValues.fixedCost },
       { label: "   Custo Variável", value: dreValues.variableCost },
       { label: "   CMO - Mão de Obra (proporcional)", value: dreValues.laborCost },
       { label: "Lucro Operacional", value: dreValues.operationalProfit, bold: true, highlight: true },
-    ];
+    );
 
     if (dreValues.grossRevenue > 0) {
       rows.push({ label: "Margem Operacional", value: parseFloat(((dreValues.operationalProfit / dreValues.grossRevenue) * 100).toFixed(1)), bold: false, isPercentage: true } as any);
