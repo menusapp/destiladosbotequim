@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Trash2, Package, DollarSign, Image, Clock, Tag, Barcode, Settings2, Layers, Copy, Pencil, ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { generateNextPdvCode } from "@/lib/pdvCodeGenerator";
+import { generateNextPdvCode, getAllUsedPdvCodes } from "@/lib/pdvCodeGenerator";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -301,7 +301,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductCategoryId(product.category_id || "__none");
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
-    setPdvCode((product as any).pdv_code || "");
+    setPdvCode("");
 
     const { data: ingredientsData } = await supabase.from("product_ingredients").select("*, stock_items(name, unit, price_per_unit)").eq("product_id", product.id);
     const formattedIngredients = ingredientsData?.map((ing: any) => ({
@@ -463,6 +463,19 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     let finalPdvCode = pdvCode || null;
     if (!editingProduct && !pdvCode) {
       finalPdvCode = await generateNextPdvCode(restaurantId);
+    }
+
+    // Validate PDV code uniqueness
+    if (finalPdvCode) {
+      const usedCodes = await getAllUsedPdvCodes(restaurantId);
+      const codeNum = parseInt(finalPdvCode, 10);
+      if (!isNaN(codeNum) && usedCodes.has(codeNum)) {
+        // If editing, check it's not our own code
+        if (!editingProduct || (editingProduct as any).pdv_code !== finalPdvCode) {
+          toast.error(`Código PDV '${finalPdvCode}' já está em uso por outro item`);
+          return;
+        }
+      }
     }
 
     const productData: any = {

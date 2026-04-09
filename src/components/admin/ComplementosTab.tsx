@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
-import { generateNextPdvCode } from "@/lib/pdvCodeGenerator";
+import { generateNextPdvCode, getAllUsedPdvCodes } from "@/lib/pdvCodeGenerator";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -172,6 +172,20 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const handleSaveItem = async () => {
     if (!itemName.trim() || !selectedCategoryId) { toast.error("Preencha o nome do item"); return; }
+
+    // Validate PDV code uniqueness before saving
+    const codeToCheck = editingItem ? (itemPdvCode || null) : (itemPdvCode || await generateNextPdvCode(restaurantId));
+    if (codeToCheck) {
+      const usedCodes = await getAllUsedPdvCodes(restaurantId);
+      const codeNum = parseInt(codeToCheck, 10);
+      if (!isNaN(codeNum) && usedCodes.has(codeNum)) {
+        if (!editingItem || editingItem.pdv_code !== codeToCheck) {
+          toast.error(`Código PDV '${codeToCheck}' já está em uso por outro item`);
+          return;
+        }
+      }
+    }
+
     if (editingItem) {
       const { error } = await supabase.from("extra_category_items").update({ name: itemName, price: parseFloat(itemPrice) || 0, pdv_code: itemPdvCode || null } as any).eq("id", editingItem.id);
       if (error) { toast.error("Erro ao atualizar item"); return; }
@@ -181,7 +195,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
       }
       toast.success("Item atualizado!");
     } else {
-      const finalPdvCode = itemPdvCode || await generateNextPdvCode(restaurantId);
+      const finalPdvCode = codeToCheck;
       const { data: newItem, error } = await supabase.from("extra_category_items").insert({ category_id: selectedCategoryId, name: itemName, price: parseFloat(itemPrice) || 0, pdv_code: finalPdvCode } as any).select().single();
       if (error) { toast.error("Erro ao criar item"); return; }
       if (newItem && itemIngredients.length > 0) {
