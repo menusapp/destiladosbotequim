@@ -496,12 +496,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
     });
 
     const totalCosts = cmv + operationalExpenses + totalFixedCosts + totalVariableCosts + totalLaborCosts;
-    const operationalProfit = totalRevenue - totalCosts;
+    const operationalProfit = totalRevenue - totalCosts + payrollRecovery;
 
     return {
       grossRevenue: totalRevenue,
       cmv,
       grossProfit: totalRevenue - cmv,
+      payrollRecovery,
       operationalExpenses,
       fixedCost: totalFixedCosts,
       variableCost: totalVariableCosts,
