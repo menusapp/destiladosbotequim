@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Trash2, Package, DollarSign, Image, Clock, Tag, Barcode, Settings2, Layers, Copy, Pencil } from "lucide-react";
+import { Plus, Search, Trash2, Package, DollarSign, Image, Clock, Tag, Barcode, Settings2, Layers, Copy, Pencil, ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateNextPdvCode } from "@/lib/pdvCodeGenerator";
@@ -96,6 +96,7 @@ interface LinkedComplementGroup {
   is_required: boolean;
   min_selection: number;
   max_selection: number | null;
+  display_order: number;
   items: {
     id: string;
     name: string;
@@ -329,10 +330,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     else { setIngredientType("fixed"); setIngredients(formattedIngredients); setVariations([]); }
     setExtras(extrasFromDB);
 
-    const { data: groupsData } = await supabase.from("product_complement_groups").select("*, extra_categories(id, name, extra_category_items(id, name, price))").eq("product_id", product.id);
-    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any) => ({
+    const { data: groupsData } = await supabase.from("product_complement_groups").select("*, extra_categories(id, name, extra_category_items(id, name, price))").eq("product_id", product.id).order("display_order");
+    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any, idx: number) => ({
       id: crypto.randomUUID(), extra_category_id: g.extra_category_id, category_name: g.extra_categories?.name || "",
       is_required: g.is_required || false, min_selection: g.min_selection || 0, max_selection: g.max_selection,
+      display_order: g.display_order ?? idx,
       items: g.extra_categories?.extra_category_items || []
     }));
     setLinkedGroups(formattedGroups);
@@ -415,9 +417,18 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setLinkedGroups([...linkedGroups, {
       id: crypto.randomUUID(), extra_category_id: selectedComplementCategory, category_name: category.name,
       is_required: groupIsRequired, min_selection: parseInt(groupMinSelection) || 0, max_selection: groupMaxSelection ? parseInt(groupMaxSelection) : null,
+      display_order: linkedGroups.length,
       items: itemsData || [],
     }]);
     setSelectedComplementCategory(""); setGroupIsRequired(false); setGroupMinSelection("0"); setGroupMaxSelection("");
+  };
+
+  const handleMoveLinkedGroup = (index: number, direction: 'up' | 'down') => {
+    const newGroups = [...linkedGroups];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newGroups.length) return;
+    [newGroups[index], newGroups[targetIndex]] = [newGroups[targetIndex], newGroups[index]];
+    setLinkedGroups(newGroups.map((g, i) => ({ ...g, display_order: i })));
   };
 
   const handleRemoveLinkedGroup = (id: string) => { setLinkedGroups(linkedGroups.filter(g => g.id !== id)); };
@@ -513,9 +524,10 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     // Save linked complement groups
     await supabase.from("product_complement_groups").delete().eq("product_id", productId);
     if (linkedGroups.length > 0) {
-      const groupsData = linkedGroups.map(group => ({
+      const groupsData = linkedGroups.map((group, index) => ({
         product_id: productId, extra_category_id: group.extra_category_id,
-        is_required: group.is_required, min_selection: group.min_selection, max_selection: group.max_selection
+        is_required: group.is_required, min_selection: group.min_selection, max_selection: group.max_selection,
+        display_order: index,
       }));
       const { error: groupError } = await supabase.from("product_complement_groups").insert(groupsData);
       if (groupError) {
@@ -591,16 +603,18 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     const { data: groupsData, error: groupsError } = await supabase
       .from("product_complement_groups")
       .select("*, extra_categories(id, name, extra_category_items(id, name, price))")
-      .eq("product_id", product.id);
+      .eq("product_id", product.id)
+      .order("display_order");
 
     if (groupsError) {
       console.error("Erro ao buscar complementos vinculados:", groupsError);
       toast.error("Erro ao carregar complementos do produto");
     }
 
-    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any) => ({
+    const formattedGroups: LinkedComplementGroup[] = (groupsData || []).map((g: any, idx: number) => ({
       id: g.id, extra_category_id: g.extra_category_id, category_name: g.extra_categories?.name || "",
       is_required: g.is_required || false, min_selection: g.min_selection || 0, max_selection: g.max_selection,
+      display_order: g.display_order ?? idx,
       items: g.extra_categories?.extra_category_items || []
     }));
 
@@ -973,14 +987,18 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                     {linkedGroups.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-sm font-medium">Categorias Vinculadas:</p>
-                        {linkedGroups.map((group) => (
+                        {linkedGroups.map((group, index) => (
                           <div key={group.id} className="p-3 bg-primary/5 rounded-lg border border-primary/20">
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{group.category_name}</span>
                                 {group.is_required && <Badge variant="default" className="text-[10px] h-5">Obrigatório</Badge>}
                               </div>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveLinkedGroup(group.id)}>Remover</Button>
+                              <div className="flex items-center gap-1">
+                                <Button type="button" variant="ghost" size="sm" onClick={() => handleMoveLinkedGroup(index, 'up')} disabled={index === 0} className="h-7 w-7 p-0"><ArrowUp className="h-3.5 w-3.5" /></Button>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => handleMoveLinkedGroup(index, 'down')} disabled={index === linkedGroups.length - 1} className="h-7 w-7 p-0"><ArrowDown className="h-3.5 w-3.5" /></Button>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveLinkedGroup(group.id)}>Remover</Button>
+                              </div>
                             </div>
                             <p className="text-xs text-muted-foreground">{
                               group.items.length} itens • Min: {group.min_selection} • Max: {group.max_selection ?? "∞"}</p>
