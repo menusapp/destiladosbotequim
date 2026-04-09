@@ -1,55 +1,61 @@
 
-# Crédito de Funcionário — Método de pagamento + Gestão de créditos
 
-## Resumo
-Criar tabela `employee_credits`, adicionar "Crédito de Funcionário" como opção de pagamento no PDV, criar sub-aba de gestão de créditos nos Relatórios, e integrar nos relatórios financeiros (Overview, DRE, Caixa).
+# Vincular categorias de complementos corretamente via ComplementosTab
 
-## 1. Migration — Tabela `employee_credits`
+## Problema
+Quando você edita uma categoria de complemento e vincula a produtos por ali, o sistema insere registros na tabela `product_extras` (complementos avulsos individuais). O correto é usar a tabela `product_complement_groups`, que é o mesmo mecanismo usado quando se vincula uma categoria pelo editor de produto ("Vincular Categoria de Complementos"). Isso garante que o complemento apareça agrupado por categoria no cardápio, e não como itens soltos.
 
-Criar tabela com campos: `employee_name`, `employee_id`, `order_id`, `amount`, `status` (pending/paid/cancelled), `notes`, `due_date`, `paid_at`, `paid_amount`, `paid_method`, `created_by`. RLS com política `anon` (padrão do projeto).
+Além disso, falta controle de ordenação das categorias vinculadas a um produto (subir/descer).
 
-## 2. PDVTab — Novo método de pagamento
+## O que muda
 
-Adicionar `employee_credit` no select de pagamento. Quando selecionado, exibir:
-- Input "Nome do Funcionário" com autocomplete de nomes anteriores
-- Input "Observação" (opcional)
-- Aviso âmbar sobre crédito pendente
+### 1. `ComplementosTab.tsx` — Refatorar vínculo de produtos
 
-No `handleSubmit`, após criar pedido, inserir registro em `employee_credits` com `status: 'pending'`.
+**Carregar produtos vinculados** (`openEditCategory`):
+- Trocar query de `product_extras` para `product_complement_groups` filtrando por `extra_category_id`
+- Carregar os `product_id`s vinculados a partir dessa tabela
 
-## 3. Relatórios — Reconhecer nas métricas
+**Salvar vínculo** (`handleSaveCategory`):
+- Ao adicionar produto: inserir em `product_complement_groups` com `product_id`, `extra_category_id`, `display_order`, `is_required: false`, `min_selection: 0`, `max_selection: null`
+- Ao remover produto: deletar da `product_complement_groups` onde `extra_category_id = categoryId AND product_id IN (removidos)`
+- **Remover** toda a lógica de `syncCategoryToProducts` e inserção em `product_extras` / `product_extra_ingredients` — não é mais necessário duplicar itens
 
-- `useOrderMetrics.ts`: normalizar `employee_credit` → "Crédito Funcionário"
-- `OverviewTab.tsx`: cor laranja para o método
-- `ReportsTab.tsx`: adicionar no `paymentTotals` e `normalizeMethod`
+**Deletar categoria** (`handleDeleteCategory`):
+- Adicionar delete de `product_complement_groups` onde `extra_category_id = categoryId` antes de deletar a categoria
 
-## 4. Caixa — Linha separada no fechamento
+### 2. `ProductsGrid.tsx` — Adicionar controle de ordenação
 
-No resumo do `FluxoCaixaTab`, somar movimentos com `payment_method` = `employee_credit` e exibir em linha separada com nota "não está no caixa físico".
+Na seção de "Categorias de Complementos Vinculadas" do editor de produto:
+- Exibir botões de seta para cima/baixo em cada grupo vinculado
+- Ao reordenar, atualizar o array `linkedGroups` localmente e salvar `display_order` ao submeter
+- Já existe `display_order` na tabela `product_complement_groups`
+- No `handleSubmit`, ao salvar os grupos, incluir `display_order: index` em cada insert
 
-## 5. Nova sub-aba "Créditos de Funcionários"
+Na query de carregamento dos grupos (`openEditProduct`), ordenar por `display_order`.
 
-Criar `EmployeeCreditsTab.tsx` com:
-- Totalizadores: Pendente (vermelho), Pago (verde), Nº funcionários
-- Filtros: status, nome, período
-- Tabela com colunas: Funcionário, Data, Pedido, Valor, Vencimento, Status (badge)
-- Ações: "Marcar como Pago" (dialog com valor/método/data) e "Cancelar"
+### 3. Queries de cardápio (Menu, DeliveryMenu, Kiosk, PDV)
 
-Registrar como sub-aba dentro do `ReportsTab`.
+Verificar que as queries de `product_complement_groups` já usam `.order("display_order")`. Se não, adicionar para respeitar a ordem definida.
+
+### 4. Limpar código legado
+
+- Remover a função `syncCategoryToProducts` inteira
+- Os `product_extras` com `extra_category_id` existentes no banco podem ficar (não quebram nada), mas novos vínculos não serão mais criados por ali
 
 ## Arquivos impactados
 
 | Arquivo | Mudança |
 |---|---|
-| Migration SQL | Criar tabela `employee_credits` |
-| `PDVTab.tsx` | Opção + campos + insert |
-| `useOrderMetrics.ts` | Normalizar método |
-| `OverviewTab.tsx` | Cor do método |
-| `ReportsTab.tsx` | Normalizar + sub-aba |
-| `FluxoCaixaTab.tsx` | Linha separada no resumo |
-| `EmployeeCreditsTab.tsx` | **Novo** — gestão completa |
+| `src/components/admin/ComplementosTab.tsx` | Refatorar para usar `product_complement_groups` em vez de `product_extras`; remover `syncCategoryToProducts` |
+| `src/components/admin/ProductsGrid.tsx` | Adicionar botões de ordenação (subir/descer) nos grupos vinculados; salvar `display_order` |
+| `src/pages/Menu.tsx` | Adicionar `.order("display_order")` na query de `product_complement_groups` se ausente |
+| `src/pages/DeliveryMenu.tsx` | Idem |
+| `src/pages/Kiosk.tsx` | Idem |
+| `src/components/admin/PDVTab.tsx` | Idem |
 
 ## O que NÃO muda
-- iFood, Delivery Direto, fiscal, NFC-e
-- Triggers de caixa existentes
-- CreateOrderDrawer, PaymentConfirmationModal
+- Complementos avulsos individuais (sem categoria) continuam funcionando via `product_extras`
+- Variações de produto (insumos variáveis) não são afetadas
+- `extra_category_items` e `extra_category_item_ingredients` continuam sendo a fonte dos itens — não há duplicação
+- Fiscal, iFood, Delivery Direto, triggers de caixa
+
