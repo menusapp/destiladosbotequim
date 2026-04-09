@@ -585,13 +585,16 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
       await upsertCustomerCRM();
       if (orderType === "delivery") {
         if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
+        const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
+        const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
           status: "preparing", customer_name: customerName,
           customer_cpf: customerCpf || "000.000.000-00",
           delivery_phone: customerPhone,
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
-          notes: notes || null, payment_type: paymentType || null,
+          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
