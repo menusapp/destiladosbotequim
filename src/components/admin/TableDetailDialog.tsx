@@ -541,6 +541,7 @@ export const TableDetailDialog = ({
           })),
         }))
       );
+      const totalDiscount = comandaOrders.reduce((sum: number, o: any) => sum + (o.coupon_discount || 0), 0);
       const virtualOrder = {
         id: comandaOrders[0].id,
         created_at: comandaOrders[0].created_at,
@@ -548,6 +549,7 @@ export const TableDetailDialog = ({
         order_type: "local" as const,
         tables: { table_number: table!.table_number },
         order_items: allItems,
+        coupon_discount: totalDiscount > 0 ? totalDiscount : undefined,
       };
       await printOrderThermal(virtualOrder, restaurantId);
     } catch {
