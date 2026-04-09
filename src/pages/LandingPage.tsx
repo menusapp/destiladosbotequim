@@ -344,7 +344,7 @@ const LandingPage = () => {
                 ))}
               </ul>
             </ScrollReveal>
-            <ScrollReveal delay={150} className="flex-1 w-full">
+            <ScrollReveal delay={150} className="flex-1 w-full lg:max-w-[60%]">
               <div className="rounded-2xl overflow-hidden border border-border shadow-2xl shadow-primary/10">
                 <img src={financialImg} alt="Dashboard financeiro do Menu's" className="w-full h-auto" />
               </div>
