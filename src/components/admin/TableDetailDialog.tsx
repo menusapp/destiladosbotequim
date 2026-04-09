@@ -100,7 +100,7 @@ export const TableDetailDialog = ({
       const { data, error } = await supabase
         .from("orders")
         .select(`
-          id, status, customer_name, customer_cpf, comanda_id, created_at,
+          id, status, customer_name, customer_cpf, comanda_id, created_at, coupon_discount, notes,
           order_items(
             id, quantity, price_at_order, notes,
             products(name),
