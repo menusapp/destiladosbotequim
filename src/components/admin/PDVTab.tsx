@@ -1360,7 +1360,8 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                         const { data: complementGroups } = await supabase
                           .from("product_complement_groups")
                           .select("extra_category_id, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
-                          .eq("product_id", product.id);
+                          .eq("product_id", product.id)
+                          .order("display_order");
 
                         const complementExtras = (complementGroups || []).flatMap((g: any) => {
                           const cat = g.extra_categories;
