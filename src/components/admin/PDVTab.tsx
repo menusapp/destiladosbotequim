@@ -601,11 +601,14 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         await insertOrderItems(order.id);
 
       } else if (orderType === "retirada") {
+        const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
+        const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
           status: "preparing", customer_name: customerName || "Cliente",
           customer_cpf: customerCpf || "000.000.000-00",
-          notes: notes || null, payment_type: paymentType || null,
+          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
