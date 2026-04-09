@@ -20,7 +20,8 @@ import {
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Search, ShoppingCart, UserPlus, X, Loader2, Settings,
-  MoreVertical, QrCode, Link2, Eraser, Eye, EyeOff, MapPin, Plus
+  MoreVertical, QrCode, Link2, Eraser, Eye, EyeOff, MapPin, Plus,
+  ChevronDown, ChevronUp, Percent, DollarSign
 } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "@/components/ui/sonner";
