@@ -205,6 +205,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         debit: "Cartão de Débito",
         pix: "PIX",
         meal_voucher: "Vale Refeição",
+        employee_credit: "Crédito de Funcionário",
       };
 
       // Agregar valores diretamente por method_type
