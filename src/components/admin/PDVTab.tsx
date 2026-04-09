@@ -1209,7 +1209,83 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                 )}
               </div>
 
-              {/* Products search + grid */}
+              {/* Discount Section */}
+              {cart.length > 0 && (
+                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded}>
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-muted-foreground">Desconto</p>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDiscountExpanded(!discountExpanded)}>
+                        {discountExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+                    </div>
+
+                    <CollapsibleContent className="mt-3 space-y-3">
+                      {/* Type toggle */}
+                      <div className="flex gap-2">
+                        <Button
+                          variant={discountType === "percentage" ? "default" : "outline"}
+                          size="sm" className="flex-1"
+                          onClick={() => setDiscountType("percentage")}
+                        >
+                          %
+                        </Button>
+                        <Button
+                          variant={discountType === "value" ? "default" : "outline"}
+                          size="sm" className="flex-1"
+                          onClick={() => setDiscountType("value")}
+                        >
+                          R$
+                        </Button>
+                      </div>
+
+                      {/* Target selector */}
+                      <Select value={discountTarget} onValueChange={setDiscountTarget}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Aplicar no total do pedido" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="total">Total do pedido</SelectItem>
+                          {cart.map(item => (
+                            <SelectItem key={item.productId} value={item.productId}>
+                              {item.productName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {/* Value input */}
+                      <Input
+                        type="number"
+                        min={0}
+                        max={discountType === "percentage" ? 100 : undefined}
+                        placeholder={discountType === "percentage" ? "Ex: 10" : "Ex: 15.00"}
+                        value={discountValue}
+                        onChange={e => setDiscountValue(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+
+                      {/* Notes */}
+                      <Input
+                        placeholder="Motivo do desconto (opcional)"
+                        value={discountNotes}
+                        onChange={e => setDiscountNotes(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </CollapsibleContent>
+
+                    {/* Preview */}
+                    {calculatedDiscount > 0 && (
+                      <div className="mt-2 flex justify-between text-sm">
+                        <span className="text-muted-foreground">Desconto aplicado</span>
+                        <span className="text-green-600 font-medium">- R$ {calculatedDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </Collapsible>
+              )}
+
+
               <div className="space-y-3">
                 <Label className="text-xs font-semibold mb-1.5 block">Produtos</Label>
                 <div className="relative">
