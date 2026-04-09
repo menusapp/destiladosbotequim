@@ -179,8 +179,6 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
       if (itemIngredients.length > 0) {
         await supabase.from("extra_category_item_ingredients").insert(itemIngredients.map(ing => ({ category_item_id: editingItem.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
       }
-      // Sync to all linked products
-      await syncCategoryToProducts(selectedCategoryId);
       toast.success("Item atualizado!");
     } else {
       const finalPdvCode = itemPdvCode || await generateNextPdvCode(restaurantId);
@@ -189,8 +187,6 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
       if (newItem && itemIngredients.length > 0) {
         await supabase.from("extra_category_item_ingredients").insert(itemIngredients.map(ing => ({ category_item_id: newItem.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
       }
-      // Sync to all linked products
-      await syncCategoryToProducts(selectedCategoryId);
       toast.success("Item criado!");
     }
     resetItemForm(); fetchCategories();
