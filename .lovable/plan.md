@@ -1,50 +1,28 @@
 
 
-# Consolidar configurações na aba "Geral"
+## Plan: Show ingredient cost values in variable variations
 
-## Resumo
-Mover as seções Horário, Regiões, Pagamentos, Impressoras e Backup para dentro da aba "Geral" como sub-abas. Simultaneamente, fundir as sub-abas internas "Operacional", "Cadastro de Clientes" e "Cardápio" em uma única sub-aba "Operacional".
+**What you reported**: Fixed ingredients already show the cost (e.g., "0,22kg de acém — R$ 6,60"), but variable ingredient variations only show the name and quantity without the corresponding cost.
 
-## Mudanças
+**Root cause**: In `ProductsGrid.tsx`, line 951, variation ingredients are displayed as:
+```
+{i.stock_item_name} — {i.quantity}{i.stock_item_unit}
+```
+Missing the cost calculation that fixed ingredients have on line 891.
 
-### 1. `AppSidebar.tsx` — Remover itens do submenu de Configurações
+### Changes
 
-Remover do `configSubItems`:
-- `config-horario`
-- `config-regioes`
-- `config-pagamentos`
-- `config-impressoras`
-- `config-backup`
+**File: `src/components/admin/ProductsGrid.tsx`**
 
-Ficam apenas: **Geral**, **Totem** e **WhatsApp**.
+Two places need the cost display added:
 
-### 2. `CompanyDataSettings.tsx` — Adicionar sub-abas e fundir conteúdo
+1. **Line 928-930 (New variation ingredient list — editing mode)**: Change the ingredient display from just name/quantity to also show the cost value:
+   - From: `{ing.stock_item_name} — {ing.quantity} {ing.stock_item_unit}`
+   - To: `{ing.stock_item_name} — {ing.quantity} {ing.stock_item_unit}` + `R$ {((ing.stock_item_price || 0) * ing.quantity).toFixed(2)}`
 
-**Novas sub-abas** (via TabsTrigger):
-- Identidade Visual (mantém)
-- Operacional (funde: Operacional + Cadastro de Clientes + Cardápio)
-- Horário de Funcionamento (importa `BusinessHoursSettings`)
-- Regiões de Entrega (importa `DeliveryZonesSettings`)
-- Formas de Pagamento (importa `PaymentMethodsSettings` + `OnlinePaymentsSettings`)
-- Impressoras (importa `PrintersSettings`)
-- Backup e Restauração (importa `BackupSettings`)
+2. **Line 951 (Saved variations list)**: Change the ingredient summary from just name/quantity to include cost:
+   - From: `` `${i.stock_item_name} — ${i.quantity}${i.stock_item_unit}` ``
+   - To: `` `${i.stock_item_name} — ${i.quantity}${i.stock_item_unit} (R$ ${((i.stock_item_price || 0) * i.quantity).toFixed(2)})` ``
 
-**Remover** as TabsTrigger "Cadastro de Clientes" e "Cardápio". O conteúdo delas (campos de cadastro + botão pedir conta) vai para dentro da TabsContent "operational", empilhado após os cards de Taxa de Serviço e Tempo de Preparo.
-
-### 3. `RestaurantAdmin.tsx` — Limpar cases desnecessários
-
-Remover os `case` de `config-horario`, `config-regioes`, `config-pagamentos`, `config-impressoras`, `config-backup` do `renderContent` e do `lazyLoaders` — tudo agora é renderizado dentro de `CompanyDataSettings`.
-
-## Arquivos impactados
-
-| Arquivo | Mudança |
-|---|---|
-| `AppSidebar.tsx` | Remover 5 sub-itens de config |
-| `CompanyDataSettings.tsx` | Importar 5 componentes de settings como sub-abas; fundir 3 sub-abas em 1 |
-| `RestaurantAdmin.tsx` | Remover cases/imports das 5 seções movidas |
-
-## O que NÃO muda
-- Totem e WhatsApp continuam como itens separados no submenu
-- Nenhum componente de settings é deletado, apenas re-hospedado
-- PDV, fiscal, iFood, triggers de caixa
+Both changes mirror the pattern already used for fixed ingredients on line 891.
 
