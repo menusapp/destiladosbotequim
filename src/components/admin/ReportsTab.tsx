@@ -763,3 +763,4 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       </TabsContent>
     </Tabs>
   );
+};
