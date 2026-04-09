@@ -754,5 +754,12 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         </CardContent>
       </Card>
     </div>
+      </TabsContent>
+
+      <TabsContent value="employee_credits">
+        <Suspense fallback={<div className="p-6 text-muted-foreground">Carregando...</div>}>
+          <EmployeeCreditsTab restaurantId={restaurantId} />
+        </Suspense>
+      </TabsContent>
+    </Tabs>
   );
-};
