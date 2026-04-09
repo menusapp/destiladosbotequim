@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
+import { TypingEffect } from "@/components/landing/TypingEffect";
 import menusLogo from "@/assets/menus-logo.png";
 import heroDashboard from "@/assets/landing-hero-dashboard.jpg";
 import {
@@ -118,7 +119,7 @@ const LandingPage = () => {
           <ScrollReveal delay={100}>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground tracking-[-0.03em] leading-[1.1]">
               O sistema completo para{" "}
-              <span className="text-primary">restaurantes</span>
+              <TypingEffect />
             </h1>
           </ScrollReveal>
 
