@@ -520,6 +520,11 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     setSelectedCustomer(null);
     setSelectedAddress(null);
     setShowNewClientForm(false);
+    setDiscountExpanded(false);
+    setDiscountType("value");
+    setDiscountTarget("total");
+    setDiscountValue("");
+    setDiscountNotes("");
   };
 
   const insertOrderItems = async (orderId: string) => {
