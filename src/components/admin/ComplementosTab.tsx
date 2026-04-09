@@ -196,8 +196,6 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
     await supabase.from("extra_category_item_ingredients").delete().eq("category_item_id", item.id);
     const { error } = await supabase.from("extra_category_items").delete().eq("id", item.id);
     if (error) { toast.error("Erro ao excluir item"); return; }
-    // Sync to rebuild remaining items for linked products
-    await syncCategoryToProducts(categoryId);
     toast.success("Item excluído!"); fetchCategories();
   };
 
