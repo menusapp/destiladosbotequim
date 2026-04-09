@@ -341,7 +341,7 @@ const LandingPage = () => {
       <div className="h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
 
       {/* ═══ VISÃO DE NEGÓCIOS ═══ */}
-      <section className="py-16 sm:py-24 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, hsl(25 100% 97%) 0%, hsl(0 0% 100%) 50%, hsl(220 13% 96%) 100%)' }}>
+      <section className="py-16 sm:py-24 relative overflow-hidden bg-primary">
         <div className="absolute bottom-20 -right-40 w-80 h-80 rounded-full bg-primary/[0.06] blur-[100px] pointer-events-none" />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="flex flex-col lg:flex-row-reverse gap-12 items-center">
@@ -350,13 +350,13 @@ const LandingPage = () => {
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground leading-tight tracking-[-0.025em]">
                 Visão completa do seu negócio
               </h2>
-              <p className="text-lg text-muted-foreground leading-relaxed">
+              <p className="text-lg leading-relaxed text-primary-foreground">
                 DRE automático, fluxo de caixa diário, CMV por produto, custos fixos e variáveis — tudo calculado a partir das suas vendas reais. Pare de usar planilha.
               </p>
               <ul className="space-y-3 pt-2">
                 {["DRE automático mensal", "Fluxo de caixa em tempo real", "CMV por produto", "Margens e lucratividade", "Custos fixos e variáveis"].map((h) => (
-                  <li key={h} className="flex items-center gap-2.5 text-base font-medium text-foreground">
-                    <div className="h-6 w-6 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                  <li key={h} className="flex items-center gap-2.5 text-base font-medium text-secondary-foreground">
+                    <div className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 bg-primary-foreground">
                       <Check className="h-3.5 w-3.5 text-primary" />
                     </div>
                     {h}
