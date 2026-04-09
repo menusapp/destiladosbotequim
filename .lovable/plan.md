@@ -1,47 +1,41 @@
 
 
-# 2 Ajustes: Remover aba "Viagem" + Descontos em Folha no DRE
+# Corrigir código PDV duplicado + validação de unicidade
 
-## 1. Remover TabsTrigger "Viagem" do PDV
+## Problema
+1. Ao duplicar produto, o código PDV é copiado, causando duplicidade (ex: Costela Burger e Picanha Burger ambos com "007")
+2. Não há validação que impeça salvar um código PDV já existente
 
-Em `PDVTab.tsx`:
-- Remover a tab "Viagem" do grid (mudar de `grid-cols-4` para `grid-cols-3`)
-- Alterar o tipo de `orderType` de `"mesa" | "delivery" | "retirada" | "viagem"` para `"mesa" | "delivery" | "retirada"`
-- Em todo lugar que trata `viagem`, redirecionar para `retirada` (que já usa `delivery_type: "pickup"`) — na prática, o bloco `else if (orderType === "viagem")` no `handleSubmit` pode ser removido porque `retirada` já cobre esse caso
-- A lógica de `delivery_type` fica: `delivery` → `"delivery"`, `retirada` → `"pickup"` (sem `"takeaway"`)
-- Verificar se `"takeaway"` é usado em outros lugares para não quebrar pedidos antigos — ele continuará sendo reconhecido nos relatórios, apenas não será criado mais pelo PDV
+## Correções
 
-## 2. Adicionar "Descontos em Folha" no DRE
+### 1. Atualizar PDV do Picanha Burger no banco
+- Usar insert tool para `UPDATE products SET pdv_code = '033' WHERE id = '356c5e96-0a43-4f2a-8710-d4ce7507e132'` (próximo código livre após o max atual de 032)
 
-Em `ReportsTab.tsx`:
-- Fazer uma query de `employee_credits` com `status = 'paid'` e `paid_method = 'payroll'` no período selecionado
-- Somar os `paid_amount` desses registros como `payrollRecovery`
-- Adicionar uma nova linha no DRE após "Lucro Bruto" e antes de "Despesas Operacionais":
-  - **"(+) Descontos em Folha"** com valor positivo em verde — representando receita recuperada de consumo de funcionários
-- Incluir esse valor no cálculo de `operationalProfit`: `totalRevenue - totalCosts + payrollRecovery`
-- Atualizar o PDF de exportação para incluir essa linha
+### 2. `ProductsGrid.tsx` — Limpar PDV ao duplicar
+- Linha 304: trocar `setPdvCode((product as any).pdv_code || "")` para `setPdvCode("")`
+- Assim o produto duplicado vem sem código PDV e o auto-generate preenche ao salvar
 
-### Posição no DRE:
-```text
-Receita Bruta                    R$ X.XXX,XX
-  (-) CMV dos Produtos           R$ X.XXX,XX
-Lucro Bruto                      R$ X.XXX,XX
-  (+) Descontos em Folha         R$ X.XXX,XX   ← NOVO
-  Despesas Operacionais
-    Saídas do Caixa              R$ X.XXX,XX
-    Custo Fixo                   R$ X.XXX,XX
-    ...
-Lucro Operacional                R$ X.XXX,XX
-```
+### 3. `ProductsGrid.tsx` — Validar unicidade antes de salvar
+- No `handleSubmit`, após resolver o `finalPdvCode` (linha ~463-466), antes de inserir/atualizar:
+  - Se `finalPdvCode` não é null, chamar `getAllUsedPdvCodes(restaurantId)` e verificar se o código já existe
+  - Se editando, excluir o próprio produto da verificação
+  - Se duplicado, mostrar `toast.error("Código PDV 'XXX' já está em uso")` e retornar sem salvar
+
+### 4. `ComplementosTab.tsx` — Mesma validação para itens de complemento
+- No `handleSaveItem`, antes de inserir/atualizar item com `pdv_code` manual:
+  - Verificar unicidade via `getAllUsedPdvCodes`
+  - Se editando, excluir o próprio item da checagem
+  - Se duplicado, mostrar toast de erro e retornar
 
 ## Arquivos impactados
 
 | Arquivo | Mudança |
 |---|---|
-| `PDVTab.tsx` | Remover tab "Viagem", limpar lógica associada |
-| `ReportsTab.tsx` | Query `employee_credits` payroll + linha no DRE + PDF |
+| Dados (insert tool) | Atualizar pdv_code do Picanha Burger para 033 |
+| `ProductsGrid.tsx` | Limpar pdvCode ao duplicar + validação de unicidade no submit |
+| `ComplementosTab.tsx` | Validação de unicidade no save de item |
 
 ## O que NÃO muda
-- Pedidos antigos com `delivery_type = "takeaway"` continuam funcionando nos relatórios
-- iFood, Delivery Direto, fiscal, triggers de caixa
+- `pdvCodeGenerator.ts` — já funciona corretamente
+- Fiscal, iFood, triggers de caixa, cardápio
 
