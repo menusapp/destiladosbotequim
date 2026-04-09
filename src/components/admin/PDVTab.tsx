@@ -20,7 +20,8 @@ import {
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Search, ShoppingCart, UserPlus, X, Loader2, Settings,
-  MoreVertical, QrCode, Link2, Eraser, Eye, EyeOff, MapPin, Plus
+  MoreVertical, QrCode, Link2, Eraser, Eye, EyeOff, MapPin, Plus,
+  ChevronDown, ChevronUp
 } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "@/components/ui/sonner";
@@ -123,6 +124,13 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   const [newAddrNeighborhood, setNewAddrNeighborhood] = useState("");
   const [newAddrCity, setNewAddrCity] = useState("");
   const [newAddrState, setNewAddrState] = useState("");
+
+  // Discount states
+  const [discountExpanded, setDiscountExpanded] = useState(false);
+  const [discountType, setDiscountType] = useState<"percentage" | "value">("value");
+  const [discountTarget, setDiscountTarget] = useState("total");
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountNotes, setDiscountNotes] = useState("");
 
   // Auto-print toggle
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem("pdv_auto_print") === "true");
@@ -328,6 +336,35 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     }, 0);
   }, [cart]);
 
+  // Calculated discount
+  const calculatedDiscount = useMemo(() => {
+    const val = parseFloat(discountValue) || 0;
+    if (val <= 0) return 0;
+    if (discountType === "percentage") {
+      if (discountTarget === "total") {
+        const pct = Math.min(val, 100);
+        return Math.min(cartSubtotal * (pct / 100), cartSubtotal);
+      } else {
+        const item = cart.find(c => c.productId === discountTarget);
+        if (!item) return 0;
+        const itemTotal = (item.price + item.extras.reduce((s, e) => s + e.price, 0)) * item.quantity;
+        const pct = Math.min(val, 100);
+        return Math.min(itemTotal * (pct / 100), itemTotal);
+      }
+    } else {
+      if (discountTarget === "total") {
+        return Math.min(val, cartSubtotal);
+      } else {
+        const item = cart.find(c => c.productId === discountTarget);
+        if (!item) return 0;
+        const itemTotal = (item.price + item.extras.reduce((s, e) => s + e.price, 0)) * item.quantity;
+        return Math.min(val, itemTotal);
+      }
+    }
+  }, [discountType, discountValue, discountTarget, cartSubtotal, cart]);
+
+  const cartTotal = cartSubtotal - calculatedDiscount;
+
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
@@ -483,6 +520,11 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     setSelectedCustomer(null);
     setSelectedAddress(null);
     setShowNewClientForm(false);
+    setDiscountExpanded(false);
+    setDiscountType("value");
+    setDiscountTarget("total");
+    setDiscountValue("");
+    setDiscountNotes("");
   };
 
   const insertOrderItems = async (orderId: string) => {
@@ -543,35 +585,44 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
       await upsertCustomerCRM();
       if (orderType === "delivery") {
         if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
+        const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
+        const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
           status: "preparing", customer_name: customerName,
           customer_cpf: customerCpf || "000.000.000-00",
           delivery_phone: customerPhone,
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
-          notes: notes || null, payment_type: paymentType || null,
+          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
 
       } else if (orderType === "retirada") {
+        const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
+        const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
           status: "preparing", customer_name: customerName || "Cliente",
           customer_cpf: customerCpf || "000.000.000-00",
-          notes: notes || null, payment_type: paymentType || null,
+          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
 
       } else if (orderType === "viagem") {
+        const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
+        const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "takeaway",
           status: "preparing", customer_name: customerName || "Cliente Viagem",
           customer_cpf: customerCpf || "000.000.000-00",
-          notes: notes || null, payment_type: paymentType || null,
+          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
@@ -620,12 +671,15 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           comandaId = nc?.id || null;
         }
 
+        const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
+        const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "local", table_id: tableId,
           comanda_id: comandaId, status: "pending",
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
-          notes: notes || null, payment_type: paymentType || null,
+          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
@@ -1155,7 +1209,83 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                 )}
               </div>
 
-              {/* Products search + grid */}
+              {/* Discount Section */}
+              {cart.length > 0 && (
+                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded}>
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-muted-foreground">Desconto</p>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDiscountExpanded(!discountExpanded)}>
+                        {discountExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+                    </div>
+
+                    <CollapsibleContent className="mt-3 space-y-3">
+                      {/* Type toggle */}
+                      <div className="flex gap-2">
+                        <Button
+                          variant={discountType === "percentage" ? "default" : "outline"}
+                          size="sm" className="flex-1"
+                          onClick={() => setDiscountType("percentage")}
+                        >
+                          %
+                        </Button>
+                        <Button
+                          variant={discountType === "value" ? "default" : "outline"}
+                          size="sm" className="flex-1"
+                          onClick={() => setDiscountType("value")}
+                        >
+                          R$
+                        </Button>
+                      </div>
+
+                      {/* Target selector */}
+                      <Select value={discountTarget} onValueChange={setDiscountTarget}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Aplicar no total do pedido" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="total">Total do pedido</SelectItem>
+                          {cart.map(item => (
+                            <SelectItem key={item.productId} value={item.productId}>
+                              {item.productName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {/* Value input */}
+                      <Input
+                        type="number"
+                        min={0}
+                        max={discountType === "percentage" ? 100 : undefined}
+                        placeholder={discountType === "percentage" ? "Ex: 10" : "Ex: 15.00"}
+                        value={discountValue}
+                        onChange={e => setDiscountValue(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+
+                      {/* Notes */}
+                      <Input
+                        placeholder="Motivo do desconto (opcional)"
+                        value={discountNotes}
+                        onChange={e => setDiscountNotes(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </CollapsibleContent>
+
+                    {/* Preview */}
+                    {calculatedDiscount > 0 && (
+                      <div className="mt-2 flex justify-between text-sm">
+                        <span className="text-muted-foreground">Desconto aplicado</span>
+                        <span className="text-green-600 font-medium">- R$ {calculatedDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </Collapsible>
+              )}
+
+
               <div className="space-y-3">
                 <Label className="text-xs font-semibold mb-1.5 block">Produtos</Label>
                 <div className="relative">
@@ -1238,9 +1368,21 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
                       </div>
                     );
                   })}
-                  <div className="flex items-center justify-between font-bold text-sm pt-2 border-t">
-                    <span>Total</span>
-                    <span>R$ {cartSubtotal.toFixed(2)}</span>
+                  <div className="pt-2 border-t space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Subtotal</span>
+                      <span>R$ {cartSubtotal.toFixed(2)}</span>
+                    </div>
+                    {calculatedDiscount > 0 && (
+                      <div className="flex items-center justify-between text-sm text-green-600">
+                        <span>Desconto</span>
+                        <span>- R$ {calculatedDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between font-bold text-sm">
+                      <span>Total</span>
+                      <span>R$ {cartTotal.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1251,7 +1393,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           <div className="border-t pt-3 mt-2 flex items-center justify-between">
             <div className="text-xs">
               <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
-              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartSubtotal.toFixed(2)}</span>
+              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
             </div>
             <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
