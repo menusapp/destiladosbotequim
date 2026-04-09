@@ -7,14 +7,14 @@ import menusLogo from "@/assets/menus-logo.png";
 import heroDashboard from "@/assets/landing-hero-dashboard.jpg";
 import {
   ArrowRight, Check, ChevronRight, Zap, Star,
-  QrCode, ShoppingCart, Utensils, Package,
+  QrCode, ShoppingCart, Utensils, CalendarCheck, Package,
   BarChart3, Receipt, Users, MessageSquare, Truck,
-  Smartphone, TrendingUp, Megaphone, CreditCard,
+  Smartphone, TrendingUp, Megaphone, Calculator, CreditCard,
   Shield, Clock, Headphones, MapPin, Printer, Bot,
-  Wallet, BadgePercent,
-  AlertTriangle, Rocket, DollarSign, LayoutGrid,
-  Timer, Award, Heart, MonitorSmartphone, BrainCircuit,
-  Bell, Send, FileText, CalendarCheck, Sparkles,
+  PieChart, Wallet, BadgePercent, BookOpen, Coffee,
+  Pizza, Beer, Sandwich, UtensilsCrossed, ChefHat, BrainCircuit,
+  AlertTriangle, Rocket, ThumbsUp, DollarSign, LayoutGrid,
+  Timer, Award, Heart, ChevronDown,
 } from "lucide-react";
 
 /* ── Plans ── */
@@ -41,14 +41,13 @@ const plans = [
 
 /* ── FAQs ── */
 const faqs = [
-  { q: "É difícil de usar?", a: "Não! Interface simples e intuitiva. Qualquer pessoa consegue usar em minutos, sem treinamento." },
-  { q: "Preciso instalar algum aplicativo?", a: "Não. Funciona 100% no navegador. Seus clientes acessam o cardápio pelo link ou QR Code sem baixar nada." },
-  { q: "Serve para meu restaurante?", a: "Sim. Feito para delivery, balcão, mesa e qualquer tipo de operação de food service." },
-  { q: "Tem suporte?", a: "Sim! Atendimento rápido e humano. Estamos sempre prontos para ajudar." },
+  { q: "Preciso instalar algum aplicativo?", a: "Não! O Menus App funciona 100% no navegador. Seus clientes acessam o cardápio pelo link ou QR Code sem baixar nada." },
   { q: "Posso cancelar a qualquer momento?", a: "Sim, sem fidelidade e sem multa. Cancele quando quiser." },
   { q: "Como funciona o delivery?", a: "Você tem seu próprio sistema de delivery com zonas de entrega, taxas configuráveis e acompanhamento de pedidos. Zero comissão." },
   { q: "O sistema emite nota fiscal?", a: "Sim! No plano Avançado você tem emissão de NFC-e integrada diretamente ao SEFAZ." },
   { q: "Como funciona o Robô IA?", a: "O Robô IA conversa com seus clientes pelo WhatsApp, sugere produtos, tira dúvidas e finaliza pedidos automaticamente." },
+  { q: "Preciso de equipamentos especiais?", a: "Não. Qualquer computador, tablet ou celular com navegador funciona." },
+  { q: "Quanto tempo leva para configurar?", a: "Menos de 2 minutos para criar a conta. Seu cardápio pode estar no ar no mesmo dia." },
 ];
 
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -81,7 +80,7 @@ const LandingPage = () => {
               Entrar
             </Button>
             <Button size="sm" className="font-semibold text-base shadow-md shadow-primary/20" onClick={() => navigate("/register")}>
-              Começar teste grátis
+              Criar meu cardápio grátis
             </Button>
           </div>
         </div>
@@ -95,258 +94,124 @@ const LandingPage = () => {
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
           <ScrollReveal>
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-8 border border-primary/20">
-              <Sparkles className="h-4 w-4" />
-              Primeiro mês grátis • Sem compromisso
+              <Zap className="h-4 w-4" />
+              7 dias grátis • Sem cartão de crédito
             </div>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground tracking-[-0.03em] leading-[1.1]">
-              Venda sem taxas. Automatize seu restaurante.{" "}
-              <span className="text-primary">Controle tudo em um só lugar.</span>
+              Pare de perder pedidos no WhatsApp e{" "}
+              <span className="text-primary">automatize seu delivery</span> em minutos
             </h1>
           </ScrollReveal>
 
           <ScrollReveal delay={200}>
             <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Delivery, balcão, mesa e WhatsApp integrados em um único sistema com IA, automação e gestão completa.
+              Cardápio digital + sistema automático de pedidos — pronto em menos de 5 minutos e sem comissão.
             </p>
-          </ScrollReveal>
-
-          {/* Hero bullets */}
-          <ScrollReveal delay={250}>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-              {[
-                "Sem comissão de marketplace",
-                "Pedidos automáticos no WhatsApp",
-                "Controle total da operação e financeiro",
-              ].map((t) => (
-                <div key={t} className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <Check className="h-4 w-4 text-primary shrink-0" />
-                  {t}
-                </div>
-              ))}
-            </div>
           </ScrollReveal>
 
           <ScrollReveal delay={300}>
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="mt-8 flex flex-col items-center gap-3">
               <Button size="lg" className="text-lg px-10 h-14 font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] transition-all" onClick={() => navigate("/register")}>
-                Começar teste grátis
+                Criar meu cardápio grátis
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 h-14 font-semibold" onClick={() => scrollTo("como-funciona")}>
-                Ver como funciona
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                Leva menos de 2 minutos • Não precisa cartão
+              </p>
             </div>
           </ScrollReveal>
 
+          {/* Trust badges */}
           <ScrollReveal delay={350}>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Sem contrato • Sem fidelidade • Cancele quando quiser
-            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-6">
+              {[
+                { icon: Shield, text: "7 dias grátis" },
+                { icon: DollarSign, text: "Sem taxa por pedido" },
+                { icon: MessageSquare, text: "Funciona com WhatsApp" },
+              ].map((b) => (
+                <div key={b.text} className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <b.icon className="h-4 w-4 text-primary" />
+                  {b.text}
+                </div>
+              ))}
+            </div>
           </ScrollReveal>
 
           {/* Hero mockup */}
           <ScrollReveal delay={400}>
             <div className="mt-12 mx-auto max-w-4xl">
               <div className="rounded-2xl border border-border shadow-2xl shadow-primary/10 overflow-hidden">
-                <img src={heroDashboard} alt="Dashboard do sistema de gestão para restaurantes" className="w-full h-auto" />
+                <img src={heroDashboard} alt="Dashboard do Menus App" className="w-full h-auto" />
               </div>
             </div>
           </ScrollReveal>
         </div>
       </section>
 
-      {/* ═══ BENEFÍCIO PRINCIPAL ═══ */}
-      <section id="vantagens" className="py-16 sm:py-24 bg-background">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ScrollReveal className="text-center mb-14">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Tudo em um</span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">
-              Tudo que seu restaurante precisa para{" "}
-              <span className="text-primary">vender mais</span> e operar melhor
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Do pedido ao financeiro, tudo centralizado em um único sistema.
-            </p>
-          </ScrollReveal>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              { icon: DollarSign, title: "Venda sem taxas", desc: "Delivery, retirada, balcão e mesa — sem comissão." },
-              { icon: Zap, title: "Fácil e personalizado", desc: "Seu cardápio com sua marca. Setup em menos de 2 minutos." },
-              { icon: ShoppingCart, title: "Pedidos automáticos", desc: "Receba pedidos direto no sistema e no WhatsApp automaticamente." },
-              { icon: Printer, title: "Impressão automática", desc: "Pedidos vão direto para a cozinha sem atraso." },
-              { icon: Package, title: "Estoque e CMV", desc: "Controle automático com ficha técnica e lucro em tempo real." },
-              { icon: MapPin, title: "Áreas de entrega", desc: "Defina taxas, zonas e raio no mapa." },
-            ].map((f, i) => (
-              <ScrollReveal key={f.title} delay={i * 60}>
-                <div className="flex items-start gap-4 p-5 rounded-xl border border-border bg-card hover:shadow-md hover:border-primary/20 transition-all">
-                  <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <f.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-foreground mb-1">{f.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-                  </div>
-                </div>
-              </ScrollReveal>
-            ))}
-          </div>
-
-          <ScrollReveal delay={400}>
-            <div className="mt-10 text-center">
-              <Button size="lg" className="text-base px-8 h-12 font-bold shadow-md shadow-primary/20 hover:scale-[1.02] transition-all" onClick={() => navigate("/register")}>
-                Testar grátis agora
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </div>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* ═══ OPERAÇÃO ═══ */}
-      <section className="py-16 sm:py-24 bg-card">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <ScrollReveal>
-              <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-4">Operação</span>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
-                Controle total da operação do seu restaurante
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
-                Do balcão ao delivery, tudo funcionando junto. PDV integrado, comandas digitais, app de garçom e confirmação automática de pedidos.
-              </p>
-              <div className="mt-6 space-y-3">
-                {[
-                  "PDV completo com atalhos",
-                  "Comandas digitais por mesa",
-                  "Gestão visual de mesas",
-                  "Confirmação automática",
-                ].map((t) => (
-                  <div key={t} className="flex items-center gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <Check className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                    <span className="text-base font-medium text-foreground">{t}</span>
-                  </div>
-                ))}
-              </div>
-            </ScrollReveal>
-            <ScrollReveal delay={200}>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { icon: MonitorSmartphone, label: "PDV" },
-                  { icon: Receipt, label: "Comandas" },
-                  { icon: Utensils, label: "Mesas" },
-                  { icon: Truck, label: "Delivery" },
-                ].map((item) => (
-                  <div key={item.label} className="p-6 rounded-xl border border-border bg-background text-center hover:shadow-md hover:border-primary/20 transition-all">
-                    <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                      <item.icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <span className="text-sm font-bold text-foreground">{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ WHATSAPP + IA ═══ */}
-      <section className="py-16 sm:py-24 bg-background">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ScrollReveal className="text-center mb-14">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">WhatsApp + IA</span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">
-              Um sistema que <span className="text-primary">vende por você</span>
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Automação, WhatsApp e inteligência artificial trabalhando 24h.
-            </p>
-          </ScrollReveal>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {[
-              { icon: Bot, title: "Robô WhatsApp", desc: "Recebe pedidos automaticamente com chatbot integrado." },
-              { icon: BrainCircuit, title: "IA Vendedora", desc: "Conversa com o cliente, sugere produtos e fecha pedidos." },
-              { icon: Megaphone, title: "Marketing automático", desc: "Dispara campanhas sozinho e recupera clientes inativos." },
-              { icon: Bell, title: "Notificações inteligentes", desc: "Confirmação de pedido, status e alertas automáticos." },
-            ].map((f, i) => (
-              <ScrollReveal key={f.title} delay={i * 80}>
-                <div className="flex items-start gap-4 p-6 rounded-xl border border-border bg-card hover:shadow-md hover:border-primary/20 transition-all">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <f.icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground mb-1">{f.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-                  </div>
-                </div>
-              </ScrollReveal>
-            ))}
-          </div>
-
-          <ScrollReveal delay={400}>
-            <p className="text-center mt-8 text-base font-semibold text-muted-foreground max-w-xl mx-auto">
-              Cliente inativo? Recebe cupom. Pedido feito? Notificação instantânea. <span className="text-primary">Tudo automático.</span>
-            </p>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* ═══ SISTEMA COMPLETO ═══ */}
-      <section className="py-16 sm:py-24 bg-card">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ScrollReveal className="text-center mb-14">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Completo</span>
+      {/* ═══ SEÇÃO DE DOR ═══ */}
+      <section className="py-16 sm:py-20 bg-background">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">
-              Tudo em um único sistema
+              Você pode estar <span className="text-destructive">perdendo pedidos</span> todos os dias
             </h2>
-            <p className="mt-3 text-lg text-muted-foreground max-w-xl mx-auto">
-              Substitua várias ferramentas por uma solução completa.
-            </p>
           </ScrollReveal>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { icon: QrCode, label: "Cardápio com QR Code" },
-              { icon: Users, label: "CRM e fidelidade" },
-              { icon: CreditCard, label: "Pagamento online" },
-              { icon: BarChart3, label: "Relatórios e DRE" },
-              { icon: FileText, label: "Nota fiscal (SEFAZ)" },
-              { icon: CalendarCheck, label: "Reservas de mesa" },
-              { icon: MessageSquare, label: "Marketing WhatsApp" },
-              { icon: Package, label: "Estoque e CMV" },
+              { icon: Clock, text: "Clientes desistem porque você demora a responder" },
+              { icon: AlertTriangle, text: "Pedidos se perdem no WhatsApp" },
+              { icon: Users, text: "Atendimento vira bagunça nos horários de pico" },
+              { icon: DollarSign, text: "Dependência de apps com taxas altas" },
             ].map((item, i) => (
-              <ScrollReveal key={item.label} delay={i * 50}>
-                <div className="flex flex-col items-center gap-3 p-5 rounded-xl border border-border bg-background hover:shadow-md hover:border-primary/20 transition-all text-center">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <item.icon className="h-5 w-5 text-primary" />
+              <ScrollReveal key={i} delay={i * 80}>
+                <div className="flex items-start gap-4 p-5 rounded-xl border border-border bg-card hover:shadow-md transition-shadow">
+                  <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0">
+                    <item.icon className="h-5 w-5 text-destructive" />
                   </div>
-                  <span className="text-sm font-semibold text-foreground leading-tight">{item.label}</span>
+                  <p className="text-base font-medium text-foreground leading-relaxed">{item.text}</p>
                 </div>
               </ScrollReveal>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ═══ SEÇÃO DE SOLUÇÃO ═══ */}
+      <section className="py-16 sm:py-20 bg-card">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <ScrollReveal>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-6">
+              <Zap className="h-4 w-4" />
+              A solução
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
+              Transforme seu WhatsApp em uma{" "}
+              <span className="text-primary">máquina automática</span> de pedidos
+            </h2>
+            <p className="mt-5 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Com o Menus App, seu cliente faz o pedido sozinho direto do cardápio digital — e você recebe tudo pronto e organizado.
+            </p>
+          </ScrollReveal>
         </div>
       </section>
 
       {/* ═══ COMO FUNCIONA (3 PASSOS) ═══ */}
-      <section id="como-funciona" className="py-16 sm:py-24 bg-background">
+      <section id="como-funciona" className="py-16 sm:py-20 bg-background">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Passo a passo</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Comece em minutos</h2>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Funciona em minutos</h2>
           </ScrollReveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { num: "1", icon: Rocket, title: "Crie sua conta", desc: "Cadastro rápido, sem burocracia." },
-              { num: "2", icon: QrCode, title: "Monte seu cardápio", desc: "Adicione produtos com fotos e preços em minutos." },
-              { num: "3", icon: ShoppingCart, title: "Comece a vender", desc: "Compartilhe o link e receba pedidos automaticamente." },
+              { num: "1", icon: QrCode, title: "Crie seu cardápio", desc: "Cadastre seus produtos com fotos e preços em minutos." },
+              { num: "2", icon: Smartphone, title: "Envie o link", desc: "Compartilhe o link do cardápio com seus clientes por WhatsApp ou QR Code." },
+              { num: "3", icon: ShoppingCart, title: "Receba pedidos", desc: "Pedidos chegam automaticamente, organizados e prontos para preparar." },
             ].map((s, i) => (
               <ScrollReveal key={s.num} delay={i * 120}>
                 <div className="text-center space-y-4 p-6">
@@ -364,18 +229,80 @@ const LandingPage = () => {
           </div>
 
           <ScrollReveal delay={400}>
-            <div className="mt-10 text-center">
-              <Button size="lg" className="text-base px-8 h-12 font-bold shadow-md shadow-primary/20 hover:scale-[1.02] transition-all" onClick={() => navigate("/register")}>
-                Começar teste grátis
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </div>
+            <p className="text-center mt-8 text-base font-semibold text-muted-foreground">
+              Sem instalação. Sem complicação.
+            </p>
           </ScrollReveal>
         </div>
       </section>
 
+      {/* ═══ DIFERENCIAL / VANTAGENS ═══ */}
+      <section id="vantagens" className="py-16 sm:py-20 bg-card">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-12">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Diferenciais</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Muito mais que um cardápio digital</h2>
+            <p className="mt-3 text-lg text-muted-foreground max-w-xl mx-auto">
+              Você não só recebe pedidos — você automatiza todo o atendimento.
+            </p>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              { icon: QrCode, title: "Cardápio digital completo", desc: "QR Code, link compartilhável, fotos em alta, categorias e complementos." },
+              { icon: ShoppingCart, title: "Pedidos automáticos", desc: "Seu cliente faz o pedido sozinho. Sem precisar ligar ou mandar mensagem." },
+              { icon: MessageSquare, title: "Integração com WhatsApp", desc: "Robô que atende, sugere e fecha vendas automaticamente no WhatsApp." },
+              { icon: Smartphone, title: "Totem de autoatendimento", desc: "Transforme um tablet em totem e elimine filas no balcão.", highlight: true },
+              { icon: Package, title: "Estoque automático", desc: "Baixa automática a cada venda. Alertas de estoque baixo." },
+              { icon: BarChart3, title: "Relatórios e DRE", desc: "Dashboard completo: vendas, DRE automático, fluxo de caixa e margens." },
+            ].map((f, i) => (
+              <ScrollReveal key={f.title} delay={i * 60}>
+                <div className={`flex items-start gap-4 p-5 rounded-xl border transition-all duration-300 hover:shadow-md ${f.highlight ? "border-primary/30 bg-primary/[0.04]" : "border-border bg-card"}`}>
+                  <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${f.highlight ? "bg-primary text-primary-foreground" : "bg-primary/10"}`}>
+                    <f.icon className={`h-5 w-5 ${f.highlight ? "" : "text-primary"}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-foreground mb-1">{f.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                  </div>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ BENEFÍCIOS ═══ */}
+      <section className="py-16 sm:py-20 bg-background">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-12">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Benefícios</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Resultados reais para o seu negócio</h2>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { icon: TrendingUp, title: "Mais pedidos", desc: "sem esforço extra" },
+              { icon: Timer, title: "Atendimento", desc: "mais rápido" },
+              { icon: Wallet, title: "Mais lucro", desc: "sem comissão" },
+              { icon: LayoutGrid, title: "Organização", desc: "total" },
+            ].map((b, i) => (
+              <ScrollReveal key={b.title} delay={i * 80}>
+                <div className="text-center p-5 rounded-xl border border-border bg-card hover:shadow-md hover:border-primary/20 transition-all">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <b.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="text-base font-bold text-foreground">{b.title}</h3>
+                  <p className="text-sm text-muted-foreground">{b.desc}</p>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ═══ PROVA SOCIAL ═══ */}
-      <section className="py-16 sm:py-24 bg-card">
+      <section className="py-16 sm:py-20 bg-card">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Depoimentos</span>
@@ -407,6 +334,7 @@ const LandingPage = () => {
             ))}
           </div>
 
+          {/* Numbers */}
           <ScrollReveal delay={300}>
             <div className="mt-12 grid grid-cols-3 gap-6 text-center max-w-2xl mx-auto">
               {[
@@ -424,50 +352,20 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ BENEFÍCIOS ═══ */}
-      <section className="py-16 sm:py-20 bg-background">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ScrollReveal className="text-center mb-12">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Resultados</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Resultados reais para o seu negócio</h2>
-          </ScrollReveal>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { icon: TrendingUp, title: "Mais pedidos", desc: "sem esforço extra" },
-              { icon: Timer, title: "Atendimento", desc: "mais rápido" },
-              { icon: Wallet, title: "Mais lucro", desc: "sem comissão" },
-              { icon: LayoutGrid, title: "Organização", desc: "total" },
-            ].map((b, i) => (
-              <ScrollReveal key={b.title} delay={i * 80}>
-                <div className="text-center p-5 rounded-xl border border-border bg-card hover:shadow-md hover:border-primary/20 transition-all">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <b.icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <h3 className="text-base font-bold text-foreground">{b.title}</h3>
-                  <p className="text-sm text-muted-foreground">{b.desc}</p>
-                </div>
-              </ScrollReveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ═══ OFERTA / TESTE GRÁTIS ═══ */}
-      <section className="py-16 sm:py-24" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
+      <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <ScrollReveal>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-[-0.025em]">
-              Teste sem risco
+              Teste grátis por 7 dias
             </h2>
-            <p className="mt-4 text-lg text-white/85 max-w-xl mx-auto leading-relaxed">
-              Use por 30 dias. Se não gostar, não paga nada.
+            <p className="mt-4 text-lg text-white/80 max-w-xl mx-auto leading-relaxed">
+              Use sem compromisso. Se não gostar, não precisa pagar nada.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm font-semibold text-white/90">
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" /> Sem contrato</span>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" /> Sem fidelidade</span>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" /> Cancelamento simples</span>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" /> Só paga se gostar</span>
+              <span className="flex items-center gap-1.5"><Shield className="h-4 w-4" /> Sem cartão</span>
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" /> Sem risco</span>
+              <span className="flex items-center gap-1.5"><Zap className="h-4 w-4" /> Setup em 2 min</span>
             </div>
             <div className="mt-8">
               <Button
@@ -475,7 +373,7 @@ const LandingPage = () => {
                 className="text-lg px-10 h-14 font-bold bg-white text-primary hover:bg-white/90 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all"
                 onClick={() => navigate("/register")}
               >
-                Testar grátis agora
+                Começar grátis agora
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </div>
@@ -484,13 +382,13 @@ const LandingPage = () => {
       </section>
 
       {/* ═══ PRICING ═══ */}
-      <section id="pricing" className="py-16 sm:py-24 bg-background relative overflow-hidden">
+      <section id="pricing" className="py-16 sm:py-20 bg-background relative overflow-hidden">
         <div className="absolute top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/[0.04] blur-[120px] pointer-events-none" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <ScrollReveal className="text-center mb-14">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Planos & Preços</span>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">Escolha o plano ideal</h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-xl mx-auto">Primeiro mês grátis em todos os planos. Sem fidelidade, sem multa.</p>
+            <p className="mt-4 text-lg text-muted-foreground max-w-xl mx-auto">7 dias grátis em todos os planos. Sem fidelidade, sem multa.</p>
           </ScrollReveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-start">
@@ -535,7 +433,7 @@ const LandingPage = () => {
                       {plan.cta}
                       <ChevronRight className="ml-1 h-5 w-5" />
                     </Button>
-                    <p className="text-xs text-center text-muted-foreground mt-2">Primeiro mês grátis • Cancele quando quiser</p>
+                    <p className="text-xs text-center text-muted-foreground mt-2">7 dias grátis • Cancele quando quiser</p>
                   </CardContent>
                 </Card>
               </ScrollReveal>
@@ -555,18 +453,18 @@ const LandingPage = () => {
               Garantia de satisfação
             </h2>
             <p className="mt-3 text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-              Se você não tiver mais organização e mais pedidos, você simplesmente não paga. Teste sem risco.
+              Se você não tiver mais organização e mais pedidos, você simplesmente não paga. Teste 7 dias sem risco.
             </p>
           </ScrollReveal>
         </div>
       </section>
 
       {/* ═══ FAQ ═══ */}
-      <section id="faq" className="py-16 sm:py-24 bg-background">
+      <section id="faq" className="py-16 sm:py-20 bg-background">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-10">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Dúvidas</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Ficou com dúvida?</h2>
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">FAQ</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Perguntas frequentes</h2>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
@@ -583,17 +481,17 @@ const LandingPage = () => {
       </section>
 
       {/* ═══ CTA FINAL ═══ */}
-      <section className="py-16 sm:py-24 bg-card">
+      <section className="py-16 sm:py-20 bg-card">
         <ScrollReveal>
           <div className="max-w-3xl mx-auto px-4 text-center">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground mb-4 tracking-[-0.025em]">
-              Comece hoje e veja seu restaurante mais organizado e <span className="text-primary">vendendo mais</span>
+              Comece agora e automatize seu delivery hoje mesmo
             </h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-              Sem risco. Sem contrato. Primeiro mês grátis.
+              Seu cardápio digital pronto em minutos. Sem risco, sem complicação.
             </p>
             <Button size="lg" className="text-lg px-10 h-14 font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-[1.02] transition-all" onClick={() => navigate("/register")}>
-              Começar teste grátis
+              Criar meu cardápio grátis
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <p className="text-sm text-muted-foreground mt-3">
