@@ -1,76 +1,44 @@
 
 
-## Plano: Reestruturar Landing Page
+## Plano: Limpar duplicações e simplificar a Landing Page
 
-### Resumo
-Três grupos de mudanças: (1) quebrar linha antes do TypingEffect no hero, (2) reformular seção de dor com formato dor→solução, (3) reorganizar ordem das seções e transformar "Funções" em carrossel horizontal dentro de "Tudo que seu restaurante precisa".
-
----
-
-### 1. Hero — Quebra de linha antes da palavra animada
-
-No `h1` (linha 120), adicionar `<br />` antes do `<TypingEffect />` para que a palavra animada fique sempre numa linha separada, evitando o "pulo" de layout:
-
-```tsx
-<h1 className="...">
-  O sistema completo para
-  <br />
-  <TypingEffect />
-</h1>
-```
-
-Também reservar altura mínima na linha do TypingEffect com um `<span className="inline-block min-h-[1.2em]">` para evitar colapso quando o texto está vazio.
+### Problema
+A página tem conteúdo duplicado em várias seções e a área de features usa carrossel quando deveria mostrar tudo de uma vez em grid compacto.
 
 ---
 
-### 2. Seção de Dor — Formato dor + solução
+### 1. Remover duplicações no array `allFeatures`
 
-Reduzir de 6 itens para 3-4 dores reais de dono de restaurante, cada uma com a solução embaixo:
+Reduzir de 20 itens para ~12, eliminando repetições:
+- **Remover**: "Sem comissão" (já tem "Delivery sem comissão"), "Delivery próprio" (idem), "IA integrada" (já tem "Robô IA Vendedor"), "Mais pedidos", "Mais rápido", "Mais lucro", "Organização" (são vagos e não agregam)
+- **Manter**: Cardápio, Delivery sem comissão, PDV, Robô IA, Estoque, Relatórios/DRE, NFC-e, Fidelidade/CRM, Marketing WhatsApp, Pagamento online, Impressão, Reservas
 
-| Dor | Solução |
-|-----|---------|
-| "Você não sabe quanto realmente lucra no final do mês" | "DRE automático e fluxo de caixa em tempo real" |
-| "Pedidos se perdem entre WhatsApp, telefone e balcão" | "Todos os pedidos centralizados num único painel" |
-| "Comissões de apps de delivery corroem seu lucro" | "Delivery próprio com zero comissão por pedido" |
-| "Falta de controle gera desperdício de estoque" | "Estoque com baixa automática e alertas" |
+### 2. Trocar carrossel por grid compacto
 
-Layout: cards com ícone vermelho + texto da dor em cima, e solução com ícone verde + texto embaixo.
+Substituir o scroll horizontal (seção 5) por um grid responsivo com cards pequenos:
+- Mobile: 2 colunas
+- Tablet: 3 colunas
+- Desktop: 4 colunas
+- Cards menores: ícone + título + descrição de 1 linha
+- Remover toda a lógica de scroll (ref, arrows, scrollCarousel function)
 
----
+### 3. Fundir "Oferta/Teste grátis" (seção 8) com "CTA Final" (seção 11)
 
-### 3. Reorganizar ordem das seções
+Ambas dizem "começar grátis / 7 dias / sem cartão". Remover a seção 11 (CTA Final) e manter apenas a seção 8 (Oferta) que é mais impactante com fundo laranja.
 
-Nova ordem após o Hero:
+### 4. Reduzir FAQs
 
-1. **Dor** (reformulada com dor+solução)
-2. **Como começar** (3 passos) — mover para cima
-3. **Gestor de pedidos completo** (Operação)
-4. **Visão completa do seu negócio** (Financeiro)
-5. **Tudo que seu restaurante precisa** (Vantagens) — absorve os itens de "Funções"
-6. **Quem usa, recomenda** (Prova social)
-7. **Versátil para diversos segmentos**
-8. **Teste grátis por 7 dias** (Oferta)
-9. **Escolha o plano ideal** (Pricing)
-10. **Como começar** — removido daqui (já está acima)
-11. **FAQ**
-12. **CTA Final**
-
-Remover a seção "Solução" standalone (linha 193-210) pois a seção de dor já mostra a solução.
+De 9 para 6 perguntas, removendo as mais óbvias ou redundantes:
+- Remover: "Preciso de equipamentos especiais?" (similar a "Preciso instalar app?"), "O sistema funciona offline?" (pouco relevante), "Quanto tempo leva para configurar?" (já dito no hero)
 
 ---
 
-### 4. "Tudo que seu restaurante precisa" — Carrossel horizontal
+### Resultado esperado
+- ~20% menos conteúdo vertical
+- Zero duplicação de mensagem
+- Features visíveis de uma vez sem scroll
+- Página mais limpa e objetiva
 
-Mesclar os 12 itens de `features` (antiga seção "Funções") + os 8 itens de vantagens na seção "Tudo que seu restaurante precisa". Mostrar como carrossel horizontal scrollável com:
-
-- Container com `overflow-x-auto` e `scroll-snap-x`
-- Cards compactos (ícone + título + descrição curta) em fila horizontal
-- Botões de seta esquerda/direita nos cantos
-- Esconder scrollbar com CSS (`scrollbar-hide`)
-- No mobile: scroll por toque natural
-
----
-
-### Arquivos modificados
-- `src/pages/LandingPage.tsx` — todas as mudanças acima
+### Arquivo modificado
+- `src/pages/LandingPage.tsx`
 
