@@ -567,6 +567,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
   }
 
   return (
+    <Tabs defaultValue="dre" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="dre">DRE</TabsTrigger>
+        <TabsTrigger value="employee_credits">Créditos Funcionários</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="dre">
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
