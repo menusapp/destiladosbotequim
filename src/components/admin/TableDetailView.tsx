@@ -64,6 +64,7 @@ interface Order {
   notes?: string;
   comanda_id?: string;
   payment_type?: string;
+  coupon_discount?: number;
   order_items: OrderItem[];
 }
 
