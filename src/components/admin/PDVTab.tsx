@@ -621,20 +621,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         if (error) throw error;
         await insertOrderItems(order.id);
 
-      } else if (orderType === "viagem") {
-        const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
-        const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
-        const { data: order, error } = await supabase.from("orders").insert({
-          restaurant_id: restaurantId, order_type: "delivery", delivery_type: "takeaway",
-          status: "preparing", customer_name: customerName || "Cliente Viagem",
-          customer_cpf: customerCpf || "000.000.000-00",
-          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
-          coupon_discount: discountForOrder,
-          pdv_source: true,
-        }).select().single();
-        if (error) throw error;
-        await insertOrderItems(order.id);
-
       } else {
         // Mesa
         const tableId = selectedTableId;
