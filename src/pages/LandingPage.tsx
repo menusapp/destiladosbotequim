@@ -186,12 +186,12 @@ const LandingPage = () => {
       <div className="h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
 
       {/* ═══ CAROUSEL DE FUNÇÕES ═══ */}
-      <section id="funcoes" className="py-16 sm:py-24" style={{ background: 'linear-gradient(180deg, hsl(25 100% 97%) 0%, hsl(220 13% 96%) 100%)' }}>
+      <section id="funcoes" className="py-16 sm:py-24 bg-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/15 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Funções</span>
-            <h2 className="text-4xl sm:text-5xl font-extrabold text-foreground tracking-[-0.025em]">Funções para você vender mais</h2>
-            <p className="mt-3 text-xl text-muted-foreground max-w-xl mx-auto">Tudo o que você precisa num único lugar, sem ferramentas avulsas.</p>
+            <h2 className="text-4xl font-extrabold tracking-[-0.025em] text-primary-foreground sm:text-7xl">Funções para você vender mais</h2>
+            <p className="mt-3 text-xl max-w-xl mx-auto bg-secondary-foreground text-secondary-foreground">Tudo o que você precisa num único lugar, sem ferramentas avulsas.</p>
           </ScrollReveal>
 
           {/* Horizontal scroll with arrows */}
