@@ -336,6 +336,35 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     }, 0);
   }, [cart]);
 
+  // Calculated discount
+  const calculatedDiscount = useMemo(() => {
+    const val = parseFloat(discountValue) || 0;
+    if (val <= 0) return 0;
+    if (discountType === "percentage") {
+      if (discountTarget === "total") {
+        const pct = Math.min(val, 100);
+        return Math.min(cartSubtotal * (pct / 100), cartSubtotal);
+      } else {
+        const item = cart.find(c => c.productId === discountTarget);
+        if (!item) return 0;
+        const itemTotal = (item.price + item.extras.reduce((s, e) => s + e.price, 0)) * item.quantity;
+        const pct = Math.min(val, 100);
+        return Math.min(itemTotal * (pct / 100), itemTotal);
+      }
+    } else {
+      if (discountTarget === "total") {
+        return Math.min(val, cartSubtotal);
+      } else {
+        const item = cart.find(c => c.productId === discountTarget);
+        if (!item) return 0;
+        const itemTotal = (item.price + item.extras.reduce((s, e) => s + e.price, 0)) * item.quantity;
+        return Math.min(val, itemTotal);
+      }
+    }
+  }, [discountType, discountValue, discountTarget, cartSubtotal, cart]);
+
+  const cartTotal = cartSubtotal - calculatedDiscount;
+
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
