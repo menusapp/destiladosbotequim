@@ -96,6 +96,7 @@ interface LinkedComplementGroup {
   is_required: boolean;
   min_selection: number;
   max_selection: number | null;
+  display_order: number;
   items: {
     id: string;
     name: string;
