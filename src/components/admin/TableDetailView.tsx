@@ -151,6 +151,7 @@ export const TableDetailView = () => {
           notes,
           comanda_id,
           payment_type,
+          coupon_discount,
           order_items (
             id,
             quantity,
