@@ -182,10 +182,11 @@ export const TableDetailView = () => {
       const comandasWithDetails: ComandaWithDetails[] = (comandasData || []).map(comanda => {
         const comandaOrders = filteredOrders.filter(o => o.comanda_id === comanda.id);
         const total = comandaOrders.reduce((sum, order) => {
-          return sum + order.order_items.reduce((itemSum, item) => {
+          const itemsTotal = order.order_items.reduce((itemSum, item) => {
             const extrasSum = item.order_item_extras.reduce((s, e) => s + e.price_at_order, 0);
             return itemSum + (item.price_at_order + extrasSum) * item.quantity;
           }, 0);
+          return sum + itemsTotal - (order.coupon_discount || 0);
         }, 0);
 
         return {
