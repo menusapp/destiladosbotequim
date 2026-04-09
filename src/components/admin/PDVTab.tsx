@@ -132,6 +132,11 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   const [discountValue, setDiscountValue] = useState("");
   const [discountNotes, setDiscountNotes] = useState("");
 
+  // Employee credit states
+  const [employeeCreditName, setEmployeeCreditName] = useState("");
+  const [employeeCreditNotes, setEmployeeCreditNotes] = useState("");
+  const [employeeNameSuggestions, setEmployeeNameSuggestions] = useState<string[]>([]);
+
   // Auto-print toggle
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem("pdv_auto_print") === "true");
 
