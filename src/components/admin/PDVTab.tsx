@@ -525,6 +525,8 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     setDiscountTarget("total");
     setDiscountValue("");
     setDiscountNotes("");
+    setEmployeeCreditName("");
+    setEmployeeCreditNotes("");
   };
 
   const insertOrderItems = async (orderId: string) => {
