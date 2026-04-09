@@ -755,14 +755,8 @@ const RestaurantAdmin = () => {
     relatorios: () => import("@/components/admin/ReportsTab"),
     "mesas-reservas": () => import("@/components/admin/TablesTab"),
     "config-dados": () => import("@/components/admin/settings/CompanyDataSettings"),
-    "config-horario": () => import("@/components/admin/settings/BusinessHoursSettings"),
-    "config-regioes": () => import("@/components/admin/settings/DeliveryZonesSettings"),
-    "config-pagamentos": () => import("@/components/admin/settings/PaymentMethodsSettings"),
-    
-    "config-impressoras": () => import("@/components/admin/settings/PrintersSettings"),
     "config-whatsapp": () => import("@/components/admin/settings/WhatsAppSettings"),
     "config-totem": () => import("@/components/admin/settings/KioskSettings"),
-    "config-backup": () => import("@/components/admin/settings/BackupSettings"),
   };
 
   const handlePrefetch = (sectionId: string) => {
@@ -809,27 +803,8 @@ const RestaurantAdmin = () => {
         return staffRole === "admin" ? <ContasTab restaurantId={restaurant.id} /> : null;
       case "config-dados":
         return <CompanyDataSettings restaurantId={restaurant.id} />;
-      case "config-horario":
-        return <BusinessHoursSettings restaurantId={restaurant.id} />;
-      case "config-regioes":
-        return <DeliveryZonesSettings restaurantId={restaurant.id} />;
-      case "config-pagamentos":
-        return (
-          <div className="space-y-8">
-            <PaymentMethodsSettings restaurantId={restaurant.id} />
-            <OnlinePaymentsSettings restaurantId={restaurant.id} />
-          </div>
-        );
-      case "config-impressoras":
-        return <PrintersSettings restaurantId={restaurant.id} />;
       case "config-whatsapp":
         return <WhatsAppSettings restaurantId={restaurant.id} />;
-      case "config-totem":
-        return isTotemUnlocked
-          ? <KioskSettings restaurantId={restaurant.id} />
-          : <KioskUpsellScreen />;
-      case "config-backup":
-        return <BackupSettings restaurantId={restaurant.id} />;
       default:
         return <OverviewTab restaurantId={restaurant.id} />;
     }
