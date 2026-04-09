@@ -316,6 +316,7 @@ export const TableDetailDialog = ({
         .reduce((sum: number, s: Split) => sum + Number(s.value), 0);
     }
 
+    const totalDiscount = comandaOrders.reduce((o: any, sum: number) => sum + (o.coupon_discount || 0), 0);
     const virtualOrder = {
       id: comandaOrders[0].id,
       table_id: table?.id,
@@ -323,6 +324,7 @@ export const TableDetailDialog = ({
       restaurant_id: restaurantId,
       customer_name: comanda.customer_name,
       order_items: allItems,
+      coupon_discount: totalDiscount > 0 ? totalDiscount : undefined,
       _comanda_id: comanda.id,
       _comanda_order_ids: orderIds,
       _splits_paid_total: splitsPaidTotal,
