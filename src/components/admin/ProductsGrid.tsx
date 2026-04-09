@@ -987,14 +987,18 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                     {linkedGroups.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-sm font-medium">Categorias Vinculadas:</p>
-                        {linkedGroups.map((group) => (
+                        {linkedGroups.map((group, index) => (
                           <div key={group.id} className="p-3 bg-primary/5 rounded-lg border border-primary/20">
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{group.category_name}</span>
                                 {group.is_required && <Badge variant="default" className="text-[10px] h-5">Obrigatório</Badge>}
                               </div>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveLinkedGroup(group.id)}>Remover</Button>
+                              <div className="flex items-center gap-1">
+                                <Button type="button" variant="ghost" size="sm" onClick={() => handleMoveLinkedGroup(index, 'up')} disabled={index === 0} className="h-7 w-7 p-0"><ArrowUp className="h-3.5 w-3.5" /></Button>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => handleMoveLinkedGroup(index, 'down')} disabled={index === linkedGroups.length - 1} className="h-7 w-7 p-0"><ArrowDown className="h-3.5 w-3.5" /></Button>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveLinkedGroup(group.id)}>Remover</Button>
+                              </div>
                             </div>
                             <p className="text-xs text-muted-foreground">{
                               group.items.length} itens • Min: {group.min_selection} • Max: {group.max_selection ?? "∞"}</p>
