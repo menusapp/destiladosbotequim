@@ -7,7 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText, Timer, RotateCcw } from "lucide-react";
+import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText, Timer, RotateCcw, MapPin, Printer, HardDrive } from "lucide-react";
+import { lazy, Suspense } from "react";
+
+const BusinessHoursSettings = lazy(() => import("./BusinessHoursSettings"));
+const DeliveryZonesSettings = lazy(() => import("./DeliveryZonesSettings"));
+const PaymentMethodsSettings = lazy(() => import("./PaymentMethodsSettings"));
+const OnlinePaymentsSettings = lazy(() => import("./OnlinePaymentsSettings"));
+const PrintersSettings = lazy(() => import("./PrintersSettings"));
+const BackupSettings = lazy(() => import("./BackupSettings"));
 
 interface Settings {
   logo_url: string | null;
@@ -21,6 +29,12 @@ interface Settings {
   bill_request_enabled: boolean;
   show_prep_timer: boolean;
 }
+
+const SubTabLoading = () => (
+  <div className="text-center py-12">
+    <p className="text-muted-foreground">Carregando...</p>
+  </div>
+);
 
 const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [settings, setSettings] = useState<Settings>({
@@ -155,7 +169,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
       </div>
 
       <Tabs defaultValue="visual" className="space-y-6">
-        <TabsList className="w-full justify-start">
+        <TabsList className="w-full justify-start flex-wrap h-auto gap-1">
           <TabsTrigger value="visual" className="gap-2">
             <Image className="h-4 w-4" />
             Identidade Visual
@@ -164,13 +178,25 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             <Clock className="h-4 w-4" />
             Operacional
           </TabsTrigger>
-          <TabsTrigger value="registration" className="gap-2">
-            <User className="h-4 w-4" />
-            Cadastro de Clientes
+          <TabsTrigger value="hours" className="gap-2">
+            <Clock className="h-4 w-4" />
+            Horário
           </TabsTrigger>
-          <TabsTrigger value="cardapio" className="gap-2">
-            <FileText className="h-4 w-4" />
-            Cardápio
+          <TabsTrigger value="delivery" className="gap-2">
+            <MapPin className="h-4 w-4" />
+            Regiões de Entrega
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="gap-2">
+            <CreditCard className="h-4 w-4" />
+            Pagamentos
+          </TabsTrigger>
+          <TabsTrigger value="printers" className="gap-2">
+            <Printer className="h-4 w-4" />
+            Impressoras
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="gap-2">
+            <HardDrive className="h-4 w-4" />
+            Backup
           </TabsTrigger>
         </TabsList>
 
@@ -216,7 +242,6 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="flex items-start gap-5">
-                  {/* Logo preview */}
                   <div className="shrink-0">
                     <div className="w-24 h-24 rounded-full border-4 border-border bg-muted flex items-center justify-center overflow-hidden">
                       {settings.logo_url ? (
@@ -270,7 +295,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           </Button>
         </TabsContent>
 
-        {/* Tab 2: Operacional */}
+        {/* Tab 2: Operacional (merged: Operacional + Cadastro de Clientes + Cardápio) */}
         <TabsContent value="operational" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Taxa de Serviço */}
@@ -353,17 +378,10 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             </Card>
           </div>
 
-          <Button onClick={handleSaveSettings} className="w-full sm:w-auto gap-2">
-            <Save className="h-4 w-4" />
-            Salvar Configurações Operacionais
-          </Button>
-        </TabsContent>
-
-        {/* Tab 3: Cadastro de Clientes */}
-        <TabsContent value="registration" className="space-y-6">
+          {/* Cadastro de Clientes (merged) */}
           <Card>
             <CardHeader>
-              <CardTitle>Campos de Cadastro</CardTitle>
+              <CardTitle>Campos de Cadastro de Clientes</CardTitle>
               <CardDescription>Defina quais informações são solicitadas ao cliente no login do cardápio</CardDescription>
             </CardHeader>
             <CardContent>
@@ -422,14 +440,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             </CardContent>
           </Card>
 
-          <Button onClick={handleSaveSettings} className="w-full sm:w-auto gap-2">
-            <Save className="h-4 w-4" />
-            Salvar Campos de Cadastro
-          </Button>
-        </TabsContent>
-
-        {/* Tab 4: Cardápio */}
-        <TabsContent value="cardapio" className="space-y-6">
+          {/* Cardápio config (merged) */}
           <Card>
             <CardHeader>
               <CardTitle>Configurações do Cardápio</CardTitle>
@@ -437,7 +448,6 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             </CardHeader>
             <CardContent>
               <div className="divide-y">
-                {/* Pedir Conta */}
                 <div className="flex items-center justify-between py-4 first:pt-0">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -453,16 +463,50 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                     onCheckedChange={(checked) => setSettings({ ...settings, bill_request_enabled: checked })}
                   />
                 </div>
-
               </div>
             </CardContent>
           </Card>
 
           <Button onClick={handleSaveSettings} className="w-full sm:w-auto gap-2">
             <Save className="h-4 w-4" />
-            Salvar Configurações do Cardápio
+            Salvar Configurações Operacionais
           </Button>
+        </TabsContent>
 
+        {/* Tab 3: Horário de Funcionamento */}
+        <TabsContent value="hours">
+          <Suspense fallback={<SubTabLoading />}>
+            <BusinessHoursSettings restaurantId={restaurantId} />
+          </Suspense>
+        </TabsContent>
+
+        {/* Tab 4: Regiões de Entrega */}
+        <TabsContent value="delivery">
+          <Suspense fallback={<SubTabLoading />}>
+            <DeliveryZonesSettings restaurantId={restaurantId} />
+          </Suspense>
+        </TabsContent>
+
+        {/* Tab 5: Formas de Pagamento */}
+        <TabsContent value="payments" className="space-y-8">
+          <Suspense fallback={<SubTabLoading />}>
+            <PaymentMethodsSettings restaurantId={restaurantId} />
+            <OnlinePaymentsSettings restaurantId={restaurantId} />
+          </Suspense>
+        </TabsContent>
+
+        {/* Tab 6: Impressoras */}
+        <TabsContent value="printers">
+          <Suspense fallback={<SubTabLoading />}>
+            <PrintersSettings restaurantId={restaurantId} />
+          </Suspense>
+        </TabsContent>
+
+        {/* Tab 7: Backup e Restauração */}
+        <TabsContent value="backup">
+          <Suspense fallback={<SubTabLoading />}>
+            <BackupSettings restaurantId={restaurantId} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
