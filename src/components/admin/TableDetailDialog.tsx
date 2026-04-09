@@ -192,10 +192,11 @@ export const TableDetailDialog = ({
   });
 
   const getOrderTotal = (order: any) => {
-    return order.order_items?.reduce((sum: number, item: any) => {
+    const itemsTotal = order.order_items?.reduce((sum: number, item: any) => {
       const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
       return sum + (item.price_at_order + extrasTotal) * item.quantity;
     }, 0) || 0;
+    return itemsTotal - (order.coupon_discount || 0);
   };
 
   const getItemTotal = (item: any) => {
