@@ -805,6 +805,10 @@ const RestaurantAdmin = () => {
         return <CompanyDataSettings restaurantId={restaurant.id} />;
       case "config-whatsapp":
         return <WhatsAppSettings restaurantId={restaurant.id} />;
+      case "config-totem":
+        return isTotemUnlocked
+          ? <KioskSettings restaurantId={restaurant.id} />
+          : <KioskUpsellScreen />;
       default:
         return <OverviewTab restaurantId={restaurant.id} />;
     }
