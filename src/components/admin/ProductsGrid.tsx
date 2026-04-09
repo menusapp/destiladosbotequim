@@ -301,7 +301,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductCategoryId(product.category_id || "__none");
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
-    setPdvCode((product as any).pdv_code || "");
+    setPdvCode("");
 
     const { data: ingredientsData } = await supabase.from("product_ingredients").select("*, stock_items(name, unit, price_per_unit)").eq("product_id", product.id);
     const formattedIngredients = ingredientsData?.map((ing: any) => ({
