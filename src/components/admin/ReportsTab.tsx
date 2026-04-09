@@ -72,6 +72,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
   const [cmv, setCmv] = useState(0);
   const [operationalExpenses, setOperationalExpenses] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
+  const [payrollRecovery, setPayrollRecovery] = useState(0);
 
   useEffect(() => {
     fetchData();
