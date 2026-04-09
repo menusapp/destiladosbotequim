@@ -214,6 +214,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         debit: 0,
         pix: 0,
         meal_voucher: 0,
+        employee_credit: 0,
       };
 
       // Função para normalizar qualquer valor salvo → method_type
