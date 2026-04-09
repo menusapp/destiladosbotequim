@@ -498,6 +498,8 @@ export const TableDetailDialog = ({
         customer_name: order.customer_name,
         order_type: "local" as const,
         tables: { table_number: table!.table_number },
+        coupon_discount: order.coupon_discount || undefined,
+        notes: order.notes || undefined,
         order_items: (order.order_items || []).map((item: any) => ({
           id: item.id,
           quantity: item.quantity,
