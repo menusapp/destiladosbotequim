@@ -72,6 +72,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
   const [cmv, setCmv] = useState(0);
   const [operationalExpenses, setOperationalExpenses] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
+  const [payrollRecovery, setPayrollRecovery] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -125,6 +126,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         { data: comandasData },
         { data: paymentMethods },
         { data: cashMovements },
+        { data: payrollCredits },
       ] = await Promise.all([
         supabase.from("fixed_costs").select("name, amount").eq("restaurant_id", restaurantId),
         supabase.from("variable_costs").select("name, type, amount, percentage").eq("restaurant_id", restaurantId),
@@ -145,11 +147,15 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         supabase.from("cash_movements").select("amount")
           .eq("restaurant_id", restaurantId).eq("movement_type", "saida")
           .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+        supabase.from("employee_credits").select("paid_amount")
+          .eq("restaurant_id", restaurantId).eq("status", "paid").eq("paid_method", "payroll")
+          .gte("paid_at", startDate.toISOString()).lte("paid_at", endDate.toISOString()),
       ]);
 
       setFixedCosts(fixedData.data || []);
       setVariableCosts(variableData.data || []);
       setLaborCosts(laborData.data || []);
+      setPayrollRecovery((payrollCredits || []).reduce((sum, c) => sum + Number(c.paid_amount || 0), 0));
 
       let billsTotal = 0;
       let billsCount = 0;
@@ -490,12 +496,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
     });
 
     const totalCosts = cmv + operationalExpenses + totalFixedCosts + totalVariableCosts + totalLaborCosts;
-    const operationalProfit = totalRevenue - totalCosts;
+    const operationalProfit = totalRevenue - totalCosts + payrollRecovery;
 
     return {
       grossRevenue: totalRevenue,
       cmv,
       grossProfit: totalRevenue - cmv,
+      payrollRecovery,
       operationalExpenses,
       fixedCost: totalFixedCosts,
       variableCost: totalVariableCosts,
@@ -511,16 +518,21 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
     const { startDate, endDate } = getDateRange();
     const periodLabel = dateFilter === "today" ? "Hoje" : dateFilter === "yesterday" ? "Ontem" : dateFilter === "7days" ? "7 Dias" : dateFilter === "30days" ? "30 Dias" : `${format(startDate, "dd/MM/yyyy", { locale: ptBR })} - ${format(endDate, "dd/MM/yyyy", { locale: ptBR })}`;
 
-    const rows = [
+    const rows: any[] = [
       { label: "Receita Bruta", value: dreValues.grossRevenue, bold: true },
       { label: "   (-) CMV dos Produtos", value: dreValues.cmv },
       { label: "Lucro Bruto", value: dreValues.grossProfit, bold: true },
+    ];
+    if (dreValues.payrollRecovery > 0) {
+      rows.push({ label: "   (+) Descontos em Folha", value: dreValues.payrollRecovery, positive: true });
+    }
+    rows.push(
       { label: "   Saídas do Caixa", value: dreValues.operationalExpenses },
       { label: "   Custo Fixo (proporcional)", value: dreValues.fixedCost },
       { label: "   Custo Variável", value: dreValues.variableCost },
       { label: "   CMO - Mão de Obra (proporcional)", value: dreValues.laborCost },
       { label: "Lucro Operacional", value: dreValues.operationalProfit, bold: true, highlight: true },
-    ];
+    );
 
     if (dreValues.grossRevenue > 0) {
       rows.push({ label: "Margem Operacional", value: parseFloat(((dreValues.operationalProfit / dreValues.grossRevenue) * 100).toFixed(1)), bold: false, isPercentage: true } as any);
@@ -541,6 +553,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         .bold td { font-weight: 700; background: #f9f9f9; }
         .highlight td { font-size: 16px; background: #f0f7ff; }
         .right { text-align: right; font-variant-numeric: tabular-nums; }
+        .positive td { color: #16a34a; font-weight: 500; }
         @media print { body { padding: 20px; } }
       </style></head><body>
       <h1>Demonstrativo de Resultados (DRE)</h1>
@@ -550,7 +563,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         <div class="stat"><div class="stat-value">R$ ${stats.averageTicket.toFixed(2).replace(".",",")}</div><div class="stat-label">Ticket Médio</div></div>
         <div class="stat"><div class="stat-value">${stats.mesasAtendidas}</div><div class="stat-label">Mesas Atendidas</div></div>
       </div>
-      <table>${rows.map(r => `<tr class="${r.bold ? 'bold' : ''} ${(r as any).highlight ? 'highlight' : ''}"><td>${r.label}</td><td class="right">${(r as any).isPercentage ? r.value + '%' : 'R$ ' + r.value.toFixed(2).replace(".",",")}</td></tr>`).join('')}</table>
+      <table>${rows.map(r => `<tr class="${r.bold ? 'bold' : ''} ${r.highlight ? 'highlight' : ''} ${r.positive ? 'positive' : ''}"><td>${r.label}</td><td class="right">${r.isPercentage ? r.value + '%' : (r.positive ? '+ ' : '') + 'R$ ' + r.value.toFixed(2).replace(".",",")}</td></tr>`).join('')}</table>
       <p style="margin-top:24px;font-size:11px;color:#aaa;">Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
       </body></html>`;
 
@@ -715,6 +728,12 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
               <span>Lucro Bruto</span>
               <span className="text-primary tabular-nums">R$ {dreValues.grossProfit.toFixed(2)}</span>
             </div>
+            {dreValues.payrollRecovery > 0 && (
+              <div className="flex justify-between items-center px-4 py-2.5 border-b text-sm pl-8">
+                <span className="text-green-600 font-medium">(+) Descontos em Folha</span>
+                <span className="tabular-nums text-green-600 font-medium">+ R$ {dreValues.payrollRecovery.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center px-4 py-2 border-b text-sm pl-8">
               <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Despesas Operacionais</span>
               <span></span>

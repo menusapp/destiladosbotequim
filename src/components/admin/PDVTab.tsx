@@ -82,7 +82,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   const queryClient = useQueryClient();
 
   // Order creation state
-  const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada" | "viagem">("mesa");
+  const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada">("mesa");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
@@ -584,7 +584,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
 
   const handleSubmit = async () => {
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
-    if (!customerName && orderType !== "mesa" && orderType !== "viagem") { toast.error("Nome do cliente é obrigatório"); return; }
+    if (!customerName && orderType !== "mesa") { toast.error("Nome do cliente é obrigatório"); return; }
 
     setSubmitting(true);
     try {
@@ -613,20 +613,6 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
           status: "preparing", customer_name: customerName || "Cliente",
-          customer_cpf: customerCpf || "000.000.000-00",
-          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
-          coupon_discount: discountForOrder,
-          pdv_source: true,
-        }).select().single();
-        if (error) throw error;
-        await insertOrderItems(order.id);
-
-      } else if (orderType === "viagem") {
-        const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
-        const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
-        const { data: order, error } = await supabase.from("orders").insert({
-          restaurant_id: restaurantId, order_type: "delivery", delivery_type: "takeaway",
-          status: "preparing", customer_name: customerName || "Cliente Viagem",
           customer_cpf: customerCpf || "000.000.000-00",
           notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
           coupon_discount: discountForOrder,
@@ -741,7 +727,7 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           created_at: new Date().toISOString(),
           customer_name: customerName || "Cliente PDV",
           order_type: orderType === "mesa" ? "local" : "delivery",
-          delivery_type: orderType === "delivery" ? "delivery" : orderType === "retirada" ? "pickup" : orderType === "viagem" ? "takeaway" : undefined,
+          delivery_type: orderType === "delivery" ? "delivery" : orderType === "retirada" ? "pickup" : undefined,
           tables: table ? { table_number: table.table_number } : null,
           delivery_address: deliveryAddress || undefined,
           delivery_phone: customerPhone || undefined,
@@ -1066,11 +1052,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
             <div className="space-y-5 pr-3">
               {/* Order type tabs */}
               <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)}>
-                <TabsList className="w-full grid grid-cols-4">
+                <TabsList className="w-full grid grid-cols-3">
                   <TabsTrigger value="mesa" className="text-xs">Mesa</TabsTrigger>
                   <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
                   <TabsTrigger value="retirada" className="text-xs">Retirada</TabsTrigger>
-                  <TabsTrigger value="viagem" className="text-xs">Viagem</TabsTrigger>
                 </TabsList>
               </Tabs>
 
