@@ -553,6 +553,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         .bold td { font-weight: 700; background: #f9f9f9; }
         .highlight td { font-size: 16px; background: #f0f7ff; }
         .right { text-align: right; font-variant-numeric: tabular-nums; }
+        .positive td { color: #16a34a; font-weight: 500; }
         @media print { body { padding: 20px; } }
       </style></head><body>
       <h1>Demonstrativo de Resultados (DRE)</h1>
