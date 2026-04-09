@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
-import { generateNextPdvCode } from "@/lib/pdvCodeGenerator";
+import { generateNextPdvCode, getAllUsedPdvCodes } from "@/lib/pdvCodeGenerator";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
