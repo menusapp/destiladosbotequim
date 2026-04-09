@@ -6,6 +6,9 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { TypingEffect } from "@/components/landing/TypingEffect";
 import menusLogo from "@/assets/menus-logo.png";
 import heroDashboard from "@/assets/landing-hero-dashboard.jpg";
+import landingPdv from "@/assets/landing-pdv.png";
+import landingDre from "@/assets/landing-dre.png";
+import landingWhatsapp from "@/assets/landing-whatsapp.png";
 import {
   ArrowRight, Check, ChevronRight, Zap, Star,
   QrCode, ShoppingCart, Utensils, Package,
@@ -150,9 +153,19 @@ const LandingPage = () => {
 
           <ScrollReveal delay={200}>
             <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Cardápio digital, pedidos online, delivery, estoque automático, financeiro, marketing e muito mais.{" "}
-              <strong className="text-foreground">Tudo em uma só plataforma.</strong>
+              Pare de perder pedidos. Aumente suas vendas sem pagar comissão.{" "}
+              <strong className="text-foreground">Automatize seu restaurante em minutos.</strong>
             </p>
+          </ScrollReveal>
+
+          {/* Diferenciadores */}
+          <ScrollReveal delay={250}>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-medium text-muted-foreground">
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> Zero comissão por pedido</span>
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> Robô IA que vende 24h</span>
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> DRE automático</span>
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> Parceiro de integração iFood</span>
+            </div>
           </ScrollReveal>
 
           <ScrollReveal delay={300}>
@@ -250,7 +263,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 3. OPERAÇÃO — GESTOR DE PEDIDOS ═══ */}
+      {/* ═══ 3. OPERAÇÃO — GESTOR DE PEDIDOS (screenshot real) ═══ */}
       <section className="py-16 sm:py-20 bg-background">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -274,51 +287,21 @@ const LandingPage = () => {
               </ul>
             </ScrollReveal>
             <ScrollReveal delay={200}>
-              <div className="rounded-2xl border border-border shadow-xl overflow-hidden bg-card">
-                <div className="p-6 space-y-4">
-                  {[
-                    { label: "Pedido #1042", status: "Preparando", color: "bg-warning" },
-                    { label: "Pedido #1043", status: "Novo", color: "bg-primary" },
-                    { label: "Pedido #1041", status: "Pronto", color: "bg-[hsl(var(--success))]" },
-                  ].map((o) => (
-                    <div key={o.label} className="flex items-center justify-between p-4 rounded-xl border border-border bg-background">
-                      <div>
-                        <p className="font-bold text-foreground">{o.label}</p>
-                        <p className="text-sm text-muted-foreground">2x Hambúrguer, 1x Batata</p>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold text-primary-foreground ${o.color}`}>{o.status}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="rounded-2xl border border-border shadow-xl overflow-hidden">
+                <img src={landingPdv} alt="Gestor de pedidos do Menus App" className="w-full h-auto" />
               </div>
             </ScrollReveal>
           </div>
         </div>
       </section>
 
-      {/* ═══ 4. FINANCEIRO ═══ */}
+      {/* ═══ 4. FINANCEIRO (screenshot real) ═══ */}
       <section className="py-16 sm:py-20 bg-card">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <ScrollReveal delay={200} className="order-2 lg:order-1">
-              <div className="rounded-2xl border border-border shadow-xl overflow-hidden bg-background p-6">
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-foreground">DRE — Maio/2025</h4>
-                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">Automático</span>
-                  </div>
-                  {[
-                    { label: "Receita Bruta", value: "R$ 48.500", positive: true },
-                    { label: "CMV", value: "- R$ 14.550", positive: false },
-                    { label: "Custos Fixos", value: "- R$ 8.200", positive: false },
-                    { label: "Lucro Líquido", value: "R$ 25.750", positive: true, bold: true },
-                  ].map((row) => (
-                    <div key={row.label} className={`flex items-center justify-between py-2 ${row.bold ? "border-t border-border pt-3" : ""}`}>
-                      <span className={`text-sm ${row.bold ? "font-bold text-foreground" : "text-muted-foreground"}`}>{row.label}</span>
-                      <span className={`text-sm font-bold ${row.positive ? "text-[hsl(var(--success))]" : "text-destructive"}`}>{row.value}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="rounded-2xl border border-border shadow-xl overflow-hidden">
+                <img src={landingDre} alt="Relatório DRE automático do Menus App" className="w-full h-auto" />
               </div>
             </ScrollReveal>
             <ScrollReveal className="order-1 lg:order-2">
@@ -344,8 +327,40 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 5. TUDO QUE SEU RESTAURANTE PRECISA — GRID ═══ */}
-      <section id="funcoes" className="py-16 sm:py-20 bg-background">
+      {/* ═══ 5. WHATSAPP ═══ */}
+      <section className="py-16 sm:py-20 bg-background">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <ScrollReveal>
+              <span className="inline-block px-3 py-1 rounded-full bg-[hsl(142_70%_45%)]/10 text-[hsl(142_70%_35%)] text-sm font-semibold uppercase tracking-wider mb-4">WhatsApp</span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
+                Marketing automático e central de alertas no <span className="text-[hsl(142_70%_35%)]">WhatsApp</span>
+              </h2>
+              <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
+                Crie campanhas de remarketing que disparam automaticamente. Cliente inativo? Ele recebe um cupom. Pedido confirmado? Notificação instantânea. Tudo sem você levantar um dedo.
+              </p>
+              <ul className="mt-6 space-y-3">
+                {["Remarketing automático", "Cupons personalizados", "Notificações de pedido", "Segmentação inteligente"].map((item) => (
+                  <li key={item} className="flex items-center gap-3">
+                    <div className="h-6 w-6 rounded-full bg-[hsl(142_70%_45%)]/10 flex items-center justify-center shrink-0">
+                      <Check className="h-3.5 w-3.5 text-[hsl(142_70%_35%)]" />
+                    </div>
+                    <span className="text-base text-foreground font-medium">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </ScrollReveal>
+            <ScrollReveal delay={200}>
+              <div className="rounded-2xl border border-border shadow-xl overflow-hidden">
+                <img src={landingWhatsapp} alt="Marketing por WhatsApp do Menus App" className="w-full h-auto" />
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ 6. TUDO QUE SEU RESTAURANTE PRECISA — GRID ═══ */}
+      <section id="funcoes" className="py-16 sm:py-20 bg-card">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-10">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Funções</span>
@@ -358,7 +373,7 @@ const LandingPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {allFeatures.map((f, i) => (
               <ScrollReveal key={i} delay={i * 50}>
-                <div className="p-4 rounded-xl border border-border bg-card hover:shadow-md hover:border-primary/20 transition-all h-full">
+                <div className="p-4 rounded-xl border border-border bg-background hover:shadow-md hover:border-primary/20 transition-all h-full">
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
                     <f.icon className="h-5 w-5 text-primary" />
                   </div>
@@ -371,8 +386,8 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 6. PROVA SOCIAL ═══ */}
-      <section className="py-16 sm:py-20 bg-card">
+      {/* ═══ 7. PROVA SOCIAL ═══ */}
+      <section className="py-16 sm:py-20 bg-background">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Depoimentos</span>
@@ -381,9 +396,9 @@ const LandingPage = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { name: "Carlos M.", role: "Dono de hamburgueria", text: "Triplicamos nossos pedidos de delivery no primeiro mês. O sistema é muito fácil de usar." },
-              { name: "Ana P.", role: "Dona de restaurante", text: "O robô do WhatsApp atende meus clientes de madrugada. Acordo com pedidos prontos!" },
-              { name: "Roberto S.", role: "Dono de pizzaria", text: "Saí do iFood e economizo mais de R$ 3.000/mês em comissões. Valeu muito a pena." },
+              { name: "Carlos M.", role: "Dono de hamburgueria", text: "Saí de 15 para 45 pedidos por dia no primeiro mês. Nunca imaginei que seria tão rápido." },
+              { name: "Ana P.", role: "Dona de restaurante", text: "O robô do WhatsApp atende meus clientes de madrugada. Acordo com pedidos prontos e faturamento garantido!" },
+              { name: "Roberto S.", role: "Dono de pizzaria", text: "Larguei o iFood e economizo mais de R$ 3.000/mês em comissões. O delivery próprio se pagou no primeiro dia." },
             ].map((t, i) => (
               <ScrollReveal key={t.name} delay={i * 100}>
                 <Card className="border-border hover:shadow-md transition-shadow h-full">
@@ -422,8 +437,8 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 7. SEGMENTOS ═══ */}
-      <section className="py-16 sm:py-20 bg-background">
+      {/* ═══ 8. SEGMENTOS ═══ */}
+      <section className="py-16 sm:py-20 bg-card">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <ScrollReveal>
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Segmentos</span>
@@ -443,7 +458,7 @@ const LandingPage = () => {
                 { icon: Coffee, label: "Cafeteria" },
                 { icon: ChefHat, label: "E muito mais!" },
               ].map((s) => (
-                <div key={s.label} className="flex items-center gap-2.5 px-5 py-3 rounded-full border border-border bg-card text-sm font-semibold text-foreground hover:border-primary/30 hover:shadow-sm transition-all">
+                <div key={s.label} className="flex items-center gap-2.5 px-5 py-3 rounded-full border border-border bg-background text-sm font-semibold text-foreground hover:border-primary/30 hover:shadow-sm transition-all">
                   <s.icon className="h-5 w-5 text-primary" />
                   {s.label}
                 </div>
@@ -453,7 +468,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 8. OFERTA / TESTE GRÁTIS ═══ */}
+      {/* ═══ 9. OFERTA / TESTE GRÁTIS ═══ */}
       <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <ScrollReveal>
@@ -482,8 +497,8 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 9. PRICING ═══ */}
-      <section id="pricing" className="py-16 sm:py-20 bg-card relative overflow-hidden">
+      {/* ═══ 10. PRICING ═══ */}
+      <section id="pricing" className="py-16 sm:py-20 bg-background relative overflow-hidden">
         <div className="absolute top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/[0.04] blur-[120px] pointer-events-none" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <ScrollReveal className="text-center mb-14">
@@ -543,8 +558,8 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 10. FAQ ═══ */}
-      <section id="faq" className="py-16 sm:py-20 bg-background">
+      {/* ═══ 11. FAQ ═══ */}
+      <section id="faq" className="py-16 sm:py-20 bg-card">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-10">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">FAQ</span>
@@ -554,7 +569,7 @@ const LandingPage = () => {
           <ScrollReveal delay={100}>
             <Accordion type="single" collapsible className="space-y-3">
               {faqs.map((faq, i) => (
-                <AccordionItem key={i} value={`faq-${i}`} className="border border-border rounded-xl px-6 bg-card data-[state=open]:shadow-md transition-shadow">
+                <AccordionItem key={i} value={`faq-${i}`} className="border border-border rounded-xl px-6 bg-background data-[state=open]:shadow-md transition-shadow">
                   <AccordionTrigger className="text-left text-base font-semibold text-foreground hover:no-underline py-5">{faq.q}</AccordionTrigger>
                   <AccordionContent className="text-base text-muted-foreground leading-relaxed pb-5">{faq.a}</AccordionContent>
                 </AccordionItem>
@@ -563,7 +578,6 @@ const LandingPage = () => {
           </ScrollReveal>
         </div>
       </section>
-
 
       {/* ═══ FOOTER ═══ */}
       <footer className="border-t border-border bg-card py-10">
@@ -579,7 +593,10 @@ const LandingPage = () => {
               <a href="#pricing" className="hover:text-foreground transition-colors">Planos</a>
               <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
             </div>
-            <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Menu's. Todos os direitos reservados.</p>
+            <div className="flex flex-col items-center md:items-end gap-1">
+              <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Menu's. Todos os direitos reservados.</p>
+              <p className="text-xs text-muted-foreground/60">Parceiro de integração iFood</p>
+            </div>
           </div>
         </div>
       </footer>
