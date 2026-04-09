@@ -49,6 +49,7 @@ interface CashMovement {
   created_by: string;
   created_at: string;
   bill_id: string | null;
+  order_id: string | null;
 }
 
 const BILL_DENOMINATIONS = [200, 100, 50, 20, 10, 5, 2];
