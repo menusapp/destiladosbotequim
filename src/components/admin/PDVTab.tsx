@@ -1052,11 +1052,10 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
             <div className="space-y-5 pr-3">
               {/* Order type tabs */}
               <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)}>
-                <TabsList className="w-full grid grid-cols-4">
+                <TabsList className="w-full grid grid-cols-3">
                   <TabsTrigger value="mesa" className="text-xs">Mesa</TabsTrigger>
                   <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
                   <TabsTrigger value="retirada" className="text-xs">Retirada</TabsTrigger>
-                  <TabsTrigger value="viagem" className="text-xs">Viagem</TabsTrigger>
                 </TabsList>
               </Tabs>
 
