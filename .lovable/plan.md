@@ -1,67 +1,67 @@
 
 
-# Atendente Virtual IA — Nova aba "Robô Menu's" + Renomear aba WhatsApp
+# Refatorar PDVTab — Layout maior + UX de cliente otimizada
 
 ## Resumo
-Criar nova aba independente "Robô Menu's" no menu lateral com toda a funcionalidade do Atendente Virtual IA. Renomear a aba existente "Automação WhatsApp" para "Notificações WhatsApp". Remover a sub-aba "Atendente Virtual" do WhatsAppSettings (se existir).
+Expandir o painel de criação de pedidos, aumentar espaçamento geral, e substituir os campos abertos de cliente/endereço por componentes compactos com botões "Buscar Cliente" e "Criar Novo" (inline colapsável). Para delivery, substituir campos de endereço por componente compacto com estado condicional baseado no cliente selecionado.
 
 ## Detalhes Técnicos
 
-### 1. Migration SQL
-Criar 3 tabelas (mesmo plano anterior):
-- **`whatsapp_ai_config`** — is_active, accept_orders_via_whatsapp, personality, welcome_message_type, custom_welcome_message, instructions. UNIQUE(restaurant_id). RLS USING(true).
-- **`whatsapp_menu_options`** — position, label, action_type, custom_message, is_active. UNIQUE(restaurant_id, position). RLS USING(true).
-- **`whatsapp_conversations`** — customer_phone, current_step, order_draft jsonb, last_message_at. UNIQUE(restaurant_id, customer_phone). RLS USING(true).
+### 1. Layout geral — `PDVTab.tsx`
 
-### 2. Edge Function `whatsapp-ai-bot`
-Mesmo plano: processa mensagens recebidas, mantém estado de conversa, usa Lovable AI para respostas naturais, envia via `whatsapp-send`.
+**Painel direito**: expandir de `w-[420px]` para `w-[520px]`.
 
-### 3. Webhook `whatsapp-webhook`
-Adicionar chamada ao bot no case `messages.upsert` (ignorar fromMe).
+**Espaçamento**: dentro do `ScrollArea`, mudar `space-y-4` para `space-y-5`, inputs de `h-8` para `h-9`, gaps entre campos de `space-y-2` para `space-y-3`.
 
-### 4. Nova aba no sidebar — `AppSidebar.tsx`
-Adicionar item no menu principal (não em configSubItems):
-```
-{ id: "robo-menus", label: "Robô Menu's", icon: Bot }
-```
-Posicionar após Marketing ou Fidelidade.
+### 2. Seção de Cliente (para Mesa, Retirada, Viagem)
 
-### 5. Renomear aba — `AppSidebar.tsx`
-Mudar `config-whatsapp` label de `"Automação WhatsApp"` para `"Notificações WhatsApp"`.
+Substituir os 3 inputs abertos (CPF, Nome, Celular) + botão "Buscar" por:
 
-### 6. Novo componente `RoboMenusTab.tsx`
-Componente dedicado com toda a UI do Atendente Virtual:
-- Banners de aviso (WhatsApp desconectado / IA desativada)
-- Toggle "IA Ativa" + "Aceitar Pedidos via WhatsApp"
-- Grid 2x2 de personalidades
-- Radio group tipo de boas-vindas (4 opções)
-- Editor de menu numérico (lista editável com add/remove)
-- Textarea de instruções
-- Simulador de conversa (mini chat)
-- Botão "Salvar Alterações"
+- Container `border rounded-lg p-4 bg-muted/30` com título "Cliente"
+- Dois botões lado a lado: "Buscar Cliente" (abre `CustomerSelectDialog` existente) e "Criar Novo" (expande formulário inline)
+- Quando cliente selecionado: card compacto com nome, telefone e botão X para limpar
+- "Criar Novo": expande abaixo (com animação via Collapsible) os 3 campos (CPF, Nome, Celular) + botão "Salvar" que faz upsert no CRM e marca como selecionado
 
-### 7. `RestaurantAdmin.tsx`
-- Importar lazy `RoboMenusTab`
-- Adicionar case `"robo-menus"` no switch de renderização
-- Manter `config-whatsapp` apontando para `WhatsAppSettings` (agora "Notificações WhatsApp")
+Estado interno: `selectedCustomer: { name, cpf, phone } | null` e `showNewClientForm: boolean`.
 
-### 8. `supabase/config.toml`
-Adicionar `[functions.whatsapp-ai-bot]` com `verify_jwt = false`.
+Ao selecionar via `CustomerSelectDialog` ou salvar novo cliente: fechar form, preencher `selectedCustomer`, popular os states existentes (`customerName`, `customerCpf`, `customerPhone`) para não quebrar o `handleSubmit`.
+
+### 3. Seção de Endereço (apenas Delivery)
+
+Substituir os 4 inputs abertos (CEP, Rua, Bairro, Cidade) por componente compacto:
+
+- Container `border rounded-lg p-4 bg-muted/30` com título "Endereço de Entrega"
+- Sem cliente: texto italic "Selecione um cliente para ver os endereços salvos"
+- Com cliente mas sem endereço: border-dashed placeholder
+- Com endereço: card compacto mostrando rua, bairro, cidade + taxa de entrega calculada
+- Botão "Alterar endereço" que abre um Dialog com:
+  - Lista de endereços salvos do cliente (busca `customer_addresses` por CPF)
+  - Botão "Novo endereço" que mostra campos CEP, Rua, Número, Complemento, Bairro, Cidade
+  - CEP com auto-lookup via ViaCEP (lógica já existente)
+  - Ao confirmar: popula os states existentes (`deliveryAddress`, `deliveryNeighborhood`, etc.) e calcula taxa via `delivery_zones`
+
+Auto-fill: quando `handleCustomerSelect` traz `defaultAddress`, já preencher o endereço selecionado automaticamente (lógica existente mantida).
+
+### 4. Novo estado e lógica
+
+Adicionar ao componente:
+- `selectedCustomer` state (derivado dos campos existentes)
+- `showNewClientForm` boolean
+- `showAddressDialog` boolean
+- `customerAddresses` query (busca por CPF quando cliente selecionado e orderType = delivery)
+
+Toda lógica de submit (`handleSubmit`, `upsertCustomerCRM`, `insertOrderItems`) permanece inalterada — os states `customerName`, `customerCpf`, `customerPhone`, `deliveryAddress`, etc. continuam sendo a fonte de verdade.
 
 ## Arquivos Impactados
 
 | Arquivo | Mudança |
 |---|---|
-| Migration SQL | Criar 3 tabelas + RLS |
-| `supabase/functions/whatsapp-ai-bot/index.ts` | **Novo** — cérebro do bot |
-| `supabase/functions/whatsapp-webhook/index.ts` | Chamar bot em `messages.upsert` |
-| `src/components/admin/RoboMenusTab.tsx` | **Novo** — UI completa do Atendente Virtual |
-| `src/components/admin/AppSidebar.tsx` | Adicionar "Robô Menu's" + renomear "Notificações WhatsApp" |
-| `src/pages/RestaurantAdmin.tsx` | Registrar nova aba |
-| `supabase/config.toml` | Registrar nova function |
+| `src/components/admin/PDVTab.tsx` | Refatorar seções de cliente e endereço + expandir layout |
 
 ## O que NÃO muda
-- `WhatsAppSettings.tsx` — permanece com sub-abas Cliente, Dono, Reservas
-- Fluxo de pedidos, fiscal, iFood, Delivery Direto
-- Edge functions existentes
+- `handleSubmit`, `upsertCustomerCRM`, `insertOrderItems` — mesma lógica
+- `CustomerSelectDialog` — reutilizado sem alteração
+- Mapa de mesas, realtime, busca de pedidos
+- `CreateOrderDrawer` — não é afetado (componente separado)
+- Backend / RPCs / triggers
 
