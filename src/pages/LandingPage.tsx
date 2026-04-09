@@ -163,7 +163,7 @@ const LandingPage = () => {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button size="lg" variant="outline" className="text-base px-8 h-13 font-medium" onClick={() => document.getElementById("funcoes")?.scrollIntoView({ behavior: "smooth" })}>
-                Ver funcionalidades
+                Ver vantagens
               </Button>
             </div>
           </ScrollReveal>
@@ -256,7 +256,7 @@ const LandingPage = () => {
         <div className="absolute top-20 -left-40 w-80 h-80 rounded-full bg-primary/[0.03] blur-[100px] pointer-events-none" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <ScrollReveal className="text-center mb-14">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Funcionalidades</span>
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-3">Vantagens</span>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">Tudo que seu restaurante precisa</h2>
             <p className="mt-3 text-lg text-muted-foreground max-w-2xl mx-auto font-light">Um sistema completo que substitui dezenas de ferramentas fragmentadas.</p>
           </ScrollReveal>
@@ -550,7 +550,7 @@ const LandingPage = () => {
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <a href="#funcoes" className="hover:text-foreground transition-colors">Funções</a>
-              <a href="#features" className="hover:text-foreground transition-colors">Funcionalidades</a>
+              <a href="#features" className="hover:text-foreground transition-colors">Vantagens</a>
               <a href="#pricing" className="hover:text-foreground transition-colors">Planos</a>
               <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
             </div>
