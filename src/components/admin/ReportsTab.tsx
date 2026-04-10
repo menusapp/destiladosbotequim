@@ -199,9 +199,25 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
 
       const counterTotal = (counterOrders || []).reduce((sum, order) => sum + Number(order.total_amount), 0);
       const counterOrderIds = (counterOrders || []).map(o => o.id);
+
+      // Totem orders
+      let totemTotal = 0;
+      const totemOrderIds: string[] = [];
+      (totemOrders || []).forEach((order: any) => {
+        let orderSubtotal = 0;
+        order.order_items?.forEach((item: any) => {
+          const itemTotal = item.price_at_order * item.quantity;
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0), 0);
+          orderSubtotal += itemTotal + extrasTotal;
+        });
+        orderSubtotal -= Number(order.coupon_discount || 0);
+        totemTotal += orderSubtotal;
+        totemOrderIds.push(order.id);
+      });
       
-      const salesTotal = billsTotal + deliveryTotal + counterTotal;
-      const ordersCount = billsCount + (deliveryOrders?.length || 0) + (counterOrders?.length || 0);
+      const salesTotal = billsTotal + deliveryTotal + counterTotal + totemTotal;
+      const ordersCount = billsCount + (deliveryOrders?.length || 0) + (counterOrders?.length || 0) + (totemOrders?.length || 0);
       const avgTicket = ordersCount > 0 ? salesTotal / ordersCount : 0;
 
       setTotalRevenue(salesTotal);
