@@ -64,6 +64,8 @@ export default function KioskSettings({ restaurantId }: Props) {
   const [savingTerminal, setSavingTerminal] = useState(false);
   const [testingPayment, setTestingPayment] = useState(false);
   const [creatingStore, setCreatingStore] = useState(false);
+  const [pendingOrderBlocked, setPendingOrderBlocked] = useState(false);
+  const [cancellingPending, setCancellingPending] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -257,9 +259,13 @@ export default function KioskSettings({ restaurantId }: Props) {
         },
       });
       if (!data?.ok) {
+        if (data?.code === "already_queued_order_on_terminal") {
+          setPendingOrderBlocked(true);
+        }
         toast.error(data?.error || "Erro ao criar cobrança de teste");
         return;
       }
+      setPendingOrderBlocked(false);
       if (data.data?.id) {
         toast.success("Cobrança de teste enviada! Verifique a maquininha.");
       } else {
