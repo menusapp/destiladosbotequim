@@ -66,6 +66,7 @@ export function KioskPayment({
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const createdOrderIdRef = useRef<string | null>(null);
+  const orderCreationInProgressRef = useRef(false);
 
   const pointsDiscount = loyaltyPointsUsed * loyaltyRealPerPoint;
   const finalTotal = Math.max(0, cartTotal - couponDiscount - pointsDiscount);
@@ -320,6 +321,10 @@ export function KioskPayment({
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             setPointStatus("paid");
 
+            // Guard against duplicate order creation from overlapping polling ticks
+            if (orderCreationInProgressRef.current) return;
+            orderCreationInProgressRef.current = true;
+
             // Payment confirmed — NOW create the order in DB
             try {
               const orderId = await createOrderInDB();
@@ -422,9 +427,14 @@ export function KioskPayment({
 
     setPointStatus("idle");
     setMpOrderId(null);
+    orderCreationInProgressRef.current = false;
   };
 
   const handleRetryPointPayment = () => {
+    setPointStatus("idle");
+    setMpOrderId(null);
+    orderCreationInProgressRef.current = false;
+    handlePointPayment();
     setPointStatus("idle");
     setMpOrderId(null);
     handlePointPayment();

@@ -134,63 +134,46 @@ async function createOrder(
 
   let result: { ok: boolean; status: number; data: any };
 
-  // When payment_type is specified (from Kiosk), use payment-intents API FIRST
-  // This API supports pre-selecting the payment type so the terminal skips the selection screen
+  // When payment_type is specified (from Kiosk), try to pre-select on the terminal
   if (body.payment_type) {
-    const amountCents = Math.round(body.amount * 100);
-    const piPayload = {
-      amount: amountCents,
-      description: body.description,
-      payment: {
-        installments: 1,
-        type: body.payment_type,
-        installments_cost: "seller",
-      },
-      additional_info: {
+    // PIX (bank_transfer) is NOT supported by payment-intents API — go straight to /v1/orders
+    if (body.payment_type === "bank_transfer") {
+      log("[MP Point] pix_direct_v1_orders", { payment_type: body.payment_type });
+
+      const orderPayload = {
+        type: "point",
         external_reference: body.order_id,
-      },
-    };
+        description: body.description,
+        transactions: {
+          payments: [{ amount: body.amount.toString() }],
+        },
+        config: {
+          point: {
+            terminal_id: body.device_id,
+            print_on_terminal: "no_ticket",
+            payment_type: "bank_transfer",
+          },
+        },
+      };
 
-    log("[MP Point] using_payment_intents_primary", { payment_type: body.payment_type });
-
-    result = await mpFetch(
-      `/point/integration-api/devices/${body.device_id}/payment-intents`,
-      accessToken,
-      {
+      result = await mpFetch("/v1/orders", accessToken, {
         method: "POST",
-        body: JSON.stringify(piPayload),
+        body: JSON.stringify(orderPayload),
         headers: { "X-Idempotency-Key": body.idempotency_key },
-      }
-    );
+      });
 
-    // Retry once on 5xx
-    if (!result.ok && result.status >= 500) {
-      log("[MP Point] payment_intents_retry_5xx", { first_status: result.status });
-      result = await mpFetch(
-        `/point/integration-api/devices/${body.device_id}/payment-intents`,
-        accessToken,
-        {
-          method: "POST",
-          body: JSON.stringify(piPayload),
-          headers: { "X-Idempotency-Key": body.idempotency_key },
-        }
-      );
-    }
-
-    if (result.ok) {
-      log("[MP Point] payment_intents_success", { id: result.data?.id });
-    } else {
-      // Fallback to /v1/orders if payment-intents fails (except queue conflict)
-      const errCode = result.data?.errors?.[0]?.code;
-      if (errCode !== "already_queued_order_on_terminal") {
-        log("[MP Point] payment_intents_failed_fallback_v1", { status: result.status, error: errCode });
-
-        const orderPayload = {
+      // If config.point.payment_type not accepted, try allowed_payment_methods
+      if (!result.ok) {
+        log("[MP Point] pix_v1_retry_allowed_methods", { status: result.status });
+        const orderPayload2 = {
           type: "point",
           external_reference: body.order_id,
           description: body.description,
           transactions: {
-            payments: [{ amount: body.amount.toString() }],
+            payments: [{
+              amount: body.amount.toString(),
+              allowed_payment_methods: ["bank_transfer"],
+            }],
           },
           config: {
             point: {
@@ -202,9 +185,75 @@ async function createOrder(
 
         result = await mpFetch("/v1/orders", accessToken, {
           method: "POST",
-          body: JSON.stringify(orderPayload),
-          headers: { "X-Idempotency-Key": body.idempotency_key },
+          body: JSON.stringify(orderPayload2),
+          headers: { "X-Idempotency-Key": body.idempotency_key + "-r" },
         });
+      }
+    } else {
+      // Card types (credit_card, debit_card, voucher_card) — use payment-intents API
+      const amountCents = Math.round(body.amount * 100);
+      const piPayload = {
+        amount: amountCents,
+        description: body.description,
+        payment: {
+          installments: 1,
+          type: body.payment_type,
+          installments_cost: "seller",
+        },
+        additional_info: {
+          external_reference: body.order_id,
+        },
+      };
+
+      log("[MP Point] using_payment_intents", { payment_type: body.payment_type });
+
+      result = await mpFetch(
+        `/point/integration-api/devices/${body.device_id}/payment-intents`,
+        accessToken,
+        {
+          method: "POST",
+          body: JSON.stringify(piPayload),
+          headers: { "X-Idempotency-Key": body.idempotency_key },
+        }
+      );
+
+      // Retry once on 5xx
+      if (!result.ok && result.status >= 500) {
+        result = await mpFetch(
+          `/point/integration-api/devices/${body.device_id}/payment-intents`,
+          accessToken,
+          {
+            method: "POST",
+            body: JSON.stringify(piPayload),
+            headers: { "X-Idempotency-Key": body.idempotency_key },
+          }
+        );
+      }
+
+      if (!result.ok) {
+        const errCode = result.data?.errors?.[0]?.code;
+        if (errCode !== "already_queued_order_on_terminal") {
+          log("[MP Point] payment_intents_failed_fallback_v1", { status: result.status, error: errCode });
+          const orderPayload = {
+            type: "point",
+            external_reference: body.order_id,
+            description: body.description,
+            transactions: {
+              payments: [{ amount: body.amount.toString() }],
+            },
+            config: {
+              point: {
+                terminal_id: body.device_id,
+                print_on_terminal: "no_ticket",
+              },
+            },
+          };
+          result = await mpFetch("/v1/orders", accessToken, {
+            method: "POST",
+            body: JSON.stringify(orderPayload),
+            headers: { "X-Idempotency-Key": body.idempotency_key },
+          });
+        }
       }
     }
   } else {
