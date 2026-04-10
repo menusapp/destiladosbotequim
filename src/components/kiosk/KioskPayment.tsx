@@ -157,6 +157,7 @@ export function KioskPayment({
 
     // For table orders paid via terminal, enter as accepted + paid immediately
     const isTablePaid = alreadyPaid && consumptionMode === "table";
+    const orderStatus = isTablePaid ? "accepted" : alreadyPaid ? "preparing" : "pending";
 
     const orderData: any = {
       table_id: tableId,
@@ -168,10 +169,9 @@ export function KioskPayment({
       order_channel: "totem",
       payment_type: getPaymentTypeForDB(),
       payment_brand: selectedBrand || null,
-      status: isTablePaid ? "accepted" : "pending",
+      status: orderStatus,
       payment_status: alreadyPaid ? "paid" : "pending",
       paid_at: alreadyPaid ? new Date().toISOString() : null,
-      total_amount: finalTotal,
       notes,
       delivery_phone: customer.phone || null,
       coupon_code: appliedCoupon?.code || null,
@@ -443,9 +443,6 @@ export function KioskPayment({
     setPointStatus("idle");
     setMpOrderId(null);
     orderCreationInProgressRef.current = false;
-    handlePointPayment();
-    setPointStatus("idle");
-    setMpOrderId(null);
     handlePointPayment();
   };
 
