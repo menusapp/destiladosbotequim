@@ -125,7 +125,7 @@ export function KioskPayment({
     return "credit_card";
   };
 
-  const createOrderInDB = useCallback(async (): Promise<string | null> => {
+  const createOrderInDB = useCallback(async (alreadyPaid = false): Promise<string | null> => {
     const { order_type, delivery_type } = getOrderTypeFields();
 
     let tableId: string | null = null;
@@ -155,6 +155,9 @@ export function KioskPayment({
       paymentLabel || null,
     ].filter(Boolean).join(" | ");
 
+    // For table orders paid via terminal, enter as accepted + paid immediately
+    const isTablePaid = alreadyPaid && consumptionMode === "table";
+
     const orderData: any = {
       table_id: tableId,
       restaurant_id: restaurant.id,
@@ -165,8 +168,10 @@ export function KioskPayment({
       order_channel: "totem",
       payment_type: getPaymentTypeForDB(),
       payment_brand: selectedBrand || null,
-      status: "pending",
-      payment_status: "pending",
+      status: isTablePaid ? "accepted" : "pending",
+      payment_status: alreadyPaid ? "paid" : "pending",
+      paid_at: alreadyPaid ? new Date().toISOString() : null,
+      total_amount: finalTotal,
       notes,
       delivery_phone: customer.phone || null,
       coupon_code: appliedCoupon?.code || null,
@@ -229,6 +234,15 @@ export function KioskPayment({
 
       if (!comandaError && comanda) {
         await supabase.from("orders").update({ comanda_id: comanda.id }).eq("id", order.id);
+      }
+
+      // Occupy table immediately for paid totem orders
+      if (isTablePaid) {
+        await supabase.from("tables").update({
+          is_occupied: true,
+          occupied_at: new Date().toISOString(),
+          occupied_by: customer.name,
+        }).eq("id", tableId);
       }
     }
 
