@@ -66,6 +66,7 @@ export default function KioskSettings({ restaurantId }: Props) {
   const [creatingStore, setCreatingStore] = useState(false);
   const [pendingOrderBlocked, setPendingOrderBlocked] = useState(false);
   const [cancellingPending, setCancellingPending] = useState(false);
+  const [switchingMode, setSwitchingMode] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -190,6 +191,29 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
+  const handleSwitchToPDV = async (deviceId?: string) => {
+    const target = deviceId || activeTerminal?.device_id;
+    if (!target) return;
+    setSwitchingMode(true);
+    try {
+      const { data } = await supabase.functions.invoke("mercadopago-point", {
+        body: { action: "change_operating_mode", restaurant_id: restaurantId, device_id: target, mode: "PDV" },
+      });
+      if (!data?.ok) {
+        toast.error(data?.error || "Erro ao trocar modo do terminal");
+        return;
+      }
+      toast.success("Maquininha alterada para modo integrado (PDV)! Ela pode reiniciar.");
+      // Update local state
+      setDiscoveredDevices(prev => prev.map(d => (d.id || d.device_id) === target ? { ...d, operating_mode: "PDV" } : d));
+      setSavedTerminals(prev => prev.map(t => t.device_id === target ? { ...t, operating_mode: "PDV" } : t));
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao trocar modo");
+    } finally {
+      setSwitchingMode(false);
+    }
+  };
+
   const handleCreateStoreAndPos = async () => {
     setCreatingStore(true);
     try {
@@ -232,6 +256,11 @@ export default function KioskSettings({ restaurantId }: Props) {
           p_mp_external_pos_id: posRes.data?.id?.toString() || null,
           p_use_on_kiosk: true,
         });
+
+        // Auto-switch to PDV mode
+        if (terminal.operating_mode !== "PDV") {
+          await handleSwitchToPDV(terminal.device_id);
+        }
       }
 
       toast.success("Loja e Caixa criados com sucesso!");
@@ -568,20 +597,36 @@ export default function KioskSettings({ restaurantId }: Props) {
                       >
                         <div>
                           <p className="text-sm font-medium">{device.name || device.id || device.device_id}</p>
-                          <p className="text-xs text-muted-foreground">ID: {device.id || device.device_id}</p>
+                          <p className="text-xs text-muted-foreground">
+                            ID: {device.id || device.device_id} — Modo: {device.operating_mode || "?"}
+                          </p>
                         </div>
-                        <Button
-                          variant={activeTerminal?.device_id === (device.id || device.device_id) ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handleSelectTerminal(device)}
-                          disabled={savingTerminal}
-                        >
-                          {activeTerminal?.device_id === (device.id || device.device_id) ? (
-                            <><CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Ativo</>
-                          ) : (
-                            "Selecionar"
+                        <div className="flex items-center gap-2">
+                          {device.operating_mode === "STANDALONE" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSwitchToPDV(device.id || device.device_id)}
+                              disabled={switchingMode}
+                              className="gap-1 text-xs"
+                            >
+                              {switchingMode ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                              Ativar PDV
+                            </Button>
                           )}
-                        </Button>
+                          <Button
+                            variant={activeTerminal?.device_id === (device.id || device.device_id) ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handleSelectTerminal(device)}
+                            disabled={savingTerminal}
+                          >
+                            {activeTerminal?.device_id === (device.id || device.device_id) ? (
+                              <><CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Ativo</>
+                            ) : (
+                              "Selecionar"
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -600,7 +645,37 @@ export default function KioskSettings({ restaurantId }: Props) {
                         Terminal ativo: {activeTerminal.device_name || activeTerminal.device_id}
                       </p>
                     </div>
-                  </div>
+                   </div>
+
+                  {/* Operating mode warning */}
+                  {activeTerminal.operating_mode === "STANDALONE" && (
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700">
+                      <div className="flex items-center gap-2 flex-1">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Modo manual (STANDALONE)</p>
+                          <p className="text-xs text-muted-foreground">A maquininha precisa estar em modo integrado (PDV) para receber cobranças do sistema</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSwitchToPDV()}
+                        disabled={switchingMode}
+                        className="gap-2 ml-3 shrink-0"
+                      >
+                        {switchingMode ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                        Ativar modo integrado
+                      </Button>
+                    </div>
+                  )}
+
+                  {activeTerminal.operating_mode === "PDV" && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <p className="text-sm font-medium text-green-700 dark:text-green-400">Modo integrado (PDV) ativo</p>
+                    </div>
+                  )}
 
                   {/* Step 2: Create Store & POS — skip if already exists */}
                   {activeTerminal.mp_store_id && activeTerminal.mp_pos_id ? (
