@@ -9,8 +9,22 @@ const corsHeaders = {
 
 const MP_API = "https://api.mercadopago.com";
 
+// Known MP error translations
+const MP_ERROR_MESSAGES: Record<string, string> = {
+  already_queued_order_on_terminal: "Já existe uma cobrança pendente nessa maquininha. Aguarde ou cancele a anterior.",
+  device_not_found: "Maquininha não encontrada. Verifique se está ligada.",
+  invalid_terminal_id: "Terminal inválido.",
+};
+
 function log(action: string, data: Record<string, unknown>) {
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), action, ...data }));
+}
+
+function respond(ok: boolean, payload: Record<string, unknown> = {}) {
+  return new Response(
+    JSON.stringify({ ok, ...payload }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 }
 
 function getSupabaseAdmin() {
@@ -32,7 +46,6 @@ async function getRestaurantToken(restaurantId: string) {
     throw new Error("Conta Mercado Pago não conectada para este restaurante");
   }
 
-  // Check token expiry
   if (data.token_expires_at && new Date(data.token_expires_at) < new Date()) {
     throw new Error("TOKEN_EXPIRED");
   }
@@ -51,19 +64,25 @@ async function mpFetch(
     ...(options.headers as Record<string, string> || {}),
   };
 
-  const res = await fetch(`${MP_API}${path}`, {
-    ...options,
-    headers,
-  });
-
+  const res = await fetch(`${MP_API}${path}`, { ...options, headers });
   const data = await res.json().catch(() => ({}));
 
-  // Log full MP error body for debugging
   if (!res.ok) {
     log("mp_api_error", { path, status: res.status, error_body: data });
   }
 
   return { ok: res.ok, status: res.status, data };
+}
+
+function translateMpError(result: { ok: boolean; status: number; data: any }): { error: string; code: string } {
+  const errors = result.data?.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    const code = errors[0].code || "unknown";
+    const msg = MP_ERROR_MESSAGES[code] || errors[0].message || "Erro desconhecido do Mercado Pago";
+    return { error: msg, code };
+  }
+  const msg = result.data?.message || result.data?.error || `Erro do Mercado Pago (HTTP ${result.status})`;
+  return { error: msg, code: "mp_error" };
 }
 
 // ============================================
@@ -74,21 +93,23 @@ async function listTerminals(restaurantId: string) {
   const { accessToken } = await getRestaurantToken(restaurantId);
   const result = await mpFetch("/point/integration-api/devices", accessToken);
   log("list_terminals", { restaurant_id: restaurantId, status: result.ok ? "success" : "error", response_status: result.status });
-  return result;
+  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
+  return respond(true, { data: result.data });
 }
 
 async function createStore(restaurantId: string, body: { name: string; external_id: string; location: { street_name: string; city_name: string; state_name: string } }) {
   const { accessToken, mpUserId } = await getRestaurantToken(restaurantId);
-  if (!mpUserId) throw new Error("mp_user_id não encontrado");
+  if (!mpUserId) return respond(false, { error: "mp_user_id não encontrado", code: "missing_user_id" });
   if (!body.location || !body.location.street_name) {
-    throw new Error("Campo 'location' é obrigatório para criar loja");
+    return respond(false, { error: "Campo 'location' é obrigatório para criar loja", code: "missing_location" });
   }
   const result = await mpFetch(`/users/${mpUserId}/stores`, accessToken, {
     method: "POST",
     body: JSON.stringify(body),
   });
   log("create_store", { restaurant_id: restaurantId, status: result.ok ? "success" : "error", store_id: result.data?.id });
-  return result;
+  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
+  return respond(true, { data: result.data });
 }
 
 async function createPos(restaurantId: string, body: { name: string; external_id: string; external_store_id: string; fixed_amount?: boolean; category?: number }) {
@@ -98,7 +119,8 @@ async function createPos(restaurantId: string, body: { name: string; external_id
     body: JSON.stringify(body),
   });
   log("create_pos", { restaurant_id: restaurantId, status: result.ok ? "success" : "error", pos_id: result.data?.id });
-  return result;
+  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
+  return respond(true, { data: result.data });
 }
 
 async function createOrder(
@@ -130,14 +152,13 @@ async function createOrder(
     idempotency_key: body.idempotency_key,
   });
 
-  // First attempt
   let result = await mpFetch("/v1/orders", accessToken, {
     method: "POST",
     body: JSON.stringify(orderPayload),
     headers: { "X-Idempotency-Key": body.idempotency_key },
   });
 
-  // Retry once on network-level failure
+  // Retry once on 5xx
   if (!result.ok && result.status >= 500) {
     log("create_order_retry", { restaurant_id: restaurantId, order_id: body.order_id, first_status: result.status });
     result = await mpFetch("/v1/orders", accessToken, {
@@ -147,8 +168,12 @@ async function createOrder(
     });
   }
 
-  if (result.ok && result.data?.id) {
-    // Save to point_order_payments via RPC
+  if (!result.ok) {
+    log("create_order_result", { restaurant_id: restaurantId, order_id: body.order_id, status: "error", response_status: result.status });
+    return respond(false, { ...translateMpError(result), data: null });
+  }
+
+  if (result.data?.id) {
     const sb = getSupabaseAdmin();
     await sb.rpc("insert_point_order_payment", {
       p_restaurant_id: restaurantId,
@@ -167,11 +192,11 @@ async function createOrder(
     restaurant_id: restaurantId,
     order_id: body.order_id,
     mp_order_id: result.data?.id,
-    status: result.ok ? "success" : "error",
+    status: "success",
     response_status: result.status,
   });
 
-  return result;
+  return respond(true, { data: result.data });
 }
 
 async function getOrder(restaurantId: string, mpOrderId: string) {
@@ -179,33 +204,33 @@ async function getOrder(restaurantId: string, mpOrderId: string) {
   const result = await mpFetch(`/v1/orders/${mpOrderId}`, accessToken);
   log("get_order", { restaurant_id: restaurantId, mp_order_id: mpOrderId, status: result.ok ? "success" : "error", order_status: result.data?.status });
 
-  // Update internal status if processed
-  if (result.ok && result.data) {
-    const sb = getSupabaseAdmin();
-    const mpStatus = result.data.status;
-    let internalStatus = "waiting_terminal";
+  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
 
-    if (mpStatus === "processed") {
-      const txn = result.data.transactions?.payments?.[0];
-      if (txn?.status_detail === "accredited" || txn?.status === "approved") {
-        internalStatus = "paid";
-      } else {
-        internalStatus = "failed";
-      }
-    } else if (mpStatus === "canceled" || mpStatus === "expired") {
-      internalStatus = "canceled";
-    } else if (mpStatus === "processing") {
-      internalStatus = "processing";
+  // Update internal status
+  const sb = getSupabaseAdmin();
+  const mpStatus = result.data.status;
+  let internalStatus = "waiting_terminal";
+
+  if (mpStatus === "processed") {
+    const txn = result.data.transactions?.payments?.[0];
+    if (txn?.status_detail === "accredited" || txn?.status === "approved") {
+      internalStatus = "paid";
+    } else {
+      internalStatus = "failed";
     }
-
-    await sb.rpc("update_point_order_payment", {
-      p_mp_order_id: mpOrderId,
-      p_status: internalStatus,
-      p_mp_status_payload: result.data,
-    });
+  } else if (mpStatus === "canceled" || mpStatus === "expired") {
+    internalStatus = "canceled";
+  } else if (mpStatus === "processing") {
+    internalStatus = "processing";
   }
 
-  return result;
+  await sb.rpc("update_point_order_payment", {
+    p_mp_order_id: mpOrderId,
+    p_status: internalStatus,
+    p_mp_status_payload: result.data,
+  });
+
+  return respond(true, { data: result.data });
 }
 
 async function cancelOrder(restaurantId: string, mpOrderId: string) {
@@ -213,7 +238,6 @@ async function cancelOrder(restaurantId: string, mpOrderId: string) {
   const result = await mpFetch(`/v1/orders/${mpOrderId}`, accessToken, { method: "DELETE" });
   log("cancel_order", { restaurant_id: restaurantId, mp_order_id: mpOrderId, status: result.ok ? "success" : "error" });
 
-  // Update internal status
   const sb = getSupabaseAdmin();
   await sb.rpc("update_point_order_payment", {
     p_mp_order_id: mpOrderId,
@@ -221,7 +245,8 @@ async function cancelOrder(restaurantId: string, mpOrderId: string) {
     p_mp_status_payload: result.data,
   });
 
-  return result;
+  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
+  return respond(true, { data: result.data });
 }
 
 async function testOrder(restaurantId: string, deviceId: string) {
@@ -244,7 +269,7 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+    return respond(false, { error: "Method not allowed", code: "method_not_allowed" });
   }
 
   try {
@@ -252,72 +277,36 @@ Deno.serve(async (req) => {
     const { action, restaurant_id, ...params } = body;
 
     if (!action || !restaurant_id) {
-      return new Response(
-        JSON.stringify({ error: "Missing action or restaurant_id" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond(false, { error: "Missing action or restaurant_id", code: "missing_params" });
     }
-
-    let result: { ok: boolean; status: number; data: any };
 
     switch (action) {
       case "list_terminals":
-        result = await listTerminals(restaurant_id);
-        break;
-
+        return await listTerminals(restaurant_id);
       case "create_store":
-        result = await createStore(restaurant_id, params as any);
-        break;
-
+        return await createStore(restaurant_id, params as any);
       case "create_pos":
-        result = await createPos(restaurant_id, params as any);
-        break;
-
+        return await createPos(restaurant_id, params as any);
       case "create_order":
-        result = await createOrder(restaurant_id, params as any);
-        break;
-
+        return await createOrder(restaurant_id, params as any);
       case "get_order":
-        result = await getOrder(restaurant_id, params.mp_order_id);
-        break;
-
+        return await getOrder(restaurant_id, params.mp_order_id);
       case "cancel_order":
-        result = await cancelOrder(restaurant_id, params.mp_order_id);
-        break;
-
+        return await cancelOrder(restaurant_id, params.mp_order_id);
       case "test_order":
-        result = await testOrder(restaurant_id, params.device_id);
-        break;
-
+        return await testOrder(restaurant_id, params.device_id);
       default:
-        return new Response(
-          JSON.stringify({ error: `Unknown action: ${action}` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return respond(false, { error: `Ação desconhecida: ${action}`, code: "unknown_action" });
     }
-
-    return new Response(
-      JSON.stringify(result.data),
-      {
-        status: result.ok ? 200 : result.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
   } catch (err: any) {
     const isTokenExpired = err.message === "TOKEN_EXPIRED";
     log("error", { error: err.message, is_token_expired: isTokenExpired });
 
-    return new Response(
-      JSON.stringify({
-        error: isTokenExpired
-          ? "Token OAuth expirado. Reconecte a conta Mercado Pago."
-          : err.message || "Internal error",
-        code: isTokenExpired ? "TOKEN_EXPIRED" : "INTERNAL_ERROR",
-      }),
-      {
-        status: isTokenExpired ? 403 : 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return respond(false, {
+      error: isTokenExpired
+        ? "Token OAuth expirado. Reconecte a conta Mercado Pago."
+        : err.message || "Erro interno",
+      code: isTokenExpired ? "TOKEN_EXPIRED" : "INTERNAL_ERROR",
+    });
   }
 });
