@@ -15,11 +15,13 @@ interface StockCardProps {
     minimum_quantity: number;
     category_id: string | null;
     supplier_id?: string | null;
+    is_active?: boolean;
     stock_categories?: { name: string } | null;
     suppliers?: { name: string } | null;
   };
   onEdit: (item: any) => void;
   onDelete: (item: any) => void;
+  onToggleActive: (item: any) => void;
 }
 
 const StockCard = memo(({ item, onEdit, onDelete }: StockCardProps) => {
