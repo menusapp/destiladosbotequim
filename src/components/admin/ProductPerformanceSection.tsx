@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useProductPerformance, type ProductPerformanceItem } from "@/hooks/useProductPerformance";
 import type { DateRange } from "@/hooks/useOrderMetrics";
-import { Package, TrendingUp, DollarSign, Layers } from "lucide-react";
+import { Package } from "lucide-react";
 
 interface Props {
   restaurantId: string;
