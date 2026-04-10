@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Banknote, CreditCard, QrCode, Loader2, ChevronLeft } from "lucide-react";
+import { ArrowLeft, Banknote, CreditCard, QrCode, Loader2, ChevronLeft, Zap, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { CartItem } from "@/types/menu";
 import { KioskCustomer } from "@/pages/Kiosk";
-import { KioskConfig } from "@/hooks/useKioskConfig";
+import { KioskConfig, KioskPointTerminal } from "@/hooks/useKioskConfig";
 import { ConsumptionMode } from "./KioskConsumptionType";
+
+type PointPaymentStatus = "idle" | "creating_payment" | "waiting_terminal" | "processing" | "paid" | "failed" | "canceled";
 
 interface Props {
   cart: CartItem[];
@@ -21,6 +23,7 @@ interface Props {
   onBack: () => void;
   onOrderCreated: (orderId: string) => void;
   kioskConfig?: KioskConfig | null;
+  pointTerminal?: KioskPointTerminal | null;
   appliedCoupon?: any;
   couponDiscount?: number;
   loyaltyPointsUsed?: number;
@@ -30,13 +33,20 @@ interface Props {
 
 export function KioskPayment({
   cart, restaurant, customer, consumptionMode, tableNumber, primaryColor, cartTotal, onBack, onOrderCreated, kioskConfig,
-  appliedCoupon, couponDiscount = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01, deliveryAddress,
+  pointTerminal, appliedCoupon, couponDiscount = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01, deliveryAddress,
 }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [cashPaid, setCashPaid] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Point terminal payment state
+  const [pointStatus, setPointStatus] = useState<PointPaymentStatus>("idle");
+  const [mpOrderId, setMpOrderId] = useState<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const createdOrderIdRef = useRef<string | null>(null);
 
   const pointsDiscount = loyaltyPointsUsed * loyaltyRealPerPoint;
   const finalTotal = Math.max(0, cartTotal - couponDiscount - pointsDiscount);
@@ -45,19 +55,21 @@ export function KioskPayment({
     ? Math.max(0, parseFloat(cashPaid) - finalTotal)
     : 0;
 
-  // Determine order_type and delivery_type based on consumptionMode
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
   const getOrderTypeFields = () => {
     switch (consumptionMode) {
-      case "counter":
-        return { order_type: "balcao", delivery_type: "pickup" };
-      case "table":
-        return { order_type: "local", delivery_type: "local" };
-      case "takeaway":
-        return { order_type: "delivery", delivery_type: "takeaway" };
-      case "delivery":
-        return { order_type: "delivery", delivery_type: "delivery" };
-      default:
-        return { order_type: "local", delivery_type: "local" };
+      case "counter": return { order_type: "balcao", delivery_type: "pickup" };
+      case "table": return { order_type: "local", delivery_type: "local" };
+      case "takeaway": return { order_type: "delivery", delivery_type: "takeaway" };
+      case "delivery": return { order_type: "delivery", delivery_type: "delivery" };
+      default: return { order_type: "local", delivery_type: "local" };
     }
   };
 
@@ -71,183 +83,315 @@ export function KioskPayment({
     }
   };
 
-  const handleFinalize = async () => {
-    if (submitting) return;
-    setSubmitting(true);
+  const createOrderInDB = async (): Promise<string | null> => {
+    const { order_type, delivery_type } = getOrderTypeFields();
 
-    try {
-      const { order_type, delivery_type } = getOrderTypeFields();
-
-      // Find table if applicable
-      let tableId: string | null = null;
-      if (consumptionMode === "table" && tableNumber) {
-        const { data: table } = await supabase
-          .from("tables")
-          .select("id")
-          .eq("restaurant_id", restaurant.id)
-          .eq("table_number", parseInt(tableNumber))
-          .maybeSingle();
-        tableId = table?.id || null;
-
-        if (!tableId) {
-          toast.error(`Mesa ${tableNumber} não encontrada`);
-          setSubmitting(false);
-          return;
-        }
+    let tableId: string | null = null;
+    if (consumptionMode === "table" && tableNumber) {
+      const { data: table } = await supabase
+        .from("tables")
+        .select("id")
+        .eq("restaurant_id", restaurant.id)
+        .eq("table_number", parseInt(tableNumber))
+        .maybeSingle();
+      tableId = table?.id || null;
+      if (!tableId) {
+        toast.error(`Mesa ${tableNumber} não encontrada`);
+        return null;
       }
+    }
 
-      const notes = [
-        `[TOTEM] ${getConsumptionLabel()}`,
-        paymentMethod === "cash" && cashPaid ? `Troco para: R$ ${parseFloat(cashPaid).toFixed(2)}` : null,
-      ].filter(Boolean).join(" | ");
+    const notes = [
+      `[TOTEM] ${getConsumptionLabel()}`,
+      paymentMethod === "cash" && cashPaid ? `Troco para: R$ ${parseFloat(cashPaid).toFixed(2)}` : null,
+      paymentMethod === "point_terminal" ? "[Maquininha Point]" : null,
+    ].filter(Boolean).join(" | ");
 
+    const orderData: any = {
+      table_id: tableId,
+      restaurant_id: restaurant.id,
+      customer_name: customer.name,
+      customer_cpf: customer.cpf,
+      order_type,
+      delivery_type,
+      order_channel: "totem",
+      payment_type: paymentMethod === "point_terminal" ? "card" : paymentMethod,
+      payment_brand: selectedBrand || null,
+      status: "pending",
+      payment_status: "pending",
+      notes,
+      delivery_phone: customer.phone || null,
+      coupon_code: appliedCoupon?.code || null,
+      coupon_discount: couponDiscount,
+      loyalty_points_used: loyaltyPointsUsed,
+      reward_discount: pointsDiscount,
+    };
 
-      const orderData: any = {
-        table_id: tableId,
-        restaurant_id: restaurant.id,
-        customer_name: customer.name,
-        customer_cpf: customer.cpf,
-        order_type,
-        delivery_type,
-        order_channel: "totem",
-        payment_type: paymentMethod,
-        payment_brand: selectedBrand || null,
-        status: "pending",
-        payment_status: "pending",
-        notes,
-        delivery_phone: customer.phone || null,
-        coupon_code: appliedCoupon?.code || null,
-        coupon_discount: couponDiscount,
-        loyalty_points_used: loyaltyPointsUsed,
-        reward_discount: pointsDiscount,
-      };
+    if (consumptionMode === "delivery" && deliveryAddress) {
+      orderData.delivery_address = deliveryAddress;
+    }
 
-      if (consumptionMode === "delivery" && deliveryAddress) {
-        orderData.delivery_address = deliveryAddress;
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .insert(orderData)
+      .select()
+      .single();
+
+    if (orderError) throw orderError;
+
+    // Insert order items
+    for (const item of cart) {
+      const priceAtOrder = item.product.promotional_price ?? item.product.price;
+      const { data: orderItem, error: itemError } = await supabase
+        .from("order_items")
+        .insert({
+          order_id: order.id,
+          product_id: item.product.id,
+          quantity: item.quantity,
+          price_at_order: priceAtOrder,
+          notes: item.notes,
+        })
+        .select()
+        .single();
+      if (itemError) throw itemError;
+
+      for (const extra of item.extras) {
+        await supabase.from("order_item_extras").insert({
+          order_item_id: orderItem.id,
+          product_extra_id: extra.id,
+          price_at_order: extra.price,
+          extra_name: extra.name,
+        });
       }
+    }
 
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert(orderData)
+    // Create comanda for table orders
+    if (consumptionMode === "table" && tableId) {
+      const { data: comanda, error: comandaError } = await supabase
+        .from("comandas")
+        .insert({
+          restaurant_id: restaurant.id,
+          table_id: tableId,
+          customer_name: customer.name,
+          customer_cpf: customer.cpf || "000.000.000-00",
+          status: "active",
+        })
         .select()
         .single();
 
-      if (orderError) {
-        console.error("[Kiosk] Order error:", orderError);
-        throw orderError;
+      if (!comandaError && comanda) {
+        await supabase.from("orders").update({ comanda_id: comanda.id }).eq("id", order.id);
       }
+    }
 
+    // Update coupon usage
+    if (appliedCoupon?.id) {
+      await supabase.from("coupons").update({
+        used_count: (appliedCoupon.used_count || 0) + 1,
+      }).eq("id", appliedCoupon.id);
+    }
 
-      // Insert order items
-      for (const item of cart) {
-        const priceAtOrder = item.product.promotional_price ?? item.product.price;
+    // Update loyalty
+    if (restaurant.loyalty_enabled && customer.cpf) {
+      const pointsToEarn = Math.floor(finalTotal * (restaurant.loyalty_points_per_real || 1));
+      if (pointsToEarn > 0) {
+        const { data: existing } = await supabase
+          .from("loyalty_points")
+          .select("*")
+          .eq("customer_cpf", customer.cpf)
+          .eq("restaurant_id", restaurant.id)
+          .maybeSingle();
 
-        const { data: orderItem, error: itemError } = await supabase
-          .from("order_items")
-          .insert({
-            order_id: order.id,
-            product_id: item.product.id,
-            quantity: item.quantity,
-            price_at_order: priceAtOrder,
-            notes: item.notes,
-          })
-          .select()
-          .single();
+        if (existing) {
+          await supabase.from("loyalty_points").update({
+            points_balance: existing.points_balance + pointsToEarn - loyaltyPointsUsed,
+            total_earned: existing.total_earned + pointsToEarn,
+            total_redeemed: (existing.total_redeemed || 0) + loyaltyPointsUsed,
+            last_updated: new Date().toISOString(),
+          }).eq("id", existing.id);
+        } else {
+          await supabase.from("loyalty_points").insert({
+            customer_cpf: customer.cpf,
+            restaurant_id: restaurant.id,
+            points_balance: pointsToEarn - loyaltyPointsUsed,
+            total_earned: pointsToEarn,
+            total_redeemed: loyaltyPointsUsed,
+          });
+        }
 
-        if (itemError) throw itemError;
-
-        for (const extra of item.extras) {
-          await supabase.from("order_item_extras").insert({
-            order_item_id: orderItem.id,
-            product_extra_id: extra.id,
-            price_at_order: extra.price,
-            extra_name: extra.name,
+        if (pointsToEarn > 0) {
+          await supabase.from("loyalty_transactions").insert({
+            customer_cpf: customer.cpf, restaurant_id: restaurant.id, order_id: order.id, points: pointsToEarn, type: "earn",
+          });
+        }
+        if (loyaltyPointsUsed > 0) {
+          await supabase.from("loyalty_transactions").insert({
+            customer_cpf: customer.cpf, restaurant_id: restaurant.id, order_id: order.id, points: -loyaltyPointsUsed, type: "redeem",
           });
         }
       }
+    }
 
-      // For table orders: create comanda but DON'T occupy the table yet
-      // Table will be occupied when operator accepts the order in PDV
-      if (consumptionMode === "table" && tableId) {
+    return order.id;
+  };
 
-        // Create comanda
-        const { data: comanda, error: comandaError } = await supabase
-          .from("comandas")
-          .insert({
-            restaurant_id: restaurant.id,
-            table_id: tableId,
-            customer_name: customer.name,
-            customer_cpf: customer.cpf || "000.000.000-00",
-            status: "active",
-          })
-          .select()
-          .single();
+  const startPointPolling = useCallback((orderId: string, mpOrdId: string) => {
+    setPointStatus("waiting_terminal");
 
-        if (comandaError) {
-          console.error("[Kiosk] Comanda error:", comandaError);
-        } else {
-          // Link the order to the comanda
-          await supabase.from("orders").update({ comanda_id: comanda.id }).eq("id", order.id);
-        }
+    // Timeout after 120s
+    timeoutRef.current = setTimeout(async () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      setPointStatus("canceled");
+
+      // Cancel on backend
+      try {
+        await supabase.functions.invoke("mercadopago-point", {
+          body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
+        });
+      } catch (e) {
+        console.error("[KioskPayment] Cancel error:", e);
       }
 
-      // Update coupon usage
-      if (appliedCoupon?.id) {
-        await supabase.from("coupons").update({
-          used_count: (appliedCoupon.used_count || 0) + 1,
-        }).eq("id", appliedCoupon.id);
-      }
+      toast.error("Tempo esgotado. Tente novamente.");
+    }, 120_000);
 
-      // Update loyalty if enabled
-      if (restaurant.loyalty_enabled && customer.cpf) {
-        const pointsToEarn = Math.floor(finalTotal * (restaurant.loyalty_points_per_real || 1));
-        if (pointsToEarn > 0) {
-          const { data: existing } = await supabase
-            .from("loyalty_points")
-            .select("*")
-            .eq("customer_cpf", customer.cpf)
-            .eq("restaurant_id", restaurant.id)
-            .maybeSingle();
+    // Poll every 3s
+    pollingRef.current = setInterval(async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("mercadopago-point", {
+          body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
+        });
 
-          if (existing) {
-            await supabase.from("loyalty_points").update({
-              points_balance: existing.points_balance + pointsToEarn - loyaltyPointsUsed,
-              total_earned: existing.total_earned + pointsToEarn,
-              total_redeemed: (existing.total_redeemed || 0) + loyaltyPointsUsed,
-              last_updated: new Date().toISOString(),
-            }).eq("id", existing.id);
+        if (error) return;
+
+        const status = data?.status;
+        const txn = data?.transactions?.payments?.[0];
+
+        if (status === "processed") {
+          if (txn?.status_detail === "accredited" || txn?.status === "approved") {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            setPointStatus("paid");
+
+            // Mark order as paid
+            await supabase.from("orders").update({
+              payment_status: "paid",
+              paid_at: new Date().toISOString(),
+            }).eq("id", orderId);
+
+            onOrderCreated(orderId);
           } else {
-            await supabase.from("loyalty_points").insert({
-              customer_cpf: customer.cpf,
-              restaurant_id: restaurant.id,
-              points_balance: pointsToEarn - loyaltyPointsUsed,
-              total_earned: pointsToEarn,
-              total_redeemed: loyaltyPointsUsed,
-            });
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            setPointStatus("failed");
+            toast.error("Pagamento recusado na maquininha.");
           }
-
-          if (pointsToEarn > 0) {
-            await supabase.from("loyalty_transactions").insert({
-              customer_cpf: customer.cpf,
-              restaurant_id: restaurant.id,
-              order_id: order.id,
-              points: pointsToEarn,
-              type: "earn",
-            });
-          }
-          if (loyaltyPointsUsed > 0) {
-            await supabase.from("loyalty_transactions").insert({
-              customer_cpf: customer.cpf,
-              restaurant_id: restaurant.id,
-              order_id: order.id,
-              points: -loyaltyPointsUsed,
-              type: "redeem",
-            });
-          }
+        } else if (status === "canceled" || status === "expired") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          setPointStatus("canceled");
+          toast.error("Pagamento cancelado.");
+        } else if (status === "processing") {
+          setPointStatus("processing");
         }
+      } catch (e) {
+        console.error("[KioskPayment] Polling error:", e);
+      }
+    }, 3000);
+  }, [restaurant.id, onOrderCreated]);
+
+  const handlePointPayment = async () => {
+    if (!pointTerminal) {
+      toast.error("Nenhuma maquininha configurada");
+      return;
+    }
+    setSubmitting(true);
+    setPointStatus("creating_payment");
+
+    try {
+      const orderId = await createOrderInDB();
+      if (!orderId) {
+        setSubmitting(false);
+        setPointStatus("idle");
+        return;
+      }
+      createdOrderIdRef.current = orderId;
+
+      const { data, error } = await supabase.functions.invoke("mercadopago-point", {
+        body: {
+          action: "create_order",
+          restaurant_id: restaurant.id,
+          amount: finalTotal,
+          description: `Pedido Totem #${orderId.slice(0, 8)}`,
+          order_id: orderId,
+          device_id: pointTerminal.device_id,
+          idempotency_key: orderId,
+        },
+      });
+
+      if (error || !data?.id) {
+        const errMsg = data?.error || error?.message || "Erro ao enviar para maquininha";
+        if (data?.code === "TOKEN_EXPIRED") {
+          toast.error("Token expirado. Reconecte a conta Mercado Pago.");
+        } else {
+          toast.error(errMsg);
+        }
+        setPointStatus("failed");
+        setSubmitting(false);
+        return;
       }
 
-      onOrderCreated(order.id);
+      setMpOrderId(data.id);
+      startPointPolling(orderId, data.id);
+    } catch (err: any) {
+      console.error("[KioskPayment] Point payment error:", err);
+      toast.error(err?.message || "Erro ao processar pagamento");
+      setPointStatus("failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancelPointPayment = async () => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    if (mpOrderId) {
+      try {
+        await supabase.functions.invoke("mercadopago-point", {
+          body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrderId },
+        });
+      } catch (e) {
+        console.error("[KioskPayment] Cancel error:", e);
+      }
+    }
+
+    setPointStatus("idle");
+    setMpOrderId(null);
+  };
+
+  const handleRetryPointPayment = () => {
+    setPointStatus("idle");
+    setMpOrderId(null);
+    handlePointPayment();
+  };
+
+  const handleFinalize = async () => {
+    if (submitting) return;
+
+    if (paymentMethod === "point_terminal") {
+      handlePointPayment();
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const orderId = await createOrderInDB();
+      if (!orderId) {
+        setSubmitting(false);
+        return;
+      }
+      onOrderCreated(orderId);
     } catch (err: any) {
       console.error("[Kiosk] Order error:", err);
       toast.error(err?.message || "Erro ao finalizar pedido");
@@ -275,6 +419,17 @@ export function KioskPayment({
     { key: "pix", label: "PIX", icon: QrCode, sublabel: "Pagamento via PIX", configKey: "payment_pix" as const },
   ];
 
+  // Add point terminal option if configured
+  if (pointTerminal && kioskConfig?.payment_card) {
+    allMethods.push({
+      key: "point_terminal",
+      label: "Pagar na Maquininha",
+      icon: Zap,
+      sublabel: pointTerminal.device_name || "Terminal Point",
+      configKey: "payment_card" as const,
+    });
+  }
+
   const methods = kioskConfig
     ? allMethods.filter(m => kioskConfig[m.configKey] !== false)
     : allMethods;
@@ -282,16 +437,50 @@ export function KioskPayment({
   const handleMethodSelect = (key: string) => {
     setPaymentMethod(key);
     setSelectedBrand("");
-    if (needsBrand(key)) {
-      setShowBrandPicker(true);
-    } else {
-      setShowBrandPicker(false);
-    }
+    setShowBrandPicker(needsBrand(key));
+    setPointStatus("idle");
   };
 
-  const canFinalizePayment = paymentMethod !== "" && 
+  const canFinalizePayment = paymentMethod !== "" &&
     (!needsBrand(paymentMethod) || selectedBrand !== "") &&
-    (paymentMethod !== "cash" || !cashPaid || parseFloat(cashPaid) >= finalTotal);
+    (paymentMethod !== "cash" || !cashPaid || parseFloat(cashPaid) >= finalTotal) &&
+    (paymentMethod !== "point_terminal" || pointStatus === "idle" || pointStatus === "failed" || pointStatus === "canceled");
+
+  // Render Point payment waiting screen
+  if (pointStatus !== "idle" && pointStatus !== "failed" && pointStatus !== "canceled" && paymentMethod === "point_terminal") {
+    const statusMessages: Record<string, string> = {
+      creating_payment: "Enviando para a maquininha...",
+      waiting_terminal: "Aguardando pagamento na maquininha...",
+      processing: "Processando pagamento...",
+      paid: "Pagamento aprovado!",
+    };
+
+    return (
+      <div className="flex flex-col h-screen bg-background items-center justify-center">
+        <div className="text-center space-y-6 p-8 max-w-md">
+          {pointStatus === "paid" ? (
+            <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-950/30 flex items-center justify-center mx-auto">
+              <Zap className="h-10 w-10 text-green-600" />
+            </div>
+          ) : (
+            <Loader2 className="h-16 w-16 animate-spin mx-auto" style={{ color: primaryColor }} />
+          )}
+          <p className="text-2xl font-bold text-foreground">{statusMessages[pointStatus]}</p>
+          <p className="text-4xl font-bold" style={{ color: primaryColor }}>R$ {finalTotal.toFixed(2)}</p>
+          {pointStatus !== "paid" && (
+            <Button
+              variant="outline"
+              onClick={handleCancelPointPayment}
+              className="gap-2 mt-4"
+            >
+              <XCircle className="h-4 w-4" />
+              Cancelar
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -312,6 +501,18 @@ export function KioskPayment({
             </p>
           )}
         </div>
+
+        {/* Failed/Canceled point payment - show retry */}
+        {(pointStatus === "failed" || pointStatus === "canceled") && paymentMethod === "point_terminal" && (
+          <div className="mb-6 p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-center space-y-3">
+            <p className="text-sm font-medium text-destructive">
+              {pointStatus === "failed" ? "Pagamento recusado" : "Pagamento cancelado"}
+            </p>
+            <Button onClick={handleRetryPointPayment} variant="outline" size="sm" className="gap-2">
+              <Zap className="h-4 w-4" /> Tentar novamente
+            </Button>
+          </div>
+        )}
 
         {showBrandPicker ? (
           <div className="space-y-4 mb-8">
@@ -395,7 +596,13 @@ export function KioskPayment({
             style={{ backgroundColor: primaryColor }}
             disabled={submitting || !canFinalizePayment}
           >
-            {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" />Finalizando...</> : "Finalizar Pedido"}
+            {submitting ? (
+              <><Loader2 className="h-5 w-5 animate-spin mr-2" />Finalizando...</>
+            ) : paymentMethod === "point_terminal" ? (
+              <><Zap className="h-5 w-5 mr-2" />Enviar para Maquininha</>
+            ) : (
+              "Finalizar Pedido"
+            )}
           </Button>
         </div>
       </div>

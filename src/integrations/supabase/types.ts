@@ -2137,6 +2137,7 @@ export type Database = {
           provider: string | null
           require_prepayment: boolean | null
           restaurant_id: string
+          token_expires_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2156,6 +2157,7 @@ export type Database = {
           provider?: string | null
           require_prepayment?: boolean | null
           restaurant_id: string
+          token_expires_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2175,6 +2177,7 @@ export type Database = {
           provider?: string | null
           require_prepayment?: boolean | null
           restaurant_id?: string
+          token_expires_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -2766,6 +2769,140 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "payment_methods_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      point_order_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          external_reference: string | null
+          id: string
+          idempotency_key: string
+          mp_order_id: string
+          mp_status_payload: Json | null
+          mp_user_id: string | null
+          order_id: string
+          restaurant_id: string
+          status: string | null
+          terminal_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          external_reference?: string | null
+          id?: string
+          idempotency_key: string
+          mp_order_id: string
+          mp_status_payload?: Json | null
+          mp_user_id?: string | null
+          order_id: string
+          restaurant_id: string
+          status?: string | null
+          terminal_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          external_reference?: string | null
+          id?: string
+          idempotency_key?: string
+          mp_order_id?: string
+          mp_status_payload?: Json | null
+          mp_user_id?: string | null
+          order_id?: string
+          restaurant_id?: string
+          status?: string | null
+          terminal_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_order_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_order_payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      point_terminals: {
+        Row: {
+          configured_by: string | null
+          created_at: string | null
+          device_id: string
+          device_name: string | null
+          id: string
+          is_active: boolean | null
+          is_default_terminal: boolean | null
+          last_seen_at: string | null
+          mp_external_pos_id: string | null
+          mp_external_store_id: string | null
+          mp_pos_id: string | null
+          mp_store_id: string | null
+          operating_mode: string | null
+          restaurant_id: string
+          terminal_metadata: Json | null
+          totem_id: string | null
+          updated_at: string | null
+          use_on_kiosk: boolean | null
+        }
+        Insert: {
+          configured_by?: string | null
+          created_at?: string | null
+          device_id: string
+          device_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default_terminal?: boolean | null
+          last_seen_at?: string | null
+          mp_external_pos_id?: string | null
+          mp_external_store_id?: string | null
+          mp_pos_id?: string | null
+          mp_store_id?: string | null
+          operating_mode?: string | null
+          restaurant_id: string
+          terminal_metadata?: Json | null
+          totem_id?: string | null
+          updated_at?: string | null
+          use_on_kiosk?: boolean | null
+        }
+        Update: {
+          configured_by?: string | null
+          created_at?: string | null
+          device_id?: string
+          device_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default_terminal?: boolean | null
+          last_seen_at?: string | null
+          mp_external_pos_id?: string | null
+          mp_external_store_id?: string | null
+          mp_pos_id?: string | null
+          mp_store_id?: string | null
+          operating_mode?: string | null
+          restaurant_id?: string
+          terminal_metadata?: Json | null
+          totem_id?: string | null
+          updated_at?: string | null
+          use_on_kiosk?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_terminals_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
@@ -4445,6 +4582,10 @@ export type Database = {
         Args: { p_restaurant_id: string }
         Returns: undefined
       }
+      admin_delete_point_terminal: {
+        Args: { p_device_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_delete_product: {
         Args: { p_product_id: string; p_restaurant_id: string }
         Returns: undefined
@@ -4490,6 +4631,29 @@ export type Database = {
           mp_sandbox_payer_email: string
           provider: string
           restaurant_id: string
+        }[]
+      }
+      admin_get_point_terminals: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          configured_by: string
+          created_at: string
+          device_id: string
+          device_name: string
+          id: string
+          is_active: boolean
+          is_default_terminal: boolean
+          last_seen_at: string
+          mp_external_pos_id: string
+          mp_external_store_id: string
+          mp_pos_id: string
+          mp_store_id: string
+          operating_mode: string
+          restaurant_id: string
+          terminal_metadata: Json
+          totem_id: string
+          updated_at: string
+          use_on_kiosk: boolean
         }[]
       }
       admin_get_whatsapp_status: {
@@ -4578,6 +4742,24 @@ export type Database = {
         Args: { p_field: string; p_restaurant_id: string; p_value?: string }
         Returns: undefined
       }
+      admin_upsert_point_terminal: {
+        Args: {
+          p_configured_by?: string
+          p_device_id: string
+          p_device_name?: string
+          p_is_default_terminal?: boolean
+          p_mp_external_pos_id?: string
+          p_mp_external_store_id?: string
+          p_mp_pos_id?: string
+          p_mp_store_id?: string
+          p_operating_mode?: string
+          p_restaurant_id: string
+          p_terminal_metadata?: Json
+          p_totem_id?: string
+          p_use_on_kiosk?: boolean
+        }
+        Returns: string
+      }
       admin_upsert_staff: {
         Args: {
           p_allowed_sections?: string
@@ -4592,6 +4774,14 @@ export type Database = {
       }
       auto_release_idle_tables: { Args: never; Returns: undefined }
       auto_release_inactive_tables: { Args: never; Returns: undefined }
+      check_mp_token_expiry: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          expires_at: string
+          has_token: boolean
+          is_expired: boolean
+        }[]
+      }
       check_product_availability: {
         Args: { p_product_id: string }
         Returns: boolean
@@ -4600,6 +4790,31 @@ export type Database = {
       deduct_stock_for_order_item: {
         Args: { p_order_item_id: string }
         Returns: undefined
+      }
+      get_kiosk_point_terminal: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          device_id: string
+          device_name: string
+          mp_pos_id: string
+          mp_store_id: string
+        }[]
+      }
+      get_point_order_payment: {
+        Args: { p_mp_order_id: string }
+        Returns: {
+          amount: number
+          external_reference: string
+          id: string
+          idempotency_key: string
+          mp_order_id: string
+          mp_status_payload: Json
+          mp_user_id: string
+          order_id: string
+          restaurant_id: string
+          status: string
+          terminal_id: string
+        }[]
       }
       get_public_payment_config: {
         Args: { p_restaurant_id: string }
@@ -4628,6 +4843,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      insert_point_order_payment: {
+        Args: {
+          p_amount: number
+          p_external_reference: string
+          p_idempotency_key: string
+          p_mp_order_id: string
+          p_mp_user_id: string
+          p_order_id: string
+          p_restaurant_id: string
+          p_status?: string
+          p_terminal_id: string
+        }
+        Returns: string
+      }
       is_restaurant_admin: {
         Args: { rest_id: string; user_uuid: string }
         Returns: boolean
@@ -4638,6 +4867,14 @@ export type Database = {
       }
       restore_stock_for_order_item: {
         Args: { p_order_item_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      update_point_order_payment: {
+        Args: {
+          p_mp_order_id: string
+          p_mp_status_payload?: Json
+          p_status: string
+        }
         Returns: undefined
       }
       validate_ceo_credentials: {
