@@ -1,41 +1,35 @@
 
 
-## Plano: Corrigir Integração MP Point — RPC + Edge Function + Polling
+## Plano: Trocar modo do terminal para PDV automaticamente
 
-### Diagnóstico Confirmado
+### Problema
+A maquininha está em modo `STANDALONE` — ela só aceita digitação manual de valor. Para receber cobranças via API, precisa estar em modo `PDV` (integrado).
 
-1. **A RPC `insert_point_order_payment` existe, MAS o `order_id` é `NOT NULL` com FK para `orders(id)`**. Quando o teste envia um UUID aleatório como `order_id`, o insert falha silenciosamente (FK violation). Por isso a tabela está vazia.
+### Solução
 
-2. **O `list_pending_orders` usa endpoint errado**: `/point/integration-api/payment-intents/{deviceId}/events` — trata o `deviceId` como um `payment_intent_id`, retornando 404 "The intent NEWLAND... doesn't exist!".
+**1. Adicionar action `change_operating_mode` na edge function `mercadopago-point`**
 
-3. **O payload do `create_order`** usa `/v1/orders` com `amount` como string — precisa verificar se o MP aceita ou se precisa do endpoint alternativo `/point/integration-api/payment-intents/{deviceId}`.
-
-### Correções
-
-**1. Migration — Tornar `order_id` nullable + adicionar `device_id` ao index**
-
-```sql
-ALTER TABLE point_order_payments ALTER COLUMN order_id DROP NOT NULL;
+Novo action que chama:
+```
+PATCH /point/integration-api/devices/{device_id}
+Body: { "operating_mode": "PDV" }
 ```
 
-A RPC `insert_point_order_payment` já aceita `p_order_id uuid` — com a coluna nullable, o insert vai funcionar quando passamos um UUID fake (teste) ou NULL.
+Isso muda o terminal para modo integrado automaticamente.
 
-**2. Edge Function `mercadopago-point/index.ts`**
+**2. Atualizar KioskSettings — botão "Ativar modo integrado"**
 
-- **`createOrder`**: Tentar primeiro `/v1/orders` (atual). Se retornar erro, fazer fallback para `/point/integration-api/payment-intents/{deviceId}` com payload `{ amount: centavos, description, payment: { installments: 1, type: "credit_card" } }`. Logar qual endpoint funcionou.
-- **`createOrder` RPC call**: Passar `null` como `p_order_id` para testes, e capturar/logar erro do RPC se falhar.
-- **`listPendingOrders`**: Corrigir para usar `GET /point/integration-api/payment-intents?device_id={deviceId}` (query param, não path param). Buscar primeiro no banco local.
-- **Logs melhorados**: Adicionar `[MP Point]` prefixo + log da resposta do RPC insert.
+Após buscar o terminal e detectar `operating_mode: STANDALONE`:
+- Mostrar aviso: "A maquininha está em modo manual. Para receber cobranças do sistema, ative o modo integrado."
+- Botão "Ativar modo integrado" que chama a nova action
+- Após sucesso, liberar o botão "Testar"
+- Se já estiver em modo `PDV`, mostrar status verde e liberar teste direto
 
-**3. KioskSettings — Polling de status após teste**
+**3. No fluxo de "Configurar", incluir a troca de modo automaticamente**
 
-Após `test_order` retornar sucesso com `mp_order_id`:
-- Iniciar polling a cada 3s chamando `get_order`
-- Mostrar status: "Aguardando pagamento...", "Aprovado!", "Recusado", "Cancelado"
-- Parar após status final ou timeout de 2 min
+Quando o admin clica "Configurar", o sistema já faz: criar Store → criar POS → **trocar modo para PDV**. Tudo automático.
 
 ### Arquivos
-- **Migration**: `ALTER TABLE point_order_payments ALTER COLUMN order_id DROP NOT NULL`
-- **Editar**: `supabase/functions/mercadopago-point/index.ts` — fallback endpoint + fix listPending + logs
-- **Editar**: `src/components/admin/settings/KioskSettings.tsx` — polling de status
+- **Editar**: `supabase/functions/mercadopago-point/index.ts` — nova action `change_operating_mode`
+- **Editar**: `src/components/admin/settings/KioskSettings.tsx` — detectar modo + botão ativar
 
