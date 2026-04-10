@@ -278,6 +278,58 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
+  const handleCancelPending = async () => {
+    const terminal = savedTerminals.find(t => t.use_on_kiosk);
+    if (!terminal) return;
+    setCancellingPending(true);
+    try {
+      // Try to cancel the last pending order from local DB first
+      const { data: localOrder } = await supabase
+        .from("point_order_payments")
+        .select("mp_order_id")
+        .eq("restaurant_id", restaurantId)
+        .eq("terminal_id", terminal.device_id)
+        .in("status", ["waiting_terminal", "processing"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let mpOrderId = localOrder?.mp_order_id;
+
+      if (!mpOrderId) {
+        // Fallback: query MP API for pending events
+        const { data: eventsRes } = await supabase.functions.invoke("mercadopago-point", {
+          body: { action: "list_pending_orders", restaurant_id: restaurantId, device_id: terminal.device_id },
+        });
+        if (eventsRes?.ok && eventsRes.data?.events?.length > 0) {
+          const pendingEvent = eventsRes.data.events.find((e: any) => e.status === "open" || e.status === "processing");
+          mpOrderId = pendingEvent?.payment_intent_id || pendingEvent?.id;
+        }
+      }
+
+      if (!mpOrderId) {
+        toast.info("Não foi possível encontrar a cobrança pendente. Tente cancelar diretamente na maquininha.");
+        setPendingOrderBlocked(false);
+        return;
+      }
+
+      const { data: cancelRes } = await supabase.functions.invoke("mercadopago-point", {
+        body: { action: "cancel_order", restaurant_id: restaurantId, mp_order_id: mpOrderId },
+      });
+
+      if (cancelRes?.ok) {
+        toast.success("Cobrança pendente cancelada! Agora pode testar novamente.");
+        setPendingOrderBlocked(false);
+      } else {
+        toast.error(cancelRes?.error || "Erro ao cancelar cobrança pendente");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao cancelar");
+    } finally {
+      setCancellingPending(false);
+    }
+  };
+
   const updateLocal = (updates: Partial<KioskConfig>) => {
     if (!localConfig) return;
     setLocalConfig({ ...localConfig, ...updates });
@@ -573,7 +625,27 @@ export default function KioskSettings({ restaurantId }: Props) {
                       {testingPayment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                       Testar
                     </Button>
-                  </div>
+                   </div>
+
+                  {/* Cancel pending order */}
+                  {pendingOrderBlocked && (
+                    <div className="flex items-center justify-between bg-destructive/10 rounded-lg p-3">
+                      <div>
+                        <p className="text-sm font-medium text-destructive">Cobrança pendente detectada</p>
+                        <p className="text-xs text-muted-foreground">Cancele a anterior para testar novamente</p>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleCancelPending}
+                        disabled={cancellingPending}
+                        className="gap-2"
+                      >
+                        {cancellingPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                        Cancelar Pendente
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
             </>
