@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Monitor, Copy, ExternalLink, CreditCard, Banknote, QrCode, Smartphone,
+  Monitor, Copy, ExternalLink, CreditCard, Banknote, QrCode,
   UtensilsCrossed, ShoppingBag, Truck, Store, Users, Gift, Tag, Percent, Timer, Loader2, Save,
   Wifi, WifiOff, RefreshCw, CheckCircle2, AlertTriangle, Zap,
 } from "lucide-react";
@@ -514,8 +514,7 @@ export default function KioskSettings({ restaurantId }: Props) {
           <CardContent className="space-y-3 pt-0">
             <ToggleRow icon={Banknote} label="Dinheiro" checked={localConfig.payment_cash} onChange={(v) => updateLocal({ payment_cash: v })} />
             <ToggleRow icon={CreditCard} label="Cartão na maquininha" checked={localConfig.payment_card} onChange={(v) => updateLocal({ payment_card: v })} />
-            <ToggleRow icon={QrCode} label="PIX" checked={localConfig.payment_pix} onChange={(v) => updateLocal({ payment_pix: v })} />
-            <ToggleRow icon={Smartphone} label="Pagamento online" checked={localConfig.payment_online} onChange={(v) => updateLocal({ payment_online: v })} />
+            <ToggleRow icon={QrCode} label="PIX na maquininha" checked={localConfig.payment_pix} onChange={(v) => updateLocal({ payment_pix: v })} />
           </CardContent>
         </Card>
       </div>
