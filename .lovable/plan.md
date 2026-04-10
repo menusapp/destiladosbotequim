@@ -1,35 +1,41 @@
 
 
-## Plano: Adicionar botão "Cancelar cobrança pendente" no admin
+## Plano: Corrigir Integração MP Point — RPC + Edge Function + Polling
 
-### Situação atual
+### Diagnóstico Confirmado
 
-A correção anterior funcionou — agora o erro real do Mercado Pago aparece: "Já existe uma cobrança pendente nessa maquininha". Porém:
+1. **A RPC `insert_point_order_payment` existe, MAS o `order_id` é `NOT NULL` com FK para `orders(id)`**. Quando o teste envia um UUID aleatório como `order_id`, o insert falha silenciosamente (FK violation). Por isso a tabela está vazia.
 
-1. Não existe botão para cancelar essa cobrança pendente no admin
-2. A tabela `point_order_payments` está vazia (as tentativas anteriores não foram salvas porque o `insert_point_order_payment` RPC não existia ou falhou silenciosamente)
-3. Sem o `mp_order_id` salvo, não dá pra cancelar diretamente
+2. **O `list_pending_orders` usa endpoint errado**: `/point/integration-api/payment-intents/{deviceId}/events` — trata o `deviceId` como um `payment_intent_id`, retornando 404 "The intent NEWLAND... doesn't exist!".
+
+3. **O payload do `create_order`** usa `/v1/orders` com `amount` como string — precisa verificar se o MP aceita ou se precisa do endpoint alternativo `/point/integration-api/payment-intents/{deviceId}`.
 
 ### Correções
 
-**1. Adicionar ação "Listar orders pendentes" na edge function**
+**1. Migration — Tornar `order_id` nullable + adicionar `device_id` ao index**
 
-Nova action `list_pending_orders` que consulta o MP por orders do terminal que estejam em status `opened`/`processing`. Isso permite descobrir o `mp_order_id` da cobrança travada mesmo sem ter salvo no banco.
+```sql
+ALTER TABLE point_order_payments ALTER COLUMN order_id DROP NOT NULL;
+```
 
-Endpoint: `GET /v1/orders?type=point&status=opened` (filtrado pelo terminal)
+A RPC `insert_point_order_payment` já aceita `p_order_id uuid` — com a coluna nullable, o insert vai funcionar quando passamos um UUID fake (teste) ou NULL.
 
-**2. Adicionar botão "Cancelar pendente" no KioskSettings**
+**2. Edge Function `mercadopago-point/index.ts`**
 
-Quando o teste falhar com código `already_queued_order_on_terminal`:
-- Mostrar botão "Cancelar cobrança pendente"
-- Ao clicar, chamar `list_pending_orders` → pegar o `mp_order_id` → chamar `cancel_order`
-- Após cancelar, liberar para novo teste
+- **`createOrder`**: Tentar primeiro `/v1/orders` (atual). Se retornar erro, fazer fallback para `/point/integration-api/payment-intents/{deviceId}` com payload `{ amount: centavos, description, payment: { installments: 1, type: "credit_card" } }`. Logar qual endpoint funcionou.
+- **`createOrder` RPC call**: Passar `null` como `p_order_id` para testes, e capturar/logar erro do RPC se falhar.
+- **`listPendingOrders`**: Corrigir para usar `GET /point/integration-api/payment-intents?device_id={deviceId}` (query param, não path param). Buscar primeiro no banco local.
+- **Logs melhorados**: Adicionar `[MP Point]` prefixo + log da resposta do RPC insert.
 
-**3. Garantir que `insert_point_order_payment` salva corretamente**
+**3. KioskSettings — Polling de status após teste**
 
-Verificar se a RPC existe e funciona para que futuras cobranças fiquem registradas no banco.
+Após `test_order` retornar sucesso com `mp_order_id`:
+- Iniciar polling a cada 3s chamando `get_order`
+- Mostrar status: "Aguardando pagamento...", "Aprovado!", "Recusado", "Cancelado"
+- Parar após status final ou timeout de 2 min
 
 ### Arquivos
-- `supabase/functions/mercadopago-point/index.ts` — nova action `list_pending_orders`
-- `src/components/admin/settings/KioskSettings.tsx` — botão cancelar + lógica
+- **Migration**: `ALTER TABLE point_order_payments ALTER COLUMN order_id DROP NOT NULL`
+- **Editar**: `supabase/functions/mercadopago-point/index.ts` — fallback endpoint + fix listPending + logs
+- **Editar**: `src/components/admin/settings/KioskSettings.tsx` — polling de status
 
