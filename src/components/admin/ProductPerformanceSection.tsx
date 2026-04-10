@@ -139,30 +139,6 @@ export default function ProductPerformanceSection({ restaurantId, dateRange }: P
         )}
       </div>
 
-      {/* Metric mini-cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MiniCard
-          icon={<Package className="h-4 w-4" />}
-          title="Total Vendidos"
-          value={`${data.totalQuantitySold} un.`}
-        />
-        <MiniCard
-          icon={<DollarSign className="h-4 w-4" />}
-          title="Mais Rentável"
-          value={data.mostProfitable?.productName || "-"}
-          sub={data.mostProfitable ? `R$ ${data.mostProfitable.totalRevenue.toFixed(2)}` : ""}
-        />
-        <MiniCard
-          icon={<TrendingUp className="h-4 w-4" />}
-          title="Ticket Médio/Produto"
-          value={`R$ ${data.avgTicketPerProduct.toFixed(2)}`}
-        />
-        <MiniCard
-          icon={<Layers className="h-4 w-4" />}
-          title="Categoria Top"
-          value={data.topCategory || "-"}
-        />
-      </div>
     </div>
   );
 }
