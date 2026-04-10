@@ -591,39 +591,42 @@ export default function KioskSettings({ restaurantId }: Props) {
                 {discoveredDevices.length > 0 && (
                   <div className="space-y-2">
                     {discoveredDevices.map((device: any) => (
-                       <div className="flex items-center justify-between gap-2">
-                         <div>
-                           <p className="text-sm font-medium">{device.name || device.id || device.device_id}</p>
-                           <p className="text-xs text-muted-foreground">
-                             ID: {device.id || device.device_id} — Modo: {device.operating_mode || "?"}
-                           </p>
-                         </div>
-                         <div className="flex items-center gap-2">
-                           {device.operating_mode === "STANDALONE" && (
-                             <Button
-                               variant="outline"
-                               size="sm"
-                               onClick={() => handleSwitchToPDV(device.id || device.device_id)}
-                               disabled={switchingMode}
-                               className="gap-1 text-xs"
-                             >
-                               {switchingMode ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-                               Ativar PDV
-                             </Button>
-                           )}
+                      <div
+                        key={device.id || device.device_id}
+                        className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{device.name || device.id || device.device_id}</p>
+                          <p className="text-xs text-muted-foreground">
+                            ID: {device.id || device.device_id} — Modo: {device.operating_mode || "?"}
+                          </p>
                         </div>
-                        <Button
-                          variant={activeTerminal?.device_id === (device.id || device.device_id) ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handleSelectTerminal(device)}
-                          disabled={savingTerminal}
-                        >
-                          {activeTerminal?.device_id === (device.id || device.device_id) ? (
-                            <><CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Ativo</>
-                          ) : (
-                            "Selecionar"
+                        <div className="flex items-center gap-2">
+                          {device.operating_mode === "STANDALONE" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSwitchToPDV(device.id || device.device_id)}
+                              disabled={switchingMode}
+                              className="gap-1 text-xs"
+                            >
+                              {switchingMode ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                              Ativar PDV
+                            </Button>
                           )}
-                        </Button>
+                          <Button
+                            variant={activeTerminal?.device_id === (device.id || device.device_id) ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handleSelectTerminal(device)}
+                            disabled={savingTerminal}
+                          >
+                            {activeTerminal?.device_id === (device.id || device.device_id) ? (
+                              <><CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Ativo</>
+                            ) : (
+                              "Selecionar"
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
