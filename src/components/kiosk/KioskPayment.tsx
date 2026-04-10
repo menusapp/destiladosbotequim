@@ -349,7 +349,7 @@ export function KioskPayment({
         console.error("[KioskPayment] Polling error:", e);
       }
     }, 3000);
-  }, [restaurant.id, onOrderCreated]);
+  }, [restaurant.id, onOrderCreated, selectedBrand, paymentMethod, selectedCardType]);
 
   const handlePointPayment = async () => {
     if (!pointTerminal) {
