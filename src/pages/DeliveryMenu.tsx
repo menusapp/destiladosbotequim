@@ -286,7 +286,8 @@ export default function DeliveryMenu() {
         }));
       });
 
-    const allExtras = [...extrasWithCategoryName, ...complementExtras];
+    const allExtras = [...extrasWithCategoryName, ...complementExtras]
+      .filter((e: any) => !disabledExtraItemIds.has(e.id));
     setProductExtras(allExtras);
     setSelectedProduct(product);
   };
@@ -359,17 +360,26 @@ export default function DeliveryMenu() {
 
 
   const primaryColor = restaurant.primary_color || "#fe9516";
-  const allProducts = categories.flatMap((c) => c.products);
+
+  // Filtrar produtos vinculados a insumos inativos
+  const activeCategories = categories.map(cat => ({
+    ...cat,
+    products: cat.products.filter(p => !disabledProductIds.has(p.id))
+  })).filter(cat => cat.products.length > 0);
+
+  const activeFeatured = featuredProducts.filter(p => !disabledProductIds.has(p.id));
+
+  const allProducts = activeCategories.flatMap((c) => c.products);
 
   // Filtrar produtos pela busca
   const filteredCategories = searchQuery.trim() 
-    ? categories.map(cat => ({
+    ? activeCategories.map(cat => ({
         ...cat,
         products: cat.products.filter(p => 
           p.name.toLowerCase().includes(searchQuery.toLowerCase())
         )
       })).filter(cat => cat.products.length > 0)
-    : categories;
+    : activeCategories;
 
   const filteredProducts = searchQuery.trim()
     ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
