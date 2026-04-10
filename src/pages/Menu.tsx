@@ -49,6 +49,10 @@ const Menu = () => {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [featuredSectionTitle, setFeaturedSectionTitle] = useState("Destaques");
 
+  const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
+  const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
+  const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
+
   // ⚡ Refs para manter valores atualizados nos listeners de realtime (evita stale closures)
   const tableIdRef = useRef<string | null>(null);
   const customerInfoRef = useRef<{name: string, cpf: string} | null>(null);
