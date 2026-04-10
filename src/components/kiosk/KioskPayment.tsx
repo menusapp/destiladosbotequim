@@ -428,6 +428,13 @@ export function KioskPayment({
     setPointStatus("idle");
     setMpOrderId(null);
     orderCreationInProgressRef.current = false;
+  };
+
+  const handleRetryPointPayment = () => {
+    setPointStatus("idle");
+    setMpOrderId(null);
+    orderCreationInProgressRef.current = false;
+    handlePointPayment();
     setPointStatus("idle");
     setMpOrderId(null);
     handlePointPayment();
