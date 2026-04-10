@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Monitor, Copy, ExternalLink, Power, CreditCard, Banknote, QrCode, Smartphone,
+  Monitor, Copy, ExternalLink, CreditCard, Banknote, QrCode, Smartphone,
   UtensilsCrossed, ShoppingBag, Truck, Store, Users, Gift, Tag, Percent, Timer, Loader2, Save,
   Wifi, WifiOff, RefreshCw, CheckCircle2, AlertTriangle, Zap,
 } from "lucide-react";

@@ -55,7 +55,7 @@ export default function Kiosk() {
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
 
-  const { config: kioskConfig, loading: configLoading } = useKioskConfig(restaurant?.id || null);
+  const { config: kioskConfig, pointTerminal, loading: configLoading } = useKioskConfig(restaurant?.id || null);
   const timeoutMs = (kioskConfig?.inactivity_timeout_seconds || 120) * 1000;
 
   const cartTotal = cart.reduce((sum, item) => {
@@ -428,6 +428,7 @@ export default function Kiosk() {
           onBack={() => consumptionMode === "delivery" ? setStep("delivery_address") : setStep("consumption")}
           onOrderCreated={(id) => { setOrderId(id); setStep("confirmation"); }}
           kioskConfig={kioskConfig}
+          pointTerminal={pointTerminal}
           appliedCoupon={appliedCoupon}
           couponDiscount={couponDiscount}
           loyaltyPointsUsed={loyaltyPointsUsed}
