@@ -296,6 +296,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
               item={item} 
               onEdit={openEditDialog} 
               onDelete={handleDeleteItem}
+              onToggleActive={handleToggleActive}
             />
           ))}
         </div>
