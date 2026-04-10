@@ -10,7 +10,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import {
-  Loader2, ExternalLink, Copy, CheckCircle2, XCircle, Plug, Truck,
+  Loader2, ExternalLink, Copy, CheckCircle2, XCircle, Plug, Truck, CreditCard,
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +34,13 @@ interface DDConfig {
   username: string | null;
   access_token: string | null;
   token_expires_at: string | null;
+}
+
+interface MpConfig {
+  id: string;
+  connection_status: string;
+  mp_access_token: string | null;
+  connected_at: string | null;
 }
 
 interface IntegrationsTabProps {
@@ -60,9 +67,17 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   const [ddUsername, setDdUsername] = useState("");
   const [ddPassword, setDdPassword] = useState("");
 
+  // Mercado Pago state
+  const [mpSheetOpen, setMpSheetOpen] = useState(false);
+  const [mpConfig, setMpConfig] = useState<MpConfig | null>(null);
+  const [mpLoading, setMpLoading] = useState(true);
+  const [startingOAuth, setStartingOAuth] = useState(false);
+  const [disconnectingMp, setDisconnectingMp] = useState(false);
+
   useEffect(() => {
     fetchIfoodConfig();
     fetchDdConfig();
+    fetchMpConfig();
   }, [restaurantId]);
 
   const fetchIfoodConfig = async () => {
@@ -87,8 +102,29 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     setDdLoading(false);
   };
 
+  const fetchMpConfig = async () => {
+    setMpLoading(true);
+    try {
+      const { data: rows, error } = await supabase.rpc("admin_get_payment_config", {
+        p_restaurant_id: restaurantId,
+      });
+      if (error) throw error;
+      const data = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      if (data && data.mp_access_token && data.connection_status === "connected") {
+        setMpConfig(data as unknown as MpConfig);
+      } else {
+        setMpConfig(null);
+      }
+    } catch {
+      setMpConfig(null);
+    } finally {
+      setMpLoading(false);
+    }
+  };
+
   const isIfoodConnected = ifoodConfig?.access_token && ifoodConfig?.merchant_id;
   const isDdConnected = ddConfig?.access_token && ddConfig?.store_id && ddConfig?.enabled;
+  const isMpConnected = !!mpConfig;
 
   // === iFood handlers ===
   const handleGenerateCode = async () => {
@@ -209,6 +245,53 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
   };
 
+  // === Mercado Pago handlers ===
+  const handleStartMpOAuth = async () => {
+    setStartingOAuth(true);
+    try {
+      let configId = mpConfig?.id;
+      if (!configId) {
+        const { data: newId, error: ensureError } = await supabase.rpc("admin_ensure_payment_config", {
+          p_restaurant_id: restaurantId,
+        });
+        if (ensureError) throw ensureError;
+        configId = newId;
+      }
+
+      const { data, error } = await supabase.functions.invoke("mercadopago-oauth", {
+        method: "GET",
+      });
+      if (error) throw error;
+      if (!data?.client_id) throw new Error("client_id não disponível");
+
+      const redirectUri = `${window.location.origin}/admin/mercadopago/callback`;
+      const authUrl = `https://auth.mercadopago.com.br/authorization?client_id=${data.client_id}&response_type=code&platform_id=mp&state=${configId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+      window.location.href = authUrl;
+    } catch (error: any) {
+      console.error("Error starting MP OAuth:", error);
+      toast.error(error.message || "Erro ao iniciar conexão com Mercado Pago");
+      setStartingOAuth(false);
+    }
+  };
+
+  const handleMpDisconnect = async () => {
+    if (!confirm("Tem certeza que deseja desconectar o Mercado Pago? Você precisará reconectar para voltar a receber pagamentos online.")) return;
+    setDisconnectingMp(true);
+    try {
+      const { error } = await supabase.rpc("admin_delete_payment_config", {
+        p_restaurant_id: restaurantId,
+      });
+      if (error) throw error;
+      setMpConfig(null);
+      toast.success("Mercado Pago desconectado.");
+    } catch (error) {
+      console.error("Error disconnecting MP:", error);
+      toast.error("Erro ao desconectar");
+    } finally {
+      setDisconnectingMp(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -239,7 +322,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
           </CardContent>
         </Card>
 
-        {/* Delivery Direto Card — ACTIVE */}
+        {/* Delivery Direto Card */}
         <Card className="cursor-pointer hover:shadow-md transition-shadow border" onClick={() => setDdSheetOpen(true)}>
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
@@ -253,6 +336,30 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
                 </div>
               </div>
               {isDdConnected ? (
+                <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">Conectado</Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px]">Desconectado</Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Mercado Pago Card */}
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border" onClick={() => setMpSheetOpen(true)}>
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-[#009EE3]/10 flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-[#009EE3]" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">Mercado Pago</h3>
+                  <p className="text-xs text-muted-foreground">Pagamentos online e maquininha</p>
+                </div>
+              </div>
+              {mpLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : isMpConnected ? (
                 <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">Conectado</Badge>
               ) : (
                 <Badge variant="outline" className="text-[10px]">Desconectado</Badge>
@@ -414,6 +521,60 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
                     {ddConnecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}Conectar
                   </Button>
                 </div>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Mercado Pago Config Sheet */}
+      <Sheet open={mpSheetOpen} onOpenChange={setMpSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-[#009EE3]" />
+              Mercado Pago
+            </SheetTitle>
+            <SheetDescription>Conecte sua conta do Mercado Pago para pagamentos online e maquininha</SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            {mpLoading ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : isMpConnected ? (
+              <div className="space-y-5">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">Conectado ao Mercado Pago</span>
+                </div>
+                {mpConfig?.connected_at && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Conectado em</Label>
+                    <p className="text-sm">{new Date(mpConfig.connected_at).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                )}
+                <Separator />
+                <Button variant="destructive" className="w-full" onClick={handleMpDisconnect} disabled={disconnectingMp}>
+                  {disconnectingMp ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
+                  Desconectar Mercado Pago
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <p className="text-sm text-muted-foreground">
+                  Ao clicar no botão abaixo, você será redirecionado para o Mercado Pago para autorizar a conexão. Nenhuma credencial manual é necessária.
+                </p>
+                <Button
+                  onClick={handleStartMpOAuth}
+                  disabled={startingOAuth}
+                  className="w-full bg-[#009EE3] hover:bg-[#007BB8]"
+                  size="lg"
+                >
+                  {startingOAuth ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Redirecionando...</>
+                  ) : (
+                    <><ExternalLink className="mr-2 h-4 w-4" />Conectar com Mercado Pago</>
+                  )}
+                </Button>
               </div>
             )}
           </div>
