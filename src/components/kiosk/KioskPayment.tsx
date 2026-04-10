@@ -154,8 +154,6 @@ export function KioskPayment({
       paymentLabel || null,
     ].filter(Boolean).join(" | ");
 
-    const isPointPay = paymentMethod === "point_card" || paymentMethod === "point_pix";
-
     const orderData: any = {
       table_id: tableId,
       restaurant_id: restaurant.id,
@@ -164,10 +162,10 @@ export function KioskPayment({
       order_type,
       delivery_type,
       order_channel: "totem",
-      payment_type: isPointPay ? null : getPaymentTypeForDB(),
-      payment_brand: isPointPay ? null : (selectedBrand || null),
+      payment_type: getPaymentTypeForDB(),
+      payment_brand: selectedBrand || null,
       status: "pending",
-      payment_status: isPointPay ? "awaiting_payment" : "pending",
+      payment_status: "pending",
       notes,
       delivery_phone: customer.phone || null,
       coupon_code: appliedCoupon?.code || null,
@@ -284,7 +282,7 @@ export function KioskPayment({
     return order.id;
   };
 
-  const startPointPolling = useCallback((orderId: string, mpOrdId: string) => {
+  const startPointPolling = useCallback((mpOrdId: string) => {
     setPointStatus("waiting_terminal");
 
     // Timeout after 120s
@@ -322,15 +320,24 @@ export function KioskPayment({
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             setPointStatus("paid");
 
-            // Now update order with confirmed payment info
-            await supabase.from("orders").update({
-              payment_status: "paid",
-              payment_type: getPaymentTypeForDB(),
-              payment_brand: selectedBrand || null,
-              paid_at: new Date().toISOString(),
-            }).eq("id", orderId);
-
-            onOrderCreated(orderId);
+            // Payment confirmed — NOW create the order in DB
+            try {
+              const orderId = await createOrderInDB();
+              if (orderId) {
+                // Order already created with correct payment info, just update paid_at
+                await supabase.from("orders").update({
+                  payment_status: "paid",
+                  paid_at: new Date().toISOString(),
+                }).eq("id", orderId);
+                createdOrderIdRef.current = orderId;
+                onOrderCreated(orderId);
+              } else {
+                toast.error("Pagamento confirmado, mas erro ao criar pedido.");
+              }
+            } catch (dbErr: any) {
+              console.error("[KioskPayment] DB error after payment:", dbErr);
+              toast.error("Pagamento confirmado, mas erro ao salvar pedido.");
+            }
           } else {
             if (pollingRef.current) clearInterval(pollingRef.current);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -360,23 +367,18 @@ export function KioskPayment({
     setPointStatus("creating_payment");
 
     try {
-      const orderId = await createOrderInDB();
-      if (!orderId) {
-        setSubmitting(false);
-        setPointStatus("idle");
-        return;
-      }
-      createdOrderIdRef.current = orderId;
+      // Generate a temporary idempotency key — order will only be created after payment confirmation
+      const tempId = crypto.randomUUID();
 
       const { data: res } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_order",
           restaurant_id: restaurant.id,
           amount: finalTotal,
-          description: `Pedido Totem #${orderId.slice(0, 8)}`,
-          order_id: orderId,
+          description: `Pedido Totem`,
+          order_id: tempId,
           device_id: pointTerminal.device_id,
-          idempotency_key: orderId,
+          idempotency_key: tempId,
           payment_type: getMpPaymentType(),
         },
       });
@@ -394,7 +396,7 @@ export function KioskPayment({
       }
 
       setMpOrderId(res.data.id);
-      startPointPolling(orderId, res.data.id);
+      startPointPolling(res.data.id);
     } catch (err: any) {
       console.error("[KioskPayment] Point payment error:", err);
       toast.error(err?.message || "Erro ao processar pagamento");
