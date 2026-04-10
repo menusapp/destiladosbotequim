@@ -64,11 +64,6 @@ function calcDeliveryOrderTotal(order: any): number {
 }
 
 function calcTotemOrderTotal(order: any): number {
-  // Use persisted total_amount if available (Totem saves this)
-  if (order.total_amount != null && Number(order.total_amount) > 0) {
-    return Number(order.total_amount);
-  }
-  // Fallback: calculate from items
   let subtotal = 0;
   (order.order_items || []).forEach((item: any) => {
     const extrasTotal = (item.order_item_extras || []).reduce(
@@ -76,7 +71,7 @@ function calcTotemOrderTotal(order: any): number {
     );
     subtotal += (item.price_at_order * item.quantity) + extrasTotal;
   });
-  return subtotal - Number(order.coupon_discount || 0) - Number(order.discount_amount || 0);
+  return subtotal - Number(order.coupon_discount || 0);
 }
 
 export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
@@ -114,7 +109,7 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
           .gte("finalized_at", start).lte("finalized_at", end),
         // Totem orders paid — recognized by paid_at
         supabase.from("orders")
-          .select("id, paid_at, order_type, delivery_type, total_amount, payment_type, payment_brand, coupon_discount, discount_amount, delivery_fee, loyalty_points_used, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
+          .select("id, paid_at, order_type, delivery_type, payment_type, payment_brand, coupon_discount, delivery_fee, loyalty_points_used, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
           .eq("restaurant_id", restaurantId)
           .eq("order_channel", "totem")
           .eq("payment_status", "paid")
