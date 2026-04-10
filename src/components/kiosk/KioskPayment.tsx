@@ -124,7 +124,7 @@ export function KioskPayment({
     return "credit_card";
   };
 
-  const createOrderInDB = async (): Promise<string | null> => {
+  const createOrderInDB = useCallback(async (): Promise<string | null> => {
     const { order_type, delivery_type } = getOrderTypeFields();
 
     let tableId: string | null = null;
