@@ -118,7 +118,7 @@ export function KioskPayment({
     if (paymentMethod === "point_pix") return "bank_transfer";
     if (paymentMethod === "point_card") {
       if (selectedCardType === "debit_card") return "debit_card";
-      // voucher and credit both use credit_card in MP API
+      if (selectedCardType === "voucher") return "voucher_card";
       return "credit_card";
     }
     return "credit_card";
