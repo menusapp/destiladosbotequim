@@ -675,7 +675,7 @@ export default function KioskSettings({ restaurantId }: Props) {
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       <p className="text-sm font-medium text-green-700 dark:text-green-400">Modo integrado (PDV) ativo</p>
                     </div>
-                  )
+                  )}
 
                   {/* Step 2: Create Store & POS — skip if already exists */}
                   {activeTerminal.mp_store_id && activeTerminal.mp_pos_id ? (
