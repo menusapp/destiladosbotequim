@@ -1,58 +1,97 @@
 
+Objetivo
 
-## Plano: Corrigir PIX na Maquininha (Properties not supported)
+- Fazer todo pedido pago no Totem entrar imediatamente em:
+  - Visão Geral
+  - Relatório RE / DRE
+  - Fluxo de Caixa
+- Mostrar método + bandeira corretamente, sem duplicar lançamento quando o pedido muda de status depois.
 
-### Diagnóstico
+Diagnóstico do código
 
-Os logs mostram exatamente o problema em 3 tentativas sequenciais:
+- `src/hooks/useOrderMetrics.ts` soma só:
+  - `bills` pagos
+  - `orders` de delivery finalizados
+  - `counter_orders` pagos
+- Os pedidos do Totem ficam em `orders` com `order_channel: "totem"`, então hoje ficam fora dessas métricas.
+- `src/components/admin/ReportsTab.tsx` repete a mesma lógica, então o RE/DRE também ignora Totem.
+- `src/components/admin/ProductPerformanceSection.tsx` funciona porque lê os `order_items` direto, por isso só os produtos aparecem.
+- `src/components/kiosk/KioskPayment.tsx` cria o pedido pago, mas só atualiza `payment_status` e `paid_at`; não cria entrada de caixa.
+- Os triggers legados de caixa trabalham por mudança de `status` operacional (`accepted`, `delivered`, `picked_up`) e não pelo pagamento do Totem, então pedido Totem pago não entra no caixa no momento certo.
 
-1. **Tentativa 1**: `config.point.payment_type: "bank_transfer"` → erro `"additionalProperties 'payment_type' not allowed"` no `$.config.point`
-2. **Tentativa 2**: `allowed_payment_methods: ["bank_transfer"]` no payment → erro `"additionalProperties 'allowed_payment_methods' not allowed"` no `$.transactions.payments[0]`
-3. **Resultado**: todas as tentativas falham com 400, PIX nunca chega na maquininha
+Implementação
 
-### Causa raiz
+1. Incluir Totem nas métricas da Visão Geral
+- Atualizar `src/hooks/useOrderMetrics.ts` para buscar também:
+  - `orders`
+  - `order_channel = 'totem'`
+  - `payment_status = 'paid'`
+  - período baseado em `paid_at`
+- Somar esses pedidos em:
+  - `totalSales`
+  - `ordersCount`
+  - `averageTicket`
+  - `hourlySales` / `dailySales`
+  - `revenueByMethod`
+- Classificar:
+  - `localSales` para `order_type = 'local'` ou `'balcao'`
+  - `deliverySales` para `order_type = 'delivery'`
 
-A documentação oficial da API `/v1/orders` do Mercado Pago Point mostra que o campo correto para pré-selecionar o tipo de pagamento é:
+2. Incluir Totem no RE / DRE
+- Atualizar `src/components/admin/ReportsTab.tsx` com a mesma fonte de pedidos pagos do Totem.
+- Fazer “Vendas”, “Ticket Médio”, “Formas de Pagamento” e “Receita Bruta” refletirem o Totem pago imediatamente.
+- Manter a regra:
+  - Totem conta no `paid_at`
+  - fluxos legados continuam como hoje
 
-```json
-"config": {
-  "point": { "terminal_id": "...", "print_on_terminal": "no_ticket" },
-  "payment_method": {
-    "default_type": "credit_card"
-  }
-}
-```
+3. Corrigir entrada no caixa
+- Criar migration para ajustar a automação de `cash_movements`.
+- Lançar caixa quando:
+  - `order_channel = 'totem'`
+  - `payment_status` muda para `paid`
+- Salvar no movimento:
+  - `order_id`
+  - `payment_method`
+  - valor correto
+  - descrição identificando Totem
+- Deduplicar por `order_id`, para não lançar de novo quando o pedido depois virar `accepted`, `ready`, `delivered` etc.
+- Ajustar a lógica legada para não relançar pedidos Totem já registrados.
 
-O campo fica em **`config.payment_method.default_type`**, e NÃO em `config.point.payment_type` nem em `transactions.payments[0].allowed_payment_methods`. O código atual usa ambos os caminhos errados.
+4. Normalizar método de pagamento
+- Ajustar normalização em métricas/relatórios/UI para aceitar corretamente:
+  - `credit`
+  - `debit`
+  - `pix`
+  - `voucher` / `meal_voucher`
+- Preservar `payment_brand` para exibir:
+  - `Crédito - Visa`
+  - `Débito - Elo`
+  - `PIX`
+  - `Vale Refeição - ...`
 
-### Solução
+5. Garantir total financeiro correto
+- No cálculo de total do pedido Totem, usar o valor persistido no pedido:
+  - itens + extras + taxa
+  - menos cupom
+  - menos desconto de fidelidade persistido
+- Se existir `reward_discount`, usar esse valor como prioridade para bater com o valor realmente pago.
 
-Arquivo: **`supabase/functions/mercadopago-point/index.ts`**
+Arquivos
 
-Para PIX (`bank_transfer`), usar o mesmo endpoint `/v1/orders` com o campo correto `config.payment_method.default_type`:
+- `src/hooks/useOrderMetrics.ts`
+- `src/components/admin/ReportsTab.tsx`
+- migration SQL para trigger/função de `cash_movements`
+- possivelmente `src/lib/utils.ts` para normalização de `voucher`
 
-```json
-{
-  "type": "point",
-  "external_reference": "...",
-  "transactions": { "payments": [{ "amount": "9.90" }] },
-  "config": {
-    "point": { "terminal_id": "...", "print_on_terminal": "no_ticket" },
-    "payment_method": { "default_type": "bank_transfer" }
-  }
-}
-```
+Validação
 
-Isso unifica o fluxo de PIX e cartões — todos usam `/v1/orders` com `config.payment_method.default_type`. A ramificação separada para PIX pode ser eliminada, simplificando o código.
-
-Se `bank_transfer` não for aceito como `default_type` (improvável mas possível), o fallback será enviar sem `payment_method` (maquininha mostra menu de seleção manual).
-
-### Mudanças
-
-- Remover toda a lógica especial de PIX (blocos `pix_direct_v1_orders` e `pix_v1_retry_allowed_methods`)
-- Usar `/v1/orders` com `config.payment_method.default_type` para TODOS os tipos (credit_card, debit_card, voucher_card, bank_transfer)
-- Manter payment-intents como fallback apenas para cartões se /v1/orders falhar
-
-### Arquivo
-- `supabase/functions/mercadopago-point/index.ts` — corrigir campo de pré-seleção de pagamento
-
+- Testar no admin, após pagar no Totem:
+  - Visão Geral: Vendas Totais, Pedidos, gráfico por hora/dia, Receita por Método
+  - RE / DRE: Receita Bruta e pagamentos
+  - Caixa: entrada criada automaticamente e só uma vez
+  - Pedido: método e bandeira corretos
+- Cenários mínimos:
+  - Totem balcão + PIX
+  - Totem balcão + crédito com bandeira
+  - Totem mesa + crédito
+  - Totem para viagem/entrega, para garantir que não duplica ao finalizar operacionalmente
