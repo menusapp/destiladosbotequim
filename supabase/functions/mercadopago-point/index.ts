@@ -357,10 +357,11 @@ async function cancelDevicePending(restaurantId: string, deviceId: string) {
     return respond(true, { data: { canceled_id: localPending.mp_order_id, api_ok: result.ok } });
   }
 
-  // No local record — try to get device status or search recent orders
-  // Use the /v1/orders search as last resort
+  // No local record — search recent orders with date range
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const searchResult = await mpFetch(
-    `/v1/orders?type=point&status=opened`,
+    `/v1/orders?type=point&status=opened&begin_date=${oneDayAgo.toISOString()}&end_date=${now.toISOString()}`,
     accessToken
   );
   
