@@ -1,45 +1,36 @@
 
 
-## Plano: Pedido Totem de mesa chega aceito e pago automaticamente
+## Plano: Corrigir erro "ao salvar pedido" + ajustar status automático do Totem
 
-### O que muda
+### Bug encontrado
 
-Quando o pedido é criado pelo Totem para uma mesa e o pagamento já foi feito (maquininha ou dinheiro), o pedido deve entrar no sistema com:
-- `status: "accepted"` (em vez de `"pending"`)
-- `payment_status: "paid"` + `paid_at`
-- Mesa marcada como `is_occupied: true`
+A coluna `total_amount` **não existe** na tabela `orders`. A linha 174 do `KioskPayment.tsx` tenta inserir `total_amount: finalTotal`, o que causa erro no Supabase e o pedido não é salvo — mesmo após o pagamento ser aprovado na maquininha.
 
-Pedidos de outros canais (QR Code, PDV) continuam entrando como `pending` normalmente.
+### O que precisa mudar
 
-### Arquivo: `src/components/kiosk/KioskPayment.tsx`
+**Arquivo: `src/components/kiosk/KioskPayment.tsx`**
 
-**1. Na função `createOrderInDB`:**
-- Para pedidos de mesa (`consumptionMode === "table"`), quando o pagamento já foi confirmado (maquininha), criar o pedido com `status: "accepted"` em vez de `"pending"`
-- Adicionar um parâmetro `alreadyPaid: boolean` à função para distinguir os fluxos
-- Quando `alreadyPaid` e `consumptionMode === "table"`: setar `status: "accepted"`, `payment_status: "paid"`, `paid_at: now()`
-- Após criar o pedido de mesa, ocupar a mesa imediatamente:
-  ```typescript
-  await supabase.from("tables").update({
-    is_occupied: true,
-    occupied_at: new Date().toISOString(),
-    occupied_by: customer.name,
-  }).eq("id", tableId);
-  ```
+1. **Remover `total_amount`** do objeto `orderData` (linha 174) — essa coluna não existe.
 
-**2. No callback de polling (pagamento por maquininha confirmado, ~linha 328):**
-- Chamar `createOrderInDB(true)` (alreadyPaid = true)
-- Remover o update separado de `payment_status` / `paid_at` pois já estará no insert
+2. **Ajustar status automático para pedidos pagos pelo Totem:**
+   - **Mesa** (consumptionMode = "table") + pago na maquininha → `status: "accepted"`, `payment_status: "paid"` — mesa ocupada (já implementado, vai funcionar ao corrigir o bug)
+   - **Balcão/Viagem/Entrega** + pago na maquininha → `status: "preparing"`, `payment_status: "paid"` — entra direto pra produção, sem precisar aceitar manualmente
+   - **Dinheiro** (qualquer modo) → continua `status: "pending"` como hoje
 
-**3. No fluxo de dinheiro (`handleFinalize`, ~linha 443):**
-- Dinheiro não é pré-pago na maquininha, então continua `createOrderInDB(false)` — pedido entra como `pending`
+3. **Corrigir `handleRetryPointPayment`** (linhas 442-450) — está duplicando chamadas (`handlePointPayment()` é chamado 2 vezes e os resets no meio são inúteis).
 
-**4. Para pedidos de balcão/viagem/entrega pagos na maquininha:**
-- Também passam `alreadyPaid = true`, mas o `status` fica `"pending"` (só mesa vira `"accepted"` automaticamente, pois precisa da ocupação)
-- Na verdade, pedidos de balcão pagos na maquininha já entram como `payment_status: "paid"` — o que muda é só mesa ganhar `status: "accepted"` + ocupação
+### Lógica simplificada
 
-### Resumo
-- 1 arquivo modificado: `src/components/kiosk/KioskPayment.tsx`
-- `createOrderInDB` ganha flag `alreadyPaid`
-- Mesa + Totem + pago = `status: "accepted"` + mesa ocupada
-- Outros modos continuam inalterados
+```
+if (alreadyPaid && consumptionMode === "table") → status: "accepted"
+else if (alreadyPaid) → status: "preparing"  
+else → status: "pending"
+```
+
+### Resultado esperado
+- Pagamento aprovado na maquininha → pedido salva sem erro
+- Tag `order_channel: "totem"` já está presente em todos os pedidos
+- Mesa: entra aceito + pago + mesa ocupada
+- Balcão/viagem: entra preparando + pago
+- Métricas/caixa/DRE já capturam pedidos com `payment_status: "paid"` + `order_channel: "totem"` (implementado na iteração anterior)
 
