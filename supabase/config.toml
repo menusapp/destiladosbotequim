@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.whatsapp-ai-bot]
 verify_jwt = false
+
+[functions.mercadopago-point]
+verify_jwt = false

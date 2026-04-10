@@ -78,6 +78,11 @@ Deno.serve(async (req) => {
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
 
+      // Calculate token_expires_at from expires_in (seconds)
+      const tokenExpiresAt = tokenData.expires_in
+        ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+        : null;
+
       const { error: updateError } = await supabaseAdmin
         .from("online_payment_config")
         .update({
@@ -87,6 +92,7 @@ Deno.serve(async (req) => {
           mp_user_id: String(tokenData.user_id),
           connection_status: "connected",
           connected_at: new Date().toISOString(),
+          token_expires_at: tokenExpiresAt,
           provider: "mercadopago",
           enabled: false,
         })

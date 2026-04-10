@@ -18,12 +18,63 @@ Deno.serve(async (req) => {
 
     // Mercado Pago sends IPN with action and data.id
     const action = body.action || body.type;
-    const paymentId = body.data?.id;
+    const dataId = body.data?.id;
 
-    if (!paymentId) {
-      console.log("[MP Webhook] No payment ID, ignoring");
+    if (!dataId) {
+      console.log("[MP Webhook] No data ID, ignoring");
       return new Response("OK", { status: 200, headers: corsHeaders });
     }
+
+    // Handle Point order events
+    if (action === "order.processed" || action === "order.canceled" || action === "order.expired") {
+      console.log("[MP Webhook] Point order event:", action, "id:", dataId);
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const sb = createClient(supabaseUrl, supabaseServiceKey);
+
+      // Look up in point_order_payments
+      const { data: pointPayment } = await sb.rpc("get_point_order_payment", { p_mp_order_id: String(dataId) });
+
+      if (pointPayment && pointPayment.length > 0) {
+        const pp = pointPayment[0];
+        let newStatus = "waiting_terminal";
+
+        if (action === "order.processed") {
+          // Fetch order details to validate transaction
+          const { data: config } = await sb
+            .from("online_payment_config")
+            .select("mp_access_token")
+            .eq("restaurant_id", pp.restaurant_id)
+            .maybeSingle();
+
+          if (config?.mp_access_token) {
+            const mpRes = await fetch(`https://api.mercadopago.com/v1/orders/${dataId}`, {
+              headers: { Authorization: `Bearer ${config.mp_access_token}` },
+            });
+            const mpOrder = await mpRes.json();
+            const txn = mpOrder.transactions?.payments?.[0];
+            if (txn?.status_detail === "accredited" || txn?.status === "approved") {
+              newStatus = "paid";
+              // Mark order as paid
+              if (pp.order_id) {
+                await sb.from("orders").update({ payment_status: "paid", paid_at: new Date().toISOString() }).eq("id", pp.order_id);
+              }
+            } else {
+              newStatus = "failed";
+            }
+            await sb.rpc("update_point_order_payment", { p_mp_order_id: String(dataId), p_status: newStatus, p_mp_status_payload: mpOrder });
+          }
+        } else {
+          newStatus = "canceled";
+          await sb.rpc("update_point_order_payment", { p_mp_order_id: String(dataId), p_status: newStatus, p_mp_status_payload: body });
+        }
+        console.log("[MP Webhook] Point payment updated:", pp.id, "->", newStatus);
+      }
+
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+
+    const paymentId = dataId;
 
     // Only process payment updates
     if (action !== "payment.updated" && action !== "payment.created" && action !== "payment") {
