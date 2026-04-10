@@ -141,11 +141,15 @@ export default function KioskSettings({ restaurantId }: Props) {
   const handleListTerminals = async () => {
     setLoadingTerminals(true);
     try {
-      const { data, error } = await supabase.functions.invoke("mercadopago-point", {
+      const { data } = await supabase.functions.invoke("mercadopago-point", {
         body: { action: "list_terminals", restaurant_id: restaurantId },
       });
-      if (error) throw error;
-      const devices = data?.devices || data || [];
+      if (!data?.ok) {
+        toast.error(data?.error || "Erro ao buscar maquininhas");
+        return;
+      }
+      const payload = data.data;
+      const devices = payload?.devices || payload || [];
       setDiscoveredDevices(Array.isArray(devices) ? devices : []);
       if (Array.isArray(devices) && devices.length === 0) {
         toast.info("Nenhuma maquininha encontrada na conta");
@@ -187,20 +191,22 @@ export default function KioskSettings({ restaurantId }: Props) {
   const handleCreateStoreAndPos = async () => {
     setCreatingStore(true);
     try {
-      // Create store
-      const { data: storeData, error: storeErr } = await supabase.functions.invoke("mercadopago-point", {
+      const { data: storeRes } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_store",
           restaurant_id: restaurantId,
           name: `Loja Totem - ${restaurantId.slice(0, 8)}`,
           external_id: `store-${restaurantId}`,
+          location: { street_name: "Endereço do restaurante", city_name: "Cidade", state_name: "Estado" },
         },
       });
-      if (storeErr) throw storeErr;
-      const storeId = storeData?.id;
+      if (!storeRes?.ok) {
+        toast.error(storeRes?.error || "Erro ao criar loja");
+        return;
+      }
+      const storeId = storeRes.data?.id;
 
-      // Create POS
-      const { data: posData, error: posErr } = await supabase.functions.invoke("mercadopago-point", {
+      const { data: posRes } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_pos",
           restaurant_id: restaurantId,
@@ -210,16 +216,18 @@ export default function KioskSettings({ restaurantId }: Props) {
           fixed_amount: false,
         },
       });
-      if (posErr) throw posErr;
+      if (!posRes?.ok) {
+        toast.error(posRes?.error || "Erro ao criar caixa");
+        return;
+      }
 
-      // Update terminal with store/pos IDs
-      const activeTerminal = savedTerminals.find(t => t.use_on_kiosk);
-      if (activeTerminal) {
+      const terminal = savedTerminals.find(t => t.use_on_kiosk);
+      if (terminal) {
         await supabase.rpc("admin_upsert_point_terminal", {
           p_restaurant_id: restaurantId,
-          p_device_id: activeTerminal.device_id,
+          p_device_id: terminal.device_id,
           p_mp_external_store_id: storeId?.toString() || null,
-          p_mp_external_pos_id: posData?.id?.toString() || null,
+          p_mp_external_pos_id: posRes.data?.id?.toString() || null,
           p_use_on_kiosk: true,
         });
       }
@@ -234,25 +242,28 @@ export default function KioskSettings({ restaurantId }: Props) {
   };
 
   const handleTestPayment = async () => {
-    const activeTerminal = savedTerminals.find(t => t.use_on_kiosk);
-    if (!activeTerminal) {
+    const terminal = savedTerminals.find(t => t.use_on_kiosk);
+    if (!terminal) {
       toast.error("Selecione uma maquininha primeiro");
       return;
     }
     setTestingPayment(true);
     try {
-      const { data, error } = await supabase.functions.invoke("mercadopago-point", {
+      const { data } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "test_order",
           restaurant_id: restaurantId,
-          device_id: activeTerminal.device_id,
+          device_id: terminal.device_id,
         },
       });
-      if (error) throw error;
-      if (data?.id) {
+      if (!data?.ok) {
+        toast.error(data?.error || "Erro ao criar cobrança de teste");
+        return;
+      }
+      if (data.data?.id) {
         toast.success("Cobrança de teste enviada! Verifique a maquininha.");
       } else {
-        toast.error(data?.message || "Erro ao criar cobrança de teste");
+        toast.error("Resposta inesperada do Mercado Pago");
       }
     } catch (err: any) {
       toast.error(err?.message || "Erro no teste");

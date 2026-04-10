@@ -258,13 +258,14 @@ export function KioskPayment({
     // Poll every 3s
     pollingRef.current = setInterval(async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("mercadopago-point", {
+        const { data: res } = await supabase.functions.invoke("mercadopago-point", {
           body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
         });
 
-        if (error) return;
+        if (!res?.ok) return;
 
-        const status = data?.status;
+        const status = res.data?.status;
+        const data = res.data;
         const txn = data?.transactions?.payments?.[0];
 
         if (status === "processed") {
@@ -317,7 +318,7 @@ export function KioskPayment({
       }
       createdOrderIdRef.current = orderId;
 
-      const { data, error } = await supabase.functions.invoke("mercadopago-point", {
+      const { data: res } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_order",
           restaurant_id: restaurant.id,
@@ -329,9 +330,9 @@ export function KioskPayment({
         },
       });
 
-      if (error || !data?.id) {
-        const errMsg = data?.error || error?.message || "Erro ao enviar para maquininha";
-        if (data?.code === "TOKEN_EXPIRED") {
+      if (!res?.ok || !res.data?.id) {
+        const errMsg = res?.error || "Erro ao enviar para maquininha";
+        if (res?.code === "TOKEN_EXPIRED") {
           toast.error("Token expirado. Reconecte a conta Mercado Pago.");
         } else {
           toast.error(errMsg);
@@ -341,8 +342,8 @@ export function KioskPayment({
         return;
       }
 
-      setMpOrderId(data.id);
-      startPointPolling(orderId, data.id);
+      setMpOrderId(res.data.id);
+      startPointPolling(orderId, res.data.id);
     } catch (err: any) {
       console.error("[KioskPayment] Point payment error:", err);
       toast.error(err?.message || "Erro ao processar pagamento");
