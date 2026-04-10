@@ -645,7 +645,37 @@ export default function KioskSettings({ restaurantId }: Props) {
                         Terminal ativo: {activeTerminal.device_name || activeTerminal.device_id}
                       </p>
                     </div>
-                  </div>
+                   </div>
+
+                  {/* Operating mode warning */}
+                  {activeTerminal.operating_mode === "STANDALONE" && (
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700">
+                      <div className="flex items-center gap-2 flex-1">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Modo manual (STANDALONE)</p>
+                          <p className="text-xs text-muted-foreground">A maquininha precisa estar em modo integrado (PDV) para receber cobranças do sistema</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSwitchToPDV()}
+                        disabled={switchingMode}
+                        className="gap-2 ml-3 shrink-0"
+                      >
+                        {switchingMode ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                        Ativar modo integrado
+                      </Button>
+                    </div>
+                  )}
+
+                  {activeTerminal.operating_mode === "PDV" && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <p className="text-sm font-medium text-green-700 dark:text-green-400">Modo integrado (PDV) ativo</p>
+                    </div>
+                  )
 
                   {/* Step 2: Create Store & POS — skip if already exists */}
                   {activeTerminal.mp_store_id && activeTerminal.mp_pos_id ? (
