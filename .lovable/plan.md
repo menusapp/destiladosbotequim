@@ -1,28 +1,58 @@
 
 
-## Plano: Corrigir PIX direto no terminal + Pedido duplicado
+## Plano: Corrigir PIX na Maquininha (Properties not supported)
 
-### Problema 1: PIX abre tela de seleção
-Nos logs vejo claramente: a API de **payment-intents** retorna erro 400 para `bank_transfer` — ela só aceita `credit_card`, `debit_card`, `voucher_card`. O sistema cai no fallback `/v1/orders` que **não suporta** pré-selecionar tipo, então a maquininha mostra o menu de seleção.
+### Diagnóstico
 
-**Correção**: Para PIX, pular payment-intents e usar `/v1/orders` com restrição de método no config: `config.point.payment_type: "bank_transfer"`. Se a API do MP não aceitar esse campo, usar `allowed_payment_methods` no payload. Testaremos ambas abordagens.
+Os logs mostram exatamente o problema em 3 tentativas sequenciais:
 
-Arquivo: `supabase/functions/mercadopago-point/index.ts`
-- Quando `payment_type === "bank_transfer"` (PIX), ir direto para `/v1/orders` com campo de restrição no config
-- NÃO tentar payment-intents para PIX (sempre falha)
+1. **Tentativa 1**: `config.point.payment_type: "bank_transfer"` → erro `"additionalProperties 'payment_type' not allowed"` no `$.config.point`
+2. **Tentativa 2**: `allowed_payment_methods: ["bank_transfer"]` no payment → erro `"additionalProperties 'allowed_payment_methods' not allowed"` no `$.transactions.payments[0]`
+3. **Resultado**: todas as tentativas falham com 400, PIX nunca chega na maquininha
 
-### Problema 2: Pedido duplicado
-O polling roda a cada 3s. Quando o status muda para `processed/accredited`, o callback chama `createOrderInDB()` — mas o `clearInterval` pode não executar antes do próximo tick do interval, causando **duas chamadas** a `createOrderInDB()`.
+### Causa raiz
 
-**Correção**: Adicionar um `ref` de guarda (`orderCreationInProgressRef`) que impede chamadas duplicadas.
+A documentação oficial da API `/v1/orders` do Mercado Pago Point mostra que o campo correto para pré-selecionar o tipo de pagamento é:
 
-Arquivo: `src/components/kiosk/KioskPayment.tsx`
-- Adicionar `const orderCreationInProgressRef = useRef(false)` 
-- No callback de polling, antes de chamar `createOrderInDB()`, checar e setar o ref
-- `if (orderCreationInProgressRef.current) return;`
-- `orderCreationInProgressRef.current = true;`
+```json
+"config": {
+  "point": { "terminal_id": "...", "print_on_terminal": "no_ticket" },
+  "payment_method": {
+    "default_type": "credit_card"
+  }
+}
+```
 
-### Arquivos
-- `supabase/functions/mercadopago-point/index.ts` — PIX direto sem payment-intents
-- `src/components/kiosk/KioskPayment.tsx` — guard contra pedido duplicado
+O campo fica em **`config.payment_method.default_type`**, e NÃO em `config.point.payment_type` nem em `transactions.payments[0].allowed_payment_methods`. O código atual usa ambos os caminhos errados.
+
+### Solução
+
+Arquivo: **`supabase/functions/mercadopago-point/index.ts`**
+
+Para PIX (`bank_transfer`), usar o mesmo endpoint `/v1/orders` com o campo correto `config.payment_method.default_type`:
+
+```json
+{
+  "type": "point",
+  "external_reference": "...",
+  "transactions": { "payments": [{ "amount": "9.90" }] },
+  "config": {
+    "point": { "terminal_id": "...", "print_on_terminal": "no_ticket" },
+    "payment_method": { "default_type": "bank_transfer" }
+  }
+}
+```
+
+Isso unifica o fluxo de PIX e cartões — todos usam `/v1/orders` com `config.payment_method.default_type`. A ramificação separada para PIX pode ser eliminada, simplificando o código.
+
+Se `bank_transfer` não for aceito como `default_type` (improvável mas possível), o fallback será enviar sem `payment_method` (maquininha mostra menu de seleção manual).
+
+### Mudanças
+
+- Remover toda a lógica especial de PIX (blocos `pix_direct_v1_orders` e `pix_v1_retry_allowed_methods`)
+- Usar `/v1/orders` com `config.payment_method.default_type` para TODOS os tipos (credit_card, debit_card, voucher_card, bank_transfer)
+- Manter payment-intents como fallback apenas para cartões se /v1/orders falhar
+
+### Arquivo
+- `supabase/functions/mercadopago-point/index.ts` — corrigir campo de pré-seleção de pagamento
 
