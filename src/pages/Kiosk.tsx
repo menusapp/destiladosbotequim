@@ -45,6 +45,8 @@ export default function Kiosk() {
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
+  const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
+  const hiddenByRequiredChoices = inactiveData?.hiddenProductIdsByRequiredChoices || new Set<string>();
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Coupon & loyalty state

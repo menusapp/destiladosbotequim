@@ -42,6 +42,8 @@ export default function DeliveryMenu() {
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
+  const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
+  const hiddenByRequiredChoices = inactiveData?.hiddenProductIdsByRequiredChoices || new Set<string>();
 
   const fetchRestaurantData = useCallback(async () => {
     try {
