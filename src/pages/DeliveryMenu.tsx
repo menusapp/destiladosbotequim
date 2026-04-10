@@ -483,9 +483,9 @@ export default function DeliveryMenu() {
                 primaryColor={primaryColor}
               />
 
-              {restaurant.featured_section_enabled && featuredProducts.length > 0 && (
+              {restaurant.featured_section_enabled && activeFeatured.length > 0 && (
                 <FeaturedProducts
-                  products={featuredProducts}
+                  products={activeFeatured}
                   primaryColor={primaryColor}
                   onProductClick={handleProductClick}
                   title={restaurant.featured_section_title || "Destaques"}

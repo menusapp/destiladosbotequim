@@ -15,6 +15,7 @@ import { KioskPayment } from "@/components/kiosk/KioskPayment";
 import { KioskConfirmation } from "@/components/kiosk/KioskConfirmation";
 import { KioskDeliveryAddress } from "@/components/kiosk/KioskDeliveryAddress";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
+import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 
 export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "delivery_address" | "payment" | "confirmation";
 
