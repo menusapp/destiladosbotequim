@@ -408,6 +408,17 @@ async function cancelDevicePending(restaurantId: string, deviceId: string) {
   return respond(false, { error: "Não encontramos a cobrança pendente via API. Cancele direto na maquininha: pressione o X vermelho ou reinicie o app de pagamentos.", code: "not_found" });
 }
 
+async function changeOperatingMode(restaurantId: string, deviceId: string, mode: string) {
+  const { accessToken } = await getRestaurantToken(restaurantId);
+  const result = await mpFetch(`/point/integration-api/devices/${deviceId}`, accessToken, {
+    method: "PATCH",
+    body: JSON.stringify({ operating_mode: mode }),
+  });
+  log("[MP Point] change_operating_mode", { device_id: deviceId, mode, ok: result.ok, status: result.status });
+  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
+  return respond(true, { data: result.data });
+}
+
 async function testOrder(restaurantId: string, deviceId: string) {
   return createOrder(restaurantId, {
     amount: 1.0,
@@ -458,6 +469,8 @@ Deno.serve(async (req) => {
         return await listPendingOrders(restaurant_id, params.device_id);
       case "cancel_device_pending":
         return await cancelDevicePending(restaurant_id, params.device_id);
+      case "change_operating_mode":
+        return await changeOperatingMode(restaurant_id, params.device_id, params.mode || "PDV");
       default:
         return respond(false, { error: `Ação desconhecida: ${action}`, code: "unknown_action" });
     }

@@ -66,6 +66,7 @@ export default function KioskSettings({ restaurantId }: Props) {
   const [creatingStore, setCreatingStore] = useState(false);
   const [pendingOrderBlocked, setPendingOrderBlocked] = useState(false);
   const [cancellingPending, setCancellingPending] = useState(false);
+  const [switchingMode, setSwitchingMode] = useState(false);
 
   useEffect(() => {
     fetchConfig();
