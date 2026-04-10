@@ -1,40 +1,48 @@
 
 
-## Plano: Fortalecer landing page com WhatsApp, screenshots reais, promessa forte e diferenciação
+## Plano: Relatório de Desempenho de Produtos na Visão Geral
 
-### Mudanças
+### Resumo
+Criar um hook `useProductPerformance` que busca métricas de produtos via Supabase JS (sem migration), e um componente `ProductPerformanceSection` renderizado no final do `OverviewTab`.
 
-**1. Adicionar seção WhatsApp entre Financeiro e Features Grid (nova seção)**
-- Layout split-screen: texto à esquerda, imagem do WhatsApp (image-16.png) à direita
-- Título: "Marketing automático e central de alertas no WhatsApp"
-- Texto descritivo conforme solicitado
-- 4 bullets: Remarketing automático, Cupons personalizados, Notificações de pedido, Segmentação inteligente
-- Copiar image-16.png para `src/assets/landing-whatsapp.png`
+---
 
-**2. Substituir mockups por screenshots reais**
-- Seção "Gestor de pedidos completo" (seção 3): trocar o mockup de cards de pedido pelo screenshot do PDV (image-17.png → `src/assets/landing-pdv.png`)
-- Seção "Visão completa do seu negócio" (seção 4): trocar o DRE mockup pelo screenshot do Relatório DRE (image-18.png → `src/assets/landing-dre.png`)
-- Ambas as imagens renderizadas como `<img>` com `rounded-2xl border shadow-xl`
+### 1. Novo hook: `src/hooks/useProductPerformance.ts`
 
-**3. Fortalecer promessa no Hero**
-- Subtítulo atual genérico → trocar para algo com promessa direta de resultado:
-  - "Pare de perder pedidos. Aumente suas vendas sem pagar comissão. Automatize seu restaurante em minutos."
+- Recebe `restaurantId` e `dateRange` (mesmo tipo do useOrderMetrics)
+- Usa `getDateRange()` do useOrderMetrics para calcular start/end
+- Faz query client-side via Supabase JS:
+  - `orders` filtrado por restaurant_id, created_at no range, status NOT IN cancelled/pending
+  - Join com `order_items` → `products` → `categories`
+  - Inclui `order_item_extras` para receita de extras
+- Agrega no JS: por product_id calcula order_count, total_quantity, total_revenue (items + extras), avg_price, category_name
+- Retorna array ordenado por total_quantity DESC
+- `staleTime: 5 * 60 * 1000` — usa `useQuery` do TanStack Query (já instalado no projeto)
+- Nenhuma alteração no backend
 
-**4. Adicionar diferenciação clara**
-- Após o hero badge "Usado por mais de 500 restaurantes", adicionar uma linha de diferenciadores compactos abaixo do subtítulo:
-  - "✓ Zero comissão por pedido  ✓ Robô IA que vende 24h  ✓ DRE automático  ✓ Parceiro de integração iFood"
+### 2. Novo componente: `src/components/admin/ProductPerformanceSection.tsx`
 
-**5. Fortalecer prova social com números mais impactantes**
-- Trocar textos dos depoimentos para incluir resultados mensuráveis (ex: "Triplicamos pedidos" → "Saí de 15 para 45 pedidos/dia no primeiro mês")
-- Manter a seção de métricas (500+, 50k+, etc.)
+**Layout:**
+- Filtro "Top X" (5, 10, 20) no canto superior direito
+- Grid `grid-cols-1 lg:grid-cols-2 gap-6`:
+  - **Esquerda — Mais Vendidos**: Top N por quantidade. Cada item: posição com badge dourado/prata/bronze para 1-2-3, nome, categoria, qty com barra de progresso relativa ao 1º, receita. Barra em cor primária.
+  - **Direita — Menos Vendidos**: Bottom N (com ≥1 venda). Mesma estrutura, barra em tom suave (muted).
+- Grid inferior `grid-cols-2 lg:grid-cols-4` com 4 mini-cards:
+  - Total de produtos vendidos (soma qty)
+  - Produto mais rentável (maior receita incluindo extras)
+  - Ticket médio por produto (receita total / total produtos distintos vendidos)
+  - Categoria mais vendida (categoria com maior soma qty)
+- Loading: Skeleton placeholders
+- Empty state: "Nenhum produto vendido no período"
 
-**6. Menção discreta ao iFood**
-- Na seção de segmentos ou no footer, adicionar um texto pequeno: "Parceiro de integração iFood" com ícone sutil
-- Alternativa: incluir no badge de diferenciadores do hero
+### 3. Integração no OverviewTab
 
-### Arquivos modificados
-- `src/pages/LandingPage.tsx` — todas as mudanças acima
-- `src/assets/landing-whatsapp.png` — copiado de upload
-- `src/assets/landing-pdv.png` — copiado de upload
-- `src/assets/landing-dre.png` — copiado de upload
+- Importar `ProductPerformanceSection`
+- Renderizar após o grid de chart + receita por método, passando `restaurantId` e `dateRange`
+- Zero alteração nos cálculos financeiros existentes
+
+### Arquivos
+- **Criar**: `src/hooks/useProductPerformance.ts`
+- **Criar**: `src/components/admin/ProductPerformanceSection.tsx`
+- **Editar**: `src/components/admin/OverviewTab.tsx` (adicionar import + render no final)
 
