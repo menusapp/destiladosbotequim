@@ -366,10 +366,10 @@ export default function DeliveryMenu() {
   // Filtrar produtos vinculados a insumos inativos
   const activeCategories = categories.map(cat => ({
     ...cat,
-    products: cat.products.filter(p => !disabledProductIds.has(p.id))
+    products: cat.products.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id))
   })).filter(cat => cat.products.length > 0);
 
-  const activeFeatured = featuredProducts.filter(p => !disabledProductIds.has(p.id));
+  const activeFeatured = featuredProducts.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id));
 
   const allProducts = activeCategories.flatMap((c) => c.products);
 
