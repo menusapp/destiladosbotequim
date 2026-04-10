@@ -1,28 +1,32 @@
 
 
-## Plano: 2 Correções Urgentes no Pagamento do Totem
+## Plano: Pedido só entra no sistema após pagamento confirmado + Origem "Totem"
 
-### Problema 1: Maquininha ainda pede pra escolher tipo de pagamento
+### Problema 1: Pedido aparece antes de pagar
+O fluxo atual em `KioskPayment.tsx` chama `createOrderInDB()` **antes** de enviar a cobrança para a maquininha. Mesmo com `payment_status: "awaiting_payment"`, o pedido já aparece no painel admin e dispara notificações.
 
-A API `/v1/orders` (endpoint principal usado) **não suporta** o campo `payment.type` no payload — ela sempre manda a maquininha perguntar crédito/débito/pix. Esse campo só funciona na API legada `/point/integration-api/devices/{device_id}/payment-intents`.
+### Solução 1: Inverter a ordem — cobrar primeiro, criar pedido depois
+Em `handlePointPayment`:
+1. **Primeiro**: enviar a cobrança para a maquininha (sem criar pedido no DB)
+2. **Polling**: aguardar confirmação de pagamento
+3. **Só após pagamento confirmado**: chamar `createOrderInDB()` com `payment_status: "paid"`, `payment_type` e `payment_brand` já preenchidos
+4. Se o pagamento for cancelado/recusado/timeout: **nenhum pedido é criado** — descartado silenciosamente
 
-**Correção**: Quando o totem envia `payment_type` (crédito, débito, pix), usar **sempre** a API de payment-intents primeiro (que aceita `payment.type`), e só usar `/v1/orders` como fallback quando não há `payment_type` especificado.
+Mudanças em `src/components/kiosk/KioskPayment.tsx`:
+- `handlePointPayment`: não chama mais `createOrderInDB()` primeiro. Gera um UUID temporário para idempotency_key, envia para maquininha, e no polling de sucesso cria o pedido
+- `startPointPolling`: no callback de sucesso (`accredited`/`approved`), chama `createOrderInDB()` com pagamento já confirmado e depois `onOrderCreated(orderId)`
+- Se cancelado/falhou: não cria nada no DB
 
-Arquivo: `supabase/functions/mercadopago-point/index.ts`
-- Inverter a ordem: se `body.payment_type` existe, chamar payment-intents primeiro
-- Fallback para `/v1/orders` apenas se payment-intents falhar
+### Problema 2: Origem mostra "Balcão" em vez de "Totem"
+O `OrderDetailModal.tsx` tem sua própria função `getOrderOrigin()` que verifica `order.order_type === "balcao"` e retorna "Balcão" **antes** de verificar `order_channel`. Totem com modo "counter" envia `order_type: "balcao"`, então cai nessa condição.
 
-### Problema 2: Pedido aparece no painel antes de ser pago
-
-O `createOrderInDB()` é chamado **antes** de enviar pra maquininha. O pedido já entra com `payment_type: "credit"` e `payment_brand: "Visa"`, e o admin vê como se já tivesse sido pago.
-
-**Correção**: Para pagamentos na maquininha (point_card / point_pix), criar o pedido com `payment_type: null` e `payment_status: "awaiting_payment"`. Só após o polling confirmar `status: "processed"` + `accredited`, atualizar o pedido com o `payment_type` e `payment_brand` corretos e `payment_status: "paid"`.
-
-Arquivo: `src/components/kiosk/KioskPayment.tsx`
-- Em `createOrderInDB`, quando `isPointPayment`, setar `payment_type: null`, `payment_brand: null`, `payment_status: "awaiting_payment"`
-- No callback de polling quando `pointStatus === "paid"`, fazer update com `payment_type`, `payment_brand`, `payment_status: "paid"`, `paid_at`
+### Solução 2: Usar o helper compartilhado
+Em `src/components/admin/OrderDetailModal.tsx`:
+- Substituir a função local `getOrderOrigin()` pelo import de `getOrderOriginLabel` de `@/lib/orderOrigin.ts`
+- Também atualizar `orderOrigin.ts` para verificar `order_channel === "totem"` **antes** de qualquer check de `order_type`, garantindo que totem sempre aparece como "Totem"
 
 ### Arquivos
-- `supabase/functions/mercadopago-point/index.ts` — inverter ordem dos endpoints quando `payment_type` presente
-- `src/components/kiosk/KioskPayment.tsx` — não enviar payment_type/brand na criação, atualizar só após confirmação
+- **`src/components/kiosk/KioskPayment.tsx`** — inverter fluxo: cobrar primeiro, criar pedido só após confirmação
+- **`src/components/admin/OrderDetailModal.tsx`** — usar `getOrderOriginLabel` do helper compartilhado
+- **`src/lib/orderOrigin.ts`** — já trata `order_channel === "totem"` corretamente (sem mudança necessária)
 
