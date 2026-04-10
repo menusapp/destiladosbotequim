@@ -237,7 +237,7 @@ export default function Kiosk() {
         });
 
       setProductExtras([...(extrasData || []), ...complementExtras]
-        .filter((e: any) => !disabledExtraItemIds.has(e.id)));
+        .filter((e: any) => !disabledExtraItemIds.has(e.id) && !disabledProductExtraIds.has(e.id)));
     } catch (err) {
       console.error("[Kiosk] Exceção ao carregar extras:", err);
       setProductExtras([]);
@@ -344,9 +344,9 @@ export default function Kiosk() {
       {step === "menu" && (
          <KioskMenu
            categories={categories.map(cat => ({
-             ...cat,
-             products: cat.products.filter(p => !disabledProductIds.has(p.id))
-           })).filter(cat => cat.products.length > 0)}
+              ...cat,
+              products: cat.products.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id))
+            })).filter(cat => cat.products.length > 0)}
           primaryColor={primaryColor}
           onSelectProduct={openProduct}
           cartCount={cartCount}
