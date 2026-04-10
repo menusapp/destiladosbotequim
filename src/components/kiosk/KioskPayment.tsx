@@ -66,6 +66,7 @@ export function KioskPayment({
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const createdOrderIdRef = useRef<string | null>(null);
+  const orderCreationInProgressRef = useRef(false);
 
   const pointsDiscount = loyaltyPointsUsed * loyaltyRealPerPoint;
   const finalTotal = Math.max(0, cartTotal - couponDiscount - pointsDiscount);
