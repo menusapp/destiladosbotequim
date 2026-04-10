@@ -2786,7 +2786,7 @@ export type Database = {
           mp_order_id: string
           mp_status_payload: Json | null
           mp_user_id: string | null
-          order_id: string
+          order_id: string | null
           restaurant_id: string
           status: string | null
           terminal_id: string
@@ -2801,7 +2801,7 @@ export type Database = {
           mp_order_id: string
           mp_status_payload?: Json | null
           mp_user_id?: string | null
-          order_id: string
+          order_id?: string | null
           restaurant_id: string
           status?: string | null
           terminal_id: string
@@ -2816,7 +2816,7 @@ export type Database = {
           mp_order_id?: string
           mp_status_payload?: Json | null
           mp_user_id?: string | null
-          order_id?: string
+          order_id?: string | null
           restaurant_id?: string
           status?: string | null
           terminal_id?: string
@@ -4845,17 +4845,17 @@ export type Database = {
       }
       insert_point_order_payment: {
         Args: {
-          p_amount: number
-          p_external_reference: string
-          p_idempotency_key: string
-          p_mp_order_id: string
-          p_mp_user_id: string
-          p_order_id: string
+          p_amount?: number
+          p_external_reference?: string
+          p_idempotency_key?: string
+          p_mp_order_id?: string
+          p_mp_user_id?: string
+          p_order_id?: string
           p_restaurant_id: string
           p_status?: string
-          p_terminal_id: string
+          p_terminal_id?: string
         }
-        Returns: string
+        Returns: undefined
       }
       is_restaurant_admin: {
         Args: { rest_id: string; user_uuid: string }
