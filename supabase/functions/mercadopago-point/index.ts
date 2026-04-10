@@ -137,7 +137,7 @@ async function createOrder(
     external_reference: body.order_id,
     description: body.description,
     transactions: {
-      payments: [{ amount: body.amount }],  // number, not string
+      payments: [{ amount: body.amount.toString() }],  // MP requires string
     },
     config: {
       point: {
