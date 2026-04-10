@@ -321,6 +321,10 @@ export function KioskPayment({
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             setPointStatus("paid");
 
+            // Guard against duplicate order creation from overlapping polling ticks
+            if (orderCreationInProgressRef.current) return;
+            orderCreationInProgressRef.current = true;
+
             // Payment confirmed — NOW create the order in DB
             try {
               const orderId = await createOrderInDB();
