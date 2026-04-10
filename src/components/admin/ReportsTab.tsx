@@ -123,6 +123,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         { data: paidBills },
         { data: deliveryOrders },
         { data: counterOrders },
+        { data: totemOrders },
         { data: comandasData },
         { data: paymentMethods },
         { data: cashMovements },
@@ -141,6 +142,12 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         supabase.from("counter_orders").select("id, total_amount, payment_method")
           .eq("restaurant_id", restaurantId).eq("status", "paid")
           .gte("finalized_at", startDate.toISOString()).lte("finalized_at", endDate.toISOString()),
+        // Totem orders paid — recognized by paid_at
+        supabase.from("orders").select(`id, total_amount, payment_type, payment_brand, order_type, delivery_type, coupon_discount, discount_amount, delivery_fee, loyalty_points_used, order_items(quantity, price_at_order, order_item_extras(price_at_order))`)
+          .eq("restaurant_id", restaurantId)
+          .eq("order_channel", "totem")
+          .eq("payment_status", "paid")
+          .gte("paid_at", startDate.toISOString()).lte("paid_at", endDate.toISOString()),
         supabase.from("comandas").select("id").eq("restaurant_id", restaurantId)
           .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
         supabase.from("payment_methods").select("id, name, method_type").eq("restaurant_id", restaurantId),

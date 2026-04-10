@@ -46,13 +46,7 @@ export interface OrderMetrics {
   deliveryOrderIds: string[];
   localOrderIds: string[];
   counterOrderIds: string[];
-}
-
-function calcOrderTotal(order: any): number {
-  return (order.order_items || []).reduce((sum: number, item: any) => {
-    const extras = (item.order_item_extras || []).reduce((s: number, e: any) => s + (e.price_at_order || 0), 0);
-    return sum + (item.price_at_order + extras) * item.quantity;
-  }, 0);
+  totemOrderIds: string[];
 }
 
 function calcDeliveryOrderTotal(order: any): number {
@@ -69,11 +63,27 @@ function calcDeliveryOrderTotal(order: any): number {
   return subtotal + deliveryFee - couponDiscount - loyaltyDiscount;
 }
 
+function calcTotemOrderTotal(order: any): number {
+  // Use persisted total_amount if available (Totem saves this)
+  if (order.total_amount != null && Number(order.total_amount) > 0) {
+    return Number(order.total_amount);
+  }
+  // Fallback: calculate from items
+  let subtotal = 0;
+  (order.order_items || []).forEach((item: any) => {
+    const extrasTotal = (item.order_item_extras || []).reduce(
+      (sum: number, extra: any) => sum + Number(extra.price_at_order || 0), 0
+    );
+    subtotal += (item.price_at_order * item.quantity) + extrasTotal;
+  });
+  return subtotal - Number(order.coupon_discount || 0) - Number(order.discount_amount || 0);
+}
+
 export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
   const [metrics, setMetrics] = useState<OrderMetrics>({
     totalSales: 0, ordersCount: 0, averageTicket: 0,
     localSales: 0, deliverySales: 0, hourlySales: [], dailySales: [], revenueByMethod: [],
-    deliveryOrderIds: [], localOrderIds: [], counterOrderIds: [],
+    deliveryOrderIds: [], localOrderIds: [], counterOrderIds: [], totemOrderIds: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -82,7 +92,7 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       const { start, end } = getDateRange(dateRange);
 
       // Fetch all data sources in parallel
-      const [deliveryRes, localBillsRes, counterRes, paymentMethodsRes] = await Promise.all([
+      const [deliveryRes, localBillsRes, counterRes, totemRes, paymentMethodsRes] = await Promise.all([
         // Delivery orders — only finalized
         supabase.from("orders")
           .select("id, created_at, order_type, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
@@ -102,6 +112,13 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
           .select("id, total_amount, finalized_at, payment_method")
           .eq("restaurant_id", restaurantId).eq("status", "paid")
           .gte("finalized_at", start).lte("finalized_at", end),
+        // Totem orders paid — recognized by paid_at
+        supabase.from("orders")
+          .select("id, paid_at, order_type, delivery_type, total_amount, payment_type, payment_brand, coupon_discount, discount_amount, delivery_fee, loyalty_points_used, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
+          .eq("restaurant_id", restaurantId)
+          .eq("order_channel", "totem")
+          .eq("payment_status", "paid")
+          .gte("paid_at", start).lte("paid_at", end),
         // Payment methods for normalization
         supabase.from("payment_methods")
           .select("id, name, method_type")
@@ -111,6 +128,7 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       const deliveryOrders = deliveryRes.data || [];
       const paidBills = localBillsRes.data || [];
       const counterOrders = counterRes.data || [];
+      const totemOrders = totemRes.data || [];
       const paymentMethods = paymentMethodsRes.data || [];
 
       // --- Calculate totals ---
@@ -120,7 +138,22 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
 
       const billsTotal = paidBills.reduce((s, b) => s + Number(b.total_amount), 0);
       const counterTotal = counterOrders.reduce((s, co) => s + (co.total_amount || 0), 0);
-      const localSales = billsTotal + counterTotal;
+
+      // Totem totals — split into local vs delivery
+      let totemLocalSales = 0;
+      let totemDeliverySales = 0;
+      totemOrders.forEach(o => {
+        const total = calcTotemOrderTotal(o);
+        if (o.order_type === 'delivery') {
+          totemDeliverySales += total;
+        } else {
+          totemLocalSales += total;
+        }
+      });
+      const totemOrderIds = totemOrders.map(o => o.id);
+
+      const localSales = billsTotal + counterTotal + totemLocalSales;
+      deliverySales += totemDeliverySales;
       const totalSales = localSales + deliverySales;
 
       // Get local order IDs for CMV
@@ -137,7 +170,7 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       }
       const counterOrderIds = counterOrders.map(o => o.id);
 
-      const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length;
+      const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length + totemOrders.length;
       const averageTicket = totalCount > 0 ? totalSales / totalCount : 0;
 
       // --- Hourly or daily sales ---
@@ -164,11 +197,16 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
             hourlyMap.set(h, (hourlyMap.get(h) || 0) + Number(b.total_amount || 0));
           }
         });
+        // Totem orders by paid_at
+        totemOrders.forEach(o => {
+          if (o.paid_at) {
+            const h = new Date(o.paid_at).getHours().toString().padStart(2, "0") + ":00";
+            hourlyMap.set(h, (hourlyMap.get(h) || 0) + calcTotemOrderTotal(o));
+          }
+        });
         hourlySales = Array.from(hourlyMap.entries()).map(([hour, total]) => ({ hour, total })).sort((a, b) => a.hour.localeCompare(b.hour));
       } else {
-        // Multi-day: aggregate by date
         const dailyMap = new Map<string, number>();
-        // Initialize all days in range
         const startDate = new Date(start);
         const endDate = new Date(end);
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
@@ -190,50 +228,45 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
             dailyMap.set(d, (dailyMap.get(d) || 0) + Number(b.total_amount || 0));
           }
         });
+        // Totem orders by paid_at
+        totemOrders.forEach(o => {
+          if (o.paid_at) {
+            const d = new Date(o.paid_at).toISOString().slice(0, 10);
+            dailyMap.set(d, (dailyMap.get(d) || 0) + calcTotemOrderTotal(o));
+          }
+        });
         dailySales = Array.from(dailyMap.entries()).map(([day, total]) => ({ day, total })).sort((a, b) => a.day.localeCompare(b.day));
       }
 
       // --- Revenue by payment method ---
-      // Normalize payment method to a base category, grouping online and presencial together
       const normalizeMethod = (method: string | null | undefined): string => {
         if (!method) return "Outros";
-
-        // Strip brand suffix: "Crédito - Visa" → "Crédito", "Débito - Mastercard" → "Débito"
         const base = method.split(" - ")[0].trim();
-
-        // Portuguese display strings
         if (base.startsWith("Crédito") || base.startsWith("Créd")) return "Crédito";
         if (base.startsWith("Débito") || base.startsWith("Déb")) return "Débito";
         if (base.startsWith("Vale")) return "Vale Refeição";
         if (base === "Dinheiro") return "Dinheiro";
         if (base === "PIX") return "PIX";
-
-        // Internal codes → display labels (online = presencial)
         if (method === "cash") return "Dinheiro";
         if (method === "pix" || method === "pix_online") return "PIX";
         if (method === "credit" || method === "card" || method === "credit_card_online") return "Crédito";
         if (method === "debit") return "Débito";
-        if (method === "meal_voucher") return "Vale Refeição";
+        if (method === "meal_voucher" || method === "voucher") return "Vale Refeição";
+        if (method === "bank_transfer") return "PIX";
         if (method === "Pago pelo iFood" || method === "ifood_online") return "iFood Online";
         if (method === "employee_credit") return "Crédito Funcionário";
-
-        // Try payment_methods table lookup
         const byId = paymentMethods.find(p => p.id === method);
         if (byId) return normalizeMethod(byId.method_type);
         const byName = paymentMethods.find(p => p.name.toLowerCase() === method.toLowerCase());
         if (byName) return normalizeMethod(byName.method_type);
-
         return "Outros";
       };
 
-      // For split/mixed payments stored as comma-separated strings,
-      // distribute the total evenly across each method
       const addMethodRevenue = (methodTotals: Record<string, number>, method: string | null | undefined, total: number) => {
         if (!method) {
           methodTotals["Outros"] = (methodTotals["Outros"] || 0) + total;
           return;
         }
-        // If comma-separated (mixed), split and distribute evenly
         if (method.includes(",")) {
           const parts = method.split(",").map(s => s.trim()).filter(Boolean);
           const perPart = total / (parts.length || 1);
@@ -248,7 +281,6 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       };
 
       const methodTotals: Record<string, number> = {};
-      // Somar bills — desagregar payment_splits quando disponível
       paidBills.forEach((b: any) => {
         const splits = b.payment_splits;
         if (Array.isArray(splits) && splits.length > 0) {
@@ -266,6 +298,10 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       deliveryOrders.forEach((o: any) => {
         addMethodRevenue(methodTotals, o.payment_type, calcDeliveryOrderTotal(o));
       });
+      // Totem orders
+      totemOrders.forEach((o: any) => {
+        addMethodRevenue(methodTotals, o.payment_type, calcTotemOrderTotal(o));
+      });
 
       const revenueByMethod = Object.entries(methodTotals)
         .filter(([_, total]) => total > 0)
@@ -274,7 +310,7 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
       setMetrics({
         totalSales, ordersCount: totalCount, averageTicket,
         localSales, deliverySales, hourlySales, dailySales, revenueByMethod,
-        deliveryOrderIds, localOrderIds, counterOrderIds,
+        deliveryOrderIds, localOrderIds, counterOrderIds, totemOrderIds,
       });
     } catch (err) {
       console.error("Error fetching order metrics:", err);
