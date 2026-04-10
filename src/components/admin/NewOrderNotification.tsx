@@ -167,7 +167,7 @@ export const NewOrderNotification = ({
             size="sm"
             className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
           >
-            Aceitar
+            Ver pedido
           </Button>
           {canReject && (
             <Button

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { formatPaymentMethod } from "@/lib/utils";
+import { formatPaymentMethod, formatPaymentWithBrand } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -100,7 +100,7 @@ export const TableDetailDialog = ({
       const { data, error } = await supabase
         .from("orders")
         .select(`
-          id, status, customer_name, customer_cpf, comanda_id, created_at, coupon_discount, notes,
+          id, status, payment_status, payment_type, payment_brand, paid_at, customer_name, customer_cpf, comanda_id, created_at, coupon_discount, notes,
           order_items(
             id, quantity, price_at_order, notes,
             products(name),
@@ -217,7 +217,7 @@ export const TableDetailDialog = ({
   }, [orders, comandas]);
 
   const tableTotal = useMemo(() => {
-    return orders?.reduce((sum, order) => sum + getOrderTotal(order), 0) || 0;
+    return orders?.filter((order: any) => order.payment_status !== "paid").reduce((sum, order) => sum + getOrderTotal(order), 0) || 0;
   }, [orders]);
 
   // Calculate paid total from splits
