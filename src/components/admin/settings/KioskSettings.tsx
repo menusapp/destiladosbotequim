@@ -191,6 +191,29 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
+  const handleSwitchToPDV = async (deviceId?: string) => {
+    const target = deviceId || activeTerminal?.device_id;
+    if (!target) return;
+    setSwitchingMode(true);
+    try {
+      const { data } = await supabase.functions.invoke("mercadopago-point", {
+        body: { action: "change_operating_mode", restaurant_id: restaurantId, device_id: target, mode: "PDV" },
+      });
+      if (!data?.ok) {
+        toast.error(data?.error || "Erro ao trocar modo do terminal");
+        return;
+      }
+      toast.success("Maquininha alterada para modo integrado (PDV)! Ela pode reiniciar.");
+      // Update local state
+      setDiscoveredDevices(prev => prev.map(d => (d.id || d.device_id) === target ? { ...d, operating_mode: "PDV" } : d));
+      setSavedTerminals(prev => prev.map(t => t.device_id === target ? { ...t, operating_mode: "PDV" } : t));
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao trocar modo");
+    } finally {
+      setSwitchingMode(false);
+    }
+  };
+
   const handleCreateStoreAndPos = async () => {
     setCreatingStore(true);
     try {
@@ -233,6 +256,11 @@ export default function KioskSettings({ restaurantId }: Props) {
           p_mp_external_pos_id: posRes.data?.id?.toString() || null,
           p_use_on_kiosk: true,
         });
+
+        // Auto-switch to PDV mode
+        if (terminal.operating_mode !== "PDV") {
+          await handleSwitchToPDV(terminal.device_id);
+        }
       }
 
       toast.success("Loja e Caixa criados com sucesso!");
