@@ -982,7 +982,8 @@ const Menu = () => {
         }));
       });
 
-    const allExtras = [...extrasWithCategoryName, ...complementExtras];
+    const allExtras = [...extrasWithCategoryName, ...complementExtras]
+      .filter((e: any) => !disabledExtraItemIds.has(e.id));
     setSelectedProduct(product);
     setProductExtras(allExtras);
     setShowProductDialog(true);

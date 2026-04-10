@@ -19,6 +19,7 @@ import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "@/components/ui/sonner";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
 import { isFeaturedVisible } from "@/lib/featuredUtils";
+import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 
 export default function DeliveryMenu() {
   const { slug: restaurantSlug } = useParams<{ slug: string }>();
