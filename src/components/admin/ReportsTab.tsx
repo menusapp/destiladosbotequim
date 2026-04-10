@@ -315,6 +315,19 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         addToPaymentTotal(order.payment_type, orderTotal);
       });
 
+      // Somar totem orders por payment_type
+      (totemOrders || []).forEach((order: any) => {
+        let orderTotal = 0;
+        order.order_items?.forEach((item: any) => {
+          const itemTotal = item.price_at_order * item.quantity;
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0), 0);
+          orderTotal += itemTotal + extrasTotal;
+        });
+        orderTotal -= Number(order.coupon_discount || 0);
+        addToPaymentTotal(order.payment_type, orderTotal);
+      });
+
       // Converter para array de exibição (apenas os que têm valor > 0)
       const paymentsByMethod: PaymentMethodSummary[] = Object.entries(paymentTotals)
         .filter(([_, total]) => total > 0)
