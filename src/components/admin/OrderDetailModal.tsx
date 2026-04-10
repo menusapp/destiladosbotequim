@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { formatPaymentWithBrand } from "@/lib/utils";
+import { getOrderOriginLabel } from "@/lib/orderOrigin";
 import { useOrderStatusAdvance } from "@/hooks/useOrderStatusAdvance";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -208,14 +209,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     return labels[status] || status;
   };
 
-  const getOrderOrigin = () => {
-    if (order.order_type === "balcao") return "Balcão";
-    const isLocal = order.order_type === "local" || (!order.order_type && order.table_id);
-    if (isLocal) return `Digital - Mesa ${order.tables?.table_number || "?"}`;
-    if (order.delivery_type === "takeaway") return "PDV - Para Viagem";
-    if (order.dd_source) return "Delivery Direto";
-    return order.delivery_type === "delivery" ? "Digital - Delivery" : "Digital - Retirada";
-  };
+  const getOrderOrigin = () => getOrderOriginLabel(order as any);
 
   const canAddItems = ["pending", "accepted", "preparing"].includes(order.status);
   const canRemoveItems = ["pending", "accepted", "preparing"].includes(order.status);

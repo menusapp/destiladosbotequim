@@ -12,6 +12,8 @@ interface OrderForOrigin {
   ifood_source?: boolean | null;
   table_id?: string | null;
   tables?: { table_number?: number; table_name?: string | null } | null;
+  payment_type?: string | null;
+  payment_brand?: string | null;
 }
 
 export function getOrderOriginLabel(order: OrderForOrigin): string {
