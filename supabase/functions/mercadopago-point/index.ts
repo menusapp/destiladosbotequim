@@ -119,7 +119,7 @@ async function createPos(restaurantId: string, body: { name: string; external_id
 
 async function createOrder(
   restaurantId: string,
-  body: { amount: number; description: string; order_id: string; device_id: string; idempotency_key: string }
+  body: { amount: number; description: string; order_id: string; device_id: string; idempotency_key: string; payment_type?: string }
 ) {
   const { accessToken, mpUserId } = await getRestaurantToken(restaurantId);
 
@@ -176,7 +176,7 @@ async function createOrder(
         description: body.description,
         payment: {
           installments: 1,
-          type: "credit_card",
+          type: body.payment_type || "credit_card",
           installments_cost: "seller",
         },
         additional_info: {

@@ -514,8 +514,7 @@ export default function KioskSettings({ restaurantId }: Props) {
           <CardContent className="space-y-3 pt-0">
             <ToggleRow icon={Banknote} label="Dinheiro" checked={localConfig.payment_cash} onChange={(v) => updateLocal({ payment_cash: v })} />
             <ToggleRow icon={CreditCard} label="Cartão na maquininha" checked={localConfig.payment_card} onChange={(v) => updateLocal({ payment_card: v })} />
-            <ToggleRow icon={QrCode} label="PIX" checked={localConfig.payment_pix} onChange={(v) => updateLocal({ payment_pix: v })} />
-            <ToggleRow icon={Smartphone} label="Pagamento online" checked={localConfig.payment_online} onChange={(v) => updateLocal({ payment_online: v })} />
+            <ToggleRow icon={QrCode} label="PIX na maquininha" checked={localConfig.payment_pix} onChange={(v) => updateLocal({ payment_pix: v })} />
           </CardContent>
         </Card>
       </div>

@@ -11,6 +11,7 @@ import { KioskConfig, KioskPointTerminal } from "@/hooks/useKioskConfig";
 import { ConsumptionMode } from "./KioskConsumptionType";
 
 type PointPaymentStatus = "idle" | "creating_payment" | "waiting_terminal" | "processing" | "paid" | "failed" | "canceled";
+type CardStep = "method" | "card_type" | "card_brand";
 
 interface Props {
   cart: CartItem[];
@@ -31,13 +32,31 @@ interface Props {
   deliveryAddress?: string;
 }
 
+const CARD_TYPES = [
+  { key: "credit_card", label: "Crédito", icon: CreditCard },
+  { key: "debit_card", label: "Débito", icon: CreditCard },
+  { key: "voucher", label: "Vale Refeição", icon: CreditCard },
+];
+
+const CARD_BRANDS = [
+  { code: "visa", name: "Visa" },
+  { code: "mastercard", name: "Mastercard" },
+  { code: "elo", name: "Elo" },
+  { code: "hipercard", name: "Hipercard" },
+  { code: "amex", name: "American Express" },
+  { code: "diners", name: "Diners Club" },
+  { code: "outros", name: "Outros" },
+];
+
 export function KioskPayment({
   cart, restaurant, customer, consumptionMode, tableNumber, primaryColor, cartTotal, onBack, onOrderCreated, kioskConfig,
   pointTerminal, appliedCoupon, couponDiscount = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01, deliveryAddress,
 }: Props) {
-  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  // "cash" | "point_card" | "point_pix"
+  const [paymentMethod, setPaymentMethod] = useState<string>("");
+  const [cardStep, setCardStep] = useState<CardStep>("method");
+  const [selectedCardType, setSelectedCardType] = useState<string>("");
   const [selectedBrand, setSelectedBrand] = useState<string>("");
-  const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [cashPaid, setCashPaid] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -83,6 +102,28 @@ export function KioskPayment({
     }
   };
 
+  const getPaymentTypeForDB = () => {
+    if (paymentMethod === "cash") return "cash";
+    if (paymentMethod === "point_pix") return "pix";
+    if (paymentMethod === "point_card") {
+      if (selectedCardType === "credit_card") return "credit";
+      if (selectedCardType === "debit_card") return "debit";
+      if (selectedCardType === "voucher") return "voucher";
+      return "card";
+    }
+    return paymentMethod;
+  };
+
+  const getMpPaymentType = () => {
+    if (paymentMethod === "point_pix") return "bank_transfer";
+    if (paymentMethod === "point_card") {
+      if (selectedCardType === "debit_card") return "debit_card";
+      // voucher and credit both use credit_card in MP API
+      return "credit_card";
+    }
+    return "credit_card";
+  };
+
   const createOrderInDB = async (): Promise<string | null> => {
     const { order_type, delivery_type } = getOrderTypeFields();
 
@@ -101,10 +142,16 @@ export function KioskPayment({
       }
     }
 
+    const paymentLabel = paymentMethod === "point_card"
+      ? `[Maquininha - ${selectedCardType === "credit_card" ? "Crédito" : selectedCardType === "debit_card" ? "Débito" : "Vale"}${selectedBrand ? ` ${selectedBrand}` : ""}]`
+      : paymentMethod === "point_pix"
+        ? "[Maquininha - PIX]"
+        : "";
+
     const notes = [
       `[TOTEM] ${getConsumptionLabel()}`,
       paymentMethod === "cash" && cashPaid ? `Troco para: R$ ${parseFloat(cashPaid).toFixed(2)}` : null,
-      paymentMethod === "point_terminal" ? "[Maquininha Point]" : null,
+      paymentLabel || null,
     ].filter(Boolean).join(" | ");
 
     const orderData: any = {
@@ -115,7 +162,7 @@ export function KioskPayment({
       order_type,
       delivery_type,
       order_channel: "totem",
-      payment_type: paymentMethod === "point_terminal" ? "card" : paymentMethod,
+      payment_type: getPaymentTypeForDB(),
       payment_brand: selectedBrand || null,
       status: "pending",
       payment_status: "pending",
@@ -243,7 +290,6 @@ export function KioskPayment({
       if (pollingRef.current) clearInterval(pollingRef.current);
       setPointStatus("canceled");
 
-      // Cancel on backend
       try {
         await supabase.functions.invoke("mercadopago-point", {
           body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
@@ -274,7 +320,6 @@ export function KioskPayment({
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             setPointStatus("paid");
 
-            // Mark order as paid
             await supabase.from("orders").update({
               payment_status: "paid",
               paid_at: new Date().toISOString(),
@@ -327,6 +372,7 @@ export function KioskPayment({
           order_id: orderId,
           device_id: pointTerminal.device_id,
           idempotency_key: orderId,
+          payment_type: getMpPaymentType(),
         },
       });
 
@@ -380,7 +426,7 @@ export function KioskPayment({
   const handleFinalize = async () => {
     if (submitting) return;
 
-    if (paymentMethod === "point_terminal") {
+    if (paymentMethod === "point_card" || paymentMethod === "point_pix") {
       handlePointPayment();
       return;
     }
@@ -401,57 +447,55 @@ export function KioskPayment({
     }
   };
 
-  const CARD_BRANDS = [
-    { code: "visa", name: "Visa" },
-    { code: "mastercard", name: "Mastercard" },
-    { code: "elo", name: "Elo" },
-    { code: "hipercard", name: "Hipercard" },
-    { code: "amex", name: "American Express" },
-    { code: "diners", name: "Diners Club" },
-    { code: "outros", name: "Outros" },
-  ];
+  // Build available payment methods
+  const hasTerminal = !!pointTerminal;
+  const methods: { key: string; label: string; icon: any; sublabel?: string }[] = [];
 
-  const needsBrand = (key: string) => key === "credit_card" || key === "debit_card";
-
-  const allMethods = [
-    { key: "cash", label: "Dinheiro", icon: Banknote, configKey: "payment_cash" as const },
-    { key: "credit_card", label: "Cartão de Crédito", icon: CreditCard, sublabel: "Selecione a bandeira", configKey: "payment_card" as const },
-    { key: "debit_card", label: "Cartão de Débito", icon: CreditCard, sublabel: "Selecione a bandeira", configKey: "payment_card" as const },
-    { key: "pix", label: "PIX", icon: QrCode, sublabel: "Pagamento via PIX", configKey: "payment_pix" as const },
-  ];
-
-  // Add point terminal option if configured
-  if (pointTerminal && kioskConfig?.payment_card) {
-    allMethods.push({
-      key: "point_terminal",
-      label: "Pagar na Maquininha",
-      icon: Zap,
-      sublabel: pointTerminal.device_name || "Terminal Point",
-      configKey: "payment_card" as const,
-    });
+  if (kioskConfig?.payment_cash !== false) {
+    methods.push({ key: "cash", label: "Dinheiro", icon: Banknote, sublabel: "Pagar no balcão" });
   }
-
-  const methods = kioskConfig
-    ? allMethods.filter(m => kioskConfig[m.configKey] !== false)
-    : allMethods;
+  if (kioskConfig?.payment_card !== false && hasTerminal) {
+    methods.push({ key: "point_card", label: "Cartão na Maquininha", icon: CreditCard, sublabel: "Crédito, Débito ou Vale" });
+  }
+  if (kioskConfig?.payment_pix !== false && hasTerminal) {
+    methods.push({ key: "point_pix", label: "Pix na Maquininha", icon: QrCode, sublabel: "QR Code PIX no terminal" });
+  }
 
   const handleMethodSelect = (key: string) => {
     setPaymentMethod(key);
+    setSelectedCardType("");
     setSelectedBrand("");
-    setShowBrandPicker(needsBrand(key));
     setPointStatus("idle");
+    if (key === "point_card") {
+      setCardStep("card_type");
+    } else {
+      setCardStep("method");
+    }
   };
 
-  const canFinalizePayment = paymentMethod !== "" &&
-    (!needsBrand(paymentMethod) || selectedBrand !== "") &&
+  const handleCardTypeSelect = (type: string) => {
+    setSelectedCardType(type);
+    setCardStep("card_brand");
+  };
+
+  const handleBrandSelect = (brand: string) => {
+    setSelectedBrand(brand);
+    setCardStep("method");
+  };
+
+  const isPointPayment = paymentMethod === "point_card" || paymentMethod === "point_pix";
+
+  const canFinalizePayment =
+    paymentMethod !== "" &&
+    (paymentMethod !== "point_card" || (selectedCardType !== "" && selectedBrand !== "")) &&
     (paymentMethod !== "cash" || !cashPaid || parseFloat(cashPaid) >= finalTotal) &&
-    (paymentMethod !== "point_terminal" || pointStatus === "idle" || pointStatus === "failed" || pointStatus === "canceled");
+    (!isPointPayment || pointStatus === "idle" || pointStatus === "failed" || pointStatus === "canceled");
 
   // Render Point payment waiting screen
-  if (pointStatus !== "idle" && pointStatus !== "failed" && pointStatus !== "canceled" && paymentMethod === "point_terminal") {
+  if (isPointPayment && pointStatus !== "idle" && pointStatus !== "failed" && pointStatus !== "canceled") {
     const statusMessages: Record<string, string> = {
       creating_payment: "Enviando para a maquininha...",
-      waiting_terminal: "Aguardando pagamento na maquininha...",
+      waiting_terminal: paymentMethod === "point_pix" ? "Aguardando pagamento PIX na maquininha..." : "Aguardando pagamento na maquininha...",
       processing: "Processando pagamento...",
       paid: "Pagamento aprovado!",
     };
@@ -504,7 +548,7 @@ export function KioskPayment({
         </div>
 
         {/* Failed/Canceled point payment - show retry */}
-        {(pointStatus === "failed" || pointStatus === "canceled") && paymentMethod === "point_terminal" && (
+        {(pointStatus === "failed" || pointStatus === "canceled") && isPointPayment && (
           <div className="mb-6 p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-center space-y-3">
             <p className="text-sm font-medium text-destructive">
               {pointStatus === "failed" ? "Pagamento recusado" : "Pagamento cancelado"}
@@ -515,24 +559,44 @@ export function KioskPayment({
           </div>
         )}
 
-        {showBrandPicker ? (
+        {/* Card type selection sub-screen */}
+        {cardStep === "card_type" && paymentMethod === "point_card" ? (
           <div className="space-y-4 mb-8">
-            <button onClick={() => setShowBrandPicker(false)} className="flex items-center gap-2 text-muted-foreground">
+            <button onClick={() => { setCardStep("method"); setPaymentMethod(""); }} className="flex items-center gap-2 text-muted-foreground">
+              <ChevronLeft className="h-5 w-5" />
+              <span className="text-sm font-medium">Voltar</span>
+            </button>
+            <p className="text-lg font-bold text-foreground">Qual tipo de cartão?</p>
+            <div className="space-y-3">
+              {CARD_TYPES.map(ct => (
+                <button
+                  key={ct.key}
+                  onClick={() => handleCardTypeSelect(ct.key)}
+                  className="w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all border-muted hover:border-muted-foreground/30"
+                >
+                  <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
+                    <ct.icon className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <span className="text-lg font-bold text-foreground">{ct.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : cardStep === "card_brand" && paymentMethod === "point_card" ? (
+          <div className="space-y-4 mb-8">
+            <button onClick={() => setCardStep("card_type")} className="flex items-center gap-2 text-muted-foreground">
               <ChevronLeft className="h-5 w-5" />
               <span className="text-sm font-medium">Voltar</span>
             </button>
             <p className="text-lg font-bold text-foreground">
-              Selecione a bandeira — {paymentMethod === "credit_card" ? "Crédito" : "Débito"}
+              Selecione a bandeira — {selectedCardType === "credit_card" ? "Crédito" : selectedCardType === "debit_card" ? "Débito" : "Vale Refeição"}
             </p>
             <div className="grid grid-cols-2 gap-3">
               {CARD_BRANDS.map(brand => (
                 <button
                   key={brand.code}
-                  onClick={() => { setSelectedBrand(brand.code); setShowBrandPicker(false); }}
-                  className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all ${
-                    selectedBrand === brand.code ? "shadow-lg" : "border-muted hover:border-muted-foreground/30"
-                  }`}
-                  style={selectedBrand === brand.code ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
+                  onClick={() => handleBrandSelect(brand.code)}
+                  className="p-4 rounded-2xl border-2 flex items-center gap-3 transition-all border-muted hover:border-muted-foreground/30"
                 >
                   <CreditCard className="h-5 w-5 text-muted-foreground" />
                   <span className="font-semibold text-foreground">{brand.name}</span>
@@ -541,6 +605,7 @@ export function KioskPayment({
             </div>
           </div>
         ) : (
+          /* Main payment method selection */
           <div className="space-y-3 mb-8">
             {methods.map(m => (
               <button
@@ -556,9 +621,9 @@ export function KioskPayment({
                 </div>
                 <div className="text-left flex-1">
                   <span className="text-lg font-bold text-foreground">{m.label}</span>
-                  {needsBrand(m.key) && selectedBrand && paymentMethod === m.key ? (
+                  {m.key === "point_card" && selectedCardType && selectedBrand && paymentMethod === "point_card" ? (
                     <p className="text-sm font-medium" style={{ color: primaryColor }}>
-                      {CARD_BRANDS.find(b => b.code === selectedBrand)?.name || selectedBrand}
+                      {CARD_TYPES.find(t => t.key === selectedCardType)?.label} — {CARD_BRANDS.find(b => b.code === selectedBrand)?.name}
                     </p>
                   ) : m.sublabel ? (
                     <p className="text-sm text-muted-foreground">{m.sublabel}</p>
@@ -569,7 +634,7 @@ export function KioskPayment({
           </div>
         )}
 
-        {paymentMethod === "cash" && !showBrandPicker && (
+        {paymentMethod === "cash" && cardStep === "method" && (
           <div className="space-y-3">
             <Label className="text-lg">Troco para quanto?</Label>
             <Input
@@ -595,11 +660,11 @@ export function KioskPayment({
             onClick={handleFinalize}
             className="w-full h-14 text-lg font-bold rounded-xl text-white"
             style={{ backgroundColor: primaryColor }}
-            disabled={submitting || !canFinalizePayment}
+            disabled={submitting || !canFinalizePayment || cardStep !== "method"}
           >
             {submitting ? (
               <><Loader2 className="h-5 w-5 animate-spin mr-2" />Finalizando...</>
-            ) : paymentMethod === "point_terminal" ? (
+            ) : isPointPayment ? (
               <><Zap className="h-5 w-5 mr-2" />Enviar para Maquininha</>
             ) : (
               "Finalizar Pedido"
