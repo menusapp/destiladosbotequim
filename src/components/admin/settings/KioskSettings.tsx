@@ -243,6 +243,53 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
+  // Polling state
+  const [pollingOrderId, setPollingOrderId] = useState<string | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<string | null>(null);
+
+  // Polling effect
+  useEffect(() => {
+    if (!pollingOrderId) return;
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 40; // 40 * 3s = 2 min
+
+    const poll = async () => {
+      if (cancelled || attempts >= maxAttempts) {
+        if (attempts >= maxAttempts) {
+          setPollingStatus("timeout");
+          toast.error("Timeout — verifique a maquininha manualmente");
+        }
+        setPollingOrderId(null);
+        return;
+      }
+      attempts++;
+      try {
+        const { data } = await supabase.functions.invoke("mercadopago-point", {
+          body: { action: "get_order", restaurant_id: restaurantId, mp_order_id: pollingOrderId },
+        });
+        const status = data?.data?.internal_status || data?.data?.status;
+        setPollingStatus(status);
+        if (status === "paid" || status === "approved" || status === "processed") {
+          toast.success("✅ Pagamento aprovado na maquininha!");
+          setPollingOrderId(null);
+          return;
+        }
+        if (status === "failed" || status === "canceled" || status === "cancelled" || status === "expired") {
+          toast.error(`Pagamento ${status === "failed" ? "recusado" : "cancelado"}`);
+          setPollingOrderId(null);
+          return;
+        }
+      } catch {
+        // ignore polling errors
+      }
+      if (!cancelled) setTimeout(poll, 3000);
+    };
+
+    setTimeout(poll, 2000); // first check after 2s
+    return () => { cancelled = true; };
+  }, [pollingOrderId, restaurantId]);
+
   const handleTestPayment = async () => {
     const terminal = savedTerminals.find(t => t.use_on_kiosk);
     if (!terminal) {
@@ -250,6 +297,7 @@ export default function KioskSettings({ restaurantId }: Props) {
       return;
     }
     setTestingPayment(true);
+    setPollingStatus(null);
     try {
       const { data } = await supabase.functions.invoke("mercadopago-point", {
         body: {
@@ -266,8 +314,11 @@ export default function KioskSettings({ restaurantId }: Props) {
         return;
       }
       setPendingOrderBlocked(false);
-      if (data.data?.id) {
-        toast.success("Cobrança de teste enviada! Verifique a maquininha.");
+      const mpOrderId = data.data?.id;
+      if (mpOrderId) {
+        toast.success("Cobrança enviada! Aguardando resposta da maquininha...");
+        setPollingOrderId(mpOrderId);
+        setPollingStatus("waiting_terminal");
       } else {
         toast.error("Resposta inesperada do Mercado Pago");
       }
@@ -283,38 +334,8 @@ export default function KioskSettings({ restaurantId }: Props) {
     if (!terminal) return;
     setCancellingPending(true);
     try {
-      // Try to cancel the last pending order from local DB first
-      const { data: localOrder } = await supabase
-        .from("point_order_payments")
-        .select("mp_order_id")
-        .eq("restaurant_id", restaurantId)
-        .eq("terminal_id", terminal.device_id)
-        .in("status", ["waiting_terminal", "processing"])
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      let mpOrderId = localOrder?.mp_order_id;
-
-      if (!mpOrderId) {
-        // Fallback: query MP API for pending events
-        const { data: eventsRes } = await supabase.functions.invoke("mercadopago-point", {
-          body: { action: "list_pending_orders", restaurant_id: restaurantId, device_id: terminal.device_id },
-        });
-        if (eventsRes?.ok && eventsRes.data?.events?.length > 0) {
-          const pendingEvent = eventsRes.data.events.find((e: any) => e.status === "open" || e.status === "processing");
-          mpOrderId = pendingEvent?.payment_intent_id || pendingEvent?.id;
-        }
-      }
-
-      if (!mpOrderId) {
-        toast.info("Não foi possível encontrar a cobrança pendente. Tente cancelar diretamente na maquininha.");
-        setPendingOrderBlocked(false);
-        return;
-      }
-
       const { data: cancelRes } = await supabase.functions.invoke("mercadopago-point", {
-        body: { action: "cancel_order", restaurant_id: restaurantId, mp_order_id: mpOrderId },
+        body: { action: "cancel_device_pending", restaurant_id: restaurantId, device_id: terminal.device_id },
       });
 
       if (cancelRes?.ok) {
@@ -626,6 +647,22 @@ export default function KioskSettings({ restaurantId }: Props) {
                       Testar
                     </Button>
                    </div>
+
+                  {/* Polling status */}
+                  {pollingOrderId && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50 animate-pulse">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">
+                          {pollingStatus === "waiting_terminal" && "Aguardando pagamento na maquininha..."}
+                          {pollingStatus === "processing" && "Processando pagamento..."}
+                          {pollingStatus === "timeout" && "Timeout — verifique manualmente"}
+                          {!pollingStatus && "Verificando status..."}
+                        </p>
+                        <p className="text-xs text-muted-foreground">ID: {pollingOrderId.slice(0, 12)}...</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Cancel pending order */}
                   {pendingOrderBlocked && (
