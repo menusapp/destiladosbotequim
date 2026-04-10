@@ -1,48 +1,41 @@
 
 
-## Plano: Relatório de Desempenho de Produtos na Visão Geral
+## Plano: Visibilidade por Canal com Checkboxes Múltiplos
 
-### Resumo
-Criar um hook `useProductPerformance` que busca métricas de produtos via Supabase JS (sem migration), e um componente `ProductPerformanceSection` renderizado no final do `OverviewTab`.
+### Análise
+
+A coluna `visibility_channels` já é um array de texto (`text[]`) na tabela `products`. O sistema já filtra com `channels.includes('all') || channels.includes('delivery')` etc. O problema é apenas que a UI usa um `Select` single-value, forçando escolher UM canal.
+
+**Não precisa de migration.** A estrutura do banco já suporta múltiplos valores no array. Basta mudar a UI.
 
 ---
 
-### 1. Novo hook: `src/hooks/useProductPerformance.ts`
+### 1. Alterar UI em `ProductsGrid.tsx`
 
-- Recebe `restaurantId` e `dateRange` (mesmo tipo do useOrderMetrics)
-- Usa `getDateRange()` do useOrderMetrics para calcular start/end
-- Faz query client-side via Supabase JS:
-  - `orders` filtrado por restaurant_id, created_at no range, status NOT IN cancelled/pending
-  - Join com `order_items` → `products` → `categories`
-  - Inclui `order_item_extras` para receita de extras
-- Agrega no JS: por product_id calcula order_count, total_quantity, total_revenue (items + extras), avg_price, category_name
-- Retorna array ordenado por total_quantity DESC
-- `staleTime: 5 * 60 * 1000` — usa `useQuery` do TanStack Query (já instalado no projeto)
-- Nenhuma alteração no backend
+Substituir o `Select` (linhas 813-821) por 3 checkboxes com o layout solicitado:
+- Checkbox "Delivery" — controla presença de `'delivery'` no array
+- Checkbox "Mesas" — controla presença de `'mesa'` no array  
+- Checkbox "Totem" — só aparece se `kioskEnabled`
+- Aviso em vermelho se nenhum canal selecionado
+- Importar `Checkbox` de `@/components/ui/checkbox` e `AlertCircle` do lucide
 
-### 2. Novo componente: `src/components/admin/ProductPerformanceSection.tsx`
+Lógica do estado:
+- Inicializar: se `visibility_channels` contém `'all'`, marcar todos os canais
+- Salvar: array com os canais marcados (ex: `['delivery', 'mesa']`)
+- Nunca mais salvar `'all'` — sempre valores explícitos
 
-**Layout:**
-- Filtro "Top X" (5, 10, 20) no canto superior direito
-- Grid `grid-cols-1 lg:grid-cols-2 gap-6`:
-  - **Esquerda — Mais Vendidos**: Top N por quantidade. Cada item: posição com badge dourado/prata/bronze para 1-2-3, nome, categoria, qty com barra de progresso relativa ao 1º, receita. Barra em cor primária.
-  - **Direita — Menos Vendidos**: Bottom N (com ≥1 venda). Mesma estrutura, barra em tom suave (muted).
-- Grid inferior `grid-cols-2 lg:grid-cols-4` com 4 mini-cards:
-  - Total de produtos vendidos (soma qty)
-  - Produto mais rentável (maior receita incluindo extras)
-  - Ticket médio por produto (receita total / total produtos distintos vendidos)
-  - Categoria mais vendida (categoria com maior soma qty)
-- Loading: Skeleton placeholders
-- Empty state: "Nenhum produto vendido no período"
+Reset do form (linha 649): setar `['delivery', 'mesa', 'totem']` em vez de `['all']`
 
-### 3. Integração no OverviewTab
+### 2. Atualizar filtros nos cardápios (backward-compatible)
 
-- Importar `ProductPerformanceSection`
-- Renderizar após o grid de chart + receita por método, passando `restaurantId` e `dateRange`
-- Zero alteração nos cálculos financeiros existentes
+Manter o check `includes('all')` existente em `Menu.tsx`, `DeliveryMenu.tsx`, `Kiosk.tsx` para produtos antigos que ainda tenham `['all']`. Nenhuma mudança necessária nos filtros — já funcionam.
 
-### Arquivos
-- **Criar**: `src/hooks/useProductPerformance.ts`
-- **Criar**: `src/components/admin/ProductPerformanceSection.tsx`
-- **Editar**: `src/components/admin/OverviewTab.tsx` (adicionar import + render no final)
+### 3. Validação ao salvar
+
+No `handleSaveProduct`, validar que `visibilityChannels.length > 0` antes de salvar. Se vazio, exibir toast de erro.
+
+---
+
+### Arquivos modificados
+- `src/components/admin/ProductsGrid.tsx` — substituir Select por Checkboxes, ajustar init/reset/save
 
