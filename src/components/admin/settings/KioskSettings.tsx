@@ -334,38 +334,8 @@ export default function KioskSettings({ restaurantId }: Props) {
     if (!terminal) return;
     setCancellingPending(true);
     try {
-      // Try to cancel the last pending order from local DB first
-      const { data: localOrder } = await supabase
-        .from("point_order_payments")
-        .select("mp_order_id")
-        .eq("restaurant_id", restaurantId)
-        .eq("terminal_id", terminal.device_id)
-        .in("status", ["waiting_terminal", "processing"])
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      let mpOrderId = localOrder?.mp_order_id;
-
-      if (!mpOrderId) {
-        // Fallback: query MP API for pending events
-        const { data: eventsRes } = await supabase.functions.invoke("mercadopago-point", {
-          body: { action: "list_pending_orders", restaurant_id: restaurantId, device_id: terminal.device_id },
-        });
-        if (eventsRes?.ok && eventsRes.data?.events?.length > 0) {
-          const pendingEvent = eventsRes.data.events.find((e: any) => e.status === "open" || e.status === "processing");
-          mpOrderId = pendingEvent?.payment_intent_id || pendingEvent?.id;
-        }
-      }
-
-      if (!mpOrderId) {
-        toast.info("Não foi possível encontrar a cobrança pendente. Tente cancelar diretamente na maquininha.");
-        setPendingOrderBlocked(false);
-        return;
-      }
-
       const { data: cancelRes } = await supabase.functions.invoke("mercadopago-point", {
-        body: { action: "cancel_order", restaurant_id: restaurantId, mp_order_id: mpOrderId },
+        body: { action: "cancel_device_pending", restaurant_id: restaurantId, device_id: terminal.device_id },
       });
 
       if (cancelRes?.ok) {

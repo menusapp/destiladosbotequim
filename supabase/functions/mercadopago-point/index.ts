@@ -429,6 +429,8 @@ Deno.serve(async (req) => {
         return await testOrder(restaurant_id, params.device_id);
       case "list_pending_orders":
         return await listPendingOrders(restaurant_id, params.device_id);
+      case "cancel_device_pending":
+        return await cancelDevicePending(restaurant_id, params.device_id);
       default:
         return respond(false, { error: `Ação desconhecida: ${action}`, code: "unknown_action" });
     }
