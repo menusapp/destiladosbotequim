@@ -1,97 +1,34 @@
 
-Objetivo
 
-- Fazer todo pedido pago no Totem entrar imediatamente em:
-  - Visão Geral
-  - Relatório RE / DRE
-  - Fluxo de Caixa
-- Mostrar método + bandeira corretamente, sem duplicar lançamento quando o pedido muda de status depois.
+## Plano: Pedido Totem de mesa pago = mesa ocupada imediatamente
 
-Diagnóstico do código
+### Problema
+Quando um pedido de mesa é feito e pago pelo Totem (cartão ou PIX na maquininha), o pedido chega com `payment_status: "paid"` mas a mesa **não fica ocupada** — porque a ocupação hoje só acontece quando o admin clica "Aceitar". O pedido já está pago, então a mesa deveria ficar ocupada automaticamente.
 
-- `src/hooks/useOrderMetrics.ts` soma só:
-  - `bills` pagos
-  - `orders` de delivery finalizados
-  - `counter_orders` pagos
-- Os pedidos do Totem ficam em `orders` com `order_channel: "totem"`, então hoje ficam fora dessas métricas.
-- `src/components/admin/ReportsTab.tsx` repete a mesma lógica, então o RE/DRE também ignora Totem.
-- `src/components/admin/ProductPerformanceSection.tsx` funciona porque lê os `order_items` direto, por isso só os produtos aparecem.
-- `src/components/kiosk/KioskPayment.tsx` cria o pedido pago, mas só atualiza `payment_status` e `paid_at`; não cria entrada de caixa.
-- Os triggers legados de caixa trabalham por mudança de `status` operacional (`accepted`, `delivered`, `picked_up`) e não pelo pagamento do Totem, então pedido Totem pago não entra no caixa no momento certo.
+### Solução
 
-Implementação
+**Arquivo: `src/components/kiosk/KioskPayment.tsx`**
 
-1. Incluir Totem nas métricas da Visão Geral
-- Atualizar `src/hooks/useOrderMetrics.ts` para buscar também:
-  - `orders`
-  - `order_channel = 'totem'`
-  - `payment_status = 'paid'`
-  - período baseado em `paid_at`
-- Somar esses pedidos em:
-  - `totalSales`
-  - `ordersCount`
-  - `averageTicket`
-  - `hourlySales` / `dailySales`
-  - `revenueByMethod`
-- Classificar:
-  - `localSales` para `order_type = 'local'` ou `'balcao'`
-  - `deliverySales` para `order_type = 'delivery'`
+Após o pagamento ser confirmado na maquininha (dentro do bloco de polling onde já faz `createOrderInDB()` + update `payment_status: "paid"`), adicionar lógica para:
 
-2. Incluir Totem no RE / DRE
-- Atualizar `src/components/admin/ReportsTab.tsx` com a mesma fonte de pedidos pagos do Totem.
-- Fazer “Vendas”, “Ticket Médio”, “Formas de Pagamento” e “Receita Bruta” refletirem o Totem pago imediatamente.
-- Manter a regra:
-  - Totem conta no `paid_at`
-  - fluxos legados continuam como hoje
+1. Se `consumptionMode === "table"` e existe `tableId`, marcar a mesa como ocupada imediatamente:
+   ```typescript
+   await supabase.from("tables").update({
+     is_occupied: true,
+     occupied_at: new Date().toISOString(),
+     occupied_by: customer.name,
+   }).eq("id", tableId);
+   ```
 
-3. Corrigir entrada no caixa
-- Criar migration para ajustar a automação de `cash_movements`.
-- Lançar caixa quando:
-  - `order_channel = 'totem'`
-  - `payment_status` muda para `paid`
-- Salvar no movimento:
-  - `order_id`
-  - `payment_method`
-  - valor correto
-  - descrição identificando Totem
-- Deduplicar por `order_id`, para não lançar de novo quando o pedido depois virar `accepted`, `ready`, `delivered` etc.
-- Ajustar a lógica legada para não relançar pedidos Totem já registrados.
+2. Como `createOrderInDB` já busca o `tableId` internamente mas não o retorna, preciso extrair o `tableId` após a criação. A abordagem mais limpa: após o `createOrderInDB()` retornar o `orderId`, buscar o `table_id` do pedido recém-criado e então ocupar a mesa.
 
-4. Normalizar método de pagamento
-- Ajustar normalização em métricas/relatórios/UI para aceitar corretamente:
-  - `credit`
-  - `debit`
-  - `pix`
-  - `voucher` / `meal_voucher`
-- Preservar `payment_brand` para exibir:
-  - `Crédito - Visa`
-  - `Débito - Elo`
-  - `PIX`
-  - `Vale Refeição - ...`
+   Alternativamente (mais eficiente): fazer `createOrderInDB` também retornar o `tableId` junto com o `orderId`, mudando o retorno para `{ orderId, tableId }`.
 
-5. Garantir total financeiro correto
-- No cálculo de total do pedido Totem, usar o valor persistido no pedido:
-  - itens + extras + taxa
-  - menos cupom
-  - menos desconto de fidelidade persistido
-- Se existir `reward_discount`, usar esse valor como prioridade para bater com o valor realmente pago.
+3. O pedido já chega com `payment_status: "paid"` — isso já está correto. Dentro da mesa no painel, ele vai aparecer como pago.
 
-Arquivos
+### Escopo mínimo
+- **1 arquivo**: `src/components/kiosk/KioskPayment.tsx`
+- Modificar `createOrderInDB` para retornar `{ orderId, tableId }`
+- No callback de polling (pagamento confirmado), após criar o pedido e marcar como pago, ocupar a mesa se for pedido de mesa
+- Mesma lógica para o fluxo de dinheiro (`handleCashPayment`) quando for mesa
 
-- `src/hooks/useOrderMetrics.ts`
-- `src/components/admin/ReportsTab.tsx`
-- migration SQL para trigger/função de `cash_movements`
-- possivelmente `src/lib/utils.ts` para normalização de `voucher`
-
-Validação
-
-- Testar no admin, após pagar no Totem:
-  - Visão Geral: Vendas Totais, Pedidos, gráfico por hora/dia, Receita por Método
-  - RE / DRE: Receita Bruta e pagamentos
-  - Caixa: entrada criada automaticamente e só uma vez
-  - Pedido: método e bandeira corretos
-- Cenários mínimos:
-  - Totem balcão + PIX
-  - Totem balcão + crédito com bandeira
-  - Totem mesa + crédito
-  - Totem para viagem/entrega, para garantir que não duplica ao finalizar operacionalmente
