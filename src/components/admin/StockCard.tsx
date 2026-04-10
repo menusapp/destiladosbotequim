@@ -24,12 +24,13 @@ interface StockCardProps {
   onToggleActive: (item: any) => void;
 }
 
-const StockCard = memo(({ item, onEdit, onDelete }: StockCardProps) => {
+const StockCard = memo(({ item, onEdit, onDelete, onToggleActive }: StockCardProps) => {
   const totalValue = item.current_quantity * item.price_per_unit;
   const isLowStock = item.current_quantity <= item.minimum_quantity;
+  const isActive = item.is_active !== false;
 
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+    <Card className={`overflow-hidden hover:shadow-md transition-shadow ${!isActive ? "opacity-50" : ""}`}>
       <CardContent className="p-3">
         <div className="space-y-2">
           {/* Header */}
@@ -43,11 +44,23 @@ const StockCard = memo(({ item, onEdit, onDelete }: StockCardProps) => {
                 <p className="text-[11px] text-muted-foreground truncate">{item.stock_categories.name}</p>
               )}
             </div>
-            {isLowStock && (
-              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 shrink-0">
-                Baixo
-              </Badge>
-            )}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {!isActive && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  Inativo
+                </Badge>
+              )}
+              {isActive && isLowStock && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                  Baixo
+                </Badge>
+              )}
+              <Switch
+                checked={isActive}
+                onCheckedChange={() => onToggleActive(item)}
+                className="h-4 w-8 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-4"
+              />
+            </div>
           </div>
 
           {/* Valor total */}

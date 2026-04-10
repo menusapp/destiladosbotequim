@@ -30,6 +30,7 @@ interface StockItem {
   minimum_quantity: number;
   category_id: string | null;
   supplier_id: string | null;
+  is_active?: boolean;
   stock_categories?: { name: string } | null;
   suppliers?: { name: string } | null;
 }
