@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DollarSign, ShoppingBag, TrendingUp, Store, Truck } from "lucide-react";
 import { useOrderMetrics, type DateRange } from "@/hooks/useOrderMetrics";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import ProductPerformanceSection from "./ProductPerformanceSection";
 
 interface OverviewTabProps {
   restaurantId: string;
@@ -145,6 +146,9 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Product Performance */}
+      <ProductPerformanceSection restaurantId={restaurantId} dateRange={dateRange} />
     </div>
   );
 };
