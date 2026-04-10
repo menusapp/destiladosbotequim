@@ -357,7 +357,9 @@ async function cancelDevicePending(restaurantId: string, deviceId: string) {
     return respond(true, { data: { canceled_id: localPending.mp_order_id, api_ok: result.ok } });
   }
 
-  // No local record — search recent orders
+  // No local record — try multiple approaches to find and cancel
+
+  // Approach 1: Search /v1/orders
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const searchResult = await mpFetch(
@@ -365,21 +367,45 @@ async function cancelDevicePending(restaurantId: string, deviceId: string) {
     accessToken
   );
   
-  log("[MP Point] cancel_device_search", { status: searchResult.status, ok: searchResult.ok });
+  log("[MP Point] cancel_device_search", { status: searchResult.status, ok: searchResult.ok, count: searchResult.data?.elements?.length });
   
   if (searchResult.ok && searchResult.data?.elements?.length > 0) {
-    // Find order for this terminal
-    const order = searchResult.data.elements.find(
-      (o: any) => o.config?.point?.terminal_id === deviceId
-    );
-    if (order?.id) {
-      const cancelResult = await mpFetch(`/v1/orders/${order.id}`, accessToken, { method: "DELETE" });
-      log("[MP Point] cancel_found_order", { mp_order_id: order.id, ok: cancelResult.ok });
-      return respond(true, { data: { canceled_id: order.id, api_ok: cancelResult.ok } });
+    for (const order of searchResult.data.elements) {
+      if (order.config?.point?.terminal_id === deviceId && order.status !== "processed" && order.status !== "canceled") {
+        const cancelResult = await mpFetch(`/v1/orders/${order.id}`, accessToken, { method: "DELETE" });
+        log("[MP Point] cancel_found_order", { mp_order_id: order.id, ok: cancelResult.ok });
+        if (cancelResult.ok) {
+          return respond(true, { data: { canceled_id: order.id, source: "v1_orders" } });
+        }
+      }
     }
   }
 
-  return respond(false, { error: "Não encontramos a cobrança pendente. Tente cancelar direto na maquininha (pressione o botão vermelho X).", code: "not_found" });
+  // Approach 2: Try getting the last payment intent from the device events endpoint
+  const eventsResult = await mpFetch(
+    `/point/integration-api/devices/${deviceId}/payment-intents?startDate=${oneDayAgo.toISOString()}&endDate=${now.toISOString()}`,
+    accessToken
+  );
+  
+  log("[MP Point] cancel_device_events", { status: eventsResult.status, ok: eventsResult.ok });
+  
+  if (eventsResult.ok && Array.isArray(eventsResult.data)) {
+    for (const intent of eventsResult.data) {
+      if (intent.state === "OPEN" || intent.status === "open") {
+        const cancelResult = await mpFetch(
+          `/point/integration-api/devices/${deviceId}/payment-intents/${intent.id}`,
+          accessToken,
+          { method: "DELETE" }
+        );
+        if (cancelResult.ok) {
+          return respond(true, { data: { canceled_id: intent.id, source: "payment_intents" } });
+        }
+      }
+    }
+  }
+
+  // Approach 3: The user needs to physically cancel on the terminal
+  return respond(false, { error: "Não encontramos a cobrança pendente via API. Cancele direto na maquininha: pressione o X vermelho ou reinicie o app de pagamentos.", code: "not_found" });
 }
 
 async function testOrder(restaurantId: string, deviceId: string) {
