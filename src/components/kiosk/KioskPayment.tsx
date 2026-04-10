@@ -280,7 +280,7 @@ export function KioskPayment({
     }
 
     return order.id;
-  };
+  }, [restaurant, customer, cart, consumptionMode, tableNumber, paymentMethod, selectedCardType, selectedBrand, cashPaid, finalTotal, appliedCoupon, couponDiscount, loyaltyPointsUsed, pointsDiscount, deliveryAddress]);
 
   const startPointPolling = useCallback((mpOrdId: string) => {
     setPointStatus("waiting_terminal");
