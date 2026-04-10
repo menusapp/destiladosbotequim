@@ -39,6 +39,9 @@ export default function DeliveryMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "reservas" | "perfil">("menu");
   const { trackCartUpdate, trackCheckoutStarted, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id);
+  const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
+  const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
+  const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
 
   const fetchRestaurantData = useCallback(async () => {
     try {
