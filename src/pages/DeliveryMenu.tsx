@@ -289,7 +289,7 @@ export default function DeliveryMenu() {
       });
 
     const allExtras = [...extrasWithCategoryName, ...complementExtras]
-      .filter((e: any) => !disabledExtraItemIds.has(e.id));
+      .filter((e: any) => !disabledExtraItemIds.has(e.id) && !disabledProductExtraIds.has(e.id));
     setProductExtras(allExtras);
     setSelectedProduct(product);
   };

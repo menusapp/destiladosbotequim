@@ -985,7 +985,7 @@ const Menu = () => {
       });
 
     const allExtras = [...extrasWithCategoryName, ...complementExtras]
-      .filter((e: any) => !disabledExtraItemIds.has(e.id));
+      .filter((e: any) => !disabledExtraItemIds.has(e.id) && !disabledProductExtraIds.has(e.id));
     setSelectedProduct(product);
     setProductExtras(allExtras);
     setShowProductDialog(true);
