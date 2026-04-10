@@ -154,6 +154,8 @@ export function KioskPayment({
       paymentLabel || null,
     ].filter(Boolean).join(" | ");
 
+    const isPointPay = paymentMethod === "point_card" || paymentMethod === "point_pix";
+
     const orderData: any = {
       table_id: tableId,
       restaurant_id: restaurant.id,
@@ -162,10 +164,10 @@ export function KioskPayment({
       order_type,
       delivery_type,
       order_channel: "totem",
-      payment_type: getPaymentTypeForDB(),
-      payment_brand: selectedBrand || null,
+      payment_type: isPointPay ? null : getPaymentTypeForDB(),
+      payment_brand: isPointPay ? null : (selectedBrand || null),
       status: "pending",
-      payment_status: "pending",
+      payment_status: isPointPay ? "awaiting_payment" : "pending",
       notes,
       delivery_phone: customer.phone || null,
       coupon_code: appliedCoupon?.code || null,
@@ -314,14 +316,17 @@ export function KioskPayment({
         const data = res.data;
         const txn = data?.transactions?.payments?.[0];
 
-        if (status === "processed") {
+        if (status === "processed" || status === "finished") {
           if (txn?.status_detail === "accredited" || txn?.status === "approved") {
             if (pollingRef.current) clearInterval(pollingRef.current);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             setPointStatus("paid");
 
+            // Now update order with confirmed payment info
             await supabase.from("orders").update({
               payment_status: "paid",
+              payment_type: getPaymentTypeForDB(),
+              payment_brand: selectedBrand || null,
               paid_at: new Date().toISOString(),
             }).eq("id", orderId);
 
