@@ -678,6 +678,22 @@ export default function KioskSettings({ restaurantId }: Props) {
                     </Button>
                    </div>
 
+                  {/* Polling status */}
+                  {pollingOrderId && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50 animate-pulse">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">
+                          {pollingStatus === "waiting_terminal" && "Aguardando pagamento na maquininha..."}
+                          {pollingStatus === "processing" && "Processando pagamento..."}
+                          {pollingStatus === "timeout" && "Timeout — verifique manualmente"}
+                          {!pollingStatus && "Verificando status..."}
+                        </p>
+                        <p className="text-xs text-muted-foreground">ID: {pollingOrderId.slice(0, 12)}...</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Cancel pending order */}
                   {pendingOrderBlocked && (
                     <div className="flex items-center justify-between bg-destructive/10 rounded-lg p-3">
