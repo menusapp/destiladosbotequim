@@ -142,18 +142,3 @@ export default function ProductPerformanceSection({ restaurantId, dateRange }: P
     </div>
   );
 }
-
-function MiniCard({ icon, title, value, sub }: { icon: React.ReactNode; title: string; value: string; sub?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-1 text-muted-foreground">
-          {icon}
-          <span className="text-xs">{title}</span>
-        </div>
-        <p className="text-sm font-semibold truncate">{value}</p>
-        {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
-      </CardContent>
-    </Card>
-  );
-}
