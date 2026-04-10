@@ -18,6 +18,8 @@ const PAYMENT_BASE_LABELS: Record<string, string> = {
   card: "Crédito",
   pix: "PIX",
   pix_online: "PIX",
+  bank_transfer: "PIX",
+  voucher: "Vale Refeição",
   meal_voucher: "Vale Refeição",
   "vale refeição": "Vale Refeição",
   pending: "Pendente",
