@@ -52,6 +52,8 @@ const Menu = () => {
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
+  const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
+  const hiddenByRequiredChoices = inactiveData?.hiddenProductIdsByRequiredChoices || new Set<string>();
 
   // ⚡ Refs para manter valores atualizados nos listeners de realtime (evita stale closures)
   const tableIdRef = useRef<string | null>(null);
@@ -983,7 +985,7 @@ const Menu = () => {
       });
 
     const allExtras = [...extrasWithCategoryName, ...complementExtras]
-      .filter((e: any) => !disabledExtraItemIds.has(e.id));
+      .filter((e: any) => !disabledExtraItemIds.has(e.id) && !disabledProductExtraIds.has(e.id));
     setSelectedProduct(product);
     setProductExtras(allExtras);
     setShowProductDialog(true);
@@ -1043,10 +1045,10 @@ const Menu = () => {
   // Filtrar produtos vinculados a insumos inativos
   const activeCategories = categories.map(cat => ({
     ...cat,
-    products: cat.products.filter(p => !disabledProductIds.has(p.id))
+    products: cat.products.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id))
   })).filter(cat => cat.products.length > 0);
 
-  const activeFeatured = featuredProducts.filter(p => !disabledProductIds.has(p.id));
+  const activeFeatured = featuredProducts.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id));
 
   const allProducts = activeCategories.flatMap((c) => c.products);
 

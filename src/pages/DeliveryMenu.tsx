@@ -42,6 +42,8 @@ export default function DeliveryMenu() {
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
+  const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
+  const hiddenByRequiredChoices = inactiveData?.hiddenProductIdsByRequiredChoices || new Set<string>();
 
   const fetchRestaurantData = useCallback(async () => {
     try {
@@ -287,7 +289,7 @@ export default function DeliveryMenu() {
       });
 
     const allExtras = [...extrasWithCategoryName, ...complementExtras]
-      .filter((e: any) => !disabledExtraItemIds.has(e.id));
+      .filter((e: any) => !disabledExtraItemIds.has(e.id) && !disabledProductExtraIds.has(e.id));
     setProductExtras(allExtras);
     setSelectedProduct(product);
   };
@@ -364,10 +366,10 @@ export default function DeliveryMenu() {
   // Filtrar produtos vinculados a insumos inativos
   const activeCategories = categories.map(cat => ({
     ...cat,
-    products: cat.products.filter(p => !disabledProductIds.has(p.id))
+    products: cat.products.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id))
   })).filter(cat => cat.products.length > 0);
 
-  const activeFeatured = featuredProducts.filter(p => !disabledProductIds.has(p.id));
+  const activeFeatured = featuredProducts.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id));
 
   const allProducts = activeCategories.flatMap((c) => c.products);
 

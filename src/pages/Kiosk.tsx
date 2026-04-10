@@ -45,6 +45,8 @@ export default function Kiosk() {
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
+  const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
+  const hiddenByRequiredChoices = inactiveData?.hiddenProductIdsByRequiredChoices || new Set<string>();
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Coupon & loyalty state
@@ -235,7 +237,7 @@ export default function Kiosk() {
         });
 
       setProductExtras([...(extrasData || []), ...complementExtras]
-        .filter((e: any) => !disabledExtraItemIds.has(e.id)));
+        .filter((e: any) => !disabledExtraItemIds.has(e.id) && !disabledProductExtraIds.has(e.id)));
     } catch (err) {
       console.error("[Kiosk] Exceção ao carregar extras:", err);
       setProductExtras([]);
@@ -342,9 +344,9 @@ export default function Kiosk() {
       {step === "menu" && (
          <KioskMenu
            categories={categories.map(cat => ({
-             ...cat,
-             products: cat.products.filter(p => !disabledProductIds.has(p.id))
-           })).filter(cat => cat.products.length > 0)}
+              ...cat,
+              products: cat.products.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id))
+            })).filter(cat => cat.products.length > 0)}
           primaryColor={primaryColor}
           onSelectProduct={openProduct}
           cartCount={cartCount}
