@@ -123,6 +123,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         { data: paidBills },
         { data: deliveryOrders },
         { data: counterOrders },
+        { data: totemOrders },
         { data: comandasData },
         { data: paymentMethods },
         { data: cashMovements },
@@ -141,6 +142,12 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         supabase.from("counter_orders").select("id, total_amount, payment_method")
           .eq("restaurant_id", restaurantId).eq("status", "paid")
           .gte("finalized_at", startDate.toISOString()).lte("finalized_at", endDate.toISOString()),
+        // Totem orders paid — recognized by paid_at
+        supabase.from("orders").select(`id, payment_type, payment_brand, order_type, delivery_type, coupon_discount, delivery_fee, loyalty_points_used, order_items(quantity, price_at_order, order_item_extras(price_at_order))`)
+          .eq("restaurant_id", restaurantId)
+          .eq("order_channel", "totem")
+          .eq("payment_status", "paid")
+          .gte("paid_at", startDate.toISOString()).lte("paid_at", endDate.toISOString()),
         supabase.from("comandas").select("id").eq("restaurant_id", restaurantId)
           .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
         supabase.from("payment_methods").select("id, name, method_type").eq("restaurant_id", restaurantId),
@@ -192,9 +199,25 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
 
       const counterTotal = (counterOrders || []).reduce((sum, order) => sum + Number(order.total_amount), 0);
       const counterOrderIds = (counterOrders || []).map(o => o.id);
+
+      // Totem orders
+      let totemTotal = 0;
+      const totemOrderIds: string[] = [];
+      (totemOrders || []).forEach((order: any) => {
+        let orderSubtotal = 0;
+        order.order_items?.forEach((item: any) => {
+          const itemTotal = item.price_at_order * item.quantity;
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0), 0);
+          orderSubtotal += itemTotal + extrasTotal;
+        });
+        orderSubtotal -= Number(order.coupon_discount || 0);
+        totemTotal += orderSubtotal;
+        totemOrderIds.push(order.id);
+      });
       
-      const salesTotal = billsTotal + deliveryTotal + counterTotal;
-      const ordersCount = billsCount + (deliveryOrders?.length || 0) + (counterOrders?.length || 0);
+      const salesTotal = billsTotal + deliveryTotal + counterTotal + totemTotal;
+      const ordersCount = billsCount + (deliveryOrders?.length || 0) + (counterOrders?.length || 0) + (totemOrders?.length || 0);
       const avgTicket = ordersCount > 0 ? salesTotal / ordersCount : 0;
 
       setTotalRevenue(salesTotal);
@@ -232,7 +255,9 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         if (paymentTotals.hasOwnProperty(method)) return method;
         
         // Mapear valores legados
-        if (method === "card") return "credit"; // card genérico vai para crédito
+        if (method === "card") return "credit";
+        if (method === "bank_transfer") return "pix";
+        if (method === "voucher") return "meal_voucher";
         
         // Verificar se é UUID de uma forma de pagamento cadastrada
         const pmById = paymentMethods?.find(p => p.id === method);
@@ -290,6 +315,19 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         addToPaymentTotal(order.payment_type, orderTotal);
       });
 
+      // Somar totem orders por payment_type
+      (totemOrders || []).forEach((order: any) => {
+        let orderTotal = 0;
+        order.order_items?.forEach((item: any) => {
+          const itemTotal = item.price_at_order * item.quantity;
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0), 0);
+          orderTotal += itemTotal + extrasTotal;
+        });
+        orderTotal -= Number(order.coupon_discount || 0);
+        addToPaymentTotal(order.payment_type, orderTotal);
+      });
+
       // Converter para array de exibição (apenas os que têm valor > 0)
       const paymentsByMethod: PaymentMethodSummary[] = Object.entries(paymentTotals)
         .filter(([_, total]) => total > 0)
@@ -308,7 +346,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       });
 
       // Calcular CMV (operational expenses already computed above)
-      await calculateCMV([...localOrderIds, ...deliveryOrderIds], counterOrderIds);
+      await calculateCMV([...localOrderIds, ...deliveryOrderIds, ...totemOrderIds], counterOrderIds);
 
     } catch (error: any) {
       toast.error("Erro ao carregar dados: " + error.message);
