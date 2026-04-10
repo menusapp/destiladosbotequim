@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useProductPerformance, type ProductPerformanceItem } from "@/hooks/useProductPerformance";
 import type { DateRange } from "@/hooks/useOrderMetrics";
-import { Package, TrendingUp, DollarSign, Layers } from "lucide-react";
+import { Package } from "lucide-react";
 
 interface Props {
   restaurantId: string;
@@ -139,45 +139,6 @@ export default function ProductPerformanceSection({ restaurantId, dateRange }: P
         )}
       </div>
 
-      {/* Metric mini-cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MiniCard
-          icon={<Package className="h-4 w-4" />}
-          title="Total Vendidos"
-          value={`${data.totalQuantitySold} un.`}
-        />
-        <MiniCard
-          icon={<DollarSign className="h-4 w-4" />}
-          title="Mais Rentável"
-          value={data.mostProfitable?.productName || "-"}
-          sub={data.mostProfitable ? `R$ ${data.mostProfitable.totalRevenue.toFixed(2)}` : ""}
-        />
-        <MiniCard
-          icon={<TrendingUp className="h-4 w-4" />}
-          title="Ticket Médio/Produto"
-          value={`R$ ${data.avgTicketPerProduct.toFixed(2)}`}
-        />
-        <MiniCard
-          icon={<Layers className="h-4 w-4" />}
-          title="Categoria Top"
-          value={data.topCategory || "-"}
-        />
-      </div>
     </div>
-  );
-}
-
-function MiniCard({ icon, title, value, sub }: { icon: React.ReactNode; title: string; value: string; sub?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-1 text-muted-foreground">
-          {icon}
-          <span className="text-xs">{title}</span>
-        </div>
-        <p className="text-sm font-semibold truncate">{value}</p>
-        {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
-      </CardContent>
-    </Card>
   );
 }
