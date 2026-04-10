@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Monitor, Copy, ExternalLink, Power, CreditCard, Banknote, QrCode, Smartphone,
   UtensilsCrossed, ShoppingBag, Truck, Store, Users, Gift, Tag, Percent, Timer, Loader2, Save,
+  Wifi, WifiOff, RefreshCw, CheckCircle2, AlertTriangle, Zap,
 } from "lucide-react";
 
 interface Props {
@@ -34,6 +36,16 @@ interface KioskConfig {
   inactivity_timeout_seconds: number;
 }
 
+interface PointTerminal {
+  id: string;
+  device_id: string;
+  device_name: string | null;
+  operating_mode: string;
+  use_on_kiosk: boolean;
+  mp_store_id: string | null;
+  mp_pos_id: string | null;
+}
+
 export default function KioskSettings({ restaurantId }: Props) {
   const [config, setConfig] = useState<KioskConfig | null>(null);
   const [localConfig, setLocalConfig] = useState<KioskConfig | null>(null);
@@ -42,8 +54,21 @@ export default function KioskSettings({ restaurantId }: Props) {
   const [slug, setSlug] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Point terminal state
+  const [mpConnected, setMpConnected] = useState(false);
+  const [tokenExpired, setTokenExpired] = useState(false);
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null);
+  const [savedTerminals, setSavedTerminals] = useState<PointTerminal[]>([]);
+  const [discoveredDevices, setDiscoveredDevices] = useState<any[]>([]);
+  const [loadingTerminals, setLoadingTerminals] = useState(false);
+  const [savingTerminal, setSavingTerminal] = useState(false);
+  const [testingPayment, setTestingPayment] = useState(false);
+  const [creatingStore, setCreatingStore] = useState(false);
+
   useEffect(() => {
     fetchConfig();
+    fetchMpStatus();
+    fetchSavedTerminals();
   }, [restaurantId]);
 
   useEffect(() => {
@@ -90,6 +115,149 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
+  const fetchMpStatus = async () => {
+    try {
+      const { data } = await supabase.rpc("check_mp_token_expiry", { p_restaurant_id: restaurantId });
+      if (data && data.length > 0) {
+        const row = data[0];
+        setMpConnected(!!row.has_token);
+        setTokenExpired(!!row.is_expired);
+        setTokenExpiresAt(row.expires_at);
+      }
+    } catch (err) {
+      console.error("[KioskSettings] Error checking MP status:", err);
+    }
+  };
+
+  const fetchSavedTerminals = async () => {
+    try {
+      const { data } = await supabase.rpc("admin_get_point_terminals", { p_restaurant_id: restaurantId });
+      if (data) setSavedTerminals(data as any[]);
+    } catch (err) {
+      console.error("[KioskSettings] Error loading terminals:", err);
+    }
+  };
+
+  const handleListTerminals = async () => {
+    setLoadingTerminals(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("mercadopago-point", {
+        body: { action: "list_terminals", restaurant_id: restaurantId },
+      });
+      if (error) throw error;
+      const devices = data?.devices || data || [];
+      setDiscoveredDevices(Array.isArray(devices) ? devices : []);
+      if (Array.isArray(devices) && devices.length === 0) {
+        toast.info("Nenhuma maquininha encontrada na conta");
+      } else {
+        toast.success(`${Array.isArray(devices) ? devices.length : 0} maquininha(s) encontrada(s)`);
+      }
+    } catch (err: any) {
+      console.error("[KioskSettings] List terminals error:", err);
+      toast.error(err?.message || "Erro ao buscar maquininhas");
+    } finally {
+      setLoadingTerminals(false);
+    }
+  };
+
+  const handleSelectTerminal = async (device: any) => {
+    setSavingTerminal(true);
+    try {
+      const { error } = await supabase.rpc("admin_upsert_point_terminal", {
+        p_restaurant_id: restaurantId,
+        p_device_id: device.id || device.device_id,
+        p_device_name: device.name || device.device_name || `Terminal ${device.id || device.device_id}`,
+        p_operating_mode: device.operating_mode || "PDV",
+        p_use_on_kiosk: true,
+        p_is_default_terminal: true,
+      });
+      if (error) throw error;
+      toast.success("Maquininha selecionada para o Totem!");
+      fetchSavedTerminals();
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao salvar maquininha");
+    } finally {
+      setSavingTerminal(false);
+    }
+  };
+
+  const handleCreateStoreAndPos = async () => {
+    setCreatingStore(true);
+    try {
+      // Create store
+      const { data: storeData, error: storeErr } = await supabase.functions.invoke("mercadopago-point", {
+        body: {
+          action: "create_store",
+          restaurant_id: restaurantId,
+          name: `Loja Totem - ${restaurantId.slice(0, 8)}`,
+          external_id: `store-${restaurantId}`,
+        },
+      });
+      if (storeErr) throw storeErr;
+      const storeId = storeData?.id;
+
+      // Create POS
+      const { data: posData, error: posErr } = await supabase.functions.invoke("mercadopago-point", {
+        body: {
+          action: "create_pos",
+          restaurant_id: restaurantId,
+          name: `Totem POS`,
+          external_id: `pos-totem-${restaurantId}`,
+          external_store_id: `store-${restaurantId}`,
+          fixed_amount: false,
+        },
+      });
+      if (posErr) throw posErr;
+
+      // Update terminal with store/pos IDs
+      const activeTerminal = savedTerminals.find(t => t.use_on_kiosk);
+      if (activeTerminal) {
+        await supabase.rpc("admin_upsert_point_terminal", {
+          p_restaurant_id: restaurantId,
+          p_device_id: activeTerminal.device_id,
+          p_mp_external_store_id: storeId?.toString() || null,
+          p_mp_external_pos_id: posData?.id?.toString() || null,
+          p_use_on_kiosk: true,
+        });
+      }
+
+      toast.success("Loja e Caixa criados com sucesso!");
+      fetchSavedTerminals();
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao criar loja/caixa");
+    } finally {
+      setCreatingStore(false);
+    }
+  };
+
+  const handleTestPayment = async () => {
+    const activeTerminal = savedTerminals.find(t => t.use_on_kiosk);
+    if (!activeTerminal) {
+      toast.error("Selecione uma maquininha primeiro");
+      return;
+    }
+    setTestingPayment(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("mercadopago-point", {
+        body: {
+          action: "test_order",
+          restaurant_id: restaurantId,
+          device_id: activeTerminal.device_id,
+        },
+      });
+      if (error) throw error;
+      if (data?.id) {
+        toast.success("Cobrança de teste enviada! Verifique a maquininha.");
+      } else {
+        toast.error(data?.message || "Erro ao criar cobrança de teste");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Erro no teste");
+    } finally {
+      setTestingPayment(false);
+    }
+  };
+
   const updateLocal = (updates: Partial<KioskConfig>) => {
     if (!localConfig) return;
     setLocalConfig({ ...localConfig, ...updates });
@@ -125,6 +293,12 @@ export default function KioskSettings({ restaurantId }: Props) {
     toast.success("Link copiado!");
   };
 
+  const daysUntilExpiry = tokenExpiresAt
+    ? Math.ceil((new Date(tokenExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  const activeTerminal = savedTerminals.find(t => t.use_on_kiosk);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -150,7 +324,6 @@ export default function KioskSettings({ restaurantId }: Props) {
 
       {/* Row 1: Status + Link */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Status */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -171,7 +344,6 @@ export default function KioskSettings({ restaurantId }: Props) {
           </CardHeader>
         </Card>
 
-        {/* Link */}
         {localConfig.enabled && kioskUrl && (
           <Card>
             <CardHeader className="pb-3">
@@ -197,7 +369,7 @@ export default function KioskSettings({ restaurantId }: Props) {
         )}
       </div>
 
-      {/* Row 2: Order Types + Payments (side by side) */}
+      {/* Row 2: Order Types + Payments */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -226,7 +398,160 @@ export default function KioskSettings({ restaurantId }: Props) {
         </Card>
       </div>
 
-      {/* Row 3: Identification + Loyalty + Timeout (3 cols) */}
+      {/* Row 3: Maquininha do Totem (Point Terminal) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Zap className="h-4 w-4 text-primary" />
+            Maquininha do Totem (Mercado Pago Point)
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Conecte uma maquininha para receber pagamentos presenciais no totem
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-0">
+          {/* Connection status */}
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+            {mpConnected ? (
+              tokenExpired ? (
+                <>
+                  <WifiOff className="h-5 w-5 text-destructive" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-destructive">Token expirado</p>
+                    <p className="text-xs text-muted-foreground">Reconecte a conta Mercado Pago nas configurações de Pagamentos Online</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Wifi className="h-5 w-5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-600">Conta Mercado Pago conectada</p>
+                    {daysUntilExpiry !== null && daysUntilExpiry <= 30 && (
+                      <p className="text-xs text-amber-600 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Token expira em {daysUntilExpiry} dia(s) — reconecte em breve
+                      </p>
+                    )}
+                  </div>
+                </>
+              )
+            ) : (
+              <>
+                <WifiOff className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">Conta Mercado Pago não conectada</p>
+                  <p className="text-xs text-muted-foreground">Conecte nas configurações de Pagamentos Online primeiro</p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {mpConnected && !tokenExpired && (
+            <>
+              <Separator />
+
+              {/* Step 1: List terminals */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">1. Buscar Maquininhas</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleListTerminals}
+                    disabled={loadingTerminals}
+                    className="gap-2"
+                  >
+                    {loadingTerminals ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                    Buscar
+                  </Button>
+                </div>
+
+                {discoveredDevices.length > 0 && (
+                  <div className="space-y-2">
+                    {discoveredDevices.map((device: any) => (
+                      <div
+                        key={device.id || device.device_id}
+                        className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{device.name || device.id || device.device_id}</p>
+                          <p className="text-xs text-muted-foreground">ID: {device.id || device.device_id}</p>
+                        </div>
+                        <Button
+                          variant={activeTerminal?.device_id === (device.id || device.device_id) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleSelectTerminal(device)}
+                          disabled={savingTerminal}
+                        >
+                          {activeTerminal?.device_id === (device.id || device.device_id) ? (
+                            <><CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Ativo</>
+                          ) : (
+                            "Selecionar"
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Active terminal info */}
+              {activeTerminal && (
+                <>
+                  <Separator />
+
+                  <div className="p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                        Terminal ativo: {activeTerminal.device_name || activeTerminal.device_id}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Step 2: Create Store & POS */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">2. Configurar Loja e Caixa</p>
+                      <p className="text-xs text-muted-foreground">Necessário para integração com o terminal</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCreateStoreAndPos}
+                      disabled={creatingStore}
+                      className="gap-2"
+                    >
+                      {creatingStore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Store className="h-3.5 w-3.5" />}
+                      Configurar
+                    </Button>
+                  </div>
+
+                  {/* Step 3: Test */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">3. Testar Cobrança</p>
+                      <p className="text-xs text-muted-foreground">Envia R$ 1,00 para a maquininha</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTestPayment}
+                      disabled={testingPayment}
+                      className="gap-2"
+                    >
+                      {testingPayment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                      Testar
+                    </Button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Row 4: Identification + Loyalty + Timeout */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">

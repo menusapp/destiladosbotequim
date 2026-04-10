@@ -19,8 +19,16 @@ export interface KioskConfig {
   inactivity_timeout_seconds: number;
 }
 
+export interface KioskPointTerminal {
+  device_id: string;
+  device_name: string | null;
+  mp_store_id: string | null;
+  mp_pos_id: string | null;
+}
+
 export function useKioskConfig(restaurantId: string | null) {
   const [config, setConfig] = useState<KioskConfig | null>(null);
+  const [pointTerminal, setPointTerminal] = useState<KioskPointTerminal | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,8 +37,9 @@ export function useKioskConfig(restaurantId: string | null) {
       return;
     }
 
-    const fetch = async () => {
+    const fetchAll = async () => {
       try {
+        // Fetch kiosk config
         const { data, error } = await supabase
           .from("kiosk_config")
           .select("*")
@@ -41,6 +50,14 @@ export function useKioskConfig(restaurantId: string | null) {
           console.error("[useKioskConfig] Error:", error);
         }
         setConfig(data as KioskConfig | null);
+
+        // Fetch active point terminal
+        const { data: terminalData } = await supabase.rpc("get_kiosk_point_terminal", {
+          p_restaurant_id: restaurantId,
+        });
+        if (terminalData && terminalData.length > 0) {
+          setPointTerminal(terminalData[0] as KioskPointTerminal);
+        }
       } catch (err) {
         console.error("[useKioskConfig] Exception:", err);
       } finally {
@@ -48,8 +65,8 @@ export function useKioskConfig(restaurantId: string | null) {
       }
     };
 
-    fetch();
+    fetchAll();
   }, [restaurantId]);
 
-  return { config, loading };
+  return { config, pointTerminal, loading };
 }
