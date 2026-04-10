@@ -346,7 +346,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       });
 
       // Calcular CMV (operational expenses already computed above)
-      await calculateCMV([...localOrderIds, ...deliveryOrderIds], counterOrderIds);
+      await calculateCMV([...localOrderIds, ...deliveryOrderIds, ...totemOrderIds], counterOrderIds);
 
     } catch (error: any) {
       toast.error("Erro ao carregar dados: " + error.message);
