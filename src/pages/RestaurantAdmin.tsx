@@ -255,9 +255,9 @@ const RestaurantAdmin = () => {
           const orderType = order.order_type;
           const orderId = order.id;
           const status = order.status;
+          const shouldNotify = status === 'pending' || (order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status));
           
-          // Verificar diretamente pelo restaurant_id do pedido e status pending
-          if (orderRestaurantId === restaurantId && status === 'pending') {
+          if (orderRestaurantId === restaurantId && shouldNotify) {
             // Skip PDV-sourced orders
             const isPdvSource = order.pdv_source === true;
             if (isPdvSource) return;
@@ -363,9 +363,9 @@ const RestaurantAdmin = () => {
           const order = payload.new as any;
           const orderId = order.id;
           const status = order.status;
+          const keepTotemNotification = order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status);
           
-          // Se o pedido foi aceito/mudou de status, remover da fila de notificações
-          if (status !== 'pending') {
+          if (!keepTotemNotification && status !== 'pending') {
             setNotificationQueue(prev => prev.filter(n => n.orderId !== orderId));
           }
         }

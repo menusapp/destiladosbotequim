@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { formatPaymentMethod } from "@/lib/utils";
+import { formatPaymentMethod, formatPaymentWithBrand } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -100,7 +100,7 @@ export const TableDetailDialog = ({
       const { data, error } = await supabase
         .from("orders")
         .select(`
-          id, status, customer_name, customer_cpf, comanda_id, created_at, coupon_discount, notes,
+          id, status, payment_status, payment_type, payment_brand, paid_at, customer_name, customer_cpf, comanda_id, created_at, coupon_discount, notes,
           order_items(
             id, quantity, price_at_order, notes,
             products(name),
@@ -217,7 +217,7 @@ export const TableDetailDialog = ({
   }, [orders, comandas]);
 
   const tableTotal = useMemo(() => {
-    return orders?.reduce((sum, order) => sum + getOrderTotal(order), 0) || 0;
+    return orders?.filter((order: any) => order.payment_status !== "paid").reduce((sum, order) => sum + getOrderTotal(order), 0) || 0;
   }, [orders]);
 
   // Calculate paid total from splits
@@ -765,6 +765,7 @@ export const TableDetailDialog = ({
               {comandas && comandas.length > 0 ? (
                 comandas.map(comanda => {
                   const comandaOrders = ordersByComanda.get(comanda.id) || [];
+                  const unpaidComandaOrders = comandaOrders.filter((o: any) => o.payment_status !== "paid");
                   const comandaItemsTotal = comandaOrders.reduce((sum, o) => {
                     return sum + (o.order_items?.reduce((s: number, item: any) => {
                       const ext = item.order_item_extras?.reduce((es: number, e: any) => es + e.price_at_order, 0) || 0;
@@ -773,6 +774,7 @@ export const TableDetailDialog = ({
                   }, 0);
                   const comandaDiscount = comandaOrders.reduce((sum, o) => sum + (o.coupon_discount || 0), 0);
                   const comandaTotal = comandaItemsTotal - comandaDiscount;
+                  const unpaidComandaTotal = unpaidComandaOrders.reduce((sum: number, o: any) => sum + getOrderTotal(o), 0);
 
                   // Calculate splits totals for this comanda
                   const comandaOrderIds = new Set(comandaOrders.map(o => o.id));
@@ -786,10 +788,6 @@ export const TableDetailDialog = ({
                   const paidItems = allItems.filter(item => {
                     const splits = splitsByItem.get(item.id);
                     return splits && splits.length > 0 && splits.every(s => s.status === "paid");
-                  });
-                  const pendingItems = allItems.filter(item => {
-                    const splits = splitsByItem.get(item.id);
-                    return !splits || splits.length === 0 || !splits.every(s => s.status === "paid");
                   });
 
                   return (
@@ -809,9 +807,15 @@ export const TableDetailDialog = ({
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Imprimir comanda" onClick={() => printFullComanda(comanda)}>
                               <Printer className="w-4 h-4" />
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handlePayComanda(comanda)}>
-                              <CreditCard className="w-3.5 h-3.5 mr-1" /> Pagar
-                            </Button>
+                            {unpaidComandaTotal > 0.01 ? (
+                              <Button size="sm" variant="outline" onClick={() => handlePayComanda(comanda)}>
+                                <CreditCard className="w-3.5 h-3.5 mr-1" /> Pagar
+                              </Button>
+                            ) : (
+                              <Badge variant="outline" className="border-green-500 text-green-700 dark:text-green-400">
+                                Pago
+                              </Badge>
+                            )}
                           </div>
                         )}
                       </div>
@@ -825,6 +829,11 @@ export const TableDetailDialog = ({
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                   {getStatusBadge(order.status)}
+                                  {order.payment_status === "paid" && (
+                                    <Badge variant="outline" className="text-[10px] border-green-500 text-green-700 dark:text-green-400">
+                                      Pago - {formatPaymentWithBrand(order.payment_type, order.payment_brand)}
+                                    </Badge>
+                                  )}
                                   <span className="text-xs text-muted-foreground">
                                     {format(new Date(order.created_at), "HH:mm", { locale: ptBR })}
                                   </span>
