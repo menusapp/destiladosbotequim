@@ -341,13 +341,8 @@ export function KioskPayment({
 
             // Payment confirmed — NOW create the order in DB
             try {
-              const orderId = await createOrderInDB();
+              const orderId = await createOrderInDB(true);
               if (orderId) {
-                // Order already created with correct payment info, just update paid_at
-                await supabase.from("orders").update({
-                  payment_status: "paid",
-                  paid_at: new Date().toISOString(),
-                }).eq("id", orderId);
                 createdOrderIdRef.current = orderId;
                 onOrderCreated(orderId);
               } else {
