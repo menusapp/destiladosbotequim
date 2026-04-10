@@ -363,9 +363,9 @@ const RestaurantAdmin = () => {
           const order = payload.new as any;
           const orderId = order.id;
           const status = order.status;
+          const keepTotemNotification = order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status);
           
-          // Se o pedido foi aceito/mudou de status, remover da fila de notificações
-          if (status !== 'pending') {
+          if (!keepTotemNotification && status !== 'pending') {
             setNotificationQueue(prev => prev.filter(n => n.orderId !== orderId));
           }
         }
