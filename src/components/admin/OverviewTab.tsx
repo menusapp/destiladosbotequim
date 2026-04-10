@@ -146,6 +146,9 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Product Performance */}
+      <ProductPerformanceSection restaurantId={restaurantId} dateRange={dateRange} />
     </div>
   );
 };
