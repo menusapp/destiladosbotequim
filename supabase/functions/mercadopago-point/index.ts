@@ -249,6 +249,18 @@ async function cancelOrder(restaurantId: string, mpOrderId: string) {
   return respond(true, { data: result.data });
 }
 
+async function listPendingOrders(restaurantId: string, deviceId: string) {
+  const { accessToken } = await getRestaurantToken(restaurantId);
+  // Query MP for orders on this terminal that are still open
+  const result = await mpFetch(
+    `/point/integration-api/payment-intents/${deviceId}/events?startDate=${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}&endDate=${new Date().toISOString()}`,
+    accessToken
+  );
+  log("list_pending_orders", { restaurant_id: restaurantId, device_id: deviceId, status: result.ok ? "success" : "error" });
+  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
+  return respond(true, { data: result.data });
+}
+
 async function testOrder(restaurantId: string, deviceId: string) {
   return createOrder(restaurantId, {
     amount: 1.0,
@@ -295,6 +307,8 @@ Deno.serve(async (req) => {
         return await cancelOrder(restaurant_id, params.mp_order_id);
       case "test_order":
         return await testOrder(restaurant_id, params.device_id);
+      case "list_pending_orders":
+        return await listPendingOrders(restaurant_id, params.device_id);
       default:
         return respond(false, { error: `Ação desconhecida: ${action}`, code: "unknown_action" });
     }
