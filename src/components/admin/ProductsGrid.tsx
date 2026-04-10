@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Trash2, Package, DollarSign, Image, Clock, Tag, Barcode, Settings2, Layers, Copy, Pencil, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Search, Trash2, Package, DollarSign, Image, Clock, Tag, Barcode, Settings2, Layers, Copy, Pencil, ArrowUp, ArrowDown, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateNextPdvCode, getAllUsedPdvCodes } from "@/lib/pdvCodeGenerator";
@@ -478,6 +479,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       }
     }
 
+    if (visibilityChannels.length === 0) {
+      toast.error("Selecione pelo menos um canal de visibilidade");
+      return;
+    }
+
     const productData: any = {
       name: productName, description: productDescription, price: parseFloat(productPrice),
       promotional_price: productPromotionalPrice ? parseFloat(productPromotionalPrice) : null,
@@ -566,7 +572,14 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setProductImageUrl(product.image_url);
     setProductPrepTime(product.prep_time?.toString() || "");
     setPdvCode((product as any).pdv_code || "");
-    setVisibilityChannels((product as any).visibility_channels || ["all"]);
+    const channels = (product as any).visibility_channels || ["all"];
+    if (channels.includes("all")) {
+      const expanded = ["delivery", "mesa"];
+      if (kioskEnabled) expanded.push("totem");
+      setVisibilityChannels(expanded);
+    } else {
+      setVisibilityChannels(channels);
+    }
 
     // Load fiscal fields
     setFiscalNcm((product as any).fiscal_ncm || "");
@@ -646,7 +659,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     setSelectedExtraStockItem(""); setExtraIngredientQuantity("");
     setEditingProduct(null); setLinkedGroups([]); setSelectedComplementCategory("");
     setGroupIsRequired(false); setGroupMinSelection("0"); setGroupMaxSelection(""); setExtraIsRequired(false);
-    setVisibilityChannels(["all"]);
+    setVisibilityChannels(["delivery", "mesa", ...(kioskEnabled ? ["totem"] : [])]);
     setFiscalNcm(""); setFiscalException(""); setFiscalCest(""); setFiscalCfop("");
     setFiscalIcmsCsosn(""); setFiscalIcmsOrigin("0"); setFiscalPisCst(""); setFiscalPisAliquota("");
     setFiscalCofinsCst(""); setFiscalCofinsAliquota(""); setFiscalIbsAliquota(""); setFiscalCbsAliquota("");
@@ -810,16 +823,44 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                         <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
                           Visibilidade por Canal
                         </div>
-                        <Select value={visibilityChannels[0] || "all"} onValueChange={(v) => setVisibilityChannels([v])}>
-                          <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Ativo em todos</SelectItem>
-                            <SelectItem value="delivery">Apenas Delivery</SelectItem>
-                            <SelectItem value="mesa">Apenas Mesas</SelectItem>
-                            {kioskEnabled && <SelectItem value="totem">Apenas Totem</SelectItem>}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">Define em quais canais este produto aparece</p>
+                        <p className="text-xs text-muted-foreground">
+                          Selecione em quais canais este produto ficará disponível
+                        </p>
+
+                        <div className="space-y-2 mt-2">
+                          {[
+                            { key: "delivery", label: "Delivery", desc: "Aparece no cardápio digital de delivery" },
+                            { key: "mesa", label: "Mesas", desc: "Aparece no cardápio digital das mesas" },
+                            ...(kioskEnabled ? [{ key: "totem", label: "Totem", desc: "Aparece no cardápio do totem de autoatendimento" }] : []),
+                          ].map(ch => (
+                            <div key={ch.key} className="flex items-center gap-3 p-3 border rounded-lg">
+                              <Checkbox
+                                id={`visible_${ch.key}`}
+                                checked={visibilityChannels.includes(ch.key)}
+                                onCheckedChange={(checked) => {
+                                  setVisibilityChannels(prev =>
+                                    checked
+                                      ? [...prev.filter(c => c !== "all"), ch.key]
+                                      : prev.filter(c => c !== ch.key)
+                                  );
+                                }}
+                              />
+                              <div>
+                                <Label htmlFor={`visible_${ch.key}`} className="cursor-pointer font-medium">
+                                  {ch.label}
+                                </Label>
+                                <p className="text-xs text-muted-foreground">{ch.desc}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {visibilityChannels.filter(c => c !== "all").length === 0 && (
+                          <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                            <AlertCircle className="w-3 h-3" />
+                            Produto não aparecerá em nenhum canal
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
 
