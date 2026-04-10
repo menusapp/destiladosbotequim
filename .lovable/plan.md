@@ -1,32 +1,28 @@
 
 
-## Plano: Pedido só entra no sistema após pagamento confirmado + Origem "Totem"
+## Plano: Corrigir PIX direto no terminal + Pedido duplicado
 
-### Problema 1: Pedido aparece antes de pagar
-O fluxo atual em `KioskPayment.tsx` chama `createOrderInDB()` **antes** de enviar a cobrança para a maquininha. Mesmo com `payment_status: "awaiting_payment"`, o pedido já aparece no painel admin e dispara notificações.
+### Problema 1: PIX abre tela de seleção
+Nos logs vejo claramente: a API de **payment-intents** retorna erro 400 para `bank_transfer` — ela só aceita `credit_card`, `debit_card`, `voucher_card`. O sistema cai no fallback `/v1/orders` que **não suporta** pré-selecionar tipo, então a maquininha mostra o menu de seleção.
 
-### Solução 1: Inverter a ordem — cobrar primeiro, criar pedido depois
-Em `handlePointPayment`:
-1. **Primeiro**: enviar a cobrança para a maquininha (sem criar pedido no DB)
-2. **Polling**: aguardar confirmação de pagamento
-3. **Só após pagamento confirmado**: chamar `createOrderInDB()` com `payment_status: "paid"`, `payment_type` e `payment_brand` já preenchidos
-4. Se o pagamento for cancelado/recusado/timeout: **nenhum pedido é criado** — descartado silenciosamente
+**Correção**: Para PIX, pular payment-intents e usar `/v1/orders` com restrição de método no config: `config.point.payment_type: "bank_transfer"`. Se a API do MP não aceitar esse campo, usar `allowed_payment_methods` no payload. Testaremos ambas abordagens.
 
-Mudanças em `src/components/kiosk/KioskPayment.tsx`:
-- `handlePointPayment`: não chama mais `createOrderInDB()` primeiro. Gera um UUID temporário para idempotency_key, envia para maquininha, e no polling de sucesso cria o pedido
-- `startPointPolling`: no callback de sucesso (`accredited`/`approved`), chama `createOrderInDB()` com pagamento já confirmado e depois `onOrderCreated(orderId)`
-- Se cancelado/falhou: não cria nada no DB
+Arquivo: `supabase/functions/mercadopago-point/index.ts`
+- Quando `payment_type === "bank_transfer"` (PIX), ir direto para `/v1/orders` com campo de restrição no config
+- NÃO tentar payment-intents para PIX (sempre falha)
 
-### Problema 2: Origem mostra "Balcão" em vez de "Totem"
-O `OrderDetailModal.tsx` tem sua própria função `getOrderOrigin()` que verifica `order.order_type === "balcao"` e retorna "Balcão" **antes** de verificar `order_channel`. Totem com modo "counter" envia `order_type: "balcao"`, então cai nessa condição.
+### Problema 2: Pedido duplicado
+O polling roda a cada 3s. Quando o status muda para `processed/accredited`, o callback chama `createOrderInDB()` — mas o `clearInterval` pode não executar antes do próximo tick do interval, causando **duas chamadas** a `createOrderInDB()`.
 
-### Solução 2: Usar o helper compartilhado
-Em `src/components/admin/OrderDetailModal.tsx`:
-- Substituir a função local `getOrderOrigin()` pelo import de `getOrderOriginLabel` de `@/lib/orderOrigin.ts`
-- Também atualizar `orderOrigin.ts` para verificar `order_channel === "totem"` **antes** de qualquer check de `order_type`, garantindo que totem sempre aparece como "Totem"
+**Correção**: Adicionar um `ref` de guarda (`orderCreationInProgressRef`) que impede chamadas duplicadas.
+
+Arquivo: `src/components/kiosk/KioskPayment.tsx`
+- Adicionar `const orderCreationInProgressRef = useRef(false)` 
+- No callback de polling, antes de chamar `createOrderInDB()`, checar e setar o ref
+- `if (orderCreationInProgressRef.current) return;`
+- `orderCreationInProgressRef.current = true;`
 
 ### Arquivos
-- **`src/components/kiosk/KioskPayment.tsx`** — inverter fluxo: cobrar primeiro, criar pedido só após confirmação
-- **`src/components/admin/OrderDetailModal.tsx`** — usar `getOrderOriginLabel` do helper compartilhado
-- **`src/lib/orderOrigin.ts`** — já trata `order_channel === "totem"` corretamente (sem mudança necessária)
+- `supabase/functions/mercadopago-point/index.ts` — PIX direto sem payment-intents
+- `src/components/kiosk/KioskPayment.tsx` — guard contra pedido duplicado
 
