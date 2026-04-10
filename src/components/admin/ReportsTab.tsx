@@ -255,7 +255,9 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         if (paymentTotals.hasOwnProperty(method)) return method;
         
         // Mapear valores legados
-        if (method === "card") return "credit"; // card genérico vai para crédito
+        if (method === "card") return "credit";
+        if (method === "bank_transfer") return "pix";
+        if (method === "voucher") return "meal_voucher";
         
         // Verificar se é UUID de uma forma de pagamento cadastrada
         const pmById = paymentMethods?.find(p => p.id === method);
