@@ -243,6 +243,53 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
+  // Polling state
+  const [pollingOrderId, setPollingOrderId] = useState<string | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<string | null>(null);
+
+  // Polling effect
+  useEffect(() => {
+    if (!pollingOrderId) return;
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 40; // 40 * 3s = 2 min
+
+    const poll = async () => {
+      if (cancelled || attempts >= maxAttempts) {
+        if (attempts >= maxAttempts) {
+          setPollingStatus("timeout");
+          toast.error("Timeout — verifique a maquininha manualmente");
+        }
+        setPollingOrderId(null);
+        return;
+      }
+      attempts++;
+      try {
+        const { data } = await supabase.functions.invoke("mercadopago-point", {
+          body: { action: "get_order", restaurant_id: restaurantId, mp_order_id: pollingOrderId },
+        });
+        const status = data?.data?.internal_status || data?.data?.status;
+        setPollingStatus(status);
+        if (status === "paid" || status === "approved" || status === "processed") {
+          toast.success("✅ Pagamento aprovado na maquininha!");
+          setPollingOrderId(null);
+          return;
+        }
+        if (status === "failed" || status === "canceled" || status === "cancelled" || status === "expired") {
+          toast.error(`Pagamento ${status === "failed" ? "recusado" : "cancelado"}`);
+          setPollingOrderId(null);
+          return;
+        }
+      } catch {
+        // ignore polling errors
+      }
+      if (!cancelled) setTimeout(poll, 3000);
+    };
+
+    setTimeout(poll, 2000); // first check after 2s
+    return () => { cancelled = true; };
+  }, [pollingOrderId, restaurantId]);
+
   const handleTestPayment = async () => {
     const terminal = savedTerminals.find(t => t.use_on_kiosk);
     if (!terminal) {
@@ -250,6 +297,7 @@ export default function KioskSettings({ restaurantId }: Props) {
       return;
     }
     setTestingPayment(true);
+    setPollingStatus(null);
     try {
       const { data } = await supabase.functions.invoke("mercadopago-point", {
         body: {
@@ -266,8 +314,11 @@ export default function KioskSettings({ restaurantId }: Props) {
         return;
       }
       setPendingOrderBlocked(false);
-      if (data.data?.id) {
-        toast.success("Cobrança de teste enviada! Verifique a maquininha.");
+      const mpOrderId = data.data?.id;
+      if (mpOrderId) {
+        toast.success("Cobrança enviada! Aguardando resposta da maquininha...");
+        setPollingOrderId(mpOrderId);
+        setPollingStatus("waiting_terminal");
       } else {
         toast.error("Resposta inesperada do Mercado Pago");
       }

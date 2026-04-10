@@ -9,7 +9,6 @@ const corsHeaders = {
 
 const MP_API = "https://api.mercadopago.com";
 
-// Known MP error translations
 const MP_ERROR_MESSAGES: Record<string, string> = {
   already_queued_order_on_terminal: "Já existe uma cobrança pendente nessa maquininha. Aguarde ou cancele a anterior.",
   device_not_found: "Maquininha não encontrada. Verifique se está ligada.",
@@ -67,9 +66,7 @@ async function mpFetch(
   const res = await fetch(`${MP_API}${path}`, { ...options, headers });
   const data = await res.json().catch(() => ({}));
 
-  if (!res.ok) {
-    log("mp_api_error", { path, status: res.status, error_body: data });
-  }
+  log("mp_api_call", { path, method: options.method || "GET", status: res.status, ok: res.ok, response_body: data });
 
   return { ok: res.ok, status: res.status, data };
 }
@@ -92,7 +89,6 @@ function translateMpError(result: { ok: boolean; status: number; data: any }): {
 async function listTerminals(restaurantId: string) {
   const { accessToken } = await getRestaurantToken(restaurantId);
   const result = await mpFetch("/point/integration-api/devices", accessToken);
-  log("list_terminals", { restaurant_id: restaurantId, status: result.ok ? "success" : "error", response_status: result.status });
   if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
   return respond(true, { data: result.data });
 }
@@ -107,7 +103,6 @@ async function createStore(restaurantId: string, body: { name: string; external_
     method: "POST",
     body: JSON.stringify(body),
   });
-  log("create_store", { restaurant_id: restaurantId, status: result.ok ? "success" : "error", store_id: result.data?.id });
   if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
   return respond(true, { data: result.data });
 }
@@ -118,7 +113,6 @@ async function createPos(restaurantId: string, body: { name: string; external_id
     method: "POST",
     body: JSON.stringify(body),
   });
-  log("create_pos", { restaurant_id: restaurantId, status: result.ok ? "success" : "error", pos_id: result.data?.id });
   if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
   return respond(true, { data: result.data });
 }
@@ -129,12 +123,21 @@ async function createOrder(
 ) {
   const { accessToken, mpUserId } = await getRestaurantToken(restaurantId);
 
+  log("[MP Point] create_order_start", {
+    restaurant_id: restaurantId,
+    order_id: body.order_id,
+    terminal_id: body.device_id,
+    amount: body.amount,
+    idempotency_key: body.idempotency_key,
+  });
+
+  // --- Attempt 1: /v1/orders (modern Orders API) ---
   const orderPayload = {
     type: "point",
     external_reference: body.order_id,
     description: body.description,
     transactions: {
-      payments: [{ amount: body.amount.toString() }],
+      payments: [{ amount: body.amount }],  // number, not string
     },
     config: {
       point: {
@@ -144,14 +147,6 @@ async function createOrder(
     },
   };
 
-  log("create_order", {
-    restaurant_id: restaurantId,
-    order_id: body.order_id,
-    terminal_id: body.device_id,
-    amount: body.amount,
-    idempotency_key: body.idempotency_key,
-  });
-
   let result = await mpFetch("/v1/orders", accessToken, {
     method: "POST",
     body: JSON.stringify(orderPayload),
@@ -160,7 +155,7 @@ async function createOrder(
 
   // Retry once on 5xx
   if (!result.ok && result.status >= 500) {
-    log("create_order_retry", { restaurant_id: restaurantId, order_id: body.order_id, first_status: result.status });
+    log("[MP Point] create_order_retry_5xx", { first_status: result.status });
     result = await mpFetch("/v1/orders", accessToken, {
       method: "POST",
       body: JSON.stringify(orderPayload),
@@ -168,31 +163,72 @@ async function createOrder(
     });
   }
 
+  // --- Attempt 2: Fallback to payment-intents API if /v1/orders fails with 4xx (not 409 queue) ---
+  if (!result.ok && result.status >= 400 && result.status < 500) {
+    const errCode = result.data?.errors?.[0]?.code;
+    if (errCode !== "already_queued_order_on_terminal") {
+      log("[MP Point] fallback_to_payment_intents", { original_status: result.status, original_error: errCode });
+      
+      // Convert amount to centavos (payment-intents API uses integer cents)
+      const amountCents = Math.round(body.amount * 100);
+      const piPayload = {
+        amount: amountCents,
+        description: body.description,
+        payment: {
+          installments: 1,
+          type: "credit_card",
+          installments_cost: "seller",
+        },
+        additional_info: {
+          external_reference: body.order_id,
+        },
+      };
+
+      result = await mpFetch(
+        `/point/integration-api/devices/${body.device_id}/payment-intents`,
+        accessToken,
+        {
+          method: "POST",
+          body: JSON.stringify(piPayload),
+          headers: { "X-Idempotency-Key": body.idempotency_key },
+        }
+      );
+
+      if (result.ok) {
+        log("[MP Point] payment_intents_success", { id: result.data?.id });
+      }
+    }
+  }
+
   if (!result.ok) {
-    log("create_order_result", { restaurant_id: restaurantId, order_id: body.order_id, status: "error", response_status: result.status });
+    log("[MP Point] create_order_failed", { status: result.status });
     return respond(false, { ...translateMpError(result), data: null });
   }
 
-  if (result.data?.id) {
+  // Save to DB — pass NULL for order_id on tests
+  const mpOrderId = result.data?.id || "";
+  if (mpOrderId) {
     const sb = getSupabaseAdmin();
-    await sb.rpc("insert_point_order_payment", {
-      p_restaurant_id: restaurantId,
-      p_order_id: body.order_id,
-      p_mp_order_id: result.data.id,
-      p_mp_user_id: mpUserId || "",
-      p_terminal_id: body.device_id,
-      p_external_reference: body.order_id,
-      p_idempotency_key: body.idempotency_key,
-      p_amount: body.amount,
-      p_status: "waiting_terminal",
-    });
+    try {
+      await sb.rpc("insert_point_order_payment", {
+        p_restaurant_id: restaurantId,
+        p_order_id: null,  // NULL for test orders (no FK violation)
+        p_mp_order_id: mpOrderId,
+        p_mp_user_id: mpUserId || "",
+        p_terminal_id: body.device_id,
+        p_external_reference: body.order_id,
+        p_idempotency_key: body.idempotency_key,
+        p_amount: body.amount,
+        p_status: "waiting_terminal",
+      });
+      log("[MP Point] db_save_success", { mp_order_id: mpOrderId });
+    } catch (dbErr: any) {
+      log("[MP Point] db_save_error", { mp_order_id: mpOrderId, error: dbErr?.message });
+    }
   }
 
-  log("create_order_result", {
-    restaurant_id: restaurantId,
-    order_id: body.order_id,
-    mp_order_id: result.data?.id,
-    status: "success",
+  log("[MP Point] create_order_success", {
+    mp_order_id: mpOrderId,
     response_status: result.status,
   });
 
@@ -201,8 +237,14 @@ async function createOrder(
 
 async function getOrder(restaurantId: string, mpOrderId: string) {
   const { accessToken } = await getRestaurantToken(restaurantId);
-  const result = await mpFetch(`/v1/orders/${mpOrderId}`, accessToken);
-  log("get_order", { restaurant_id: restaurantId, mp_order_id: mpOrderId, status: result.ok ? "success" : "error", order_status: result.data?.status });
+  
+  // Try /v1/orders first
+  let result = await mpFetch(`/v1/orders/${mpOrderId}`, accessToken);
+  
+  // Fallback: try payment-intents
+  if (!result.ok && result.status === 404) {
+    result = await mpFetch(`/point/integration-api/payment-intents/${mpOrderId}`, accessToken);
+  }
 
   if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
 
@@ -211,38 +253,45 @@ async function getOrder(restaurantId: string, mpOrderId: string) {
   const mpStatus = result.data.status;
   let internalStatus = "waiting_terminal";
 
-  if (mpStatus === "processed") {
-    const txn = result.data.transactions?.payments?.[0];
+  // Handle both /v1/orders and payment-intents response shapes
+  if (mpStatus === "processed" || mpStatus === "finished") {
+    const txn = result.data.transactions?.payments?.[0] || result.data.payment;
     if (txn?.status_detail === "accredited" || txn?.status === "approved") {
       internalStatus = "paid";
     } else {
       internalStatus = "failed";
     }
-  } else if (mpStatus === "canceled" || mpStatus === "expired") {
+  } else if (mpStatus === "canceled" || mpStatus === "expired" || mpStatus === "cancelled") {
     internalStatus = "canceled";
-  } else if (mpStatus === "processing") {
+  } else if (mpStatus === "processing" || mpStatus === "open") {
     internalStatus = "processing";
   }
 
   await sb.rpc("update_point_order_payment", {
     p_mp_order_id: mpOrderId,
     p_status: internalStatus,
-    p_mp_status_payload: result.data,
   });
 
-  return respond(true, { data: result.data });
+  return respond(true, { data: { ...result.data, internal_status: internalStatus } });
 }
 
 async function cancelOrder(restaurantId: string, mpOrderId: string) {
   const { accessToken } = await getRestaurantToken(restaurantId);
-  const result = await mpFetch(`/v1/orders/${mpOrderId}`, accessToken, { method: "DELETE" });
-  log("cancel_order", { restaurant_id: restaurantId, mp_order_id: mpOrderId, status: result.ok ? "success" : "error" });
+  
+  // Try /v1/orders DELETE
+  let result = await mpFetch(`/v1/orders/${mpOrderId}`, accessToken, { method: "DELETE" });
+  
+  // Fallback: try payment-intents cancel
+  if (!result.ok && result.status === 404) {
+    result = await mpFetch(`/point/integration-api/payment-intents/${mpOrderId}`, accessToken, { method: "DELETE" });
+  }
+
+  log("[MP Point] cancel_order", { mp_order_id: mpOrderId, status: result.ok ? "success" : "error" });
 
   const sb = getSupabaseAdmin();
   await sb.rpc("update_point_order_payment", {
     p_mp_order_id: mpOrderId,
     p_status: "canceled",
-    p_mp_status_payload: result.data,
   });
 
   if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
@@ -251,14 +300,35 @@ async function cancelOrder(restaurantId: string, mpOrderId: string) {
 
 async function listPendingOrders(restaurantId: string, deviceId: string) {
   const { accessToken } = await getRestaurantToken(restaurantId);
-  // Query MP for orders on this terminal that are still open
+
+  // First check local DB for pending orders
+  const sb = getSupabaseAdmin();
+  const { data: localPending } = await sb
+    .from("point_order_payments")
+    .select("mp_order_id, status, created_at, amount")
+    .eq("restaurant_id", restaurantId)
+    .eq("device_id", deviceId)
+    .in("status", ["waiting_terminal", "processing"])
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  log("[MP Point] list_pending_local", { device_id: deviceId, local_count: localPending?.length || 0 });
+
+  // Also query MP API — use correct endpoint with query param
   const result = await mpFetch(
-    `/point/integration-api/payment-intents/${deviceId}/events?startDate=${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}&endDate=${new Date().toISOString()}`,
+    `/point/integration-api/devices/${deviceId}/payment-intents`,
     accessToken
   );
-  log("list_pending_orders", { restaurant_id: restaurantId, device_id: deviceId, status: result.ok ? "success" : "error" });
-  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
-  return respond(true, { data: result.data });
+
+  log("[MP Point] list_pending_api", { device_id: deviceId, api_ok: result.ok, api_status: result.status });
+
+  return respond(true, {
+    data: {
+      local_pending: localPending || [],
+      api_response: result.ok ? result.data : null,
+      api_error: result.ok ? null : result.data,
+    },
+  });
 }
 
 async function testOrder(restaurantId: string, deviceId: string) {
