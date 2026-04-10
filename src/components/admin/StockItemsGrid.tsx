@@ -30,6 +30,7 @@ interface StockItem {
   minimum_quantity: number;
   category_id: string | null;
   supplier_id: string | null;
+  is_active?: boolean;
   stock_categories?: { name: string } | null;
   suppliers?: { name: string } | null;
 }
@@ -166,6 +167,20 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
     fetchStockItems();
   };
 
+  const handleToggleActive = async (item: StockItem) => {
+    const newValue = item.is_active === false ? true : false;
+    const { error } = await supabase
+      .from("stock_items")
+      .update({ is_active: newValue })
+      .eq("id", item.id);
+
+    if (error) {
+      toast({ title: "Erro ao atualizar status", variant: "destructive" });
+      return;
+    }
+    fetchStockItems();
+  };
+
   const handleDeleteItem = (item: StockItem) => {
     setItemToDelete(item);
     setDeleteDialogOpen(true);
@@ -281,6 +296,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
               item={item} 
               onEdit={openEditDialog} 
               onDelete={handleDeleteItem}
+              onToggleActive={handleToggleActive}
             />
           ))}
         </div>

@@ -17,6 +17,7 @@ import { Clock } from "lucide-react";
 import { ReviewModal } from "@/components/menu/ReviewModal";
 import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
 import { isFeaturedVisible } from "@/lib/featuredUtils";
+import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 
 const Menu = () => {
   const { slug: restaurantSlug, tableNumber } = useParams();
@@ -47,6 +48,10 @@ const Menu = () => {
   
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [featuredSectionTitle, setFeaturedSectionTitle] = useState("Destaques");
+
+  const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
+  const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
+  const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
 
   // ⚡ Refs para manter valores atualizados nos listeners de realtime (evita stale closures)
   const tableIdRef = useRef<string | null>(null);
@@ -977,7 +982,8 @@ const Menu = () => {
         }));
       });
 
-    const allExtras = [...extrasWithCategoryName, ...complementExtras];
+    const allExtras = [...extrasWithCategoryName, ...complementExtras]
+      .filter((e: any) => !disabledExtraItemIds.has(e.id));
     setSelectedProduct(product);
     setProductExtras(allExtras);
     setShowProductDialog(true);
@@ -1033,17 +1039,26 @@ const Menu = () => {
   }
 
   const primaryColor = restaurant.primary_color || "#fe9516";
-  const allProducts = categories.flatMap((c) => c.products);
+
+  // Filtrar produtos vinculados a insumos inativos
+  const activeCategories = categories.map(cat => ({
+    ...cat,
+    products: cat.products.filter(p => !disabledProductIds.has(p.id))
+  })).filter(cat => cat.products.length > 0);
+
+  const activeFeatured = featuredProducts.filter(p => !disabledProductIds.has(p.id));
+
+  const allProducts = activeCategories.flatMap((c) => c.products);
 
   // Filtrar produtos pela busca
   const filteredCategories = searchQuery.trim() 
-    ? categories.map(cat => ({
+    ? activeCategories.map(cat => ({
         ...cat,
         products: cat.products.filter(p => 
           p.name.toLowerCase().includes(searchQuery.toLowerCase())
         )
       })).filter(cat => cat.products.length > 0)
-    : categories;
+    : activeCategories;
 
   const filteredProducts = searchQuery.trim()
     ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -1151,9 +1166,9 @@ const Menu = () => {
             primaryColor={primaryColor}
           />
 
-          {featuredProducts.length > 0 && (
+          {activeFeatured.length > 0 && (
             <FeaturedProducts
-              products={featuredProducts}
+              products={activeFeatured}
               primaryColor={primaryColor}
               onProductClick={handleProductClick}
               title={featuredSectionTitle}

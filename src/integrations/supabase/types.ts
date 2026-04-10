@@ -3764,6 +3764,7 @@ export type Database = {
           created_at: string | null
           current_quantity: number
           id: string
+          is_active: boolean | null
           minimum_quantity: number
           name: string
           price_per_unit: number
@@ -3777,6 +3778,7 @@ export type Database = {
           created_at?: string | null
           current_quantity?: number
           id?: string
+          is_active?: boolean | null
           minimum_quantity?: number
           name: string
           price_per_unit?: number
@@ -3790,6 +3792,7 @@ export type Database = {
           created_at?: string | null
           current_quantity?: number
           id?: string
+          is_active?: boolean | null
           minimum_quantity?: number
           name?: string
           price_per_unit?: number

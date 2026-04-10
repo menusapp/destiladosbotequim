@@ -15,6 +15,7 @@ import { KioskPayment } from "@/components/kiosk/KioskPayment";
 import { KioskConfirmation } from "@/components/kiosk/KioskConfirmation";
 import { KioskDeliveryAddress } from "@/components/kiosk/KioskDeliveryAddress";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
+import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 
 export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "delivery_address" | "payment" | "confirmation";
 
@@ -41,6 +42,9 @@ export default function Kiosk() {
   const [loading, setLoading] = useState(true);
   const [kioskDisabled, setKioskDisabled] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
+  const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
+  const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
+  const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Coupon & loyalty state
@@ -230,7 +234,8 @@ export default function Kiosk() {
           }));
         });
 
-      setProductExtras([...(extrasData || []), ...complementExtras]);
+      setProductExtras([...(extrasData || []), ...complementExtras]
+        .filter((e: any) => !disabledExtraItemIds.has(e.id)));
     } catch (err) {
       console.error("[Kiosk] Exceção ao carregar extras:", err);
       setProductExtras([]);
@@ -335,8 +340,11 @@ export default function Kiosk() {
       )}
 
       {step === "menu" && (
-        <KioskMenu
-          categories={categories}
+         <KioskMenu
+           categories={categories.map(cat => ({
+             ...cat,
+             products: cat.products.filter(p => !disabledProductIds.has(p.id))
+           })).filter(cat => cat.products.length > 0)}
           primaryColor={primaryColor}
           onSelectProduct={openProduct}
           cartCount={cartCount}

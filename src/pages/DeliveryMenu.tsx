@@ -19,6 +19,7 @@ import { Product, Category, CartItem, ProductExtra } from "@/types/menu";
 import { toast } from "@/components/ui/sonner";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
 import { isFeaturedVisible } from "@/lib/featuredUtils";
+import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 
 export default function DeliveryMenu() {
   const { slug: restaurantSlug } = useParams<{ slug: string }>();
@@ -38,6 +39,9 @@ export default function DeliveryMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "reservas" | "perfil">("menu");
   const { trackCartUpdate, trackCheckoutStarted, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id);
+  const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
+  const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
+  const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
 
   const fetchRestaurantData = useCallback(async () => {
     try {
@@ -282,7 +286,8 @@ export default function DeliveryMenu() {
         }));
       });
 
-    const allExtras = [...extrasWithCategoryName, ...complementExtras];
+    const allExtras = [...extrasWithCategoryName, ...complementExtras]
+      .filter((e: any) => !disabledExtraItemIds.has(e.id));
     setProductExtras(allExtras);
     setSelectedProduct(product);
   };
@@ -355,17 +360,26 @@ export default function DeliveryMenu() {
 
 
   const primaryColor = restaurant.primary_color || "#fe9516";
-  const allProducts = categories.flatMap((c) => c.products);
+
+  // Filtrar produtos vinculados a insumos inativos
+  const activeCategories = categories.map(cat => ({
+    ...cat,
+    products: cat.products.filter(p => !disabledProductIds.has(p.id))
+  })).filter(cat => cat.products.length > 0);
+
+  const activeFeatured = featuredProducts.filter(p => !disabledProductIds.has(p.id));
+
+  const allProducts = activeCategories.flatMap((c) => c.products);
 
   // Filtrar produtos pela busca
   const filteredCategories = searchQuery.trim() 
-    ? categories.map(cat => ({
+    ? activeCategories.map(cat => ({
         ...cat,
         products: cat.products.filter(p => 
           p.name.toLowerCase().includes(searchQuery.toLowerCase())
         )
       })).filter(cat => cat.products.length > 0)
-    : categories;
+    : activeCategories;
 
   const filteredProducts = searchQuery.trim()
     ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -469,9 +483,9 @@ export default function DeliveryMenu() {
                 primaryColor={primaryColor}
               />
 
-              {restaurant.featured_section_enabled && featuredProducts.length > 0 && (
+              {restaurant.featured_section_enabled && activeFeatured.length > 0 && (
                 <FeaturedProducts
-                  products={featuredProducts}
+                  products={activeFeatured}
                   primaryColor={primaryColor}
                   onProductClick={handleProductClick}
                   title={restaurant.featured_section_title || "Destaques"}
