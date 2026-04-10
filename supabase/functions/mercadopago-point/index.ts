@@ -57,6 +57,12 @@ async function mpFetch(
   });
 
   const data = await res.json().catch(() => ({}));
+
+  // Log full MP error body for debugging
+  if (!res.ok) {
+    log("mp_api_error", { path, status: res.status, error_body: data });
+  }
+
   return { ok: res.ok, status: res.status, data };
 }
 
@@ -71,9 +77,12 @@ async function listTerminals(restaurantId: string) {
   return result;
 }
 
-async function createStore(restaurantId: string, body: { name: string; external_id: string; location?: { street_name?: string; city_name?: string; state_name?: string } }) {
+async function createStore(restaurantId: string, body: { name: string; external_id: string; location: { street_name: string; city_name: string; state_name: string } }) {
   const { accessToken, mpUserId } = await getRestaurantToken(restaurantId);
   if (!mpUserId) throw new Error("mp_user_id não encontrado");
+  if (!body.location || !body.location.street_name) {
+    throw new Error("Campo 'location' é obrigatório para criar loja");
+  }
   const result = await mpFetch(`/users/${mpUserId}/stores`, accessToken, {
     method: "POST",
     body: JSON.stringify(body),
@@ -101,9 +110,7 @@ async function createOrder(
   const orderPayload = {
     type: "point",
     external_reference: body.order_id,
-    title: body.description,
     description: body.description,
-    total_amount: body.amount.toString(),
     transactions: {
       payments: [{ amount: body.amount.toString() }],
     },

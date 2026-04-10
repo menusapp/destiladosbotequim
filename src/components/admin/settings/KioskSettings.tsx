@@ -163,13 +163,16 @@ export default function KioskSettings({ restaurantId }: Props) {
   const handleSelectTerminal = async (device: any) => {
     setSavingTerminal(true);
     try {
+      const deviceId = device.id || device.device_id;
       const { error } = await supabase.rpc("admin_upsert_point_terminal", {
         p_restaurant_id: restaurantId,
-        p_device_id: device.id || device.device_id,
-        p_device_name: device.name || device.device_name || `Terminal ${device.id || device.device_id}`,
+        p_device_id: deviceId,
+        p_device_name: device.name || device.device_name || `Terminal ${deviceId}`,
         p_operating_mode: device.operating_mode || "PDV",
         p_use_on_kiosk: true,
         p_is_default_terminal: true,
+        p_mp_store_id: device.store_id?.toString() || null,
+        p_mp_pos_id: device.pos_id?.toString() || null,
       });
       if (error) throw error;
       toast.success("Maquininha selecionada para o Totem!");
@@ -509,28 +512,38 @@ export default function KioskSettings({ restaurantId }: Props) {
                     </div>
                   </div>
 
-                  {/* Step 2: Create Store & POS */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">2. Configurar Loja e Caixa</p>
-                      <p className="text-xs text-muted-foreground">Necessário para integração com o terminal</p>
+                  {/* Step 2: Create Store & POS — skip if already exists */}
+                  {activeTerminal.mp_store_id && activeTerminal.mp_pos_id ? (
+                    <div className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-green-700 dark:text-green-400">Loja e Caixa já configurados</p>
+                        <p className="text-xs text-muted-foreground">Store: {activeTerminal.mp_store_id} | POS: {activeTerminal.mp_pos_id}</p>
+                      </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCreateStoreAndPos}
-                      disabled={creatingStore}
-                      className="gap-2"
-                    >
-                      {creatingStore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Store className="h-3.5 w-3.5" />}
-                      Configurar
-                    </Button>
-                  </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">2. Configurar Loja e Caixa</p>
+                        <p className="text-xs text-muted-foreground">Necessário para integração com o terminal</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCreateStoreAndPos}
+                        disabled={creatingStore}
+                        className="gap-2"
+                      >
+                        {creatingStore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Store className="h-3.5 w-3.5" />}
+                        Configurar
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Step 3: Test */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium">3. Testar Cobrança</p>
+                      <p className="text-sm font-medium">{activeTerminal.mp_store_id ? "2" : "3"}. Testar Cobrança</p>
                       <p className="text-xs text-muted-foreground">Envia R$ 1,00 para a maquininha</p>
                     </div>
                     <Button
