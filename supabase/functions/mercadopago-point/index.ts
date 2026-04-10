@@ -299,10 +299,9 @@ async function cancelOrder(restaurantId: string, mpOrderId: string) {
 }
 
 async function listPendingOrders(restaurantId: string, deviceId: string) {
-  const { accessToken } = await getRestaurantToken(restaurantId);
-
-  // First check local DB for pending orders
   const sb = getSupabaseAdmin();
+
+  // Check local DB for pending orders
   const { data: localPending } = await sb
     .from("point_order_payments")
     .select("mp_order_id, status, created_at, amount")
@@ -314,21 +313,72 @@ async function listPendingOrders(restaurantId: string, deviceId: string) {
 
   log("[MP Point] list_pending_local", { device_id: deviceId, local_count: localPending?.length || 0 });
 
-  // Also query MP API — use correct endpoint with query param
-  const result = await mpFetch(
-    `/point/integration-api/devices/${deviceId}/payment-intents`,
-    accessToken
-  );
-
-  log("[MP Point] list_pending_api", { device_id: deviceId, api_ok: result.ok, api_status: result.status });
-
   return respond(true, {
     data: {
       local_pending: localPending || [],
-      api_response: result.ok ? result.data : null,
-      api_error: result.ok ? null : result.data,
     },
   });
+}
+
+// Cancel whatever is queued on a device (no intent ID needed)
+async function cancelDevicePending(restaurantId: string, deviceId: string) {
+  const { accessToken } = await getRestaurantToken(restaurantId);
+  
+  // Try to create a dummy intent to find what's blocking, or use device API to cancel
+  // The MP Point API doesn't have a "cancel current" endpoint, but we can try:
+  // 1. Cancel via local DB mp_order_id
+  // 2. If no local record, try the /v1/orders search
+  
+  const sb = getSupabaseAdmin();
+  const { data: localPending } = await sb
+    .from("point_order_payments")
+    .select("mp_order_id")
+    .eq("restaurant_id", restaurantId)
+    .eq("device_id", deviceId)
+    .in("status", ["waiting_terminal", "processing"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (localPending?.mp_order_id) {
+    log("[MP Point] cancel_device_pending_local", { mp_order_id: localPending.mp_order_id });
+    
+    // Try both cancel endpoints
+    let result = await mpFetch(`/point/integration-api/payment-intents/${localPending.mp_order_id}`, accessToken, { method: "DELETE" });
+    if (!result.ok) {
+      result = await mpFetch(`/v1/orders/${localPending.mp_order_id}`, accessToken, { method: "DELETE" });
+    }
+    
+    await sb.rpc("update_point_order_payment", {
+      p_mp_order_id: localPending.mp_order_id,
+      p_status: "canceled",
+    });
+    
+    return respond(true, { data: { canceled_id: localPending.mp_order_id, api_ok: result.ok } });
+  }
+
+  // No local record — try to get device status or search recent orders
+  // Use the /v1/orders search as last resort
+  const searchResult = await mpFetch(
+    `/v1/orders?type=point&status=opened`,
+    accessToken
+  );
+  
+  log("[MP Point] cancel_device_search", { status: searchResult.status, ok: searchResult.ok });
+  
+  if (searchResult.ok && searchResult.data?.elements?.length > 0) {
+    // Find order for this terminal
+    const order = searchResult.data.elements.find(
+      (o: any) => o.config?.point?.terminal_id === deviceId
+    );
+    if (order?.id) {
+      const cancelResult = await mpFetch(`/v1/orders/${order.id}`, accessToken, { method: "DELETE" });
+      log("[MP Point] cancel_found_order", { mp_order_id: order.id, ok: cancelResult.ok });
+      return respond(true, { data: { canceled_id: order.id, api_ok: cancelResult.ok } });
+    }
+  }
+
+  return respond(false, { error: "Não encontramos a cobrança pendente. Tente cancelar direto na maquininha (pressione o botão vermelho X).", code: "not_found" });
 }
 
 async function testOrder(restaurantId: string, deviceId: string) {
