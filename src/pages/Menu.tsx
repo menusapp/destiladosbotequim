@@ -1165,9 +1165,9 @@ const Menu = () => {
             primaryColor={primaryColor}
           />
 
-          {featuredProducts.length > 0 && (
+          {activeFeatured.length > 0 && (
             <FeaturedProducts
-              products={featuredProducts}
+              products={activeFeatured}
               primaryColor={primaryColor}
               onProductClick={handleProductClick}
               title={featuredSectionTitle}
