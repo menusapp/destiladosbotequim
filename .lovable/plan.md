@@ -1,34 +1,45 @@
 
 
-## Plano: Pedido Totem de mesa pago = mesa ocupada imediatamente
+## Plano: Pedido Totem de mesa chega aceito e pago automaticamente
 
-### Problema
-Quando um pedido de mesa é feito e pago pelo Totem (cartão ou PIX na maquininha), o pedido chega com `payment_status: "paid"` mas a mesa **não fica ocupada** — porque a ocupação hoje só acontece quando o admin clica "Aceitar". O pedido já está pago, então a mesa deveria ficar ocupada automaticamente.
+### O que muda
 
-### Solução
+Quando o pedido é criado pelo Totem para uma mesa e o pagamento já foi feito (maquininha ou dinheiro), o pedido deve entrar no sistema com:
+- `status: "accepted"` (em vez de `"pending"`)
+- `payment_status: "paid"` + `paid_at`
+- Mesa marcada como `is_occupied: true`
 
-**Arquivo: `src/components/kiosk/KioskPayment.tsx`**
+Pedidos de outros canais (QR Code, PDV) continuam entrando como `pending` normalmente.
 
-Após o pagamento ser confirmado na maquininha (dentro do bloco de polling onde já faz `createOrderInDB()` + update `payment_status: "paid"`), adicionar lógica para:
+### Arquivo: `src/components/kiosk/KioskPayment.tsx`
 
-1. Se `consumptionMode === "table"` e existe `tableId`, marcar a mesa como ocupada imediatamente:
-   ```typescript
-   await supabase.from("tables").update({
-     is_occupied: true,
-     occupied_at: new Date().toISOString(),
-     occupied_by: customer.name,
-   }).eq("id", tableId);
-   ```
+**1. Na função `createOrderInDB`:**
+- Para pedidos de mesa (`consumptionMode === "table"`), quando o pagamento já foi confirmado (maquininha), criar o pedido com `status: "accepted"` em vez de `"pending"`
+- Adicionar um parâmetro `alreadyPaid: boolean` à função para distinguir os fluxos
+- Quando `alreadyPaid` e `consumptionMode === "table"`: setar `status: "accepted"`, `payment_status: "paid"`, `paid_at: now()`
+- Após criar o pedido de mesa, ocupar a mesa imediatamente:
+  ```typescript
+  await supabase.from("tables").update({
+    is_occupied: true,
+    occupied_at: new Date().toISOString(),
+    occupied_by: customer.name,
+  }).eq("id", tableId);
+  ```
 
-2. Como `createOrderInDB` já busca o `tableId` internamente mas não o retorna, preciso extrair o `tableId` após a criação. A abordagem mais limpa: após o `createOrderInDB()` retornar o `orderId`, buscar o `table_id` do pedido recém-criado e então ocupar a mesa.
+**2. No callback de polling (pagamento por maquininha confirmado, ~linha 328):**
+- Chamar `createOrderInDB(true)` (alreadyPaid = true)
+- Remover o update separado de `payment_status` / `paid_at` pois já estará no insert
 
-   Alternativamente (mais eficiente): fazer `createOrderInDB` também retornar o `tableId` junto com o `orderId`, mudando o retorno para `{ orderId, tableId }`.
+**3. No fluxo de dinheiro (`handleFinalize`, ~linha 443):**
+- Dinheiro não é pré-pago na maquininha, então continua `createOrderInDB(false)` — pedido entra como `pending`
 
-3. O pedido já chega com `payment_status: "paid"` — isso já está correto. Dentro da mesa no painel, ele vai aparecer como pago.
+**4. Para pedidos de balcão/viagem/entrega pagos na maquininha:**
+- Também passam `alreadyPaid = true`, mas o `status` fica `"pending"` (só mesa vira `"accepted"` automaticamente, pois precisa da ocupação)
+- Na verdade, pedidos de balcão pagos na maquininha já entram como `payment_status: "paid"` — o que muda é só mesa ganhar `status: "accepted"` + ocupação
 
-### Escopo mínimo
-- **1 arquivo**: `src/components/kiosk/KioskPayment.tsx`
-- Modificar `createOrderInDB` para retornar `{ orderId, tableId }`
-- No callback de polling (pagamento confirmado), após criar o pedido e marcar como pago, ocupar a mesa se for pedido de mesa
-- Mesma lógica para o fluxo de dinheiro (`handleCashPayment`) quando for mesa
+### Resumo
+- 1 arquivo modificado: `src/components/kiosk/KioskPayment.tsx`
+- `createOrderInDB` ganha flag `alreadyPaid`
+- Mesa + Totem + pago = `status: "accepted"` + mesa ocupada
+- Outros modos continuam inalterados
 
