@@ -1,55 +1,55 @@
 
+Resumo
 
-## Plano: Ativação/Desativação de Insumos com Impacto no Cardápio
+- Achei a causa: hoje o filtro compartilhado só cobre `product_ingredients` (insumo fixo do produto) e `extra_category_item_ingredients` (itens de categoria de complemento).
+- As variações e complementos avulsos do produto são carregados via `product_extras` + `product_extra_ingredients`, então itens com ACEM por esse caminho continuam aparecendo.
+- Não precisa mexer em backend nem migration. O ajuste pode ser 100% no front.
 
-### Resumo
-Adicionar coluna `is_active` na tabela `stock_items`, toggle na UI de insumos, e filtrar automaticamente produtos/complementos vinculados a insumos inativos em todos os cardápios (Mesas, Delivery, Totem).
+Plano
 
----
+1. Corrigir a lógica compartilhada de indisponibilidade
+- Editar `src/hooks/useInactiveStockItems.ts`.
+- Manter os sets atuais e adicionar mais 2 saídas:
+  - `disabledProductExtraIds`: extras/variações do produto ligados a insumos inativos.
+  - `hiddenProductIdsByRequiredChoices`: produtos que perderam todas as opções válidas de escolha obrigatória.
+- Regra de negócio:
+  - produto com insumo fixo inativo: some.
+  - variação com ACEM inativo: some.
+  - complemento avulso com ACEM inativo: some.
+  - item de categoria de complemento com ACEM inativo: some.
+  - se todas as variações obrigatórias sumirem, o produto inteiro some.
+  - se ainda sobrar pelo menos 1 variação válida, o produto continua com apenas as opções restantes.
 
-### 1. Migration — Adicionar `is_active` em `stock_items`
+2. Aplicar o filtro nos 3 fronts
+- `src/pages/Menu.tsx`
+- `src/pages/DeliveryMenu.tsx`
+- `src/pages/Kiosk.tsx`
+- Ajustes:
+  - filtrar listas de produtos por `disabledProductIds` + `hiddenProductIdsByRequiredChoices`.
+  - filtrar extras diretos por `disabledProductExtraIds`.
+  - continuar filtrando itens de categorias de complemento por `disabledExtraCategoryItemIds`.
+  - ao abrir um produto, recalcular as opções válidas antes de exibir o drawer/tela.
 
-```sql
-ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
-```
+3. Blindagem para não quebrar fluxo
+- Se um produto ainda aparecer por cache/lista antiga, mas ao abrir ficar sem nenhuma escolha obrigatória válida, bloquear a abertura e tratar como indisponível.
+- Não alterar carrinho, pedidos, checkout, relatórios, fiscal, integrações nem cálculos financeiros.
+- Manter a lógica centralizada no hook para Mesa, Delivery e Totem ficarem idênticos.
 
-### 2. UI do Toggle — `StockCard.tsx` e `StockItemsGrid.tsx`
+Detalhes técnicos
+- Neste projeto, “variações” de insumo variável estão sendo salvas como `product_extras` com `is_required = true`.
+- Então o ponto que falta hoje é ler `product_extra_ingredients` e cruzar isso com os insumos inativos.
+- Alguns adicionais estão em `product_extras`; outros em `extra_category_items`. Vou cobrir os dois caminhos.
 
-- Adicionar `is_active` à interface `StockItem`
-- Adicionar switch discreto (mesmo padrão usado em categorias/complementos: 16x32px) no `StockCard`
-- Toggle faz `UPDATE stock_items SET is_active = !current WHERE id = X`
-- Card com opacidade reduzida + badge "Inativo" quando desativado (mesmo padrão visual do sistema)
+Validação após implementar
+- Produto com insumo fixo inativo some do cardápio.
+- Variações com ACEM somem individualmente.
+- Se sobrar 1 variação válida, o produto continua.
+- Se todas as variações obrigatórias sumirem, o produto some.
+- Adicional/complemento com ACEM some.
+- Mesmo comportamento em Mesa, Delivery e Totem.
 
-### 3. Filtro nos cardápios — Lógica compartilhada
-
-Criar hook `useInactiveStockItems(restaurantId)` que:
-- Busca `stock_items` onde `is_active = false` para o restaurante
-- Busca `product_ingredients` e `extra_category_item_ingredients` vinculados a esses insumos
-- Retorna dois Sets: `disabledProductIds` e `disabledExtraCategoryItemIds`
-- Cache com `staleTime: 60s`
-
-### 4. Integrar filtro nos 3 cardápios
-
-**Menu.tsx (Mesas):** Após filtrar por `available` e `visibility_channels`, também excluir produtos cujo ID está em `disabledProductIds`. Na abertura de produto, filtrar extras vinculados a insumos inativos.
-
-**DeliveryMenu.tsx:** Mesma lógica.
-
-**Kiosk.tsx:** Mesma lógica — filtrar no `fetchData` e no `openProduct`.
-
-Em todos os casos: complementos afetados são ocultados individualmente (não a categoria inteira).
-
-### 5. Reativação automática
-
-Quando o toggle volta para ativo, o hook retorna Sets atualizados e os produtos/complementos reaparecem automaticamente.
-
----
-
-### Arquivos
-- **Migration**: adicionar `is_active` em `stock_items`
-- **Criar**: `src/hooks/useInactiveStockItems.ts`
-- **Editar**: `src/components/admin/StockCard.tsx` — toggle + visual
-- **Editar**: `src/components/admin/StockItemsGrid.tsx` — interface + toggle handler
-- **Editar**: `src/pages/Menu.tsx` — filtro por insumos inativos
-- **Editar**: `src/pages/DeliveryMenu.tsx` — filtro por insumos inativos
-- **Editar**: `src/pages/Kiosk.tsx` — filtro por insumos inativos
-
+Arquivos
+- `src/hooks/useInactiveStockItems.ts`
+- `src/pages/Menu.tsx`
+- `src/pages/DeliveryMenu.tsx`
+- `src/pages/Kiosk.tsx`
