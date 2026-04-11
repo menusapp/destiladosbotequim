@@ -37,7 +37,7 @@ async function getRestaurantToken(restaurantId: string) {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("online_payment_config")
-    .select("mp_access_token, mp_user_id, token_expires_at, mp_pos_id")
+    .select("mp_access_token, mp_user_id, token_expires_at")
     .eq("restaurant_id", restaurantId)
     .maybeSingle();
 
@@ -49,7 +49,7 @@ async function getRestaurantToken(restaurantId: string) {
     throw new Error("TOKEN_EXPIRED");
   }
 
-  return { accessToken: data.mp_access_token, mpUserId: data.mp_user_id, mpPosId: data.mp_pos_id };
+  return { accessToken: data.mp_access_token, mpUserId: data.mp_user_id };
 }
 
 async function mpFetch(
@@ -113,232 +113,10 @@ async function createPos(restaurantId: string, body: { name: string; external_id
     method: "POST",
     body: JSON.stringify(body),
   });
-
-  // Handle 409 = POS already exists — still save the external_id
-  if (!result.ok && result.status !== 409) {
-    return respond(false, { ...translateMpError(result), data: null });
-  }
-
-  // Save external_id as mp_pos_id in online_payment_config (server-side to bypass RLS)
-  const sb = getSupabaseAdmin();
-  const posExternalId = body.external_id;
-  const { error: updateErr } = await sb
-    .from("online_payment_config")
-    .update({ mp_pos_id: posExternalId, mp_pos_name: body.name })
-    .eq("restaurant_id", restaurantId);
-
-  log("create_pos_save_mp_pos_id", {
-    restaurant_id: restaurantId,
-    external_id: posExternalId,
-    mp_pos_id_saved: !updateErr,
-    save_error: updateErr?.message || null,
-    pos_already_existed: result.status === 409,
-  });
-
-  if (updateErr) {
-    return respond(false, { error: "POS criado mas falha ao salvar mp_pos_id: " + updateErr.message, code: "save_error" });
-  }
-
-  return respond(true, { data: { ...result.data, mp_pos_id_saved: posExternalId, pos_already_existed: result.status === 409 } });
+  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
+  return respond(true, { data: result.data });
 }
 
-// ========== List real POS devices from MP account ==========
-async function listPos(restaurantId: string) {
-  const { accessToken, mpUserId } = await getRestaurantToken(restaurantId);
-
-  // GET /pos returns all POS for this account
-  const result = await mpFetch("/pos", accessToken);
-
-  if (!result.ok) {
-    return respond(false, { ...translateMpError(result), data: null });
-  }
-
-  const allPos = result.data?.results || result.data || [];
-  const posList = Array.isArray(allPos)
-    ? allPos.map((p: any) => ({
-        id: p.id,
-        external_id: p.external_id || null,
-        name: p.name,
-        store_id: p.store_id,
-        external_store_id: p.external_store_id || null,
-        status: p.status,
-        category: p.category,
-        uuid: p.uuid || null,
-        qr: p.qr ? { image: p.qr.image, template_document: p.qr.template_document, template_image: p.qr.template_image } : null,
-      }))
-    : [];
-
-  log("list_pos", { restaurant_id: restaurantId, mp_user_id: mpUserId, pos_count: posList.length, pos_list: posList, raw_sample: allPos[0] || null });
-
-  return respond(true, { data: { pos_list: posList, mp_user_id: mpUserId } });
-}
-
-// ========== Save a selected real POS external_id ==========
-async function selectPos(restaurantId: string, body: { external_id: string; name?: string }) {
-  if (!body.external_id) {
-    return respond(false, { error: "external_id é obrigatório", code: "missing_external_id" });
-  }
-
-  const sb = getSupabaseAdmin();
-  const { error } = await sb
-    .from("online_payment_config")
-    .update({ mp_pos_id: body.external_id, mp_pos_name: body.name || null })
-    .eq("restaurant_id", restaurantId);
-
-  log("select_pos_save", {
-    restaurant_id: restaurantId,
-    external_id: body.external_id,
-    name: body.name,
-    saved: !error,
-    error: error?.message || null,
-  });
-
-  if (error) {
-    return respond(false, { error: "Falha ao salvar POS: " + error.message, code: "save_error" });
-  }
-
-  return respond(true, { data: { mp_pos_id_saved: body.external_id } });
-}
-
-// ========== Assign external_id to existing POS and save it ==========
-async function assignPosExternalId(restaurantId: string, body: { pos_id: number; external_id: string }) {
-  if (!body.pos_id || !body.external_id) {
-    return respond(false, { error: "pos_id e external_id são obrigatórios", code: "missing_params" });
-  }
-
-  const { accessToken } = await getRestaurantToken(restaurantId);
-
-  // PUT /pos/{id} to update external_id
-  const result = await mpFetch(`/pos/${body.pos_id}`, accessToken, {
-    method: "PUT",
-    body: JSON.stringify({ external_id: body.external_id }),
-  });
-
-  log("assign_pos_external_id_mp", {
-    restaurant_id: restaurantId,
-    pos_id: body.pos_id,
-    external_id: body.external_id,
-    ok: result.ok,
-    status: result.status,
-  });
-
-  if (!result.ok) {
-    return respond(false, { ...translateMpError(result), data: null });
-  }
-
-  // Save to online_payment_config
-  const sb = getSupabaseAdmin();
-  const { error } = await sb
-    .from("online_payment_config")
-    .update({ mp_pos_id: body.external_id, mp_pos_name: result.data?.name || null })
-    .eq("restaurant_id", restaurantId);
-
-  log("assign_pos_external_id_save", {
-    restaurant_id: restaurantId,
-    external_id: body.external_id,
-    saved: !error,
-    error: error?.message || null,
-  });
-
-  if (error) {
-    return respond(false, { error: "External ID atribuído no MP mas falha ao salvar: " + error.message, code: "save_error" });
-  }
-
-  return respond(true, { data: { external_id: body.external_id, pos_name: result.data?.name, mp_pos_id_saved: body.external_id } });
-}
-
-// ========== PIX: dedicated QR Code action ==========
-async function createPixQr(
-  restaurantId: string,
-  body: { amount: number; description: string; order_id: string; device_id: string; idempotency_key: string }
-) {
-  const { accessToken, mpUserId, mpPosId } = await getRestaurantToken(restaurantId);
-
-  // Format amount: must be a number with max 2 decimal places
-  const safeAmount = Number(Number(body.amount).toFixed(2));
-
-  log("[MP PIX] create_pix_qr_start", {
-    restaurant_id: restaurantId,
-    order_id: body.order_id,
-    raw_amount: body.amount,
-    safe_amount: safeAmount,
-    mp_user_id: mpUserId,
-    mp_pos_id: mpPosId,
-  });
-
-  if (!mpUserId || !mpPosId) {
-    log("[MP PIX] Missing mp_user_id or mp_pos_id", { mpUserId, mpPosId });
-    return respond(false, { error: "POS não configurado para PIX. Configure o External POS ID nas configurações do Totem.", code: "missing_pos_config" });
-  }
-
-  if (isNaN(safeAmount) || safeAmount <= 0) {
-    return respond(false, { error: "Valor inválido para pagamento PIX", code: "invalid_amount" });
-  }
-
-  const pixQrPayload = {
-    external_reference: body.order_id,
-    title: body.description,
-    description: body.description,
-    total_amount: safeAmount,
-    items: [{
-      sku_number: body.order_id.slice(0, 30),
-      category: "marketplace",
-      title: body.description,
-      description: body.description,
-      unit_price: safeAmount,
-      quantity: 1,
-      unit_measure: "unit",
-      total_amount: safeAmount,
-    }],
-    cash_out: { amount: 0 },
-  };
-
-  const qrEndpoint = `/instore/orders/qr/seller/collectors/${mpUserId}/pos/${mpPosId}/qrs`;
-  log("[MP PIX] request", { endpoint: qrEndpoint, payload: pixQrPayload });
-
-  const result = await mpFetch(qrEndpoint, accessToken, {
-    method: "PUT",
-    body: JSON.stringify(pixQrPayload),
-    headers: { "X-Idempotency-Key": body.idempotency_key },
-  });
-
-  log("[MP PIX] response", {
-    status: result.status,
-    ok: result.ok,
-    data: result.data,
-    mp_user_id: mpUserId,
-    mp_pos_id: mpPosId,
-    total_amount_sent: safeAmount,
-  });
-
-  if (!result.ok) {
-    return respond(false, { ...translateMpError(result), mp_pos_id_used: mpPosId, data: null });
-  }
-
-  // Save to DB
-  const mpOrderId = result.data?.in_store_order_id || result.data?.id || body.order_id;
-  const sb = getSupabaseAdmin();
-  try {
-    await sb.rpc("insert_point_order_payment", {
-      p_restaurant_id: restaurantId,
-      p_order_id: null,
-      p_mp_order_id: mpOrderId,
-      p_mp_user_id: mpUserId || "",
-      p_terminal_id: body.device_id,
-      p_external_reference: body.order_id,
-      p_idempotency_key: body.idempotency_key,
-      p_amount: safeAmount,
-      p_status: "waiting_terminal",
-    });
-    log("[MP PIX] db_save_success", { mp_order_id: mpOrderId });
-  } catch (dbErr: any) {
-    log("[MP PIX] db_save_error", { mp_order_id: mpOrderId, error: dbErr?.message });
-  }
-
-  return respond(true, { data: { ...result.data, is_qr_pix: true, external_reference: body.order_id, pix_accepted: true } });
-}
-
-// ========== CARD: Orders API (no PIX here) ==========
 async function createOrder(
   restaurantId: string,
   body: { amount: number; description: string; order_id: string; device_id: string; idempotency_key: string; payment_type?: string }
@@ -356,34 +134,64 @@ async function createOrder(
 
   let result: { ok: boolean; status: number; data: any };
 
-  // CARD PATH ONLY: /v1/orders first, then payment-intents fallback
-  const configObj: any = {
-    point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" },
-  };
-  if (body.payment_type) {
-    configObj.payment_method = { default_type: body.payment_type };
-  }
+  const isPix = body.payment_type === "bank_transfer";
 
-  const orderPayload = {
-    type: "point",
-    external_reference: body.order_id,
-    description: body.description,
-    transactions: { payments: [{ amount: body.amount.toString() }] },
-    config: configObj,
-  };
+  // ========== PIX PATH: use payment-intents first ==========
+  if (isPix) {
+    const amountCents = Math.round(body.amount * 100);
 
-  log("[MP Point] v1_orders_with_default_type", { payment_type: body.payment_type || "none" });
-  result = await mpFetch("/v1/orders", accessToken, {
-    method: "POST",
-    body: JSON.stringify(orderPayload),
-    headers: { "X-Idempotency-Key": body.idempotency_key },
-  });
+    // Attempt 1: payment-intents with type: bank_transfer
+    log("[MP PIX] Trying payment-intents with bank_transfer", { endpoint: `/point/integration-api/devices/${body.device_id}/payment-intents` });
+    const pixPayload1 = {
+      amount: amountCents,
+      description: body.description,
+      payment: { type: "bank_transfer" },
+      additional_info: { external_reference: body.order_id },
+    };
+    result = await mpFetch(
+      `/point/integration-api/devices/${body.device_id}/payment-intents`,
+      accessToken,
+      { method: "POST", body: JSON.stringify(pixPayload1), headers: { "X-Idempotency-Key": body.idempotency_key } }
+    );
+    log("[MP PIX] Response attempt 1", { status: result.status, ok: result.ok, body: result.data });
 
-  // Retry without payment_method restriction
-  if (!result.ok && body.payment_type) {
-    const errCode = result.data?.errors?.[0]?.code;
-    if (errCode !== "already_queued_order_on_terminal") {
-      log("[MP Point] v1_orders_retry_without_default_type", { status: result.status });
+    // Attempt 2: add payment_method_id: "pix"
+    if (!result.ok && result.status === 400) {
+      log("[MP PIX] Trying payment-intents with payment_method_id pix", {});
+      const pixPayload2 = {
+        amount: amountCents,
+        description: body.description,
+        payment: { installments: 1, type: "bank_transfer", payment_method_id: "pix" },
+        additional_info: { external_reference: body.order_id },
+      };
+      result = await mpFetch(
+        `/point/integration-api/devices/${body.device_id}/payment-intents`,
+        accessToken,
+        { method: "POST", body: JSON.stringify(pixPayload2), headers: { "X-Idempotency-Key": body.idempotency_key + "-pix2" } }
+      );
+      log("[MP PIX] Response attempt 2", { status: result.status, ok: result.ok, body: result.data });
+    }
+
+    // Attempt 3: alternate endpoint path
+    if (!result.ok && result.status === 400) {
+      log("[MP PIX] Trying alternate endpoint /v1/point/integration-api/devices", {});
+      const pixPayload3 = {
+        amount: amountCents,
+        description: body.description,
+        payment: { type: "bank_transfer" },
+        additional_info: { external_reference: body.order_id },
+      };
+      result = await mpFetch(
+        `/v1/point/integration-api/devices/${body.device_id}/payment-intents`,
+        accessToken,
+        { method: "POST", body: JSON.stringify(pixPayload3), headers: { "X-Idempotency-Key": body.idempotency_key + "-pix3" } }
+      );
+      log("[MP PIX] Response attempt 3", { status: result.status, ok: result.ok, body: result.data });
+    }
+
+    // Attempt 4: /v1/orders without specifying payment type (terminal shows menu)
+    if (!result.ok) {
+      log("[MP PIX] Fallback to /v1/orders without payment type", {});
       const fallbackPayload = {
         type: "point",
         external_reference: body.order_id,
@@ -396,36 +204,80 @@ async function createOrder(
         body: JSON.stringify(fallbackPayload),
         headers: { "X-Idempotency-Key": body.idempotency_key + "-fb" },
       });
+      log("[MP PIX] Response fallback /v1/orders", { status: result.status, ok: result.ok, body: result.data });
     }
-  }
-
-  // Payment-intents as last resort for cards
-  if (!result.ok && body.payment_type) {
-    const errCode = result.data?.errors?.[0]?.code;
-    if (errCode !== "already_queued_order_on_terminal") {
-      log("[MP Point] fallback_payment_intents", { payment_type: body.payment_type });
-      const amountCents = Math.round(body.amount * 100);
-      const piPayload = {
-        amount: amountCents,
-        description: body.description,
-        payment: { installments: 1, type: body.payment_type, installments_cost: "seller" },
-        additional_info: { external_reference: body.order_id },
-      };
-      result = await mpFetch(
-        `/point/integration-api/devices/${body.device_id}/payment-intents`,
-        accessToken,
-        { method: "POST", body: JSON.stringify(piPayload), headers: { "X-Idempotency-Key": body.idempotency_key } }
-      );
+  } else {
+    // ========== CARD PATH: /v1/orders first, then payment-intents fallback ==========
+    const configObj: any = {
+      point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" },
+    };
+    if (body.payment_type) {
+      configObj.payment_method = { default_type: body.payment_type };
     }
-  }
 
-  // Retry once on 5xx
-  if (!result.ok && result.status >= 500) {
+    const orderPayload = {
+      type: "point",
+      external_reference: body.order_id,
+      description: body.description,
+      transactions: { payments: [{ amount: body.amount.toString() }] },
+      config: configObj,
+    };
+
+    log("[MP Point] v1_orders_with_default_type", { payment_type: body.payment_type || "none" });
     result = await mpFetch("/v1/orders", accessToken, {
       method: "POST",
       body: JSON.stringify(orderPayload),
       headers: { "X-Idempotency-Key": body.idempotency_key },
     });
+
+    // Retry without payment_method restriction
+    if (!result.ok && body.payment_type) {
+      const errCode = result.data?.errors?.[0]?.code;
+      if (errCode !== "already_queued_order_on_terminal") {
+        log("[MP Point] v1_orders_retry_without_default_type", { status: result.status });
+        const fallbackPayload = {
+          type: "point",
+          external_reference: body.order_id,
+          description: body.description,
+          transactions: { payments: [{ amount: body.amount.toString() }] },
+          config: { point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" } },
+        };
+        result = await mpFetch("/v1/orders", accessToken, {
+          method: "POST",
+          body: JSON.stringify(fallbackPayload),
+          headers: { "X-Idempotency-Key": body.idempotency_key + "-fb" },
+        });
+      }
+    }
+
+    // Payment-intents as last resort for cards
+    if (!result.ok && body.payment_type) {
+      const errCode = result.data?.errors?.[0]?.code;
+      if (errCode !== "already_queued_order_on_terminal") {
+        log("[MP Point] fallback_payment_intents", { payment_type: body.payment_type });
+        const amountCents = Math.round(body.amount * 100);
+        const piPayload = {
+          amount: amountCents,
+          description: body.description,
+          payment: { installments: 1, type: body.payment_type, installments_cost: "seller" },
+          additional_info: { external_reference: body.order_id },
+        };
+        result = await mpFetch(
+          `/point/integration-api/devices/${body.device_id}/payment-intents`,
+          accessToken,
+          { method: "POST", body: JSON.stringify(piPayload), headers: { "X-Idempotency-Key": body.idempotency_key } }
+        );
+      }
+    }
+
+    // Retry once on 5xx
+    if (!result.ok && result.status >= 500) {
+      result = await mpFetch("/v1/orders", accessToken, {
+        method: "POST",
+        body: JSON.stringify(orderPayload),
+        headers: { "X-Idempotency-Key": body.idempotency_key },
+      });
+    }
   }
 
   if (!result.ok) {
@@ -434,7 +286,7 @@ async function createOrder(
   }
 
   // Save to DB
-  const mpOrderId = result.data?.id || result.data?.in_store_order_id || body.order_id;
+  const mpOrderId = result.data?.id || "";
   if (mpOrderId) {
     const sb = getSupabaseAdmin();
     try {
@@ -456,10 +308,10 @@ async function createOrder(
   }
 
   log("[MP Point] create_order_success", { mp_order_id: mpOrderId, response_status: result.status });
-  return respond(true, { data: { ...result.data, external_reference: body.order_id } });
+  return respond(true, { data: result.data });
 }
 
-async function getOrder(restaurantId: string, mpOrderId: string, externalReference?: string) {
+async function getOrder(restaurantId: string, mpOrderId: string) {
   const { accessToken } = await getRestaurantToken(restaurantId);
   
   // Try /v1/orders first
@@ -470,36 +322,6 @@ async function getOrder(restaurantId: string, mpOrderId: string, externalReferen
     result = await mpFetch(`/point/integration-api/payment-intents/${mpOrderId}`, accessToken);
   }
 
-  // Fallback: try merchant_orders by external_reference (QR PIX)
-  const extRef = externalReference || mpOrderId;
-  if (!result.ok && result.status === 404) {
-    log("[MP Point] Trying merchant_orders by external_reference", { external_reference: extRef });
-    const moResult = await mpFetch(`/merchant_orders?external_reference=${extRef}`, accessToken);
-    if (moResult.ok && moResult.data?.elements?.length > 0) {
-      const mo = moResult.data.elements[0];
-      const payments = mo.payments || [];
-      const approvedPayment = payments.find((p: any) => p.status === "approved");
-      const pendingPayment = payments.find((p: any) => p.status === "pending" || p.status === "in_process");
-
-      let moStatus = "open";
-      if (approvedPayment) moStatus = "processed";
-      else if (mo.status === "closed" && !approvedPayment) moStatus = "canceled";
-
-      result = {
-        ok: true,
-        status: 200,
-        data: {
-          id: mo.id,
-          status: moStatus,
-          external_reference: mo.external_reference,
-          transactions: approvedPayment ? { payments: [{ status: "approved", status_detail: "accredited", ...approvedPayment }] } : undefined,
-          is_merchant_order: true,
-        },
-      };
-      log("[MP Point] merchant_orders result", { mo_id: mo.id, mo_status: moStatus, payments_count: payments.length });
-    }
-  }
-
   if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
 
   // Update internal status
@@ -507,7 +329,7 @@ async function getOrder(restaurantId: string, mpOrderId: string, externalReferen
   const mpStatus = result.data.status;
   let internalStatus = "waiting_terminal";
 
-  // Handle both /v1/orders, payment-intents and merchant_orders response shapes
+  // Handle both /v1/orders and payment-intents response shapes
   if (mpStatus === "processed" || mpStatus === "finished") {
     const txn = result.data.transactions?.payments?.[0] || result.data.payment;
     if (txn?.status_detail === "accredited" || txn?.status === "approved") {
@@ -711,18 +533,10 @@ Deno.serve(async (req) => {
         return await createStore(restaurant_id, params as any);
       case "create_pos":
         return await createPos(restaurant_id, params as any);
-      case "list_pos":
-        return await listPos(restaurant_id);
-      case "select_pos":
-        return await selectPos(restaurant_id, params as any);
-      case "assign_pos_external_id":
-        return await assignPosExternalId(restaurant_id, params as any);
-      case "create_pix_qr":
-        return await createPixQr(restaurant_id, params as any);
       case "create_order":
         return await createOrder(restaurant_id, params as any);
       case "get_order":
-        return await getOrder(restaurant_id, params.mp_order_id, params.external_reference);
+        return await getOrder(restaurant_id, params.mp_order_id);
       case "cancel_order":
         return await cancelOrder(restaurant_id, params.mp_order_id);
       case "test_order":

@@ -67,17 +67,11 @@ export default function KioskSettings({ restaurantId }: Props) {
   const [pendingOrderBlocked, setPendingOrderBlocked] = useState(false);
   const [cancellingPending, setCancellingPending] = useState(false);
   const [switchingMode, setSwitchingMode] = useState(false);
-  const [pixPosId, setPixPosId] = useState<string | null>(null);
-  const [pixUserId, setPixUserId] = useState<string | null>(null);
-  const [mpPosList, setMpPosList] = useState<any[]>([]);
-  const [loadingPosList, setLoadingPosList] = useState(false);
-  const [selectingPos, setSelectingPos] = useState(false);
 
   useEffect(() => {
     fetchConfig();
     fetchMpStatus();
     fetchSavedTerminals();
-    fetchPixPosStatus();
   }, [restaurantId]);
 
   useEffect(() => {
@@ -144,17 +138,6 @@ export default function KioskSettings({ restaurantId }: Props) {
       if (data) setSavedTerminals(data as any[]);
     } catch (err) {
       console.error("[KioskSettings] Error loading terminals:", err);
-    }
-  };
-  const fetchPixPosStatus = async () => {
-    try {
-      const { data } = await supabase.rpc("admin_get_pix_pos_config", { p_restaurant_id: restaurantId });
-      if (data && data.length > 0) {
-        setPixPosId(data[0].mp_pos_id || null);
-        setPixUserId(data[0].mp_user_id || null);
-      }
-    } catch (err) {
-      console.error("[KioskSettings] Error loading PIX POS config:", err);
     }
   };
 
@@ -234,13 +217,12 @@ export default function KioskSettings({ restaurantId }: Props) {
   const handleCreateStoreAndPos = async () => {
     setCreatingStore(true);
     try {
-      const storeExternalId = `store-${restaurantId}`;
       const { data: storeRes } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_store",
           restaurant_id: restaurantId,
           name: `Loja Totem - ${restaurantId.slice(0, 8)}`,
-          external_id: storeExternalId,
+          external_id: `store-${restaurantId}`,
           location: { street_name: "Endereço do restaurante", city_name: "Cidade", state_name: "Estado" },
         },
       });
@@ -248,16 +230,15 @@ export default function KioskSettings({ restaurantId }: Props) {
         toast.error(storeRes?.error || "Erro ao criar loja");
         return;
       }
-      const mpStoreInternalId = storeRes.data?.id;
+      const storeId = storeRes.data?.id;
 
-      const posExternalId = `pos-totem-${restaurantId}`;
       const { data: posRes } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_pos",
           restaurant_id: restaurantId,
           name: `Totem POS`,
-          external_id: posExternalId,
-          external_store_id: storeExternalId,
+          external_id: `pos-totem-${restaurantId}`,
+          external_store_id: `store-${restaurantId}`,
           fixed_amount: false,
         },
       });
@@ -266,107 +247,28 @@ export default function KioskSettings({ restaurantId }: Props) {
         return;
       }
 
-      console.log("[KioskSettings] POS created/synced, mp_pos_id saved:", posRes.data?.mp_pos_id_saved || posExternalId);
-
       const terminal = savedTerminals.find(t => t.use_on_kiosk);
       if (terminal) {
         await supabase.rpc("admin_upsert_point_terminal", {
           p_restaurant_id: restaurantId,
           p_device_id: terminal.device_id,
-          p_mp_store_id: storeExternalId,
-          p_mp_pos_id: posExternalId,
-          p_mp_external_store_id: mpStoreInternalId?.toString() || null,
+          p_mp_external_store_id: storeId?.toString() || null,
           p_mp_external_pos_id: posRes.data?.id?.toString() || null,
           p_use_on_kiosk: true,
         });
 
+        // Auto-switch to PDV mode
         if (terminal.operating_mode !== "PDV") {
           await handleSwitchToPDV(terminal.device_id);
         }
       }
 
-      toast.success(posRes.data?.pos_already_existed
-        ? "POS já existia — configuração sincronizada!"
-        : "Loja e Caixa criados com sucesso!");
+      toast.success("Loja e Caixa criados com sucesso!");
       fetchSavedTerminals();
-      fetchPixPosStatus();
-      // After creating, auto-load POS list for selection
-      handleListPos();
     } catch (err: any) {
       toast.error(err?.message || "Erro ao criar loja/caixa");
     } finally {
       setCreatingStore(false);
-    }
-  };
-
-  const handleListPos = async () => {
-    setLoadingPosList(true);
-    try {
-      const { data } = await supabase.functions.invoke("mercadopago-point", {
-        body: { action: "list_pos", restaurant_id: restaurantId },
-      });
-      if (!data?.ok) {
-        toast.error(data?.error || "Erro ao buscar caixas (POS)");
-        return;
-      }
-      const list = data.data?.pos_list || [];
-      setMpPosList(list);
-      if (list.length === 0) {
-        toast.info("Nenhum caixa (POS) encontrado na conta. Crie um primeiro.");
-      } else {
-        toast.success(`${list.length} caixa(s) encontrado(s)`);
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "Erro ao buscar POS");
-    } finally {
-      setLoadingPosList(false);
-    }
-  };
-
-  const handleSelectPos = async (pos: any) => {
-    setSelectingPos(true);
-    try {
-      // If POS already has external_id, just save it
-      if (pos.external_id) {
-        const { data } = await supabase.functions.invoke("mercadopago-point", {
-          body: {
-            action: "select_pos",
-            restaurant_id: restaurantId,
-            external_id: pos.external_id,
-            name: pos.name,
-          },
-        });
-        if (!data?.ok) {
-          toast.error(data?.error || "Erro ao salvar POS");
-          return;
-        }
-        setPixPosId(pos.external_id);
-        toast.success(`POS "${pos.name || pos.external_id}" selecionado para PIX!`);
-      } else {
-        // POS lacks external_id — assign one via PUT /pos/{id}
-        const newExternalId = `postotem${restaurantId.replace(/-/g, '').slice(0, 8)}${pos.id}`;
-        const { data } = await supabase.functions.invoke("mercadopago-point", {
-          body: {
-            action: "assign_pos_external_id",
-            restaurant_id: restaurantId,
-            pos_id: pos.id,
-            external_id: newExternalId,
-          },
-        });
-        if (!data?.ok) {
-          toast.error(data?.error || "Erro ao atribuir External ID ao POS");
-          return;
-        }
-        setPixPosId(newExternalId);
-        // Update local list to reflect the new external_id
-        setMpPosList(prev => prev.map(p => p.id === pos.id ? { ...p, external_id: newExternalId } : p));
-        toast.success(`External ID atribuído e POS "${pos.name}" selecionado para PIX!`);
-      }
-      fetchPixPosStatus();
-    } catch (err: any) {
-      toast.error(err?.message || "Erro ao selecionar POS");
-    } finally {
-      setSelectingPos(false);
     }
   };
 
@@ -774,89 +676,33 @@ export default function KioskSettings({ restaurantId }: Props) {
                     </div>
                   )}
 
-                  {/* Step 2: Configure POS for PIX */}
-                  <Separator />
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                  {/* Step 2: Create Store & POS — skip if already exists */}
+                  {activeTerminal.mp_store_id && activeTerminal.mp_pos_id ? (
+                    <div className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
                       <div>
-                        <p className="text-sm font-medium">2. Configurar Caixa (POS) para PIX</p>
-                        <p className="text-xs text-muted-foreground">Selecione o caixa real da conta Mercado Pago</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleListPos}
-                          disabled={loadingPosList}
-                          className="gap-2"
-                        >
-                          {loadingPosList ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                          Buscar POS
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCreateStoreAndPos}
-                          disabled={creatingStore}
-                          className="gap-2"
-                        >
-                          {creatingStore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Store className="h-3.5 w-3.5" />}
-                          Criar Novo
-                        </Button>
+                        <p className="text-sm font-medium text-green-700 dark:text-green-400">Loja e Caixa já configurados</p>
+                        <p className="text-xs text-muted-foreground">Store: {activeTerminal.mp_store_id} | POS: {activeTerminal.mp_pos_id}</p>
                       </div>
                     </div>
-
-                    {/* POS List from MP */}
-                    {mpPosList.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground">Caixas encontrados na conta:</p>
-                        {mpPosList.map((pos: any) => (
-                          <div
-                            key={pos.id || pos.external_id}
-                            className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                          >
-                            <div>
-                              <p className="text-sm font-medium">{pos.name || pos.external_id}</p>
-                              <p className="text-xs text-muted-foreground">
-                                External ID: {pos.external_id} — ID: {pos.id} — Status: {pos.status || "?"}
-                              </p>
-                            </div>
-                            <Button
-                              variant={pixPosId === pos.external_id ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handleSelectPos(pos)}
-                              disabled={selectingPos}
-                            >
-                              {pixPosId === pos.external_id ? (
-                                <><CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Ativo</>
-                              ) : (
-                                "Selecionar"
-                              )}
-                            </Button>
-                          </div>
-                        ))}
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">2. Configurar Loja e Caixa</p>
+                        <p className="text-xs text-muted-foreground">Necessário para integração com o terminal</p>
                       </div>
-                    )}
-
-                    {/* Current PIX POS status */}
-                    {pixPosId ? (
-                      <div className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
-                        <QrCode className="h-4 w-4 text-green-600" />
-                        <div>
-                          <p className="text-sm font-medium text-green-700 dark:text-green-400">PIX QR Code habilitado</p>
-                          <p className="text-xs text-muted-foreground">External POS ID: {pixPosId}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700">
-                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">PIX não configurado</p>
-                          <p className="text-xs text-muted-foreground">Clique em "Buscar POS" e selecione um caixa real da conta</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCreateStoreAndPos}
+                        disabled={creatingStore}
+                        className="gap-2"
+                      >
+                        {creatingStore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Store className="h-3.5 w-3.5" />}
+                        Configurar
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Step 3: Test */}
                   <div className="flex items-center justify-between">
