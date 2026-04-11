@@ -249,7 +249,7 @@ export default function KioskSettings({ restaurantId }: Props) {
       }
 
       // mp_pos_id is now saved server-side by the create_pos edge function
-      log("[KioskSettings] POS created, mp_pos_id saved server-side:", posRes.data?.mp_pos_id_saved || posExternalId);
+      console.log("[KioskSettings] POS created, mp_pos_id saved server-side:", posRes.data?.mp_pos_id_saved || posExternalId);
 
       const terminal = savedTerminals.find(t => t.use_on_kiosk);
       if (terminal) {
