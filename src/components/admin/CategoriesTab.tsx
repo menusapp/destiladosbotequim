@@ -410,6 +410,44 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
               className={`flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors ${category.is_active === false ? "opacity-50" : ""}`}
             >
               <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    disabled={categories.indexOf(category) === 0}
+                    onClick={async () => {
+                      const idx = categories.indexOf(category);
+                      const target = categories[idx - 1];
+                      const currentOrder = category.display_order;
+                      const targetOrder = target.display_order;
+                      const newCurrent = targetOrder === currentOrder ? currentOrder - 1 : targetOrder;
+                      await supabase.from("categories").update({ display_order: newCurrent } as any).eq("id", category.id);
+                      await supabase.from("categories").update({ display_order: currentOrder } as any).eq("id", target.id);
+                      fetchCategories();
+                    }}
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    disabled={categories.indexOf(category) === categories.length - 1}
+                    onClick={async () => {
+                      const idx = categories.indexOf(category);
+                      const target = categories[idx + 1];
+                      const currentOrder = category.display_order;
+                      const targetOrder = target.display_order;
+                      const newCurrent = targetOrder === currentOrder ? currentOrder + 1 : targetOrder;
+                      await supabase.from("categories").update({ display_order: newCurrent } as any).eq("id", category.id);
+                      await supabase.from("categories").update({ display_order: currentOrder } as any).eq("id", target.id);
+                      fetchCategories();
+                    }}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </div>
                 {category.image_url ? (
                   <img src={category.image_url} alt="" className="h-10 w-10 rounded-lg object-cover" />
                 ) : (
@@ -421,46 +459,6 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
                 {category.is_active === false && (
                   <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Inativo</span>
                 )}
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  disabled={categories.indexOf(category) === 0}
-                  onClick={async () => {
-                    const idx = categories.indexOf(category);
-                    const target = categories[idx - 1];
-                    const currentOrder = category.display_order;
-                    const targetOrder = target.display_order;
-                    // Ensure different values to actually swap
-                    const newCurrent = targetOrder === currentOrder ? currentOrder - 1 : targetOrder;
-                    await supabase.from("categories").update({ display_order: newCurrent } as any).eq("id", category.id);
-                    await supabase.from("categories").update({ display_order: currentOrder } as any).eq("id", target.id);
-                    fetchCategories();
-                  }}
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  disabled={categories.indexOf(category) === categories.length - 1}
-                  onClick={async () => {
-                    const idx = categories.indexOf(category);
-                    const target = categories[idx + 1];
-                    const currentOrder = category.display_order;
-                    const targetOrder = target.display_order;
-                    const newCurrent = targetOrder === currentOrder ? currentOrder + 1 : targetOrder;
-                    await supabase.from("categories").update({ display_order: newCurrent } as any).eq("id", category.id);
-                    await supabase.from("categories").update({ display_order: currentOrder } as any).eq("id", target.id);
-                    fetchCategories();
-                  }}
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-                <div className="w-px h-5 bg-border mx-1" />
               </div>
               <div className="flex items-center gap-2">
                 <Switch
