@@ -446,7 +446,6 @@ export function KioskPayment({
     setPointStatus("creating_payment");
 
     try {
-      // Generate a temporary idempotency key — order will only be created after payment confirmation
       const tempId = crypto.randomUUID();
 
       const { data: res } = await supabase.functions.invoke("mercadopago-point", {
@@ -474,8 +473,10 @@ export function KioskPayment({
         return;
       }
 
+      const isPixQr = !!res.data.pix_qr;
       setMpOrderId(res.data.id);
-      startPointPolling(res.data.id);
+      setPixQrExternalRef(isPixQr ? tempId : null);
+      startPointPolling(res.data.id, isPixQr, isPixQr ? tempId : undefined);
     } catch (err: any) {
       console.error("[KioskPayment] Point payment error:", err);
       toast.error(err?.message || "Erro ao processar pagamento");
@@ -489,7 +490,8 @@ export function KioskPayment({
     if (pollingRef.current) clearInterval(pollingRef.current);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    if (mpOrderId) {
+    if (mpOrderId && !pixQrExternalRef) {
+      // Only cancel via API for card orders (not QR PIX — those expire on their own)
       try {
         await supabase.functions.invoke("mercadopago-point", {
           body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrderId },
@@ -501,12 +503,14 @@ export function KioskPayment({
 
     setPointStatus("idle");
     setMpOrderId(null);
+    setPixQrExternalRef(null);
     orderCreationInProgressRef.current = false;
   };
 
   const handleRetryPointPayment = () => {
     setPointStatus("idle");
     setMpOrderId(null);
+    setPixQrExternalRef(null);
     orderCreationInProgressRef.current = false;
     handlePointPayment();
   };
