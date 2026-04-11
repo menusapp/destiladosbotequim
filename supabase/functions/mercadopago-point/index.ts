@@ -142,6 +142,61 @@ async function createPos(restaurantId: string, body: { name: string; external_id
   return respond(true, { data: { ...result.data, mp_pos_id_saved: posExternalId, pos_already_existed: result.status === 409 } });
 }
 
+// ========== List real POS devices from MP account ==========
+async function listPos(restaurantId: string) {
+  const { accessToken, mpUserId } = await getRestaurantToken(restaurantId);
+
+  // GET /pos returns all POS for this account
+  const result = await mpFetch("/pos", accessToken);
+
+  if (!result.ok) {
+    return respond(false, { ...translateMpError(result), data: null });
+  }
+
+  const allPos = result.data?.results || result.data || [];
+  const posList = Array.isArray(allPos)
+    ? allPos.map((p: any) => ({
+        id: p.id,
+        external_id: p.external_id,
+        name: p.name,
+        store_id: p.store_id,
+        status: p.status,
+        category: p.category,
+      }))
+    : [];
+
+  log("list_pos", { restaurant_id: restaurantId, mp_user_id: mpUserId, pos_count: posList.length, pos_list: posList });
+
+  return respond(true, { data: { pos_list: posList, mp_user_id: mpUserId } });
+}
+
+// ========== Save a selected real POS external_id ==========
+async function selectPos(restaurantId: string, body: { external_id: string; name?: string }) {
+  if (!body.external_id) {
+    return respond(false, { error: "external_id é obrigatório", code: "missing_external_id" });
+  }
+
+  const sb = getSupabaseAdmin();
+  const { error } = await sb
+    .from("online_payment_config")
+    .update({ mp_pos_id: body.external_id, mp_pos_name: body.name || null })
+    .eq("restaurant_id", restaurantId);
+
+  log("select_pos_save", {
+    restaurant_id: restaurantId,
+    external_id: body.external_id,
+    name: body.name,
+    saved: !error,
+    error: error?.message || null,
+  });
+
+  if (error) {
+    return respond(false, { error: "Falha ao salvar POS: " + error.message, code: "save_error" });
+  }
+
+  return respond(true, { data: { mp_pos_id_saved: body.external_id } });
+}
+
 // ========== PIX: dedicated QR Code action ==========
 async function createPixQr(
   restaurantId: string,
