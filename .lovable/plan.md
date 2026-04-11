@@ -1,36 +1,29 @@
 
 
-## Plano: Corrigir erro "ao salvar pedido" + ajustar status automático do Totem
+## Plano: PIX direto na maquininha sem tela de seleção
 
-### Bug encontrado
+### Diagnóstico
 
-A coluna `total_amount` **não existe** na tabela `orders`. A linha 174 do `KioskPayment.tsx` tenta inserir `total_amount: finalTotal`, o que causa erro no Supabase e o pedido não é salvo — mesmo após o pagamento ser aprovado na maquininha.
+Para cartão, o sistema usa `/v1/orders` com `config.payment_method.default_type: "credit_card"` e isso pula a tela de seleção. Funciona.
 
-### O que precisa mudar
+Para PIX, o código **não usa esse mesmo caminho**. Em vez disso, tenta o endpoint `payment-intents` com payloads experimentais que retornam 400, e cai num fallback que cria a order **sem** `default_type` — por isso a maquininha mostra a tela de seleção.
 
-**Arquivo: `src/components/kiosk/KioskPayment.tsx`**
+A correção é usar o mesmo endpoint `/v1/orders` com `config.payment_method.default_type: "bank_transfer"` para PIX, exatamente como já funciona para cartões.
 
-1. **Remover `total_amount`** do objeto `orderData` (linha 174) — essa coluna não existe.
+### O que muda
 
-2. **Ajustar status automático para pedidos pagos pelo Totem:**
-   - **Mesa** (consumptionMode = "table") + pago na maquininha → `status: "accepted"`, `payment_status: "paid"` — mesa ocupada (já implementado, vai funcionar ao corrigir o bug)
-   - **Balcão/Viagem/Entrega** + pago na maquininha → `status: "preparing"`, `payment_status: "paid"` — entra direto pra produção, sem precisar aceitar manualmente
-   - **Dinheiro** (qualquer modo) → continua `status: "pending"` como hoje
+**Arquivo: `supabase/functions/mercadopago-point/index.ts`**
 
-3. **Corrigir `handleRetryPointPayment`** (linhas 442-450) — está duplicando chamadas (`handlePointPayment()` é chamado 2 vezes e os resets no meio são inúteis).
+Na função `createOrder`, remover todo o bloco `if (isPix)` (linhas 139-208) que tenta 4 endpoints diferentes. Unificar o caminho do PIX com o dos cartões:
 
-### Lógica simplificada
+- PIX passa por `/v1/orders` com `config.payment_method.default_type: "bank_transfer"`
+- Mantém o fallback sem `default_type` caso retorne erro (mas não `already_queued`)
+- Mantém o fallback para `payment-intents` como último recurso
+- Log detalhado em cada tentativa para diagnóstico
 
-```
-if (alreadyPaid && consumptionMode === "table") → status: "accepted"
-else if (alreadyPaid) → status: "preparing"  
-else → status: "pending"
-```
+Resultado: um único fluxo para todos os tipos de pagamento (cartão e PIX), usando o mesmo endpoint que já funciona para cartões. A maquininha recebe `default_type: "bank_transfer"` e deve abrir o QR Code do PIX direto, sem tela de seleção.
 
-### Resultado esperado
-- Pagamento aprovado na maquininha → pedido salva sem erro
-- Tag `order_channel: "totem"` já está presente em todos os pedidos
-- Mesa: entra aceito + pago + mesa ocupada
-- Balcão/viagem: entra preparando + pago
-- Métricas/caixa/DRE já capturam pedidos com `payment_status: "paid"` + `order_channel: "totem"` (implementado na iteração anterior)
+### Risco e validação
+
+Se `bank_transfer` não for aceito como `default_type` (a API retornar `property_value` error), o fallback sem tipo será usado e a maquininha mostrará o menu — comportamento atual. Logs detalhados permitirão diagnosticar rapidamente.
 
