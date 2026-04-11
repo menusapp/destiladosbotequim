@@ -326,20 +326,42 @@ export default function KioskSettings({ restaurantId }: Props) {
   const handleSelectPos = async (pos: any) => {
     setSelectingPos(true);
     try {
-      const { data } = await supabase.functions.invoke("mercadopago-point", {
-        body: {
-          action: "select_pos",
-          restaurant_id: restaurantId,
-          external_id: pos.external_id,
-          name: pos.name,
-        },
-      });
-      if (!data?.ok) {
-        toast.error(data?.error || "Erro ao salvar POS");
-        return;
+      // If POS already has external_id, just save it
+      if (pos.external_id) {
+        const { data } = await supabase.functions.invoke("mercadopago-point", {
+          body: {
+            action: "select_pos",
+            restaurant_id: restaurantId,
+            external_id: pos.external_id,
+            name: pos.name,
+          },
+        });
+        if (!data?.ok) {
+          toast.error(data?.error || "Erro ao salvar POS");
+          return;
+        }
+        setPixPosId(pos.external_id);
+        toast.success(`POS "${pos.name || pos.external_id}" selecionado para PIX!`);
+      } else {
+        // POS lacks external_id — assign one via PUT /pos/{id}
+        const newExternalId = `pos-totem-${restaurantId.slice(0, 8)}-${pos.id}`;
+        const { data } = await supabase.functions.invoke("mercadopago-point", {
+          body: {
+            action: "assign_pos_external_id",
+            restaurant_id: restaurantId,
+            pos_id: pos.id,
+            external_id: newExternalId,
+          },
+        });
+        if (!data?.ok) {
+          toast.error(data?.error || "Erro ao atribuir External ID ao POS");
+          return;
+        }
+        setPixPosId(newExternalId);
+        // Update local list to reflect the new external_id
+        setMpPosList(prev => prev.map(p => p.id === pos.id ? { ...p, external_id: newExternalId } : p));
+        toast.success(`External ID atribuído e POS "${pos.name}" selecionado para PIX!`);
       }
-      setPixPosId(pos.external_id);
-      toast.success(`POS "${pos.name || pos.external_id}" selecionado para PIX!`);
       fetchPixPosStatus();
     } catch (err: any) {
       toast.error(err?.message || "Erro ao selecionar POS");
