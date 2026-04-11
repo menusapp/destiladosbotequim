@@ -15,7 +15,7 @@ const MP_ERROR_MESSAGES: Record<string, string> = {
   invalid_terminal_id: "Terminal inválido.",
 };
 
-function log(action: string, data: Record<string, unknown>) {
+function log(action: string, data: Record<string, unknown> = {}) {
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), action, ...data }));
 }
 
@@ -37,7 +37,7 @@ async function getRestaurantToken(restaurantId: string) {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("online_payment_config")
-    .select("mp_access_token, mp_user_id, token_expires_at")
+    .select("mp_access_token, mp_user_id, token_expires_at, mp_external_pos_id")
     .eq("restaurant_id", restaurantId)
     .maybeSingle();
 
@@ -49,7 +49,11 @@ async function getRestaurantToken(restaurantId: string) {
     throw new Error("TOKEN_EXPIRED");
   }
 
-  return { accessToken: data.mp_access_token, mpUserId: data.mp_user_id };
+  return {
+    accessToken: data.mp_access_token,
+    mpUserId: data.mp_user_id,
+    mpExternalPosId: data.mp_external_pos_id,
+  };
 }
 
 async function mpFetch(
@@ -114,6 +118,16 @@ async function createPos(restaurantId: string, body: { name: string; external_id
     body: JSON.stringify(body),
   });
   if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
+
+  // Save external_id (external_pos_id) to online_payment_config for QR Code PIX
+  if (result.data?.external_id) {
+    const sb = getSupabaseAdmin();
+    await sb.from("online_payment_config")
+      .update({ mp_external_pos_id: result.data.external_id })
+      .eq("restaurant_id", restaurantId);
+    log("[MP Point] saved_external_pos_id", { external_pos_id: result.data.external_id });
+  }
+
   return respond(true, { data: result.data });
 }
 
@@ -121,7 +135,7 @@ async function createOrder(
   restaurantId: string,
   body: { amount: number; description: string; order_id: string; device_id: string; idempotency_key: string; payment_type?: string }
 ) {
-  const { accessToken, mpUserId } = await getRestaurantToken(restaurantId);
+  const { accessToken, mpUserId, mpExternalPosId } = await getRestaurantToken(restaurantId);
 
   log("[MP Point] create_order_start", {
     restaurant_id: restaurantId,
@@ -134,7 +148,119 @@ async function createOrder(
 
   let result: { ok: boolean; status: number; data: any };
 
-  // ========== UNIFIED PATH: /v1/orders with default_type for all payment types ==========
+  const isPix = body.payment_type === "bank_transfer";
+
+  // ========== PIX: Use QR Code dinâmico para PDV presencial ==========
+  if (isPix) {
+    const userId = mpUserId;
+    const externalPosId = mpExternalPosId;
+
+    log("[MP PIX] QR Code attempt", { has_pos_id: !!externalPosId, has_user_id: !!userId });
+
+    if (externalPosId && userId) {
+      const pixQrPayload = {
+        external_reference: body.order_id,
+        title: body.description || "Pedido Totem",
+        description: body.description || "Pagamento",
+        notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`,
+        total_amount: body.amount,
+        items: [{
+          sku_number: body.order_id.substring(0, 20),
+          category: "marketplace",
+          title: body.description || "Pedido",
+          description: body.description || "Pagamento",
+          unit_price: body.amount,
+          quantity: 1,
+          unit_measure: "unit",
+          total_amount: body.amount,
+        }],
+        cash_out: { amount: 0 },
+      };
+
+      result = await mpFetch(
+        `/instore/orders/qr/seller/collectors/${userId}/pos/${externalPosId}/qrs`,
+        accessToken,
+        {
+          method: "POST",
+          body: JSON.stringify(pixQrPayload),
+          headers: { "X-Idempotency-Key": body.idempotency_key },
+        }
+      );
+
+      log("[MP PIX] QR Code response", { status: result.status, ok: result.ok, data: result.data });
+
+      if (result.ok) {
+        const qrOrderId = result.data?.in_store_order_id || result.data?.id || body.order_id;
+        const sb = getSupabaseAdmin();
+        try {
+          await sb.rpc("insert_point_order_payment", {
+            p_restaurant_id: restaurantId,
+            p_order_id: null,
+            p_mp_order_id: String(qrOrderId),
+            p_mp_user_id: userId || "",
+            p_terminal_id: body.device_id,
+            p_external_reference: body.order_id,
+            p_idempotency_key: body.idempotency_key,
+            p_amount: body.amount,
+            p_status: "waiting_terminal",
+          });
+          log("[MP PIX] db_save_success", { qr_order_id: qrOrderId });
+        } catch (dbErr: any) {
+          log("[MP PIX] db_save_error", { error: dbErr?.message });
+        }
+        return respond(true, { data: { ...result.data, id: qrOrderId, pix_qr: true } });
+      }
+
+      log("[MP PIX] QR Code failed, check if POS is registered correctly", {
+        status: result.status,
+        error: result.data,
+      });
+    }
+
+    // Fallback: no POS configured — create normal order (terminal shows selection menu)
+    log("[MP PIX] Falling back to /v1/orders without payment type (no POS configured)");
+    result = await mpFetch("/v1/orders", accessToken, {
+      method: "POST",
+      body: JSON.stringify({
+        type: "point",
+        external_reference: body.order_id,
+        description: body.description,
+        transactions: { payments: [{ amount: body.amount.toString() }] },
+        config: { point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" } },
+      }),
+      headers: { "X-Idempotency-Key": body.idempotency_key + "-fb" },
+    });
+
+    if (!result.ok) {
+      log("[MP Point] create_order_failed", { status: result.status, payment_type: body.payment_type });
+      return respond(false, { ...translateMpError(result), data: null });
+    }
+
+    // Save to DB
+    const fallbackOrderId = result.data?.id || "";
+    if (fallbackOrderId) {
+      const sb = getSupabaseAdmin();
+      try {
+        await sb.rpc("insert_point_order_payment", {
+          p_restaurant_id: restaurantId,
+          p_order_id: null,
+          p_mp_order_id: fallbackOrderId,
+          p_mp_user_id: mpUserId || "",
+          p_terminal_id: body.device_id,
+          p_external_reference: body.order_id,
+          p_idempotency_key: body.idempotency_key,
+          p_amount: body.amount,
+          p_status: "waiting_terminal",
+        });
+      } catch (dbErr: any) {
+        log("[MP Point] db_save_error", { mp_order_id: fallbackOrderId, error: dbErr?.message });
+      }
+    }
+    log("[MP Point] create_order_success", { mp_order_id: fallbackOrderId, response_status: result.status });
+    return respond(true, { data: result.data });
+  }
+
+  // ========== CARD: /v1/orders with default_type ==========
   const configObj: any = {
     point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" },
   };
@@ -174,26 +300,6 @@ async function createOrder(
         body: JSON.stringify(fallbackPayload),
         headers: { "X-Idempotency-Key": body.idempotency_key + "-fb" },
       });
-    }
-  }
-
-  // Payment-intents as last resort
-  if (!result.ok && body.payment_type) {
-    const errCode = result.data?.errors?.[0]?.code;
-    if (errCode !== "already_queued_order_on_terminal") {
-      log("[MP Point] fallback_payment_intents", { payment_type: body.payment_type });
-      const amountCents = Math.round(body.amount * 100);
-      const piPayload = {
-        amount: amountCents,
-        description: body.description,
-        payment: { installments: 1, type: body.payment_type, installments_cost: "seller" },
-        additional_info: { external_reference: body.order_id },
-      };
-      result = await mpFetch(
-        `/point/integration-api/devices/${body.device_id}/payment-intents`,
-        accessToken,
-        { method: "POST", body: JSON.stringify(piPayload), headers: { "X-Idempotency-Key": body.idempotency_key + "-pi" } }
-      );
     }
   }
 
@@ -277,6 +383,66 @@ async function getOrder(restaurantId: string, mpOrderId: string) {
   return respond(true, { data: { ...result.data, internal_status: internalStatus } });
 }
 
+// Poll QR Code PIX payment via merchant_orders
+async function getQrOrder(restaurantId: string, externalReference: string) {
+  const { accessToken } = await getRestaurantToken(restaurantId);
+
+  log("[MP PIX] get_qr_order", { external_reference: externalReference });
+
+  // Search merchant orders by external_reference
+  const result = await mpFetch(
+    `/merchant_orders?external_reference=${encodeURIComponent(externalReference)}`,
+    accessToken
+  );
+
+  if (!result.ok) {
+    log("[MP PIX] merchant_orders_failed", { status: result.status });
+    return respond(false, { ...translateMpError(result), data: null });
+  }
+
+  const elements = result.data?.elements || [];
+  if (elements.length === 0) {
+    // No merchant order yet — still waiting
+    return respond(true, { data: { status: "waiting", internal_status: "waiting_terminal" } });
+  }
+
+  const order = elements[0];
+  const payments = order.payments || [];
+  const approvedPayment = payments.find((p: any) => p.status === "approved");
+
+  let internalStatus = "waiting_terminal";
+
+  if (approvedPayment || order.status === "closed" || order.order_status === "paid") {
+    internalStatus = "paid";
+  } else if (payments.some((p: any) => p.status === "rejected" || p.status === "cancelled")) {
+    internalStatus = "failed";
+  } else if (payments.length > 0) {
+    internalStatus = "processing";
+  }
+
+  // Update DB
+  const sb = getSupabaseAdmin();
+  // Find by external_reference since QR orders use in_store_order_id
+  if (internalStatus === "paid" || internalStatus === "failed" || internalStatus === "canceled") {
+    await sb.from("point_order_payments")
+      .update({ status: internalStatus })
+      .eq("external_reference", externalReference)
+      .in("status", ["waiting_terminal", "processing"]);
+  }
+
+  log("[MP PIX] get_qr_order_result", { internal_status: internalStatus, merchant_order_id: order.id, payments_count: payments.length });
+
+  return respond(true, {
+    data: {
+      ...order,
+      internal_status: internalStatus,
+      status: internalStatus === "paid" ? "processed" : order.status,
+      // Mimic the transactions shape for frontend compatibility
+      transactions: approvedPayment ? { payments: [{ status: "approved", status_detail: "accredited" }] } : undefined,
+    },
+  });
+}
+
 async function cancelOrder(restaurantId: string, mpOrderId: string) {
   const { accessToken } = await getRestaurantToken(restaurantId);
   
@@ -303,7 +469,6 @@ async function cancelOrder(restaurantId: string, mpOrderId: string) {
 async function listPendingOrders(restaurantId: string, deviceId: string) {
   const sb = getSupabaseAdmin();
 
-  // Check local DB for pending orders
   const { data: localPending } = await sb
     .from("point_order_payments")
     .select("mp_order_id, status, created_at, amount")
@@ -322,14 +487,8 @@ async function listPendingOrders(restaurantId: string, deviceId: string) {
   });
 }
 
-// Cancel whatever is queued on a device (no intent ID needed)
 async function cancelDevicePending(restaurantId: string, deviceId: string) {
   const { accessToken } = await getRestaurantToken(restaurantId);
-  
-  // Try to create a dummy intent to find what's blocking, or use device API to cancel
-  // The MP Point API doesn't have a "cancel current" endpoint, but we can try:
-  // 1. Cancel via local DB mp_order_id
-  // 2. If no local record, try the /v1/orders search
   
   const sb = getSupabaseAdmin();
   const { data: localPending } = await sb
@@ -345,7 +504,6 @@ async function cancelDevicePending(restaurantId: string, deviceId: string) {
   if (localPending?.mp_order_id) {
     log("[MP Point] cancel_device_pending_local", { mp_order_id: localPending.mp_order_id });
     
-    // Try both cancel endpoints
     let result = await mpFetch(`/point/integration-api/payment-intents/${localPending.mp_order_id}`, accessToken, { method: "DELETE" });
     if (!result.ok) {
       result = await mpFetch(`/v1/orders/${localPending.mp_order_id}`, accessToken, { method: "DELETE" });
@@ -359,9 +517,6 @@ async function cancelDevicePending(restaurantId: string, deviceId: string) {
     return respond(true, { data: { canceled_id: localPending.mp_order_id, api_ok: result.ok } });
   }
 
-  // No local record — try multiple approaches to find and cancel
-
-  // Approach 1: Search /v1/orders
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const searchResult = await mpFetch(
@@ -383,7 +538,6 @@ async function cancelDevicePending(restaurantId: string, deviceId: string) {
     }
   }
 
-  // Approach 2: Try getting the last payment intent from the device events endpoint
   const eventsResult = await mpFetch(
     `/point/integration-api/devices/${deviceId}/payment-intents?startDate=${oneDayAgo.toISOString()}&endDate=${now.toISOString()}`,
     accessToken
@@ -406,7 +560,6 @@ async function cancelDevicePending(restaurantId: string, deviceId: string) {
     }
   }
 
-  // Approach 3: The user needs to physically cancel on the terminal
   return respond(false, { error: "Não encontramos a cobrança pendente via API. Cancele direto na maquininha: pressione o X vermelho ou reinicie o app de pagamentos.", code: "not_found" });
 }
 
@@ -463,6 +616,8 @@ Deno.serve(async (req) => {
         return await createOrder(restaurant_id, params as any);
       case "get_order":
         return await getOrder(restaurant_id, params.mp_order_id);
+      case "get_qr_order":
+        return await getQrOrder(restaurant_id, params.external_reference);
       case "cancel_order":
         return await cancelOrder(restaurant_id, params.mp_order_id);
       case "test_order":

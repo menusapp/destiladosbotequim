@@ -11,6 +11,7 @@ import { KioskConfig, KioskPointTerminal } from "@/hooks/useKioskConfig";
 import { ConsumptionMode } from "./KioskConsumptionType";
 
 type PointPaymentStatus = "idle" | "creating_payment" | "waiting_terminal" | "processing" | "paid" | "failed" | "canceled";
+
 type CardStep = "method" | "card_type" | "card_brand";
 
 interface Props {
@@ -63,6 +64,7 @@ export function KioskPayment({
   // Point terminal payment state
   const [pointStatus, setPointStatus] = useState<PointPaymentStatus>("idle");
   const [mpOrderId, setMpOrderId] = useState<string | null>(null);
+  const [pixQrExternalRef, setPixQrExternalRef] = useState<string | null>(null); // For QR Code PIX polling
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const createdOrderIdRef = useRef<string | null>(null);
@@ -332,7 +334,7 @@ export function KioskPayment({
     return order.id;
   }, [restaurant, customer, cart, consumptionMode, tableNumber, paymentMethod, selectedCardType, selectedBrand, cashPaid, finalTotal, appliedCoupon, couponDiscount, loyaltyPointsUsed, pointsDiscount, deliveryAddress]);
 
-  const startPointPolling = useCallback((mpOrdId: string) => {
+  const startPointPolling = useCallback((mpOrdId: string, isPixQr = false, extRef?: string) => {
     setPointStatus("waiting_terminal");
 
     // Timeout after 120s
@@ -340,12 +342,14 @@ export function KioskPayment({
       if (pollingRef.current) clearInterval(pollingRef.current);
       setPointStatus("canceled");
 
-      try {
-        await supabase.functions.invoke("mercadopago-point", {
-          body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
-        });
-      } catch (e) {
-        console.error("[KioskPayment] Cancel error:", e);
+      if (!isPixQr) {
+        try {
+          await supabase.functions.invoke("mercadopago-point", {
+            body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
+          });
+        } catch (e) {
+          console.error("[KioskPayment] Cancel error:", e);
+        }
       }
 
       toast.error("Tempo esgotado. Tente novamente.");
@@ -354,51 +358,77 @@ export function KioskPayment({
     // Poll every 3s
     pollingRef.current = setInterval(async () => {
       try {
-        const { data: res } = await supabase.functions.invoke("mercadopago-point", {
-          body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
-        });
+        let res: any;
+
+        if (isPixQr && extRef) {
+          // QR Code PIX: poll via merchant_orders using external_reference
+          const { data } = await supabase.functions.invoke("mercadopago-point", {
+            body: { action: "get_qr_order", restaurant_id: restaurant.id, external_reference: extRef },
+          });
+          res = data;
+        } else {
+          // Card: poll via get_order
+          const { data } = await supabase.functions.invoke("mercadopago-point", {
+            body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
+          });
+          res = data;
+        }
 
         if (!res?.ok) return;
 
         const status = res.data?.status;
+        const internalStatus = res.data?.internal_status;
         const data = res.data;
         const txn = data?.transactions?.payments?.[0];
 
-        if (status === "processed" || status === "finished") {
-          if (txn?.status_detail === "accredited" || txn?.status === "approved") {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            setPointStatus("paid");
+        // Check for paid status (both card and PIX QR paths)
+        const isPaid = internalStatus === "paid" ||
+          status === "processed" || status === "finished" ||
+          (txn?.status_detail === "accredited" || txn?.status === "approved");
 
-            // Guard against duplicate order creation from overlapping polling ticks
-            if (orderCreationInProgressRef.current) return;
-            orderCreationInProgressRef.current = true;
+        if (isPaid) {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          setPointStatus("paid");
 
-            // Payment confirmed — NOW create the order in DB
-            try {
-              const orderId = await createOrderInDB(true);
-              if (orderId) {
-                createdOrderIdRef.current = orderId;
-                onOrderCreated(orderId);
-              } else {
-                toast.error("Pagamento confirmado, mas erro ao criar pedido.");
-              }
-            } catch (dbErr: any) {
-              console.error("[KioskPayment] DB error after payment:", dbErr);
-              toast.error("Pagamento confirmado, mas erro ao salvar pedido.");
+          if (orderCreationInProgressRef.current) return;
+          orderCreationInProgressRef.current = true;
+
+          try {
+            const orderId = await createOrderInDB(true);
+            if (orderId) {
+              createdOrderIdRef.current = orderId;
+              onOrderCreated(orderId);
+            } else {
+              toast.error("Pagamento confirmado, mas erro ao criar pedido.");
             }
-          } else {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            setPointStatus("failed");
-            toast.error("Pagamento recusado na maquininha.");
+          } catch (dbErr: any) {
+            console.error("[KioskPayment] DB error after payment:", dbErr);
+            toast.error("Pagamento confirmado, mas erro ao salvar pedido.");
           }
-        } else if (status === "canceled" || status === "expired") {
+          return;
+        }
+
+        const isFailed = internalStatus === "failed" ||
+          (status === "processed" && txn && txn.status !== "approved");
+        if (isFailed) {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          setPointStatus("failed");
+          toast.error("Pagamento recusado na maquininha.");
+          return;
+        }
+
+        const isCanceled = internalStatus === "canceled" || status === "canceled" || status === "expired";
+        if (isCanceled) {
           if (pollingRef.current) clearInterval(pollingRef.current);
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
           setPointStatus("canceled");
           toast.error("Pagamento cancelado.");
-        } else if (status === "processing") {
+          return;
+        }
+
+        if (internalStatus === "processing" || status === "processing") {
           setPointStatus("processing");
         }
       } catch (e) {
@@ -416,7 +446,6 @@ export function KioskPayment({
     setPointStatus("creating_payment");
 
     try {
-      // Generate a temporary idempotency key — order will only be created after payment confirmation
       const tempId = crypto.randomUUID();
 
       const { data: res } = await supabase.functions.invoke("mercadopago-point", {
@@ -444,8 +473,10 @@ export function KioskPayment({
         return;
       }
 
+      const isPixQr = !!res.data.pix_qr;
       setMpOrderId(res.data.id);
-      startPointPolling(res.data.id);
+      setPixQrExternalRef(isPixQr ? tempId : null);
+      startPointPolling(res.data.id, isPixQr, isPixQr ? tempId : undefined);
     } catch (err: any) {
       console.error("[KioskPayment] Point payment error:", err);
       toast.error(err?.message || "Erro ao processar pagamento");
@@ -459,7 +490,8 @@ export function KioskPayment({
     if (pollingRef.current) clearInterval(pollingRef.current);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    if (mpOrderId) {
+    if (mpOrderId && !pixQrExternalRef) {
+      // Only cancel via API for card orders (not QR PIX — those expire on their own)
       try {
         await supabase.functions.invoke("mercadopago-point", {
           body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrderId },
@@ -471,12 +503,14 @@ export function KioskPayment({
 
     setPointStatus("idle");
     setMpOrderId(null);
+    setPixQrExternalRef(null);
     orderCreationInProgressRef.current = false;
   };
 
   const handleRetryPointPayment = () => {
     setPointStatus("idle");
     setMpOrderId(null);
+    setPixQrExternalRef(null);
     orderCreationInProgressRef.current = false;
     handlePointPayment();
   };

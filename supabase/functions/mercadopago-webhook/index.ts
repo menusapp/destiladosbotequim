@@ -25,12 +25,68 @@ Deno.serve(async (req) => {
       return new Response("OK", { status: 200, headers: corsHeaders });
     }
 
-    // Handle Point order events
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(supabaseUrl, supabaseServiceKey);
+
+    // ========== Handle merchant_order events (QR Code PIX) ==========
+    if (action === "merchant_order" || action === "merchant_order.updated" || body.topic === "merchant_order") {
+      console.log("[MP Webhook] Merchant order event:", action, "id:", dataId);
+
+      // We need an access token to fetch merchant order details
+      // Try to find which restaurant this belongs to by checking point_order_payments
+      // First fetch the merchant order without auth to get external_reference
+      // Actually we need auth — find all restaurants and try
+      const { data: configs } = await sb
+        .from("online_payment_config")
+        .select("restaurant_id, mp_access_token")
+        .not("mp_access_token", "is", null);
+
+      for (const config of (configs || [])) {
+        try {
+          const moRes = await fetch(`https://api.mercadopago.com/merchant_orders/${dataId}`, {
+            headers: { Authorization: `Bearer ${config.mp_access_token}` },
+          });
+          if (!moRes.ok) continue;
+
+          const mo = await moRes.json();
+          const externalRef = mo.external_reference;
+          if (!externalRef) continue;
+
+          const approvedPayment = mo.payments?.find((p: any) => p.status === "approved");
+          const isClosed = mo.status === "closed" || mo.order_status === "paid";
+
+          if (approvedPayment || isClosed) {
+            console.log("[MP Webhook] Merchant order paid, external_reference:", externalRef);
+
+            // Update point_order_payments by external_reference
+            const { data: updated } = await sb
+              .from("point_order_payments")
+              .update({ status: "paid" })
+              .eq("external_reference", externalRef)
+              .in("status", ["waiting_terminal", "processing"])
+              .select("id, order_id");
+
+            if (updated && updated.length > 0) {
+              console.log("[MP Webhook] Point payment updated via merchant_order:", updated[0].id);
+              // If there's a linked order, mark it as paid too
+              if (updated[0].order_id) {
+                await sb.from("orders").update({ payment_status: "paid", paid_at: new Date().toISOString() }).eq("id", updated[0].order_id);
+              }
+            }
+          }
+          break; // Found the right restaurant
+        } catch (e: any) {
+          console.log("[MP Webhook] merchant_order fetch error:", e.message);
+        }
+      }
+
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+
+    // ========== Handle Point order events ==========
     if (action === "order.processed" || action === "order.canceled" || action === "order.expired") {
       console.log("[MP Webhook] Point order event:", action, "id:", dataId);
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const sb = createClient(supabaseUrl, supabaseServiceKey);
 
       // Look up in point_order_payments
       const { data: pointPayment } = await sb.rpc("get_point_order_payment", { p_mp_order_id: String(dataId) });
@@ -82,12 +138,8 @@ Deno.serve(async (req) => {
       return new Response("OK", { status: 200, headers: corsHeaders });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     // Find the online_payment record by provider_payment_id
-    const { data: onlinePayment, error: findError } = await supabase
+    const { data: onlinePayment, error: findError } = await sb
       .from("online_payments")
       .select("id, restaurant_id, order_id, status, amount")
       .eq("provider_payment_id", String(paymentId))
@@ -105,8 +157,7 @@ Deno.serve(async (req) => {
     }
 
     // Fetch payment details from Mercado Pago to verify status
-    // We need the restaurant's access token
-    const { data: config } = await supabase
+    const { data: config } = await sb
       .from("online_payment_config")
       .select("mp_access_token")
       .eq("restaurant_id", onlinePayment.restaurant_id)
@@ -127,7 +178,7 @@ Deno.serve(async (req) => {
 
     if (mpPayment.status === "approved") {
       // Update online_payments to confirmed
-      const { error: updateError } = await supabase
+      const { error: updateError } = await sb
         .from("online_payments")
         .update({
           status: "confirmed",
@@ -143,7 +194,7 @@ Deno.serve(async (req) => {
 
         // Update order payment status if linked
         if (onlinePayment.order_id) {
-          await supabase
+          await sb
             .from("orders")
             .update({ payment_status: "paid" })
             .eq("id", onlinePayment.order_id);
@@ -167,11 +218,10 @@ Deno.serve(async (req) => {
           console.log("[MP Webhook] Nuvem Fiscal response:", nfceResult);
         } catch (nfceError: any) {
           console.error("[MP Webhook] Nuvem Fiscal call failed:", nfceError.message);
-          // Don't fail the webhook because of NFC-e errors
         }
       }
     } else if (mpPayment.status === "rejected" || mpPayment.status === "cancelled") {
-      await supabase
+      await sb
         .from("online_payments")
         .update({
           status: "failed",
