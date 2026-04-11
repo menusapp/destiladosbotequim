@@ -69,6 +69,9 @@ export default function KioskSettings({ restaurantId }: Props) {
   const [switchingMode, setSwitchingMode] = useState(false);
   const [pixPosId, setPixPosId] = useState<string | null>(null);
   const [pixUserId, setPixUserId] = useState<string | null>(null);
+  const [mpPosList, setMpPosList] = useState<any[]>([]);
+  const [loadingPosList, setLoadingPosList] = useState(false);
+  const [selectingPos, setSelectingPos] = useState(false);
 
   useEffect(() => {
     fetchConfig();
