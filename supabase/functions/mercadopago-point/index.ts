@@ -308,7 +308,7 @@ async function createOrder(
   return respond(true, { data: { ...result.data, is_qr_pix: isQrPix, external_reference: body.order_id } });
 }
 
-async function getOrder(restaurantId: string, mpOrderId: string) {
+async function getOrder(restaurantId: string, mpOrderId: string, externalReference?: string) {
   const { accessToken } = await getRestaurantToken(restaurantId);
   
   // Try /v1/orders first
@@ -319,6 +319,36 @@ async function getOrder(restaurantId: string, mpOrderId: string) {
     result = await mpFetch(`/point/integration-api/payment-intents/${mpOrderId}`, accessToken);
   }
 
+  // Fallback: try merchant_orders by external_reference (QR PIX)
+  const extRef = externalReference || mpOrderId;
+  if (!result.ok && result.status === 404) {
+    log("[MP Point] Trying merchant_orders by external_reference", { external_reference: extRef });
+    const moResult = await mpFetch(`/merchant_orders?external_reference=${extRef}`, accessToken);
+    if (moResult.ok && moResult.data?.elements?.length > 0) {
+      const mo = moResult.data.elements[0];
+      const payments = mo.payments || [];
+      const approvedPayment = payments.find((p: any) => p.status === "approved");
+      const pendingPayment = payments.find((p: any) => p.status === "pending" || p.status === "in_process");
+
+      let moStatus = "open";
+      if (approvedPayment) moStatus = "processed";
+      else if (mo.status === "closed" && !approvedPayment) moStatus = "canceled";
+
+      result = {
+        ok: true,
+        status: 200,
+        data: {
+          id: mo.id,
+          status: moStatus,
+          external_reference: mo.external_reference,
+          transactions: approvedPayment ? { payments: [{ status: "approved", status_detail: "accredited", ...approvedPayment }] } : undefined,
+          is_merchant_order: true,
+        },
+      };
+      log("[MP Point] merchant_orders result", { mo_id: mo.id, mo_status: moStatus, payments_count: payments.length });
+    }
+  }
+
   if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
 
   // Update internal status
@@ -326,7 +356,7 @@ async function getOrder(restaurantId: string, mpOrderId: string) {
   const mpStatus = result.data.status;
   let internalStatus = "waiting_terminal";
 
-  // Handle both /v1/orders and payment-intents response shapes
+  // Handle both /v1/orders, payment-intents and merchant_orders response shapes
   if (mpStatus === "processed" || mpStatus === "finished") {
     const txn = result.data.transactions?.payments?.[0] || result.data.payment;
     if (txn?.status_detail === "accredited" || txn?.status === "approved") {
