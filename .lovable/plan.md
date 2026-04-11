@@ -1,36 +1,31 @@
 
 
-## Plano: Corrigir erro "ao salvar pedido" + ajustar status automático do Totem
+## Plano: Separar fluxo PIX do fluxo de cartão no Totem
 
-### Bug encontrado
+### Problema
+O fluxo PIX atual na edge function `mercadopago-point` está dentro da action `create_order`, misturado com o fluxo de cartão. Quando o QR dinâmico falha, cai num fallback para `/v1/orders` que abre a tela de seleção na maquininha. O frontend também usa a mesma action `create_order` para ambos.
 
-A coluna `total_amount` **não existe** na tabela `orders`. A linha 174 do `KioskPayment.tsx` tenta inserir `total_amount: finalTotal`, o que causa erro no Supabase e o pedido não é salvo — mesmo após o pagamento ser aprovado na maquininha.
+### Mudanças
 
-### O que precisa mudar
+**1. Edge Function `supabase/functions/mercadopago-point/index.ts`**
 
-**Arquivo: `src/components/kiosk/KioskPayment.tsx`**
+- Criar nova função `createPixQr(restaurantId, body)` dedicada ao PIX
+- Usar exclusivamente `PUT /instore/orders/qr/seller/collectors/{mp_user_id}/pos/{mp_pos_id}/qrs`
+- Se `mp_user_id` ou `mp_pos_id` não existirem → retornar erro claro `"POS não configurado para PIX"`
+- **Sem fallback** para `/v1/orders`
+- Logar request completo, response, status
+- Registrar nova action no handler: `case "create_pix_qr"`
 
-1. **Remover `total_amount`** do objeto `orderData` (linha 174) — essa coluna não existe.
+- Na função `createOrder` existente: **remover todo o bloco PIX** (linhas 138-205, o `if (isPix) {...}`) — deixar apenas o fluxo de cartão
 
-2. **Ajustar status automático para pedidos pagos pelo Totem:**
-   - **Mesa** (consumptionMode = "table") + pago na maquininha → `status: "accepted"`, `payment_status: "paid"` — mesa ocupada (já implementado, vai funcionar ao corrigir o bug)
-   - **Balcão/Viagem/Entrega** + pago na maquininha → `status: "preparing"`, `payment_status: "paid"` — entra direto pra produção, sem precisar aceitar manualmente
-   - **Dinheiro** (qualquer modo) → continua `status: "pending"` como hoje
+**2. Frontend `src/components/kiosk/KioskPayment.tsx`**
 
-3. **Corrigir `handleRetryPointPayment`** (linhas 442-450) — está duplicando chamadas (`handlePointPayment()` é chamado 2 vezes e os resets no meio são inúteis).
+- Na função `handlePointPayment`: quando `paymentMethod === "point_pix"`, chamar `action: "create_pix_qr"` em vez de `action: "create_order"`
+- Não passar `payment_type` para PIX (desnecessário, action já é específica)
+- Fluxo de cartão continua chamando `action: "create_order"` sem alteração
 
-### Lógica simplificada
-
-```
-if (alreadyPaid && consumptionMode === "table") → status: "accepted"
-else if (alreadyPaid) → status: "preparing"  
-else → status: "pending"
-```
-
-### Resultado esperado
-- Pagamento aprovado na maquininha → pedido salva sem erro
-- Tag `order_channel: "totem"` já está presente em todos os pedidos
-- Mesa: entra aceito + pago + mesa ocupada
-- Balcão/viagem: entra preparando + pago
-- Métricas/caixa/DRE já capturam pedidos com `payment_status: "paid"` + `order_channel: "totem"` (implementado na iteração anterior)
+### Escopo
+- 2 arquivos: edge function + KioskPayment.tsx
+- Nenhuma alteração no fluxo de cartão
+- Nenhuma alteração na lógica de polling (já funciona com `external_reference` / `merchant_orders`)
 
