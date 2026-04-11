@@ -290,10 +290,61 @@ export default function KioskSettings({ restaurantId }: Props) {
         : "Loja e Caixa criados com sucesso!");
       fetchSavedTerminals();
       fetchPixPosStatus();
+      // After creating, auto-load POS list for selection
+      handleListPos();
     } catch (err: any) {
       toast.error(err?.message || "Erro ao criar loja/caixa");
     } finally {
       setCreatingStore(false);
+    }
+  };
+
+  const handleListPos = async () => {
+    setLoadingPosList(true);
+    try {
+      const { data } = await supabase.functions.invoke("mercadopago-point", {
+        body: { action: "list_pos", restaurant_id: restaurantId },
+      });
+      if (!data?.ok) {
+        toast.error(data?.error || "Erro ao buscar caixas (POS)");
+        return;
+      }
+      const list = data.data?.pos_list || [];
+      setMpPosList(list);
+      if (list.length === 0) {
+        toast.info("Nenhum caixa (POS) encontrado na conta. Crie um primeiro.");
+      } else {
+        toast.success(`${list.length} caixa(s) encontrado(s)`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao buscar POS");
+    } finally {
+      setLoadingPosList(false);
+    }
+  };
+
+  const handleSelectPos = async (pos: any) => {
+    setSelectingPos(true);
+    try {
+      const { data } = await supabase.functions.invoke("mercadopago-point", {
+        body: {
+          action: "select_pos",
+          restaurant_id: restaurantId,
+          external_id: pos.external_id,
+          name: pos.name,
+        },
+      });
+      if (!data?.ok) {
+        toast.error(data?.error || "Erro ao salvar POS");
+        return;
+      }
+      setPixPosId(pos.external_id);
+      toast.success(`POS "${pos.name || pos.external_id}" selecionado para PIX!`);
+      fetchPixPosStatus();
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao selecionar POS");
+    } finally {
+      setSelectingPos(false);
     }
   };
 
