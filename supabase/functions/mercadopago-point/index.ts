@@ -117,11 +117,88 @@ async function createPos(restaurantId: string, body: { name: string; external_id
   return respond(true, { data: result.data });
 }
 
+// ========== PIX: dedicated QR Code action ==========
+async function createPixQr(
+  restaurantId: string,
+  body: { amount: number; description: string; order_id: string; device_id: string; idempotency_key: string }
+) {
+  const { accessToken, mpUserId, mpPosId } = await getRestaurantToken(restaurantId);
+
+  log("[MP PIX] create_pix_qr_start", {
+    restaurant_id: restaurantId,
+    order_id: body.order_id,
+    amount: body.amount,
+    mp_user_id: mpUserId,
+    mp_pos_id: mpPosId,
+  });
+
+  if (!mpUserId || !mpPosId) {
+    log("[MP PIX] Missing mp_user_id or mp_pos_id", { mpUserId, mpPosId });
+    return respond(false, { error: "POS não configurado para PIX. Configure o External POS ID nas configurações do Totem.", code: "missing_pos_config" });
+  }
+
+  const pixQrPayload = {
+    external_reference: body.order_id,
+    title: body.description,
+    description: body.description,
+    total_amount: body.amount,
+    items: [{
+      sku_number: body.order_id.slice(0, 30),
+      category: "marketplace",
+      title: body.description,
+      description: body.description,
+      unit_price: body.amount,
+      quantity: 1,
+      unit_measure: "unit",
+      total_amount: body.amount,
+    }],
+    cash_out: { amount: 0 },
+  };
+
+  const qrEndpoint = `/instore/orders/qr/seller/collectors/${mpUserId}/pos/${mpPosId}/qrs`;
+  log("[MP PIX] request", { endpoint: qrEndpoint, payload: pixQrPayload });
+
+  const result = await mpFetch(qrEndpoint, accessToken, {
+    method: "PUT",
+    body: JSON.stringify(pixQrPayload),
+    headers: { "X-Idempotency-Key": body.idempotency_key },
+  });
+
+  log("[MP PIX] response", { status: result.status, ok: result.ok, data: result.data });
+
+  if (!result.ok) {
+    return respond(false, { ...translateMpError(result), data: null });
+  }
+
+  // Save to DB
+  const mpOrderId = result.data?.in_store_order_id || result.data?.id || body.order_id;
+  const sb = getSupabaseAdmin();
+  try {
+    await sb.rpc("insert_point_order_payment", {
+      p_restaurant_id: restaurantId,
+      p_order_id: null,
+      p_mp_order_id: mpOrderId,
+      p_mp_user_id: mpUserId || "",
+      p_terminal_id: body.device_id,
+      p_external_reference: body.order_id,
+      p_idempotency_key: body.idempotency_key,
+      p_amount: body.amount,
+      p_status: "waiting_terminal",
+    });
+    log("[MP PIX] db_save_success", { mp_order_id: mpOrderId });
+  } catch (dbErr: any) {
+    log("[MP PIX] db_save_error", { mp_order_id: mpOrderId, error: dbErr?.message });
+  }
+
+  return respond(true, { data: { ...result.data, is_qr_pix: true, external_reference: body.order_id } });
+}
+
+// ========== CARD: Orders API (no PIX here) ==========
 async function createOrder(
   restaurantId: string,
   body: { amount: number; description: string; order_id: string; device_id: string; idempotency_key: string; payment_type?: string }
 ) {
-  const { accessToken, mpUserId, mpPosId } = await getRestaurantToken(restaurantId);
+  const { accessToken, mpUserId } = await getRestaurantToken(restaurantId);
 
   log("[MP Point] create_order_start", {
     restaurant_id: restaurantId,
@@ -133,148 +210,77 @@ async function createOrder(
   });
 
   let result: { ok: boolean; status: number; data: any };
-  let isQrPix = false;
 
-  const isPix = body.payment_type === "bank_transfer";
+  // CARD PATH ONLY: /v1/orders first, then payment-intents fallback
+  const configObj: any = {
+    point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" },
+  };
+  if (body.payment_type) {
+    configObj.payment_method = { default_type: body.payment_type };
+  }
 
-  // ========== PIX PATH: QR Code dinâmico via /instore/orders/qr ==========
-  if (isPix) {
-    const externalPosId = mpPosId;
+  const orderPayload = {
+    type: "point",
+    external_reference: body.order_id,
+    description: body.description,
+    transactions: { payments: [{ amount: body.amount.toString() }] },
+    config: configObj,
+  };
 
-    if (!externalPosId || !mpUserId) {
-      log("[MP PIX] Missing pos_id or user_id for QR Code — fallback to /v1/orders", { externalPosId, mpUserId });
-      // Fallback: create order without type (terminal shows menu)
+  log("[MP Point] v1_orders_with_default_type", { payment_type: body.payment_type || "none" });
+  result = await mpFetch("/v1/orders", accessToken, {
+    method: "POST",
+    body: JSON.stringify(orderPayload),
+    headers: { "X-Idempotency-Key": body.idempotency_key },
+  });
+
+  // Retry without payment_method restriction
+  if (!result.ok && body.payment_type) {
+    const errCode = result.data?.errors?.[0]?.code;
+    if (errCode !== "already_queued_order_on_terminal") {
+      log("[MP Point] v1_orders_retry_without_default_type", { status: result.status });
+      const fallbackPayload = {
+        type: "point",
+        external_reference: body.order_id,
+        description: body.description,
+        transactions: { payments: [{ amount: body.amount.toString() }] },
+        config: { point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" } },
+      };
       result = await mpFetch("/v1/orders", accessToken, {
         method: "POST",
-        body: JSON.stringify({
-          type: "point",
-          external_reference: body.order_id,
-          description: body.description,
-          transactions: { payments: [{ amount: body.amount.toString() }] },
-          config: { point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" } },
-        }),
-        headers: { "X-Idempotency-Key": body.idempotency_key },
+        body: JSON.stringify(fallbackPayload),
+        headers: { "X-Idempotency-Key": body.idempotency_key + "-fb" },
       });
-    } else {
-      isQrPix = true;
-      const pixQrPayload = {
-        external_reference: body.order_id,
-        title: body.description,
+    }
+  }
+
+  // Payment-intents as last resort for cards
+  if (!result.ok && body.payment_type) {
+    const errCode = result.data?.errors?.[0]?.code;
+    if (errCode !== "already_queued_order_on_terminal") {
+      log("[MP Point] fallback_payment_intents", { payment_type: body.payment_type });
+      const amountCents = Math.round(body.amount * 100);
+      const piPayload = {
+        amount: amountCents,
         description: body.description,
-        total_amount: body.amount,
-        items: [{
-          sku_number: body.order_id.slice(0, 30),
-          category: "marketplace",
-          title: body.description,
-          description: body.description,
-          unit_price: body.amount,
-          quantity: 1,
-          unit_measure: "unit",
-          total_amount: body.amount,
-        }],
-        cash_out: { amount: 0 },
+        payment: { installments: 1, type: body.payment_type, installments_cost: "seller" },
+        additional_info: { external_reference: body.order_id },
       };
-
-      const qrEndpoint = `/instore/orders/qr/seller/collectors/${mpUserId}/pos/${externalPosId}/qrs`;
-      log("[MP PIX] Using QR Code dynamic endpoint", { endpoint: qrEndpoint, amount: body.amount });
-
-      result = await mpFetch(qrEndpoint, accessToken, {
-        method: "PUT",
-        body: JSON.stringify(pixQrPayload),
-        headers: { "X-Idempotency-Key": body.idempotency_key },
-      });
-
-      log("[MP PIX] QR Code response", { status: result.status, ok: result.ok, data: result.data });
-
-      // If QR fails, fallback to /v1/orders without type
-      if (!result.ok) {
-        log("[MP PIX] QR failed, fallback to /v1/orders", { status: result.status });
-        isQrPix = false;
-        result = await mpFetch("/v1/orders", accessToken, {
-          method: "POST",
-          body: JSON.stringify({
-            type: "point",
-            external_reference: body.order_id,
-            description: body.description,
-            transactions: { payments: [{ amount: body.amount.toString() }] },
-            config: { point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" } },
-          }),
-          headers: { "X-Idempotency-Key": body.idempotency_key + "-fb" },
-        });
-      }
+      result = await mpFetch(
+        `/point/integration-api/devices/${body.device_id}/payment-intents`,
+        accessToken,
+        { method: "POST", body: JSON.stringify(piPayload), headers: { "X-Idempotency-Key": body.idempotency_key } }
+      );
     }
-  } else {
-    // ========== CARD PATH: /v1/orders first, then payment-intents fallback ==========
-    const configObj: any = {
-      point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" },
-    };
-    if (body.payment_type) {
-      configObj.payment_method = { default_type: body.payment_type };
-    }
+  }
 
-    const orderPayload = {
-      type: "point",
-      external_reference: body.order_id,
-      description: body.description,
-      transactions: { payments: [{ amount: body.amount.toString() }] },
-      config: configObj,
-    };
-
-    log("[MP Point] v1_orders_with_default_type", { payment_type: body.payment_type || "none" });
+  // Retry once on 5xx
+  if (!result.ok && result.status >= 500) {
     result = await mpFetch("/v1/orders", accessToken, {
       method: "POST",
       body: JSON.stringify(orderPayload),
       headers: { "X-Idempotency-Key": body.idempotency_key },
     });
-
-    // Retry without payment_method restriction
-    if (!result.ok && body.payment_type) {
-      const errCode = result.data?.errors?.[0]?.code;
-      if (errCode !== "already_queued_order_on_terminal") {
-        log("[MP Point] v1_orders_retry_without_default_type", { status: result.status });
-        const fallbackPayload = {
-          type: "point",
-          external_reference: body.order_id,
-          description: body.description,
-          transactions: { payments: [{ amount: body.amount.toString() }] },
-          config: { point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" } },
-        };
-        result = await mpFetch("/v1/orders", accessToken, {
-          method: "POST",
-          body: JSON.stringify(fallbackPayload),
-          headers: { "X-Idempotency-Key": body.idempotency_key + "-fb" },
-        });
-      }
-    }
-
-    // Payment-intents as last resort for cards
-    if (!result.ok && body.payment_type) {
-      const errCode = result.data?.errors?.[0]?.code;
-      if (errCode !== "already_queued_order_on_terminal") {
-        log("[MP Point] fallback_payment_intents", { payment_type: body.payment_type });
-        const amountCents = Math.round(body.amount * 100);
-        const piPayload = {
-          amount: amountCents,
-          description: body.description,
-          payment: { installments: 1, type: body.payment_type, installments_cost: "seller" },
-          additional_info: { external_reference: body.order_id },
-        };
-        result = await mpFetch(
-          `/point/integration-api/devices/${body.device_id}/payment-intents`,
-          accessToken,
-          { method: "POST", body: JSON.stringify(piPayload), headers: { "X-Idempotency-Key": body.idempotency_key } }
-        );
-      }
-    }
-
-    // Retry once on 5xx
-    if (!result.ok && result.status >= 500) {
-      result = await mpFetch("/v1/orders", accessToken, {
-        method: "POST",
-        body: JSON.stringify(orderPayload),
-        headers: { "X-Idempotency-Key": body.idempotency_key },
-      });
-    }
   }
 
   if (!result.ok) {
@@ -304,8 +310,8 @@ async function createOrder(
     }
   }
 
-  log("[MP Point] create_order_success", { mp_order_id: mpOrderId, is_qr_pix: isQrPix, response_status: result.status });
-  return respond(true, { data: { ...result.data, is_qr_pix: isQrPix, external_reference: body.order_id } });
+  log("[MP Point] create_order_success", { mp_order_id: mpOrderId, response_status: result.status });
+  return respond(true, { data: { ...result.data, external_reference: body.order_id } });
 }
 
 async function getOrder(restaurantId: string, mpOrderId: string, externalReference?: string) {
@@ -560,6 +566,8 @@ Deno.serve(async (req) => {
         return await createStore(restaurant_id, params as any);
       case "create_pos":
         return await createPos(restaurant_id, params as any);
+      case "create_pix_qr":
+        return await createPixQr(restaurant_id, params as any);
       case "create_order":
         return await createOrder(restaurant_id, params as any);
       case "get_order":

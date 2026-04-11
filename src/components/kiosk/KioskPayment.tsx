@@ -423,21 +423,25 @@ export function KioskPayment({
     setPointStatus("creating_payment");
 
     try {
-      // Generate a temporary idempotency key — order will only be created after payment confirmation
       const tempId = crypto.randomUUID();
+      const isPix = paymentMethod === "point_pix";
 
-      const { data: res } = await supabase.functions.invoke("mercadopago-point", {
-        body: {
-          action: "create_order",
-          restaurant_id: restaurant.id,
-          amount: finalTotal,
-          description: `Pedido Totem`,
-          order_id: tempId,
-          device_id: pointTerminal.device_id,
-          idempotency_key: tempId,
-          payment_type: getMpPaymentType(),
-        },
-      });
+      const invokeBody: any = {
+        action: isPix ? "create_pix_qr" : "create_order",
+        restaurant_id: restaurant.id,
+        amount: finalTotal,
+        description: `Pedido Totem`,
+        order_id: tempId,
+        device_id: pointTerminal.device_id,
+        idempotency_key: tempId,
+      };
+
+      // Only send payment_type for card flows
+      if (!isPix) {
+        invokeBody.payment_type = getMpPaymentType();
+      }
+
+      const { data: res } = await supabase.functions.invoke("mercadopago-point", { body: invokeBody });
 
       if (!res?.ok) {
         const errMsg = res?.error || "Erro ao enviar para maquininha";
@@ -451,7 +455,6 @@ export function KioskPayment({
         return;
       }
 
-      // For QR PIX, the response may not have a standard 'id' — use external_reference or in_store_order_id
       const ordId = res.data?.id || res.data?.in_store_order_id || tempId;
       const extRef = res.data?.external_reference || tempId;
       setMpOrderId(ordId);
