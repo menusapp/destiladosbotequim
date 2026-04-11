@@ -37,7 +37,7 @@ async function getRestaurantToken(restaurantId: string) {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("online_payment_config")
-    .select("mp_access_token, mp_user_id, token_expires_at")
+    .select("mp_access_token, mp_user_id, token_expires_at, mp_pos_id")
     .eq("restaurant_id", restaurantId)
     .maybeSingle();
 
@@ -49,7 +49,7 @@ async function getRestaurantToken(restaurantId: string) {
     throw new Error("TOKEN_EXPIRED");
   }
 
-  return { accessToken: data.mp_access_token, mpUserId: data.mp_user_id };
+  return { accessToken: data.mp_access_token, mpUserId: data.mp_user_id, mpPosId: data.mp_pos_id };
 }
 
 async function mpFetch(
