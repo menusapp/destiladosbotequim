@@ -249,7 +249,7 @@ export default function KioskSettings({ restaurantId }: Props) {
       }
 
       // The edge function now auto-saves mp_external_pos_id to online_payment_config
-      setMpExternalPosId(posRes.data?.external_id || externalPosId);
+      // The edge function now auto-saves mp_external_pos_id to online_payment_config
 
       const terminal = savedTerminals.find(t => t.use_on_kiosk);
       if (terminal) {
