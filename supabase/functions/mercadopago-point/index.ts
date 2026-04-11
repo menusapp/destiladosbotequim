@@ -142,6 +142,111 @@ async function createPos(restaurantId: string, body: { name: string; external_id
   return respond(true, { data: { ...result.data, mp_pos_id_saved: posExternalId, pos_already_existed: result.status === 409 } });
 }
 
+// ========== List real POS devices from MP account ==========
+async function listPos(restaurantId: string) {
+  const { accessToken, mpUserId } = await getRestaurantToken(restaurantId);
+
+  // GET /pos returns all POS for this account
+  const result = await mpFetch("/pos", accessToken);
+
+  if (!result.ok) {
+    return respond(false, { ...translateMpError(result), data: null });
+  }
+
+  const allPos = result.data?.results || result.data || [];
+  const posList = Array.isArray(allPos)
+    ? allPos.map((p: any) => ({
+        id: p.id,
+        external_id: p.external_id || null,
+        name: p.name,
+        store_id: p.store_id,
+        external_store_id: p.external_store_id || null,
+        status: p.status,
+        category: p.category,
+        uuid: p.uuid || null,
+        qr: p.qr ? { image: p.qr.image, template_document: p.qr.template_document, template_image: p.qr.template_image } : null,
+      }))
+    : [];
+
+  log("list_pos", { restaurant_id: restaurantId, mp_user_id: mpUserId, pos_count: posList.length, pos_list: posList, raw_sample: allPos[0] || null });
+
+  return respond(true, { data: { pos_list: posList, mp_user_id: mpUserId } });
+}
+
+// ========== Save a selected real POS external_id ==========
+async function selectPos(restaurantId: string, body: { external_id: string; name?: string }) {
+  if (!body.external_id) {
+    return respond(false, { error: "external_id é obrigatório", code: "missing_external_id" });
+  }
+
+  const sb = getSupabaseAdmin();
+  const { error } = await sb
+    .from("online_payment_config")
+    .update({ mp_pos_id: body.external_id, mp_pos_name: body.name || null })
+    .eq("restaurant_id", restaurantId);
+
+  log("select_pos_save", {
+    restaurant_id: restaurantId,
+    external_id: body.external_id,
+    name: body.name,
+    saved: !error,
+    error: error?.message || null,
+  });
+
+  if (error) {
+    return respond(false, { error: "Falha ao salvar POS: " + error.message, code: "save_error" });
+  }
+
+  return respond(true, { data: { mp_pos_id_saved: body.external_id } });
+}
+
+// ========== Assign external_id to existing POS and save it ==========
+async function assignPosExternalId(restaurantId: string, body: { pos_id: number; external_id: string }) {
+  if (!body.pos_id || !body.external_id) {
+    return respond(false, { error: "pos_id e external_id são obrigatórios", code: "missing_params" });
+  }
+
+  const { accessToken } = await getRestaurantToken(restaurantId);
+
+  // PUT /pos/{id} to update external_id
+  const result = await mpFetch(`/pos/${body.pos_id}`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify({ external_id: body.external_id }),
+  });
+
+  log("assign_pos_external_id_mp", {
+    restaurant_id: restaurantId,
+    pos_id: body.pos_id,
+    external_id: body.external_id,
+    ok: result.ok,
+    status: result.status,
+  });
+
+  if (!result.ok) {
+    return respond(false, { ...translateMpError(result), data: null });
+  }
+
+  // Save to online_payment_config
+  const sb = getSupabaseAdmin();
+  const { error } = await sb
+    .from("online_payment_config")
+    .update({ mp_pos_id: body.external_id, mp_pos_name: result.data?.name || null })
+    .eq("restaurant_id", restaurantId);
+
+  log("assign_pos_external_id_save", {
+    restaurant_id: restaurantId,
+    external_id: body.external_id,
+    saved: !error,
+    error: error?.message || null,
+  });
+
+  if (error) {
+    return respond(false, { error: "External ID atribuído no MP mas falha ao salvar: " + error.message, code: "save_error" });
+  }
+
+  return respond(true, { data: { external_id: body.external_id, pos_name: result.data?.name, mp_pos_id_saved: body.external_id } });
+}
+
 // ========== PIX: dedicated QR Code action ==========
 async function createPixQr(
   restaurantId: string,
@@ -591,6 +696,12 @@ Deno.serve(async (req) => {
         return await createStore(restaurant_id, params as any);
       case "create_pos":
         return await createPos(restaurant_id, params as any);
+      case "list_pos":
+        return await listPos(restaurant_id);
+      case "select_pos":
+        return await selectPos(restaurant_id, params as any);
+      case "assign_pos_external_id":
+        return await assignPosExternalId(restaurant_id, params as any);
       case "create_pix_qr":
         return await createPixQr(restaurant_id, params as any);
       case "create_order":
