@@ -232,12 +232,13 @@ export default function KioskSettings({ restaurantId }: Props) {
       }
       const storeId = storeRes.data?.id;
 
+      const posExternalId = `pos-totem-${restaurantId}`;
       const { data: posRes } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_pos",
           restaurant_id: restaurantId,
           name: `Totem POS`,
-          external_id: `pos-totem-${restaurantId}`,
+          external_id: posExternalId,
           external_store_id: `store-${restaurantId}`,
           fixed_amount: false,
         },
@@ -246,6 +247,12 @@ export default function KioskSettings({ restaurantId }: Props) {
         toast.error(posRes?.error || "Erro ao criar caixa");
         return;
       }
+
+      // Save mp_pos_id (external_id) to online_payment_config for QR PIX
+      await supabase
+        .from("online_payment_config" as any)
+        .update({ mp_pos_id: posExternalId, mp_pos_name: "Totem POS" } as any)
+        .eq("restaurant_id", restaurantId);
 
       const terminal = savedTerminals.find(t => t.use_on_kiosk);
       if (terminal) {
