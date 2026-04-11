@@ -214,6 +214,23 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
+  const [mpExternalPosId, setMpExternalPosId] = useState<string | null>(null);
+
+  // Check if external POS ID exists
+  useEffect(() => {
+    const checkPos = async () => {
+      try {
+        const { data } = await supabase.rpc("get_mp_external_pos_id", { p_restaurant_id: restaurantId });
+        if (data && data.length > 0) {
+          setMpExternalPosId(data[0].mp_external_pos_id || null);
+        }
+      } catch {
+        // RPC may not exist yet, ignore
+      }
+    };
+    checkPos();
+  }, [restaurantId]);
+
   const handleCreateStoreAndPos = async () => {
     setCreatingStore(true);
     try {
@@ -232,12 +249,13 @@ export default function KioskSettings({ restaurantId }: Props) {
       }
       const storeId = storeRes.data?.id;
 
+      const externalPosId = `pos-totem-${restaurantId}`;
       const { data: posRes } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_pos",
           restaurant_id: restaurantId,
           name: `Totem POS`,
-          external_id: `pos-totem-${restaurantId}`,
+          external_id: externalPosId,
           external_store_id: `store-${restaurantId}`,
           fixed_amount: false,
         },
@@ -246,6 +264,9 @@ export default function KioskSettings({ restaurantId }: Props) {
         toast.error(posRes?.error || "Erro ao criar caixa");
         return;
       }
+
+      // The edge function now auto-saves mp_external_pos_id to online_payment_config
+      setMpExternalPosId(posRes.data?.external_id || externalPosId);
 
       const terminal = savedTerminals.find(t => t.use_on_kiosk);
       if (terminal) {
@@ -263,7 +284,7 @@ export default function KioskSettings({ restaurantId }: Props) {
         }
       }
 
-      toast.success("Loja e Caixa criados com sucesso!");
+      toast.success("Loja e Caixa criados com sucesso! PIX QR Code direto ativado.");
       fetchSavedTerminals();
     } catch (err: any) {
       toast.error(err?.message || "Erro ao criar loja/caixa");
