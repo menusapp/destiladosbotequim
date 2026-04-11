@@ -248,11 +248,8 @@ export default function KioskSettings({ restaurantId }: Props) {
         return;
       }
 
-      // Save mp_pos_id (external_id) to online_payment_config for QR PIX
-      await supabase
-        .from("online_payment_config" as any)
-        .update({ mp_pos_id: posExternalId, mp_pos_name: "Totem POS" } as any)
-        .eq("restaurant_id", restaurantId);
+      // mp_pos_id is now saved server-side by the create_pos edge function
+      log("[KioskSettings] POS created, mp_pos_id saved server-side:", posRes.data?.mp_pos_id_saved || posExternalId);
 
       const terminal = savedTerminals.find(t => t.use_on_kiosk);
       if (terminal) {
