@@ -294,6 +294,41 @@ export function KioskPayment({
       }
     }
 
+    // Register cash movement for paid totem orders
+    if (alreadyPaid) {
+      try {
+        const { data: cashSession } = await supabase
+          .from("cash_register_sessions")
+          .select("id")
+          .eq("restaurant_id", restaurant.id)
+          .eq("status", "open")
+          .order("opened_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (cashSession) {
+          const modeLabel = consumptionMode === "table" ? "Mesa"
+            : consumptionMode === "counter" ? "Retirada"
+            : consumptionMode === "takeaway" ? "Viagem"
+            : consumptionMode === "delivery" ? "Entrega" : "Balcão";
+
+          await supabase.from("cash_movements").insert({
+            cash_session_id: cashSession.id,
+            restaurant_id: restaurant.id,
+            movement_type: "entrada",
+            amount: finalTotal,
+            payment_method: getPaymentTypeForDB(),
+            category: "Totem",
+            description: `Pedido Totem - ${modeLabel} - ${customer.name}`,
+            created_by: "Sistema",
+            order_id: order.id,
+          });
+        }
+      } catch (cashErr) {
+        console.error("[KioskPayment] Cash movement error:", cashErr);
+      }
+    }
+
     return order.id;
   }, [restaurant, customer, cart, consumptionMode, tableNumber, paymentMethod, selectedCardType, selectedBrand, cashPaid, finalTotal, appliedCoupon, couponDiscount, loyaltyPointsUsed, pointsDiscount, deliveryAddress]);
 
