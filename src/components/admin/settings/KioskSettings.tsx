@@ -687,25 +687,31 @@ export default function KioskSettings({ restaurantId }: Props) {
                       <div>
                         <p className="text-sm font-medium text-green-700 dark:text-green-400">Loja e Caixa já configurados</p>
                         <p className="text-xs text-muted-foreground">Store: {activeTerminal.mp_store_id} | POS: {activeTerminal.mp_pos_id}</p>
+                        <p className="text-xs text-green-600">✅ PIX QR Code direto ativo</p>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">2. Configurar Loja e Caixa</p>
-                        <p className="text-xs text-muted-foreground">Necessário para integração com o terminal</p>
+                    <>
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700">
+                        <div className="flex items-center gap-2 flex-1">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">POS não configurado</p>
+                            <p className="text-xs text-muted-foreground">O PIX abrirá a tela de seleção na maquininha. Configure o POS para ativar o QR Code direto.</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCreateStoreAndPos}
+                          disabled={creatingStore}
+                          className="gap-2 ml-3 shrink-0"
+                        >
+                          {creatingStore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Store className="h-3.5 w-3.5" />}
+                          Configurar POS
+                        </Button>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCreateStoreAndPos}
-                        disabled={creatingStore}
-                        className="gap-2"
-                      >
-                        {creatingStore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Store className="h-3.5 w-3.5" />}
-                        Configurar
-                      </Button>
-                    </div>
+                    </>
                   )}
 
                   {/* Step 3: Test */}
