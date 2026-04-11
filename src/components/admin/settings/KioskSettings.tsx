@@ -214,23 +214,6 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
-  const [mpExternalPosId, setMpExternalPosId] = useState<string | null>(null);
-
-  // Check if external POS ID exists
-  useEffect(() => {
-    const checkPos = async () => {
-      try {
-        const { data } = await supabase.rpc("get_mp_external_pos_id", { p_restaurant_id: restaurantId });
-        if (data && data.length > 0) {
-          setMpExternalPosId(data[0].mp_external_pos_id || null);
-        }
-      } catch {
-        // RPC may not exist yet, ignore
-      }
-    };
-    checkPos();
-  }, [restaurantId]);
-
   const handleCreateStoreAndPos = async () => {
     setCreatingStore(true);
     try {
