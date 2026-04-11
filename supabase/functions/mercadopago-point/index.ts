@@ -700,6 +700,8 @@ Deno.serve(async (req) => {
         return await listPos(restaurant_id);
       case "select_pos":
         return await selectPos(restaurant_id, params as any);
+      case "assign_pos_external_id":
+        return await assignPosExternalId(restaurant_id, params as any);
       case "create_pix_qr":
         return await createPixQr(restaurant_id, params as any);
       case "create_order":
