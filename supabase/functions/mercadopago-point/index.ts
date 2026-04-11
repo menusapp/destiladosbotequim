@@ -114,7 +114,23 @@ async function createPos(restaurantId: string, body: { name: string; external_id
     body: JSON.stringify(body),
   });
   if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
-  return respond(true, { data: result.data });
+
+  // Save external_id as mp_pos_id in online_payment_config (server-side to bypass RLS)
+  const sb = getSupabaseAdmin();
+  const posExternalId = body.external_id;
+  const { error: updateErr } = await sb
+    .from("online_payment_config")
+    .update({ mp_pos_id: posExternalId, mp_pos_name: body.name })
+    .eq("restaurant_id", restaurantId);
+
+  log("create_pos_save_mp_pos_id", {
+    restaurant_id: restaurantId,
+    external_id: posExternalId,
+    mp_pos_id_saved: !updateErr,
+    error: updateErr?.message || null,
+  });
+
+  return respond(true, { data: { ...result.data, mp_pos_id_saved: posExternalId } });
 }
 
 // ========== PIX: dedicated QR Code action ==========
