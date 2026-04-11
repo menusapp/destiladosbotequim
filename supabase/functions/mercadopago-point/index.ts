@@ -254,10 +254,14 @@ async function createPixQr(
 ) {
   const { accessToken, mpUserId, mpPosId } = await getRestaurantToken(restaurantId);
 
+  // Format amount: must be a number with max 2 decimal places
+  const safeAmount = Number(Number(body.amount).toFixed(2));
+
   log("[MP PIX] create_pix_qr_start", {
     restaurant_id: restaurantId,
     order_id: body.order_id,
-    amount: body.amount,
+    raw_amount: body.amount,
+    safe_amount: safeAmount,
     mp_user_id: mpUserId,
     mp_pos_id: mpPosId,
   });
@@ -267,20 +271,24 @@ async function createPixQr(
     return respond(false, { error: "POS não configurado para PIX. Configure o External POS ID nas configurações do Totem.", code: "missing_pos_config" });
   }
 
+  if (isNaN(safeAmount) || safeAmount <= 0) {
+    return respond(false, { error: "Valor inválido para pagamento PIX", code: "invalid_amount" });
+  }
+
   const pixQrPayload = {
     external_reference: body.order_id,
     title: body.description,
     description: body.description,
-    total_amount: body.amount,
+    total_amount: safeAmount,
     items: [{
       sku_number: body.order_id.slice(0, 30),
       category: "marketplace",
       title: body.description,
       description: body.description,
-      unit_price: body.amount,
+      unit_price: safeAmount,
       quantity: 1,
       unit_measure: "unit",
-      total_amount: body.amount,
+      total_amount: safeAmount,
     }],
     cash_out: { amount: 0 },
   };
@@ -294,10 +302,17 @@ async function createPixQr(
     headers: { "X-Idempotency-Key": body.idempotency_key },
   });
 
-  log("[MP PIX] response", { status: result.status, ok: result.ok, data: result.data });
+  log("[MP PIX] response", {
+    status: result.status,
+    ok: result.ok,
+    data: result.data,
+    mp_user_id: mpUserId,
+    mp_pos_id: mpPosId,
+    total_amount_sent: safeAmount,
+  });
 
   if (!result.ok) {
-    return respond(false, { ...translateMpError(result), data: null });
+    return respond(false, { ...translateMpError(result), mp_pos_id_used: mpPosId, data: null });
   }
 
   // Save to DB
@@ -312,7 +327,7 @@ async function createPixQr(
       p_terminal_id: body.device_id,
       p_external_reference: body.order_id,
       p_idempotency_key: body.idempotency_key,
-      p_amount: body.amount,
+      p_amount: safeAmount,
       p_status: "waiting_terminal",
     });
     log("[MP PIX] db_save_success", { mp_order_id: mpOrderId });
@@ -320,7 +335,7 @@ async function createPixQr(
     log("[MP PIX] db_save_error", { mp_order_id: mpOrderId, error: dbErr?.message });
   }
 
-  return respond(true, { data: { ...result.data, is_qr_pix: true, external_reference: body.order_id } });
+  return respond(true, { data: { ...result.data, is_qr_pix: true, external_reference: body.order_id, pix_accepted: true } });
 }
 
 // ========== CARD: Orders API (no PIX here) ==========
