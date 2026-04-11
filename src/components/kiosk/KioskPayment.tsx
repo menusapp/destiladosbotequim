@@ -11,7 +11,7 @@ import { KioskConfig, KioskPointTerminal } from "@/hooks/useKioskConfig";
 import { ConsumptionMode } from "./KioskConsumptionType";
 
 type PointPaymentStatus = "idle" | "creating_payment" | "waiting_terminal" | "processing" | "paid" | "failed" | "canceled";
-type PixQrMode = false | string; // false or the external_reference used for QR polling
+
 type CardStep = "method" | "card_type" | "card_brand";
 
 interface Props {
