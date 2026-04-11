@@ -426,10 +426,13 @@ export function KioskPayment({
       const tempId = crypto.randomUUID();
       const isPix = paymentMethod === "point_pix";
 
+      // Format amount to exactly 2 decimal places as a number
+      const safeAmount = Number(finalTotal.toFixed(2));
+
       const invokeBody: any = {
         action: isPix ? "create_pix_qr" : "create_order",
         restaurant_id: restaurant.id,
-        amount: finalTotal,
+        amount: safeAmount,
         description: `Pedido Totem`,
         order_id: tempId,
         device_id: pointTerminal.device_id,
@@ -441,7 +444,11 @@ export function KioskPayment({
         invokeBody.payment_type = getMpPaymentType();
       }
 
+      console.log("[KioskPayment] Sending to MP:", { action: invokeBody.action, amount: safeAmount, pos: pointTerminal.device_id });
+
       const { data: res } = await supabase.functions.invoke("mercadopago-point", { body: invokeBody });
+
+      console.log("[KioskPayment] MP response:", res);
 
       if (!res?.ok) {
         const errMsg = res?.error || "Erro ao enviar para maquininha";
@@ -455,9 +462,18 @@ export function KioskPayment({
         return;
       }
 
+      // For PIX: only proceed to waiting_terminal if API confirmed acceptance
+      if (isPix && !res.data?.pix_accepted) {
+        toast.error("PIX não foi aceito pelo Mercado Pago. Verifique o POS configurado.");
+        setPointStatus("failed");
+        setSubmitting(false);
+        return;
+      }
+
       const ordId = res.data?.id || res.data?.in_store_order_id || tempId;
       const extRef = res.data?.external_reference || tempId;
       setMpOrderId(ordId);
+      setPointStatus("waiting_terminal");
       startPointPolling(ordId, extRef);
     } catch (err: any) {
       console.error("[KioskPayment] Point payment error:", err);
