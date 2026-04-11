@@ -355,7 +355,7 @@ export function KioskPayment({
     pollingRef.current = setInterval(async () => {
       try {
         const { data: res } = await supabase.functions.invoke("mercadopago-point", {
-          body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
+          body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId, external_reference: extRef || mpOrdId },
         });
 
         if (!res?.ok) return;
