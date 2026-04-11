@@ -432,7 +432,7 @@ export function KioskPayment({
         },
       });
 
-      if (!res?.ok || !res.data?.id) {
+      if (!res?.ok) {
         const errMsg = res?.error || "Erro ao enviar para maquininha";
         if (res?.code === "TOKEN_EXPIRED") {
           toast.error("Token expirado. Reconecte a conta Mercado Pago.");
@@ -444,8 +444,11 @@ export function KioskPayment({
         return;
       }
 
-      setMpOrderId(res.data.id);
-      startPointPolling(res.data.id);
+      // For QR PIX, the response may not have a standard 'id' — use external_reference or in_store_order_id
+      const ordId = res.data?.id || res.data?.in_store_order_id || tempId;
+      const extRef = res.data?.external_reference || tempId;
+      setMpOrderId(ordId);
+      startPointPolling(ordId, extRef);
     } catch (err: any) {
       console.error("[KioskPayment] Point payment error:", err);
       toast.error(err?.message || "Erro ao processar pagamento");
