@@ -563,7 +563,7 @@ Deno.serve(async (req) => {
       case "create_order":
         return await createOrder(restaurant_id, params as any);
       case "get_order":
-        return await getOrder(restaurant_id, params.mp_order_id);
+        return await getOrder(restaurant_id, params.mp_order_id, params.external_reference);
       case "cancel_order":
         return await cancelOrder(restaurant_id, params.mp_order_id);
       case "test_order":
