@@ -361,11 +361,19 @@ export function KioskPayment({
         if (!res?.ok) return;
 
         const status = res.data?.status;
+        const internalStatus = res.data?.internal_status;
         const data = res.data;
         const txn = data?.transactions?.payments?.[0];
 
-        if (status === "processed" || status === "finished") {
-          if (txn?.status_detail === "accredited" || txn?.status === "approved") {
+        // Check internal_status first (handles merchant_orders / QR PIX)
+        const isPaid = internalStatus === "paid" ||
+          ((status === "processed" || status === "finished") && (txn?.status_detail === "accredited" || txn?.status === "approved"));
+        const isFailed = internalStatus === "failed" ||
+          ((status === "processed" || status === "finished") && !isPaid);
+        const isCanceled = internalStatus === "canceled" ||
+          status === "canceled" || status === "expired";
+
+        if (isPaid) {
             if (pollingRef.current) clearInterval(pollingRef.current);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             setPointStatus("paid");
@@ -387,18 +395,17 @@ export function KioskPayment({
               console.error("[KioskPayment] DB error after payment:", dbErr);
               toast.error("Pagamento confirmado, mas erro ao salvar pedido.");
             }
-          } else {
+        } else if (isFailed) {
             if (pollingRef.current) clearInterval(pollingRef.current);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             setPointStatus("failed");
             toast.error("Pagamento recusado na maquininha.");
-          }
-        } else if (status === "canceled" || status === "expired") {
+        } else if (isCanceled) {
           if (pollingRef.current) clearInterval(pollingRef.current);
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
           setPointStatus("canceled");
           toast.error("Pagamento cancelado.");
-        } else if (status === "processing") {
+        } else if (status === "processing" || internalStatus === "processing") {
           setPointStatus("processing");
         }
       } catch (e) {
