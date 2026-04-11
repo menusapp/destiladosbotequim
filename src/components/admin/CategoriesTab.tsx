@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil, Trash2, ImageIcon, Loader2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, ImageIcon, Loader2, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -421,6 +421,46 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
                 {category.is_active === false && (
                   <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Inativo</span>
                 )}
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={categories.indexOf(category) === 0}
+                  onClick={async () => {
+                    const idx = categories.indexOf(category);
+                    const target = categories[idx - 1];
+                    const currentOrder = category.display_order;
+                    const targetOrder = target.display_order;
+                    // Ensure different values to actually swap
+                    const newCurrent = targetOrder === currentOrder ? currentOrder - 1 : targetOrder;
+                    await supabase.from("categories").update({ display_order: newCurrent } as any).eq("id", category.id);
+                    await supabase.from("categories").update({ display_order: currentOrder } as any).eq("id", target.id);
+                    fetchCategories();
+                  }}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={categories.indexOf(category) === categories.length - 1}
+                  onClick={async () => {
+                    const idx = categories.indexOf(category);
+                    const target = categories[idx + 1];
+                    const currentOrder = category.display_order;
+                    const targetOrder = target.display_order;
+                    const newCurrent = targetOrder === currentOrder ? currentOrder + 1 : targetOrder;
+                    await supabase.from("categories").update({ display_order: newCurrent } as any).eq("id", category.id);
+                    await supabase.from("categories").update({ display_order: currentOrder } as any).eq("id", target.id);
+                    fetchCategories();
+                  }}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+                <div className="w-px h-5 bg-border mx-1" />
               </div>
               <div className="flex items-center gap-2">
                 <Switch
