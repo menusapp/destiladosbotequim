@@ -64,6 +64,7 @@ export function KioskPayment({
   // Point terminal payment state
   const [pointStatus, setPointStatus] = useState<PointPaymentStatus>("idle");
   const [mpOrderId, setMpOrderId] = useState<string | null>(null);
+  const [pixQrExternalRef, setPixQrExternalRef] = useState<string | null>(null); // For QR Code PIX polling
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const createdOrderIdRef = useRef<string | null>(null);
