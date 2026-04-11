@@ -143,8 +143,18 @@ export default function KioskSettings({ restaurantId }: Props) {
       console.error("[KioskSettings] Error loading terminals:", err);
     }
   };
+  const fetchPixPosStatus = async () => {
+    try {
+      const { data } = await supabase.rpc("admin_get_pix_pos_config", { p_restaurant_id: restaurantId });
+      if (data && data.length > 0) {
+        setPixPosId(data[0].mp_pos_id || null);
+        setPixUserId(data[0].mp_user_id || null);
+      }
+    } catch (err) {
+      console.error("[KioskSettings] Error loading PIX POS config:", err);
+    }
+  };
 
-  const handleListTerminals = async () => {
     setLoadingTerminals(true);
     try {
       const { data } = await supabase.functions.invoke("mercadopago-point", {
