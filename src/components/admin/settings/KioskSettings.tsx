@@ -155,6 +155,7 @@ export default function KioskSettings({ restaurantId }: Props) {
     }
   };
 
+  const handleListTerminals = async () => {
     setLoadingTerminals(true);
     try {
       const { data } = await supabase.functions.invoke("mercadopago-point", {
