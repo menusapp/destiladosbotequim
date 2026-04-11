@@ -344,7 +344,7 @@ export default function KioskSettings({ restaurantId }: Props) {
         toast.success(`POS "${pos.name || pos.external_id}" selecionado para PIX!`);
       } else {
         // POS lacks external_id — assign one via PUT /pos/{id}
-        const newExternalId = `pos-totem-${restaurantId.slice(0, 8)}-${pos.id}`;
+        const newExternalId = `postotem${restaurantId.replace(/-/g, '').slice(0, 8)}${pos.id}`;
         const { data } = await supabase.functions.invoke("mercadopago-point", {
           body: {
             action: "assign_pos_external_id",
