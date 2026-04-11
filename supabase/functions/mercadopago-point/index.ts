@@ -113,7 +113,11 @@ async function createPos(restaurantId: string, body: { name: string; external_id
     method: "POST",
     body: JSON.stringify(body),
   });
-  if (!result.ok) return respond(false, { ...translateMpError(result), data: null });
+
+  // Handle 409 = POS already exists — still save the external_id
+  if (!result.ok && result.status !== 409) {
+    return respond(false, { ...translateMpError(result), data: null });
+  }
 
   // Save external_id as mp_pos_id in online_payment_config (server-side to bypass RLS)
   const sb = getSupabaseAdmin();
@@ -127,10 +131,15 @@ async function createPos(restaurantId: string, body: { name: string; external_id
     restaurant_id: restaurantId,
     external_id: posExternalId,
     mp_pos_id_saved: !updateErr,
-    error: updateErr?.message || null,
+    save_error: updateErr?.message || null,
+    pos_already_existed: result.status === 409,
   });
 
-  return respond(true, { data: { ...result.data, mp_pos_id_saved: posExternalId } });
+  if (updateErr) {
+    return respond(false, { error: "POS criado mas falha ao salvar mp_pos_id: " + updateErr.message, code: "save_error" });
+  }
+
+  return respond(true, { data: { ...result.data, mp_pos_id_saved: posExternalId, pos_already_existed: result.status === 409 } });
 }
 
 // ========== PIX: dedicated QR Code action ==========

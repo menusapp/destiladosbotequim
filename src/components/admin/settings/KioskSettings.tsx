@@ -67,11 +67,14 @@ export default function KioskSettings({ restaurantId }: Props) {
   const [pendingOrderBlocked, setPendingOrderBlocked] = useState(false);
   const [cancellingPending, setCancellingPending] = useState(false);
   const [switchingMode, setSwitchingMode] = useState(false);
+  const [pixPosId, setPixPosId] = useState<string | null>(null);
+  const [pixUserId, setPixUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConfig();
     fetchMpStatus();
     fetchSavedTerminals();
+    fetchPixPosStatus();
   }, [restaurantId]);
 
   useEffect(() => {
@@ -138,6 +141,17 @@ export default function KioskSettings({ restaurantId }: Props) {
       if (data) setSavedTerminals(data as any[]);
     } catch (err) {
       console.error("[KioskSettings] Error loading terminals:", err);
+    }
+  };
+  const fetchPixPosStatus = async () => {
+    try {
+      const { data } = await supabase.rpc("admin_get_pix_pos_config", { p_restaurant_id: restaurantId });
+      if (data && data.length > 0) {
+        setPixPosId(data[0].mp_pos_id || null);
+        setPixUserId(data[0].mp_user_id || null);
+      }
+    } catch (err) {
+      console.error("[KioskSettings] Error loading PIX POS config:", err);
     }
   };
 
@@ -217,12 +231,13 @@ export default function KioskSettings({ restaurantId }: Props) {
   const handleCreateStoreAndPos = async () => {
     setCreatingStore(true);
     try {
+      const storeExternalId = `store-${restaurantId}`;
       const { data: storeRes } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_store",
           restaurant_id: restaurantId,
           name: `Loja Totem - ${restaurantId.slice(0, 8)}`,
-          external_id: `store-${restaurantId}`,
+          external_id: storeExternalId,
           location: { street_name: "Endereço do restaurante", city_name: "Cidade", state_name: "Estado" },
         },
       });
@@ -230,7 +245,7 @@ export default function KioskSettings({ restaurantId }: Props) {
         toast.error(storeRes?.error || "Erro ao criar loja");
         return;
       }
-      const storeId = storeRes.data?.id;
+      const mpStoreInternalId = storeRes.data?.id;
 
       const posExternalId = `pos-totem-${restaurantId}`;
       const { data: posRes } = await supabase.functions.invoke("mercadopago-point", {
@@ -239,7 +254,7 @@ export default function KioskSettings({ restaurantId }: Props) {
           restaurant_id: restaurantId,
           name: `Totem POS`,
           external_id: posExternalId,
-          external_store_id: `store-${restaurantId}`,
+          external_store_id: storeExternalId,
           fixed_amount: false,
         },
       });
@@ -248,27 +263,30 @@ export default function KioskSettings({ restaurantId }: Props) {
         return;
       }
 
-      // mp_pos_id is now saved server-side by the create_pos edge function
-      console.log("[KioskSettings] POS created, mp_pos_id saved server-side:", posRes.data?.mp_pos_id_saved || posExternalId);
+      console.log("[KioskSettings] POS created/synced, mp_pos_id saved:", posRes.data?.mp_pos_id_saved || posExternalId);
 
       const terminal = savedTerminals.find(t => t.use_on_kiosk);
       if (terminal) {
         await supabase.rpc("admin_upsert_point_terminal", {
           p_restaurant_id: restaurantId,
           p_device_id: terminal.device_id,
-          p_mp_external_store_id: storeId?.toString() || null,
+          p_mp_store_id: storeExternalId,
+          p_mp_pos_id: posExternalId,
+          p_mp_external_store_id: mpStoreInternalId?.toString() || null,
           p_mp_external_pos_id: posRes.data?.id?.toString() || null,
           p_use_on_kiosk: true,
         });
 
-        // Auto-switch to PDV mode
         if (terminal.operating_mode !== "PDV") {
           await handleSwitchToPDV(terminal.device_id);
         }
       }
 
-      toast.success("Loja e Caixa criados com sucesso!");
+      toast.success(posRes.data?.pos_already_existed
+        ? "POS já existia — configuração sincronizada!"
+        : "Loja e Caixa criados com sucesso!");
       fetchSavedTerminals();
+      fetchPixPosStatus();
     } catch (err: any) {
       toast.error(err?.message || "Erro ao criar loja/caixa");
     } finally {
@@ -680,20 +698,52 @@ export default function KioskSettings({ restaurantId }: Props) {
                     </div>
                   )}
 
-                  {/* Step 2: Create Store & POS — skip if already exists */}
+                  {/* Step 2: Create Store & POS */}
                   {activeTerminal.mp_store_id && activeTerminal.mp_pos_id ? (
-                    <div className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      <div>
-                        <p className="text-sm font-medium text-green-700 dark:text-green-400">Loja e Caixa já configurados</p>
-                        <p className="text-xs text-muted-foreground">Store: {activeTerminal.mp_store_id} | POS: {activeTerminal.mp_pos_id}</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-green-700 dark:text-green-400">Loja e Caixa configurados</p>
+                          <p className="text-xs text-muted-foreground">Store: {activeTerminal.mp_store_id} | POS: {activeTerminal.mp_pos_id}</p>
+                        </div>
                       </div>
+                      {/* PIX POS status from online_payment_config (canonical source) */}
+                      {pixPosId ? (
+                        <div className="flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+                          <QrCode className="h-4 w-4 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-green-700 dark:text-green-400">PIX QR Code habilitado</p>
+                            <p className="text-xs text-muted-foreground">External POS ID: {pixPosId}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700">
+                          <div className="flex items-center gap-2 flex-1">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                            <div>
+                              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">PIX não configurado</p>
+                              <p className="text-xs text-muted-foreground">External POS ID não salvo — clique em Reconfigurar</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCreateStoreAndPos}
+                            disabled={creatingStore}
+                            className="gap-2 ml-3 shrink-0"
+                          >
+                            {creatingStore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Store className="h-3.5 w-3.5" />}
+                            Reconfigurar
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">2. Configurar Loja e Caixa</p>
-                        <p className="text-xs text-muted-foreground">Necessário para integração com o terminal</p>
+                        <p className="text-xs text-muted-foreground">Necessário para integração com o terminal e PIX</p>
                       </div>
                       <Button
                         variant="outline"
