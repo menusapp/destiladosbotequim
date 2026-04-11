@@ -2130,6 +2130,7 @@ export type Database = {
           enabled: boolean | null
           id: string
           mp_access_token: string | null
+          mp_external_pos_id: string | null
           mp_pos_id: string | null
           mp_pos_name: string | null
           mp_public_key: string | null
@@ -2152,6 +2153,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           mp_access_token?: string | null
+          mp_external_pos_id?: string | null
           mp_pos_id?: string | null
           mp_pos_name?: string | null
           mp_public_key?: string | null
@@ -2174,6 +2176,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           mp_access_token?: string | null
+          mp_external_pos_id?: string | null
           mp_pos_id?: string | null
           mp_pos_name?: string | null
           mp_public_key?: string | null
