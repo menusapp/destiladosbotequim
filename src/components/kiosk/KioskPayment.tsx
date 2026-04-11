@@ -334,7 +334,7 @@ export function KioskPayment({
     return order.id;
   }, [restaurant, customer, cart, consumptionMode, tableNumber, paymentMethod, selectedCardType, selectedBrand, cashPaid, finalTotal, appliedCoupon, couponDiscount, loyaltyPointsUsed, pointsDiscount, deliveryAddress]);
 
-  const startPointPolling = useCallback((mpOrdId: string) => {
+  const startPointPolling = useCallback((mpOrdId: string, isPixQr = false, extRef?: string) => {
     setPointStatus("waiting_terminal");
 
     // Timeout after 120s
@@ -342,12 +342,14 @@ export function KioskPayment({
       if (pollingRef.current) clearInterval(pollingRef.current);
       setPointStatus("canceled");
 
-      try {
-        await supabase.functions.invoke("mercadopago-point", {
-          body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
-        });
-      } catch (e) {
-        console.error("[KioskPayment] Cancel error:", e);
+      if (!isPixQr) {
+        try {
+          await supabase.functions.invoke("mercadopago-point", {
+            body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
+          });
+        } catch (e) {
+          console.error("[KioskPayment] Cancel error:", e);
+        }
       }
 
       toast.error("Tempo esgotado. Tente novamente.");
@@ -356,51 +358,77 @@ export function KioskPayment({
     // Poll every 3s
     pollingRef.current = setInterval(async () => {
       try {
-        const { data: res } = await supabase.functions.invoke("mercadopago-point", {
-          body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
-        });
+        let res: any;
+
+        if (isPixQr && extRef) {
+          // QR Code PIX: poll via merchant_orders using external_reference
+          const { data } = await supabase.functions.invoke("mercadopago-point", {
+            body: { action: "get_qr_order", restaurant_id: restaurant.id, external_reference: extRef },
+          });
+          res = data;
+        } else {
+          // Card: poll via get_order
+          const { data } = await supabase.functions.invoke("mercadopago-point", {
+            body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
+          });
+          res = data;
+        }
 
         if (!res?.ok) return;
 
         const status = res.data?.status;
+        const internalStatus = res.data?.internal_status;
         const data = res.data;
         const txn = data?.transactions?.payments?.[0];
 
-        if (status === "processed" || status === "finished") {
-          if (txn?.status_detail === "accredited" || txn?.status === "approved") {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            setPointStatus("paid");
+        // Check for paid status (both card and PIX QR paths)
+        const isPaid = internalStatus === "paid" ||
+          status === "processed" || status === "finished" ||
+          (txn?.status_detail === "accredited" || txn?.status === "approved");
 
-            // Guard against duplicate order creation from overlapping polling ticks
-            if (orderCreationInProgressRef.current) return;
-            orderCreationInProgressRef.current = true;
+        if (isPaid) {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          setPointStatus("paid");
 
-            // Payment confirmed — NOW create the order in DB
-            try {
-              const orderId = await createOrderInDB(true);
-              if (orderId) {
-                createdOrderIdRef.current = orderId;
-                onOrderCreated(orderId);
-              } else {
-                toast.error("Pagamento confirmado, mas erro ao criar pedido.");
-              }
-            } catch (dbErr: any) {
-              console.error("[KioskPayment] DB error after payment:", dbErr);
-              toast.error("Pagamento confirmado, mas erro ao salvar pedido.");
+          if (orderCreationInProgressRef.current) return;
+          orderCreationInProgressRef.current = true;
+
+          try {
+            const orderId = await createOrderInDB(true);
+            if (orderId) {
+              createdOrderIdRef.current = orderId;
+              onOrderCreated(orderId);
+            } else {
+              toast.error("Pagamento confirmado, mas erro ao criar pedido.");
             }
-          } else {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            setPointStatus("failed");
-            toast.error("Pagamento recusado na maquininha.");
+          } catch (dbErr: any) {
+            console.error("[KioskPayment] DB error after payment:", dbErr);
+            toast.error("Pagamento confirmado, mas erro ao salvar pedido.");
           }
-        } else if (status === "canceled" || status === "expired") {
+          return;
+        }
+
+        const isFailed = internalStatus === "failed" ||
+          (status === "processed" && txn && txn.status !== "approved");
+        if (isFailed) {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          setPointStatus("failed");
+          toast.error("Pagamento recusado na maquininha.");
+          return;
+        }
+
+        const isCanceled = internalStatus === "canceled" || status === "canceled" || status === "expired";
+        if (isCanceled) {
           if (pollingRef.current) clearInterval(pollingRef.current);
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
           setPointStatus("canceled");
           toast.error("Pagamento cancelado.");
-        } else if (status === "processing") {
+          return;
+        }
+
+        if (internalStatus === "processing" || status === "processing") {
           setPointStatus("processing");
         }
       } catch (e) {
