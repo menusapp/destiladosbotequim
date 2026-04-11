@@ -217,12 +217,13 @@ export default function KioskSettings({ restaurantId }: Props) {
   const handleCreateStoreAndPos = async () => {
     setCreatingStore(true);
     try {
+      const storeExternalId = `store-${restaurantId}`;
       const { data: storeRes } = await supabase.functions.invoke("mercadopago-point", {
         body: {
           action: "create_store",
           restaurant_id: restaurantId,
           name: `Loja Totem - ${restaurantId.slice(0, 8)}`,
-          external_id: `store-${restaurantId}`,
+          external_id: storeExternalId,
           location: { street_name: "Endereço do restaurante", city_name: "Cidade", state_name: "Estado" },
         },
       });
@@ -230,7 +231,7 @@ export default function KioskSettings({ restaurantId }: Props) {
         toast.error(storeRes?.error || "Erro ao criar loja");
         return;
       }
-      const storeId = storeRes.data?.id;
+      const mpStoreInternalId = storeRes.data?.id;
 
       const posExternalId = `pos-totem-${restaurantId}`;
       const { data: posRes } = await supabase.functions.invoke("mercadopago-point", {
@@ -239,7 +240,7 @@ export default function KioskSettings({ restaurantId }: Props) {
           restaurant_id: restaurantId,
           name: `Totem POS`,
           external_id: posExternalId,
-          external_store_id: `store-${restaurantId}`,
+          external_store_id: storeExternalId,
           fixed_amount: false,
         },
       });
@@ -248,27 +249,30 @@ export default function KioskSettings({ restaurantId }: Props) {
         return;
       }
 
-      // mp_pos_id is now saved server-side by the create_pos edge function
-      console.log("[KioskSettings] POS created, mp_pos_id saved server-side:", posRes.data?.mp_pos_id_saved || posExternalId);
+      console.log("[KioskSettings] POS created/synced, mp_pos_id saved:", posRes.data?.mp_pos_id_saved || posExternalId);
 
       const terminal = savedTerminals.find(t => t.use_on_kiosk);
       if (terminal) {
         await supabase.rpc("admin_upsert_point_terminal", {
           p_restaurant_id: restaurantId,
           p_device_id: terminal.device_id,
-          p_mp_external_store_id: storeId?.toString() || null,
+          p_mp_store_id: storeExternalId,
+          p_mp_pos_id: posExternalId,
+          p_mp_external_store_id: mpStoreInternalId?.toString() || null,
           p_mp_external_pos_id: posRes.data?.id?.toString() || null,
           p_use_on_kiosk: true,
         });
 
-        // Auto-switch to PDV mode
         if (terminal.operating_mode !== "PDV") {
           await handleSwitchToPDV(terminal.device_id);
         }
       }
 
-      toast.success("Loja e Caixa criados com sucesso!");
+      toast.success(posRes.data?.pos_already_existed
+        ? "POS já existia — configuração sincronizada!"
+        : "Loja e Caixa criados com sucesso!");
       fetchSavedTerminals();
+      fetchPixPosStatus();
     } catch (err: any) {
       toast.error(err?.message || "Erro ao criar loja/caixa");
     } finally {
