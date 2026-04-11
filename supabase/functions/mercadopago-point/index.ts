@@ -200,6 +200,53 @@ async function selectPos(restaurantId: string, body: { external_id: string; name
   return respond(true, { data: { mp_pos_id_saved: body.external_id } });
 }
 
+// ========== Assign external_id to existing POS and save it ==========
+async function assignPosExternalId(restaurantId: string, body: { pos_id: number; external_id: string }) {
+  if (!body.pos_id || !body.external_id) {
+    return respond(false, { error: "pos_id e external_id são obrigatórios", code: "missing_params" });
+  }
+
+  const { accessToken } = await getRestaurantToken(restaurantId);
+
+  // PUT /pos/{id} to update external_id
+  const result = await mpFetch(`/pos/${body.pos_id}`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify({ external_id: body.external_id }),
+  });
+
+  log("assign_pos_external_id_mp", {
+    restaurant_id: restaurantId,
+    pos_id: body.pos_id,
+    external_id: body.external_id,
+    ok: result.ok,
+    status: result.status,
+  });
+
+  if (!result.ok) {
+    return respond(false, { ...translateMpError(result), data: null });
+  }
+
+  // Save to online_payment_config
+  const sb = getSupabaseAdmin();
+  const { error } = await sb
+    .from("online_payment_config")
+    .update({ mp_pos_id: body.external_id, mp_pos_name: result.data?.name || null })
+    .eq("restaurant_id", restaurantId);
+
+  log("assign_pos_external_id_save", {
+    restaurant_id: restaurantId,
+    external_id: body.external_id,
+    saved: !error,
+    error: error?.message || null,
+  });
+
+  if (error) {
+    return respond(false, { error: "External ID atribuído no MP mas falha ao salvar: " + error.message, code: "save_error" });
+  }
+
+  return respond(true, { data: { external_id: body.external_id, pos_name: result.data?.name, mp_pos_id_saved: body.external_id } });
+}
+
 // ========== PIX: dedicated QR Code action ==========
 async function createPixQr(
   restaurantId: string,
