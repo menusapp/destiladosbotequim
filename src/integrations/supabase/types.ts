@@ -4639,6 +4639,14 @@ export type Database = {
           restaurant_id: string
         }[]
       }
+      admin_get_pix_pos_config: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          mp_pos_id: string
+          mp_pos_name: string
+          mp_user_id: string
+        }[]
+      }
       admin_get_point_terminals: {
         Args: { p_restaurant_id: string }
         Returns: {
