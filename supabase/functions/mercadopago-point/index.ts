@@ -157,15 +157,18 @@ async function listPos(restaurantId: string) {
   const posList = Array.isArray(allPos)
     ? allPos.map((p: any) => ({
         id: p.id,
-        external_id: p.external_id,
+        external_id: p.external_id || null,
         name: p.name,
         store_id: p.store_id,
+        external_store_id: p.external_store_id || null,
         status: p.status,
         category: p.category,
+        uuid: p.uuid || null,
+        qr: p.qr ? { image: p.qr.image, template_document: p.qr.template_document, template_image: p.qr.template_image } : null,
       }))
     : [];
 
-  log("list_pos", { restaurant_id: restaurantId, mp_user_id: mpUserId, pos_count: posList.length, pos_list: posList });
+  log("list_pos", { restaurant_id: restaurantId, mp_user_id: mpUserId, pos_count: posList.length, pos_list: posList, raw_sample: allPos[0] || null });
 
   return respond(true, { data: { pos_list: posList, mp_user_id: mpUserId } });
 }
