@@ -1,59 +1,46 @@
 
-Objetivo
 
-- Parar definitivamente as respostas duplicadas do robô.
-- Fazer todo link enviado no WhatsApp usar o endereço público real do restaurante, nunca URL interna/preview da Lovable.
+## Plano: Corrigir duplicatas no caixa + realtime + abrir mesa pela notificação
 
-Plano
+### Problema 1 — Pedidos duplicados no caixa (CRÍTICO)
 
-1. Centralizar a geração dos links públicos
-- Criar uma fonte única para montar URL pública do restaurante a partir do slug.
-- Substituir o hardcode em `supabase/functions/whatsapp-ai-bot/index.ts`, que hoje usa `https://menu-mesa-master.lovable.app/${restaurant.slug}`.
-- Substituir em `src/hooks/useOrderStatusAdvance.ts` os links montados com `window.location.origin`, porque isso pega o domínio do admin/preview e manda o link errado no WhatsApp.
-- Deixar todos os links do bot e das notificações usando a mesma regra.
+**Causa raiz identificada**: Existem DOIS caminhos que inserem movimentações no caixa para pedidos locais:
 
-2. Corrigir o link de avaliação
-- Ajustar a rota usada nas mensagens de avaliação.
-- Hoje o hook monta `/:slug/pedido-confirmado/:id`, mas a rota real cadastrada em `src/App.tsx` é `/:slug/pedido/:orderId`.
-- Assim, o link de avaliação/status vai abrir a página certa no domínio publicado.
+1. **Trigger de banco** `add_local_order_to_cash_register` — dispara quando `payment_type` muda de null para um valor real. Insere com `order_id` preenchido.
+2. **PaymentConfirmationModal** (frontend) — insere manualmente ao confirmar pagamento. Insere **sem** `order_id` (null).
 
-3. Trocar a deduplicação frágil por deduplicação persistente
-- Remover a confiança na `Map` em memória de `supabase/functions/whatsapp-webhook/index.ts`.
-- Criar uma tabela leve de controle de eventos recebidos, com chave única por restaurante + `message_id` (e fallback por fingerprint quando necessário).
-- No webhook, registrar o evento antes de chamar `whatsapp-ai-bot`; se já existir, ignorar sem responder de novo.
-- Isso resolve o problema mesmo com invocações paralelas/serverless.
+Quando o operador confirma pagamento pela modal, o UPDATE no `orders.payment_type` dispara o trigger (entrada 1) e a modal também insere (entrada 2). A limpeza da modal usa `LIKE` por nome do cliente na descrição, que não encontra a entrada do trigger (formato diferente).
 
-4. Endurecer o webhook sem mexer na VPS
-- Garantir que só mensagens 1:1 válidas entrem no fluxo do robô.
-- Manter a saudação e o menu atuais; a mudança aqui será apenas idempotência e links corretos.
-- Não precisa fazer nada manual na VPS para essa correção.
+**Solução**: Fazer o `PaymentConfirmationModal` sempre usar `order_id` nas suas inserções de `cash_movements` e, na limpeza, deletar por `order_id` em vez de pattern matching frágil. Assim:
+- Deletar `WHERE order_id IN (targetOrderIds)` antes de inserir
+- Inserir com `order_id` preenchido
+- Isso garante que tanto o trigger quanto a modal não criem duplicatas, porque a modal limpa tudo do pedido antes de recriar
 
-Arquivos previstos
+Também adicionar deduplicação no trigger: checar se já existe `cash_movement` com aquele `order_id` antes de inserir (já existe parcialmente mas a description pattern é diferente).
 
-- `supabase/functions/whatsapp-ai-bot/index.ts`
-- `supabase/functions/whatsapp-webhook/index.ts`
-- `src/hooks/useOrderStatusAdvance.ts`
-- `src/App.tsx` (apenas para alinhar/verificar rota usada nos links)
-- nova migration em `supabase/migrations/...`
-- possivelmente um helper novo para URL pública compartilhada no frontend
+### Problema 2 — Realtime no PDV
 
-Detalhes técnicos
+O realtime já está configurado corretamente no PDVTab (canal `pdv-tables-rt` escutando tables, comandas, orders). O canal de notificações em `RestaurantAdmin.tsx` também funciona. O problema relatado pode ser intermitente por falta de filtro por `restaurant_id` no canal — todos os eventos de todos restaurantes chegam e são processados.
 
-- Causa do link errado:
-  - `whatsapp-ai-bot` ainda está hardcoded com domínio `.lovable.app`
-  - `useOrderStatusAdvance` usa `window.location.origin`, então o sistema envia o domínio da sessão atual do admin/preview
-- Causa da duplicidade:
-  - a deduplicação atual é só em memória; em ambiente serverless isso não garante bloqueio entre execuções concorrentes
-- Assunção de implementação:
-  - vou apontar os links para o domínio público oficial do produto/restaurante em vez da URL interna da Lovable; se a regra oficial for `menusapp.com.br/{slug}`, tudo sai por ela
-- Resultado esperado:
-  - 1 mensagem recebida = 1 resposta
-  - links de cardápio e avaliação sempre saindo com URL pública correta
-  - sem depender de ajuste manual na VPS
+**Solução**: Adicionar `filter: restaurant_id=eq.${restaurantId}` nos canais de realtime do PDV para reduzir ruído e melhorar performance.
 
-Validação final
+### Problema 3 — Notificação de mesa deve abrir a mesa no PDV
 
-- Enviar uma única mensagem de teste e confirmar que chega só uma resposta.
-- Testar o link do cardápio no WhatsApp.
-- Testar o link de avaliação/status no WhatsApp.
-- Repetir com mais de uma mensagem seguida para garantir que o bloqueio de duplicidade ficou estável.
+O mecanismo `pendingTableToOpen` já existe e funciona, mas tem um bug sutil: o `useEffect` que consome `pendingTableToOpen` depende de `tables` estar carregado. Se o PDV ainda está em loading quando o `pendingTableToOpen` é setado, o efeito roda mas `tables` é undefined, e o `onTableOpened()` nunca é chamado. Quando `tables` finalmente carrega, o `pendingTableToOpen` já foi consumido.
+
+**Solução**: Não chamar `onTableOpened()` se a mesa não foi encontrada, para que o efeito tente novamente quando `tables` atualizar. Só chamar `onTableOpened()` quando realmente encontrar e abrir a mesa.
+
+### Arquivos alterados
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/admin/PaymentConfirmationModal.tsx` | Limpeza por `order_id` + inserção com `order_id` |
+| `src/components/admin/PDVTab.tsx` | Filtro `restaurant_id` no realtime + fix no auto-open |
+| Migration SQL | Atualizar trigger `add_local_order_to_cash_register` para checar `order_id` existente |
+
+### Resultado esperado
+- Cada pedido gera exatamente UMA entrada no caixa
+- Métricas e relatórios refletem valores corretos sem duplicatas
+- Realtime filtrado por restaurante, mais rápido e sem ruído
+- Clicar "Ver pedido" na notificação de mesa abre a mesa corretamente no PDV
+
