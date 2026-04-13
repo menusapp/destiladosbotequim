@@ -38,6 +38,8 @@ const RoboMenusTab = lazy(() => import("@/components/admin/RoboMenusTab"));
 
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { useRestaurantModules } from "@/hooks/useRestaurantModules";
+import { usePageAccess } from "@/hooks/usePageAccess";
+import { BlockedOverlay } from "@/components/admin/BlockedOverlay";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
 import { NewReservationNotification } from "@/components/admin/NewReservationNotification";
@@ -193,12 +195,7 @@ const RestaurantAdmin = () => {
   const { isSectionAllowed, hasActiveSubscription, allowedModules, isDelinquent } = useRestaurantModules(restaurant?.id || null);
   const isTotemUnlocked = allowedModules === null || (Array.isArray(allowedModules) && allowedModules.includes("totem"));
 
-  // Force "modulos" section when no active subscription
-  useEffect(() => {
-    if (hasActiveSubscription === false && activeSection !== "modulos") {
-      setActiveSection("modulos");
-    }
-  }, [hasActiveSubscription]);
+  // No longer force modulos — overlays handle blocked access now
 
   // Read staff data from localStorage
   const staffRole = localStorage.getItem('staff_role') || '';
@@ -764,54 +761,58 @@ const RestaurantAdmin = () => {
   };
 
   const renderContent = () => {
-    switch (activeSection) {
-      case "visao-geral":
-        return <OverviewTab restaurantId={restaurant.id} />;
-      case "pedidos":
-        return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} showPrepTimer={restaurant.show_prep_timer !== false} />;
-      case "pdv":
-        return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} showPrepTimer={restaurant.show_prep_timer !== false} />;
-      case "mesas-reservas":
-        return <TablesTab restaurantId={restaurant.id} />;
-      case "cardapio":
-        return <CardapioTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
-      case "caixa":
-        return <FluxoCaixaTab restaurantId={restaurant.id} />;
-      case "estoque":
-        return <StockTab restaurantId={restaurant.id} />;
-      case "custos":
-        return <CostosTab restaurantId={restaurant.id} />;
-      case "margens":
-        return <MargensTab restaurantId={restaurant.id} />;
-      case "relatorios":
-        return <ReportsTab restaurantId={restaurant.id} />;
-      case "clientes":
-        return <ClientesTab restaurantId={restaurant.id} />;
-      case "fidelidade":
-        return <FidelityTab restaurantId={restaurant.id} />;
-      case "marketing":
-        return <MarketingTab restaurantId={restaurant.id} onNavigateToWhatsApp={() => setActiveSection("config-whatsapp")} />;
-      case "robo-menus":
-        return <RoboMenusTab restaurantId={restaurant.id} />;
-      case "fiscal":
-        return <FiscalTab restaurantId={restaurant.id} />;
-      case "integracoes":
-        return <IntegrationsTab restaurantId={restaurant.id} />;
-      case "modulos":
-        return <ModulosTab restaurantId={restaurant.id} />;
-      case "contas":
-        return staffRole === "admin" ? <ContasTab restaurantId={restaurant.id} /> : null;
-      case "config-dados":
-        return <CompanyDataSettings restaurantId={restaurant.id} />;
-      case "config-whatsapp":
-        return <WhatsAppSettings restaurantId={restaurant.id} />;
-      case "config-totem":
-        return isTotemUnlocked
-          ? <KioskSettings restaurantId={restaurant.id} />
-          : <KioskUpsellScreen />;
-      default:
-        return <OverviewTab restaurantId={restaurant.id} />;
-    }
+    const content = (() => {
+      switch (activeSection) {
+        case "visao-geral":
+          return <OverviewTab restaurantId={restaurant.id} />;
+        case "pedidos":
+          return <UnifiedOrdersTab restaurantId={restaurant.id} pendingOrderToOpen={pendingOrderToOpen} onOrderOpened={() => setPendingOrderToOpen(null)} showPrepTimer={restaurant.show_prep_timer !== false} />;
+        case "pdv":
+          return <PDVTab restaurantId={restaurant.id} pendingTableToOpen={pendingTableToOpen} onTableOpened={() => setPendingTableToOpen(null)} showPrepTimer={restaurant.show_prep_timer !== false} />;
+        case "mesas-reservas":
+          return <TablesTab restaurantId={restaurant.id} />;
+        case "cardapio":
+          return <CardapioTab restaurantId={restaurant.id} isRestaurantOpen={restaurant.is_open} />;
+        case "caixa":
+          return <FluxoCaixaTab restaurantId={restaurant.id} />;
+        case "estoque":
+          return <StockTab restaurantId={restaurant.id} />;
+        case "custos":
+          return <CostosTab restaurantId={restaurant.id} />;
+        case "margens":
+          return <MargensTab restaurantId={restaurant.id} />;
+        case "relatorios":
+          return <ReportsTab restaurantId={restaurant.id} />;
+        case "clientes":
+          return <ClientesTab restaurantId={restaurant.id} />;
+        case "fidelidade":
+          return <FidelityTab restaurantId={restaurant.id} />;
+        case "marketing":
+          return <MarketingTab restaurantId={restaurant.id} onNavigateToWhatsApp={() => setActiveSection("config-whatsapp")} />;
+        case "robo-menus":
+          return <RoboMenusTab restaurantId={restaurant.id} />;
+        case "fiscal":
+          return <FiscalTab restaurantId={restaurant.id} />;
+        case "integracoes":
+          return <IntegrationsTab restaurantId={restaurant.id} />;
+        case "modulos":
+          return <ModulosTab restaurantId={restaurant.id} />;
+        case "contas":
+          return staffRole === "admin" ? <ContasTab restaurantId={restaurant.id} /> : null;
+        case "config-dados":
+          return <CompanyDataSettings restaurantId={restaurant.id} />;
+        case "config-whatsapp":
+          return <WhatsAppSettings restaurantId={restaurant.id} />;
+        case "config-totem":
+          return isTotemUnlocked
+            ? <KioskSettings restaurantId={restaurant.id} />
+            : <KioskUpsellScreen />;
+        default:
+          return <OverviewTab restaurantId={restaurant.id} />;
+      }
+    })();
+
+    return <SectionWrapper sectionId={activeSection} restaurantId={restaurant.id} staffRole={staffRole} staffAllowedSections={staffAllowedSections} onNavigateToPlans={() => setActiveSection("modulos")}>{content}</SectionWrapper>;
   };
 
   return (
