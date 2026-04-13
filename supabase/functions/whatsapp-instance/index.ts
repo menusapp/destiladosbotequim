@@ -106,28 +106,29 @@ async function configureWebhook(instanceName: string): Promise<void> {
     { label: 'flat', data: webhookData },
   ];
 
-  for (const ep of endpoints) {
+  for (const pl of payloads) {
     try {
-      console.log(`[WEBHOOK] Trying ${ep.method} ${ep.path} for ${instanceName} -> ${webhookUrl}`);
-      const res = await fetch(`${EVOLUTION_API_URL}${ep.path}`, {
-        method: ep.method,
+      const ep = `/webhook/set/${instanceName}`;
+      console.log(`[WEBHOOK] Trying POST ${ep} (${pl.label}) for ${instanceName}`);
+      const res = await fetch(`${EVOLUTION_API_URL}${ep}`, {
+        method: 'POST',
         headers: {
           'apikey': EVOLUTION_API_KEY!,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(pl.data)
       });
       const body = await res.text();
-      console.log(`[WEBHOOK] ${ep.method} ${ep.path} response: ${res.status} - ${body.substring(0, 300)}`);
+      console.log(`[WEBHOOK] POST ${ep} (${pl.label}) response: ${res.status} - ${body.substring(0, 300)}`);
       if (res.ok) {
         console.log(`[WEBHOOK] Successfully configured webhook for ${instanceName}`);
         return;
       }
     } catch (error) {
-      console.log(`[WEBHOOK] Error on ${ep.method} ${ep.path}:`, error);
+      console.log(`[WEBHOOK] Error (${pl.label}):`, error);
     }
   }
-  console.log(`[WEBHOOK] All endpoint attempts failed for ${instanceName} (non-blocking)`);
+  console.log(`[WEBHOOK] All attempts failed for ${instanceName} (non-blocking)`);
 }
 
 // Restart instance to force new QR generation
