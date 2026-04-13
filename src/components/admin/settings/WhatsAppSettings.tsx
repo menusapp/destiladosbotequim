@@ -136,6 +136,7 @@ const SUPABASE_URL = "https://nrddbsudiphrvgfneqle.supabase.co";
 const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [statusChecked, setStatusChecked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectFlowActive, setConnectFlowActive] = useState(false);
