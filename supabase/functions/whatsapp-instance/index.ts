@@ -92,25 +92,43 @@ async function configureWebhook(instanceName: string): Promise<void> {
     return;
   }
   const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
-  try {
-    console.log(`[WEBHOOK] Configuring webhook for ${instanceName} -> ${webhookUrl}`);
-    const res = await fetch(`${EVOLUTION_API_URL}/webhook/set/${instanceName}`, {
-      method: 'POST',
-      headers: {
-        'apikey': EVOLUTION_API_KEY!,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        url: webhookUrl,
-        webhook_by_events: false,
-        webhook_base64: false,
-        events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED', 'MESSAGES_UPSERT']
-      })
-    });
-    console.log(`[WEBHOOK] Config response: ${res.status}`);
-  } catch (error) {
-    console.log(`[WEBHOOK] Failed to configure (non-blocking):`, error);
+  const webhookData = {
+    url: webhookUrl,
+    webhook_by_events: false,
+    webhook_base64: false,
+    events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED', 'MESSAGES_UPSERT', 'LOGOUT_INSTANCE'],
+    enabled: true,
+  };
+
+  // Try with "webhook" wrapper first (Evolution API v2 format), then flat
+  const payloads = [
+    { label: 'wrapped', data: { webhook: webhookData } },
+    { label: 'flat', data: webhookData },
+  ];
+
+  for (const pl of payloads) {
+    try {
+      const ep = `/webhook/set/${instanceName}`;
+      console.log(`[WEBHOOK] Trying POST ${ep} (${pl.label}) for ${instanceName}`);
+      const res = await fetch(`${EVOLUTION_API_URL}${ep}`, {
+        method: 'POST',
+        headers: {
+          'apikey': EVOLUTION_API_KEY!,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(pl.data)
+      });
+      const body = await res.text();
+      console.log(`[WEBHOOK] POST ${ep} (${pl.label}) response: ${res.status} - ${body.substring(0, 300)}`);
+      if (res.ok) {
+        console.log(`[WEBHOOK] Successfully configured webhook for ${instanceName}`);
+        return;
+      }
+    } catch (error) {
+      console.log(`[WEBHOOK] Error (${pl.label}):`, error);
+    }
   }
+  console.log(`[WEBHOOK] All attempts failed for ${instanceName} (non-blocking)`);
 }
 
 // Restart instance to force new QR generation
