@@ -18,7 +18,7 @@ export function KioskIdleScreen({ restaurant, onStart }: KioskIdleScreenProps) {
       {restaurant?.logo_url && (
         <img src={restaurant.logo_url} alt={restaurant.name} className="h-32 w-32 object-contain rounded-2xl" />
       )}
-      <h1 className="text-4xl md:text-6xl font-bold text-foreground">{restaurant?.name}</h1>
+      
       <p className="text-xl md:text-2xl text-muted-foreground">Faça seu pedido aqui!</p>
 
       <Button
