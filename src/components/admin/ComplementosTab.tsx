@@ -87,7 +87,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
             stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit,
           })),
         }));
-        return { id: cat.id, name: cat.name, is_active: (cat as any).is_active, items };
+        return { id: cat.id, name: cat.name, is_active: (cat as any).is_active, is_required: (cat as any).is_required, min_quantity: (cat as any).min_quantity, max_quantity: (cat as any).max_quantity, items };
       })
     );
     setCategories(categoriesWithItems);
