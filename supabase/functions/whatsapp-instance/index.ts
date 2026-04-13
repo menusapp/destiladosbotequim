@@ -151,9 +151,12 @@ async function restartInstance(instanceName: string): Promise<boolean> {
   }
 }
 
-// Try checking connection state, with fallback to old instance name
-async function tryCheckState(instanceName: string, fallbackName: string | null): Promise<{ stateData: any; resolvedName: string } | null> {
-  for (const name of [instanceName, fallbackName].filter(Boolean) as string[]) {
+// Try checking connection state, with fallback to old instance name and DB-saved name
+async function tryCheckState(instanceName: string, fallbackName: string | null, dbInstanceName: string | null = null): Promise<{ stateData: any; resolvedName: string } | null> {
+  const namesToTry = [instanceName, fallbackName, dbInstanceName].filter(Boolean) as string[];
+  // Deduplicate
+  const unique = [...new Set(namesToTry)];
+  for (const name of unique) {
     try {
       const res = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${name}`, {
         headers: { 'apikey': EVOLUTION_API_KEY! }
@@ -214,7 +217,8 @@ Deno.serve(async (req) => {
         .eq('restaurant_id', restaurantId)
         .maybeSingle();
 
-      const stateResult = await tryCheckState(instanceName, fallbackName);
+      const dbInstanceName = config?.instance_name || null;
+      const stateResult = await tryCheckState(instanceName, fallbackName, dbInstanceName);
 
       if (stateResult) {
         const { stateData, resolvedName } = stateResult;
