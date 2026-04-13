@@ -811,8 +811,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
   // Table actions
   const getTableMenuUrl = (tableNumber: number) => {
-    const base = window.location.origin;
-    return restaurantSlug ? `${base}/${restaurantSlug}/mesa/${tableNumber}` : null;
+    return restaurantSlug ? `https://menusapp.com.br/${restaurantSlug}/mesa/${tableNumber}` : null;
   };
 
   const handleCopyLink = (table: TableData) => {
