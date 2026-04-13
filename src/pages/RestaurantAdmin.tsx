@@ -38,7 +38,7 @@ const RoboMenusTab = lazy(() => import("@/components/admin/RoboMenusTab"));
 
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { useRestaurantModules } from "@/hooks/useRestaurantModules";
-import { usePageAccess } from "@/hooks/usePageAccess";
+
 import { BlockedOverlay } from "@/components/admin/BlockedOverlay";
 import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
