@@ -276,11 +276,13 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   }, [restaurantId]);
 
   useEffect(() => {
-    Promise.all([fetchConfig(), fetchNotificationConfigs(), fetchOwnerConfig()]).then(() => {
-      // Auto-check real status from Evolution API on mount
-      checkStatus();
+    Promise.all([fetchConfig(), fetchNotificationConfigs(), fetchOwnerConfig()]).then(async () => {
+      // Auto-check real status from Evolution API on mount - wait for it before showing UI
+      await checkStatus();
+      setStatusChecked(true);
     }).finally(() => setLoading(false));
     return () => { stopAllPolling(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchConfig, fetchNotificationConfigs, fetchOwnerConfig, stopAllPolling]);
 
   const checkStatus = async (): Promise<{ status: string } | null> => {
