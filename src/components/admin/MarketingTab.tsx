@@ -28,31 +28,14 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
 
   const checkWhatsAppStatus = async () => {
     try {
-      // First get enabled flag from DB
       const { data } = await supabase
         .from("whatsapp_config")
-        .select("enabled, instance_status")
+        .select("instance_status")
         .eq("restaurant_id", restaurantId)
         .single();
 
-      setWhatsappEnabled(data?.enabled || false);
-
-      // Check real-time status from Evolution API
-      try {
-        const res = await fetch(`https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
-        const statusData = await res.json();
-        // If API returns connected, trust it; otherwise fallback to DB status
-        if (statusData.status === "connected") {
-          setWhatsappConnected(true);
-        } else {
-          // Trust DB instance_status as fallback (API may not find instance by name)
-          const dbStatus = statusData.config?.instance_status || data?.instance_status;
-          setWhatsappConnected(dbStatus === "connected");
-        }
-      } catch {
-        // Fallback to DB value
-        setWhatsappConnected(data?.instance_status === "connected");
-      }
+      setWhatsappEnabled(true);
+      setWhatsappConnected(data?.instance_status === "connected");
     } catch (error) {
       console.error("Error checking WhatsApp status:", error);
       setWhatsappEnabled(false);
@@ -140,9 +123,8 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
           <AlertDescription className="flex items-center justify-between">
             <span>
               Para as campanhas funcionarem, o WhatsApp deve estar{" "}
-              <strong>conectado</strong> e com{" "}
-              <strong>mensagens automáticas ativadas</strong> em{" "}
-              Configurações → Automação WhatsApp
+              <strong>conectado</strong> na aba{" "}
+              Configurações → Notificações WhatsApp
             </span>
             {onNavigateToWhatsApp && (
               <Button
