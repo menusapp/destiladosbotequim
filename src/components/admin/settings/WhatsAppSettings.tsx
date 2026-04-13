@@ -531,7 +531,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Automação WhatsApp</h2>
+        <h2 className="text-2xl font-bold">Notificações WhatsApp</h2>
         <p className="text-muted-foreground">Configure notificações automáticas via WhatsApp</p>
       </div>
 
