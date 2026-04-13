@@ -187,7 +187,17 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     if (qrPollTimeoutRef.current) { clearTimeout(qrPollTimeoutRef.current); qrPollTimeoutRef.current = null; }
   }, []);
 
-  const fetchConfig = useCallback(async () => {
+  const handleToggleEnabled = useCallback(async (newValue: boolean) => {
+    setEnabled(newValue);
+    try {
+      await supabase.from('whatsapp_config').update({ enabled: newValue }).eq('restaurant_id', restaurantId);
+    } catch (err) {
+      console.error('[WA] Erro ao salvar toggle enabled:', err);
+      setEnabled(!newValue);
+    }
+  }, [restaurantId]);
+
+
     try {
       const { data, error } = await supabase.from('whatsapp_config').select('*').eq('restaurant_id', restaurantId).maybeSingle();
       if (error) throw error;
