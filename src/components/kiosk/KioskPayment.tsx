@@ -191,6 +191,16 @@ export function KioskPayment({
       }
     }
 
+    // Now that items exist, update to final status so triggers (stock deduction, cash) fire with items
+    if (finalStatus !== "pending") {
+      await supabase.from("orders").update({
+        status: finalStatus,
+        payment_type: getPaymentTypeForDB(),
+        payment_status: "paid",
+        paid_at: new Date().toISOString(),
+      }).eq("id", order.id);
+    }
+
     // Create comanda for table orders
     if (consumptionMode === "table" && tableId) {
       const { data: comanda, error: comandaError } = await supabase
