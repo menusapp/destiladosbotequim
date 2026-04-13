@@ -31,6 +31,7 @@ export function KioskCart({
   cart, primaryColor, onUpdateQuantity, onRemove, cartTotal, onBack, onNext,
   customerCpf, restaurantId, appliedCoupon, onApplyCoupon, couponDiscount = 0,
   loyaltyPoints = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01, onRedeemPoints,
+  isOpen = true,
 }: Props) {
   const [couponCode, setCouponCode] = useState("");
   const [validatingCoupon, setValidatingCoupon] = useState(false);
