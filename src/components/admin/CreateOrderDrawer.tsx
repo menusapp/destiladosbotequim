@@ -415,11 +415,27 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         await insertOrderItems(order.id);
 
         // Now UPDATE payment_type to fire the add_local_order_to_cash_register trigger
+        // If a payment method was selected, mark the order as paid
         if (resolvedPaymentType) {
           await supabase.from("orders").update({
             payment_type: resolvedPaymentType,
             payment_brand: resolvedPaymentBrand,
+            payment_status: "paid",
+            paid_at: new Date().toISOString(),
           }).eq("id", order.id);
+        }
+
+        // Insert employee credit record if payment type is employee_credit
+        if (paymentMethod === "employee_credit") {
+          await supabase.from("employee_credits").insert({
+            restaurant_id: restaurantId,
+            employee_name: employeeCreditName || customerName || "Funcionário",
+            order_id: order.id,
+            amount: cartTotal,
+            status: "pending",
+            notes: employeeCreditNotes || null,
+            created_by: "Sistema PDV",
+          });
         }
       }
 
