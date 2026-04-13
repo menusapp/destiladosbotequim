@@ -19,6 +19,19 @@ function normalizeEvent(event: string): string {
     'LOGOUT_INSTANCE': 'logout',
   };
   return map[event] || event;
+// Simple in-memory dedup cache to prevent processing same message twice
+const recentMessageIds = new Map<string, number>();
+const DEDUP_TTL_MS = 30_000; // 30 seconds
+
+function isDuplicate(messageId: string): boolean {
+  // Clean old entries
+  const now = Date.now();
+  for (const [key, ts] of recentMessageIds) {
+    if (now - ts > DEDUP_TTL_MS) recentMessageIds.delete(key);
+  }
+  if (recentMessageIds.has(messageId)) return true;
+  recentMessageIds.set(messageId, now);
+  return false;
 }
 
 Deno.serve(async (req) => {
