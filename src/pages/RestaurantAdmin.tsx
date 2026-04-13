@@ -105,43 +105,28 @@ const RestaurantAdmin = () => {
   const [pendingOrderToOpen, setPendingOrderToOpen] = useState<string | null>(null);
   const [pendingTableToOpen, setPendingTableToOpen] = useState<string | null>(null);
 
-  // Global sound control (Ajuste 6)
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const audioIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Global sound control — MP3 loop
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [soundMuted, setSoundMuted] = useState(false);
 
   const startGlobalSound = useCallback(() => {
-    if (audioIntervalRef.current !== null) return; // Already playing
+    if (audioRef.current) return; // Already playing
     try {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const playBeep = () => {
-        if (!audioContextRef.current) return;
-        const osc = audioContextRef.current.createOscillator();
-        const gain = audioContextRef.current.createGain();
-        osc.connect(gain);
-        gain.connect(audioContextRef.current.destination);
-        osc.frequency.value = 1000;
-        osc.type = 'square';
-        gain.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.2);
-        osc.start(audioContextRef.current.currentTime);
-        osc.stop(audioContextRef.current.currentTime + 0.2);
-      };
-      playBeep();
-      audioIntervalRef.current = setInterval(playBeep, 400);
+      const audio = new Audio('/notification-sound.mp3');
+      audio.loop = true;
+      audio.volume = 0.7;
+      audio.play().catch(e => console.error("Erro ao tocar som:", e));
+      audioRef.current = audio;
     } catch (e) {
       console.error("Erro ao iniciar som:", e);
     }
   }, []);
 
   const stopGlobalSound = useCallback(() => {
-    if (audioIntervalRef.current) {
-      clearInterval(audioIntervalRef.current);
-      audioIntervalRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
     }
   }, []);
 
