@@ -28,19 +28,19 @@ const plans = [
     name: "Básico", price: "69,90", daily: "R$ 2,33/dia", description: "Para começar a digitalizar", highlighted: false,
     features: ["Cardápio digital ilimitado", "QR Code para mesas", "Pedidos em tempo real", "1 usuário administrador", "Suporte por email"],
     cta: "Escolher este plano",
-    mpLink: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=ce558ba8031d48e78c875adbe8af561a",
+    planSlug: "basico",
   },
   {
     name: "Intermediário", price: "149,90", daily: "R$ 5,00/dia", description: "Para crescer com eficiência", highlighted: true,
     features: ["Tudo do Básico", "Delivery completo", "Gestão de estoque & CMV", "Relatórios e DRE", "Programa de fidelidade", "Até 5 usuários", "Suporte prioritário"],
     cta: "Escolher este plano",
-    mpLink: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=fe9ff4a87e634b86a493887ab8737b17",
+    planSlug: "intermediario",
   },
   {
     name: "Avançado", price: "249,90", daily: "R$ 8,33/dia", description: "Solução completa", highlighted: false,
     features: ["Tudo do Intermediário", "Robô IA Vendedor", "Marketing WhatsApp", "Remarketing automático", "Nota fiscal eletrônica", "Fluxo de caixa & DRE", "Reservas online", "Usuários ilimitados", "Suporte VIP"],
     cta: "Escolher este plano",
-    mpLink: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=e0f8cd5628974aa180490d2b6e9d78ea",
+    planSlug: "avancado",
   },
 ];
 
@@ -540,11 +540,7 @@ const LandingPage = () => {
                     <Button
                       className={`w-full mt-8 h-12 font-bold text-base hover:scale-[1.02] transition-all ${plan.highlighted ? "shadow-lg shadow-primary/25" : ""}`}
                       variant={plan.highlighted ? "default" : "outline"}
-                      onClick={() => {
-                        if (plan.mpLink && plan.mpLink !== "#") {
-                          window.open(plan.mpLink, "_blank");
-                        }
-                      }}
+                      onClick={() => navigate(`/registro/${plan.planSlug}`)}
                     >
                       {plan.cta}
                       <ChevronRight className="ml-1 h-5 w-5" />

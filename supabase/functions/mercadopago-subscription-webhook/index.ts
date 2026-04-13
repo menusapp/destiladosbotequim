@@ -51,11 +51,10 @@ Deno.serve(async (req) => {
         return new Response("OK", { status: 200, headers: corsHeaders });
       }
 
-      // Find restaurant by mp_payer_email or external_reference (restaurant_id)
+      // Find restaurant by external_reference (restaurant_id) or mp_payer_email
       let restaurantId: string | null = null;
 
       if (externalRef) {
-        // external_reference should be restaurant_id
         const { data: rest } = await supabase
           .from("restaurants")
           .select("id")
@@ -79,54 +78,85 @@ Deno.serve(async (req) => {
       }
 
       if (preapproval.status === "authorized" || preapproval.status === "active") {
-        // Cancel previous subscriptions
-        await supabase
-          .from("restaurant_subscriptions" as any)
-          .update({ status: "cancelled" })
+        // Try to update existing pending_payment subscription first
+        const { data: existingSub } = await (supabase.from("restaurant_subscriptions" as any) as any)
+          .select("id")
           .eq("restaurant_id", restaurantId)
-          .eq("status", "active");
+          .in("status", ["pending_payment", "suspended"])
+          .maybeSingle();
 
-        // Determine plan based on amount
-        const amount = preapproval.auto_recurring?.transaction_amount || 0;
-        const { data: plans } = await supabase
-          .from("subscription_plans")
-          .select("id, price")
-          .eq("is_active", true)
-          .order("price");
+        if (existingSub) {
+          // Update existing subscription to active
+          const nextPayment = new Date();
+          nextPayment.setMonth(nextPayment.getMonth() + 1);
 
-        // Find closest matching plan
-        let planId: string | null = null;
-        if (plans && plans.length > 0) {
-          const closest = plans.reduce((prev: any, curr: any) =>
-            Math.abs(curr.price - amount) < Math.abs(prev.price - amount) ? curr : prev
-          );
-          planId = closest.id;
-        }
+          await (supabase.from("restaurant_subscriptions" as any) as any)
+            .update({
+              status: "active",
+              last_payment_at: new Date().toISOString(),
+              next_payment_at: nextPayment.toISOString(),
+              mp_preapproval_id: String(dataId),
+              failed_payments: 0,
+            })
+            .eq("id", existingSub.id);
 
-        if (!planId) {
-          console.error("[MP Sub Webhook] No matching plan for amount:", amount);
-          return new Response("OK", { status: 200, headers: corsHeaders });
-        }
-
-        const nextPayment = new Date();
-        nextPayment.setMonth(nextPayment.getMonth() + 1);
-
-        await (supabase.from("restaurant_subscriptions" as any) as any).insert({
-          restaurant_id: restaurantId,
-          plan_id: planId,
-          status: "active",
-          last_payment_at: new Date().toISOString(),
-          next_payment_at: nextPayment.toISOString(),
-          mp_preapproval_id: String(dataId),
-        });
-
-        // Update restaurant's payer email
-        if (payerEmail) {
+          console.log("[MP Sub Webhook] Existing subscription activated for restaurant:", restaurantId);
+        } else {
+          // Cancel any other active subscriptions
           await supabase
-            .from("restaurants")
-            .update({ mp_payer_email: payerEmail })
-            .eq("id", restaurantId);
+            .from("restaurant_subscriptions" as any)
+            .update({ status: "cancelled" })
+            .eq("restaurant_id", restaurantId)
+            .eq("status", "active");
+
+          // Determine plan based on amount
+          const amount = preapproval.auto_recurring?.transaction_amount || 0;
+          const { data: plans } = await supabase
+            .from("subscription_plans")
+            .select("id, price")
+            .eq("is_active", true)
+            .order("price");
+
+          let planId: string | null = null;
+          if (plans && plans.length > 0) {
+            const closest = plans.reduce((prev: any, curr: any) =>
+              Math.abs(curr.price - amount) < Math.abs(prev.price - amount) ? curr : prev
+            );
+            planId = closest.id;
+          }
+
+          if (!planId) {
+            console.error("[MP Sub Webhook] No matching plan for amount:", amount);
+            return new Response("OK", { status: 200, headers: corsHeaders });
+          }
+
+          const nextPayment = new Date();
+          nextPayment.setMonth(nextPayment.getMonth() + 1);
+
+          await (supabase.from("restaurant_subscriptions" as any) as any).insert({
+            restaurant_id: restaurantId,
+            plan_id: planId,
+            status: "active",
+            last_payment_at: new Date().toISOString(),
+            next_payment_at: nextPayment.toISOString(),
+            mp_preapproval_id: String(dataId),
+            failed_payments: 0,
+          });
+
+          console.log("[MP Sub Webhook] New subscription created for restaurant:", restaurantId);
         }
+
+        // Clear pending_plan_slug and update payer email
+        const updateData: any = { pending_plan_slug: null };
+        if (payerEmail) updateData.mp_payer_email = payerEmail;
+        await supabase.from("restaurants").update(updateData).eq("id", restaurantId);
+
+        // Clear trial flags if any
+        await supabase.from("restaurants").update({
+          trial_expired: false,
+          trial_started_at: null,
+          trial_ends_at: null,
+        }).eq("id", restaurantId);
 
         console.log("[MP Sub Webhook] Subscription activated for restaurant:", restaurantId);
       } else if (preapproval.status === "paused" || preapproval.status === "cancelled") {
@@ -153,21 +183,73 @@ Deno.serve(async (req) => {
       });
       const payment = await mpResponse.json();
 
-      if (payment.status === "approved" && payment.metadata?.preapproval_id) {
-        const preapprovalId = payment.metadata.preapproval_id;
+      const preapprovalId = payment.metadata?.preapproval_id;
+      const externalRef = payment.external_reference;
 
+      if (payment.status === "approved") {
         const nextPayment = new Date();
         nextPayment.setMonth(nextPayment.getMonth() + 1);
 
-        await (supabase.from("restaurant_subscriptions" as any) as any)
-          .update({
-            status: "active",
-            last_payment_at: new Date().toISOString(),
-            next_payment_at: nextPayment.toISOString(),
-          })
-          .eq("mp_preapproval_id", String(preapprovalId));
+        // Try matching by preapproval_id first, then external_reference
+        if (preapprovalId) {
+          await (supabase.from("restaurant_subscriptions" as any) as any)
+            .update({
+              status: "active",
+              last_payment_at: new Date().toISOString(),
+              next_payment_at: nextPayment.toISOString(),
+              failed_payments: 0,
+            })
+            .eq("mp_preapproval_id", String(preapprovalId));
 
-        console.log("[MP Sub Webhook] Payment renewed for preapproval:", preapprovalId);
+          console.log("[MP Sub Webhook] Payment renewed for preapproval:", preapprovalId);
+        } else if (externalRef) {
+          await (supabase.from("restaurant_subscriptions" as any) as any)
+            .update({
+              status: "active",
+              last_payment_at: new Date().toISOString(),
+              next_payment_at: nextPayment.toISOString(),
+              failed_payments: 0,
+            })
+            .eq("restaurant_id", externalRef)
+            .in("status", ["pending_payment", "active", "suspended"]);
+
+          console.log("[MP Sub Webhook] Payment activated for restaurant:", externalRef);
+        }
+      } else if (payment.status === "rejected" || payment.status === "refunded") {
+        // Increment failed_payments
+        let matchField = "";
+        let matchValue = "";
+
+        if (preapprovalId) {
+          matchField = "mp_preapproval_id";
+          matchValue = String(preapprovalId);
+        } else if (externalRef) {
+          matchField = "restaurant_id";
+          matchValue = externalRef;
+        }
+
+        if (matchField) {
+          // Get current failed_payments count
+          const { data: sub } = await (supabase.from("restaurant_subscriptions" as any) as any)
+            .select("id, failed_payments")
+            .eq(matchField, matchValue)
+            .in("status", ["active", "pending_payment"])
+            .maybeSingle();
+
+          if (sub) {
+            const newFailedCount = (sub.failed_payments || 0) + 1;
+            const newStatus = newFailedCount >= 2 ? "suspended" : sub.status || "active";
+
+            await (supabase.from("restaurant_subscriptions" as any) as any)
+              .update({
+                failed_payments: newFailedCount,
+                status: newStatus,
+              })
+              .eq("id", sub.id);
+
+            console.log("[MP Sub Webhook] Payment rejected. Failed count:", newFailedCount, "New status:", newStatus);
+          }
+        }
       }
     }
 
