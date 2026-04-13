@@ -63,7 +63,15 @@ export const ProductDetailDrawer = ({
       }
       groupMap.get(key)!.items.push(ext);
     }
-    return Array.from(groupMap.values());
+    const groupList = Array.from(groupMap.values());
+    groupList.sort((a, b) => {
+      const aIsPao = a.categoryName.toLowerCase().includes("qual pão");
+      const bIsPao = b.categoryName.toLowerCase().includes("qual pão");
+      if (aIsPao && !bIsPao) return -1;
+      if (!aIsPao && bIsPao) return 1;
+      return 0;
+    });
+    return groupList;
   }, [extras]);
 
   const toggleExtra = (id: string, group: ExtraGroup) => {

@@ -62,6 +62,14 @@ const ProductDetailDialog = ({
       groups.push({ categoryName, items });
     }
 
+    groups.sort((a, b) => {
+      const aIsPao = a.categoryName.toLowerCase().includes("qual pão");
+      const bIsPao = b.categoryName.toLowerCase().includes("qual pão");
+      if (aIsPao && !bIsPao) return -1;
+      if (!aIsPao && bIsPao) return 1;
+      return 0;
+    });
+
     return groups;
   }, [extras]);
 
