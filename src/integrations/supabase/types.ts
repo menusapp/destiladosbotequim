@@ -3700,6 +3700,7 @@ export type Database = {
           created_at: string | null
           expires_at: string | null
           id: string
+          is_trial: boolean | null
           last_payment_at: string | null
           mp_preapproval_id: string | null
           next_payment_at: string | null
@@ -3713,6 +3714,7 @@ export type Database = {
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_trial?: boolean | null
           last_payment_at?: string | null
           mp_preapproval_id?: string | null
           next_payment_at?: string | null
@@ -3726,6 +3728,7 @@ export type Database = {
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_trial?: boolean | null
           last_payment_at?: string | null
           mp_preapproval_id?: string | null
           next_payment_at?: string | null
@@ -3789,6 +3792,9 @@ export type Database = {
           show_prep_timer: boolean | null
           slug: string
           target_cmv_percentage: number | null
+          trial_ends_at: string | null
+          trial_expired: boolean | null
+          trial_started_at: string | null
           uf: string | null
           updated_at: string | null
         }
@@ -3828,6 +3834,9 @@ export type Database = {
           show_prep_timer?: boolean | null
           slug: string
           target_cmv_percentage?: number | null
+          trial_ends_at?: string | null
+          trial_expired?: boolean | null
+          trial_started_at?: string | null
           uf?: string | null
           updated_at?: string | null
         }
@@ -3867,6 +3876,9 @@ export type Database = {
           show_prep_timer?: boolean | null
           slug?: string
           target_cmv_percentage?: number | null
+          trial_ends_at?: string | null
+          trial_expired?: boolean | null
+          trial_started_at?: string | null
           uf?: string | null
           updated_at?: string | null
         }
