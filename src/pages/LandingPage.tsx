@@ -27,19 +27,19 @@ const plans = [
   {
     name: "Básico", price: "69,90", daily: "R$ 2,33/dia", description: "Para começar a digitalizar", highlighted: false,
     features: ["Cardápio digital ilimitado", "QR Code para mesas", "Pedidos em tempo real", "1 usuário administrador", "Suporte por email"],
-    cta: "Começar grátis",
+    cta: "Escolher este plano",
     mpLink: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=ce558ba8031d48e78c875adbe8af561a",
   },
   {
     name: "Intermediário", price: "149,90", daily: "R$ 5,00/dia", description: "Para crescer com eficiência", highlighted: true,
     features: ["Tudo do Básico", "Delivery completo", "Gestão de estoque & CMV", "Relatórios e DRE", "Programa de fidelidade", "Até 5 usuários", "Suporte prioritário"],
-    cta: "Começar grátis",
+    cta: "Escolher este plano",
     mpLink: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=fe9ff4a87e634b86a493887ab8737b17",
   },
   {
     name: "Avançado", price: "249,90", daily: "R$ 8,33/dia", description: "Solução completa", highlighted: false,
     features: ["Tudo do Intermediário", "Robô IA Vendedor", "Marketing WhatsApp", "Remarketing automático", "Nota fiscal eletrônica", "Fluxo de caixa & DRE", "Reservas online", "Usuários ilimitados", "Suporte VIP"],
-    cta: "Começar grátis",
+    cta: "Escolher este plano",
     mpLink: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=e0f8cd5628974aa180490d2b6e9d78ea",
   },
 ];
@@ -121,7 +121,7 @@ const LandingPage = () => {
             <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-base font-medium" onClick={() => navigate("/login")}>
               Entrar
             </Button>
-            <Button size="sm" className="font-semibold text-base shadow-md shadow-primary/20" onClick={() => navigate("/register")}>
+            <Button size="sm" className="font-semibold text-base shadow-md shadow-primary/20" onClick={() => navigate("/registro/trial")}>
               Começar agora
             </Button>
           </div>
@@ -170,7 +170,7 @@ const LandingPage = () => {
 
           <ScrollReveal delay={300}>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" className="text-lg px-10 h-14 font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] transition-all" onClick={() => navigate("/register")}>
+              <Button size="lg" className="text-lg px-10 h-14 font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] transition-all" onClick={() => navigate("/registro/trial")}>
                 Começar agora
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -487,7 +487,7 @@ const LandingPage = () => {
               <Button
                 size="lg"
                 className="text-lg px-10 h-14 font-bold bg-white text-primary hover:bg-white/90 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all"
-                onClick={() => navigate("/register")}
+                onClick={() => navigate("/registro/trial")}
               >
                 Começar grátis agora
                 <ArrowRight className="ml-2 h-5 w-5" />

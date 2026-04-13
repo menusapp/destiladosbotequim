@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/sonner";
 import { Loader2, CheckCircle, Store } from "lucide-react";
 
 const planDisplayMap: Record<string, { name: string; color: string }> = {
+  trial: { name: "Básico (7 dias grátis)", color: "text-green-600" },
   basico: { name: "Básico", color: "text-blue-600" },
   intermediario: { name: "Intermediário", color: "text-primary" },
   avancado: { name: "Avançado", color: "text-amber-600" },
@@ -109,7 +110,15 @@ const RestaurantRegistration = () => {
 
       setSuccess(true);
       toast.success("Restaurante cadastrado com sucesso!");
-      setTimeout(() => navigate("/login"), 3000);
+
+      // Auto-login: save credentials and redirect to admin panel
+      const restaurantId = res.data?.restaurantId;
+      if (restaurantId) {
+        localStorage.setItem("restaurant_id", restaurantId);
+        localStorage.setItem("staff_user", form.username);
+        localStorage.setItem("staff_role", "admin");
+      }
+      setTimeout(() => navigate(`/${form.slug}/admin`), 3000);
     } catch {
       toast.error("Erro inesperado. Tente novamente.");
     } finally {
@@ -141,8 +150,13 @@ const RestaurantRegistration = () => {
             <h2 className="text-2xl font-bold">Cadastro realizado!</h2>
             <p className="text-muted-foreground">
               Seu restaurante foi criado no plano <span className={`font-semibold ${planInfo.color}`}>{planInfo.name}</span>.
-              Redirecionando para o login...
             </p>
+            {planSlug === "trial" && (
+              <p className="text-sm font-medium text-green-600">
+                Seu período gratuito termina em 7 dias.
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground">Redirecionando para o painel...</p>
           </CardContent>
         </Card>
       </div>
