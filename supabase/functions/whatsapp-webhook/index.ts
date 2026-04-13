@@ -143,15 +143,23 @@ Deno.serve(async (req) => {
 
       case 'messages.upsert': {
         // Message received — extract directly from data (Evolution API v2 structure)
+        const msgId = data?.key?.id || '';
         const fromMe = data?.key?.fromMe ?? false;
         const remoteJid = data?.key?.remoteJid || '';
         const customerPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
         const messageText = data?.message?.conversation
           || data?.message?.extendedTextMessage?.text
           || '';
+        const pushName = data?.pushName || '';
+
+        // Dedup: skip if we already processed this message ID
+        if (msgId && isDuplicate(msgId)) {
+          console.log(`[WEBHOOK] Duplicate message ${msgId}, skipping`);
+          break;
+        }
 
         if (!fromMe && customerPhone && messageText) {
-          console.log(`[WEBHOOK] Incoming message on ${instanceName} from ${customerPhone}: ${messageText.slice(0, 50)}`);
+          console.log(`[WEBHOOK] Incoming message on ${instanceName} from ${customerPhone} (${pushName}): ${messageText.slice(0, 50)}`);
           // Fire-and-forget call to AI bot
           fetch(`${supabaseUrl}/functions/v1/whatsapp-ai-bot`, {
             method: 'POST',
@@ -163,6 +171,7 @@ Deno.serve(async (req) => {
               restaurant_id: restaurantId,
               customer_phone: customerPhone,
               message_text: messageText,
+              customer_name: pushName,
             }),
           }).catch(err => console.error('[WEBHOOK] AI bot call failed:', err));
         } else {
