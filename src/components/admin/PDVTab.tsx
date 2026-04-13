@@ -144,17 +144,17 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   // Table management state
   const [selectedTableForDrawer, setSelectedTableForDrawer] = useState<TableData | null>(null);
   const [isManageTablesOpen, setIsManageTablesOpen] = useState(false);
-  const [restaurantSlug, setRestaurantSlug] = useState<string | null>(null);
+  const [restaurantSlug, setRestaurantSlug] = useState<string | null>(slugProp || null);
 
-  // Fetch restaurant slug
+  // Fetch restaurant slug if not provided via prop
   useEffect(() => {
-    if (!restaurantId) return;
+    if (restaurantSlug || !restaurantId) return;
     supabase.from("restaurants").select("slug").eq("id", restaurantId).single()
       .then(({ data, error }) => {
         if (error) console.error("[PDV] Erro ao buscar slug:", error);
         if (data?.slug) setRestaurantSlug(data.slug);
       });
-  }, [restaurantId]);
+  }, [restaurantId, restaurantSlug]);
 
   // Fetch products
   const { data: products } = useQuery({
