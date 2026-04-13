@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, startOfMonth, endOfMonth, subMonths, startOfYear, startOfDay, endOfDay } from "date-fns";
 
@@ -42,12 +43,17 @@ export interface OrderMetrics {
   hourlySales: { hour: string; total: number }[];
   dailySales: { day: string; total: number }[];
   revenueByMethod: { method: string; total: number }[];
-  /** IDs for CMV calculations */
   deliveryOrderIds: string[];
   localOrderIds: string[];
   counterOrderIds: string[];
   totemOrderIds: string[];
 }
+
+const EMPTY_METRICS: OrderMetrics = {
+  totalSales: 0, ordersCount: 0, averageTicket: 0,
+  localSales: 0, deliverySales: 0, hourlySales: [], dailySales: [], revenueByMethod: [],
+  deliveryOrderIds: [], localOrderIds: [], counterOrderIds: [], totemOrderIds: [],
+};
 
 function calcDeliveryOrderTotal(order: any): number {
   let subtotal = 0;
@@ -74,250 +80,229 @@ function calcTotemOrderTotal(order: any): number {
   return subtotal - Number(order.coupon_discount || 0);
 }
 
-export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
-  const [metrics, setMetrics] = useState<OrderMetrics>({
-    totalSales: 0, ordersCount: 0, averageTicket: 0,
-    localSales: 0, deliverySales: 0, hourlySales: [], dailySales: [], revenueByMethod: [],
-    deliveryOrderIds: [], localOrderIds: [], counterOrderIds: [], totemOrderIds: [],
-  });
-  const [loading, setLoading] = useState(true);
+async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Promise<OrderMetrics> {
+  const { start, end } = getDateRange(dateRange);
 
-  const fetchMetrics = useCallback(async () => {
-    try {
-      const { start, end } = getDateRange(dateRange);
+  const [deliveryRes, localBillsRes, counterRes, totemRes, paymentMethodsRes] = await Promise.all([
+    supabase.from("orders")
+      .select("id, created_at, order_type, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
+      .eq("restaurant_id", restaurantId)
+      .eq("order_type", "delivery")
+      .in("status", FINALIZED_ORDER_STATUSES)
+      .gte("created_at", start).lte("created_at", end),
+    supabase.from("bills")
+      .select("id, total_amount, payment_method, payment_splits, paid_at, table_id, tables!inner(restaurant_id)")
+      .eq("tables.restaurant_id", restaurantId)
+      .eq("status", "paid")
+      .gt("total_amount", 0)
+      .gte("paid_at", start).lte("paid_at", end),
+    supabase.from("counter_orders")
+      .select("id, total_amount, finalized_at, payment_method")
+      .eq("restaurant_id", restaurantId).eq("status", "paid")
+      .gte("finalized_at", start).lte("finalized_at", end),
+    supabase.from("orders")
+      .select("id, paid_at, order_type, delivery_type, payment_type, payment_brand, coupon_discount, delivery_fee, loyalty_points_used, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
+      .eq("restaurant_id", restaurantId)
+      .eq("order_channel", "totem")
+      .eq("payment_status", "paid")
+      .gte("paid_at", start).lte("paid_at", end),
+    supabase.from("payment_methods")
+      .select("id, name, method_type")
+      .eq("restaurant_id", restaurantId),
+  ]);
 
-      // Fetch all data sources in parallel
-      const [deliveryRes, localBillsRes, counterRes, totemRes, paymentMethodsRes] = await Promise.all([
-        // Delivery orders — only finalized
-        supabase.from("orders")
-          .select("id, created_at, order_type, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
-          .eq("restaurant_id", restaurantId)
-          .eq("order_type", "delivery")
-          .in("status", FINALIZED_ORDER_STATUSES)
-          .gte("created_at", start).lte("created_at", end),
-        // Local bills paid (exclude zero-amount bills)
-        supabase.from("bills")
-          .select("id, total_amount, payment_method, payment_splits, paid_at, table_id, tables!inner(restaurant_id)")
-          .eq("tables.restaurant_id", restaurantId)
-          .eq("status", "paid")
-          .gt("total_amount", 0)
-          .gte("paid_at", start).lte("paid_at", end),
-        // Counter orders paid
-        supabase.from("counter_orders")
-          .select("id, total_amount, finalized_at, payment_method")
-          .eq("restaurant_id", restaurantId).eq("status", "paid")
-          .gte("finalized_at", start).lte("finalized_at", end),
-        // Totem orders paid — recognized by paid_at
-        supabase.from("orders")
-          .select("id, paid_at, order_type, delivery_type, payment_type, payment_brand, coupon_discount, delivery_fee, loyalty_points_used, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
-          .eq("restaurant_id", restaurantId)
-          .eq("order_channel", "totem")
-          .eq("payment_status", "paid")
-          .gte("paid_at", start).lte("paid_at", end),
-        // Payment methods for normalization
-        supabase.from("payment_methods")
-          .select("id, name, method_type")
-          .eq("restaurant_id", restaurantId),
-      ]);
+  const deliveryOrders = deliveryRes.data || [];
+  const paidBills = localBillsRes.data || [];
+  const counterOrders = counterRes.data || [];
+  const totemOrders = totemRes.data || [];
+  const paymentMethods = paymentMethodsRes.data || [];
 
-      const deliveryOrders = deliveryRes.data || [];
-      const paidBills = localBillsRes.data || [];
-      const counterOrders = counterRes.data || [];
-      const totemOrders = totemRes.data || [];
-      const paymentMethods = paymentMethodsRes.data || [];
+  let deliverySales = 0;
+  deliveryOrders.forEach(o => { deliverySales += calcDeliveryOrderTotal(o); });
+  const deliveryOrderIds = deliveryOrders.map(o => o.id);
 
-      // --- Calculate totals ---
-      let deliverySales = 0;
-      deliveryOrders.forEach(o => { deliverySales += calcDeliveryOrderTotal(o); });
-      const deliveryOrderIds = deliveryOrders.map(o => o.id);
+  const billsTotal = paidBills.reduce((s, b) => s + Number(b.total_amount), 0);
+  const counterTotal = counterOrders.reduce((s, co) => s + (co.total_amount || 0), 0);
 
-      const billsTotal = paidBills.reduce((s, b) => s + Number(b.total_amount), 0);
-      const counterTotal = counterOrders.reduce((s, co) => s + (co.total_amount || 0), 0);
-
-      // Totem totals — split into local vs delivery
-      let totemLocalSales = 0;
-      let totemDeliverySales = 0;
-      totemOrders.forEach(o => {
-        const total = calcTotemOrderTotal(o);
-        if (o.order_type === 'delivery') {
-          totemDeliverySales += total;
-        } else {
-          totemLocalSales += total;
-        }
-      });
-      const totemOrderIds = totemOrders.map(o => o.id);
-
-      const localSales = billsTotal + counterTotal + totemLocalSales;
-      deliverySales += totemDeliverySales;
-      const totalSales = localSales + deliverySales;
-
-      // Get local order IDs for CMV
-      const tableIds = [...new Set(paidBills.map(b => b.table_id))];
-      let localOrderIds: string[] = [];
-      if (tableIds.length > 0) {
-        const { data: localOrders } = await supabase
-          .from("orders")
-          .select("id")
-          .in("table_id", tableIds)
-          .eq("order_type", "local")
-          .gte("created_at", start).lte("created_at", end);
-        localOrderIds = (localOrders || []).map(o => o.id);
-      }
-      const counterOrderIds = counterOrders.map(o => o.id);
-
-      const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length + totemOrders.length;
-      const averageTicket = totalCount > 0 ? totalSales / totalCount : 0;
-
-      // --- Hourly or daily sales ---
-      let hourlySales: { hour: string; total: number }[] = [];
-      let dailySales: { day: string; total: number }[] = [];
-      const isSingleDay = dateRange === "today" || dateRange === "yesterday";
-
-      if (isSingleDay) {
-        const hourlyMap = new Map<string, number>();
-        for (let h = 6; h <= 23; h++) hourlyMap.set(h.toString().padStart(2, "0") + ":00", 0);
-        deliveryOrders.forEach(o => {
-          const h = new Date(o.created_at).getHours().toString().padStart(2, "0") + ":00";
-          hourlyMap.set(h, (hourlyMap.get(h) || 0) + calcDeliveryOrderTotal(o));
-        });
-        counterOrders.forEach(co => {
-          if (co.finalized_at) {
-            const h = new Date(co.finalized_at).getHours().toString().padStart(2, "0") + ":00";
-            hourlyMap.set(h, (hourlyMap.get(h) || 0) + (co.total_amount || 0));
-          }
-        });
-        paidBills.forEach(b => {
-          if (b.paid_at) {
-            const h = new Date(b.paid_at).getHours().toString().padStart(2, "0") + ":00";
-            hourlyMap.set(h, (hourlyMap.get(h) || 0) + Number(b.total_amount || 0));
-          }
-        });
-        // Totem orders by paid_at
-        totemOrders.forEach(o => {
-          if (o.paid_at) {
-            const h = new Date(o.paid_at).getHours().toString().padStart(2, "0") + ":00";
-            hourlyMap.set(h, (hourlyMap.get(h) || 0) + calcTotemOrderTotal(o));
-          }
-        });
-        hourlySales = Array.from(hourlyMap.entries()).map(([hour, total]) => ({ hour, total })).sort((a, b) => a.hour.localeCompare(b.hour));
-      } else {
-        const dailyMap = new Map<string, number>();
-        const startDate = new Date(start);
-        const endDate = new Date(end);
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-          dailyMap.set(d.toISOString().slice(0, 10), 0);
-        }
-        deliveryOrders.forEach(o => {
-          const d = new Date(o.created_at).toISOString().slice(0, 10);
-          dailyMap.set(d, (dailyMap.get(d) || 0) + calcDeliveryOrderTotal(o));
-        });
-        counterOrders.forEach(co => {
-          if (co.finalized_at) {
-            const d = new Date(co.finalized_at).toISOString().slice(0, 10);
-            dailyMap.set(d, (dailyMap.get(d) || 0) + (co.total_amount || 0));
-          }
-        });
-        paidBills.forEach(b => {
-          if (b.paid_at) {
-            const d = new Date(b.paid_at).toISOString().slice(0, 10);
-            dailyMap.set(d, (dailyMap.get(d) || 0) + Number(b.total_amount || 0));
-          }
-        });
-        // Totem orders by paid_at
-        totemOrders.forEach(o => {
-          if (o.paid_at) {
-            const d = new Date(o.paid_at).toISOString().slice(0, 10);
-            dailyMap.set(d, (dailyMap.get(d) || 0) + calcTotemOrderTotal(o));
-          }
-        });
-        dailySales = Array.from(dailyMap.entries()).map(([day, total]) => ({ day, total })).sort((a, b) => a.day.localeCompare(b.day));
-      }
-
-      // --- Revenue by payment method ---
-      const normalizeMethod = (method: string | null | undefined): string => {
-        if (!method) return "Outros";
-        const base = method.split(" - ")[0].trim();
-        if (base.startsWith("Crédito") || base.startsWith("Créd")) return "Crédito";
-        if (base.startsWith("Débito") || base.startsWith("Déb")) return "Débito";
-        if (base.startsWith("Vale")) return "Vale Refeição";
-        if (base === "Dinheiro") return "Dinheiro";
-        if (base === "PIX") return "PIX";
-        if (method === "cash") return "Dinheiro";
-        if (method === "pix" || method === "pix_online") return "PIX";
-        if (method === "credit" || method === "card" || method === "credit_card_online") return "Crédito";
-        if (method === "debit") return "Débito";
-        if (method === "meal_voucher" || method === "voucher") return "Vale Refeição";
-        if (method === "bank_transfer") return "PIX";
-        if (method === "Pago pelo iFood" || method === "ifood_online") return "iFood Online";
-        if (method === "employee_credit") return "Crédito Funcionário";
-        const byId = paymentMethods.find(p => p.id === method);
-        if (byId) return normalizeMethod(byId.method_type);
-        const byName = paymentMethods.find(p => p.name.toLowerCase() === method.toLowerCase());
-        if (byName) return normalizeMethod(byName.method_type);
-        return "Outros";
-      };
-
-      const addMethodRevenue = (methodTotals: Record<string, number>, method: string | null | undefined, total: number) => {
-        if (!method) {
-          methodTotals["Outros"] = (methodTotals["Outros"] || 0) + total;
-          return;
-        }
-        if (method.includes(",")) {
-          const parts = method.split(",").map(s => s.trim()).filter(Boolean);
-          const perPart = total / (parts.length || 1);
-          for (const part of parts) {
-            const m = normalizeMethod(part);
-            methodTotals[m] = (methodTotals[m] || 0) + perPart;
-          }
-          return;
-        }
-        const m = normalizeMethod(method);
-        methodTotals[m] = (methodTotals[m] || 0) + total;
-      };
-
-      const methodTotals: Record<string, number> = {};
-      paidBills.forEach((b: any) => {
-        const splits = b.payment_splits;
-        if (Array.isArray(splits) && splits.length > 0) {
-          for (const split of splits) {
-            const m = normalizeMethod(split.display || split.method);
-            methodTotals[m] = (methodTotals[m] || 0) + Number(split.amount || 0);
-          }
-        } else {
-          addMethodRevenue(methodTotals, b.payment_method, Number(b.total_amount));
-        }
-      });
-      counterOrders.forEach((co: any) => {
-        addMethodRevenue(methodTotals, co.payment_method, Number(co.total_amount));
-      });
-      deliveryOrders.forEach((o: any) => {
-        addMethodRevenue(methodTotals, o.payment_type, calcDeliveryOrderTotal(o));
-      });
-      // Totem orders
-      totemOrders.forEach((o: any) => {
-        addMethodRevenue(methodTotals, o.payment_type, calcTotemOrderTotal(o));
-      });
-
-      const revenueByMethod = Object.entries(methodTotals)
-        .filter(([_, total]) => total > 0)
-        .map(([method, total]) => ({ method, total }));
-
-      setMetrics({
-        totalSales, ordersCount: totalCount, averageTicket,
-        localSales, deliverySales, hourlySales, dailySales, revenueByMethod,
-        deliveryOrderIds, localOrderIds, counterOrderIds, totemOrderIds,
-      });
-    } catch (err) {
-      console.error("Error fetching order metrics:", err);
-    } finally {
-      setLoading(false);
+  let totemLocalSales = 0;
+  let totemDeliverySales = 0;
+  totemOrders.forEach(o => {
+    const total = calcTotemOrderTotal(o);
+    if (o.order_type === 'delivery') {
+      totemDeliverySales += total;
+    } else {
+      totemLocalSales += total;
     }
-  }, [restaurantId, dateRange]);
+  });
+  const totemOrderIds = totemOrders.map(o => o.id);
 
-  useEffect(() => {
-    setLoading(true);
-    fetchMetrics();
-  }, [fetchMetrics]);
+  const localSales = billsTotal + counterTotal + totemLocalSales;
+  deliverySales += totemDeliverySales;
+  const totalSales = localSales + deliverySales;
 
-  return { metrics, loading, refetch: fetchMetrics };
+  const tableIds = [...new Set(paidBills.map(b => b.table_id))];
+  let localOrderIds: string[] = [];
+  if (tableIds.length > 0) {
+    const { data: localOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .in("table_id", tableIds)
+      .eq("order_type", "local")
+      .gte("created_at", start).lte("created_at", end);
+    localOrderIds = (localOrders || []).map(o => o.id);
+  }
+  const counterOrderIds = counterOrders.map(o => o.id);
+
+  const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length + totemOrders.length;
+  const averageTicket = totalCount > 0 ? totalSales / totalCount : 0;
+
+  let hourlySales: { hour: string; total: number }[] = [];
+  let dailySales: { day: string; total: number }[] = [];
+  const isSingleDay = dateRange === "today" || dateRange === "yesterday";
+
+  if (isSingleDay) {
+    const hourlyMap = new Map<string, number>();
+    for (let h = 6; h <= 23; h++) hourlyMap.set(h.toString().padStart(2, "0") + ":00", 0);
+    deliveryOrders.forEach(o => {
+      const h = new Date(o.created_at).getHours().toString().padStart(2, "0") + ":00";
+      hourlyMap.set(h, (hourlyMap.get(h) || 0) + calcDeliveryOrderTotal(o));
+    });
+    counterOrders.forEach(co => {
+      if (co.finalized_at) {
+        const h = new Date(co.finalized_at).getHours().toString().padStart(2, "0") + ":00";
+        hourlyMap.set(h, (hourlyMap.get(h) || 0) + (co.total_amount || 0));
+      }
+    });
+    paidBills.forEach(b => {
+      if (b.paid_at) {
+        const h = new Date(b.paid_at).getHours().toString().padStart(2, "0") + ":00";
+        hourlyMap.set(h, (hourlyMap.get(h) || 0) + Number(b.total_amount || 0));
+      }
+    });
+    totemOrders.forEach(o => {
+      if (o.paid_at) {
+        const h = new Date(o.paid_at).getHours().toString().padStart(2, "0") + ":00";
+        hourlyMap.set(h, (hourlyMap.get(h) || 0) + calcTotemOrderTotal(o));
+      }
+    });
+    hourlySales = Array.from(hourlyMap.entries()).map(([hour, total]) => ({ hour, total })).sort((a, b) => a.hour.localeCompare(b.hour));
+  } else {
+    const dailyMap = new Map<string, number>();
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      dailyMap.set(d.toISOString().slice(0, 10), 0);
+    }
+    deliveryOrders.forEach(o => {
+      const d = new Date(o.created_at).toISOString().slice(0, 10);
+      dailyMap.set(d, (dailyMap.get(d) || 0) + calcDeliveryOrderTotal(o));
+    });
+    counterOrders.forEach(co => {
+      if (co.finalized_at) {
+        const d = new Date(co.finalized_at).toISOString().slice(0, 10);
+        dailyMap.set(d, (dailyMap.get(d) || 0) + (co.total_amount || 0));
+      }
+    });
+    paidBills.forEach(b => {
+      if (b.paid_at) {
+        const d = new Date(b.paid_at).toISOString().slice(0, 10);
+        dailyMap.set(d, (dailyMap.get(d) || 0) + Number(b.total_amount || 0));
+      }
+    });
+    totemOrders.forEach(o => {
+      if (o.paid_at) {
+        const d = new Date(o.paid_at).toISOString().slice(0, 10);
+        dailyMap.set(d, (dailyMap.get(d) || 0) + calcTotemOrderTotal(o));
+      }
+    });
+    dailySales = Array.from(dailyMap.entries()).map(([day, total]) => ({ day, total })).sort((a, b) => a.day.localeCompare(b.day));
+  }
+
+  const normalizeMethod = (method: string | null | undefined): string => {
+    if (!method) return "Outros";
+    const base = method.split(" - ")[0].trim();
+    if (base.startsWith("Crédito") || base.startsWith("Créd")) return "Crédito";
+    if (base.startsWith("Débito") || base.startsWith("Déb")) return "Débito";
+    if (base.startsWith("Vale")) return "Vale Refeição";
+    if (base === "Dinheiro") return "Dinheiro";
+    if (base === "PIX") return "PIX";
+    if (method === "cash") return "Dinheiro";
+    if (method === "pix" || method === "pix_online") return "PIX";
+    if (method === "credit" || method === "card" || method === "credit_card_online") return "Crédito";
+    if (method === "debit") return "Débito";
+    if (method === "meal_voucher" || method === "voucher") return "Vale Refeição";
+    if (method === "bank_transfer") return "PIX";
+    if (method === "Pago pelo iFood" || method === "ifood_online") return "iFood Online";
+    if (method === "employee_credit") return "Crédito Funcionário";
+    const byId = paymentMethods.find(p => p.id === method);
+    if (byId) return normalizeMethod(byId.method_type);
+    const byName = paymentMethods.find(p => p.name.toLowerCase() === method.toLowerCase());
+    if (byName) return normalizeMethod(byName.method_type);
+    return "Outros";
+  };
+
+  const addMethodRevenue = (methodTotals: Record<string, number>, method: string | null | undefined, total: number) => {
+    if (!method) {
+      methodTotals["Outros"] = (methodTotals["Outros"] || 0) + total;
+      return;
+    }
+    if (method.includes(",")) {
+      const parts = method.split(",").map(s => s.trim()).filter(Boolean);
+      const perPart = total / (parts.length || 1);
+      for (const part of parts) {
+        const m = normalizeMethod(part);
+        methodTotals[m] = (methodTotals[m] || 0) + perPart;
+      }
+      return;
+    }
+    const m = normalizeMethod(method);
+    methodTotals[m] = (methodTotals[m] || 0) + total;
+  };
+
+  const methodTotals: Record<string, number> = {};
+  paidBills.forEach((b: any) => {
+    const splits = b.payment_splits;
+    if (Array.isArray(splits) && splits.length > 0) {
+      for (const split of splits) {
+        const m = normalizeMethod(split.display || split.method);
+        methodTotals[m] = (methodTotals[m] || 0) + Number(split.amount || 0);
+      }
+    } else {
+      addMethodRevenue(methodTotals, b.payment_method, Number(b.total_amount));
+    }
+  });
+  counterOrders.forEach((co: any) => {
+    addMethodRevenue(methodTotals, co.payment_method, Number(co.total_amount));
+  });
+  deliveryOrders.forEach((o: any) => {
+    addMethodRevenue(methodTotals, o.payment_type, calcDeliveryOrderTotal(o));
+  });
+  totemOrders.forEach((o: any) => {
+    addMethodRevenue(methodTotals, o.payment_type, calcTotemOrderTotal(o));
+  });
+
+  const revenueByMethod = Object.entries(methodTotals)
+    .filter(([_, total]) => total > 0)
+    .map(([method, total]) => ({ method, total }));
+
+  return {
+    totalSales, ordersCount: totalCount, averageTicket,
+    localSales, deliverySales, hourlySales, dailySales, revenueByMethod,
+    deliveryOrderIds, localOrderIds, counterOrderIds, totemOrderIds,
+  };
+}
+
+export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["order-metrics", restaurantId, dateRange],
+    queryFn: () => fetchOrderMetrics(restaurantId, dateRange),
+    staleTime: 2 * 60 * 1000,
+    enabled: !!restaurantId,
+  });
+
+  const stableRefetch = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  return { metrics: data || EMPTY_METRICS, loading: isLoading, refetch: stableRefetch };
 }

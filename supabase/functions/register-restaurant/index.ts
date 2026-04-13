@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       console.error("[register-restaurant] Invalid password length");
       return new Response(JSON.stringify({ error: "Senha deve ter pelo menos 6 caracteres" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    if (!planSlug || !["basico", "intermediario", "avancado"].includes(planSlug)) {
+    if (!planSlug || !["basico", "intermediario", "avancado", "trial"].includes(planSlug)) {
       console.error("[register-restaurant] Invalid planSlug:", planSlug);
       return new Response(JSON.stringify({ error: "Plano inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -81,19 +81,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Este nome de usuário já está em uso." }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Map planSlug to plan name
-    const planNameMap: Record<string, string> = {
+    // Determine the actual plan to use
+    const isTrial = planSlug === "trial";
+    const actualPlanName = isTrial ? "Básico" : {
       basico: "Básico",
       intermediario: "Intermediário",
       avancado: "Avançado",
-    };
+    }[planSlug] || "Básico";
 
     // Find the subscription plan
-    console.log("[register-restaurant] Looking for plan:", planNameMap[planSlug]);
+    console.log("[register-restaurant] Looking for plan:", actualPlanName);
     const { data: plan, error: planError } = await supabase
       .from("subscription_plans")
       .select("id, name")
-      .eq("name", planNameMap[planSlug])
+      .eq("name", actualPlanName)
       .eq("is_active", true)
       .maybeSingle();
 
@@ -102,7 +103,7 @@ Deno.serve(async (req) => {
     }
 
     if (!plan) {
-      console.error("[register-restaurant] Plan not found for:", planNameMap[planSlug]);
+      console.error("[register-restaurant] Plan not found for:", actualPlanName);
       return new Response(JSON.stringify({ error: "Plano não encontrado" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -119,16 +120,27 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Erro ao processar senha. Tente novamente." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Calculate trial dates
+    const now = new Date();
+    const trialEndsAt = isTrial ? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+
     // 1. Create restaurant
     console.log("[register-restaurant] Creating restaurant...");
+    const restaurantInsert: any = {
+      name: name.trim(),
+      slug: slug.trim(),
+      cnpj: cnpj?.trim() || null,
+      endereco_fiscal: address?.trim() || null,
+    };
+    if (isTrial) {
+      restaurantInsert.trial_started_at = now.toISOString();
+      restaurantInsert.trial_ends_at = trialEndsAt!.toISOString();
+      restaurantInsert.trial_expired = false;
+    }
+
     const { data: restaurant, error: restError } = await supabase
       .from("restaurants")
-      .insert({
-        name: name.trim(),
-        slug: slug.trim(),
-        cnpj: cnpj?.trim() || null,
-        endereco_fiscal: address?.trim() || null,
-      })
+      .insert(restaurantInsert)
       .select("id")
       .single();
 
@@ -151,26 +163,49 @@ Deno.serve(async (req) => {
 
     if (credError) {
       console.error("[register-restaurant] Credentials creation failed:", credError);
-      // Rollback restaurant
       await supabase.from("restaurants").delete().eq("id", restaurant.id);
       return new Response(JSON.stringify({ error: "Erro ao criar credenciais: " + credError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     console.log("[register-restaurant] Credentials created successfully");
 
-    // 3. Create subscription
-    const now = new Date().toISOString();
+    // 3. Create staff admin account (so user can login via staff login)
+    console.log("[register-restaurant] Creating staff admin account...");
+    const { error: staffError } = await supabase
+      .from("restaurant_staff")
+      .insert({
+        restaurant_id: restaurant.id,
+        display_name: name.trim(),
+        username: username.trim(),
+        password_hash: passwordHash,
+        role: "admin",
+        allowed_sections: JSON.stringify([]),
+        is_active: true,
+      });
+
+    if (staffError) {
+      console.error("[register-restaurant] Staff creation error (non-blocking):", staffError);
+    } else {
+      console.log("[register-restaurant] Staff admin created");
+    }
+
+    // 4. Create subscription
     const nextPayment = new Date();
     nextPayment.setMonth(nextPayment.getMonth() + 1);
 
     console.log("[register-restaurant] Creating subscription...");
-    const { error: subError } = await (supabase.from("restaurant_subscriptions" as any) as any).insert({
+    const subInsert: any = {
       restaurant_id: restaurant.id,
       plan_id: plan.id,
       status: "active",
-      started_at: now,
-      next_payment_at: nextPayment.toISOString(),
-    });
+      started_at: now.toISOString(),
+      next_payment_at: isTrial ? trialEndsAt!.toISOString() : nextPayment.toISOString(),
+    };
+    if (isTrial) {
+      subInsert.is_trial = true;
+    }
+
+    const { error: subError } = await (supabase.from("restaurant_subscriptions" as any) as any).insert(subInsert);
 
     if (subError) {
       console.error("[register-restaurant] Subscription error (non-blocking):", subError);
@@ -181,7 +216,7 @@ Deno.serve(async (req) => {
     console.log("[register-restaurant] Registration complete for slug:", slug.trim());
 
     return new Response(
-      JSON.stringify({ success: true, restaurantId: restaurant.id, slug: slug.trim() }),
+      JSON.stringify({ success: true, restaurantId: restaurant.id, slug: slug.trim(), isTrial }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
