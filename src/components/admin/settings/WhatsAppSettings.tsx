@@ -136,6 +136,7 @@ const SUPABASE_URL = "https://nrddbsudiphrvgfneqle.supabase.co";
 const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [statusChecked, setStatusChecked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectFlowActive, setConnectFlowActive] = useState(false);
@@ -275,11 +276,13 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   }, [restaurantId]);
 
   useEffect(() => {
-    Promise.all([fetchConfig(), fetchNotificationConfigs(), fetchOwnerConfig()]).then(() => {
-      // Auto-check real status from Evolution API on mount
-      checkStatus();
+    Promise.all([fetchConfig(), fetchNotificationConfigs(), fetchOwnerConfig()]).then(async () => {
+      // Auto-check real status from Evolution API on mount - wait for it before showing UI
+      await checkStatus();
+      setStatusChecked(true);
     }).finally(() => setLoading(false));
     return () => { stopAllPolling(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchConfig, fetchNotificationConfigs, fetchOwnerConfig, stopAllPolling]);
 
   const checkStatus = async (): Promise<{ status: string } | null> => {
@@ -463,6 +466,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
   const isConnected = config?.instance_status === 'connected';
   const isPending = config?.instance_status === 'pending' || config?.instance_status === 'connecting';
+  const isStatusKnown = statusChecked;
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
@@ -629,9 +633,10 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
               <Label>Enviar mensagens automáticas</Label>
               <p className="text-sm text-muted-foreground">Notificar automaticamente sobre pedidos e caixa</p>
             </div>
-            <Switch checked={enabled} onCheckedChange={setEnabled} disabled={!isConnected} />
+            <Switch checked={enabled} onCheckedChange={setEnabled} disabled={isStatusKnown && !isConnected} />
           </div>
-          {!isConnected && <p className="text-sm text-orange-600 mt-2">⚠️ Conecte o WhatsApp primeiro para ativar a automação</p>}
+          {isStatusKnown && !isConnected && <p className="text-sm text-orange-600 mt-2">⚠️ Conecte o WhatsApp primeiro para ativar a automação</p>}
+          {!isStatusKnown && !isConnected && <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Verificando conexão...</p>}
         </CardContent>
       </Card>
 
