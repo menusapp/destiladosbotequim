@@ -365,11 +365,17 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
   const handleDisconnect = async () => {
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`, { method: 'DELETE' });
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY }
+      });
       const data = await response.json();
       if (data.success) {
         setConfig(prev => prev ? { ...prev, instance_status: 'disconnected', connected_phone: null, connected_at: null } : null);
         setQrCodeDataUrl(null); setConnectFlowActive(false); stopAllPolling();
+        toast({ title: "Desconectado", description: "WhatsApp desconectado com sucesso" });
+      } else {
+        throw new Error(data.error || 'Falha ao desconectar');
       }
     } catch (error) {
       console.error('Error disconnecting:', error);
