@@ -6,6 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Normalize event names from Evolution API (supports both formats)
+function normalizeEvent(event: string): string {
+  const map: Record<string, string> = {
+    'connection.update': 'connection.update',
+    'CONNECTION_UPDATE': 'connection.update',
+    'qrcode.updated': 'qrcode.updated',
+    'QRCODE_UPDATED': 'qrcode.updated',
+    'messages.upsert': 'messages.upsert',
+    'MESSAGES_UPSERT': 'messages.upsert',
+    'logout': 'logout',
+    'LOGOUT_INSTANCE': 'logout',
+  };
+  return map[event] || event;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -27,7 +42,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     console.log('[WEBHOOK] Received event:', JSON.stringify(body, null, 2));
 
-    const { event, instance, data } = body;
+    const { event: rawEvent, data } = body;
+    // Extract instance name from various payload formats
+    const instance = body.instance || body.instanceName || data?.instance || data?.instanceName;
 
     if (!instance) {
       console.log('[WEBHOOK] No instance in payload');
@@ -37,6 +54,7 @@ Deno.serve(async (req) => {
     }
 
     const instanceName = instance;
+    const event = normalizeEvent(rawEvent);
 
     // Find restaurant by instance name
     const { data: config } = await supabase
@@ -57,28 +75,30 @@ Deno.serve(async (req) => {
     // Handle different event types
     switch (event) {
       case 'connection.update': {
-        const state = data?.state;
+        const state = data?.state || data?.instance?.state;
         console.log(`[WEBHOOK] Connection update for ${instanceName}: ${state}`);
 
-        if (state === 'open') {
-          // Connected successfully
-          await supabase
-            .from('whatsapp_config')
-            .update({
-              instance_status: 'connected',
-              connected_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('restaurant_id', restaurantId);
-        } else if (state === 'close' || state === 'connecting') {
-          await supabase
-            .from('whatsapp_config')
-            .update({
-              instance_status: state === 'close' ? 'disconnected' : 'connecting',
-              updated_at: new Date().toISOString()
-            })
-            .eq('restaurant_id', restaurantId);
+        // Normalize state consistently
+        const stateMap: Record<string, string> = {
+          'open': 'connected',
+          'connecting': 'connecting',
+          'close': 'disconnected',
+          'closed': 'disconnected',
+        };
+        const normalizedStatus = stateMap[state] || 'disconnected';
+
+        const updateData: Record<string, any> = {
+          instance_status: normalizedStatus,
+          updated_at: new Date().toISOString()
+        };
+        if (normalizedStatus === 'connected') {
+          updateData.connected_at = new Date().toISOString();
         }
+
+        await supabase
+          .from('whatsapp_config')
+          .update(updateData)
+          .eq('restaurant_id', restaurantId);
         break;
       }
 
@@ -141,7 +161,7 @@ Deno.serve(async (req) => {
       }
 
       default:
-        console.log(`[WEBHOOK] Unhandled event: ${event}`);
+        console.log(`[WEBHOOK] Unhandled event: ${rawEvent}`);
     }
 
     return new Response(JSON.stringify({ received: true, event }), {

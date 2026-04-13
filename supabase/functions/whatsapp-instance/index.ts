@@ -172,23 +172,35 @@ Deno.serve(async (req) => {
         const { stateData, resolvedName } = stateResult;
         console.log(`[GET] Connection state (${resolvedName}):`, stateData);
 
-        const isConnected = stateData.instance?.state === 'open' || stateData.state === 'open';
         const instanceState = stateData.instance?.state || stateData.state || 'unknown';
+
+        // Normalize state mapping
+        const stateMap: Record<string, string> = {
+          'open': 'connected',
+          'connecting': 'connecting',
+          'close': 'disconnected',
+          'closed': 'disconnected',
+        };
+        const normalizedStatus = stateMap[instanceState] || 'disconnected';
+
+        const updateData: Record<string, any> = {
+          restaurant_id: restaurantId,
+          instance_name: resolvedName,
+          instance_status: normalizedStatus,
+          updated_at: new Date().toISOString()
+        };
+        if (normalizedStatus === 'connected') {
+          updateData.connected_at = new Date().toISOString();
+        }
 
         await supabase
           .from('whatsapp_config')
-          .upsert({
-            restaurant_id: restaurantId,
-            instance_name: resolvedName,
-            instance_status: isConnected ? 'connected' : 'disconnected',
-            connected_at: isConnected ? new Date().toISOString() : null,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'restaurant_id' });
+          .upsert(updateData, { onConflict: 'restaurant_id' });
 
         return new Response(
           JSON.stringify({
             instance_name: resolvedName,
-            status: isConnected ? 'connected' : 'disconnected',
+            status: normalizedStatus,
             state: instanceState,
             config
           }),

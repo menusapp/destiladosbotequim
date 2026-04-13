@@ -93,10 +93,9 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [configRes, optionsRes, whatsappRes] = await Promise.all([
+      const [configRes, optionsRes] = await Promise.all([
         supabase.from('whatsapp_ai_config').select('*').eq('restaurant_id', restaurantId).maybeSingle(),
         supabase.from('whatsapp_menu_options').select('*').eq('restaurant_id', restaurantId).order('position'),
-        supabase.from('whatsapp_config').select('instance_status').eq('restaurant_id', restaurantId).maybeSingle(),
       ]);
 
       if (configRes.data) {
@@ -123,7 +122,16 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
         setMenuOptions(DEFAULT_MENU_OPTIONS.map(o => ({ ...o })));
       }
 
-      setWhatsappConnected(whatsappRes.data?.instance_status === 'connected');
+      // Check real-time status from Evolution API
+      try {
+        const statusRes = await fetch(`https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
+        const statusData = await statusRes.json();
+        setWhatsappConnected(statusData.status === 'connected');
+      } catch {
+        // Fallback to DB value
+        const { data: whatsappData } = await supabase.from('whatsapp_config').select('instance_status').eq('restaurant_id', restaurantId).maybeSingle();
+        setWhatsappConnected(whatsappData?.instance_status === 'connected');
+      }
     } catch (e) {
       console.error('Error loading AI config:', e);
     } finally {

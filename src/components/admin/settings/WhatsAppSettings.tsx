@@ -286,15 +286,19 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
       const data = await response.json();
-      if (data.status === 'connected') {
-        setConfig(prev => prev ? { ...prev, instance_status: 'connected', instance_name: data.instance_name || prev.instance_name } : null);
+      const status = data.status; // connected | connecting | disconnected | not_created
+
+      // Always update config status, even if config is null (create a minimal one)
+      setConfig(prev => {
+        const base = prev || { id: '', restaurant_id: restaurantId, enabled: false, instance_name: null, instance_status: null, connected_phone: null, connected_at: null, message_accepted: null, message_out_for_delivery: null, message_delivered: null, message_ready_for_pickup: null, message_picked_up: null, message_cancelled: null, message_reservation_created: null, message_reservation_confirmed: null, message_reservation_cancelled: null };
+        return { ...base, instance_status: status, instance_name: data.instance_name || base.instance_name };
+      });
+
+      if (status === 'connected') {
         setQrCodeDataUrl(null);
         setConnectFlowActive(false);
         stopAllPolling();
-        // Refresh full config from DB to sync
         fetchConfig();
-      } else if (data.status === 'disconnected' || data.status === 'not_created') {
-        setConfig(prev => prev ? { ...prev, instance_status: data.status } : null);
       }
       return data;
     } catch (error) { console.error('Error checking status:', error); return null; }
@@ -458,7 +462,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const toggleExpanded = (key: string) => setExpandedCards(prev => ({ ...prev, [key]: !prev[key] }));
 
   const isConnected = config?.instance_status === 'connected';
-  const isPending = config?.instance_status === 'pending';
+  const isPending = config?.instance_status === 'pending' || config?.instance_status === 'connecting';
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
