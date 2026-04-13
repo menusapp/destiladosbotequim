@@ -1,51 +1,32 @@
 
 
-## Plano: Validação de CPF/telefone nos cardápios + edição de perfil no delivery
+## Plano: Corrigir detecção de WhatsApp no Marketing + erro 406
 
-### 1. Validação de telefone
+### Problema 1 — WhatsApp aparece desconectado no Marketing
 
-Criar função `validatePhone` em `src/lib/cpfValidator.ts` (ou novo arquivo) que valida:
-- Número tem 10 ou 11 dígitos (fixo ou celular)
-- DDD válido (11-99)
-- Se 11 dígitos, deve começar com 9 no nono dígito
+**Causa raiz**: A edge function `whatsapp-instance` resolve o nome da instância como `rest-ravih-rooftop` (slug) e faz fallback para `rest-9a786bc0` (8 chars do UUID). Porém no banco, o `instance_name` salvo é `rest-8947a1f1` — nenhum dos dois nomes bate. A Evolution API retorna 404 para ambos, e a função retorna `status: "not_created"`, mesmo com `instance_status: "connected"` no banco.
 
-### 2. Adicionar validação de telefone no `CustomerInfoDialog.tsx`
+**Correção (2 camadas)**:
 
-- Importar `validatePhone`
-- No `handleSubmit`, antes de prosseguir, validar o telefone se preenchido: se não passar, mostrar erro "Número de telefone inválido"
-- Mesmo se `requirePhone` for false, se o usuário digitou algo, validar
+1. **`whatsapp-instance/index.ts`** — Na função `resolveInstanceName`, também retornar o `instance_name` salvo no banco como terceira opção de fallback. Alterar `tryCheckState` para tentar os 3 nomes: slug-based → uuid-based → DB-saved.
 
-### 3. Adicionar validação de telefone no `KioskIdentification.tsx`
+2. **`MarketingTab.tsx`** — Quando a API retorna `status !== "connected"`, usar o `instance_status` do banco como fallback (atualmente só faz fallback em caso de exceção de rede). Simplificar: confiar no campo `config.instance_status` retornado pela própria API quando o status principal é "not_created".
 
-- Mesma lógica: se telefone preenchido, validar antes de submeter
+### Problema 2 — Erro 406
 
-### 4. Tornar perfil editável no delivery (`ProfileView.tsx`)
+**Causa provável**: A query na `CampaignsList.tsx` faz `supabase.from("orders").select("id, order_items(price_at_order, quantity)").in("coupon_code", couponCodes)` — se não houver FK reconhecida entre `orders` e `order_items` pelo PostgREST, ou se o header `Accept` não estiver configurado corretamente, retorna 406.
 
-Atualmente nome e CPF estão `disabled`. Mudanças:
-
-- **Nome**: tornar editável com botão "Salvar" que atualiza na tabela `customers` e chama `onNameUpdate`
-- **Telefone**: adicionar campo editável, buscar do `customers` table, salvar com validação
-- **CPF**: manter como somente leitura (é identificador do cliente, não deve mudar)
-
-Adicionar prop `onPhoneUpdate` e `onCpfUpdate` se necessário, ou apenas `onProfileUpdate(name, phone)`.
-
-### 5. Propagar atualizações no `DeliveryMenu.tsx`
-
-- Expandir `ProfileView` props para incluir `customerPhone` e callback `onProfileUpdate`
-- Atualizar `sessionStorage` com novos valores quando perfil for editado
+**Correção**: Separar a query em duas chamadas independentes (buscar orders, depois buscar order_items pelo order_id), evitando a relação embutida que pode causar 406.
 
 ### Arquivos alterados
 
 | Arquivo | Mudança |
 |---|---|
-| `src/lib/cpfValidator.ts` | Adicionar `validatePhone()` |
-| `src/components/menu/CustomerInfoDialog.tsx` | Validar telefone no submit |
-| `src/components/kiosk/KioskIdentification.tsx` | Validar telefone no submit |
-| `src/components/menu/ProfileView.tsx` | Tornar nome e telefone editáveis, salvar no banco |
-| `src/pages/DeliveryMenu.tsx` | Passar phone props e handler de atualização ao ProfileView |
+| `supabase/functions/whatsapp-instance/index.ts` | Adicionar instance_name do DB como fallback em `tryCheckState` |
+| `src/components/admin/MarketingTab.tsx` | Usar `config.instance_status` da resposta como fallback |
+| `src/components/admin/marketing/CampaignsList.tsx` | Separar query de orders+order_items para evitar 406 |
 
 ### Resultado
-- CPF já é validado nos dois fluxos (mesa e delivery) — mantido
-- Telefone passa a ser validado em todos os pontos de entrada
-- Perfil no delivery permite editar nome e telefone com salvamento no banco
+- Marketing detecta WhatsApp conectado mesmo quando o nome da instância no banco difere do slug
+- Sem erro 406 na aba de campanhas
 
