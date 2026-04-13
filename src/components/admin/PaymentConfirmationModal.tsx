@@ -294,13 +294,12 @@ export const PaymentConfirmationModal = ({
         const restId = order.restaurant_id || restaurantId;
         const customerLabel = (order as any).customer_name || "Cliente";
 
-        // Parallel cleanup of old cash movements for this order
-        await Promise.all([
-          supabase.from("cash_movements").delete().eq("restaurant_id", restId)
-            .like("description", `%${customerLabel}%`).like("description", `%Pedido Local%`),
-          supabase.from("cash_movements").delete().eq("restaurant_id", restId)
-            .like("description", `%#${order.id}%`),
-        ]);
+        // Clean up ALL existing cash movements for these orders by order_id (robust dedup)
+        await supabase.from("cash_movements").delete().in("order_id", targetOrderIds);
+        // Also clean legacy entries without order_id
+        await supabase.from("cash_movements").delete().eq("restaurant_id", restId)
+          .is("order_id", null)
+          .like("description", `%#${order.id}%`);
 
         // Re-create in current open session
         const { data: cashSession } = await supabase
@@ -324,6 +323,7 @@ export const PaymentConfirmationModal = ({
               description: `Pedido Local - ${customerLabel} - ${payment.method} (R$ ${payment.amount.toFixed(2)})`,
               created_by: "Sistema",
               bill_id: resolvedBillId,
+              order_id: order.id,
             })
           ));
         }
