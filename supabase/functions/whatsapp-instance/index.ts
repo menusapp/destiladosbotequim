@@ -300,6 +300,9 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString()
           }, { onConflict: 'restaurant_id' });
 
+        // Configure webhook automatically (non-blocking)
+        await configureWebhook(instanceName);
+
         // Wait for instance to initialize (reduced from 3s to 1s)
         console.log(`[POST] Waiting 1s for instance to initialize...`);
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -371,6 +374,7 @@ Deno.serve(async (req) => {
         console.log(`[POST] Restart requested for: ${instanceName}`);
         
         const success = await restartInstance(instanceName);
+        if (success) await configureWebhook(instanceName);
         
         if (success) {
           await new Promise(resolve => setTimeout(resolve, 2000));
