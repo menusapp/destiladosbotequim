@@ -251,6 +251,7 @@ export default function Kiosk() {
             max_selection: group.max_selection || undefined,
             extra_category_id: group.extra_category_id,
             extra_category_name: group.extra_categories?.name || undefined,
+            isComplementItem: true,
           }));
         });
 
