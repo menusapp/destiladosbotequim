@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText, Timer, RotateCcw, MapPin, Printer, HardDrive } from "lucide-react";
+import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText, Timer, RotateCcw, MapPin, Printer, HardDrive, Truck } from "lucide-react";
 import { lazy, Suspense } from "react";
 
 const BusinessHoursSettings = lazy(() => import("./BusinessHoursSettings"));
@@ -377,6 +377,33 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Tempo Estimado Delivery/Retirada */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Tempo Estimado para Delivery / Retirada
+              </CardTitle>
+              <CardDescription>Tempo informado ao cliente nas notificações e no checkout</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="prep-time-delivery">Preparo + Entrega (minutos)</Label>
+                  <Input
+                    id="prep-time-delivery"
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={settings.prep_time_minutes}
+                    onChange={(e) => setSettings({ ...settings, prep_time_minutes: parseInt(e.target.value) || 30 })}
+                  />
+                  <p className="text-xs text-muted-foreground">Usado como tempo estimado nos pedidos delivery</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Cadastro de Clientes (merged) */}
           <Card>
