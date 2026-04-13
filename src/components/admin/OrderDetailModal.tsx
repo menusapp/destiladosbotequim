@@ -122,9 +122,9 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const elapsedTime = getElapsedTime();
 
   const calculateTotal = () => {
-    return order.order_items.reduce((total, item) => {
+    return (order.order_items || []).reduce((total, item) => {
       const itemTotal = item.price_at_order * item.quantity;
-      const extrasTotal = item.order_item_extras.reduce((sum, extra) => sum + extra.price_at_order, 0) * item.quantity;
+      const extrasTotal = (item.order_item_extras || []).reduce((sum, extra) => sum + extra.price_at_order, 0) * item.quantity;
       return total + itemTotal + extrasTotal;
     }, 0);
   };
@@ -168,7 +168,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   };
 
   const handleRemoveItem = async (itemId: string) => {
-    if (order.order_items.length <= 1) {
+    if ((order.order_items || []).length <= 1) {
       toast.error("Não é possível remover o último item. Cancele o pedido se necessário.");
       return;
     }
@@ -231,6 +231,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       <Dialog open={true} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-6">
           <DialogHeader>
+            <DialogDescription className="sr-only">Detalhes do pedido</DialogDescription>
             <div className="flex items-start justify-between">
               <div>
                 <DialogTitle className="text-2xl">Pedido #{order.id.slice(0, 8)}</DialogTitle>
