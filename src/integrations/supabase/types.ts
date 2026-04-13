@@ -4471,6 +4471,35 @@ export type Database = {
           },
         ]
       }
+      whatsapp_inbound_events: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          restaurant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          restaurant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_inbound_events_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_menu_options: {
         Row: {
           action_type: string
