@@ -4435,30 +4435,39 @@ export type Database = {
       }
       whatsapp_conversations: {
         Row: {
+          bot_paused: boolean | null
+          bot_paused_until: string | null
           created_at: string | null
           current_step: string | null
           customer_phone: string
           id: string
           last_message_at: string | null
           order_draft: Json | null
+          paused_reason: string | null
           restaurant_id: string
         }
         Insert: {
+          bot_paused?: boolean | null
+          bot_paused_until?: string | null
           created_at?: string | null
           current_step?: string | null
           customer_phone: string
           id?: string
           last_message_at?: string | null
           order_draft?: Json | null
+          paused_reason?: string | null
           restaurant_id: string
         }
         Update: {
+          bot_paused?: boolean | null
+          bot_paused_until?: string | null
           created_at?: string | null
           current_step?: string | null
           customer_phone?: string
           id?: string
           last_message_at?: string | null
           order_draft?: Json | null
+          paused_reason?: string | null
           restaurant_id?: string
         }
         Relationships: [
