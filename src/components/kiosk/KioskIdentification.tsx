@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { validateCPF } from "@/lib/cpfValidator";
+import { validateCPF, validatePhone } from "@/lib/cpfValidator";
 import { toast } from "@/components/ui/sonner";
 import { ArrowLeft, Loader2, UserCheck } from "lucide-react";
 import { KioskCustomer } from "@/pages/Kiosk";

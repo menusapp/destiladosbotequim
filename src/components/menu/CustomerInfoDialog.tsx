@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { validateCPF } from "@/lib/cpfValidator";
+import { validateCPF, validatePhone } from "@/lib/cpfValidator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { Loader2, UserCheck } from "lucide-react";

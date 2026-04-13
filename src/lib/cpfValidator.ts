@@ -43,6 +43,33 @@ export function validateCPF(cpf: string): boolean {
 }
 
 /**
+ * Valida se um número de telefone brasileiro é válido
+ * @param phone - Telefone com ou sem formatação
+ * @returns true se o telefone for válido, false caso contrário
+ */
+export function validatePhone(phone: string): boolean {
+  const digits = phone.replace(/\D/g, "");
+
+  // Aceita 10 (fixo) ou 11 (celular) dígitos
+  if (digits.length < 10 || digits.length > 11) {
+    return false;
+  }
+
+  // DDD válido: 11-99
+  const ddd = parseInt(digits.slice(0, 2), 10);
+  if (ddd < 11 || ddd > 99) {
+    return false;
+  }
+
+  // Se 11 dígitos, o terceiro dígito (primeiro do número) deve ser 9
+  if (digits.length === 11 && digits.charAt(2) !== "9") {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Formata um CPF para o padrão XXX.XXX.XXX-XX
  * @param cpf - CPF sem formatação
  * @returns CPF formatado
