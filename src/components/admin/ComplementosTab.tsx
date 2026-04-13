@@ -130,9 +130,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
         const groupsInserts = productsToAdd.map(productId => ({
           product_id: productId,
           extra_category_id: categoryId!,
-          is_required: false,
-          min_selection: 0,
-          max_selection: null as number | null,
+          is_required: categoryIsRequired,
+          min_selection: minQ,
+          max_selection: maxQ || null,
           display_order: 999,
         }));
         await supabase.from("product_complement_groups").insert(groupsInserts);
