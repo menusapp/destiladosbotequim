@@ -69,7 +69,18 @@ export const ProfileView = ({
     fetchAddresses();
     fetchCoupons();
     fetchLoyaltyProgram();
+    fetchCustomerPhone();
   }, [customerCPF, restaurantId]);
+
+  const fetchCustomerPhone = async () => {
+    const { data } = await supabase
+      .from("customers")
+      .select("phone")
+      .eq("restaurant_id", restaurantId)
+      .eq("cpf", customerCPF)
+      .maybeSingle();
+    if (data?.phone) setPhone(data.phone);
+  };
 
   const fetchAddresses = async () => {
     const { data } = await supabase
@@ -79,9 +90,6 @@ export const ProfileView = ({
       .order("is_default", { ascending: false });
     
     setAddresses(data || []);
-    if (data && data.length > 0) {
-      setPhone(data[0].customer_phone || "");
-    }
   };
 
   const fetchCoupons = async () => {
@@ -211,9 +219,43 @@ export const ProfileView = ({
     }
   };
 
-  const handleSaveName = () => {
-    onNameUpdate(name);
-    toast.success("Nome atualizado!");
+  const formatPhoneDisplay = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 11);
+    if (d.length <= 2) return d;
+    if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  };
+
+  const handleSaveProfile = async () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      toast.error("Nome não pode estar vazio");
+      return;
+    }
+
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits && !validatePhone(phoneDigits)) {
+      toast.error("Número de telefone inválido");
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      await supabase
+        .from("customers")
+        .update({ name: trimmedName, phone: phoneDigits || null })
+        .eq("restaurant_id", restaurantId)
+        .eq("cpf", customerCPF);
+
+      onNameUpdate(trimmedName);
+      onPhoneUpdate?.(phoneDigits);
+      toast.success("Perfil atualizado!");
+    } catch {
+      toast.error("Erro ao salvar perfil");
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleAddAddress = async () => {
