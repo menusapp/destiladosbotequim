@@ -41,7 +41,14 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
       try {
         const res = await fetch(`https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
         const statusData = await res.json();
-        setWhatsappConnected(statusData.status === "connected");
+        // If API returns connected, trust it; otherwise fallback to DB status
+        if (statusData.status === "connected") {
+          setWhatsappConnected(true);
+        } else {
+          // Trust DB instance_status as fallback (API may not find instance by name)
+          const dbStatus = statusData.config?.instance_status || data?.instance_status;
+          setWhatsappConnected(dbStatus === "connected");
+        }
       } catch {
         // Fallback to DB value
         setWhatsappConnected(data?.instance_status === "connected");

@@ -136,18 +136,23 @@ export function CampaignsList({ restaurantId }: CampaignsListProps) {
               
               couponsUsed = usedCoupons?.reduce((sum, c) => sum + (c.used_count || 0), 0) || 0;
 
-              // Get sales from orders using these coupons
+              // Get sales from orders using these coupons (separate queries to avoid 406)
               const { data: ordersWithCoupons } = await supabase
                 .from("orders")
-                .select("id, order_items(price_at_order, quantity)")
+                .select("id")
                 .in("coupon_code", couponCodes);
 
-              if (ordersWithCoupons) {
-                totalSales = ordersWithCoupons.reduce((sum, order) => {
-                  const orderTotal = order.order_items?.reduce((s: number, i: any) => 
-                    s + (i.price_at_order * i.quantity), 0) || 0;
-                  return sum + orderTotal;
-                }, 0);
+              if (ordersWithCoupons && ordersWithCoupons.length > 0) {
+                const orderIds = ordersWithCoupons.map(o => o.id);
+                const { data: orderItems } = await supabase
+                  .from("order_items")
+                  .select("order_id, price_at_order, quantity")
+                  .in("order_id", orderIds);
+
+                if (orderItems) {
+                  totalSales = orderItems.reduce((sum, i) => 
+                    sum + (i.price_at_order * i.quantity), 0);
+                }
               }
             }
           }
