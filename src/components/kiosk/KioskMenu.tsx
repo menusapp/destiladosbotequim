@@ -193,7 +193,7 @@ export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount
       {cartCount > 0 && (
         <button
           onClick={onOpenCart}
-          className="fixed bottom-6 right-6 z-50 h-14 rounded-2xl flex items-center gap-2.5 px-5 text-white shadow-2xl transition-transform active:scale-95"
+          className="fixed bottom-6 left-6 z-50 h-20 rounded-2xl flex items-center gap-3 px-6 text-white shadow-2xl transition-transform active:scale-95"
           style={{ backgroundColor: primaryColor }}
         >
           <div className="relative">
