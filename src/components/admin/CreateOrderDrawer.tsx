@@ -76,6 +76,10 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [deliveryFee, setDeliveryFee] = useState("");
   const [deliveryFeeAuto, setDeliveryFeeAuto] = useState<number | null>(null);
 
+  // Employee credit states
+  const [employeeCreditName, setEmployeeCreditName] = useState("");
+  const [employeeCreditNotes, setEmployeeCreditNotes] = useState("");
+
   // Fetch delivery config for auto fee calculation
   const { data: deliveryConfig } = useQuery({
     queryKey: ["delivery-config-pdv", restaurantId],
