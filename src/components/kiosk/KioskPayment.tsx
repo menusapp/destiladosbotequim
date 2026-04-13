@@ -129,7 +129,8 @@ export function KioskPayment({
     ].filter(Boolean).join(" | ");
 
     const isTablePaid = alreadyPaid && consumptionMode === "table";
-    const orderStatus = isTablePaid ? "accepted" : alreadyPaid ? "preparing" : "pending";
+    // Insert as 'pending' first so items exist when we update to final status (triggers need items)
+    const finalStatus = isTablePaid ? "accepted" : alreadyPaid ? "preparing" : "pending";
 
     const orderData: any = {
       table_id: tableId,
@@ -139,11 +140,11 @@ export function KioskPayment({
       order_type,
       delivery_type,
       order_channel: "totem",
-      payment_type: getPaymentTypeForDB(),
+      payment_type: alreadyPaid ? getPaymentTypeForDB() : null,
       payment_brand: null,
-      status: orderStatus,
-      payment_status: alreadyPaid ? "paid" : "pending",
-      paid_at: alreadyPaid ? new Date().toISOString() : null,
+      status: "pending",
+      payment_status: "pending",
+      paid_at: null,
       notes,
       delivery_phone: customer.phone || null,
       coupon_code: appliedCoupon?.code || null,
