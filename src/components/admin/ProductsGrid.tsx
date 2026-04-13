@@ -690,6 +690,35 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const groupedByCategory = useMemo(() => {
+    const categoryMap = new Map<string, { name: string; products: Product[] }>();
+    const uncategorized: Product[] = [];
+
+    for (const product of filteredProducts) {
+      if (!product.category_id) {
+        uncategorized.push(product);
+        continue;
+      }
+      if (!categoryMap.has(product.category_id)) {
+        const cat = categories.find(c => c.id === product.category_id);
+        categoryMap.set(product.category_id, { name: cat?.name || "Categoria desconhecida", products: [] });
+      }
+      categoryMap.get(product.category_id)!.products.push(product);
+    }
+
+    const sortedGroups = Array.from(categoryMap.values())
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+    sortedGroups.forEach(g => g.products.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")));
+    uncategorized.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+    if (uncategorized.length > 0) {
+      sortedGroups.push({ name: "Sem categoria", products: uncategorized });
+    }
+
+    return sortedGroups;
+  }, [filteredProducts, categories]);
+
   return (
     <div className="space-y-6">
       {/* Search and Add Button */}
@@ -703,15 +732,26 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         </Button>
       </div>
 
-      {/* Products Grid */}
+      {/* Products Grid grouped by category */}
       {filteredProducts.length === 0 ? (
         <div className="text-center py-16 border border-dashed rounded-xl bg-muted/20">
           <p className="text-muted-foreground">{searchQuery ? "Nenhum produto encontrado" : "Nenhum produto cadastrado ainda"}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onEdit={openEditDialog} onToggleAvailable={handleToggleAvailable} onDuplicate={handleDuplicateProduct} onDelete={handleDeleteProduct} />
+        <div className="space-y-8">
+          {groupedByCategory.map((group) => (
+            <div key={group.name}>
+              <div className="flex items-center gap-3 mb-4">
+                <h3 className="text-lg font-semibold text-foreground whitespace-nowrap">{group.name}</h3>
+                <Separator className="flex-1" />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{group.products.length} {group.products.length === 1 ? "produto" : "produtos"}</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {group.products.map((product) => (
+                  <ProductCard key={product.id} product={product} onEdit={openEditDialog} onToggleAvailable={handleToggleAvailable} onDuplicate={handleDuplicateProduct} onDelete={handleDeleteProduct} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
