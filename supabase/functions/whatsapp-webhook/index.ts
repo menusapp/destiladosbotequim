@@ -129,15 +129,13 @@ Deno.serve(async (req) => {
       }
 
       case 'messages.upsert': {
-        // Message received — trigger AI bot if not from self
-        const msgData = data?.message || data;
-        const fromMe = msgData?.key?.fromMe ?? msgData?.fromMe ?? false;
-        const messageText = msgData?.message?.conversation
-          || msgData?.message?.extendedTextMessage?.text
-          || msgData?.body
-          || '';
-        const remoteJid = msgData?.key?.remoteJid || '';
+        // Message received — extract directly from data (Evolution API v2 structure)
+        const fromMe = data?.key?.fromMe ?? false;
+        const remoteJid = data?.key?.remoteJid || '';
         const customerPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
+        const messageText = data?.message?.conversation
+          || data?.message?.extendedTextMessage?.text
+          || '';
 
         if (!fromMe && customerPhone && messageText) {
           console.log(`[WEBHOOK] Incoming message on ${instanceName} from ${customerPhone}: ${messageText.slice(0, 50)}`);
@@ -155,7 +153,7 @@ Deno.serve(async (req) => {
             }),
           }).catch(err => console.error('[WEBHOOK] AI bot call failed:', err));
         } else {
-          console.log(`[WEBHOOK] Message on ${instanceName} (fromMe=${fromMe}, skipped)`);
+          console.log(`[WEBHOOK] Message on ${instanceName} (fromMe=${fromMe}, phone=${customerPhone}, text=${messageText ? 'yes' : 'empty'}, skipped)`);
         }
         break;
       }
