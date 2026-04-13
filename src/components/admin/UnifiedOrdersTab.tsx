@@ -234,8 +234,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   };
 
   const calculateTotal = (order: Order) => {
-    return order.order_items.reduce((total, item) => {
-      const extrasTotal = item.order_item_extras.reduce((s, e) => s + e.price_at_order, 0) * item.quantity;
+    return (order.order_items || []).reduce((total, item) => {
+      const extrasTotal = (item.order_item_extras || []).reduce((s, e) => s + e.price_at_order, 0) * item.quantity;
       return total + item.price_at_order * item.quantity + extrasTotal;
     }, 0);
   };
