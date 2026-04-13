@@ -21,6 +21,7 @@ import StaffLogin from "./pages/StaffLogin";
 import { TableDetailView } from "./components/admin/TableDetailView";
 import MercadoPagoCallback from "./pages/MercadoPagoCallback";
 import RestaurantRegistration from "./pages/RestaurantRegistration";
+import PaymentPending from "./pages/PaymentPending";
 import Kiosk from "./pages/Kiosk";
 
 
@@ -59,6 +60,7 @@ const App = () => (
 
             {/* Registration routes (post-payment redirect) */}
             <Route path="/registro/:planSlug" element={<RestaurantRegistration />} />
+            <Route path="/pagamento-pendente/:slug" element={<PaymentPending />} />
 
             {/* Restaurant-scoped routes (slug-based) */}
             <Route path="/:slug/kiosk" element={<Kiosk />} />

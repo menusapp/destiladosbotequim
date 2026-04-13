@@ -3699,6 +3699,7 @@ export type Database = {
         Row: {
           created_at: string | null
           expires_at: string | null
+          failed_payments: number
           id: string
           is_trial: boolean | null
           last_payment_at: string | null
@@ -3713,6 +3714,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           expires_at?: string | null
+          failed_payments?: number
           id?: string
           is_trial?: boolean | null
           last_payment_at?: string | null
@@ -3727,6 +3729,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           expires_at?: string | null
+          failed_payments?: number
           id?: string
           is_trial?: boolean | null
           last_payment_at?: string | null
@@ -3778,6 +3781,7 @@ export type Database = {
           mp_payer_email: string | null
           municipio_codigo: string | null
           name: string
+          pending_plan_slug: string | null
           pickup_time_minutes: number | null
           prep_time_minutes: number | null
           primary_color: string | null
@@ -3820,6 +3824,7 @@ export type Database = {
           mp_payer_email?: string | null
           municipio_codigo?: string | null
           name: string
+          pending_plan_slug?: string | null
           pickup_time_minutes?: number | null
           prep_time_minutes?: number | null
           primary_color?: string | null
@@ -3862,6 +3867,7 @@ export type Database = {
           mp_payer_email?: string | null
           municipio_codigo?: string | null
           name?: string
+          pending_plan_slug?: string | null
           pickup_time_minutes?: number | null
           prep_time_minutes?: number | null
           primary_color?: string | null

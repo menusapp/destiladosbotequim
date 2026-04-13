@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
-import { Loader2, CheckCircle, Store } from "lucide-react";
+import { Loader2, CheckCircle, Store, CreditCard } from "lucide-react";
 
 const planDisplayMap: Record<string, { name: string; color: string }> = {
   trial: { name: "Básico (7 dias grátis)", color: "text-green-600" },
@@ -14,6 +14,8 @@ const planDisplayMap: Record<string, { name: string; color: string }> = {
   intermediario: { name: "Intermediário", color: "text-primary" },
   avancado: { name: "Avançado", color: "text-amber-600" },
 };
+
+const isPaidPlan = (slug: string) => ["basico", "intermediario", "avancado"].includes(slug);
 
 const RestaurantRegistration = () => {
   const { planSlug } = useParams<{ planSlug: string }>();
@@ -33,6 +35,7 @@ const RestaurantRegistration = () => {
   const [slugChecking, setSlugChecking] = useState(false);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [success, setSuccess] = useState(false);
+  const [redirectingToPayment, setRedirectingToPayment] = useState(false);
 
   const planInfo = planDisplayMap[planSlug || ""] || { name: "Desconhecido", color: "text-muted-foreground" };
 
@@ -85,7 +88,6 @@ const RestaurantRegistration = () => {
       });
 
       if (res.error) {
-        // Extract error from FunctionsHttpError response body
         let errorMsg = "Erro ao registrar. Tente novamente.";
         try {
           if (res.error.context && typeof res.error.context === "object") {
@@ -95,7 +97,7 @@ const RestaurantRegistration = () => {
             errorMsg = res.error.message;
           }
         } catch {
-          // fallback to generic message
+          // fallback
         }
         toast.error(errorMsg);
         setLoading(false);
@@ -108,16 +110,27 @@ const RestaurantRegistration = () => {
         return;
       }
 
-      setSuccess(true);
-      toast.success("Restaurante cadastrado com sucesso!");
-
-      // Auto-login: save credentials and redirect to admin panel
+      // Auto-login: save credentials
       const restaurantId = res.data?.restaurantId;
       if (restaurantId) {
         localStorage.setItem("restaurant_id", restaurantId);
         localStorage.setItem("staff_user", form.username);
         localStorage.setItem("staff_role", "admin");
       }
+
+      // Check if there's a payment redirect (paid plans)
+      if (res.data?.redirectUrl) {
+        setRedirectingToPayment(true);
+        toast.success("Restaurante criado! Redirecionando para pagamento...");
+        setTimeout(() => {
+          window.location.href = res.data.redirectUrl;
+        }, 2000);
+        return;
+      }
+
+      // Trial flow: go directly to admin
+      setSuccess(true);
+      toast.success("Restaurante cadastrado com sucesso!");
       setTimeout(() => navigate(`/${form.slug}/admin`), 3000);
     } catch {
       toast.error("Erro inesperado. Tente novamente.");
@@ -135,6 +148,26 @@ const RestaurantRegistration = () => {
             <Button variant="outline" className="mt-4" onClick={() => navigate("/")}>
               Voltar ao site
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (redirectingToPayment) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="py-12 text-center space-y-4">
+            <CreditCard className="h-16 w-16 text-primary mx-auto animate-pulse" />
+            <h2 className="text-2xl font-bold">Redirecionando para pagamento...</h2>
+            <p className="text-muted-foreground">
+              Seu restaurante foi criado no plano <span className={`font-semibold ${planInfo.color}`}>{planInfo.name}</span>.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Você será redirecionado para o Mercado Pago para finalizar a assinatura.
+            </p>
+            <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
           </CardContent>
         </Card>
       </div>
@@ -173,6 +206,9 @@ const RestaurantRegistration = () => {
           <CardTitle className="text-2xl">Cadastre seu Restaurante</CardTitle>
           <CardDescription>
             Plano selecionado: <span className={`font-semibold ${planInfo.color}`}>{planInfo.name}</span>
+            {isPaidPlan(planSlug || "") && (
+              <span className="block text-xs mt-1 text-muted-foreground">Após o cadastro, você será redirecionado para o pagamento</span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -278,7 +314,13 @@ const RestaurantRegistration = () => {
             </div>
 
             <Button type="submit" className="w-full h-11 font-semibold mt-2" disabled={loading || slugAvailable === false}>
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cadastrando...</> : "Criar meu Restaurante"}
+              {loading ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cadastrando...</>
+              ) : isPaidPlan(planSlug || "") ? (
+                "Cadastrar e ir para pagamento"
+              ) : (
+                "Criar meu Restaurante"
+              )}
             </Button>
           </form>
         </CardContent>
