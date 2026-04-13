@@ -25,7 +25,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 interface StockItem { id: string; name: string; unit: string; price_per_unit: number; }
 interface CategoryItemIngredient { id: string; stock_item_id: string; quantity: number; stock_item_name?: string; stock_item_unit?: string; stock_item_price?: number; }
 interface CategoryItem { id: string; name: string; price: number; pdv_code?: string; ingredients: CategoryItemIngredient[]; is_active?: boolean | null; }
-interface ComplementCategory { id: string; name: string; items: CategoryItem[]; is_active?: boolean | null; }
+interface ComplementCategory { id: string; name: string; items: CategoryItem[]; is_active?: boolean | null; is_required?: boolean; min_quantity?: number; max_quantity?: number; }
 interface SimpleProduct { id: string; name: string; }
 interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; }
 
@@ -44,6 +44,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
   const [deletingCategory, setDeletingCategory] = useState<ComplementCategory | null>(null);
 
   const [categoryName, setCategoryName] = useState("");
+  const [categoryIsRequired, setCategoryIsRequired] = useState(false);
+  const [categoryMinQty, setCategoryMinQty] = useState("0");
+  const [categoryMaxQty, setCategoryMaxQty] = useState("0");
   const [allProducts, setAllProducts] = useState<SimpleProduct[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [originalProductIds, setOriginalProductIds] = useState<Set<string>>(new Set());
@@ -84,7 +87,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
             stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit,
           })),
         }));
-        return { id: cat.id, name: cat.name, is_active: (cat as any).is_active, items };
+        return { id: cat.id, name: cat.name, is_active: (cat as any).is_active, is_required: (cat as any).is_required, min_quantity: (cat as any).min_quantity, max_quantity: (cat as any).max_quantity, items };
       })
     );
     setCategories(categoriesWithItems);
@@ -95,12 +98,16 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const handleSaveCategory = async () => {
     if (!categoryName.trim()) { toast.error("Digite o nome da categoria"); return; }
+    const minQ = parseInt(categoryMinQty) || 0;
+    const maxQ = parseInt(categoryMaxQty) || 0;
     let categoryId = editingCategory?.id;
     if (editingCategory) {
-      const { error } = await supabase.from("extra_categories").update({ name: categoryName }).eq("id", editingCategory.id);
+      const { error } = await supabase.from("extra_categories").update({ name: categoryName, is_required: categoryIsRequired, min_quantity: minQ, max_quantity: maxQ } as any).eq("id", editingCategory.id);
       if (error) { toast.error("Erro ao atualizar categoria"); return; }
+      // Propagate to all linked product_complement_groups
+      await supabase.from("product_complement_groups").update({ is_required: categoryIsRequired, min_selection: minQ, max_selection: maxQ || null } as any).eq("extra_category_id", editingCategory.id);
     } else {
-      const { data, error } = await supabase.from("extra_categories").insert({ name: categoryName, restaurant_id: restaurantId }).select().single();
+      const { data, error } = await supabase.from("extra_categories").insert({ name: categoryName, restaurant_id: restaurantId, is_required: categoryIsRequired, min_quantity: minQ, max_quantity: maxQ } as any).select().single();
       if (error || !data) { toast.error("Erro ao criar categoria"); return; }
       categoryId = data.id;
     }
@@ -123,9 +130,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
         const groupsInserts = productsToAdd.map(productId => ({
           product_id: productId,
           extra_category_id: categoryId!,
-          is_required: false,
-          min_selection: 0,
-          max_selection: null as number | null,
+          is_required: categoryIsRequired,
+          min_selection: minQ,
+          max_selection: maxQ || null,
           display_order: 999,
         }));
         await supabase.from("product_complement_groups").insert(groupsInserts);
@@ -216,6 +223,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
   const openEditCategory = async (category: ComplementCategory) => {
     if (isRestaurantOpen) { toast.error("Feche o restaurante para editar"); return; }
     setEditingCategory(category); setCategoryName(category.name);
+    setCategoryIsRequired(category.is_required || false);
+    setCategoryMinQty(String(category.min_quantity || 0));
+    setCategoryMaxQty(String(category.max_quantity || 0));
     // Load linked products from product_complement_groups
     const { data: linkedGroups } = await supabase.from("product_complement_groups").select("product_id").eq("extra_category_id", category.id);
     const linkedIds = new Set((linkedGroups || []).map((g: any) => g.product_id as string));
@@ -244,6 +254,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const resetCategoryForm = () => {
     setCategoryDialogOpen(false); setEditingCategory(null); setCategoryName("");
+    setCategoryIsRequired(false); setCategoryMinQty("0"); setCategoryMaxQty("0");
     setSelectedProductIds(new Set()); setOriginalProductIds(new Set()); setProductSearchQuery("");
   };
 
@@ -301,6 +312,14 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                         {expandedCategories.has(category.id) ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                         <CardTitle className="text-lg">{category.name}</CardTitle>
                         <span className="text-sm text-muted-foreground">({category.items.length} {category.items.length === 1 ? "item" : "itens"})</span>
+                        {category.is_required && (
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Obrigatório</span>
+                        )}
+                        {(category.min_quantity || category.max_quantity) ? (
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                            {category.min_quantity ? `Mín: ${category.min_quantity}` : ""}{category.min_quantity && category.max_quantity ? " · " : ""}{category.max_quantity ? `Máx: ${category.max_quantity}` : ""}
+                          </span>
+                        ) : null}
                         {category.is_active === false && (
                           <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Inativo</span>
                         )}
@@ -374,6 +393,24 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
           </DialogHeader>
           <div className="space-y-4">
             <div><Label htmlFor="category-name">Nome da Categoria *</Label><Input id="category-name" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Ex: Tamanhos, Molhos, Acompanhamentos" /></div>
+
+            <div className="p-4 border rounded-xl bg-muted/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="cat-required" className="cursor-pointer">Obrigatório</Label>
+                <Switch id="cat-required" checked={categoryIsRequired} onCheckedChange={setCategoryIsRequired} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="cat-min">Mínimo de seleções</Label>
+                  <Input id="cat-min" type="number" min="0" value={categoryMinQty} onChange={(e) => setCategoryMinQty(e.target.value)} placeholder="0" />
+                </div>
+                <div>
+                  <Label htmlFor="cat-max">Máximo de seleções</Label>
+                  <Input id="cat-max" type="number" min="0" value={categoryMaxQty} onChange={(e) => setCategoryMaxQty(e.target.value)} placeholder="0 = ilimitado" />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Máximo 0 = ilimitado. Essas regras serão aplicadas a todos os produtos vinculados.</p>
+            </div>
 
             <div className="space-y-2">
               <Label>Produtos vinculados ({selectedProductIds.size} selecionados)</Label>
