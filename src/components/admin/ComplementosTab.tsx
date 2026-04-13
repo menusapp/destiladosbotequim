@@ -25,7 +25,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 interface StockItem { id: string; name: string; unit: string; price_per_unit: number; }
 interface CategoryItemIngredient { id: string; stock_item_id: string; quantity: number; stock_item_name?: string; stock_item_unit?: string; stock_item_price?: number; }
 interface CategoryItem { id: string; name: string; price: number; pdv_code?: string; ingredients: CategoryItemIngredient[]; is_active?: boolean | null; }
-interface ComplementCategory { id: string; name: string; items: CategoryItem[]; is_active?: boolean | null; }
+interface ComplementCategory { id: string; name: string; items: CategoryItem[]; is_active?: boolean | null; is_required?: boolean; min_quantity?: number; max_quantity?: number; }
 interface SimpleProduct { id: string; name: string; }
 interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; }
 
