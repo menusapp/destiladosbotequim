@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
-    const { restaurant_id, customer_phone, message_text, simulate } = body;
+    const { restaurant_id, customer_phone, message_text, simulate, customer_name } = body;
 
     if (!restaurant_id || !customer_phone || message_text === undefined) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
 
     // Process by step
     if (conversation.current_step === 'welcome') {
-      responseText = buildWelcomeMessage(welcomeType, restaurant.name, menuLink, menuOptions || []);
+      responseText = buildWelcomeMessage(welcomeType, restaurant.name, menuLink, menuOptions || [], customer_name || '');
       newStep = welcomeType === 'link_only' ? 'menu' : 'menu';
     } else if (conversation.current_step === 'menu') {
       if (welcomeType === 'link_only') {
@@ -158,14 +158,18 @@ Deno.serve(async (req) => {
 });
 
 function buildWelcomeMessage(
-  type: string, restaurantName: string, menuLink: string, menuOptions: any[]
+  type: string, restaurantName: string, menuLink: string, menuOptions: any[], customerName: string
 ): string {
+  const greeting = customerName
+    ? `👋 Olá, *${customerName}*! Tudo bem?`
+    : `👋 Olá! Tudo bem?`;
+
   if (type === 'link_only') {
-    return `🍽️ *${restaurantName}*\n\nAcesse nosso cardápio digital:\n${menuLink}`;
+    return `${greeting}\n\nBem-vindo(a) ao *${restaurantName}*! 🍽️\n\nAcesse nosso cardápio digital:\n${menuLink}`;
   }
 
   // numeric_menu (default)
-  let msg = `👋 Olá! Bem-vindo ao *${restaurantName}*!\n\n📱 Cardápio: ${menuLink}\n\nDigite o número da opção desejada:\n`;
+  let msg = `${greeting}\n\nBem-vindo(a) ao *${restaurantName}*! 🍽️\n\n📱 Cardápio: ${menuLink}\n\nDigite o número da opção desejada:\n`;
   for (const opt of menuOptions) {
     msg += `\n*${opt.position}* - ${opt.label}`;
   }
