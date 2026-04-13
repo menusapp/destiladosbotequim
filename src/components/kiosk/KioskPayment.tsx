@@ -129,7 +129,8 @@ export function KioskPayment({
     ].filter(Boolean).join(" | ");
 
     const isTablePaid = alreadyPaid && consumptionMode === "table";
-    const orderStatus = isTablePaid ? "accepted" : alreadyPaid ? "preparing" : "pending";
+    // Insert as 'pending' first so items exist when we update to final status (triggers need items)
+    const finalStatus = isTablePaid ? "accepted" : alreadyPaid ? "preparing" : "pending";
 
     const orderData: any = {
       table_id: tableId,
@@ -139,11 +140,11 @@ export function KioskPayment({
       order_type,
       delivery_type,
       order_channel: "totem",
-      payment_type: getPaymentTypeForDB(),
+      payment_type: null,
       payment_brand: null,
-      status: orderStatus,
-      payment_status: alreadyPaid ? "paid" : "pending",
-      paid_at: alreadyPaid ? new Date().toISOString() : null,
+      status: "pending",
+      payment_status: "pending",
+      paid_at: null,
       notes,
       delivery_phone: customer.phone || null,
       coupon_code: appliedCoupon?.code || null,
@@ -188,6 +189,16 @@ export function KioskPayment({
           extra_name: extra.name,
         });
       }
+    }
+
+    // Now that items exist, update to final status so triggers (stock deduction, cash) fire with items
+    if (finalStatus !== "pending") {
+      await supabase.from("orders").update({
+        status: finalStatus,
+        payment_type: getPaymentTypeForDB(),
+        payment_status: "paid",
+        paid_at: new Date().toISOString(),
+      }).eq("id", order.id);
     }
 
     // Create comanda for table orders
@@ -265,40 +276,8 @@ export function KioskPayment({
       }
     }
 
-    // Register cash movement for paid totem orders
-    if (alreadyPaid) {
-      try {
-        const { data: cashSession } = await supabase
-          .from("cash_register_sessions")
-          .select("id")
-          .eq("restaurant_id", restaurant.id)
-          .eq("status", "open")
-          .order("opened_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (cashSession) {
-          const modeLabel = consumptionMode === "table" ? "Mesa"
-            : consumptionMode === "counter" ? "Retirada"
-            : consumptionMode === "takeaway" ? "Viagem"
-            : consumptionMode === "delivery" ? "Entrega" : "Balcão";
-
-          await supabase.from("cash_movements").insert({
-            cash_session_id: cashSession.id,
-            restaurant_id: restaurant.id,
-            movement_type: "entrada",
-            amount: finalTotal,
-            payment_method: getPaymentTypeForDB(),
-            category: "Totem",
-            description: `Pedido Totem - ${modeLabel} - ${customer.name}`,
-            created_by: "Sistema",
-            order_id: order.id,
-          });
-        }
-      } catch (cashErr) {
-        console.error("[KioskPayment] Cash movement error:", cashErr);
-      }
-    }
+    // Cash movement is now handled by DB triggers (add_delivery_order_to_cash_register / add_local_order_to_cash_register)
+    // via the two-step insert: pending → update to final status with payment_type
 
     return order.id;
   }, [restaurant, customer, cart, consumptionMode, tableNumber, paymentMethod, cashPaid, finalTotal, appliedCoupon, couponDiscount, loyaltyPointsUsed, pointsDiscount, deliveryAddress]);
