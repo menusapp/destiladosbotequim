@@ -44,6 +44,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
   const [deletingCategory, setDeletingCategory] = useState<ComplementCategory | null>(null);
 
   const [categoryName, setCategoryName] = useState("");
+  const [categoryIsRequired, setCategoryIsRequired] = useState(false);
+  const [categoryMinQty, setCategoryMinQty] = useState("0");
+  const [categoryMaxQty, setCategoryMaxQty] = useState("0");
   const [allProducts, setAllProducts] = useState<SimpleProduct[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [originalProductIds, setOriginalProductIds] = useState<Set<string>>(new Set());
