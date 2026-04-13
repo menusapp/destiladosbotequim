@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { Bot, Plus, Trash2, AlertTriangle, Send, RotateCcw, MessageSquare } from "lucide-react";
+import { Bot, Plus, Trash2, AlertTriangle, Send, RotateCcw, MessageSquare, UserCheck, RefreshCw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
 interface RoboMenusTabProps {
   restaurantId: string;
@@ -32,6 +33,13 @@ interface MenuOption {
 interface SimMessage {
   role: 'user' | 'bot';
   text: string;
+}
+
+interface PausedConversation {
+  id: string;
+  customer_phone: string;
+  bot_paused_until: string;
+  paused_reason: string | null;
 }
 
 const DEFAULT_CONFIG: AiConfig = {
@@ -62,17 +70,42 @@ const WELCOME_TYPES = [
   { value: 'link_only', label: 'Apenas o Link Digital', desc: 'Foca 100% em conversão, só entrega o link direto' },
 ];
 
+function formatTimeRemaining(until: string): string {
+  const diff = new Date(until).getTime() - Date.now();
+  if (diff <= 0) return 'expirando...';
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  if (h > 0) return `${h}h ${m}min restantes`;
+  return `${m}min restantes`;
+}
+
 const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
   const [config, setConfig] = useState<AiConfig>(DEFAULT_CONFIG);
   const [menuOptions, setMenuOptions] = useState<MenuOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [whatsappConnected, setWhatsappConnected] = useState(false);
+  const [pausedConversations, setPausedConversations] = useState<PausedConversation[]>([]);
 
   // Simulator state
   const [simMessages, setSimMessages] = useState<SimMessage[]>([]);
   const [simInput, setSimInput] = useState('');
   const [simLoading, setSimLoading] = useState(false);
+
+  const loadPausedConversations = useCallback(async () => {
+    const { data } = await supabase
+      .from('whatsapp_conversations')
+      .select('id, customer_phone, bot_paused_until, paused_reason')
+      .eq('restaurant_id', restaurantId)
+      .eq('bot_paused', true)
+      .not('bot_paused_until', 'is', null);
+    
+    if (data) {
+      // Filter only those still active
+      const active = data.filter((c: any) => new Date(c.bot_paused_until) > new Date());
+      setPausedConversations(active as PausedConversation[]);
+    }
+  }, [restaurantId]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -111,14 +144,31 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
         const { data: whatsappData } = await supabase.from('whatsapp_config').select('instance_status').eq('restaurant_id', restaurantId).maybeSingle();
         setWhatsappConnected(whatsappData?.instance_status === 'connected');
       }
+
+      await loadPausedConversations();
     } catch (e) {
       console.error('Error loading AI config:', e);
     } finally {
       setLoading(false);
     }
-  }, [restaurantId]);
+  }, [restaurantId, loadPausedConversations]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const handleReactivateBot = async (conversationId: string) => {
+    await supabase
+      .from('whatsapp_conversations')
+      .update({
+        bot_paused: false,
+        bot_paused_until: null,
+        paused_reason: null,
+        current_step: 'welcome',
+      })
+      .eq('id', conversationId);
+    
+    toast.success('Bot reativado para este contato!');
+    await loadPausedConversations();
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -242,6 +292,43 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span className="text-sm">O WhatsApp não está conectado. Conecte um dispositivo nas Notificações WhatsApp.</span>
         </div>
+      )}
+
+      {/* Paused conversations */}
+      {pausedConversations.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Atendimentos Humanos Ativos
+            </CardTitle>
+            <CardDescription>Contatos com bot pausado aguardando atendimento humano</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pausedConversations.map((conv) => (
+              <div key={conv.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">{conv.customer_phone}</span>
+                  <Badge variant="warning" className="text-xs">
+                    Atendimento humano
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {formatTimeRemaining(conv.bot_paused_until)}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleReactivateBot(conv.id)}
+                  className="gap-1"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Reativar bot
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
