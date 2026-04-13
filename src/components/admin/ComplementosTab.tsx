@@ -254,6 +254,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const resetCategoryForm = () => {
     setCategoryDialogOpen(false); setEditingCategory(null); setCategoryName("");
+    setCategoryIsRequired(false); setCategoryMinQty("0"); setCategoryMaxQty("0");
     setSelectedProductIds(new Set()); setOriginalProductIds(new Set()); setProductSearchQuery("");
   };
 
