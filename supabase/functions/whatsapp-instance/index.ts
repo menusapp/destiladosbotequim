@@ -83,6 +83,35 @@ async function tryGetQrCode(instanceName: string): Promise<{ qrString: string | 
   return { qrString: null, pairingCode: null, rawResponse: null };
 }
 
+// Configure webhook for instance so messages flow to our system automatically
+async function configureWebhook(instanceName: string): Promise<void> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  if (!supabaseUrl) {
+    console.log('[WEBHOOK] SUPABASE_URL not set, skipping webhook config');
+    return;
+  }
+  const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
+  try {
+    console.log(`[WEBHOOK] Configuring webhook for ${instanceName} -> ${webhookUrl}`);
+    const res = await fetch(`${EVOLUTION_API_URL}/webhook/set/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': EVOLUTION_API_KEY!,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        url: webhookUrl,
+        webhook_by_events: false,
+        webhook_base64: false,
+        events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED', 'MESSAGES_UPSERT']
+      })
+    });
+    console.log(`[WEBHOOK] Config response: ${res.status}`);
+  } catch (error) {
+    console.log(`[WEBHOOK] Failed to configure (non-blocking):`, error);
+  }
+}
+
 // Restart instance to force new QR generation
 async function restartInstance(instanceName: string): Promise<boolean> {
   try {
@@ -271,6 +300,9 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString()
           }, { onConflict: 'restaurant_id' });
 
+        // Configure webhook automatically (non-blocking)
+        await configureWebhook(instanceName);
+
         // Wait for instance to initialize (reduced from 3s to 1s)
         console.log(`[POST] Waiting 1s for instance to initialize...`);
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -342,6 +374,7 @@ Deno.serve(async (req) => {
         console.log(`[POST] Restart requested for: ${instanceName}`);
         
         const success = await restartInstance(instanceName);
+        if (success) await configureWebhook(instanceName);
         
         if (success) {
           await new Promise(resolve => setTimeout(resolve, 2000));
