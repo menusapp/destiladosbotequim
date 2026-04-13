@@ -307,24 +307,25 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
     return map;
   }, [todayReservations]);
 
-  // Realtime for tables and orders
+  // Realtime for tables and orders — filtered by restaurant_id
   useEffect(() => {
     const ch = supabase.channel("pdv-tables-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tables" }, () => refetchTables())
-      .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => refetchTables())
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => { refetchPendingOrders(); refetchActiveOrders(); queryClient.invalidateQueries({ queryKey: ["pdv-searchable-orders"] }); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tables", filter: `restaurant_id=eq.${restaurantId}` }, () => refetchTables())
+      .on("postgres_changes", { event: "*", schema: "public", table: "comandas", filter: `restaurant_id=eq.${restaurantId}` }, () => refetchTables())
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => { refetchPendingOrders(); refetchActiveOrders(); queryClient.invalidateQueries({ queryKey: ["pdv-searchable-orders"] }); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [refetchTables, refetchPendingOrders, refetchActiveOrders, queryClient]);
+  }, [restaurantId, refetchTables, refetchPendingOrders, refetchActiveOrders, queryClient]);
 
-  // Auto-open table from notification
+  // Auto-open table from notification — only consume when table is actually found
   useEffect(() => {
-    if (pendingTableToOpen && tables) {
+    if (pendingTableToOpen && tables && tables.length > 0) {
       const table = tables.find(t => t.id === pendingTableToOpen);
       if (table) {
         setSelectedTableForDrawer(table);
         onTableOpened?.();
       }
+      // If table not found yet, don't call onTableOpened — let it retry on next tables update
     }
   }, [pendingTableToOpen, tables]);
 
