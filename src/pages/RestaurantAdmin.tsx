@@ -787,6 +787,7 @@ const RestaurantAdmin = () => {
   };
 
 
+  const renderContent = () => {
     const content = (() => {
       switch (activeSection) {
         case "visao-geral":
