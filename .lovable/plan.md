@@ -1,32 +1,71 @@
+<final-text>Diagnóstico
 
+- O sintoma bate com um problema no fluxo do Totem em `src/components/kiosk/KioskPayment.tsx`.
+- Hoje o pedido é criado no cliente e os adicionais são gravados depois, um por um, neste trecho:
+  - cria `orders`
+  - cria `order_items`
+  - faz `insert` em `order_item_extras`
+  - depois marca o pedido como pago/preparo
+- O ponto crítico: os inserts de `order_item_extras` estão sendo feitos sem checar `error`. Então, se qualquer adicional/complemento falhar, o pedido continua mesmo assim.
+- Isso explica exatamente o que você relatou:
+  - a maquininha cobra o valor certo do Totem
+  - mas o pedido salvo chega só com o item base
+  - mesa, caixa, notificação e impressão ficam com total menor porque todos recalculam a partir de `order_items + order_item_extras`
 
-## Plano: Corrigir detecção de WhatsApp no Marketing + erro 406
+Plano de correção
 
-### Problema 1 — WhatsApp aparece desconectado no Marketing
+1. Blindar a gravação do pedido do Totem
+- Tirar a lógica “solta” de gravação dos adicionais no cliente.
+- Fazer a criação do pedido do Totem de forma atômica no backend, em uma única operação/transação:
+  - criar pedido
+  - criar itens
+  - criar extras/complementos
+  - só então marcar como pago / aceito / preparando
 
-**Causa raiz**: A edge function `whatsapp-instance` resolve o nome da instância como `rest-ravih-rooftop` (slug) e faz fallback para `rest-9a786bc0` (8 chars do UUID). Porém no banco, o `instance_name` salvo é `rest-8947a1f1` — nenhum dos dois nomes bate. A Evolution API retorna 404 para ambos, e a função retorna `status: "not_created"`, mesmo com `instance_status: "connected"` no banco.
+2. Validar o total no backend
+- Recalcular o total usando o que foi realmente salvo no banco.
+- Usar esse total recalculado como fonte de verdade para o pedido final.
+- Se houver divergência entre o que foi pago e o que foi persistido, interromper a finalização e registrar erro, em vez de salvar pedido incompleto.
 
-**Correção (2 camadas)**:
+3. Corrigir especificamente extras e complementos do Totem
+- Garantir que:
+  - extras de `product_extras` salvem com `product_extra_id`
+  - complementos de categoria salvem com `product_extra_id = null`
+  - `extra_name` sempre seja persistido
+- Adicionar tratamento explícito de erro para nenhum adicional “sumir” silenciosamente.
 
-1. **`whatsapp-instance/index.ts`** — Na função `resolveInstanceName`, também retornar o `instance_name` salvo no banco como terceira opção de fallback. Alterar `tryCheckState` para tentar os 3 nomes: slug-based → uuid-based → DB-saved.
+4. Ajustar atualização imediata no painel
+- Revisar as telas que mostram pedido recém-criado para garantir refresh após `order_item_extras`, especialmente onde hoje o refresh depende só de `orders` / `order_items`.
+- Assim o pedido já aparece completo na mesa, caixa e detalhe do pedido logo após a criação.
 
-2. **`MarketingTab.tsx`** — Quando a API retorna `status !== "connected"`, usar o `instance_status` do banco como fallback (atualmente só faz fallback em caso de exceção de rede). Simplificar: confiar no campo `config.instance_status` retornado pela própria API quando o status principal é "not_created".
+5. Teste fim a fim obrigatório
+- Repetir exatamente um cenário como o seu:
+  - item base
+  - variação
+  - combo
+  - complemento pago
+- Confirmar que o mesmo valor aparece igual em:
+  - Totem
+  - maquininha
+  - mesa/comanda
+  - caixa
+  - notificações
+  - impressão
 
-### Problema 2 — Erro 406
+Detalhes técnicos
 
-**Causa provável**: A query na `CampaignsList.tsx` faz `supabase.from("orders").select("id, order_items(price_at_order, quantity)").in("coupon_code", couponCodes)` — se não houver FK reconhecida entre `orders` e `order_items` pelo PostgREST, ou se o header `Accept` não estiver configurado corretamente, retorna 406.
+- Arquivos mais prováveis:
+  - `src/components/kiosk/KioskPayment.tsx`
+  - nova migration com função/RPC de criação do pedido do Totem
+  - `src/components/admin/TableDetailView.tsx`
+  - `src/components/admin/UnifiedOrdersTab.tsx`
+  - `src/components/admin/OrderDetailModal.tsx`
+  - `src/pages/RestaurantAdmin.tsx`
+- Vou manter o fluxo atual de Totem “cria pendente -> depois finaliza pago”, porque os gatilhos financeiros/estoque já dependem disso.
+- A diferença é que a persistência de itens + adicionais vai deixar de ser frágil e passar a ser garantida antes da finalização.
 
-**Correção**: Separar a query em duas chamadas independentes (buscar orders, depois buscar order_items pelo order_id), evitando a relação embutida que pode causar 406.
+Resultado esperado após a implementação
 
-### Arquivos alterados
-
-| Arquivo | Mudança |
-|---|---|
-| `supabase/functions/whatsapp-instance/index.ts` | Adicionar instance_name do DB como fallback em `tryCheckState` |
-| `src/components/admin/MarketingTab.tsx` | Usar `config.instance_status` da resposta como fallback |
-| `src/components/admin/marketing/CampaignsList.tsx` | Separar query de orders+order_items para evitar 406 |
-
-### Resultado
-- Marketing detecta WhatsApp conectado mesmo quando o nome da instância no banco difere do slug
-- Sem erro 406 na aba de campanhas
-
+- Não vai mais existir pedido do Totem pago na maquininha e salvo sem combo/adicional.
+- O total do pedido ficará consistente em todo o sistema.
+- Se houver qualquer erro de gravação, o sistema não vai mais “engolir” o problema em silêncio.</final-text>
