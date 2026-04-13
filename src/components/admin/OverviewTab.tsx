@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DollarSign, ShoppingBag, TrendingUp, Store, Truck } from "lucide-react";
 import { useOrderMetrics, type DateRange } from "@/hooks/useOrderMetrics";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import ProductPerformanceSection from "./ProductPerformanceSection";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const ProductPerformanceSection = lazy(() => import("./ProductPerformanceSection"));
 
 interface OverviewTabProps {
   restaurantId: string;
@@ -28,31 +30,66 @@ const getMethodColor = (method: string): string => {
   return "bg-gray-400";
 };
 
+function OverviewSkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-8 w-40 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Skeleton className="h-10 w-[200px]" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {[1,2,3,4,5].map(i => (
+          <Card key={i}><CardContent className="p-4"><Skeleton className="h-4 w-20 mb-3" /><Skeleton className="h-7 w-28 mb-2" /><Skeleton className="h-3 w-16" /></CardContent></Card>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2"><CardContent className="p-5"><Skeleton className="h-[260px] w-full" /></CardContent></Card>
+        <Card><CardContent className="p-5"><Skeleton className="h-[260px] w-full" /></CardContent></Card>
+      </div>
+    </div>
+  );
+}
+
+function ProductPerformanceSkeleton() {
+  return (
+    <Card><CardContent className="p-5"><Skeleton className="h-6 w-48 mb-4" /><Skeleton className="h-[200px] w-full" /></CardContent></Card>
+  );
+}
+
 const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
   const [dateRange, setDateRange] = useState<DateRange>("today");
   const { metrics: data, loading, refetch } = useOrderMetrics(restaurantId, dateRange);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Realtime refresh
+  // Realtime refresh with debounce
   useEffect(() => {
+    const debouncedRefetch = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => refetch(), 2000);
+    };
+
     const ch = supabase.channel(`overview-rt-${restaurantId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => refetch())
-      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, () => refetch())
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => debouncedRefetch())
+      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, () => debouncedRefetch())
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      supabase.removeChannel(ch);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [restaurantId, refetch]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-96 text-muted-foreground">Carregando...</div>;
+    return <OverviewSkeleton />;
   }
 
   const totalMethodRevenue = data.revenueByMethod.reduce((s, r) => s + r.total, 0);
-
-  // Determine if single-day or multi-day
   const isSingleDay = dateRange === "today" || dateRange === "yesterday";
   const chartData = isSingleDay ? data.hourlySales : data.dailySales;
   const chartLabel = isSingleDay ? "Vendas por Hora" : "Vendas por Dia";
 
-  // Prepare recharts data
   const rechartsData = chartData.map((h: any) => ({
     label: isSingleDay ? (h.hour?.slice(0, 2) + "h") : h.day?.slice(5),
     total: h.total ?? 0,
@@ -147,8 +184,10 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
         </Card>
       </div>
 
-      {/* Product Performance */}
-      <ProductPerformanceSection restaurantId={restaurantId} dateRange={dateRange} />
+      {/* Product Performance — lazy loaded */}
+      <Suspense fallback={<ProductPerformanceSkeleton />}>
+        <ProductPerformanceSection restaurantId={restaurantId} dateRange={dateRange} />
+      </Suspense>
     </div>
   );
 };
