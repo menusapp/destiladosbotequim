@@ -73,12 +73,13 @@ interface SelectedAddress {
 
 interface PDVTabProps {
   restaurantId: string;
+  restaurantSlug?: string;
   pendingTableToOpen?: string | null;
   onTableOpened?: () => void;
   showPrepTimer?: boolean;
 }
 
-const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer = true }: PDVTabProps) => {
+const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, onTableOpened, showPrepTimer = true }: PDVTabProps) => {
   const queryClient = useQueryClient();
 
   // Order creation state
@@ -143,13 +144,17 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
   // Table management state
   const [selectedTableForDrawer, setSelectedTableForDrawer] = useState<TableData | null>(null);
   const [isManageTablesOpen, setIsManageTablesOpen] = useState(false);
-  const [restaurantSlug, setRestaurantSlug] = useState<string | null>(null);
+  const [restaurantSlug, setRestaurantSlug] = useState<string | null>(slugProp || null);
 
-  // Fetch restaurant slug
+  // Fetch restaurant slug if not provided via prop
   useEffect(() => {
+    if (restaurantSlug || !restaurantId) return;
     supabase.from("restaurants").select("slug").eq("id", restaurantId).single()
-      .then(({ data }) => { if (data) setRestaurantSlug(data.slug); });
-  }, [restaurantId]);
+      .then(({ data, error }) => {
+        if (error) console.error("[PDV] Erro ao buscar slug:", error);
+        if (data?.slug) setRestaurantSlug(data.slug);
+      });
+  }, [restaurantId, restaurantSlug]);
 
   // Fetch products
   const { data: products } = useQuery({
