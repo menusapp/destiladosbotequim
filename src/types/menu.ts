@@ -50,6 +50,7 @@ export interface CartItemExtra {
   id: string;
   name: string;
   price: number;
+  isComplementItem?: boolean;
 }
 
 export interface CartItem {
