@@ -24,12 +24,14 @@ interface Props {
   loyaltyPointsUsed?: number;
   loyaltyRealPerPoint?: number;
   onRedeemPoints?: (points: number) => void;
+  isOpen?: boolean;
 }
 
 export function KioskCart({
   cart, primaryColor, onUpdateQuantity, onRemove, cartTotal, onBack, onNext,
   customerCpf, restaurantId, appliedCoupon, onApplyCoupon, couponDiscount = 0,
   loyaltyPoints = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01, onRedeemPoints,
+  isOpen = true,
 }: Props) {
   const [couponCode, setCouponCode] = useState("");
   const [validatingCoupon, setValidatingCoupon] = useState(false);
@@ -236,7 +238,12 @@ export function KioskCart({
             <span className="text-lg font-medium text-foreground">Total</span>
             <span className="text-2xl font-bold" style={{ color: primaryColor }}>R$ {finalTotal.toFixed(2)}</span>
           </div>
-          <Button onClick={onNext} className="w-full h-14 text-lg font-bold rounded-xl text-white" style={{ backgroundColor: primaryColor }}>
+          {!isOpen && (
+            <div className="mb-3 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-center">
+              <p className="text-sm font-medium text-destructive">Restaurante fechado no momento. Não é possível finalizar pedidos.</p>
+            </div>
+          )}
+          <Button onClick={onNext} disabled={!isOpen} className="w-full h-14 text-lg font-bold rounded-xl text-white" style={{ backgroundColor: isOpen ? primaryColor : undefined }}>
             Continuar
           </Button>
         </div>

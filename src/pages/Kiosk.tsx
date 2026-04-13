@@ -194,6 +194,24 @@ export default function Kiosk() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Track is_open in realtime
+  const isOpen = restaurant?.is_open !== false;
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    const channel = supabase
+      .channel(`kiosk-restaurant-${restaurant.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'restaurants',
+        filter: `id=eq.${restaurant.id}`,
+      }, (payload) => {
+        setRestaurant((prev: any) => prev ? { ...prev, ...payload.new } : prev);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [restaurant?.id]);
+
   const openProduct = useCallback(async (product: Product) => {
     setSelectedProduct(product);
     try {
@@ -386,6 +404,7 @@ export default function Kiosk() {
           loyaltyPointsUsed={loyaltyPointsUsed}
           loyaltyRealPerPoint={loyaltyRealPerPoint}
           onRedeemPoints={setLoyaltyPointsUsed}
+          isOpen={isOpen}
         />
       )}
 
