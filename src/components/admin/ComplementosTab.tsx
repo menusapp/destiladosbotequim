@@ -386,6 +386,24 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
           <div className="space-y-4">
             <div><Label htmlFor="category-name">Nome da Categoria *</Label><Input id="category-name" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} placeholder="Ex: Tamanhos, Molhos, Acompanhamentos" /></div>
 
+            <div className="p-4 border rounded-xl bg-muted/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="cat-required" className="cursor-pointer">Obrigatório</Label>
+                <Switch id="cat-required" checked={categoryIsRequired} onCheckedChange={setCategoryIsRequired} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="cat-min">Mínimo de seleções</Label>
+                  <Input id="cat-min" type="number" min="0" value={categoryMinQty} onChange={(e) => setCategoryMinQty(e.target.value)} placeholder="0" />
+                </div>
+                <div>
+                  <Label htmlFor="cat-max">Máximo de seleções</Label>
+                  <Input id="cat-max" type="number" min="0" value={categoryMaxQty} onChange={(e) => setCategoryMaxQty(e.target.value)} placeholder="0 = ilimitado" />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Máximo 0 = ilimitado. Essas regras serão aplicadas a todos os produtos vinculados.</p>
+            </div>
+
             <div className="space-y-2">
               <Label>Produtos vinculados ({selectedProductIds.size} selecionados)</Label>
               <div className="relative">
