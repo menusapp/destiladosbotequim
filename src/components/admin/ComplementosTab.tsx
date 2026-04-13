@@ -312,6 +312,14 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
                         {expandedCategories.has(category.id) ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                         <CardTitle className="text-lg">{category.name}</CardTitle>
                         <span className="text-sm text-muted-foreground">({category.items.length} {category.items.length === 1 ? "item" : "itens"})</span>
+                        {category.is_required && (
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Obrigatório</span>
+                        )}
+                        {(category.min_quantity || category.max_quantity) ? (
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                            {category.min_quantity ? `Mín: ${category.min_quantity}` : ""}{category.min_quantity && category.max_quantity ? " · " : ""}{category.max_quantity ? `Máx: ${category.max_quantity}` : ""}
+                          </span>
+                        ) : null}
                         {category.is_active === false && (
                           <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Inativo</span>
                         )}
