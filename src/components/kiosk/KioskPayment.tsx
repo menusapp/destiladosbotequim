@@ -184,7 +184,7 @@ export function KioskPayment({
       for (const extra of item.extras) {
         await supabase.from("order_item_extras").insert({
           order_item_id: orderItem.id,
-          product_extra_id: extra.id,
+          product_extra_id: extra.isComplementItem ? null : extra.id,
           price_at_order: extra.price,
           extra_name: extra.name,
         });
