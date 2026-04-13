@@ -330,7 +330,7 @@ export const PaymentConfirmationModal = ({
       }
 
       await onConfirm();
-      toast.success("Pagamento confirmado!");
+      toast.success("Forma de pagamento registrada!");
     } catch (error) {
       console.error("[payment-confirmation] erro ao confirmar pagamento", {
         orderId: order.id,
@@ -565,7 +565,7 @@ export const PaymentConfirmationModal = ({
             ) : (
               <Check className="w-5 h-5" />
             )}
-            {confirming ? "Processando..." : "Confirmar Pagamento"}
+            {confirming ? "Processando..." : "Registrar Pagamento"}
           </Button>
         </div>
       </DialogContent>

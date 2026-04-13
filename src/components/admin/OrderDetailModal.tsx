@@ -476,7 +476,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div className="mt-2 px-2">
-                    <Button onClick={() => setShowPaymentModal(true)} className="w-full">Confirmar Pagamento</Button>
+                    <Button onClick={() => setShowPaymentModal(true)} className="w-full">Forma de Pagamento</Button>
                   </div>
                 </CollapsibleContent>
               </Collapsible>
