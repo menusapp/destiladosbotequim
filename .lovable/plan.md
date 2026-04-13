@@ -1,44 +1,51 @@
 
 
-## Plano: Simplificar pagamento no Totem — sem seleção de método
+## Plano: Validação de CPF/telefone nos cardápios + edição de perfil no delivery
 
-### O que muda
+### 1. Validação de telefone
 
-O cliente no totem não escolhe mais como pagar. Ao clicar "Finalizar e Pagar", o sistema envia direto para a maquininha **sem pré-selecionar tipo de cartão** (a maquininha mostra o menu dela), e exibe uma tela simples: "Continue o pagamento na maquininha" com uma seta para a direita embaixo. O sistema só aguarda o webhook/polling de confirmação.
+Criar função `validatePhone` em `src/lib/cpfValidator.ts` (ou novo arquivo) que valida:
+- Número tem 10 ou 11 dígitos (fixo ou celular)
+- DDD válido (11-99)
+- Se 11 dígitos, deve começar com 9 no nono dígito
 
-Se não houver maquininha configurada, mantém apenas "Dinheiro" como opção (pagar no balcão).
+### 2. Adicionar validação de telefone no `CustomerInfoDialog.tsx`
 
-### Arquivo alterado
+- Importar `validatePhone`
+- No `handleSubmit`, antes de prosseguir, validar o telefone se preenchido: se não passar, mostrar erro "Número de telefone inválido"
+- Mesmo se `requirePhone` for false, se o usuário digitou algo, validar
 
-`src/components/kiosk/KioskPayment.tsx`
+### 3. Adicionar validação de telefone no `KioskIdentification.tsx`
 
-### Mudanças
+- Mesma lógica: se telefone preenchido, validar antes de submeter
 
-1. **Remover tela de seleção de método de pagamento** quando há maquininha configurada
-   - Se `pointTerminal` existe: pular direto para envio à maquininha ao entrar na tela de pagamento
-   - Não mostrar opções "Cartão", "PIX", "Dinheiro" — o terminal cuida disso
+### 4. Tornar perfil editável no delivery (`ProfileView.tsx`)
 
-2. **Remover seleção de tipo de cartão e bandeira**
-   - Não enviar `payment_type` na chamada ao `mercadopago-point` (ou enviar sem restrição para que o terminal mostre todas as opções)
-   - Remover estados `cardStep`, `selectedCardType`, `selectedBrand` do fluxo principal
+Atualmente nome e CPF estão `disabled`. Mudanças:
 
-3. **Nova tela de espera**
-   - Mostrar: valor total, texto "Continue o pagamento na maquininha", ícone de seta para direita (→) embaixo
-   - Botão "Cancelar" discreto
-   - Quando polling detecta pagamento aprovado → cria pedido e avança para confirmação
+- **Nome**: tornar editável com botão "Salvar" que atualiza na tabela `customers` e chama `onNameUpdate`
+- **Telefone**: adicionar campo editável, buscar do `customers` table, salvar com validação
+- **CPF**: manter como somente leitura (é identificador do cliente, não deve mudar)
 
-4. **Fallback sem maquininha**
-   - Se `!pointTerminal`: mostrar apenas opção "Dinheiro (pagar no balcão)" como hoje, criar pedido como pendente
+Adicionar prop `onPhoneUpdate` e `onCpfUpdate` se necessário, ou apenas `onProfileUpdate(name, phone)`.
 
-5. **Ajustar `createOrderInDB`**
-   - Para pagamentos de terminal, `payment_type` fica como `"card"` genérico (ou o que vier do webhook depois)
-   - Remover referências a `selectedCardType` e `selectedBrand` no label de pagamento
+### 5. Propagar atualizações no `DeliveryMenu.tsx`
 
-6. **Ajustar chamada `mercadopago-point`**
-   - Não enviar `payment_type` no body, para que o terminal mostre o menu padrão de seleção
+- Expandir `ProfileView` props para incluir `customerPhone` e callback `onProfileUpdate`
+- Atualizar `sessionStorage` com novos valores quando perfil for editado
+
+### Arquivos alterados
+
+| Arquivo | Mudança |
+|---|---|
+| `src/lib/cpfValidator.ts` | Adicionar `validatePhone()` |
+| `src/components/menu/CustomerInfoDialog.tsx` | Validar telefone no submit |
+| `src/components/kiosk/KioskIdentification.tsx` | Validar telefone no submit |
+| `src/components/menu/ProfileView.tsx` | Tornar nome e telefone editáveis, salvar no banco |
+| `src/pages/DeliveryMenu.tsx` | Passar phone props e handler de atualização ao ProfileView |
 
 ### Resultado
-- Cliente toca "Finalizar e Pagar" → tela "Continue na maquininha" com seta → paga na maquininha como quiser → pedido criado automaticamente
-- Sem tela de escolha de método no totem
-- Maquininha mostra todas as opções (crédito, débito, PIX, vale)
+- CPF já é validado nos dois fluxos (mesa e delivery) — mantido
+- Telefone passa a ser validado em todos os pontos de entrada
+- Perfil no delivery permite editar nome e telefone com salvamento no banco
 
