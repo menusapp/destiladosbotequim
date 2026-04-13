@@ -89,7 +89,8 @@ export function useOrderStatusAdvance(restaurantId: string) {
     try {
       let notificationType: string | null = null;
       if (newStatus === "accepted" || newStatus === "preparing") notificationType = "order_accepted";
-      else if (newStatus === "out_for_delivery" || newStatus === "ready") notificationType = "order_out_for_delivery";
+      else if (newStatus === "out_for_delivery") notificationType = "order_out_for_delivery";
+      else if (newStatus === "ready") notificationType = "order_ready_pickup";
       else if (newStatus === "cancelled") notificationType = "order_cancelled";
 
       if (!notificationType) return;
