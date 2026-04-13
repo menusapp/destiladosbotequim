@@ -626,16 +626,16 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
       {/* Enable Automation */}
       <Card>
-        <CardHeader><CardTitle>Ativar Automação</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Notificações Automáticas</CardTitle></CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label>Enviar mensagens automáticas</Label>
-              <p className="text-sm text-muted-foreground">Notificar automaticamente sobre pedidos e caixa</p>
+              <Label>Ativar todas as notificações</Label>
+              <p className="text-sm text-muted-foreground">Desative para pausar todas as notificações de uma vez</p>
             </div>
-            <Switch checked={enabled} onCheckedChange={setEnabled} disabled={isStatusKnown && !isConnected} />
+            <Switch checked={enabled} onCheckedChange={handleToggleEnabled} disabled={isStatusKnown && !isConnected} />
           </div>
-          {isStatusKnown && !isConnected && <p className="text-sm text-orange-600 mt-2">⚠️ Conecte o WhatsApp primeiro para ativar a automação</p>}
+          {isStatusKnown && !isConnected && <p className="text-sm text-orange-600 mt-2">⚠️ Conecte o WhatsApp primeiro para ativar as notificações</p>}
           {!isStatusKnown && !isConnected && <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Verificando conexão...</p>}
         </CardContent>
       </Card>
