@@ -1,91 +1,44 @@
 
 
-## Plano: 3 Correções — Toggle, Tempo de Preparo Delivery, Robô no WhatsApp Real
+## Plano: Configurar webhook automaticamente ao criar instância
 
-### 1. Remover card "Ativar todas as notificações" e manter apenas toggles individuais
+### Problema
+Hoje, quando um restaurante conecta o WhatsApp, a edge function `whatsapp-instance` cria a instância na Evolution API mas **não configura o webhook** dessa instância. Isso significa que mensagens recebidas naquela instância nunca chegam ao sistema, a menos que alguém vá manualmente na VPS configurar o webhook global ou por instância.
 
-**Problema:** A tabela `whatsapp_config` tem uma RLS policy `block_direct_access` que bloqueia TODAS as operações diretas do frontend (`qual: false`, `with_check: false`). O `upsert` do toggle global sempre falha por causa disso.
+### Solução
+Adicionar uma chamada automática de configuração de webhook **dentro da própria edge function `whatsapp-instance`**, logo após criar a instância com sucesso. A Evolution API tem um endpoint `POST /webhook/set/{instanceName}` que permite configurar o webhook por instância via API. Como a edge function já tem acesso ao `EVOLUTION_API_URL` e `EVOLUTION_API_KEY`, basta adicionar essa chamada.
 
-**Solução:** Remover o card "Notificações Automáticas" inteiro de `WhatsAppSettings.tsx` (linhas ~646-659). Os toggles individuais de cada notificação (que salvam em `whatsapp_notification_configs`, não em `whatsapp_config`) já funcionam e são o controle real. Também remover o estado `enabled`, `handleToggleEnabled`, e as referências a ele.
+### O que muda
 
-**Arquivo:** `src/components/admin/settings/WhatsAppSettings.tsx`
+**Arquivo:** `supabase/functions/whatsapp-instance/index.ts`
 
----
-
-### 2. Adicionar campo "Tempo de preparo para Delivery" na aba Operacional
-
-**Problema:** O `prep_time_minutes` na tabela `restaurants` já existe e é usado como tempo estimado nas notificações e no checkout. Porém na aba Operacional ele aparece apenas como "Tempo de Preparo nos Pedidos" (timer de mesa). Falta um campo editável para o tempo que é informado ao cliente de delivery.
-
-**Solução:** 
-- Na `CompanyDataSettings.tsx`, dentro da aba Operacional, adicionar um novo Card "Tempo Estimado para Delivery" com um campo numérico que edita `prep_time_minutes`.
-- Também adicionar `pickup_time_minutes` para retirada.
-- O save já persiste `prep_time_minutes`, só falta o campo visual dedicado ao delivery.
-
-**Arquivo:** `src/components/admin/settings/CompanyDataSettings.tsx`
-
----
-
-### 3. Robô Menu's — O que falta para funcionar no WhatsApp real
-
-O simulador funciona porque chama a edge function `whatsapp-ai-bot` diretamente. No WhatsApp real, o fluxo é:
+Após a criação da instância (linha ~272, depois do `upsert` no banco), adicionar uma função `configureWebhook(instanceName)` que faz:
 
 ```text
-Cliente manda mensagem no WhatsApp
-  → Evolution API recebe
-  → Evolution API chama webhook global
-  → webhook global aponta para: supabase/functions/v1/whatsapp-webhook
-  → whatsapp-webhook recebe evento messages.upsert
-  → whatsapp-webhook chama whatsapp-ai-bot (fire-and-forget)
-  → whatsapp-ai-bot processa e chama whatsapp-send para responder
+POST {EVOLUTION_API_URL}/webhook/set/{instanceName}
+{
+  "url": "{SUPABASE_URL}/functions/v1/whatsapp-webhook",
+  "webhook_by_events": false,
+  "webhook_base64": false,
+  "events": ["CONNECTION_UPDATE", "QRCODE_UPDATED", "MESSAGES_UPSERT"]
+}
 ```
 
-O código já está todo implementado (linhas 131-156 do `whatsapp-webhook`). O que provavelmente falta é a **configuração do webhook na VPS/Evolution API** para apontar para o endpoint correto.
+Essa chamada será feita automaticamente toda vez que:
+- Uma instância nova é criada (`action: create`)
+- Uma instância existente é reiniciada (`action: restart`)
 
-#### Passo a passo para configurar na VPS:
+Assim, qualquer restaurante que conectar o WhatsApp pelo painel terá o webhook configurado automaticamente, sem precisar tocar na VPS.
 
-1. **Acessar o Portainer** na sua VPS e verificar se a Evolution API está rodando.
+### Detalhes técnicos
+- A URL do webhook é construída dinamicamente usando `Deno.env.get('SUPABASE_URL')` + `/functions/v1/whatsapp-webhook`
+- Se a chamada de webhook falhar, o fluxo continua normalmente (log de aviso, sem bloquear o QR code)
+- Não é necessária nenhuma variável de ambiente nova, tudo já existe
 
-2. **Configurar o webhook global** da Evolution API. Existem duas formas:
-
-   **Opção A — Via variável de ambiente** (recomendado):
-   No `docker-compose.yml` ou nas variáveis de ambiente do container da Evolution API, adicionar/verificar:
-   ```
-   WEBHOOK_GLOBAL_ENABLED=true
-   WEBHOOK_GLOBAL_URL=https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-webhook
-   WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
-   ```
-   Após alterar, reiniciar o container.
-
-   **Opção B — Via API** (se já estiver rodando e não quiser reiniciar):
-   ```bash
-   curl -X POST "SUA_EVOLUTION_API_URL/webhook/set/NOME_DA_INSTANCIA" \
-     -H "apikey: SUA_API_KEY" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "url": "https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-webhook",
-       "webhook_by_events": false,
-       "webhook_base64": false,
-       "events": [
-         "CONNECTION_UPDATE",
-         "QRCODE_UPDATED",
-         "MESSAGES_UPSERT"
-       ]
-     }'
-   ```
-   Substitua `SUA_EVOLUTION_API_URL` pela URL real (ex: `https://evo.seudominio.com.br`) e `NOME_DA_INSTANCIA` pelo nome da instância do restaurante (ex: `rest-rods`).
-
-3. **Testar**: Envie uma mensagem para o número do WhatsApp conectado. Verifique os logs da edge function `whatsapp-webhook` para confirmar que o evento chegou e que o `whatsapp-ai-bot` foi chamado.
-
-4. **Se o webhook já estiver configurado** mas não funciona, verificar nos logs do `whatsapp-webhook` se há erros. Pode ser que a instância na Evolution tenha um nome diferente do registrado em `whatsapp_config.instance_name`.
-
-**Nenhuma alteração de código necessária para o robô** — o fluxo inteiro já está implementado. É puramente configuração da VPS.
-
----
-
-### Resumo de arquivos alterados
-
+### Resumo
 | Arquivo | Alteração |
 |---------|-----------|
-| `WhatsAppSettings.tsx` | Remover card "Notificações Automáticas" e todo o código do toggle global |
-| `CompanyDataSettings.tsx` | Adicionar card com campo de tempo estimado delivery + retirada |
+| `supabase/functions/whatsapp-instance/index.ts` | Adicionar `configureWebhook()` após criar/reiniciar instância |
+
+Nenhuma alteração na VPS necessária. Depois disso, basta o restaurante conectar o WhatsApp pelo painel e o robô já vai funcionar.
 
