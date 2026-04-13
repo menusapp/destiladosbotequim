@@ -760,7 +760,33 @@ const RestaurantAdmin = () => {
     prefetchMap[sectionId]?.();
   };
 
-  const renderContent = () => {
+  // Section wrapper that adds blur overlay for blocked sections
+  const SectionWrapper = ({ sectionId, children, onNavigateToPlans: navToPlans }: { sectionId: string; restaurantId: string; staffRole: string; staffAllowedSections: string[]; children: React.ReactNode; onNavigateToPlans: () => void }) => {
+    const access = (() => {
+      const checkAllowed = (id: string) => !isSectionAllowed || isSectionAllowed(id);
+      const isStaffOk = (id: string) => {
+        if (!staffRole || staffRole === "admin") return true;
+        if (id === "contas") return false;
+        return staffAllowedSections?.includes(id) ?? true;
+      };
+      if (!checkAllowed(sectionId)) return { blocked: true, reason: 'plan' as const };
+      if (!isStaffOk(sectionId)) return { blocked: true, reason: 'permission' as const };
+      return { blocked: false, reason: null };
+    })();
+
+    if (!access.blocked) return <>{children}</>;
+
+    return (
+      <div className="relative min-h-[400px]">
+        <div className="pointer-events-none select-none" style={{ filter: 'blur(8px)' }}>
+          {children}
+        </div>
+        <BlockedOverlay reason={access.reason!} onNavigateToPlans={navToPlans} />
+      </div>
+    );
+  };
+
+
     const content = (() => {
       switch (activeSection) {
         case "visao-geral":
