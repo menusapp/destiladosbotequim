@@ -194,7 +194,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       if (error) throw error;
       if (data) {
         setConfig(data);
-        setEnabled(data.enabled || false);
+        
         setMessages({
           accepted: data.message_accepted || DEFAULT_MESSAGES.accepted,
           out_for_delivery: data.message_out_for_delivery || DEFAULT_MESSAGES.out_for_delivery,
@@ -381,7 +381,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     setSaving(true);
     try {
       const { error } = await supabase.from('whatsapp_config').upsert({
-        restaurant_id: restaurantId, enabled,
+        restaurant_id: restaurantId, enabled: config?.enabled ?? true,
         message_accepted: messages.accepted, message_out_for_delivery: messages.out_for_delivery,
         message_delivered: messages.delivered, message_ready_for_pickup: messages.ready_for_pickup,
         message_picked_up: messages.picked_up, message_cancelled: messages.cancelled,
