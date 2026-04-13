@@ -607,6 +607,19 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         if (error) throw error;
         await insertOrderItems(order.id);
 
+        // Employee credit for delivery
+        if (paymentType === "employee_credit") {
+          await supabase.from("employee_credits").insert({
+            restaurant_id: restaurantId,
+            employee_name: employeeCreditName || customerName || "Funcionário",
+            order_id: order.id,
+            amount: cartTotal,
+            status: "pending",
+            notes: employeeCreditNotes || null,
+            created_by: "Sistema PDV",
+          });
+        }
+
       } else if (orderType === "retirada") {
         const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
         const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
@@ -620,6 +633,19 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
+
+        // Employee credit for retirada
+        if (paymentType === "employee_credit") {
+          await supabase.from("employee_credits").insert({
+            restaurant_id: restaurantId,
+            employee_name: employeeCreditName || customerName || "Funcionário",
+            order_id: order.id,
+            amount: cartTotal,
+            status: "pending",
+            notes: employeeCreditNotes || null,
+            created_by: "Sistema PDV",
+          });
+        }
 
       } else {
         // Mesa
