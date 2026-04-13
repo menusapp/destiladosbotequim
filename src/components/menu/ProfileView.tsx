@@ -515,14 +515,37 @@ export const ProfileView = ({
               <Input
                 id="name"
                 value={name}
-                disabled
-                className="bg-muted"
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Seu nome"
               />
             </div>
             <div className="space-y-2">
               <Label>CPF</Label>
               <Input value={customerCPF} disabled className="bg-muted" />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-phone">Telefone</Label>
+              <Input
+                id="profile-phone"
+                value={formatPhoneDisplay(phone)}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                placeholder="(00) 00000-0000"
+                maxLength={15}
+                inputMode="tel"
+              />
+            </div>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={savingProfile}
+              className="w-full"
+              size="sm"
+            >
+              {savingProfile ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</>
+              ) : (
+                <><Save className="w-4 h-4 mr-2" /> Salvar Alterações</>
+              )}
+            </Button>
           </CardContent>
         </Card>
 
