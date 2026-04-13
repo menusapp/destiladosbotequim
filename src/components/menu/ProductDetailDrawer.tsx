@@ -53,7 +53,7 @@ export const ProductDetailDrawer = ({
       const key = ext.extra_category_name || ext.extra_category_id || "__uncategorized__";
       if (!groupMap.has(key)) {
         groupMap.set(key, {
-          categoryName: ext.extra_category_name || "Adicionais",
+          categoryName: ext.extra_category_name || "Variações",
           categoryId: ext.extra_category_id,
           isRequired: ext.is_required || false,
           minSelection: ext.min_selection || 0,

@@ -53,7 +53,7 @@ const ProductDetailDialog = ({
     const map = new Map<string, ProductExtra[]>();
 
     for (const extra of extras) {
-      const catName = extra.extra_category_name || "Adicionais";
+      const catName = extra.extra_category_name || "Variações";
       if (!map.has(catName)) map.set(catName, []);
       map.get(catName)!.push(extra);
     }
