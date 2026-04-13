@@ -24,6 +24,7 @@ interface Props {
   loyaltyPointsUsed?: number;
   loyaltyRealPerPoint?: number;
   onRedeemPoints?: (points: number) => void;
+  isOpen?: boolean;
 }
 
 export function KioskCart({

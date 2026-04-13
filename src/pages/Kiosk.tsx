@@ -404,6 +404,7 @@ export default function Kiosk() {
           loyaltyPointsUsed={loyaltyPointsUsed}
           loyaltyRealPerPoint={loyaltyRealPerPoint}
           onRedeemPoints={setLoyaltyPointsUsed}
+          isOpen={isOpen}
         />
       )}
 
