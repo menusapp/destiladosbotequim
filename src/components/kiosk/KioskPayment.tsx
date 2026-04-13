@@ -140,7 +140,7 @@ export function KioskPayment({
       order_type,
       delivery_type,
       order_channel: "totem",
-      payment_type: alreadyPaid ? getPaymentTypeForDB() : null,
+      payment_type: null,
       payment_brand: null,
       status: "pending",
       payment_status: "pending",
