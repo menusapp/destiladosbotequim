@@ -16,65 +16,159 @@ interface Props {
   onBack: () => void;
 }
 
+interface ExtraGroup {
+  categoryName: string;
+  categoryId?: string;
+  isRequired: boolean;
+  minSelection: number;
+  maxSelection: number;
+  items: ProductExtra[];
+}
+
 export function KioskProductDetail({ product, extras, primaryColor, onAdd, onBack }: Props) {
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [quantity, setQuantity] = useState(1);
 
-  const { requiredExtras, optionalExtrasGrouped } = useMemo(() => {
-    const required = extras.filter(e => e.is_required);
-    const optional = extras.filter(e => !e.is_required);
-    const grouped: { categoryName: string; items: ProductExtra[] }[] = [];
-    const uncategorized: ProductExtra[] = [];
-    const categoryMap = new Map<string, ProductExtra[]>();
-    for (const ext of optional) {
-      const catName = ext.extra_category_name;
-      if (catName) {
-        if (!categoryMap.has(catName)) categoryMap.set(catName, []);
-        categoryMap.get(catName)!.push(ext);
-      } else {
-        uncategorized.push(ext);
+  const groups = useMemo(() => {
+    const groupMap = new Map<string, ExtraGroup>();
+
+    for (const ext of extras) {
+      const key = ext.extra_category_name || ext.extra_category_id || "__uncategorized__";
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          categoryName: ext.extra_category_name || "Adicionais",
+          categoryId: ext.extra_category_id,
+          isRequired: ext.is_required || false,
+          minSelection: ext.min_selection || 0,
+          maxSelection: ext.max_selection || 0,
+          items: [],
+        });
       }
+      groupMap.get(key)!.items.push(ext);
     }
-    for (const [name, items] of categoryMap) {
-      grouped.push({ categoryName: name, items });
-    }
-    if (uncategorized.length > 0) {
-      grouped.push({ categoryName: "Adicionais", items: uncategorized });
-    }
-    return { requiredExtras: required, optionalExtrasGrouped: grouped };
+
+    return Array.from(groupMap.values());
   }, [extras]);
 
-  const hasRequired = requiredExtras.length > 0;
-  const minRequired = hasRequired ? (requiredExtras[0]?.min_selection || 1) : 0;
-  const maxRequired = hasRequired ? (requiredExtras[0]?.max_selection || 1) : 0;
-  const selectedRequiredCount = requiredExtras.filter(e => selectedExtras.includes(e.id)).length;
-  const isRequiredSatisfied = !hasRequired || selectedRequiredCount >= minRequired;
-
-  const toggleExtra = (id: string, isRequired: boolean) => {
-    if (isRequired && maxRequired === 1) {
+  const toggleExtra = (id: string, group: ExtraGroup) => {
+    if (group.maxSelection === 1 && group.isRequired) {
+      // Radio behavior: deselect others in this group, select this one
       setSelectedExtras(prev => {
-        const withoutRequired = prev.filter(eid => !requiredExtras.some(re => re.id === eid));
-        return [...withoutRequired, id];
+        const groupIds = new Set(group.items.map(i => i.id));
+        const withoutGroup = prev.filter(eid => !groupIds.has(eid));
+        return [...withoutGroup, id];
       });
       return;
     }
-    setSelectedExtras(prev =>
-      prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]
-    );
+    if (group.maxSelection === 1) {
+      // Optional but max 1: toggle within group
+      setSelectedExtras(prev => {
+        const groupIds = new Set(group.items.map(i => i.id));
+        const withoutGroup = prev.filter(eid => !groupIds.has(eid));
+        if (prev.includes(id)) return withoutGroup;
+        return [...withoutGroup, id];
+      });
+      return;
+    }
+    // Multi-select with max limit
+    setSelectedExtras(prev => {
+      if (prev.includes(id)) return prev.filter(e => e !== id);
+      if (group.maxSelection > 0) {
+        const groupIds = new Set(group.items.map(i => i.id));
+        const currentCount = prev.filter(eid => groupIds.has(eid)).length;
+        if (currentCount >= group.maxSelection) {
+          toast.error(`Máximo de ${group.maxSelection} itens nesta categoria`);
+          return prev;
+        }
+      }
+      return [...prev, id];
+    });
   };
+
+  // Validate all required groups
+  const allRequiredSatisfied = groups.every(group => {
+    if (!group.isRequired) return true;
+    const min = group.minSelection || 1;
+    const groupIds = new Set(group.items.map(i => i.id));
+    const count = selectedExtras.filter(id => groupIds.has(id)).length;
+    return count >= min;
+  });
 
   const effectivePrice = product.promotional_price ?? product.price;
   const extrasTotal = extras.filter(e => selectedExtras.includes(e.id)).reduce((s, e) => s + e.price, 0);
   const itemTotal = (effectivePrice + extrasTotal) * quantity;
 
   const handleAdd = () => {
-    if (!isRequiredSatisfied) {
-      toast.error(`Selecione pelo menos ${minRequired} opção obrigatória`);
+    if (!allRequiredSatisfied) {
+      toast.error("Selecione todas as opções obrigatórias");
       return;
     }
     const selected = extras.filter(e => selectedExtras.includes(e.id));
     onAdd(product, selected, notes || undefined, quantity);
+  };
+
+  const renderGroup = (group: ExtraGroup, index: number) => {
+    const groupIds = new Set(group.items.map(i => i.id));
+    const selectedInGroup = selectedExtras.filter(id => groupIds.has(id));
+    const isRadio = group.maxSelection === 1;
+
+    const selectionHint = group.isRequired
+      ? isRadio ? "(escolha 1)" : `(mín. ${group.minSelection || 1}, máx. ${group.maxSelection})`
+      : group.maxSelection > 0 ? `(máx. ${group.maxSelection})` : "";
+
+    return (
+      <div key={index} className="mb-6">
+        <h3 className="text-lg font-bold mb-1 text-foreground">
+          {group.categoryName}
+          {group.isRequired && (
+            <span className="text-sm font-semibold text-red-500 ml-2">(obrigatório)</span>
+          )}
+          {selectionHint && (
+            <span className="text-sm font-normal text-muted-foreground ml-2">{selectionHint}</span>
+          )}
+        </h3>
+
+        {isRadio && group.isRequired ? (
+          <RadioGroup
+            value={selectedInGroup[0] || ""}
+            onValueChange={(v) => toggleExtra(v, group)}
+          >
+            {group.items.map(ext => (
+              <label key={ext.id} className="flex items-center justify-between p-4 rounded-xl border cursor-pointer hover:bg-muted transition-colors">
+                <div className="flex items-center gap-3">
+                  <RadioGroupItem value={ext.id} />
+                  <div>
+                    <span className="text-base">{ext.name}</span>
+                    {ext.description && (
+                      <p className="text-xs text-muted-foreground leading-tight mt-0.5">{ext.description}</p>
+                    )}
+                  </div>
+                </div>
+                {ext.price > 0 && <span className="text-base font-medium" style={{ color: primaryColor }}>+ R$ {ext.price.toFixed(2)}</span>}
+              </label>
+            ))}
+          </RadioGroup>
+        ) : (
+          <div className="space-y-2">
+            {group.items.map(ext => (
+              <label key={ext.id} className="flex items-center justify-between p-4 rounded-xl border cursor-pointer hover:bg-muted transition-colors">
+                <div className="flex items-center gap-3">
+                  <Checkbox checked={selectedExtras.includes(ext.id)} onCheckedChange={() => toggleExtra(ext.id, group)} />
+                  <div>
+                    <span className="text-base">{ext.name}</span>
+                    {ext.description && (
+                      <p className="text-xs text-muted-foreground leading-tight mt-0.5">{ext.description}</p>
+                    )}
+                  </div>
+                </div>
+                {ext.price > 0 && <span className="text-base font-medium" style={{ color: primaryColor }}>+ R$ {ext.price.toFixed(2)}</span>}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -101,65 +195,7 @@ export function KioskProductDetail({ product, extras, primaryColor, onAdd, onBac
             <span className="text-3xl font-bold" style={{ color: primaryColor }}>R$ {effectivePrice.toFixed(2)}</span>
           </div>
 
-          {/* Required extras */}
-          {hasRequired && (
-            <div className="mb-6">
-              <h3 className="text-lg font-bold mb-1 text-foreground">
-                Escolha obrigatória
-                <span className="text-sm font-normal text-muted-foreground ml-2">
-                  {maxRequired === 1 ? "(escolha 1)" : `(mín. ${minRequired}, máx. ${maxRequired})`}
-                </span>
-              </h3>
-              {maxRequired === 1 ? (
-                <RadioGroup value={selectedExtras.find(id => requiredExtras.some(e => e.id === id)) || ""} onValueChange={(v) => toggleExtra(v, true)}>
-                  {requiredExtras.map(ext => (
-                    <label key={ext.id} className="flex items-center justify-between p-4 rounded-xl border cursor-pointer hover:bg-muted transition-colors">
-                      <div className="flex items-center gap-3">
-                        <RadioGroupItem value={ext.id} />
-                        <span className="text-base">{ext.name}</span>
-                      </div>
-                      {ext.price > 0 && <span className="text-base font-medium" style={{ color: primaryColor }}>+ R$ {ext.price.toFixed(2)}</span>}
-                    </label>
-                  ))}
-                </RadioGroup>
-              ) : (
-                <div className="space-y-2">
-                  {requiredExtras.map(ext => (
-                    <label key={ext.id} className="flex items-center justify-between p-4 rounded-xl border cursor-pointer hover:bg-muted transition-colors">
-                      <div className="flex items-center gap-3">
-                        <Checkbox checked={selectedExtras.includes(ext.id)} onCheckedChange={() => toggleExtra(ext.id, true)} />
-                        <span className="text-base">{ext.name}</span>
-                      </div>
-                      {ext.price > 0 && <span className="text-base font-medium" style={{ color: primaryColor }}>+ R$ {ext.price.toFixed(2)}</span>}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Optional extras - grouped by category */}
-          {optionalExtrasGrouped.map((group, gi) => (
-            <div key={gi} className="mb-6">
-              <h3 className="text-lg font-bold mb-1 text-foreground">{group.categoryName}</h3>
-              <div className="space-y-2">
-                {group.items.map(ext => (
-                  <label key={ext.id} className="flex items-center justify-between p-4 rounded-xl border cursor-pointer hover:bg-muted transition-colors">
-                    <div className="flex items-center gap-3">
-                      <Checkbox checked={selectedExtras.includes(ext.id)} onCheckedChange={() => toggleExtra(ext.id, false)} />
-                      <div>
-                        <span className="text-base">{ext.name}</span>
-                        {ext.description && (
-                          <p className="text-xs text-muted-foreground leading-tight mt-0.5">{ext.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    {ext.price > 0 && <span className="text-base font-medium" style={{ color: primaryColor }}>+ R$ {ext.price.toFixed(2)}</span>}
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
+          {groups.map((group, i) => renderGroup(group, i))}
 
           {/* Notes */}
           <div className="mb-6">
@@ -184,7 +220,7 @@ export function KioskProductDetail({ product, extras, primaryColor, onAdd, onBac
           onClick={handleAdd}
           className="flex-1 h-16 text-xl font-bold rounded-xl text-white"
           style={{ backgroundColor: primaryColor }}
-          disabled={!isRequiredSatisfied}
+          disabled={!allRequiredSatisfied}
         >
           Adicionar • R$ {itemTotal.toFixed(2)}
         </Button>
