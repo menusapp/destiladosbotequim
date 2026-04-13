@@ -275,7 +275,10 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   }, [restaurantId]);
 
   useEffect(() => {
-    Promise.all([fetchConfig(), fetchNotificationConfigs(), fetchOwnerConfig()]).finally(() => setLoading(false));
+    Promise.all([fetchConfig(), fetchNotificationConfigs(), fetchOwnerConfig()]).then(() => {
+      // Auto-check real status from Evolution API on mount
+      checkStatus();
+    }).finally(() => setLoading(false));
     return () => { stopAllPolling(); };
   }, [fetchConfig, fetchNotificationConfigs, fetchOwnerConfig, stopAllPolling]);
 
@@ -284,10 +287,12 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
       const data = await response.json();
       if (data.status === 'connected') {
-        setConfig(prev => prev ? { ...prev, instance_status: 'connected' } : null);
+        setConfig(prev => prev ? { ...prev, instance_status: 'connected', instance_name: data.instance_name || prev.instance_name } : null);
         setQrCodeDataUrl(null);
         setConnectFlowActive(false);
         stopAllPolling();
+        // Refresh full config from DB to sync
+        fetchConfig();
       } else if (data.status === 'disconnected' || data.status === 'not_created') {
         setConfig(prev => prev ? { ...prev, instance_status: data.status } : null);
       }
@@ -340,7 +345,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       else throw new Error('Resposta inesperada do servidor');
 
       pollIntervalRef.current = setInterval(async () => { await checkStatus(); }, 3000);
-      setTimeout(() => { if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; } }, 120000);
+      setTimeout(() => { if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; } }, 300000);
     } catch (error) {
       console.error('Error connecting:', error);
       setConnectFlowActive(false);

@@ -14,7 +14,6 @@ function extractQrData(data: any): { qrString: string | null; pairingCode: strin
   let qrString = null;
   let pairingCode = null;
 
-  // Try to find QR string in various fields (priority order)
   if (typeof data.code === 'string' && data.code.length > 20) {
     qrString = data.code;
   } else if (typeof data.qrcode === 'string' && data.qrcode.length > 20) {
@@ -67,7 +66,6 @@ async function tryGetQrCode(instanceName: string): Promise<{ qrString: string | 
         continue;
       }
 
-      // Skip if count:0 or empty
       if (data.count === 0 || (typeof data === 'object' && Object.keys(data).length === 0)) {
         continue;
       }
@@ -89,24 +87,51 @@ async function tryGetQrCode(instanceName: string): Promise<{ qrString: string | 
 async function restartInstance(instanceName: string): Promise<boolean> {
   try {
     console.log(`[RESTART] Restarting instance: ${instanceName}`);
-    
-    // First try restart
     const restartResponse = await fetch(`${EVOLUTION_API_URL}/instance/restart/${instanceName}`, {
       method: 'PUT',
       headers: { 'apikey': EVOLUTION_API_KEY! }
     });
     console.log(`[RESTART] Restart status: ${restartResponse.status}`);
-    
     if (restartResponse.ok) {
       await new Promise(resolve => setTimeout(resolve, 2000));
       return true;
     }
-    
     return false;
   } catch (error) {
     console.log(`[RESTART] Error:`, error);
     return false;
   }
+}
+
+// Try checking connection state, with fallback to old instance name
+async function tryCheckState(instanceName: string, fallbackName: string | null): Promise<{ stateData: any; resolvedName: string } | null> {
+  for (const name of [instanceName, fallbackName].filter(Boolean) as string[]) {
+    try {
+      const res = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${name}`, {
+        headers: { 'apikey': EVOLUTION_API_KEY! }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { stateData: data, resolvedName: name };
+      }
+    } catch {}
+  }
+  return null;
+}
+
+// Resolve instance name: prefer slug-based, fallback to uuid-based
+async function resolveInstanceName(supabase: any, restaurantId: string): Promise<{ instanceName: string; fallbackName: string }> {
+  const { data: restaurant } = await supabase
+    .from('restaurants')
+    .select('slug')
+    .eq('id', restaurantId)
+    .single();
+
+  const slug = restaurant?.slug;
+  const instanceName = slug ? `rest-${slug}` : `rest-${restaurantId.slice(0, 8)}`;
+  const fallbackName = `rest-${restaurantId.slice(0, 8)}`;
+
+  return { instanceName, fallbackName };
 }
 
 Deno.serve(async (req) => {
@@ -129,7 +154,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const instanceName = `rest-${restaurantId.slice(0, 8)}`;
+    const { instanceName, fallbackName } = await resolveInstanceName(supabase, restaurantId);
 
     // GET - Fetch instance status
     if (req.method === 'GET') {
@@ -141,41 +166,34 @@ Deno.serve(async (req) => {
         .eq('restaurant_id', restaurantId)
         .maybeSingle();
 
-      try {
-        const stateResponse = await fetch(
-          `${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`,
-          { headers: { 'apikey': EVOLUTION_API_KEY! } }
+      const stateResult = await tryCheckState(instanceName, fallbackName);
+
+      if (stateResult) {
+        const { stateData, resolvedName } = stateResult;
+        console.log(`[GET] Connection state (${resolvedName}):`, stateData);
+
+        const isConnected = stateData.instance?.state === 'open' || stateData.state === 'open';
+        const instanceState = stateData.instance?.state || stateData.state || 'unknown';
+
+        await supabase
+          .from('whatsapp_config')
+          .upsert({
+            restaurant_id: restaurantId,
+            instance_name: resolvedName,
+            instance_status: isConnected ? 'connected' : 'disconnected',
+            connected_at: isConnected ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'restaurant_id' });
+
+        return new Response(
+          JSON.stringify({
+            instance_name: resolvedName,
+            status: isConnected ? 'connected' : 'disconnected',
+            state: instanceState,
+            config
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
-
-        if (stateResponse.ok) {
-          const stateData = await stateResponse.json();
-          console.log(`[GET] Connection state:`, stateData);
-
-          const isConnected = stateData.instance?.state === 'open' || stateData.state === 'open';
-          const instanceState = stateData.instance?.state || stateData.state || 'unknown';
-
-          await supabase
-            .from('whatsapp_config')
-            .upsert({
-              restaurant_id: restaurantId,
-              instance_name: instanceName,
-              instance_status: isConnected ? 'connected' : 'disconnected',
-              connected_at: isConnected ? new Date().toISOString() : null,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'restaurant_id' });
-
-          return new Response(
-            JSON.stringify({
-              instance_name: instanceName,
-              status: isConnected ? 'connected' : 'disconnected',
-              state: instanceState,
-              config
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      } catch (error) {
-        console.log(`[GET] Instance might not exist yet:`, error);
       }
 
       return new Response(
@@ -196,7 +214,6 @@ Deno.serve(async (req) => {
       if (action === 'create') {
         console.log(`[POST] Creating instance: ${instanceName}`);
 
-        // Create instance in Evolution API
         const createResponse = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
           method: 'POST',
           headers: {
@@ -242,16 +259,16 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString()
           }, { onConflict: 'restaurant_id' });
 
-        // Wait for instance to initialize
-        console.log(`[POST] Waiting 3s for instance to initialize...`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Wait for instance to initialize (reduced from 3s to 1s)
+        console.log(`[POST] Waiting 1s for instance to initialize...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Get QR code with extended retry
+        // Get QR code with faster retry
         let qrString = null;
         let pairingCode = null;
         let attempts = 0;
-        const maxAttempts = 10;
-        const retryDelay = 3000;
+        const maxAttempts = 6;
+        const retryDelay = 1500;
 
         while (!qrString && attempts < maxAttempts) {
           attempts++;
@@ -341,15 +358,15 @@ Deno.serve(async (req) => {
     if (req.method === 'DELETE') {
       console.log(`[DELETE] Disconnecting instance: ${instanceName}`);
 
-      const logoutResponse = await fetch(
-        `${EVOLUTION_API_URL}/instance/logout/${instanceName}`,
-        {
-          method: 'DELETE',
-          headers: { 'apikey': EVOLUTION_API_KEY! }
-        }
-      );
-
-      console.log(`[DELETE] Logout status:`, logoutResponse.status);
+      // Try both names for disconnect
+      for (const name of [instanceName, fallbackName]) {
+        try {
+          await fetch(`${EVOLUTION_API_URL}/instance/logout/${name}`, {
+            method: 'DELETE',
+            headers: { 'apikey': EVOLUTION_API_KEY! }
+          });
+        } catch {}
+      }
 
       await supabase
         .from('whatsapp_config')
