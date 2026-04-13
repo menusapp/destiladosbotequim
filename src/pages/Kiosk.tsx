@@ -269,7 +269,7 @@ export default function Kiosk() {
       id: `kiosk-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       product,
       quantity: quantity || 1,
-      extras: extras.map(e => ({ id: e.id, name: e.name, price: e.price, isComplementItem: !!(e as any).isComplementItem })),
+      extras: extras.map(e => ({ id: e.id, name: e.name, price: e.price, isComplementItem: !!(e as any).isComplementItem || !!(e as any).is_complement })),
       notes,
     };
     setCart(prev => [...prev, newItem]);

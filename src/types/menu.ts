@@ -51,6 +51,7 @@ export interface CartItemExtra {
   name: string;
   price: number;
   isComplementItem?: boolean;
+  is_complement?: boolean;
 }
 
 export interface CartItem {
