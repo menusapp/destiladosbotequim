@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
-    const { restaurant_id, customer_phone, message_text, simulate } = body;
+    const { restaurant_id, customer_phone, message_text, simulate, customer_name } = body;
 
     if (!restaurant_id || !customer_phone || message_text === undefined) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
