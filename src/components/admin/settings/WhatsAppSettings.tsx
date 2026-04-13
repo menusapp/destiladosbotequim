@@ -187,24 +187,6 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     if (qrPollTimeoutRef.current) { clearTimeout(qrPollTimeoutRef.current); qrPollTimeoutRef.current = null; }
   }, []);
 
-  const handleToggleEnabled = useCallback(async (newValue: boolean) => {
-    const previous = enabled;
-    setEnabled(newValue);
-    // Also update local config object so it doesn't get overridden
-    setConfig(prev => prev ? { ...prev, enabled: newValue } : prev);
-    try {
-      const { error } = await supabase.from('whatsapp_config').upsert(
-        { restaurant_id: restaurantId, enabled: newValue, updated_at: new Date().toISOString() },
-        { onConflict: 'restaurant_id' }
-      );
-      if (error) throw error;
-    } catch (err) {
-      console.error('[WA] Erro ao salvar toggle enabled:', err);
-      setEnabled(previous);
-      setConfig(prev => prev ? { ...prev, enabled: previous } : prev);
-      toast({ title: "Erro", description: "Falha ao salvar estado das notificações", variant: "destructive" });
-    }
-  }, [restaurantId, enabled, toast]);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -643,20 +625,13 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
         </CardContent>
       </Card>
 
-      {/* Enable Automation */}
-      <Card>
-        <CardHeader><CardTitle>Notificações Automáticas</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Ativar todas as notificações</Label>
-              <p className="text-sm text-muted-foreground">Desative para pausar todas as notificações de uma vez</p>
-            </div>
-            <Switch checked={enabled} onCheckedChange={handleToggleEnabled} />
-          </div>
-          {isStatusKnown && !isConnected && <p className="text-sm text-orange-600 mt-2">⚠️ O WhatsApp não está conectado. As notificações só serão enviadas quando a conexão estiver ativa.</p>}
-        </CardContent>
-      </Card>
+      {isStatusKnown && !isConnected && (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-orange-600">⚠️ O WhatsApp não está conectado. As notificações só serão enviadas quando a conexão estiver ativa.</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Sub-tabs: Cliente / Dono / Reservas */}
       <Tabs defaultValue="cliente" className="w-full">
