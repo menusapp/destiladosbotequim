@@ -98,12 +98,16 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
 
   const handleSaveCategory = async () => {
     if (!categoryName.trim()) { toast.error("Digite o nome da categoria"); return; }
+    const minQ = parseInt(categoryMinQty) || 0;
+    const maxQ = parseInt(categoryMaxQty) || 0;
     let categoryId = editingCategory?.id;
     if (editingCategory) {
-      const { error } = await supabase.from("extra_categories").update({ name: categoryName }).eq("id", editingCategory.id);
+      const { error } = await supabase.from("extra_categories").update({ name: categoryName, is_required: categoryIsRequired, min_quantity: minQ, max_quantity: maxQ } as any).eq("id", editingCategory.id);
       if (error) { toast.error("Erro ao atualizar categoria"); return; }
+      // Propagate to all linked product_complement_groups
+      await supabase.from("product_complement_groups").update({ is_required: categoryIsRequired, min_selection: minQ, max_selection: maxQ || null } as any).eq("extra_category_id", editingCategory.id);
     } else {
-      const { data, error } = await supabase.from("extra_categories").insert({ name: categoryName, restaurant_id: restaurantId }).select().single();
+      const { data, error } = await supabase.from("extra_categories").insert({ name: categoryName, restaurant_id: restaurantId, is_required: categoryIsRequired, min_quantity: minQ, max_quantity: maxQ } as any).select().single();
       if (error || !data) { toast.error("Erro ao criar categoria"); return; }
       categoryId = data.id;
     }
