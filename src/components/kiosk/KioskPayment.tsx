@@ -105,126 +105,105 @@ export function KioskPayment({
   const createOrderInDB = useCallback(async (alreadyPaid = false): Promise<string | null> => {
     const { order_type, delivery_type } = getOrderTypeFields();
 
-    let tableId: string | null = null;
-    if (consumptionMode === "table" && tableNumber) {
-      const { data: table } = await supabase
-        .from("tables")
-        .select("id")
-        .eq("restaurant_id", restaurant.id)
-        .eq("table_number", parseInt(tableNumber))
-        .maybeSingle();
-      tableId = table?.id || null;
-      if (!tableId) {
-        toast.error(`Mesa ${tableNumber} não encontrada`);
-        return null;
-      }
-    }
-
     const paymentLabel = paymentMethod === "point_terminal" ? "[Maquininha]" : "";
-
     const notes = [
       `[TOTEM] ${getConsumptionLabel()}`,
       paymentMethod === "cash" && cashPaid ? `Troco para: R$ ${parseFloat(cashPaid).toFixed(2)}` : null,
       paymentLabel || null,
     ].filter(Boolean).join(" | ");
 
+    // Build items array for the RPC
+    const itemsPayload = cart.map(item => ({
+      product_id: item.product.id,
+      quantity: item.quantity,
+      price_at_order: item.product.promotional_price ?? item.product.price,
+      notes: item.notes || null,
+      extras: item.extras.map(extra => ({
+        product_extra_id: extra.id,
+        price_at_order: extra.price,
+        extra_name: extra.name,
+        is_complement: !!(extra.isComplementItem || extra.is_complement),
+      })),
+    }));
+
+    // Call atomic RPC — order + items + extras in a single transaction
+    const { data: orderId, error: rpcError } = await supabase.rpc("create_kiosk_order", {
+      p_restaurant_id: restaurant.id,
+      p_customer_name: customer.name,
+      p_customer_cpf: customer.cpf,
+      p_order_type: order_type,
+      p_delivery_type: delivery_type,
+      p_notes: notes,
+      p_delivery_phone: customer.phone || null,
+      p_delivery_address: consumptionMode === "delivery" && deliveryAddress ? deliveryAddress : null,
+      p_coupon_code: appliedCoupon?.code || null,
+      p_coupon_discount: couponDiscount,
+      p_loyalty_points_used: loyaltyPointsUsed,
+      p_reward_discount: pointsDiscount,
+      p_table_number: consumptionMode === "table" && tableNumber ? parseInt(tableNumber) : null,
+      p_items: itemsPayload,
+    });
+
+    if (rpcError) {
+      console.error("[KioskPayment] RPC create_kiosk_order error:", rpcError);
+      throw new Error(rpcError.message || "Erro ao salvar pedido");
+    }
+
+    if (!orderId) {
+      throw new Error("Pedido não foi criado");
+    }
+
     const isTablePaid = alreadyPaid && consumptionMode === "table";
-    // Insert as 'pending' first so items exist when we update to final status (triggers need items)
     const finalStatus = isTablePaid ? "accepted" : alreadyPaid ? "preparing" : "pending";
 
-    const orderData: any = {
-      table_id: tableId,
-      restaurant_id: restaurant.id,
-      customer_name: customer.name,
-      customer_cpf: customer.cpf,
-      order_type,
-      delivery_type,
-      order_channel: "totem",
-      payment_type: null,
-      payment_brand: null,
-      status: "pending",
-      payment_status: "pending",
-      paid_at: null,
-      notes,
-      delivery_phone: customer.phone || null,
-      coupon_code: appliedCoupon?.code || null,
-      coupon_discount: couponDiscount,
-      loyalty_points_used: loyaltyPointsUsed,
-      reward_discount: pointsDiscount,
-    };
-
-    if (consumptionMode === "delivery" && deliveryAddress) {
-      orderData.delivery_address = deliveryAddress;
-    }
-
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .insert(orderData)
-      .select()
-      .single();
-
-    if (orderError) throw orderError;
-
-    // Insert order items
-    for (const item of cart) {
-      const priceAtOrder = item.product.promotional_price ?? item.product.price;
-      const { data: orderItem, error: itemError } = await supabase
-        .from("order_items")
-        .insert({
-          order_id: order.id,
-          product_id: item.product.id,
-          quantity: item.quantity,
-          price_at_order: priceAtOrder,
-          notes: item.notes,
-        })
-        .select()
-        .single();
-      if (itemError) throw itemError;
-
-      for (const extra of item.extras) {
-        await supabase.from("order_item_extras").insert({
-          order_item_id: orderItem.id,
-          product_extra_id: extra.isComplementItem ? null : extra.id,
-          price_at_order: extra.price,
-          extra_name: extra.name,
-        });
-      }
-    }
-
-    // Now that items exist, update to final status so triggers (stock deduction, cash) fire with items
+    // Now that items+extras exist atomically, update to final status so triggers fire
     if (finalStatus !== "pending") {
-      await supabase.from("orders").update({
+      const { error: updateError } = await supabase.from("orders").update({
         status: finalStatus,
         payment_type: getPaymentTypeForDB(),
         payment_status: "paid",
         paid_at: new Date().toISOString(),
-      }).eq("id", order.id);
+      }).eq("id", orderId);
+
+      if (updateError) {
+        console.error("[KioskPayment] Status update error:", updateError);
+      }
     }
 
     // Create comanda for table orders
+    const tableId = consumptionMode === "table" && tableNumber ? true : false;
     if (consumptionMode === "table" && tableId) {
-      const { data: comanda, error: comandaError } = await supabase
-        .from("comandas")
-        .insert({
-          restaurant_id: restaurant.id,
-          table_id: tableId,
-          customer_name: customer.name,
-          customer_cpf: customer.cpf || "000.000.000-00",
-          status: "active",
-        })
-        .select()
+      // Get table_id from order
+      const { data: orderData } = await supabase
+        .from("orders")
+        .select("table_id")
+        .eq("id", orderId)
         .single();
 
-      if (!comandaError && comanda) {
-        await supabase.from("orders").update({ comanda_id: comanda.id }).eq("id", order.id);
-      }
+      if (orderData?.table_id) {
+        const { data: comanda, error: comandaError } = await supabase
+          .from("comandas")
+          .insert({
+            restaurant_id: restaurant.id,
+            table_id: orderData.table_id,
+            customer_name: customer.name,
+            customer_cpf: customer.cpf || "000.000.000-00",
+            status: "active",
+          })
+          .select()
+          .single();
 
-      if (isTablePaid) {
-        await supabase.from("tables").update({
-          is_occupied: true,
-          occupied_at: new Date().toISOString(),
-          occupied_by: customer.name,
-        }).eq("id", tableId);
+        if (!comandaError && comanda) {
+          await supabase.from("orders").update({ comanda_id: comanda.id }).eq("id", orderId);
+        }
+
+        if (isTablePaid) {
+          await supabase.from("tables").update({
+            is_occupied: true,
+            occupied_at: new Date().toISOString(),
+            occupied_by: customer.name,
+          }).eq("id", orderData.table_id);
+        }
       }
     }
 
@@ -265,21 +244,18 @@ export function KioskPayment({
 
         if (pointsToEarn > 0) {
           await supabase.from("loyalty_transactions").insert({
-            customer_cpf: customer.cpf, restaurant_id: restaurant.id, order_id: order.id, points: pointsToEarn, type: "earn",
+            customer_cpf: customer.cpf, restaurant_id: restaurant.id, order_id: orderId, points: pointsToEarn, type: "earn",
           });
         }
         if (loyaltyPointsUsed > 0) {
           await supabase.from("loyalty_transactions").insert({
-            customer_cpf: customer.cpf, restaurant_id: restaurant.id, order_id: order.id, points: -loyaltyPointsUsed, type: "redeem",
+            customer_cpf: customer.cpf, restaurant_id: restaurant.id, order_id: orderId, points: -loyaltyPointsUsed, type: "redeem",
           });
         }
       }
     }
 
-    // Cash movement is now handled by DB triggers (add_delivery_order_to_cash_register / add_local_order_to_cash_register)
-    // via the two-step insert: pending → update to final status with payment_type
-
-    return order.id;
+    return orderId;
   }, [restaurant, customer, cart, consumptionMode, tableNumber, paymentMethod, cashPaid, finalTotal, appliedCoupon, couponDiscount, loyaltyPointsUsed, pointsDiscount, deliveryAddress]);
 
   const startPointPolling = useCallback((mpOrdId: string) => {
