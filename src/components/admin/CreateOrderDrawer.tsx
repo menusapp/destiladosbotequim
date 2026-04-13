@@ -278,6 +278,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       resolvedPaymentType = "Dinheiro";
     } else if (paymentMethod === "pix") {
       resolvedPaymentType = "PIX";
+    } else if (paymentMethod === "employee_credit") {
+      resolvedPaymentType = "Crédito Funcionário";
     } else if (paymentMethod) {
       resolvedPaymentType = paymentMethod;
     }
