@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText, Timer, RotateCcw, MapPin, Printer, HardDrive } from "lucide-react";
+import { Palette, User, Phone, CreditCard, Image, Clock, Percent, Save, FileText, Timer, RotateCcw, MapPin, Printer, HardDrive, Truck } from "lucide-react";
 import { lazy, Suspense } from "react";
 
 const BusinessHoursSettings = lazy(() => import("./BusinessHoursSettings"));
