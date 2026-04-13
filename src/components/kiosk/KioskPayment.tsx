@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Banknote, CreditCard, QrCode, Loader2, ChevronLeft, Zap, XCircle } from "lucide-react";
+import { ArrowLeft, Banknote, Loader2, Zap, XCircle, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { CartItem } from "@/types/menu";
@@ -11,8 +11,6 @@ import { KioskConfig, KioskPointTerminal } from "@/hooks/useKioskConfig";
 import { ConsumptionMode } from "./KioskConsumptionType";
 
 type PointPaymentStatus = "idle" | "creating_payment" | "waiting_terminal" | "processing" | "paid" | "failed" | "canceled";
-
-type CardStep = "method" | "card_type" | "card_brand";
 
 interface Props {
   cart: CartItem[];
@@ -33,38 +31,17 @@ interface Props {
   deliveryAddress?: string;
 }
 
-const CARD_TYPES = [
-  { key: "credit_card", label: "Crédito", icon: CreditCard },
-  { key: "debit_card", label: "Débito", icon: CreditCard },
-  { key: "voucher", label: "Vale Refeição", icon: CreditCard },
-];
-
-const CARD_BRANDS = [
-  { code: "visa", name: "Visa" },
-  { code: "mastercard", name: "Mastercard" },
-  { code: "elo", name: "Elo" },
-  { code: "hipercard", name: "Hipercard" },
-  { code: "amex", name: "American Express" },
-  { code: "diners", name: "Diners Club" },
-  { code: "outros", name: "Outros" },
-];
-
 export function KioskPayment({
   cart, restaurant, customer, consumptionMode, tableNumber, primaryColor, cartTotal, onBack, onOrderCreated, kioskConfig,
   pointTerminal, appliedCoupon, couponDiscount = 0, loyaltyPointsUsed = 0, loyaltyRealPerPoint = 0.01, deliveryAddress,
 }: Props) {
-  // "cash" | "point_card" | "point_pix"
   const [paymentMethod, setPaymentMethod] = useState<string>("");
-  const [cardStep, setCardStep] = useState<CardStep>("method");
-  const [selectedCardType, setSelectedCardType] = useState<string>("");
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [cashPaid, setCashPaid] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // Point terminal payment state
   const [pointStatus, setPointStatus] = useState<PointPaymentStatus>("idle");
   const [mpOrderId, setMpOrderId] = useState<string | null>(null);
-  const [pixQrExternalRef, setPixQrExternalRef] = useState<string | null>(null); // For QR Code PIX polling
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const createdOrderIdRef = useRef<string | null>(null);
@@ -76,6 +53,20 @@ export function KioskPayment({
   const changeAmount = paymentMethod === "cash" && cashPaid
     ? Math.max(0, parseFloat(cashPaid) - finalTotal)
     : 0;
+
+  const hasTerminal = !!pointTerminal;
+
+  // Auto-start terminal payment when entering this screen with a terminal configured
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (hasTerminal && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      setPaymentMethod("point_terminal");
+      // Start terminal payment automatically
+      startTerminalPayment();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasTerminal]);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -107,24 +98,8 @@ export function KioskPayment({
 
   const getPaymentTypeForDB = () => {
     if (paymentMethod === "cash") return "cash";
-    if (paymentMethod === "point_pix") return "pix";
-    if (paymentMethod === "point_card") {
-      if (selectedCardType === "credit_card") return "credit";
-      if (selectedCardType === "debit_card") return "debit";
-      if (selectedCardType === "voucher") return "voucher";
-      return "card";
-    }
-    return paymentMethod;
-  };
-
-  const getMpPaymentType = () => {
-    if (paymentMethod === "point_pix") return "bank_transfer";
-    if (paymentMethod === "point_card") {
-      if (selectedCardType === "debit_card") return "debit_card";
-      if (selectedCardType === "voucher") return "voucher_card";
-      return "credit_card";
-    }
-    return "credit_card";
+    // Terminal payment — generic "card" until webhook provides details
+    return "card";
   };
 
   const createOrderInDB = useCallback(async (alreadyPaid = false): Promise<string | null> => {
@@ -145,11 +120,7 @@ export function KioskPayment({
       }
     }
 
-    const paymentLabel = paymentMethod === "point_card"
-      ? `[Maquininha - ${selectedCardType === "credit_card" ? "Crédito" : selectedCardType === "debit_card" ? "Débito" : "Vale"}${selectedBrand ? ` ${selectedBrand}` : ""}]`
-      : paymentMethod === "point_pix"
-        ? "[Maquininha - PIX]"
-        : "";
+    const paymentLabel = paymentMethod === "point_terminal" ? "[Maquininha]" : "";
 
     const notes = [
       `[TOTEM] ${getConsumptionLabel()}`,
@@ -157,7 +128,6 @@ export function KioskPayment({
       paymentLabel || null,
     ].filter(Boolean).join(" | ");
 
-    // For table orders paid via terminal, enter as accepted + paid immediately
     const isTablePaid = alreadyPaid && consumptionMode === "table";
     const orderStatus = isTablePaid ? "accepted" : alreadyPaid ? "preparing" : "pending";
 
@@ -170,7 +140,7 @@ export function KioskPayment({
       delivery_type,
       order_channel: "totem",
       payment_type: getPaymentTypeForDB(),
-      payment_brand: selectedBrand || null,
+      payment_brand: null,
       status: orderStatus,
       payment_status: alreadyPaid ? "paid" : "pending",
       paid_at: alreadyPaid ? new Date().toISOString() : null,
@@ -238,7 +208,6 @@ export function KioskPayment({
         await supabase.from("orders").update({ comanda_id: comanda.id }).eq("id", order.id);
       }
 
-      // Occupy table immediately for paid totem orders
       if (isTablePaid) {
         await supabase.from("tables").update({
           is_occupied: true,
@@ -332,9 +301,9 @@ export function KioskPayment({
     }
 
     return order.id;
-  }, [restaurant, customer, cart, consumptionMode, tableNumber, paymentMethod, selectedCardType, selectedBrand, cashPaid, finalTotal, appliedCoupon, couponDiscount, loyaltyPointsUsed, pointsDiscount, deliveryAddress]);
+  }, [restaurant, customer, cart, consumptionMode, tableNumber, paymentMethod, cashPaid, finalTotal, appliedCoupon, couponDiscount, loyaltyPointsUsed, pointsDiscount, deliveryAddress]);
 
-  const startPointPolling = useCallback((mpOrdId: string, isPixQr = false, extRef?: string) => {
+  const startPointPolling = useCallback((mpOrdId: string) => {
     setPointStatus("waiting_terminal");
 
     // Timeout after 120s
@@ -342,14 +311,12 @@ export function KioskPayment({
       if (pollingRef.current) clearInterval(pollingRef.current);
       setPointStatus("canceled");
 
-      if (!isPixQr) {
-        try {
-          await supabase.functions.invoke("mercadopago-point", {
-            body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
-          });
-        } catch (e) {
-          console.error("[KioskPayment] Cancel error:", e);
-        }
+      try {
+        await supabase.functions.invoke("mercadopago-point", {
+          body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
+        });
+      } catch (e) {
+        console.error("[KioskPayment] Cancel error:", e);
       }
 
       toast.error("Tempo esgotado. Tente novamente.");
@@ -358,21 +325,9 @@ export function KioskPayment({
     // Poll every 3s
     pollingRef.current = setInterval(async () => {
       try {
-        let res: any;
-
-        if (isPixQr && extRef) {
-          // QR Code PIX: poll via merchant_orders using external_reference
-          const { data } = await supabase.functions.invoke("mercadopago-point", {
-            body: { action: "get_qr_order", restaurant_id: restaurant.id, external_reference: extRef },
-          });
-          res = data;
-        } else {
-          // Card: poll via get_order
-          const { data } = await supabase.functions.invoke("mercadopago-point", {
-            body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
-          });
-          res = data;
-        }
+        const { data: res } = await supabase.functions.invoke("mercadopago-point", {
+          body: { action: "get_order", restaurant_id: restaurant.id, mp_order_id: mpOrdId },
+        });
 
         if (!res?.ok) return;
 
@@ -381,7 +336,6 @@ export function KioskPayment({
         const data = res.data;
         const txn = data?.transactions?.payments?.[0];
 
-        // Check for paid status (both card and PIX QR paths)
         const isPaid = internalStatus === "paid" ||
           status === "processed" || status === "finished" ||
           (txn?.status_detail === "accredited" || txn?.status === "approved");
@@ -437,7 +391,7 @@ export function KioskPayment({
     }, 3000);
   }, [restaurant.id, onOrderCreated, createOrderInDB]);
 
-  const handlePointPayment = async () => {
+  const startTerminalPayment = useCallback(async () => {
     if (!pointTerminal) {
       toast.error("Nenhuma maquininha configurada");
       return;
@@ -457,7 +411,7 @@ export function KioskPayment({
           order_id: tempId,
           device_id: pointTerminal.device_id,
           idempotency_key: tempId,
-          payment_type: getMpPaymentType(),
+          // No payment_type — let the terminal show its default selection menu
         },
       });
 
@@ -473,10 +427,8 @@ export function KioskPayment({
         return;
       }
 
-      const isPixQr = !!res.data.pix_qr;
       setMpOrderId(res.data.id);
-      setPixQrExternalRef(isPixQr ? tempId : null);
-      startPointPolling(res.data.id, isPixQr, isPixQr ? tempId : undefined);
+      startPointPolling(res.data.id);
     } catch (err: any) {
       console.error("[KioskPayment] Point payment error:", err);
       toast.error(err?.message || "Erro ao processar pagamento");
@@ -484,14 +436,13 @@ export function KioskPayment({
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [pointTerminal, restaurant.id, finalTotal, startPointPolling]);
 
   const handleCancelPointPayment = async () => {
     if (pollingRef.current) clearInterval(pollingRef.current);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    if (mpOrderId && !pixQrExternalRef) {
-      // Only cancel via API for card orders (not QR PIX — those expire on their own)
+    if (mpOrderId) {
       try {
         await supabase.functions.invoke("mercadopago-point", {
           body: { action: "cancel_order", restaurant_id: restaurant.id, mp_order_id: mpOrderId },
@@ -503,26 +454,19 @@ export function KioskPayment({
 
     setPointStatus("idle");
     setMpOrderId(null);
-    setPixQrExternalRef(null);
     orderCreationInProgressRef.current = false;
+    onBack();
   };
 
   const handleRetryPointPayment = () => {
     setPointStatus("idle");
     setMpOrderId(null);
-    setPixQrExternalRef(null);
     orderCreationInProgressRef.current = false;
-    handlePointPayment();
+    startTerminalPayment();
   };
 
-  const handleFinalize = async () => {
+  const handleFinalizeCash = async () => {
     if (submitting) return;
-
-    if (paymentMethod === "point_card" || paymentMethod === "point_pix") {
-      handlePointPayment();
-      return;
-    }
-
     setSubmitting(true);
     try {
       const orderId = await createOrderInDB();
@@ -539,86 +483,98 @@ export function KioskPayment({
     }
   };
 
-  // Build available payment methods
-  const hasTerminal = !!pointTerminal;
-  const methods: { key: string; label: string; icon: any; sublabel?: string }[] = [];
+  // === TERMINAL PAYMENT SCREEN (auto-triggered when terminal exists) ===
+  if (hasTerminal) {
+    // Waiting / processing / creating screen
+    if (pointStatus === "creating_payment" || pointStatus === "waiting_terminal" || pointStatus === "processing" || pointStatus === "paid") {
+      const statusMessages: Record<string, string> = {
+        creating_payment: "Enviando para a maquininha...",
+        waiting_terminal: "Continue o pagamento na maquininha",
+        processing: "Processando pagamento...",
+        paid: "Pagamento aprovado!",
+      };
 
-  if (kioskConfig?.payment_cash !== false) {
-    methods.push({ key: "cash", label: "Dinheiro", icon: Banknote, sublabel: "Pagar no balcão" });
-  }
-  if (kioskConfig?.payment_card !== false && hasTerminal) {
-    methods.push({ key: "point_card", label: "Cartão na Maquininha", icon: CreditCard, sublabel: "Crédito, Débito ou Vale" });
-  }
-  if (kioskConfig?.payment_pix !== false && hasTerminal) {
-    methods.push({ key: "point_pix", label: "Pix na Maquininha", icon: QrCode, sublabel: "QR Code PIX no terminal" });
-  }
+      return (
+        <div className="flex flex-col h-screen bg-background items-center justify-center relative">
+          <div className="text-center space-y-8 p-8 max-w-md">
+            {pointStatus === "paid" ? (
+              <div className="h-24 w-24 rounded-full bg-green-100 dark:bg-green-950/30 flex items-center justify-center mx-auto">
+                <Zap className="h-12 w-12 text-green-600" />
+              </div>
+            ) : pointStatus === "creating_payment" ? (
+              <Loader2 className="h-20 w-20 animate-spin mx-auto" style={{ color: primaryColor }} />
+            ) : (
+              <div className="h-24 w-24 rounded-full flex items-center justify-center mx-auto" style={{ backgroundColor: `${primaryColor}15` }}>
+                <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ backgroundColor: `${primaryColor}25` }}>
+                  <div className="h-4 w-4 rounded-full animate-pulse" style={{ backgroundColor: primaryColor }} />
+                </div>
+              </div>
+            )}
 
-  const handleMethodSelect = (key: string) => {
-    setPaymentMethod(key);
-    setSelectedCardType("");
-    setSelectedBrand("");
-    setPointStatus("idle");
-    if (key === "point_card") {
-      setCardStep("card_type");
-    } else {
-      setCardStep("method");
-    }
-  };
-
-  const handleCardTypeSelect = (type: string) => {
-    setSelectedCardType(type);
-    setCardStep("card_brand");
-  };
-
-  const handleBrandSelect = (brand: string) => {
-    setSelectedBrand(brand);
-    setCardStep("method");
-  };
-
-  const isPointPayment = paymentMethod === "point_card" || paymentMethod === "point_pix";
-
-  const canFinalizePayment =
-    paymentMethod !== "" &&
-    (paymentMethod !== "point_card" || (selectedCardType !== "" && selectedBrand !== "")) &&
-    (paymentMethod !== "cash" || !cashPaid || parseFloat(cashPaid) >= finalTotal) &&
-    (!isPointPayment || pointStatus === "idle" || pointStatus === "failed" || pointStatus === "canceled");
-
-  // Render Point payment waiting screen
-  if (isPointPayment && pointStatus !== "idle" && pointStatus !== "failed" && pointStatus !== "canceled") {
-    const statusMessages: Record<string, string> = {
-      creating_payment: "Enviando para a maquininha...",
-      waiting_terminal: paymentMethod === "point_pix" ? "Aguardando pagamento PIX na maquininha..." : "Aguardando pagamento na maquininha...",
-      processing: "Processando pagamento...",
-      paid: "Pagamento aprovado!",
-    };
-
-    return (
-      <div className="flex flex-col h-screen bg-background items-center justify-center">
-        <div className="text-center space-y-6 p-8 max-w-md">
-          {pointStatus === "paid" ? (
-            <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-950/30 flex items-center justify-center mx-auto">
-              <Zap className="h-10 w-10 text-green-600" />
+            <div className="space-y-2">
+              <p className="text-3xl font-bold text-foreground">{statusMessages[pointStatus]}</p>
+              <p className="text-5xl font-bold" style={{ color: primaryColor }}>R$ {finalTotal.toFixed(2)}</p>
             </div>
-          ) : (
-            <Loader2 className="h-16 w-16 animate-spin mx-auto" style={{ color: primaryColor }} />
-          )}
-          <p className="text-2xl font-bold text-foreground">{statusMessages[pointStatus]}</p>
-          <p className="text-4xl font-bold" style={{ color: primaryColor }}>R$ {finalTotal.toFixed(2)}</p>
-          {pointStatus !== "paid" && (
-            <Button
-              variant="outline"
-              onClick={handleCancelPointPayment}
-              className="gap-2 mt-4"
-            >
-              <XCircle className="h-4 w-4" />
-              Cancelar
-            </Button>
+
+            {pointStatus !== "paid" && (
+              <Button
+                variant="ghost"
+                onClick={handleCancelPointPayment}
+                className="gap-2 mt-6 text-muted-foreground"
+              >
+                <XCircle className="h-4 w-4" />
+                Cancelar
+              </Button>
+            )}
+          </div>
+
+          {/* Arrow indicator bottom-right */}
+          {(pointStatus === "waiting_terminal" || pointStatus === "processing") && (
+            <div className="absolute bottom-12 right-12 flex items-center gap-3 text-muted-foreground animate-pulse">
+              <span className="text-lg font-medium">Maquininha</span>
+              <ArrowRight className="h-8 w-8" style={{ color: primaryColor }} />
+            </div>
           )}
         </div>
+      );
+    }
+
+    // Failed / canceled — show retry
+    if (pointStatus === "failed" || pointStatus === "canceled") {
+      return (
+        <div className="flex flex-col h-screen bg-background items-center justify-center">
+          <div className="text-center space-y-6 p-8 max-w-md">
+            <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+              <XCircle className="h-10 w-10 text-destructive" />
+            </div>
+            <p className="text-2xl font-bold text-foreground">
+              {pointStatus === "failed" ? "Pagamento recusado" : "Pagamento cancelado"}
+            </p>
+            <p className="text-4xl font-bold" style={{ color: primaryColor }}>R$ {finalTotal.toFixed(2)}</p>
+            <div className="flex gap-3 justify-center mt-4">
+              <Button variant="outline" onClick={onBack} className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </Button>
+              <Button onClick={handleRetryPointPayment} className="gap-2 text-white" style={{ backgroundColor: primaryColor }}>
+                <Zap className="h-4 w-4" />
+                Tentar novamente
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Idle with terminal — should not normally be visible (auto-start fires), but fallback
+    return (
+      <div className="flex flex-col h-screen bg-background items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin" style={{ color: primaryColor }} />
       </div>
     );
   }
 
+  // === NO TERMINAL — CASH ONLY FALLBACK ===
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center gap-4 p-5 border-b bg-card shrink-0">
@@ -639,94 +595,26 @@ export function KioskPayment({
           )}
         </div>
 
-        {/* Failed/Canceled point payment - show retry */}
-        {(pointStatus === "failed" || pointStatus === "canceled") && isPointPayment && (
-          <div className="mb-6 p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-center space-y-3">
-            <p className="text-sm font-medium text-destructive">
-              {pointStatus === "failed" ? "Pagamento recusado" : "Pagamento cancelado"}
-            </p>
-            <Button onClick={handleRetryPointPayment} variant="outline" size="sm" className="gap-2">
-              <Zap className="h-4 w-4" /> Tentar novamente
-            </Button>
-          </div>
-        )}
-
-        {/* Card type selection sub-screen */}
-        {cardStep === "card_type" && paymentMethod === "point_card" ? (
-          <div className="space-y-4 mb-8">
-            <button onClick={() => { setCardStep("method"); setPaymentMethod(""); }} className="flex items-center gap-2 text-muted-foreground">
-              <ChevronLeft className="h-5 w-5" />
-              <span className="text-sm font-medium">Voltar</span>
-            </button>
-            <p className="text-lg font-bold text-foreground">Qual tipo de cartão?</p>
-            <div className="space-y-3">
-              {CARD_TYPES.map(ct => (
-                <button
-                  key={ct.key}
-                  onClick={() => handleCardTypeSelect(ct.key)}
-                  className="w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all border-muted hover:border-muted-foreground/30"
-                >
-                  <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
-                    <ct.icon className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <span className="text-lg font-bold text-foreground">{ct.label}</span>
-                </button>
-              ))}
+        {/* Cash payment option */}
+        <div className="space-y-3 mb-8">
+          <button
+            onClick={() => setPaymentMethod("cash")}
+            className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+              paymentMethod === "cash" ? "shadow-lg" : "border-muted hover:border-muted-foreground/30"
+            }`}
+            style={paymentMethod === "cash" ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
+          >
+            <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: paymentMethod === "cash" ? primaryColor : undefined }}>
+              <Banknote className="h-6 w-6" style={{ color: paymentMethod === "cash" ? "#fff" : undefined }} />
             </div>
-          </div>
-        ) : cardStep === "card_brand" && paymentMethod === "point_card" ? (
-          <div className="space-y-4 mb-8">
-            <button onClick={() => setCardStep("card_type")} className="flex items-center gap-2 text-muted-foreground">
-              <ChevronLeft className="h-5 w-5" />
-              <span className="text-sm font-medium">Voltar</span>
-            </button>
-            <p className="text-lg font-bold text-foreground">
-              Selecione a bandeira — {selectedCardType === "credit_card" ? "Crédito" : selectedCardType === "debit_card" ? "Débito" : "Vale Refeição"}
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {CARD_BRANDS.map(brand => (
-                <button
-                  key={brand.code}
-                  onClick={() => handleBrandSelect(brand.code)}
-                  className="p-4 rounded-2xl border-2 flex items-center gap-3 transition-all border-muted hover:border-muted-foreground/30"
-                >
-                  <CreditCard className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-semibold text-foreground">{brand.name}</span>
-                </button>
-              ))}
+            <div className="text-left flex-1">
+              <span className="text-lg font-bold text-foreground">Dinheiro</span>
+              <p className="text-sm text-muted-foreground">Pagar no balcão</p>
             </div>
-          </div>
-        ) : (
-          /* Main payment method selection */
-          <div className="space-y-3 mb-8">
-            {methods.map(m => (
-              <button
-                key={m.key}
-                onClick={() => handleMethodSelect(m.key)}
-                className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
-                  paymentMethod === m.key ? "shadow-lg" : "border-muted hover:border-muted-foreground/30"
-                }`}
-                style={paymentMethod === m.key ? { borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : {}}
-              >
-                <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: paymentMethod === m.key ? primaryColor : undefined }}>
-                  <m.icon className="h-6 w-6" style={{ color: paymentMethod === m.key ? "#fff" : undefined }} />
-                </div>
-                <div className="text-left flex-1">
-                  <span className="text-lg font-bold text-foreground">{m.label}</span>
-                  {m.key === "point_card" && selectedCardType && selectedBrand && paymentMethod === "point_card" ? (
-                    <p className="text-sm font-medium" style={{ color: primaryColor }}>
-                      {CARD_TYPES.find(t => t.key === selectedCardType)?.label} — {CARD_BRANDS.find(b => b.code === selectedBrand)?.name}
-                    </p>
-                  ) : m.sublabel ? (
-                    <p className="text-sm text-muted-foreground">{m.sublabel}</p>
-                  ) : null}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
+          </button>
+        </div>
 
-        {paymentMethod === "cash" && cardStep === "method" && (
+        {paymentMethod === "cash" && (
           <div className="space-y-3">
             <Label className="text-lg">Troco para quanto?</Label>
             <Input
@@ -749,15 +637,13 @@ export function KioskPayment({
       <div className="border-t bg-card p-5 shrink-0">
         <div className="max-w-lg mx-auto">
           <Button
-            onClick={handleFinalize}
+            onClick={handleFinalizeCash}
             className="w-full h-14 text-lg font-bold rounded-xl text-white"
             style={{ backgroundColor: primaryColor }}
-            disabled={submitting || !canFinalizePayment || cardStep !== "method"}
+            disabled={submitting || paymentMethod !== "cash" || (cashPaid !== "" && parseFloat(cashPaid) < finalTotal)}
           >
             {submitting ? (
               <><Loader2 className="h-5 w-5 animate-spin mr-2" />Finalizando...</>
-            ) : isPointPayment ? (
-              <><Zap className="h-5 w-5 mr-2" />Enviar para Maquininha</>
             ) : (
               "Finalizar Pedido"
             )}
