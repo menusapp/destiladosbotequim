@@ -73,12 +73,13 @@ interface SelectedAddress {
 
 interface PDVTabProps {
   restaurantId: string;
+  restaurantSlug?: string;
   pendingTableToOpen?: string | null;
   onTableOpened?: () => void;
   showPrepTimer?: boolean;
 }
 
-const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer = true }: PDVTabProps) => {
+const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, onTableOpened, showPrepTimer = true }: PDVTabProps) => {
   const queryClient = useQueryClient();
 
   // Order creation state
