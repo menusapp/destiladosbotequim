@@ -158,14 +158,18 @@ Deno.serve(async (req) => {
 });
 
 function buildWelcomeMessage(
-  type: string, restaurantName: string, menuLink: string, menuOptions: any[]
+  type: string, restaurantName: string, menuLink: string, menuOptions: any[], customerName: string
 ): string {
+  const greeting = customerName
+    ? `👋 Olá, *${customerName}*! Tudo bem?`
+    : `👋 Olá! Tudo bem?`;
+
   if (type === 'link_only') {
-    return `🍽️ *${restaurantName}*\n\nAcesse nosso cardápio digital:\n${menuLink}`;
+    return `${greeting}\n\nBem-vindo(a) ao *${restaurantName}*! 🍽️\n\nAcesse nosso cardápio digital:\n${menuLink}`;
   }
 
   // numeric_menu (default)
-  let msg = `👋 Olá! Bem-vindo ao *${restaurantName}*!\n\n📱 Cardápio: ${menuLink}\n\nDigite o número da opção desejada:\n`;
+  let msg = `${greeting}\n\nBem-vindo(a) ao *${restaurantName}*! 🍽️\n\n📱 Cardápio: ${menuLink}\n\nDigite o número da opção desejada:\n`;
   for (const opt of menuOptions) {
     msg += `\n*${opt.position}* - ${opt.label}`;
   }
