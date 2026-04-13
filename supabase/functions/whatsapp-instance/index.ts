@@ -221,6 +221,7 @@ Deno.serve(async (req) => {
         };
         if (normalizedStatus === 'connected') {
           updateData.connected_at = new Date().toISOString();
+          await configureWebhook(resolvedName);
         }
 
         await supabase
