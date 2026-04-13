@@ -90,6 +90,10 @@ export function KioskIdentification({ restaurant, onIdentified, onBack }: Props)
     if (!name.trim()) { toast.error("Informe seu nome"); return; }
 
     const phoneRaw = phone.replace(/\D/g, "") || undefined;
+    if (phoneRaw && !validatePhone(phoneRaw)) {
+      toast.error("Número de telefone inválido");
+      return;
+    }
     // Save new customer
     if (restaurant?.id) {
       await supabase.from("customers").insert({
