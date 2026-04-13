@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
 
     // Process by step
     if (conversation.current_step === 'welcome') {
-      responseText = buildWelcomeMessage(welcomeType, restaurant.name, menuLink, menuOptions || []);
+      responseText = buildWelcomeMessage(welcomeType, restaurant.name, menuLink, menuOptions || [], customer_name || '');
       newStep = welcomeType === 'link_only' ? 'menu' : 'menu';
     } else if (conversation.current_step === 'menu') {
       if (welcomeType === 'link_only') {
