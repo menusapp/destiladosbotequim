@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { validateCPF } from "@/lib/cpfValidator";
+import { validateCPF, validatePhone } from "@/lib/cpfValidator";
 import { toast } from "@/components/ui/sonner";
 import { ArrowLeft, Loader2, UserCheck } from "lucide-react";
 import { KioskCustomer } from "@/pages/Kiosk";
@@ -90,6 +90,10 @@ export function KioskIdentification({ restaurant, onIdentified, onBack }: Props)
     if (!name.trim()) { toast.error("Informe seu nome"); return; }
 
     const phoneRaw = phone.replace(/\D/g, "") || undefined;
+    if (phoneRaw && !validatePhone(phoneRaw)) {
+      toast.error("Número de telefone inválido");
+      return;
+    }
     // Save new customer
     if (restaurant?.id) {
       await supabase.from("customers").insert({

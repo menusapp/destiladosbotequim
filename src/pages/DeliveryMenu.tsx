@@ -241,6 +241,10 @@ export default function DeliveryMenu() {
     sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
   };
 
+  const handlePhoneUpdate = (phone: string) => {
+    if (phone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, phone);
+  };
+
   const saveCartToStorage = () => {
     localStorage.setItem(`delivery-cart-${restaurantSlug}`, JSON.stringify(cart));
   };
@@ -592,6 +596,7 @@ export default function DeliveryMenu() {
             customerCPF={customerCPF}
             restaurantId={restaurant.id}
             onNameUpdate={handleNameUpdate}
+            onPhoneUpdate={handlePhoneUpdate}
           />
         </div>
       )}

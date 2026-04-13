@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { validateCPF } from "@/lib/cpfValidator";
+import { validateCPF, validatePhone } from "@/lib/cpfValidator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { Loader2, UserCheck } from "lucide-react";
@@ -144,16 +144,22 @@ const CustomerInfoDialog = ({
 
     // If existing customer, use their saved name (ignore whatever was typed)
     const finalName = existingCustomer ? existingCustomer.name : name.trim();
-    // Se cliente existente não tem telefone, usar o que foi digitado no form
-    const typedPhone = phone.replace(/\D/g, "");
-    const finalPhone = existingCustomer?.phone || typedPhone || undefined;
 
     if (requireName && !finalName) {
       toast.error("Por favor, informe seu nome");
       return;
     }
 
+    // Validar telefone se preenchido
+    const typedPhone = phone.replace(/\D/g, "");
+    if (typedPhone && !validatePhone(typedPhone)) {
+      setPhoneError("Número de telefone inválido");
+      toast.error("Número de telefone inválido. Verifique o DDD e o número.");
+      return;
+    }
+
     // Validar telefone: se requirePhone e não tem telefone (nem salvo nem digitado)
+    const finalPhone = existingCustomer?.phone || typedPhone || undefined;
     if (requirePhone && !finalPhone) {
       toast.error("Por favor, informe seu telefone");
       return;
