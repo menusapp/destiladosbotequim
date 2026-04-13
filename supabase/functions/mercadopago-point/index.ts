@@ -225,7 +225,7 @@ async function createOrder(
         type: "point",
         external_reference: body.order_id,
         description: body.description,
-        transactions: { payments: [{ amount: body.amount.toString() }] },
+        transactions: { payments: [{ amount: Number(body.amount).toFixed(2) }] },
         config: { point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" } },
       }),
       headers: { "X-Idempotency-Key": body.idempotency_key + "-fb" },
@@ -272,7 +272,7 @@ async function createOrder(
     type: "point",
     external_reference: body.order_id,
     description: body.description,
-    transactions: { payments: [{ amount: body.amount.toString() }] },
+    transactions: { payments: [{ amount: Number(body.amount).toFixed(2) }] },
     config: configObj,
   };
 
@@ -292,7 +292,7 @@ async function createOrder(
         type: "point",
         external_reference: body.order_id,
         description: body.description,
-        transactions: { payments: [{ amount: body.amount.toString() }] },
+        transactions: { payments: [{ amount: Number(body.amount).toFixed(2) }] },
         config: { point: { terminal_id: body.device_id, print_on_terminal: "no_ticket" } },
       };
       result = await mpFetch("/v1/orders", accessToken, {
