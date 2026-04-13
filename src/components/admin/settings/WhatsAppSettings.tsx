@@ -466,6 +466,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
   const isConnected = config?.instance_status === 'connected';
   const isPending = config?.instance_status === 'pending' || config?.instance_status === 'connecting';
+  const isStatusKnown = statusChecked;
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
