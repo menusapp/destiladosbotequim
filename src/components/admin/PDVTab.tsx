@@ -147,8 +147,12 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
 
   // Fetch restaurant slug
   useEffect(() => {
+    if (!restaurantId) return;
     supabase.from("restaurants").select("slug").eq("id", restaurantId).single()
-      .then(({ data }) => { if (data) setRestaurantSlug(data.slug); });
+      .then(({ data, error }) => {
+        if (error) console.error("[PDV] Erro ao buscar slug:", error);
+        if (data?.slug) setRestaurantSlug(data.slug);
+      });
   }, [restaurantId]);
 
   // Fetch products
