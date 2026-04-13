@@ -1,40 +1,57 @@
 
+Objetivo: corrigir o status de conexão do WhatsApp para refletir o estado real em toda a interface.
 
-## Plano: Corrigir Status WhatsApp + Nome da Instância + QR Mais Rápido
+Diagnóstico confirmado
+- Os logs de rede mostram que a função `whatsapp-instance` já respondeu `status: "connected"` com `state: "open"`.
+- Antes disso, ela respondeu `status: "disconnected"` com `state: "connecting"`.
+- Hoje o backend trata qualquer estado diferente de `open` como `disconnected`, e a tela só reconhece `pending` como estado intermediário.
+- Resultado: durante a conexão — e em alguns fluxos após ela — a UI pode continuar exibindo “Desconectado” mesmo com a instância em processo de abertura ou já aberta.
+- Além disso, as outras abas (Marketing e Robô Menu’s) leem o status salvo e podem ficar desatualizadas.
 
-### Problemas identificados
+Plano
+1. Normalizar os estados no backend
+- Em `supabase/functions/whatsapp-instance/index.ts`, criar um mapeamento único:
+  - `open` -> `connected`
+  - `connecting` -> `connecting`
+  - `close` / `closed` -> `disconnected`
+  - sem instância -> `not_created`
+- Parar de devolver `disconnected` quando o estado real for `connecting`.
+- Retornar o status final normalizado também no payload de resposta, evitando resposta “mista”.
 
-1. **Nome da instância** usa `rest-{uuid[:8]}` — deveria usar o slug do restaurante (ex: `rest-rods`)
-2. **QR lento** — espera 3s antes de tentar + 10 tentativas com 3s de delay = até 33s
-3. **Status mostra "desconectado"** mesmo quando Evolution está conectado — o polling do frontend tem timeout de 2 minutos e pode expirar antes da conexão; além disso, ao recarregar a página, o `fetchConfig` lê o DB (que pode estar desatualizado) e não consulta o Evolution API
+2. Robustecer a sincronização por webhook
+- Em `supabase/functions/whatsapp-webhook/index.ts`, aceitar variações de evento da Evolution, como:
+  - `connection.update` / `CONNECTION_UPDATE`
+  - `qrcode.updated` / `QRCODE_UPDATED`
+  - `messages.upsert` / `MESSAGES_UPSERT`
+  - `logout` / `LOGOUT_INSTANCE`
+- Extrair `instance` e `state` de formatos alternativos do payload.
+- Atualizar o registro do restaurante com `connected`, `connecting`, `pending` e `disconnected` de forma consistente.
 
-### Alterações
+3. Corrigir a tela “Notificações WhatsApp”
+- Em `src/components/admin/settings/WhatsAppSettings.tsx`, tratar `connecting` como estado intermediário visual, junto com `pending`.
+- Ajustar `checkStatus()` para persistir e renderizar `connected`, `connecting`, `pending`, `disconnected` e `not_created`.
+- Remover a dependência de `setConfig(prev => prev ? ... : null)` nos casos em que o estado precisa ser sincronizado mesmo sem config prévia carregada.
 
-**1. `supabase/functions/whatsapp-instance/index.ts`**
+4. Sincronizar as abas dependentes
+- Em `src/components/admin/MarketingTab.tsx` e `src/components/admin/RoboMenusTab.tsx`, usar a mesma lógica de sincronização da tela principal, em vez de depender só do valor salvo.
+- Se fizer sentido, centralizar isso em um hook compartilhado para evitar divergência futura.
 
-- Buscar o `slug` do restaurante no banco antes de montar o `instanceName`:
-  ```
-  const { data: restaurant } = await supabase.from('restaurants').select('slug').eq('id', restaurantId).single();
-  const instanceName = `rest-${restaurant.slug}`;
-  ```
-- Reduzir espera inicial de 3s para 1s
-- Reduzir `retryDelay` de 3000ms para 1500ms
-- Reduzir `maxAttempts` de 10 para 6
-- Manter compatibilidade: ao fazer GET, se não achar a instância com o novo nome, tentar com o nome antigo (`rest-{uuid[:8]}`)
+Validação
+- Conectar pelo QR.
+- Confirmar que durante o pareamento aparece “Aguardando conexão...”, e não “Desconectado”.
+- Confirmar que ao abrir a sessão o status muda sozinho para “Conectado”.
+- Recarregar o painel e validar o mesmo status em:
+  - Notificações WhatsApp
+  - Marketing
+  - Robô Menu’s
+- Enviar uma mensagem de teste para confirmar que as automações voltaram a liberar envio.
 
-**2. `src/components/admin/settings/WhatsAppSettings.tsx`**
-
-- No `useEffect` inicial, após carregar config do DB, chamar `checkStatus()` automaticamente para sincronizar com Evolution em tempo real
-- Aumentar timeout do polling de conexão de 2min para 5min
-- No `checkStatus`, ao receber `connected`, também chamar `fetchConfig()` para recarregar config completa
-
-**3. Migration para atualizar instância existente**
-
-- Nenhuma migration necessária — o `instance_name` já existe no `whatsapp_config` e será atualizado automaticamente pelo edge function na próxima chamada
-
-### Resultado esperado
-
-- Instância aparecerá como `rest-rods` na Evolution (usa o slug)
-- QR code gerado em ~5-10s em vez de ~30s
-- Status sincronizado corretamente ao abrir a página e após escanear QR
-
+Detalhes técnicos
+- Arquivos principais:
+  - `supabase/functions/whatsapp-instance/index.ts`
+  - `supabase/functions/whatsapp-webhook/index.ts`
+  - `src/components/admin/settings/WhatsAppSettings.tsx`
+  - `src/components/admin/MarketingTab.tsx`
+  - `src/components/admin/RoboMenusTab.tsx`
+- Não precisa migration.
+- O foco é unificar a origem da verdade do status e eliminar a tradução incorreta de `connecting` para `disconnected`.
