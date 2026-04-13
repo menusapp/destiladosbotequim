@@ -4869,6 +4869,25 @@ export type Database = {
         Returns: boolean
       }
       cleanup_abandoned_tables: { Args: never; Returns: undefined }
+      create_kiosk_order: {
+        Args: {
+          p_coupon_code?: string
+          p_coupon_discount?: number
+          p_customer_cpf: string
+          p_customer_name: string
+          p_delivery_address?: string
+          p_delivery_phone?: string
+          p_delivery_type: string
+          p_items?: Json
+          p_loyalty_points_used?: number
+          p_notes?: string
+          p_order_type: string
+          p_restaurant_id: string
+          p_reward_discount?: number
+          p_table_number?: number
+        }
+        Returns: string
+      }
       deduct_stock_for_order_item: {
         Args: { p_order_item_id: string }
         Returns: undefined
