@@ -607,6 +607,19 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         if (error) throw error;
         await insertOrderItems(order.id);
 
+        // Employee credit for delivery
+        if (paymentType === "employee_credit") {
+          await supabase.from("employee_credits").insert({
+            restaurant_id: restaurantId,
+            employee_name: employeeCreditName || customerName || "Funcionário",
+            order_id: order.id,
+            amount: cartTotal,
+            status: "pending",
+            notes: employeeCreditNotes || null,
+            created_by: "Sistema PDV",
+          });
+        }
+
       } else if (orderType === "retirada") {
         const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
         const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
@@ -620,6 +633,19 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
+
+        // Employee credit for retirada
+        if (paymentType === "employee_credit") {
+          await supabase.from("employee_credits").insert({
+            restaurant_id: restaurantId,
+            employee_name: employeeCreditName || customerName || "Funcionário",
+            order_id: order.id,
+            amount: cartTotal,
+            status: "pending",
+            notes: employeeCreditNotes || null,
+            created_by: "Sistema PDV",
+          });
+        }
 
       } else {
         // Mesa
@@ -664,35 +690,51 @@ const PDVTab = ({ restaurantId, pendingTableToOpen, onTableOpened, showPrepTimer
           comandaId = nc?.id || null;
         }
 
+        // Resolve payment type label
+        let resolvedPaymentType: string | null = null;
+        if (paymentType === "cash") resolvedPaymentType = "Dinheiro";
+        else if (paymentType === "pix") resolvedPaymentType = "PIX";
+        else if (paymentType === "employee_credit") resolvedPaymentType = "Crédito Funcionário";
+        else if (paymentType === "meal_voucher") resolvedPaymentType = "Vale Refeição";
+        else if (paymentType.includes(" - ")) resolvedPaymentType = paymentType;
+        else if (paymentType) resolvedPaymentType = paymentType;
+
         const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
         const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
+
+        // Insert order with null payment_type first (trigger fires on UPDATE)
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "local", table_id: tableId,
           comanda_id: comandaId, status: "pending",
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
-          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          notes: (notes || "") + discountNotesText || null,
+          payment_type: null,
+          payment_brand: null,
           coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
-        await insertOrderItems(order.id);
-      }
 
-      // Insert employee credit record if payment type is employee_credit
-      if (paymentType === "employee_credit") {
-        const lastOrder = await supabase.from("orders")
-          .select("id")
-          .eq("restaurant_id", restaurantId)
-          .eq("pdv_source", true)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-        if (lastOrder.data) {
+        // Insert items first so trigger calculates total correctly
+        await insertOrderItems(order.id);
+
+        // UPDATE payment_type to fire add_local_order_to_cash_register trigger
+        // If a payment method was selected, mark the order as paid
+        if (resolvedPaymentType) {
+          await supabase.from("orders").update({
+            payment_type: resolvedPaymentType,
+            payment_status: "paid",
+            paid_at: new Date().toISOString(),
+          }).eq("id", order.id);
+        }
+
+        // Insert employee credit record if payment type is employee_credit
+        if (paymentType === "employee_credit") {
           await supabase.from("employee_credits").insert({
             restaurant_id: restaurantId,
             employee_name: employeeCreditName || customerName || "Funcionário",
-            order_id: lastOrder.data.id,
+            order_id: order.id,
             amount: cartTotal,
             status: "pending",
             notes: employeeCreditNotes || null,

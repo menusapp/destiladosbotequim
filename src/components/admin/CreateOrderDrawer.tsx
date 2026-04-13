@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Trash2, ShoppingCart, UserPlus, X, Loader2, Plus, CreditCard, Percent, DollarSign, MapPin } from "lucide-react";
+import { Search, ShoppingCart, UserPlus, X, Loader2, Percent, DollarSign, AlertTriangle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
@@ -75,6 +75,10 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [discountValue, setDiscountValue] = useState("");
   const [deliveryFee, setDeliveryFee] = useState("");
   const [deliveryFeeAuto, setDeliveryFeeAuto] = useState<number | null>(null);
+
+  // Employee credit states
+  const [employeeCreditName, setEmployeeCreditName] = useState("");
+  const [employeeCreditNotes, setEmployeeCreditNotes] = useState("");
 
   // Fetch delivery config for auto fee calculation
   const { data: deliveryConfig } = useQuery({
@@ -214,6 +218,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
     setDiscountType("percentage"); setDiscountValue("");
     setDeliveryFee(""); setDeliveryFeeAuto(null);
+    setEmployeeCreditName(""); setEmployeeCreditNotes("");
   };
 
   // CRM: Save/update customer data before creating orders
@@ -273,6 +278,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       resolvedPaymentType = "Dinheiro";
     } else if (paymentMethod === "pix") {
       resolvedPaymentType = "PIX";
+    } else if (paymentMethod === "employee_credit") {
+      resolvedPaymentType = "Crédito Funcionário";
     } else if (paymentMethod) {
       resolvedPaymentType = paymentMethod;
     }
@@ -408,11 +415,27 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         await insertOrderItems(order.id);
 
         // Now UPDATE payment_type to fire the add_local_order_to_cash_register trigger
+        // If a payment method was selected, mark the order as paid
         if (resolvedPaymentType) {
           await supabase.from("orders").update({
             payment_type: resolvedPaymentType,
             payment_brand: resolvedPaymentBrand,
+            payment_status: "paid",
+            paid_at: new Date().toISOString(),
           }).eq("id", order.id);
+        }
+
+        // Insert employee credit record if payment type is employee_credit
+        if (paymentMethod === "employee_credit") {
+          await supabase.from("employee_credits").insert({
+            restaurant_id: restaurantId,
+            employee_name: employeeCreditName || customerName || "Funcionário",
+            order_id: order.id,
+            amount: cartTotal,
+            status: "pending",
+            notes: employeeCreditNotes || null,
+            created_by: "Sistema PDV",
+          });
         }
       }
 
@@ -562,6 +585,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                     <SelectItem value="credit">Crédito</SelectItem>
                     <SelectItem value="pix">Pix</SelectItem>
                     <SelectItem value="meal_voucher">Vale Refeição</SelectItem>
+                    <SelectItem value="employee_credit">Crédito de Funcionário</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -592,6 +616,32 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       ))}
                     </SelectContent>
                   </Select>
+                )}
+
+                {/* Employee Credit Fields */}
+                {paymentMethod === "employee_credit" && (
+                  <div className="space-y-2 border rounded-lg p-3 bg-amber-50/50 dark:bg-amber-950/20">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs font-medium">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Este pedido será lançado como crédito pendente. O funcionário deverá quitar posteriormente.
+                    </div>
+                    <div>
+                      <Label className="text-xs">Nome do Funcionário *</Label>
+                      <Input
+                        placeholder="Nome do funcionário"
+                        value={employeeCreditName}
+                        onChange={e => setEmployeeCreditName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Observação</Label>
+                      <Input
+                        placeholder="Observação (opcional)"
+                        value={employeeCreditNotes}
+                        onChange={e => setEmployeeCreditNotes(e.target.value)}
+                      />
+                    </div>
+                  </div>
                 )}
                 </div>
 
