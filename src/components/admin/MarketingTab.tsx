@@ -28,18 +28,23 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
 
   const checkWhatsAppStatus = async () => {
     try {
+      // First get enabled flag from DB
       const { data } = await supabase
         .from("whatsapp_config")
         .select("enabled, instance_status")
         .eq("restaurant_id", restaurantId)
         .single();
 
-      if (data) {
-        setWhatsappEnabled(data.enabled || false);
-        setWhatsappConnected(data.instance_status === "connected");
-      } else {
-        setWhatsappEnabled(false);
-        setWhatsappConnected(false);
+      setWhatsappEnabled(data?.enabled || false);
+
+      // Check real-time status from Evolution API
+      try {
+        const res = await fetch(`https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
+        const statusData = await res.json();
+        setWhatsappConnected(statusData.status === "connected");
+      } catch {
+        // Fallback to DB value
+        setWhatsappConnected(data?.instance_status === "connected");
       }
     } catch (error) {
       console.error("Error checking WhatsApp status:", error);
