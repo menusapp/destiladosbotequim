@@ -67,6 +67,30 @@ Deno.serve(async (req) => {
       .eq('customer_phone', customer_phone)
       .maybeSingle();
 
+    // ── Bot pause check ──
+    if (conversation?.bot_paused && conversation?.bot_paused_until) {
+      const pausedUntil = new Date(conversation.bot_paused_until);
+      if (pausedUntil > new Date()) {
+        console.log(`[AI-BOT] Bot paused for ${customer_phone} until ${pausedUntil.toISOString()}`);
+        return new Response(JSON.stringify({ skipped: true, reason: 'bot_paused' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } else {
+        // Pause expired — reactivate bot
+        await supabase
+          .from('whatsapp_conversations')
+          .update({
+            bot_paused: false,
+            bot_paused_until: null,
+            paused_reason: null,
+            current_step: 'welcome',
+          })
+          .eq('id', conversation.id);
+        conversation.current_step = 'welcome';
+        conversation.bot_paused = false;
+      }
+    }
+
     if (conversation && conversation.last_message_at < fourHoursAgo) {
       await supabase
         .from('whatsapp_conversations')
@@ -119,6 +143,43 @@ Deno.serve(async (req) => {
         );
         responseText = result.response;
         newStep = result.newStep;
+
+        // ── If human_attendant was selected, pause the bot for 6h ──
+        if (newStep === 'human') {
+          const pauseUntil = new Date(Date.now() + 6 * 60 * 60 * 1000);
+          await supabase
+            .from('whatsapp_conversations')
+            .update({
+              current_step: 'human',
+              bot_paused: true,
+              bot_paused_until: pauseUntil.toISOString(),
+              paused_reason: 'human_requested',
+              last_message_at: new Date().toISOString(),
+            })
+            .eq('id', conversation.id);
+
+          // Send the transfer message and return immediately
+          if (!simulate && responseText) {
+            await fetch(`${supabaseUrl}/functions/v1/whatsapp-send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                restaurantId: restaurant_id,
+                phone: customer_phone,
+                message: responseText,
+                messageType: 'ai_bot',
+              }),
+            });
+          }
+
+          return new Response(JSON.stringify({
+            response: responseText,
+            step: newStep,
+            simulated: !!simulate
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
       }
     } else if (conversation.current_step === 'human') {
       return new Response(JSON.stringify({ skipped: true, reason: 'human_mode' }), {
@@ -174,7 +235,6 @@ function buildWelcomeMessage(
     return `${greeting}\n\nBem-vindo(a) ao *${restaurantName}*! 🍽️\n\nAcesse nosso cardápio digital:\n${menuLink}`;
   }
 
-  // numeric_menu (default)
   let msg = `${greeting}\n\nBem-vindo(a) ao *${restaurantName}*! 🍽️\n\n📱 Cardápio: ${menuLink}\n\nDigite o número da opção desejada:\n`;
   for (const opt of menuOptions) {
     msg += `\n*${opt.position}* - ${opt.label}`;
@@ -267,7 +327,7 @@ async function processMenuChoice(
 
     case 'human_attendant':
       return {
-        response: `👤 Transferindo para um atendente humano. Aguarde um momento, por favor!`,
+        response: `👤 Transferindo para um atendente humano. Em breve alguém entrará em contato! 😊`,
         newStep: 'human'
       };
 
