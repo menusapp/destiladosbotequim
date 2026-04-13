@@ -21,23 +21,7 @@ function normalizeEvent(event: string): string {
   return map[event] || event;
 }
 
-// Simple in-memory dedup cache to prevent processing same message twice
-const recentMessageIds = new Map<string, number>();
-const DEDUP_TTL_MS = 30_000; // 30 seconds
-
-function isDuplicate(messageId: string): boolean {
-  // Clean old entries
-  const now = Date.now();
-  for (const [key, ts] of recentMessageIds) {
-    if (now - ts > DEDUP_TTL_MS) recentMessageIds.delete(key);
-  }
-  if (recentMessageIds.has(messageId)) return true;
-  recentMessageIds.set(messageId, now);
-  return false;
-}
-
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -58,7 +42,6 @@ Deno.serve(async (req) => {
     console.log('[WEBHOOK] Received event:', JSON.stringify(body, null, 2));
 
     const { event: rawEvent, data } = body;
-    // Extract instance name from various payload formats
     const instance = body.instance || body.instanceName || data?.instance || data?.instanceName;
 
     if (!instance) {
@@ -87,13 +70,11 @@ Deno.serve(async (req) => {
 
     const restaurantId = config.restaurant_id;
 
-    // Handle different event types
     switch (event) {
       case 'connection.update': {
         const state = data?.state || data?.instance?.state;
         console.log(`[WEBHOOK] Connection update for ${instanceName}: ${state}`);
 
-        // Normalize state consistently
         const stateMap: Record<string, string> = {
           'open': 'connected',
           'connecting': 'connecting',
@@ -144,7 +125,6 @@ Deno.serve(async (req) => {
       }
 
       case 'messages.upsert': {
-        // Message received — extract directly from data (Evolution API v2 structure)
         const msgId = data?.key?.id || '';
         const fromMe = data?.key?.fromMe ?? false;
         const remoteJid = data?.key?.remoteJid || '';
@@ -154,13 +134,26 @@ Deno.serve(async (req) => {
           || '';
         const pushName = data?.pushName || '';
 
-        // Dedup: skip if we already processed this message ID
-        if (msgId && isDuplicate(msgId)) {
-          console.log(`[WEBHOOK] Duplicate message ${msgId}, skipping`);
+        // Skip group messages, status broadcasts, and empty messages
+        if (remoteJid.endsWith('@g.us') || remoteJid === 'status@broadcast' || !remoteJid) {
+          console.log(`[WEBHOOK] Skipping non-1:1 message: ${remoteJid}`);
           break;
         }
 
         if (!fromMe && customerPhone && messageText) {
+          // Persistent deduplication via DB
+          if (msgId) {
+            const { error: insertError } = await supabase
+              .from('whatsapp_inbound_events')
+              .insert({ message_id: msgId, restaurant_id: restaurantId });
+
+            if (insertError) {
+              // unique constraint violation = duplicate
+              console.log(`[WEBHOOK] Duplicate message ${msgId}, skipping`);
+              break;
+            }
+          }
+
           console.log(`[WEBHOOK] Incoming message on ${instanceName} from ${customerPhone} (${pushName}): ${messageText.slice(0, 50)}`);
           // Fire-and-forget call to AI bot
           fetch(`${supabaseUrl}/functions/v1/whatsapp-ai-bot`, {

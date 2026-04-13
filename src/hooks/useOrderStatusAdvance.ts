@@ -3,6 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { printOrder } from "@/lib/printOrder";
 
+const PUBLIC_DOMAIN = 'https://menusapp.com.br';
+
+function buildPublicUrl(slug: string, path?: string): string {
+  const base = `${PUBLIC_DOMAIN}/${slug}`;
+  return path ? `${base}/${path}` : base;
+}
+
 interface Order {
   id: string;
   status: string;
@@ -69,18 +76,24 @@ export function getNextStatus(order: Order): NextStatusResult | null {
 export function useOrderStatusAdvance(restaurantId: string) {
   const [loadingOrderId, setLoadingOrderId] = useState<string | null>(null);
 
+  const getRestaurantSlug = async (): Promise<string> => {
+    const { data } = await supabase
+      .from("restaurants")
+      .select("slug")
+      .eq("id", restaurantId)
+      .single();
+    return data?.slug || '';
+  };
+
   const sendWhatsAppNotification = async (order: Order, newStatus: string, reason?: string) => {
     try {
-      // Determine notification type
       let notificationType: string | null = null;
       if (newStatus === "accepted" || newStatus === "preparing") notificationType = "order_accepted";
       else if (newStatus === "out_for_delivery" || newStatus === "ready") notificationType = "order_out_for_delivery";
       else if (newStatus === "cancelled") notificationType = "order_cancelled";
-      // delivered/picked_up handled separately for review request
 
       if (!notificationType) return;
 
-      // Resolve phone: delivery_phone first, then customer CPF lookup
       let phone = order.delivery_phone || null;
       if (!phone && order.customer_cpf) {
         const { data: customer } = await supabase
@@ -95,11 +108,11 @@ export function useOrderStatusAdvance(restaurantId: string) {
 
       const { data: restaurant } = await supabase
         .from("restaurants")
-        .select("prep_time_minutes")
+        .select("prep_time_minutes, slug")
         .eq("id", restaurantId)
         .single();
 
-      const slug = window.location.pathname.split('/')[1] || '';
+      const slug = restaurant?.slug || '';
 
       await supabase.functions.invoke("whatsapp-notifications", {
         body: {
@@ -111,7 +124,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
             tempo_estimado: restaurant?.prep_time_minutes?.toString() || "30",
             phone,
             motivo: reason || "Não informado",
-            link_avaliacao: `${window.location.origin}/${slug}/pedido-confirmado/${order.id}`,
+            link_avaliacao: buildPublicUrl(slug, `pedido/${order.id}`),
           },
         },
       });
@@ -207,7 +220,6 @@ export function useOrderStatusAdvance(restaurantId: string) {
       if (newStatus === "delivered" || newStatus === "picked_up") {
         supabase.functions.invoke("marketing-trigger", { body: { orderId: order.id, restaurantId } });
 
-        // Resolve phone for review request
         let phone = order.delivery_phone || null;
         if (!phone && order.customer_cpf) {
           const { data: customer } = await supabase
@@ -220,7 +232,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
         }
 
         if (phone) {
-          const slug = window.location.pathname.split('/')[1] || '';
+          const slug = await getRestaurantSlug();
           supabase.functions.invoke("whatsapp-notifications", {
             body: {
               restaurant_id: restaurantId,
@@ -229,7 +241,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
                 nome: order.customer_name || "Cliente",
                 numero_pedido: order.id.slice(0, 8),
                 phone,
-                link_avaliacao: `${window.location.origin}/${slug}/pedido-confirmado/${order.id}`,
+                link_avaliacao: buildPublicUrl(slug, `pedido/${order.id}`),
               },
             },
           }).catch(() => {});

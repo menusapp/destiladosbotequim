@@ -6,6 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const PUBLIC_DOMAIN = 'https://menusapp.com.br';
+
+function buildPublicUrl(slug: string, path?: string): string {
+  const base = `${PUBLIC_DOMAIN}/${slug}`;
+  return path ? `${base}/${path}` : base;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,7 +45,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get restaurant info (public data only)
+    // Get restaurant info
     const { data: restaurant } = await supabase
       .from('restaurants')
       .select('name, slug, prep_time_minutes')
@@ -92,7 +99,7 @@ Deno.serve(async (req) => {
       .eq('is_active', true)
       .order('position');
 
-    const menuLink = `https://menu-mesa-master.lovable.app/${restaurant.slug}`;
+    const menuLink = buildPublicUrl(restaurant.slug);
     const welcomeType = aiConfig.welcome_message_type || 'numeric_menu';
 
     let responseText = '';
@@ -101,10 +108,9 @@ Deno.serve(async (req) => {
     // Process by step
     if (conversation.current_step === 'welcome') {
       responseText = buildWelcomeMessage(welcomeType, restaurant.name, menuLink, menuOptions || [], customer_name || '');
-      newStep = welcomeType === 'link_only' ? 'menu' : 'menu';
+      newStep = 'menu';
     } else if (conversation.current_step === 'menu') {
       if (welcomeType === 'link_only') {
-        // In link_only mode, always respond with the link
         responseText = `📱 Acesse nosso cardápio digital:\n${menuLink}`;
         newStep = 'menu';
       } else {
@@ -126,7 +132,7 @@ Deno.serve(async (req) => {
       .update({ current_step: newStep, last_message_at: new Date().toISOString() })
       .eq('id', conversation.id);
 
-    // Send via WhatsApp (unless simulating) - fixed payload
+    // Send via WhatsApp (unless simulating)
     if (!simulate && responseText) {
       await fetch(`${supabaseUrl}/functions/v1/whatsapp-send`, {
         method: 'POST',
