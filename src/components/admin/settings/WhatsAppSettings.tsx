@@ -142,7 +142,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [connectFlowActive, setConnectFlowActive] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [config, setConfig] = useState<WhatsAppConfig | null>(null);
-  const [enabled, setEnabled] = useState(false);
+  
   const [messages, setMessages] = useState({
     accepted: DEFAULT_MESSAGES.accepted,
     out_for_delivery: DEFAULT_MESSAGES.out_for_delivery,
