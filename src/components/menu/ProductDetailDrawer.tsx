@@ -53,7 +53,7 @@ export const ProductDetailDrawer = ({
       const key = ext.extra_category_name || ext.extra_category_id || "__uncategorized__";
       if (!groupMap.has(key)) {
         groupMap.set(key, {
-          categoryName: ext.extra_category_name || "Adicionais",
+          categoryName: ext.extra_category_name || "Variações",
           categoryId: ext.extra_category_id,
           isRequired: ext.is_required || false,
           minSelection: ext.min_selection || 0,
@@ -63,7 +63,15 @@ export const ProductDetailDrawer = ({
       }
       groupMap.get(key)!.items.push(ext);
     }
-    return Array.from(groupMap.values());
+    const groupList = Array.from(groupMap.values());
+    groupList.sort((a, b) => {
+      const aIsPao = a.categoryName.toLowerCase().includes("qual pão");
+      const bIsPao = b.categoryName.toLowerCase().includes("qual pão");
+      if (aIsPao && !bIsPao) return -1;
+      if (!aIsPao && bIsPao) return 1;
+      return 0;
+    });
+    return groupList;
   }, [extras]);
 
   const toggleExtra = (id: string, group: ExtraGroup) => {

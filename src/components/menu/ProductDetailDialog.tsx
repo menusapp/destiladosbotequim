@@ -53,7 +53,7 @@ const ProductDetailDialog = ({
     const map = new Map<string, ProductExtra[]>();
 
     for (const extra of extras) {
-      const catName = extra.extra_category_name || "Adicionais";
+      const catName = extra.extra_category_name || "Variações";
       if (!map.has(catName)) map.set(catName, []);
       map.get(catName)!.push(extra);
     }
@@ -61,6 +61,14 @@ const ProductDetailDialog = ({
     for (const [categoryName, items] of map) {
       groups.push({ categoryName, items });
     }
+
+    groups.sort((a, b) => {
+      const aIsPao = a.categoryName.toLowerCase().includes("qual pão");
+      const bIsPao = b.categoryName.toLowerCase().includes("qual pão");
+      if (aIsPao && !bIsPao) return -1;
+      if (!aIsPao && bIsPao) return 1;
+      return 0;
+    });
 
     return groups;
   }, [extras]);
