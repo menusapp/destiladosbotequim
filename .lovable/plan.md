@@ -1,52 +1,40 @@
 
 
-## Plano: Reconectar WhatsApp com a Nova VPS
+## Plano: Corrigir Status WhatsApp + Nome da Instância + QR Mais Rápido
 
-O código do sistema já está 100% pronto. Tudo que precisa ser feito é atualizar 2 segredos (secrets) e configurar o webhook na Evolution API.
+### Problemas identificados
 
-### Passo 1 — Atualizar os segredos do projeto
+1. **Nome da instância** usa `rest-{uuid[:8]}` — deveria usar o slug do restaurante (ex: `rest-rods`)
+2. **QR lento** — espera 3s antes de tentar + 10 tentativas com 3s de delay = até 33s
+3. **Status mostra "desconectado"** mesmo quando Evolution está conectado — o polling do frontend tem timeout de 2 minutos e pode expirar antes da conexão; além disso, ao recarregar a página, o `fetchConfig` lê o DB (que pode estar desatualizado) e não consulta o Evolution API
 
-Os segredos `EVOLUTION_API_URL` e `EVOLUTION_API_KEY` já existem, mas apontam para o servidor antigo. Preciso atualizá-los para a nova VPS:
+### Alterações
 
-- **EVOLUTION_API_URL**: `http://SEU_IP_VPS:8080` (o endereço da Evolution API na nova VPS)
-- **EVOLUTION_API_KEY**: a API key que você configurou no `.env` da Evolution na VPS
+**1. `supabase/functions/whatsapp-instance/index.ts`**
 
-Vou pedir para você inserir esses valores.
+- Buscar o `slug` do restaurante no banco antes de montar o `instanceName`:
+  ```
+  const { data: restaurant } = await supabase.from('restaurants').select('slug').eq('id', restaurantId).single();
+  const instanceName = `rest-${restaurant.slug}`;
+  ```
+- Reduzir espera inicial de 3s para 1s
+- Reduzir `retryDelay` de 3000ms para 1500ms
+- Reduzir `maxAttempts` de 10 para 6
+- Manter compatibilidade: ao fazer GET, se não achar a instância com o novo nome, tentar com o nome antigo (`rest-{uuid[:8]}`)
 
-### Passo 2 — Configurar o Webhook na Evolution API
+**2. `src/components/admin/settings/WhatsAppSettings.tsx`**
 
-A Evolution API precisa saber para onde enviar eventos (mensagens recebidas, conexão, QR code, etc.). Você precisa configurar o webhook global na Evolution API apontando para:
+- No `useEffect` inicial, após carregar config do DB, chamar `checkStatus()` automaticamente para sincronizar com Evolution em tempo real
+- Aumentar timeout do polling de conexão de 2min para 5min
+- No `checkStatus`, ao receber `connected`, também chamar `fetchConfig()` para recarregar config completa
 
-```
-https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-webhook
-```
+**3. Migration para atualizar instância existente**
 
-Isso pode ser feito de duas formas:
-- **Via `.env` da Evolution** (recomendado): adicionar as variáveis de webhook no docker-compose
-- **Via API**: fazer um POST para configurar o webhook da instância
+- Nenhuma migration necessária — o `instance_name` já existe no `whatsapp_config` e será atualizado automaticamente pelo edge function na próxima chamada
 
-Vou fornecer os comandos exatos.
+### Resultado esperado
 
-### Passo 3 — Reconectar via painel
-
-Depois dos segredos atualizados e webhook configurado, basta ir em **Notificações WhatsApp** no painel admin e clicar em **Conectar WhatsApp**. O sistema vai criar a instância, gerar o QR code, e ao escanear tudo volta a funcionar:
-
-- Notificações automáticas para clientes (pedidos)
-- Notificações para o dono (caixa)
-- Notificações de reservas
-- Campanhas de marketing
-- Robô Menu's
-
-### Nenhuma alteração de código necessária
-
-O sistema já suporta tudo. É só questão de apontar para o novo servidor.
-
-### Resumo
-
-| Item | Ação |
-|------|------|
-| `EVOLUTION_API_URL` | Atualizar para IP da nova VPS |
-| `EVOLUTION_API_KEY` | Atualizar para a key da nova VPS |
-| Webhook na Evolution | Apontar para o endpoint do sistema |
-| Reconectar WhatsApp | Usar o painel admin |
+- Instância aparecerá como `rest-rods` na Evolution (usa o slug)
+- QR code gerado em ~5-10s em vez de ~30s
+- Status sincronizado corretamente ao abrir a página e após escanear QR
 
