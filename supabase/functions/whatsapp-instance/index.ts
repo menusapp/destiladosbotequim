@@ -92,7 +92,7 @@ async function configureWebhook(instanceName: string): Promise<void> {
     return;
   }
   const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
-  const payload = {
+  const webhookData = {
     url: webhookUrl,
     webhook_by_events: false,
     webhook_base64: false,
@@ -100,11 +100,10 @@ async function configureWebhook(instanceName: string): Promise<void> {
     enabled: true,
   };
 
-  // Try multiple endpoint formats (v1 and v2 of Evolution API)
-  const endpoints = [
-    { method: 'POST', path: `/webhook/set/${instanceName}` },
-    { method: 'PUT', path: `/webhook/set/${instanceName}` },
-    { method: 'POST', path: `/webhook/instance/${instanceName}` },
+  // Try with "webhook" wrapper first (Evolution API v2 format), then flat
+  const payloads = [
+    { label: 'wrapped', data: { webhook: webhookData } },
+    { label: 'flat', data: webhookData },
   ];
 
   for (const ep of endpoints) {
