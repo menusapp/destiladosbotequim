@@ -1,44 +1,43 @@
 
 
-## Plano: Configurar webhook automaticamente ao criar instância
+## Plano: Corrigir robô que não responde + lentidão na aba WhatsApp
 
-### Problema
-Hoje, quando um restaurante conecta o WhatsApp, a edge function `whatsapp-instance` cria a instância na Evolution API mas **não configura o webhook** dessa instância. Isso significa que mensagens recebidas naquela instância nunca chegam ao sistema, a menos que alguém vá manualmente na VPS configurar o webhook global ou por instância.
+### Problema 1: Robô não responde (BUG CRÍTICO)
 
-### Solução
-Adicionar uma chamada automática de configuração de webhook **dentro da própria edge function `whatsapp-instance`**, logo após criar a instância com sucesso. A Evolution API tem um endpoint `POST /webhook/set/{instanceName}` que permite configurar o webhook por instância via API. Como a edge function já tem acesso ao `EVOLUTION_API_URL` e `EVOLUTION_API_KEY`, basta adicionar essa chamada.
-
-### O que muda
-
-**Arquivo:** `supabase/functions/whatsapp-instance/index.ts`
-
-Após a criação da instância (linha ~272, depois do `upsert` no banco), adicionar uma função `configureWebhook(instanceName)` que faz:
-
-```text
-POST {EVOLUTION_API_URL}/webhook/set/{instanceName}
-{
-  "url": "{SUPABASE_URL}/functions/v1/whatsapp-webhook",
-  "webhook_by_events": false,
-  "webhook_base64": false,
-  "events": ["CONNECTION_UPDATE", "QRCODE_UPDATED", "MESSAGES_UPSERT"]
-}
+No `whatsapp-webhook/index.ts`, linha 133:
+```typescript
+const msgData = data?.message || data;
 ```
 
-Essa chamada será feita automaticamente toda vez que:
-- Uma instância nova é criada (`action: create`)
-- Uma instância existente é reiniciada (`action: restart`)
+O payload da Evolution API v2 tem esta estrutura:
+```
+body.data.key.remoteJid = "5514997522469@s.whatsapp.net"
+body.data.message.conversation = "ola"
+body.data.key.fromMe = false
+```
 
-Assim, qualquer restaurante que conectar o WhatsApp pelo painel terá o webhook configurado automaticamente, sem precisar tocar na VPS.
+Como `data.message` existe (é o objeto `{ conversation: "ola", messageContextInfo: ... }`), o código pega `data.message` como `msgData`. Depois tenta acessar `msgData.key.remoteJid` — que não existe nesse nível. Resultado: `customerPhone = ""` e `messageText = ""`, e a mensagem é ignorada com log "skipped".
 
-### Detalhes técnicos
-- A URL do webhook é construída dinamicamente usando `Deno.env.get('SUPABASE_URL')` + `/functions/v1/whatsapp-webhook`
-- Se a chamada de webhook falhar, o fluxo continua normalmente (log de aviso, sem bloquear o QR code)
-- Não é necessária nenhuma variável de ambiente nova, tudo já existe
+**Correção:** Extrair `key`, `remoteJid` e `messageText` diretamente de `data` (o objeto raiz do payload), não de `data.message`.
 
-### Resumo
+### Problema 2: Lentidão ao abrir a aba
+
+No `whatsapp-instance/index.ts`, toda vez que o GET detecta status `connected`, chama `await configureWebhook(resolvedName)` — que faz um POST HTTP para a Evolution API na VPS. Isso adiciona 1-3 segundos a cada carregamento da página.
+
+**Correção:** Remover o `configureWebhook` do GET. O webhook já é configurado no POST (create/restart), então não precisa reconfigurar a cada verificação de status.
+
+### Sobre a VPS
+
+Não precisa fazer nada na VPS. O webhook é configurado automaticamente pela edge function quando a instância é criada ou reiniciada. O único requisito é que a VPS esteja rodando a Evolution API com as portas abertas — o que já está funcionando (os logs mostram mensagens chegando).
+
+### Arquivos alterados
+
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/whatsapp-instance/index.ts` | Adicionar `configureWebhook()` após criar/reiniciar instância |
+| `supabase/functions/whatsapp-webhook/index.ts` | Corrigir extração de dados da mensagem (linhas 131-158) |
+| `supabase/functions/whatsapp-instance/index.ts` | Remover `configureWebhook` do fluxo GET (linha 242) |
 
-Nenhuma alteração na VPS necessária. Depois disso, basta o restaurante conectar o WhatsApp pelo painel e o robô já vai funcionar.
+### Resultado esperado
+- Robô responde imediatamente às mensagens
+- Aba WhatsApp carrega em ~1s em vez de 3-4s
 
