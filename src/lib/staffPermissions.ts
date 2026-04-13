@@ -1,28 +1,24 @@
 // All available sections in the system
 export const ALL_SECTIONS = [
-  { id: "pedidos-online", label: "Pedidos Online" },
-  { id: "pedidos-locais", label: "Pedidos Locais" },
+  { id: "pedidos", label: "Pedidos" },
   { id: "pdv", label: "PDV" },
-  { id: "mesas-reservas", label: "Mesas e Reservas" },
+  { id: "mesas-reservas", label: "Reservas" },
   { id: "cardapio", label: "Cardápio" },
-  { id: "caixa", label: "Caixa" },
   { id: "estoque", label: "Estoque" },
+  { id: "caixa", label: "Caixa" },
   { id: "custos", label: "Custos" },
   { id: "margens", label: "Margens" },
   { id: "relatorios", label: "Relatório DRE" },
   { id: "clientes", label: "Clientes" },
   { id: "fidelidade", label: "Fidelidade" },
   { id: "marketing", label: "Marketing" },
-  { id: "fiscal", label: "Fiscal" },
-  { id: "modulos", label: "Módulos" },
-  { id: "config-dados", label: "Dados da Empresa" },
-  { id: "config-horario", label: "Horário de Funcionamento" },
-  { id: "config-regioes", label: "Regiões de Entrega" },
-  { id: "config-pagamentos", label: "Formas de Pagamento" },
-  { id: "config-pagamentos-online", label: "Pagamentos Online" },
-  { id: "config-impressoras", label: "Impressoras" },
-  { id: "config-whatsapp", label: "Automação WhatsApp" },
+  { id: "robo-menus", label: "Robô Menu's" },
   { id: "integracoes", label: "Integrações" },
+  { id: "fiscal", label: "Fiscal" },
+  { id: "modulos", label: "Planos" },
+  { id: "config-dados", label: "Configurações — Geral" },
+  { id: "config-totem", label: "Configurações — Totem" },
+  { id: "config-whatsapp", label: "Configurações — WhatsApp" },
 ] as const;
 
 export type StaffRole = "admin" | "gerente" | "caixa" | "garcom" | "cozinha" | "atendente";
@@ -40,10 +36,10 @@ export const STAFF_ROLES: { value: StaffRole; label: string; description: string
 export const ROLE_DEFAULT_SECTIONS: Record<StaffRole, string[]> = {
   admin: ALL_SECTIONS.map(s => s.id),
   gerente: ALL_SECTIONS.map(s => s.id).filter(id => id !== "modulos"),
-  caixa: ["pedidos-online", "pedidos-locais", "pdv", "caixa"],
-  garcom: ["pedidos-locais", "mesas-reservas", "pdv"],
-  cozinha: ["pedidos-online", "pedidos-locais"],
-  atendente: ["pedidos-online", "pedidos-locais", "clientes", "mesas-reservas"],
+  caixa: ["pedidos", "pdv", "caixa"],
+  garcom: ["pedidos", "mesas-reservas", "pdv"],
+  cozinha: ["pedidos"],
+  atendente: ["pedidos", "clientes", "mesas-reservas"],
 };
 
 // Check if a staff member can access a section
