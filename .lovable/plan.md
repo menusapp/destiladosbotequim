@@ -1,166 +1,91 @@
 
-Objetivo
-- Corrigir as notificações de status para cliente no WhatsApp.
-- Fazer o botão “Ativar todas as notificações” parar de se desativar sozinho.
-- Preparar o Robô Menu’s para um modelo simples, seguro e realmente funcional.
 
-Diagnóstico confirmado
-- As notificações para o dono funcionam porque já usam o fluxo novo (`whatsapp-notifications` + configs do dono).
-- As notificações para cliente estão quebradas porque hoje o sistema está dividido em dois modelos:
-  - a tela “Para o Cliente” salva em `whatsapp_notification_configs`
-  - mas o envio dos status do pedido em `useOrderStatusAdvance.ts` ainda lê os campos antigos de `whatsapp_config.message_*`
-- Resultado: o usuário configura a aba nova, mas o envio real do cliente continua olhando para os campos antigos, então aceite/pronto/cancelado podem simplesmente não disparar.
-- O toggle global ainda é frágil porque:
-  - salva com `update()` sem validar `error`
-  - não faz `upsert()` se a linha não existir
-  - o visual dele ainda depende do status momentâneo da conexão, então ao sair e voltar ele parece desligado mesmo sem o usuário desligar
-- No Robô Menu’s, o que existe hoje ainda foge do que você pediu:
-  - ainda tem personalidade
-  - ainda tem fluxo livre e totalmente personalizado
-  - ainda tem instruções livres
-  - e o envio real do bot tem um bug: ele chama `whatsapp-send` com payload diferente do esperado, então o simulador pode responder e o WhatsApp real não
+## Plano: 3 Correções — Toggle, Tempo de Preparo Delivery, Robô no WhatsApp Real
 
-Plano de implementação
+### 1. Remover card "Ativar todas as notificações" e manter apenas toggles individuais
 
-1. Unificar as notificações do cliente no mesmo motor do dono
-- Parar de usar o envio legado em `useOrderStatusAdvance.ts`.
-- Passar aceite, saiu para entrega/pronto, cancelamento e avaliação final para o edge function `whatsapp-notifications`.
-- Enviar contexto completo no payload:
-  - `nome`
-  - `numero_pedido`
-  - `tempo_estimado`
-  - `phone`
-  - `motivo`
-  - `link_avaliacao`
-- Fazer fallback de telefone:
-  - primeiro `orders.delivery_phone`
-  - se faltar, buscar telefone do cliente por CPF, como já é feito em outros fluxos.
-- Manter tudo centralizado nas configs da aba “Para o Cliente”.
+**Problema:** A tabela `whatsapp_config` tem uma RLS policy `block_direct_access` que bloqueia TODAS as operações diretas do frontend (`qual: false`, `with_check: false`). O `upsert` do toggle global sempre falha por causa disso.
 
-2. Preservar templates antigos sem perder configuração já feita
-- Criar uma migration de backfill:
-  - copiar os textos antigos de `whatsapp_config.message_*` para `whatsapp_notification_configs` quando ainda não existir config nova correspondente.
-- Assim, restaurantes que já tinham mensagens antigas não perdem seus textos.
+**Solução:** Remover o card "Notificações Automáticas" inteiro de `WhatsAppSettings.tsx` (linhas ~646-659). Os toggles individuais de cada notificação (que salvam em `whatsapp_notification_configs`, não em `whatsapp_config`) já funcionam e são o controle real. Também remover o estado `enabled`, `handleToggleEnabled`, e as referências a ele.
 
-3. Fazer o botão “Ativar todas as notificações” persistir de verdade
-- Em `WhatsAppSettings.tsx`, trocar o `update()` simples por `upsert()` com validação real de erro.
-- Atualizar também o `config.enabled` local, não só o estado `enabled`.
-- Se ainda não existir registro em `whatsapp_config`, criar automaticamente.
-- Deixar o padrão “ligado de fábrica” para novos restaurantes/conexões.
-- Remover o comportamento visual que faz o toggle parecer desligado só porque a conexão ainda está sendo conferida.
-- Manter o aviso de desconexão, mas sem forçar o botão a aparentar estado errado.
+**Arquivo:** `src/components/admin/settings/WhatsAppSettings.tsx`
 
-4. Garantir que as notificações do cliente sempre tenham config persistida
-- Hoje a UI monta defaults em memória, mas nem sempre isso vira registro salvo.
-- Vou ajustar para semear configs padrão no backend quando faltarem registros de cliente.
-- Assim, o sistema não depende do usuário entrar e clicar em “Salvar” antes de funcionar.
+---
 
-5. Simplificar o Robô Menu’s exatamente no formato que você pediu
-- Na interface:
-  - manter `IA Ativa`
-  - manter `Aceitar pedidos via WhatsApp`
-  - manter apenas:
-    - `Menu Numérico Padrão`
-    - `Apenas o Link Digital`
-- Remover:
-  - personalidade
-  - fluxo livre conversacional
-  - totalmente personalizada
-  - caixa livre de instruções para IA
-- No lugar disso, deixar um comportamento funcional e fechado.
+### 2. Adicionar campo "Tempo de preparo para Delivery" na aba Operacional
 
-6. Fazer o Robô Menu’s conhecer o restaurante sem risco de vazar dados internos
-- O bot vai usar somente dados públicos do restaurante:
-  - nome
-  - slug/link do cardápio
-  - categorias
-  - produtos
-  - preços
-  - promoções públicas
-  - horários
-  - taxa/prazo de entrega públicos
-  - opções de atendimento disponíveis
-- O bot não poderá responder sobre:
-  - custo
-  - lucro
-  - faturamento
-  - caixa
-  - estoque interno/custos
-  - credenciais
-  - dados fiscais
-  - configurações administrativas sensíveis
-- Ou seja: ele saberá “tudo que o cliente pode ver”, e nada além disso.
+**Problema:** O `prep_time_minutes` na tabela `restaurants` já existe e é usado como tempo estimado nas notificações e no checkout. Porém na aba Operacional ele aparece apenas como "Tempo de Preparo nos Pedidos" (timer de mesa). Falta um campo editável para o tempo que é informado ao cliente de delivery.
 
-7. Explicação de como “aceitar pedidos via WhatsApp” vai funcionar
-- Eu faria um MVP simples e seguro, sem conversa solta.
-- Fluxo proposto:
+**Solução:** 
+- Na `CompanyDataSettings.tsx`, dentro da aba Operacional, adicionar um novo Card "Tempo Estimado para Delivery" com um campo numérico que edita `prep_time_minutes`.
+- Também adicionar `pickup_time_minutes` para retirada.
+- O save já persiste `prep_time_minutes`, só falta o campo visual dedicado ao delivery.
+
+**Arquivo:** `src/components/admin/settings/CompanyDataSettings.tsx`
+
+---
+
+### 3. Robô Menu's — O que falta para funcionar no WhatsApp real
+
+O simulador funciona porque chama a edge function `whatsapp-ai-bot` diretamente. No WhatsApp real, o fluxo é:
+
 ```text
-Cliente manda mensagem
-  -> bot responde com:
-     1 Ver cardápio
-     2 Status do pedido
-     3 Horário de funcionamento
-     4 Falar com atendente
-     5 Fazer pedido
-
-Se escolher "Fazer pedido":
-  -> escolhe entrega ou retirada
-  -> escolhe categoria
-  -> escolhe produto por número
-  -> escolhe quantidade
-  -> escolhe complementos
-  -> decide se quer adicionar mais itens
-  -> informa nome
-  -> informa endereço (se entrega)
-  -> confirma resumo
-  -> sistema cria um pedido normal
-  -> pedido entra no painel admin
+Cliente manda mensagem no WhatsApp
+  → Evolution API recebe
+  → Evolution API chama webhook global
+  → webhook global aponta para: supabase/functions/v1/whatsapp-webhook
+  → whatsapp-webhook recebe evento messages.upsert
+  → whatsapp-webhook chama whatsapp-ai-bot (fire-and-forget)
+  → whatsapp-ai-bot processa e chama whatsapp-send para responder
 ```
-- Para a primeira versão, eu deixaria o pagamento fora da conversa do WhatsApp, para ficar confiável e simples.
-- Depois do pedido confirmado, o bot pode orientar:
-  - pagar no cardápio digital
-  - pagar na entrega
-  - pagar na retirada
-  conforme a configuração do restaurante.
 
-8. Corrigir o backend atual do Robô Menu’s antes de ativar de verdade
-- Corrigir a chamada do `whatsapp-ai-bot` para `whatsapp-send`, porque hoje o payload está incompatível.
-- Reaproveitar `whatsapp_conversations.current_step` + `order_draft` para virar uma máquina de estados real do pedido.
-- Fazer o modo `link_only` responder só com o link.
-- Fazer o modo `numeric_menu` responder sempre dentro do fluxo numérico, sem liberdade aberta.
+O código já está todo implementado (linhas 131-156 do `whatsapp-webhook`). O que provavelmente falta é a **configuração do webhook na VPS/Evolution API** para apontar para o endpoint correto.
 
-Validação após implementação
-- Cliente:
-  - aceitar pedido e validar mensagem de aceite
-  - avançar para pronto/saiu para entrega e validar mensagem
-  - cancelar pedido e validar mensagem
-  - finalizar e validar mensagem de avaliação
-- Toggle global:
-  - desligar
-  - sair da aba
-  - voltar
-  - recarregar a página
-  - confirmar que continua no estado salvo
-  - validar que ele pausa dono + cliente ao mesmo tempo
-- Robô Menu’s:
-  - testar no simulador
-  - testar no WhatsApp real
-  - testar `link_only`
-  - testar `numeric_menu`
-  - testar pedido completo pelo WhatsApp até aparecer no admin
-  - validar que perguntas sobre dados internos são bloqueadas
+#### Passo a passo para configurar na VPS:
 
-Detalhes técnicos
-- Correções imediatas:
-  - `src/hooks/useOrderStatusAdvance.ts`
-  - `src/components/admin/settings/WhatsAppSettings.tsx`
-  - `supabase/functions/whatsapp-notifications/index.ts`
-  - migration de backfill para configs de cliente
-- Robô Menu’s:
-  - `src/components/admin/RoboMenusTab.tsx`
-  - `supabase/functions/whatsapp-ai-bot/index.ts`
-  - ajuste de integração com `whatsapp-send`
-- Regra central da implementação:
-  - unificar o envio do cliente no motor novo
-  - remover dependência dos campos antigos `whatsapp_config.message_*`
-  - deixar o robô restrito a dados públicos e fluxo guiado
+1. **Acessar o Portainer** na sua VPS e verificar se a Evolution API está rodando.
+
+2. **Configurar o webhook global** da Evolution API. Existem duas formas:
+
+   **Opção A — Via variável de ambiente** (recomendado):
+   No `docker-compose.yml` ou nas variáveis de ambiente do container da Evolution API, adicionar/verificar:
+   ```
+   WEBHOOK_GLOBAL_ENABLED=true
+   WEBHOOK_GLOBAL_URL=https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-webhook
+   WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
+   ```
+   Após alterar, reiniciar o container.
+
+   **Opção B — Via API** (se já estiver rodando e não quiser reiniciar):
+   ```bash
+   curl -X POST "SUA_EVOLUTION_API_URL/webhook/set/NOME_DA_INSTANCIA" \
+     -H "apikey: SUA_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "url": "https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-webhook",
+       "webhook_by_events": false,
+       "webhook_base64": false,
+       "events": [
+         "CONNECTION_UPDATE",
+         "QRCODE_UPDATED",
+         "MESSAGES_UPSERT"
+       ]
+     }'
+   ```
+   Substitua `SUA_EVOLUTION_API_URL` pela URL real (ex: `https://evo.seudominio.com.br`) e `NOME_DA_INSTANCIA` pelo nome da instância do restaurante (ex: `rest-rods`).
+
+3. **Testar**: Envie uma mensagem para o número do WhatsApp conectado. Verifique os logs da edge function `whatsapp-webhook` para confirmar que o evento chegou e que o `whatsapp-ai-bot` foi chamado.
+
+4. **Se o webhook já estiver configurado** mas não funciona, verificar nos logs do `whatsapp-webhook` se há erros. Pode ser que a instância na Evolution tenha um nome diferente do registrado em `whatsapp_config.instance_name`.
+
+**Nenhuma alteração de código necessária para o robô** — o fluxo inteiro já está implementado. É puramente configuração da VPS.
+
+---
+
+### Resumo de arquivos alterados
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `WhatsAppSettings.tsx` | Remover card "Notificações Automáticas" e todo o código do toggle global |
+| `CompanyDataSettings.tsx` | Adicionar card com campo de tempo estimado delivery + retirada |
+
