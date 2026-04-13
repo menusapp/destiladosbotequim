@@ -7,14 +7,16 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { MapPin, Plus, Trash2, User, Gift, Check, Circle } from "lucide-react";
+import { MapPin, Plus, Trash2, User, Gift, Check, Circle, Save, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { validatePhone } from "@/lib/cpfValidator";
 
 interface ProfileViewProps {
   customerName: string;
   customerCPF: string;
   restaurantId: string;
   onNameUpdate: (name: string) => void;
+  onPhoneUpdate?: (phone: string) => void;
 }
 
 interface LoyaltyProgram {
@@ -43,9 +45,11 @@ export const ProfileView = ({
   customerCPF,
   restaurantId,
   onNameUpdate,
+  onPhoneUpdate,
 }: ProfileViewProps) => {
   const [name, setName] = useState(customerName);
   const [phone, setPhone] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
   const [addresses, setAddresses] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [showAddAddress, setShowAddAddress] = useState(false);
