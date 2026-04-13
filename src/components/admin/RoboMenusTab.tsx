@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { Bot, Plus, Trash2, AlertTriangle, Send, RotateCcw, MessageSquare, Sparkles } from "lucide-react";
+import { Bot, Plus, Trash2, AlertTriangle, Send, RotateCcw, MessageSquare } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface RoboMenusTabProps {
@@ -18,10 +17,7 @@ interface RoboMenusTabProps {
 interface AiConfig {
   is_active: boolean;
   accept_orders_via_whatsapp: boolean;
-  personality: string;
   welcome_message_type: string;
-  custom_welcome_message: string;
-  instructions: string;
 }
 
 interface MenuOption {
@@ -41,10 +37,7 @@ interface SimMessage {
 const DEFAULT_CONFIG: AiConfig = {
   is_active: false,
   accept_orders_via_whatsapp: false,
-  personality: 'friendly',
   welcome_message_type: 'numeric_menu',
-  custom_welcome_message: '',
-  instructions: '',
 };
 
 const DEFAULT_MENU_OPTIONS: Omit<MenuOption, 'id'>[] = [
@@ -53,13 +46,6 @@ const DEFAULT_MENU_OPTIONS: Omit<MenuOption, 'id'>[] = [
   { position: 3, label: 'Horário de funcionamento', action_type: 'business_hours', custom_message: '', is_active: true },
   { position: 4, label: 'Falar com atendente', action_type: 'human_attendant', custom_message: '', is_active: true },
   { position: 5, label: 'Fazer pedido', action_type: 'start_order', custom_message: '', is_active: true },
-];
-
-const PERSONALITIES = [
-  { value: 'classic_waiter', label: 'Garçom Clássico', desc: 'Formal e polido, trata por senhor(a)', emoji: '🎩' },
-  { value: 'friendly', label: 'Amigável', desc: 'Simpático e descontraído com emojis', emoji: '😊' },
-  { value: 'objective', label: 'Objetivo', desc: 'Direto ao ponto, respostas curtas', emoji: '🎯' },
-  { value: 'patient', label: 'Paciente', desc: 'Detalhista e calmo, explica tudo', emoji: '🧘' },
 ];
 
 const ACTION_TYPES = [
@@ -73,9 +59,7 @@ const ACTION_TYPES = [
 
 const WELCOME_TYPES = [
   { value: 'numeric_menu', label: 'Menu Numérico Padrão', desc: 'Entrega o link do cardápio e lista as opções principais' },
-  { value: 'free_flow', label: 'Fluxo Livre Conversacional', desc: 'O bot diz "Olá! Como posso te ajudar hoje?"' },
   { value: 'link_only', label: 'Apenas o Link Digital', desc: 'Foca 100% em conversão, só entrega o link direto' },
-  { value: 'custom', label: 'Totalmente Personalizada', desc: 'Você digita a mensagem de boas-vindas' },
 ];
 
 const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
@@ -102,10 +86,7 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
         setConfig({
           is_active: configRes.data.is_active ?? false,
           accept_orders_via_whatsapp: configRes.data.accept_orders_via_whatsapp ?? false,
-          personality: configRes.data.personality ?? 'friendly',
           welcome_message_type: configRes.data.welcome_message_type ?? 'numeric_menu',
-          custom_welcome_message: configRes.data.custom_welcome_message ?? '',
-          instructions: configRes.data.instructions ?? '',
         });
       }
 
@@ -122,13 +103,11 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
         setMenuOptions(DEFAULT_MENU_OPTIONS.map(o => ({ ...o })));
       }
 
-      // Check real-time status from Evolution API
       try {
         const statusRes = await fetch(`https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
         const statusData = await statusRes.json();
         setWhatsappConnected(statusData.status === 'connected');
       } catch {
-        // Fallback to DB value
         const { data: whatsappData } = await supabase.from('whatsapp_config').select('instance_status').eq('restaurant_id', restaurantId).maybeSingle();
         setWhatsappConnected(whatsappData?.instance_status === 'connected');
       }
@@ -144,23 +123,21 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Upsert AI config
       const { error: configError } = await supabase
         .from('whatsapp_ai_config')
         .upsert({
           restaurant_id: restaurantId,
           is_active: config.is_active,
           accept_orders_via_whatsapp: config.accept_orders_via_whatsapp,
-          personality: config.personality,
+          personality: 'objective',
           welcome_message_type: config.welcome_message_type,
-          custom_welcome_message: config.custom_welcome_message || null,
-          instructions: config.instructions || null,
+          custom_welcome_message: null,
+          instructions: null,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'restaurant_id' });
 
       if (configError) throw configError;
 
-      // Delete existing menu options and re-insert
       await supabase.from('whatsapp_menu_options').delete().eq('restaurant_id', restaurantId);
 
       if (menuOptions.length > 0) {
@@ -234,7 +211,6 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
   };
 
   const resetSimulator = async () => {
-    // Delete simulator conversation
     await supabase
       .from('whatsapp_conversations')
       .delete()
@@ -257,11 +233,10 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
         <Bot className="h-6 w-6 text-primary" />
         <div>
           <h2 className="text-xl font-bold">Robô Menu's</h2>
-          <p className="text-sm text-muted-foreground">Atendente virtual IA para WhatsApp</p>
+          <p className="text-sm text-muted-foreground">Atendente virtual para WhatsApp</p>
         </div>
       </div>
 
-      {/* Banners */}
       {!whatsappConnected && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200">
           <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -295,35 +270,6 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
             </CardContent>
           </Card>
 
-          {/* Personality */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Personalidade</CardTitle>
-              <CardDescription>Escolha o tom das respostas do bot</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                {PERSONALITIES.map(p => (
-                  <button
-                    key={p.value}
-                    onClick={() => setConfig(prev => ({ ...prev, personality: p.value }))}
-                    className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                      config.personality === p.value
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{p.emoji}</span>
-                      <span className="font-medium text-sm">{p.label}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{p.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Welcome message */}
           <Card>
             <CardHeader>
@@ -348,14 +294,6 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
                   </div>
                 </label>
               ))}
-              {config.welcome_message_type === 'custom' && (
-                <Textarea
-                  value={config.custom_welcome_message}
-                  onChange={e => setConfig(p => ({ ...p, custom_welcome_message: e.target.value }))}
-                  placeholder="Digite sua mensagem de boas-vindas personalizada... Use {{nome_restaurante}} e {{link_cardapio}}"
-                  rows={4}
-                />
-              )}
             </CardContent>
           </Card>
 
@@ -396,11 +334,10 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
                       />
                     </div>
                     {opt.action_type === 'custom_message' && (
-                      <Textarea
+                      <Input
                         value={opt.custom_message}
                         onChange={e => updateMenuOption(i, 'custom_message', e.target.value)}
                         placeholder="Mensagem personalizada..."
-                        rows={2}
                         className="text-sm"
                       />
                     )}
@@ -413,25 +350,6 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
               <Button variant="outline" size="sm" onClick={addMenuOption} className="w-full">
                 <Plus className="h-3.5 w-3.5 mr-1" /> Nova opção
               </Button>
-            </CardContent>
-          </Card>
-
-          {/* Instructions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                Instruções para a IA
-              </CardTitle>
-              <CardDescription>Informações que o bot deve considerar nas respostas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                value={config.instructions}
-                onChange={e => setConfig(p => ({ ...p, instructions: e.target.value }))}
-                placeholder="Ex: Não abrimos segundas. Taxa grátis acima de R$100. Não aceitamos cheque..."
-                rows={4}
-              />
             </CardContent>
           </Card>
 

@@ -10,6 +10,7 @@ interface Order {
   delivery_type?: string;
   order_type?: string;
   delivery_phone?: string;
+  customer_cpf?: string;
   table_id?: string;
   tables?: { table_number: number };
   ifood_source?: boolean;
@@ -24,7 +25,6 @@ interface Order {
   loyalty_points_used?: number;
   created_at?: string;
   notes?: string;
-  customer_cpf?: string;
   delivery_address?: string;
   dd_scheduled_for?: string;
   cancellation_reason?: string;
@@ -69,29 +69,55 @@ export function getNextStatus(order: Order): NextStatusResult | null {
 export function useOrderStatusAdvance(restaurantId: string) {
   const [loadingOrderId, setLoadingOrderId] = useState<string | null>(null);
 
-  const sendWhatsAppNotification = async (order: Order, newStatus: string) => {
+  const sendWhatsAppNotification = async (order: Order, newStatus: string, reason?: string) => {
     try {
-      if (!order.delivery_phone) return;
-      const { data: config } = await supabase.from("whatsapp_config").select("*").eq("restaurant_id", restaurantId).maybeSingle();
-      if (!config?.enabled || config?.instance_status !== "connected") return;
+      // Determine notification type
+      let notificationType: string | null = null;
+      if (newStatus === "accepted" || newStatus === "preparing") notificationType = "order_accepted";
+      else if (newStatus === "out_for_delivery" || newStatus === "ready") notificationType = "order_out_for_delivery";
+      else if (newStatus === "cancelled") notificationType = "order_cancelled";
+      // delivered/picked_up handled separately for review request
 
-      let template: string | null = null;
-      let messageType = "";
-      if (newStatus === "accepted" || newStatus === "preparing") { template = config.message_accepted; messageType = "accepted"; }
-      else if (newStatus === "out_for_delivery") {
-        if (order.delivery_type === "pickup") { template = config.message_ready_for_pickup; messageType = "ready_for_pickup"; }
-        else { template = config.message_out_for_delivery; messageType = "out_for_delivery"; }
-      } else if (newStatus === "ready") { template = config.message_ready_for_pickup; messageType = "ready_for_pickup"; }
-      else if (newStatus === "delivered") { template = config.message_delivered; messageType = "delivered"; }
-      else if (newStatus === "picked_up") { template = config.message_picked_up; messageType = "picked_up"; }
-      else if (newStatus === "cancelled") { template = config.message_cancelled; messageType = "cancelled"; }
-      if (!template) return;
+      if (!notificationType) return;
 
-      const { data: restaurant } = await supabase.from("restaurants").select("prep_time_minutes").eq("id", restaurantId).single();
-      const tempoEstimado = restaurant?.prep_time_minutes?.toString() || "30";
-      const message = template.replace(/{nome}/g, order.customer_name || "Cliente").replace(/{pedido}/g, order.id.slice(0, 8)).replace(/{tempo}/g, tempoEstimado);
-      await supabase.functions.invoke("whatsapp-send", { body: { restaurantId, phone: order.delivery_phone, message, orderId: order.id, messageType } });
-    } catch (error) { console.error("[WhatsApp][AUTO] Erro:", error); }
+      // Resolve phone: delivery_phone first, then customer CPF lookup
+      let phone = order.delivery_phone || null;
+      if (!phone && order.customer_cpf) {
+        const { data: customer } = await supabase
+          .from("customers")
+          .select("phone")
+          .eq("restaurant_id", restaurantId)
+          .eq("cpf", order.customer_cpf)
+          .maybeSingle();
+        phone = customer?.phone || null;
+      }
+      if (!phone) return;
+
+      const { data: restaurant } = await supabase
+        .from("restaurants")
+        .select("prep_time_minutes")
+        .eq("id", restaurantId)
+        .single();
+
+      const slug = window.location.pathname.split('/')[1] || '';
+
+      await supabase.functions.invoke("whatsapp-notifications", {
+        body: {
+          restaurant_id: restaurantId,
+          notification_type: notificationType,
+          context: {
+            nome: order.customer_name || "Cliente",
+            numero_pedido: order.id.slice(0, 8),
+            tempo_estimado: restaurant?.prep_time_minutes?.toString() || "30",
+            phone,
+            motivo: reason || "Não informado",
+            link_avaliacao: `${window.location.origin}/${slug}/pedido-confirmado/${order.id}`,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("[WhatsApp][NOTIF] Erro:", error);
+    }
   };
 
   const syncDDStatus = async (order: Order, newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string }> => {
@@ -148,17 +174,14 @@ export function useOrderStatusAdvance(restaurantId: string) {
 
     setLoadingOrderId(order.id);
     try {
-      // iFood sync (best-effort)
       await syncIfoodStatus(order, newStatus);
 
-      // DD sync (blocking)
       const ddResult = await syncDDStatus(order, newStatus, reason);
       if (!ddResult.ok) {
         toast.error(`Delivery Direto: ${ddResult.errorMsg || "Erro ao sincronizar"}`);
         return false;
       }
 
-      // Update status via RPC
       const { error } = await supabase.rpc("admin_update_order_status", { p_order_id: order.id, p_new_status: newStatus, p_restaurant_id: restaurantId });
       if (error) throw error;
 
@@ -166,8 +189,8 @@ export function useOrderStatusAdvance(restaurantId: string) {
         await supabase.from("orders").update({ cancellation_reason: reason }).eq("id", order.id);
       }
 
-      // WhatsApp (fire-and-forget)
-      sendWhatsAppNotification(order, newStatus);
+      // WhatsApp notification via unified engine (fire-and-forget)
+      sendWhatsAppNotification(order, newStatus, reason);
 
       // Accept: mark table occupied + auto-print
       if (newStatus === "accepted") {
@@ -180,12 +203,23 @@ export function useOrderStatusAdvance(restaurantId: string) {
         } catch (printErr) { console.error("Auto-print error:", printErr); }
       }
 
-      // Marketing trigger on finalization
+      // Marketing trigger + review request on finalization
       if (newStatus === "delivered" || newStatus === "picked_up") {
         supabase.functions.invoke("marketing-trigger", { body: { orderId: order.id, restaurantId } });
 
-        // Review request via new notification system
-        if (order.delivery_phone) {
+        // Resolve phone for review request
+        let phone = order.delivery_phone || null;
+        if (!phone && order.customer_cpf) {
+          const { data: customer } = await supabase
+            .from("customers")
+            .select("phone")
+            .eq("restaurant_id", restaurantId)
+            .eq("cpf", order.customer_cpf)
+            .maybeSingle();
+          phone = customer?.phone || null;
+        }
+
+        if (phone) {
           const slug = window.location.pathname.split('/')[1] || '';
           supabase.functions.invoke("whatsapp-notifications", {
             body: {
@@ -194,7 +228,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
               context: {
                 nome: order.customer_name || "Cliente",
                 numero_pedido: order.id.slice(0, 8),
-                phone: order.delivery_phone,
+                phone,
                 link_avaliacao: `${window.location.origin}/${slug}/pedido-confirmado/${order.id}`,
               },
             },

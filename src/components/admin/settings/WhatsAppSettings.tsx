@@ -188,14 +188,23 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   }, []);
 
   const handleToggleEnabled = useCallback(async (newValue: boolean) => {
+    const previous = enabled;
     setEnabled(newValue);
+    // Also update local config object so it doesn't get overridden
+    setConfig(prev => prev ? { ...prev, enabled: newValue } : prev);
     try {
-      await supabase.from('whatsapp_config').update({ enabled: newValue }).eq('restaurant_id', restaurantId);
+      const { error } = await supabase.from('whatsapp_config').upsert(
+        { restaurant_id: restaurantId, enabled: newValue, updated_at: new Date().toISOString() },
+        { onConflict: 'restaurant_id' }
+      );
+      if (error) throw error;
     } catch (err) {
       console.error('[WA] Erro ao salvar toggle enabled:', err);
-      setEnabled(!newValue);
+      setEnabled(previous);
+      setConfig(prev => prev ? { ...prev, enabled: previous } : prev);
+      toast({ title: "Erro", description: "Falha ao salvar estado das notificações", variant: "destructive" });
     }
-  }, [restaurantId]);
+  }, [restaurantId, enabled, toast]);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -643,10 +652,9 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
               <Label>Ativar todas as notificações</Label>
               <p className="text-sm text-muted-foreground">Desative para pausar todas as notificações de uma vez</p>
             </div>
-            <Switch checked={enabled} onCheckedChange={handleToggleEnabled} disabled={isStatusKnown && !isConnected} />
+            <Switch checked={enabled} onCheckedChange={handleToggleEnabled} />
           </div>
-          {isStatusKnown && !isConnected && <p className="text-sm text-orange-600 mt-2">⚠️ Conecte o WhatsApp primeiro para ativar as notificações</p>}
-          {!isStatusKnown && !isConnected && <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Verificando conexão...</p>}
+          {isStatusKnown && !isConnected && <p className="text-sm text-orange-600 mt-2">⚠️ O WhatsApp não está conectado. As notificações só serão enviadas quando a conexão estiver ativa.</p>}
         </CardContent>
       </Card>
 
