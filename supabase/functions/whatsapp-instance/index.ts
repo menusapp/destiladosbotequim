@@ -92,25 +92,43 @@ async function configureWebhook(instanceName: string): Promise<void> {
     return;
   }
   const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
-  try {
-    console.log(`[WEBHOOK] Configuring webhook for ${instanceName} -> ${webhookUrl}`);
-    const res = await fetch(`${EVOLUTION_API_URL}/webhook/set/${instanceName}`, {
-      method: 'POST',
-      headers: {
-        'apikey': EVOLUTION_API_KEY!,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        url: webhookUrl,
-        webhook_by_events: false,
-        webhook_base64: false,
-        events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED', 'MESSAGES_UPSERT']
-      })
-    });
-    console.log(`[WEBHOOK] Config response: ${res.status}`);
-  } catch (error) {
-    console.log(`[WEBHOOK] Failed to configure (non-blocking):`, error);
+  const payload = {
+    url: webhookUrl,
+    webhook_by_events: false,
+    webhook_base64: false,
+    events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED', 'MESSAGES_UPSERT', 'LOGOUT_INSTANCE'],
+    enabled: true,
+  };
+
+  // Try multiple endpoint formats (v1 and v2 of Evolution API)
+  const endpoints = [
+    { method: 'POST', path: `/webhook/set/${instanceName}` },
+    { method: 'PUT', path: `/webhook/set/${instanceName}` },
+    { method: 'POST', path: `/webhook/instance/${instanceName}` },
+  ];
+
+  for (const ep of endpoints) {
+    try {
+      console.log(`[WEBHOOK] Trying ${ep.method} ${ep.path} for ${instanceName} -> ${webhookUrl}`);
+      const res = await fetch(`${EVOLUTION_API_URL}${ep.path}`, {
+        method: ep.method,
+        headers: {
+          'apikey': EVOLUTION_API_KEY!,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      const body = await res.text();
+      console.log(`[WEBHOOK] ${ep.method} ${ep.path} response: ${res.status} - ${body.substring(0, 300)}`);
+      if (res.ok) {
+        console.log(`[WEBHOOK] Successfully configured webhook for ${instanceName}`);
+        return;
+      }
+    } catch (error) {
+      console.log(`[WEBHOOK] Error on ${ep.method} ${ep.path}:`, error);
+    }
   }
+  console.log(`[WEBHOOK] All endpoint attempts failed for ${instanceName} (non-blocking)`);
 }
 
 // Restart instance to force new QR generation
