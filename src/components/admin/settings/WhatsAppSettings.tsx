@@ -197,8 +197,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     }
   }, [restaurantId]);
 
-
-    try {
+  const fetchConfig = useCallback(async () => {
       const { data, error } = await supabase.from('whatsapp_config').select('*').eq('restaurant_id', restaurantId).maybeSingle();
       if (error) throw error;
       if (data) {
