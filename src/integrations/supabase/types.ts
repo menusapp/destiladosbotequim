@@ -4746,7 +4746,10 @@ export type Database = {
       }
       admin_get_whatsapp_status: {
         Args: { p_restaurant_id: string }
-        Returns: Json
+        Returns: {
+          enabled: boolean
+          instance_status: string
+        }[]
       }
       admin_list_ceo_users: {
         Args: never
