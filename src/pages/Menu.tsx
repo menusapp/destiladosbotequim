@@ -357,20 +357,7 @@ const Menu = () => {
   }, [restaurant?.id]);
 
 
-  // ⚡ Mostrar dialog de login APENAS quando dados estiverem carregados E não tiver avaliação pendente
-  useEffect(() => {
-    // NÃO mostrar login se estiver mostrando avaliação
-    if (blockLoginForReview || reviewModalOpen) {
-      return;
-    }
-    
-    if (!loading && restaurant && !customerName && !showCustomerDialog) {
-      const savedName = sessionStorage.getItem(`customer_name_${tableNumber}`);
-      if (!savedName) {
-        setShowCustomerDialog(true);
-      }
-    }
-  }, [loading, restaurant, customerName, tableNumber, showCustomerDialog, blockLoginForReview, reviewModalOpen]);
+  // Dialog de login NÃO é mais automático - usuário pode navegar livremente
 
   useEffect(() => {
     
@@ -937,7 +924,7 @@ const Menu = () => {
 
   const handleProductClick = useCallback(async (product: Product) => {
     if (!customerName || !customerCPF) {
-      // Não abrir novamente se já está aberto
+      toast.error("Faça login para adicionar itens ao pedido");
       if (!showCustomerDialog) {
         setShowCustomerDialog(true);
       }
@@ -1204,7 +1191,7 @@ const Menu = () => {
 
       <CustomerInfoDialog
         open={showCustomerDialog}
-        onClose={() => {}} 
+        onClose={() => setShowCustomerDialog(false)} 
         onSubmit={handleCustomerInfoSubmit}
         restaurantColor={primaryColor}
         restaurantId={restaurant?.id}
