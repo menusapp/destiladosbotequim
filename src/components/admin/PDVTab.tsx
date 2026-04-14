@@ -162,7 +162,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     queryFn: async () => {
       const { data } = await supabase
         .from("products")
-        .select("*, categories!inner(id, name, restaurant_id), product_extras(*)")
+        .select("*, categories!inner(id, name, restaurant_id), product_extras(*, extra_categories(name))")
         .eq("categories.restaurant_id", restaurantId)
         .eq("available", true)
         .order("name");
@@ -1391,7 +1391,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       onClick={async () => {
                         const { data: complementGroups } = await supabase
                           .from("product_complement_groups")
-                          .select("extra_category_id, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
+                          .select("extra_category_id, display_order, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
                           .eq("product_id", product.id)
                           .order("display_order");
 
@@ -1405,6 +1405,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                             is_required: g.is_required,
                             min_selection: g.min_selection,
                             max_selection: g.max_selection,
+                            extra_category_id: g.extra_category_id,
+                            extra_category_name: cat.name,
+                            group_order: g.display_order ?? 9999,
                             is_complement: true,
                           }));
                         });
