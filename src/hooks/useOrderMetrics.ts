@@ -83,7 +83,7 @@ function calcTotemOrderTotal(order: any): number {
 async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Promise<OrderMetrics> {
   const { start, end } = getDateRange(dateRange);
 
-  const [deliveryRes, localBillsRes, counterRes, totemRes, paymentMethodsRes, cashMovementsRes] = await Promise.all([
+  const [deliveryRes, localBillsRes, counterRes, totemRes, paymentMethodsRes, cashMovementsRes, pdvPaidRes] = await Promise.all([
     supabase.from("orders")
       .select("id, created_at, order_type, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
       .eq("restaurant_id", restaurantId)
@@ -109,11 +109,18 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
     supabase.from("payment_methods")
       .select("id, name, method_type")
       .eq("restaurant_id", restaurantId),
-    // Query cash_movements to reconcile with overview
     supabase.from("cash_movements")
       .select("id, amount, order_id, bill_id, payment_method, category, created_at")
       .eq("restaurant_id", restaurantId)
       .eq("movement_type", "entrada")
+      .gte("created_at", start).lte("created_at", end),
+    // PDV paid orders (local/balcao with payment_status=paid, not totem)
+    supabase.from("orders")
+      .select("id, created_at, paid_at, order_type, payment_type, payment_status, coupon_discount, table_id, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
+      .eq("restaurant_id", restaurantId)
+      .in("order_type", ["local", "balcao"])
+      .eq("payment_status", "paid")
+      .neq("status", "cancelled")
       .gte("created_at", start).lte("created_at", end),
   ]);
 
