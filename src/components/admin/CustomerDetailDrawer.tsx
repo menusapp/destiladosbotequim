@@ -27,7 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { User, Phone, Mail, FileText, ShoppingBag, Calendar, Trash2, Save, MapPin, Plus, Star, Clock } from "lucide-react";
+import { User, Phone, Mail, FileText, ShoppingBag, Calendar, Trash2, Save, MapPin, Plus, Star, Clock, Cake } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -39,6 +39,7 @@ interface Customer {
   phone: string | null;
   email: string | null;
   notes: string | null;
+  birth_date: string | null;
   created_at: string;
   total_orders?: number;
   total_spent?: number;
@@ -65,6 +66,7 @@ export const CustomerDetailDrawer = ({
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editBirthDate, setEditBirthDate] = useState("");
   
   // Address form
   const [showAddressForm, setShowAddressForm] = useState(false);
@@ -117,13 +119,42 @@ export const CustomerDetailDrawer = ({
     setEditPhone(customer.phone || "");
     setEditEmail(customer.email || "");
     setEditNotes(customer.notes || "");
+    setEditBirthDate(customer.birth_date ? formatBirthDateForInput(customer.birth_date) : "");
     setIsEditing(true);
+  };
+
+  const formatBirthDateInput = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
+  const formatBirthDateForInput = (value: string) => {
+    const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+    }
+    return value;
+  };
+
+  const parseBirthDateToISO = (value: string): string | null => {
+    const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return null;
+    const [, day, month, year] = match.map(Number);
+    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900) return null;
+    return `${match[3]}-${match[2]}-${match[1]}`;
   };
 
   const handleSave = async () => {
     if (!customer) return;
+    const birthDateISO = editBirthDate ? parseBirthDateToISO(editBirthDate) : null;
+    if (editBirthDate && !birthDateISO) {
+      toast.error("Data de nascimento inválida. Use DD/MM/AAAA.");
+      return;
+    }
     const { error } = await supabase.from("customers").update({
-      name: editName, phone: editPhone || null, email: editEmail || null, notes: editNotes || null,
+      name: editName, phone: editPhone || null, email: editEmail || null, notes: editNotes || null, birth_date: birthDateISO,
     }).eq("id", customer.id);
     if (error) { toast.error("Erro ao atualizar cliente"); return; }
     toast.success("Cliente atualizado!");
@@ -288,6 +319,9 @@ export const CustomerDetailDrawer = ({
                     <div className="space-y-2"><Label>Telefone</Label><Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} /></div>
                     <div className="space-y-2"><Label>E-mail</Label><Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></div>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Data de Nascimento</Label><Input value={editBirthDate} onChange={(e) => setEditBirthDate(formatBirthDateInput(e.target.value))} placeholder="DD/MM/AAAA" maxLength={10} inputMode="numeric" /></div>
+                  </div>
                   <div className="space-y-2"><Label>Observações</Label><Textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={3} /></div>
                 </div>
               ) : (
@@ -305,7 +339,13 @@ export const CustomerDetailDrawer = ({
                         <div><p className="text-xs text-muted-foreground">E-mail</p><p className="text-sm font-medium">{customer.email}</p></div>
                       </div>
                     )}
-                    {!customer.phone && !customer.email && (
+                    {customer.birth_date && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"><Cake className="w-4 h-4 text-muted-foreground" /></div>
+                        <div><p className="text-xs text-muted-foreground">Data de Nascimento</p><p className="text-sm font-medium">{formatBirthDateForInput(customer.birth_date)}</p></div>
+                      </div>
+                    )}
+                    {!customer.phone && !customer.email && !customer.birth_date && (
                       <p className="text-sm text-muted-foreground">Nenhum contato cadastrado</p>
                     )}
                   </div>

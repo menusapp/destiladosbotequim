@@ -114,7 +114,7 @@ const Menu = () => {
           id, name, slug, is_open, logo_url, banner_url, primary_color, 
           prep_time_minutes, service_fee_enabled, service_fee_percentage,
           featured_section_enabled, featured_section_title,
-          login_require_name, login_require_phone,
+          login_require_name, login_require_phone, login_require_birth_date,
           categories (
             id, name, display_order,
             products (
@@ -1197,6 +1197,7 @@ const Menu = () => {
         restaurantId={restaurant?.id}
         requireName={restaurant?.login_require_name ?? true}
         requirePhone={restaurant?.login_require_phone ?? false}
+        requireBirthDate={restaurant?.login_require_birth_date ?? false}
       />
 
       <ProductDetailDrawer
