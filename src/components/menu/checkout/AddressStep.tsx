@@ -581,14 +581,14 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
               )}
             </div>
             <div>
-              <Label htmlFor="complement">Complemento</Label>
+              <Label htmlFor="complement">Complemento (opcional)</Label>
               <Input
                 id="complement"
                 value={newAddress.complement}
                 onChange={(e) =>
                   setNewAddress({ ...newAddress, complement: e.target.value })
                 }
-                placeholder="Opcional"
+                placeholder="Ex: Casa, Apartamento, Bloco B"
               />
             </div>
           </div>

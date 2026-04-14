@@ -165,8 +165,8 @@ export function KioskDeliveryAddress({ primaryColor, customerCpf, customerName, 
                   <Input value={number} onChange={e => setNumber(e.target.value)} placeholder="Nº" className="h-12 rounded-xl" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Complemento</Label>
-                  <Input value={complement} onChange={e => setComplement(e.target.value)} placeholder="Apto, bloco..." className="h-12 rounded-xl" />
+                  <Label>Complemento (opcional)</Label>
+                  <Input value={complement} onChange={e => setComplement(e.target.value)} placeholder="Ex: Casa, Apartamento, Bloco B" className="h-12 rounded-xl" />
                 </div>
               </div>
               <div className="space-y-2">
