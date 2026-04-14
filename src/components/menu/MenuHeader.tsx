@@ -21,9 +21,12 @@ export const MenuHeader = ({
   onSearchClose
 }: MenuHeaderProps) => {
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/60 to-transparent px-4 py-3">
+    <div
+      data-menu-header
+      className="fixed top-0 left-0 right-0 z-50 pointer-events-none bg-gradient-to-b from-black/60 to-transparent px-4 py-3"
+    >
       {searchOpen ? (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pointer-events-auto">
           <Input
             autoFocus
             type="text"
@@ -40,7 +43,7 @@ export const MenuHeader = ({
           </button>
         </div>
       ) : (
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end pointer-events-auto">
           {showSearch && (
             <button
               onClick={onSearchClick}
