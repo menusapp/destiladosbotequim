@@ -661,7 +661,7 @@ export const TableDetailDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogDescription className="sr-only">Detalhes da mesa</DialogDescription>
             <div className="flex items-center justify-between">
@@ -716,8 +716,9 @@ export const TableDetailDialog = ({
             </div>
           </DialogHeader>
 
-          <ScrollArea className="relative overflow-hidden flex-1 min-h-0 -mx-6 px-[24px] py-0 my-0">
-            <div className="space-y-6 pb-4">
+          <div className="flex-1 min-h-0">
+            <ScrollArea className="relative h-full overflow-hidden -mx-6 px-[24px] py-0 my-0">
+              <div className="space-y-6 pb-4">
               {/* Clients Section */}
               {comandas && comandas.length > 0 && (
                 <div>
@@ -975,8 +976,9 @@ export const TableDetailDialog = ({
                   </div>
                 </>
               )}
-            </div>
-          </ScrollArea>
+              </div>
+            </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
 
