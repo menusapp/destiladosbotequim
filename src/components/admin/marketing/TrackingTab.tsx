@@ -316,7 +316,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
             </div>
             <Button
               size="sm"
-              onClick={() => handleCreateCampaign(abandonedSessions.map((s) => ({ name: s.name || "Cliente", phone: s.phone })))}
+              onClick={() => handleCreateCampaign("abandoned_cart")}
               disabled={abandonedSessions.filter((s) => s.phone).length === 0}
               className="gap-2"
             >
@@ -389,7 +389,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
           <div className="flex items-center justify-end">
             <Button
               size="sm"
-              onClick={() => handleCreateCampaign(inactiveCustomers.map((c) => ({ name: c.name, phone: c.phone })))}
+              onClick={() => handleCreateCampaign("inactive_customer")}
               disabled={inactiveCustomers.filter((c) => c.phone).length === 0}
               className="gap-2"
             >
@@ -439,7 +439,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
           <div className="flex items-center justify-end">
             <Button
               size="sm"
-              onClick={() => handleCreateCampaign(noPurchaseCustomers.map((c) => ({ name: c.name, phone: c.phone })))}
+              onClick={() => handleCreateCampaign("no_purchase")}
               disabled={noPurchaseCustomers.filter((c) => c.phone).length === 0}
               className="gap-2"
             >
