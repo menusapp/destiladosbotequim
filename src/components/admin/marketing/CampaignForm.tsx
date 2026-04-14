@@ -365,6 +365,18 @@ export function CampaignForm({
                 <RadioGroupItem value="category_purchased" id="category" />
                 <Label htmlFor="category">Categoria específica</Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="abandoned_cart" id="abandoned" />
+                <Label htmlFor="abandoned">Carrinho abandonado</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="inactive_customer" id="inactive" />
+                <Label htmlFor="inactive">Cliente inativo (30+ dias)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="no_purchase" id="nopurchase" />
+                <Label htmlFor="nopurchase">Nunca comprou</Label>
+              </div>
             </RadioGroup>
 
             {triggerType === "product_purchased" && (
