@@ -39,6 +39,7 @@ interface Customer {
   phone: string | null;
   email: string | null;
   notes: string | null;
+  birth_date: string | null;
   created_at: string;
   total_orders?: number;
   total_spent?: number;
