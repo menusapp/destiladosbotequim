@@ -13,6 +13,43 @@ interface AccountSettingsDialogProps {
   restaurantId: string;
 }
 
+interface PasswordFieldProps {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  show: boolean;
+  onToggle: () => void;
+  placeholder: string;
+  required?: boolean;
+}
+
+const PasswordField = ({
+  label,
+  value,
+  onChange,
+  show,
+  onToggle,
+  placeholder,
+  required,
+}: PasswordFieldProps) => (
+  <div className="space-y-1.5">
+    <Label className="text-xs">{label}</Label>
+    <div className="relative">
+      <Input
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className="pr-9 text-sm"
+      />
+      <button type="button" className="absolute right-3 top-2.5 text-muted-foreground" onClick={onToggle}>
+        {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  </div>
+);
+
 export const AccountSettingsDialog = ({ open, onOpenChange, restaurantId }: AccountSettingsDialogProps) => {
   // Restaurant side
   const [restName, setRestName] = useState("");
@@ -135,41 +172,6 @@ export const AccountSettingsDialog = ({ open, onOpenChange, restaurantId }: Acco
       setLoading(false);
     }
   };
-
-  const PasswordField = ({
-    label,
-    value,
-    onChange,
-    show,
-    onToggle,
-    placeholder,
-    required,
-  }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    show: boolean;
-    onToggle: () => void;
-    placeholder: string;
-    required?: boolean;
-  }) => (
-    <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
-      <div className="relative">
-        <Input
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          required={required}
-          className="pr-9 text-sm"
-        />
-        <button type="button" className="absolute right-3 top-2.5 text-muted-foreground" onClick={onToggle}>
-          {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
