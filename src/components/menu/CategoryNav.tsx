@@ -7,7 +7,7 @@ interface CategoryNavProps {
 }
 
 export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps) => {
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(categories[0]?.id ?? null);
   const isManualScroll = useRef(false);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -25,17 +25,27 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
   useEffect(() => {
     if (categories.length === 0) return;
 
+    const visibleIds = new Set<string>();
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (isManualScroll.current) return;
         for (const entry of entries) {
+          const id = entry.target.id.replace("category-", "");
           if (entry.isIntersecting) {
-            const id = entry.target.id.replace("category-", "");
-            setActiveCategory(id);
+            visibleIds.add(id);
+          } else {
+            visibleIds.delete(id);
+          }
+        }
+        for (const cat of categories) {
+          if (visibleIds.has(cat.id)) {
+            setActiveCategory(cat.id);
+            return;
           }
         }
       },
-      { threshold: 0.15, rootMargin: "-80px 0px -60% 0px" }
+      { threshold: 0.01, rootMargin: "0px 0px -70% 0px" }
     );
 
     categories.forEach((cat) => {

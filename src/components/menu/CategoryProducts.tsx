@@ -16,7 +16,7 @@ export const CategoryProducts = memo(({
   onProductClick,
   showNav = true,
 }: CategoryProductsProps) => {
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(categories[0]?.id ?? null);
   const isManualScroll = useRef(false);
   const navContainerRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -35,17 +35,28 @@ export const CategoryProducts = memo(({
   useEffect(() => {
     if (categories.length === 0) return;
 
+    const visibleIds = new Set<string>();
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (isManualScroll.current) return;
         for (const entry of entries) {
+          const id = entry.target.id.replace("category-", "");
           if (entry.isIntersecting) {
-            const id = entry.target.id.replace("category-", "");
-            setActiveCategory(id);
+            visibleIds.add(id);
+          } else {
+            visibleIds.delete(id);
+          }
+        }
+        // Pick the first visible category in DOM order
+        for (const cat of categories) {
+          if (visibleIds.has(cat.id)) {
+            setActiveCategory(cat.id);
+            return;
           }
         }
       },
-      { threshold: 0.15, rootMargin: "-80px 0px -60% 0px" }
+      { threshold: 0.01, rootMargin: "0px 0px -70% 0px" }
     );
 
     categories.forEach((cat) => {
@@ -73,7 +84,7 @@ export const CategoryProducts = memo(({
       {showNav && categories.length > 0 && (
         <div
           ref={navContainerRef}
-          className="sticky top-0 z-30 bg-background border-b border-border px-3 py-3 my-1 flex gap-1.5 overflow-x-auto category-scroll-bar"
+          className="sticky top-0 z-40 bg-background border-b border-border px-3 py-3 my-1 flex gap-1.5 overflow-x-auto category-scroll-bar pointer-events-auto"
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
