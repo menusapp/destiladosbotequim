@@ -44,6 +44,7 @@ export interface Restaurant {
   prep_time_minutes?: number;
   login_require_name?: boolean;
   login_require_phone?: boolean;
+  login_require_birth_date?: boolean;
 }
 
 export interface CartItemExtra {
