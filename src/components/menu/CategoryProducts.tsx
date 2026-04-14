@@ -16,7 +16,7 @@ export const CategoryProducts = memo(({
   onProductClick,
   showNav = true,
 }: CategoryProductsProps) => {
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(categories[0]?.id ?? null);
   const isManualScroll = useRef(false);
   const navContainerRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
