@@ -252,11 +252,6 @@ const CustomerInfoDialog = ({
 
     const trimmedBirthDate = birthDate.trim();
 
-    if (trimmedBirthDate && !birthDateConsent) {
-      toast.error("Para continuar com a data informada, concorde com o uso da sua data de nascimento ou apague o campo.");
-      return;
-    }
-
     // Validar data de nascimento se preenchida
     let finalBirthDate: string | null = null;
     if (trimmedBirthDate) {
@@ -461,19 +456,9 @@ const CustomerInfoDialog = ({
                   inputMode="numeric"
                 />
               </div>
-              {birthDate && (
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    id="birth-date-consent"
-                    checked={birthDateConsent}
-                    onCheckedChange={(checked) => setBirthDateConsent(!!checked)}
-                    className="mt-0.5"
-                  />
-                  <label htmlFor="birth-date-consent" className="text-xs text-muted-foreground leading-tight cursor-pointer">
-                    Concordo com o uso da minha data de nascimento para campanhas de aniversário e benefícios exclusivos.
-                  </label>
-                </div>
-              )}
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                Ao informar sua data de nascimento, você concorda com o uso dessa informação para campanhas de aniversário e benefícios exclusivos.
+              </p>
             </div>
           )}
 
