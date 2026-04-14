@@ -118,9 +118,10 @@ interface IngredientVariation {
 interface ProductsGridProps {
   restaurantId: string;
   isRestaurantOpen: boolean;
+  onOpenDigitizer?: () => void;
 }
 
-const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => {
+const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: ProductsGridProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
@@ -739,9 +740,23 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome ou código PDV..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
-        <Button onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para adicionar produtos"); return; } resetForm(); setDialogOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" /> Novo Produto
-        </Button>
+        <div className="flex items-center gap-2">
+          {onOpenDigitizer && (
+            <Button
+              onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para importar"); return; } onOpenDigitizer(); }}
+              variant="outline"
+              className="gap-2 border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
+              disabled={isRestaurantOpen}
+              title={isRestaurantOpen ? "Feche o restaurante para importar por foto" : undefined}
+            >
+              <Camera className="h-4 w-4" />
+              Importar por Foto (IA)
+            </Button>
+          )}
+          <Button onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para adicionar produtos"); return; } resetForm(); setDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" /> Novo Produto
+          </Button>
+        </div>
       </div>
 
       {/* Products Grid grouped by category */}

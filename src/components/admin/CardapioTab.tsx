@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Camera } from "lucide-react";
 import ProductsGrid from "./ProductsGrid";
 import ComplementosTab from "./ComplementosTab";
 import CategoriesTab from "./CategoriesTab";
@@ -19,13 +17,6 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
   const [digitizerMode, setDigitizerMode] = useState<ImportMode>("products");
   const [refreshKey, setRefreshKey] = useState(0);
   const [complementsRefreshKey, setComplementsRefreshKey] = useState(0);
-
-  const showImportButton = activeTab === "produtos" || activeTab === "complementos";
-
-  const handleOpenDigitizer = () => {
-    setDigitizerMode(activeTab === "complementos" ? "complements" : "products");
-    setDigitizerOpen(true);
-  };
 
   const handleImportComplete = () => {
     if (digitizerMode === "complements") {
@@ -91,7 +82,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
         </TabsContent>
 
         <TabsContent value="complementos" className="mt-6">
-          <ComplementosTab key={complementsRefreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
+          <ComplementosTab key={complementsRefreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} onOpenDigitizer={() => { setDigitizerMode("complements"); setDigitizerOpen(true); }} />
         </TabsContent>
 
         <TabsContent value="destaques" className="mt-6">
