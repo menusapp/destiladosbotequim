@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     console.log("[register-restaurant] Received body keys:", Object.keys(body));
 
-    const { name, slug, cnpj, phone, address, username, password, planSlug } = body;
+    const { name, slug, cnpj, phone, address, username, password, adminUsername, adminPassword, planSlug } = body;
 
     // Validation
     if (!name || typeof name !== "string" || name.trim().length < 2 || name.length > 200) {
@@ -32,10 +32,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Slug inválido (apenas letras minúsculas, números e hífens, 3-50 caracteres)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (!username || typeof username !== "string" || username.trim().length < 3 || username.length > 100) {
-      return new Response(JSON.stringify({ error: "Usuário inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Usuário do restaurante inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (!password || typeof password !== "string" || password.length < 6 || password.length > 100) {
-      return new Response(JSON.stringify({ error: "Senha deve ter pelo menos 6 caracteres" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Senha do restaurante deve ter pelo menos 6 caracteres" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (!adminUsername || typeof adminUsername !== "string" || adminUsername.trim().length < 3 || adminUsername.length > 100) {
+      return new Response(JSON.stringify({ error: "Usuário da conta admin inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (!adminPassword || typeof adminPassword !== "string" || adminPassword.length < 6 || adminPassword.length > 100) {
+      return new Response(JSON.stringify({ error: "Senha da conta admin deve ter pelo menos 6 caracteres" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (!planSlug || !["basico", "intermediario", "avancado", "trial"].includes(planSlug)) {
       return new Response(JSON.stringify({ error: "Plano inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
