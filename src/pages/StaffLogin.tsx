@@ -31,6 +31,14 @@ const StaffLogin = () => {
   useEffect(() => {
     if (!restaurantId) return;
 
+    // If staff session already exists, skip login and go to admin
+    const existingStaffId = localStorage.getItem('staff_id');
+    if (existingStaffId) {
+      const slug = localStorage.getItem("restaurant_slug") || restaurantId;
+      navigate(`/${slug}/admin`, { replace: true });
+      return;
+    }
+
     // Load logo and check staff count in parallel
     const loadData = async () => {
       const [logoRes, hasStaffRes] = await Promise.all([
