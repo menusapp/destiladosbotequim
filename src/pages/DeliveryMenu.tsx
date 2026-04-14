@@ -566,6 +566,10 @@ export default function DeliveryMenu() {
               setCheckoutOpen(false);
               handleProductClick(product);
             }}
+            onRequireLogin={() => {
+              setCheckoutOpen(false);
+              setShowCustomerDialog(true);
+            }}
           />
 
           <CustomerInfoDialog
