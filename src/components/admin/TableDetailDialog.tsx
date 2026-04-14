@@ -26,7 +26,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer } from "lucide-react";
+import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil } from "lucide-react";
+import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -75,6 +76,7 @@ export const TableDetailDialog = ({
   const [splittingItem, setSplittingItem] = useState<any>(null);
   const [splittingOrderId, setSplittingOrderId] = useState<string>("");
   const [payingSplit, setPayingSplit] = useState<Split | null>(null);
+  const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
 
   // Fetch active comandas for the table
   const { data: comandas, refetch: refetchComandas } = useQuery({
@@ -390,6 +392,28 @@ export const TableDetailDialog = ({
     refetchBills();
     onTableCleared();
     toast.success("Pagamento registrado!");
+  };
+
+  const handleSwapCustomer = async (comandaId: string, newCustomer: { cpf: string; name: string; phone: string | null }) => {
+    const { error: e1 } = await supabase
+      .from("comandas")
+      .update({ customer_name: newCustomer.name, customer_cpf: newCustomer.cpf })
+      .eq("id", comandaId);
+
+    const { error: e2 } = await supabase
+      .from("orders")
+      .update({ customer_name: newCustomer.name, customer_cpf: newCustomer.cpf })
+      .eq("comanda_id", comandaId);
+
+    if (e1 || e2) {
+      toast.error("Erro ao trocar cliente");
+      return;
+    }
+
+    toast.success(`Cliente alterado para ${newCustomer.name}`);
+    setEditingComandaId(null);
+    refetchComandas();
+    refetchOrders();
   };
 
   const handleSplitItem = (item: any, orderId: string) => {
@@ -738,6 +762,15 @@ export const TableDetailDialog = ({
                               <p className="text-sm font-medium truncate">{comanda.customer_name}</p>
                               <p className="text-[10px] text-muted-foreground font-mono">{comanda.customer_cpf}</p>
                             </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 flex-shrink-0"
+                              onClick={(e) => { e.stopPropagation(); setEditingComandaId(comanda.id); }}
+                              title="Trocar cliente"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
                           </div>
                           {bill && (
                             <div className="mt-2 flex items-center gap-1.5">
@@ -1013,6 +1046,16 @@ export const TableDetailDialog = ({
           splitValue={payingSplit.value}
           restaurantId={restaurantId}
           onPaid={handleSplitPaid}
+        />
+      )}
+
+      {/* Customer Edit Dialog */}
+      {editingComandaId && (
+        <CustomerSelectDialog
+          restaurantId={restaurantId}
+          open={!!editingComandaId}
+          onOpenChange={(o) => { if (!o) setEditingComandaId(null); }}
+          onSelect={(customer) => handleSwapCustomer(editingComandaId, customer)}
         />
       )}
     </>
