@@ -6,8 +6,6 @@ interface CategoryNavProps {
   primaryColor: string;
 }
 
-const FALLBACK_HEADER_HEIGHT = 72;
-
 export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps) => {
   const [activeCategory, setActiveCategory] = useState<string | null>(categories[0]?.id ?? null);
   const isManualScroll = useRef(false);
@@ -15,12 +13,8 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const getScrollOffset = useCallback(() => {
-    const headerHeight =
-      (document.querySelector("[data-menu-header]") as HTMLElement | null)?.offsetHeight ??
-      FALLBACK_HEADER_HEIGHT;
     const navHeight = navRef.current?.offsetHeight ?? 0;
-
-    return headerHeight + navHeight + 12;
+    return navHeight + 4;
   }, []);
 
   const updateActiveCategory = useCallback(() => {
@@ -30,7 +24,6 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
       .map((cat) => {
         const el = document.getElementById(`category-${cat.id}`);
         if (!el) return null;
-
         return {
           id: cat.id,
           top: el.getBoundingClientRect().top + window.scrollY,
@@ -51,9 +44,14 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
       }
     }
 
+    // At top of page, always select first category
+    if (window.scrollY <= 10) {
+      nextActive = sections[0].id;
+    }
+
+    // Near bottom, always select last category
     const isNearBottom =
       window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8;
-
     if (isNearBottom) {
       nextActive = sections[sections.length - 1].id;
     }
@@ -72,26 +70,23 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
 
       const el = document.getElementById(`category-${categoryId}`);
       if (el) {
-        const y = el.getBoundingClientRect().top + window.scrollY - getScrollOffset();
+        const y = el.getBoundingClientRect().top + window.scrollY - getScrollOffset() + 2;
         window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
       }
 
       window.setTimeout(() => {
         isManualScroll.current = false;
-        updateActiveCategory();
-      }, 700);
+      }, 900);
     },
-    [getScrollOffset, updateActiveCategory]
+    [getScrollOffset]
   );
 
   useEffect(() => {
     updateActiveCategory();
 
     let ticking = false;
-
     const handlePositionChange = () => {
       if (ticking) return;
-
       ticking = true;
       window.requestAnimationFrame(() => {
         updateActiveCategory();
@@ -123,9 +118,8 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
   return (
     <div
       ref={navRef}
-      className="sticky z-40 bg-background border-b border-border px-3 py-3 flex gap-1.5 overflow-x-auto category-scroll-bar my-0"
+      className="sticky top-0 z-40 bg-background border-b border-border px-3 py-3 flex gap-1.5 overflow-x-auto category-scroll-bar my-0"
       style={{
-        top: `${FALLBACK_HEADER_HEIGHT}px`,
         scrollbarWidth: "none",
         msOverflowStyle: "none",
         WebkitOverflowScrolling: "touch",

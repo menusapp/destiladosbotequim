@@ -56,12 +56,12 @@ export const RestaurantInfoCard = ({
         {/* Logo */}
         <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-30 my-0 py-0">
           {logoUrl ? (
-            <div className="w-20 h-20 rounded-full bg-white shadow-lg overflow-hidden border-4 border-white p-1">
-              <img src={logoUrl} alt={name} className="w-full h-full rounded-full object-fill py-0 pb-0 my-0 mt-0 mb-0" />
+            <div className="w-24 h-24 rounded-full bg-white shadow-lg overflow-hidden border-4 border-white p-1">
+              <img src={logoUrl} alt={name} className="w-full h-full rounded-full object-fill" />
             </div>
           ) : (
             <div 
-              className="w-20 h-20 rounded-full shadow-lg border-4 border-white flex items-center justify-center text-white text-2xl font-bold"
+              className="w-24 h-24 rounded-full shadow-lg border-4 border-white flex items-center justify-center text-white text-2xl font-bold"
               style={{ backgroundColor: primaryColor }}
             >
               {name.charAt(0).toUpperCase()}

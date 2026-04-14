@@ -26,24 +26,28 @@ export const DeliveryBottomNav = ({
   const cols = tabs.length;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border shadow-lg bg-primary-foreground">
-      <div className={`grid h-14`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+    <div
+      className="fixed bottom-0 left-0 right-0 z-50 border-t shadow-lg"
+      style={{ backgroundColor: primaryColor, borderColor: "rgba(255,255,255,0.15)" }}
+    >
+      <div className="grid h-14" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          
+
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 transition-colors",
-                isActive ? "text-foreground" : "text-muted-foreground"
-              )}
-              style={isActive ? { color: primaryColor } : undefined}
+              className="flex flex-col items-center justify-center gap-1 transition-colors"
+              style={{
+                color: isActive ? "#ffffff" : "rgba(255,255,255,0.6)",
+              }}
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-xs font-medium">{tab.label}</span>
+              <Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.8} />
+              <span className={cn("text-xs", isActive ? "font-bold" : "font-normal")}>
+                {tab.label}
+              </span>
             </button>
           );
         })}
