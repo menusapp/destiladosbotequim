@@ -239,6 +239,12 @@ export function CampaignsList({ restaurantId }: CampaignsListProps) {
         return `Comprou categoria: ${campaign.trigger_category_name || "Categoria"}`;
       case "any_purchase":
         return "Qualquer compra";
+      case "abandoned_cart":
+        return "Carrinho abandonado";
+      case "inactive_customer":
+        return "Cliente inativo (30+ dias)";
+      case "no_purchase":
+        return "Nunca comprou";
       default:
         return "Gatilho desconhecido";
     }
