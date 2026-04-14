@@ -110,12 +110,12 @@ const RestaurantRegistration = () => {
         return;
       }
 
-      // Auto-login: save credentials
+      // Save restaurant context (but NOT staff session — no staff account exists yet)
       const restaurantId = res.data?.restaurantId;
       if (restaurantId) {
         localStorage.setItem("restaurant_id", restaurantId);
-        localStorage.setItem("staff_user", form.username);
-        localStorage.setItem("staff_role", "admin");
+        localStorage.setItem("restaurant_name", form.name.trim());
+        localStorage.setItem("restaurant_slug", form.slug.trim());
       }
 
       // Check if there's a payment redirect (paid plans)
@@ -128,10 +128,10 @@ const RestaurantRegistration = () => {
         return;
       }
 
-      // Trial flow: go directly to admin
+      // Trial flow: redirect to staff login where first-time setup will trigger
       setSuccess(true);
-      toast.success("Restaurante cadastrado com sucesso!");
-      setTimeout(() => navigate(`/${form.slug}/admin`), 3000);
+      toast.success("Restaurante cadastrado! Crie sua conta de administrador.");
+      setTimeout(() => navigate(`/login/staff`), 3000);
     } catch {
       toast.error("Erro inesperado. Tente novamente.");
     } finally {
@@ -273,7 +273,8 @@ const RestaurantRegistration = () => {
             </div>
 
             <div className="border-t pt-4 mt-2">
-              <p className="text-sm font-semibold text-foreground mb-3">Dados de Acesso ao Painel</p>
+              <p className="text-sm font-semibold text-foreground mb-1">Credenciais do Restaurante</p>
+              <p className="text-xs text-muted-foreground mb-3">Essas credenciais são usadas para acessar o restaurante. Após o primeiro login, você criará uma conta de administrador separada.</p>
               <div className="space-y-3">
                 <div className="space-y-2">
                   <Label>Usuário *</Label>
