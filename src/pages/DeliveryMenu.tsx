@@ -39,7 +39,7 @@ export default function DeliveryMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "reservas" | "perfil">("menu");
   const [pendingTab, setPendingTab] = useState<"pedidos" | "reservas" | "perfil" | null>(null);
-  const { trackCartUpdate, trackCheckoutStarted, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id);
+  const { trackCartUpdate, trackCheckoutStarted, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id, restaurantSlug);
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,9 @@ interface AbandonedSession {
   phone: string | null;
   cart_items: any[];
   cart_value: number;
-  abandoned_at: string;
+  abandoned_at: string | null;
+  last_activity: string | null;
+  status: string;
 }
 
 interface InactiveCustomer {
@@ -65,23 +67,26 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const todayISO = todayStart.toISOString();
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-      const [sessionsRes, abandonedRes, cartRes] = await Promise.all([
+      const [sessionsRes, abandonedRes, potentialRes] = await Promise.all([
         supabase.from("customer_sessions" as any).select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId).gte("created_at", todayISO),
-        supabase.from("customer_sessions" as any).select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId).eq("status", "abandoned").gte("abandoned_at", todayISO),
-        supabase.from("customer_sessions" as any).select("id, cart_value", { count: "exact" }).eq("restaurant_id", restaurantId).in("status", ["cart_added", "checkout_started"]).gte("created_at", todayISO),
+        supabase.from("customer_sessions" as any).select("id, cart_value").eq("restaurant_id", restaurantId).eq("status", "abandoned").gte("abandoned_at", todayISO),
+        supabase.from("customer_sessions" as any).select("id, cart_value").eq("restaurant_id", restaurantId).in("status", ["cart_added", "checkout_started"]).lt("last_activity", thirtyMinAgo),
       ]);
 
       const totalSessions = (sessionsRes as any).count || 0;
-      const totalAbandoned = (abandonedRes as any).count || 0;
-      const cartSessions = (cartRes as any).data || [];
-      const totalValue = cartSessions.reduce((s: number, r: any) => s + (Number(r.cart_value) || 0), 0);
-      const cartCount = (cartRes as any).count || 0;
+      const abandonedData = (abandonedRes as any).data || [];
+      const potentialData = (potentialRes as any).data || [];
+
+      const allAbandoned = [...abandonedData, ...potentialData];
+      const totalAbandoned = allAbandoned.length;
+      const totalValue = allAbandoned.reduce((s: number, r: any) => s + (Number(r.cart_value) || 0), 0);
 
       setMetrics({
         sessions: totalSessions,
         abandoned: totalAbandoned,
-        rate: cartCount > 0 ? Math.round((totalAbandoned / cartCount) * 100) : 0,
+        rate: totalSessions > 0 ? Math.round((totalAbandoned / totalSessions) * 100) : 0,
         value: totalValue,
       });
     } catch (e) {
@@ -98,16 +103,33 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
       else if (abandonedFilter === "7d") since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       else since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      const { data } = await supabase
-        .from("customer_sessions" as any)
-        .select("id, name, phone, cart_items, cart_value, abandoned_at")
-        .eq("restaurant_id", restaurantId)
-        .eq("status", "abandoned")
-        .gte("abandoned_at", since.toISOString())
-        .order("abandoned_at", { ascending: false })
-        .limit(100) as any;
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-      setAbandonedSessions(data || []);
+      // Fetch both abandoned and potential abandoned sessions in parallel
+      const [abandonedRes, potentialRes] = await Promise.all([
+        supabase
+          .from("customer_sessions" as any)
+          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status")
+          .eq("restaurant_id", restaurantId)
+          .eq("status", "abandoned")
+          .gte("abandoned_at", since.toISOString())
+          .order("abandoned_at", { ascending: false })
+          .limit(100) as any,
+        supabase
+          .from("customer_sessions" as any)
+          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status")
+          .eq("restaurant_id", restaurantId)
+          .in("status", ["cart_added", "checkout_started"])
+          .lt("last_activity", thirtyMinAgo)
+          .gte("last_activity", since.toISOString())
+          .order("last_activity", { ascending: false })
+          .limit(100) as any,
+      ]);
+
+      const abandoned = (abandonedRes.data || []) as AbandonedSession[];
+      const potential = (potentialRes.data || []) as AbandonedSession[];
+
+      setAbandonedSessions([...potential, ...abandoned]);
     } catch (e) {
       console.error(e);
     } finally {
@@ -119,7 +141,6 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
     try {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Get customers who have orders but none in last 30 days
       const { data: customers } = await supabase
         .from("customers")
         .select("id, name, phone, cpf, created_at")
@@ -212,6 +233,10 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
     onCreateCampaign?.(valid);
   };
 
+  const getTimestamp = (session: AbandonedSession) => {
+    return session.abandoned_at || session.last_activity;
+  };
+
   return (
     <div className="space-y-6">
       {/* Metrics */}
@@ -234,7 +259,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
             </div>
             <div>
               <p className="text-2xl font-bold">{metrics.abandoned}</p>
-              <p className="text-xs text-muted-foreground">Abandonos hoje</p>
+              <p className="text-xs text-muted-foreground">Abandonos</p>
             </div>
           </CardContent>
         </Card>
@@ -319,7 +344,8 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
                     <TableHead>Telefone</TableHead>
                     <TableHead>Itens</TableHead>
                     <TableHead>Valor</TableHead>
-                    <TableHead>Abandonou há</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Tempo</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -342,9 +368,16 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold">R$ {Number(s.cart_value).toFixed(2)}</TableCell>
+                      <TableCell>
+                        {s.status === "abandoned" ? (
+                          <Badge variant="destructive" className="text-xs">Abandonado</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs border-orange-400 text-orange-600">Potencial</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {s.abandoned_at
-                          ? formatDistanceToNow(new Date(s.abandoned_at), { locale: ptBR, addSuffix: true })
+                        {getTimestamp(s)
+                          ? formatDistanceToNow(new Date(getTimestamp(s)!), { locale: ptBR, addSuffix: true })
                           : "—"}
                       </TableCell>
                     </TableRow>

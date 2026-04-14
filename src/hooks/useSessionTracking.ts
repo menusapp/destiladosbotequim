@@ -13,44 +13,64 @@ function getOrCreateSessionToken(): string {
   return token;
 }
 
-export function useSessionTracking(restaurantId: string | undefined) {
+function getLocalStorageCustomerData(slug?: string): { name?: string; phone?: string } {
+  if (!slug) return {};
+  const result: { name?: string; phone?: string } = {};
+  try {
+    const name = localStorage.getItem(`delivery-customer-${slug}`);
+    const phone = localStorage.getItem(`delivery-phone-${slug}`);
+    if (name) result.name = name;
+    if (phone) result.phone = phone;
+  } catch {
+    // silent
+  }
+  return result;
+}
+
+export function useSessionTracking(restaurantId: string | undefined, restaurantSlug?: string) {
   const sessionToken = useRef(getOrCreateSessionToken());
   const lastStatus = useRef<string>("");
 
-  const updateSession = useCallback(
-    async (fields: Record<string, any>) => {
+  const upsertSession = useCallback(
+    async (fields: Record<string, any>, isBrowsing = false) => {
       if (!restaurantId) return;
       try {
         const token = sessionToken.current;
-        // Try update first
-        const { data } = await supabase
-          .from("customer_sessions" as any)
-          .update({ ...fields, last_activity: new Date().toISOString() } as any)
-          .eq("session_token", token)
-          .eq("restaurant_id", restaurantId)
-          .select("id")
-          .maybeSingle();
+        const customerData = getLocalStorageCustomerData(restaurantSlug);
 
-        if (!data) {
-          await supabase.from("customer_sessions" as any).insert({
-            restaurant_id: restaurantId,
-            session_token: token,
-            ...fields,
-          } as any);
+        const payload: Record<string, any> = {
+          session_token: token,
+          restaurant_id: restaurantId,
+          last_activity: new Date().toISOString(),
+          ...fields,
+        };
+
+        // Enrich with localStorage customer data if available
+        if (customerData.name && !payload.name) payload.name = customerData.name;
+        if (customerData.phone && !payload.phone) payload.phone = customerData.phone;
+
+        // For browsing updates, don't overwrite cart data
+        if (isBrowsing) {
+          delete payload.cart_items;
+          delete payload.cart_value;
         }
-      } catch (e) {
+
+        await supabase
+          .from("customer_sessions" as any)
+          .upsert(payload as any, { onConflict: "session_token,restaurant_id" });
+      } catch {
         // Silent - never block navigation
       }
     },
-    [restaurantId]
+    [restaurantId, restaurantSlug]
   );
 
-  // Track page load - create browsing session
+  // Track page load - create/update browsing session
   useEffect(() => {
     if (!restaurantId) return;
-    updateSession({ status: "browsing" });
+    upsertSession({ status: "browsing" }, true);
     lastStatus.current = "browsing";
-  }, [restaurantId, updateSession]);
+  }, [restaurantId, upsertSession]);
 
   const trackCartUpdate = useCallback(
     (cart: CartItem[]) => {
@@ -67,38 +87,36 @@ export function useSessionTracking(restaurantId: string | undefined) {
         price: item.product.promotional_price ?? item.product.price,
       }));
 
-      if (lastStatus.current !== "cart_added") {
-        lastStatus.current = "cart_added";
-      }
+      lastStatus.current = "cart_added";
 
-      updateSession({
+      upsertSession({
         status: "cart_added",
         cart_items: cartSnapshot,
         cart_value: Math.round(cartValue * 100) / 100,
       });
     },
-    [restaurantId, updateSession]
+    [restaurantId, upsertSession]
   );
 
   const trackCheckoutStarted = useCallback(() => {
     if (lastStatus.current === "checkout_started") return;
     lastStatus.current = "checkout_started";
-    updateSession({ status: "checkout_started" });
-  }, [updateSession]);
+    upsertSession({ status: "checkout_started" });
+  }, [upsertSession]);
 
   const trackCompleted = useCallback(() => {
     lastStatus.current = "completed";
-    updateSession({ status: "completed", cart_items: [], cart_value: 0 });
-  }, [updateSession]);
+    upsertSession({ status: "completed", cart_items: [], cart_value: 0 });
+  }, [upsertSession]);
 
   const trackCustomerInfo = useCallback(
     (phone?: string, name?: string) => {
       const fields: Record<string, any> = {};
       if (phone) fields.phone = phone;
       if (name) fields.name = name;
-      if (Object.keys(fields).length > 0) updateSession(fields);
+      if (Object.keys(fields).length > 0) upsertSession(fields);
     },
-    [updateSession]
+    [upsertSession]
   );
 
   return {

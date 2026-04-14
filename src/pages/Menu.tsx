@@ -18,7 +18,7 @@ import { ReviewModal } from "@/components/menu/ReviewModal";
 import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
 import { isFeaturedVisible } from "@/lib/featuredUtils";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
-
+import { useSessionTracking } from "@/hooks/useSessionTracking";
 const Menu = () => {
   const { slug: restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
@@ -55,6 +55,9 @@ const Menu = () => {
   const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
   const hiddenByRequiredChoices = inactiveData?.hiddenProductIdsByRequiredChoices || new Set<string>();
 
+  // Session tracking for abandoned cart metrics
+  const { trackCartUpdate: trackMenuCartUpdate } = useSessionTracking(restaurant?.id, restaurantSlug);
+
   // ⚡ Refs para manter valores atualizados nos listeners de realtime (evita stale closures)
   const tableIdRef = useRef<string | null>(null);
   const customerInfoRef = useRef<{name: string, cpf: string} | null>(null);
@@ -78,6 +81,13 @@ const Menu = () => {
   }, [restaurant]);
 
   useMenuInactivityLogout(tableId, tableNumber || "", restaurantSlug || "");
+
+  // Track cart changes for abandoned cart metrics
+  useEffect(() => {
+    if (cart.length > 0) {
+      trackMenuCartUpdate(cart);
+    }
+  }, [cart, trackMenuCartUpdate]);
 
   // Verificar se deve abrir modal de avaliação ao carregar
   useEffect(() => {
