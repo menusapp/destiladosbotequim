@@ -44,6 +44,7 @@ interface Product {
   prep_time?: number;
   sku?: string;
   variableCosts?: VariableCostInfo[];
+  extraPdvCodes?: string[];
 }
 
 interface VariableCostInfo {
@@ -692,9 +693,14 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const effectivePriceForCMV = parsedPromoPrice > 0 ? parsedPromoPrice : parsedProductPrice;
   const cmvPercentage = effectivePriceForCMV > 0 ? (fixedCost / effectivePriceForCMV) * 100 : 0;
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProducts = products.filter(product => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    if (product.name.toLowerCase().includes(q)) return true;
+    if ((product as any).pdv_code && (product as any).pdv_code.toLowerCase().includes(q)) return true;
+    if (product.extraPdvCodes?.some(code => code.toLowerCase().includes(q))) return true;
+    return false;
+  });
 
   const groupedByCategory = useMemo(() => {
     const categoryMap = new Map<string, { name: string; products: Product[] }>();
