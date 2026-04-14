@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit2, Trash2, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Package, ChevronDown, ChevronUp, Camera } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,7 +27,7 @@ interface CategoryItemIngredient { id: string; stock_item_id: string; quantity: 
 interface CategoryItem { id: string; name: string; price: number; pdv_code?: string; ingredients: CategoryItemIngredient[]; is_active?: boolean | null; }
 interface ComplementCategory { id: string; name: string; items: CategoryItem[]; is_active?: boolean | null; is_required?: boolean; min_quantity?: number; max_quantity?: number; }
 interface SimpleProduct { id: string; name: string; }
-interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; }
+interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; onOpenDigitizer?: () => void; }
 
 const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProps) => {
   const [categories, setCategories] = useState<ComplementCategory[]>([]);
