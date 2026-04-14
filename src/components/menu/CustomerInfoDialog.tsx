@@ -293,10 +293,11 @@ const CustomerInfoDialog = ({
               <Input
                 id="customer-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value.slice(0, 35))}
                 placeholder="Digite seu nome"
                 required={requireName}
                 disabled={isCheckingCpf}
+                maxLength={35}
               />
             </div>
           )}

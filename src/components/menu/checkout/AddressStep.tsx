@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Trash2, AlertCircle } from "lucide-react";
+import { validatePhone } from "@/lib/cpfValidator";
 
 interface DeliveryZone {
   id: string;
@@ -296,7 +297,12 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
     
     if (!customerName) errors.name = true;
     if (!customerCPF || customerCPF.length !== 11) errors.cpf = true;
-    if (!customerPhone) errors.phone = true;
+    const phoneRaw = customerPhone.replace(/\D/g, "");
+    if (!phoneRaw) {
+      errors.phone = true;
+    } else if (!validatePhone(phoneRaw)) {
+      errors.phone = true;
+    }
 
     const addressToUse = showNewForm ? newAddress : selectedAddress;
     
@@ -391,10 +397,11 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
             id="name"
             value={customerName}
             onChange={(e) => {
-              setCustomerName(e.target.value);
+              setCustomerName(e.target.value.slice(0, 35));
               if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: false }));
             }}
             placeholder="Seu nome"
+            maxLength={35}
             className={fieldErrors.name ? "border-red-300 bg-red-50/50" : ""}
           />
           {fieldErrors.name && (
@@ -431,11 +438,17 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
             value={customerPhone}
             onChange={(e) => {
               if (!phoneFromCustomer) {
-                setCustomerPhone(e.target.value);
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
+                let formatted = digits;
+                if (digits.length > 2 && digits.length <= 7) formatted = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+                else if (digits.length > 7) formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+                setCustomerPhone(formatted);
                 if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: false }));
               }
             }}
             placeholder="(00) 00000-0000"
+            maxLength={15}
+            inputMode="tel"
             className={`${fieldErrors.phone ? "border-red-300 bg-red-50/50" : ""} ${phoneFromCustomer ? "bg-muted/50" : ""}`}
             readOnly={phoneFromCustomer}
           />
@@ -445,7 +458,7 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
             </p>
           )}
           {fieldErrors.phone && !phoneFromCustomer && (
-            <p className="text-xs text-red-500 mt-1">Preencher aqui</p>
+            <p className="text-xs text-red-500 mt-1">Telefone inválido. Verifique o DDD e número.</p>
           )}
         </div>
       </div>

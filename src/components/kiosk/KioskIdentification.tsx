@@ -18,6 +18,7 @@ export function KioskIdentification({ restaurant, onIdentified, onBack }: Props)
   const [cpf, setCpf] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [checking, setChecking] = useState(false);
   const [existing, setExisting] = useState<{ name: string; phone?: string } | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -88,9 +89,11 @@ export function KioskIdentification({ restaurant, onIdentified, onBack }: Props)
     }
 
     if (!name.trim()) { toast.error("Informe seu nome"); return; }
+    if (name.trim().length > 35) { toast.error("Nome deve ter no máximo 35 caracteres"); return; }
 
     const phoneRaw = phone.replace(/\D/g, "") || undefined;
     if (phoneRaw && !validatePhone(phoneRaw)) {
+      setPhoneError("Número de telefone inválido");
       toast.error("Número de telefone inválido");
       return;
     }
@@ -146,11 +149,12 @@ export function KioskIdentification({ restaurant, onIdentified, onBack }: Props)
           <>
             <div className="w-full space-y-2">
               <Label className="text-lg">Nome</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" className="text-xl h-14" />
+              <Input value={name} onChange={(e) => setName(e.target.value.slice(0, 35))} placeholder="Seu nome" className="text-xl h-14" maxLength={35} />
             </div>
             <div className="w-full space-y-2">
               <Label className="text-lg">Telefone (opcional)</Label>
-              <Input value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" className="text-xl h-14" maxLength={15} inputMode="tel" />
+              <Input value={phone} onChange={(e) => { setPhone(formatPhone(e.target.value)); setPhoneError(""); }} placeholder="(00) 00000-0000" className={`text-xl h-14 ${phoneError ? "border-destructive" : ""}`} maxLength={15} inputMode="tel" />
+              {phoneError && <p className="text-sm text-destructive">{phoneError}</p>}
             </div>
           </>
         )}
