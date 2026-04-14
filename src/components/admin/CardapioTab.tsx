@@ -43,18 +43,6 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
           <h1 className="text-[32px] font-bold text-foreground leading-tight">Cardápio</h1>
           <p className="text-sm text-muted-foreground mt-1">Gerencie produtos, categorias, complementos e destaques</p>
         </div>
-        {showImportButton && (
-          <Button
-            onClick={handleOpenDigitizer}
-            variant="outline"
-            className="gap-2"
-            disabled={isRestaurantOpen}
-            title={isRestaurantOpen ? "Feche o restaurante para importar por foto" : undefined}
-          >
-            <Camera className="h-4 w-4" />
-            Importar por Foto
-          </Button>
-        )}
       </div>
 
       <MenuDigitizerDialog
