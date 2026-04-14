@@ -117,31 +117,33 @@ export const PDVProductDrawer = ({
 
   if (!product) return null;
 
-  const handleExtraToggle = (extraId: string, isRequired: boolean) => {
-    const extra = extras.find(e => e.id === extraId);
-    if (!extra) return;
+  const handleExtraToggle = (extraId: string, groupKey: string) => {
+    const group = groupedExtras.find(([k]) => k === groupKey)?.[1];
+    if (!group) return;
 
-    if (isRequired && maxRequiredSelection === 1) {
-      const otherRequiredIds = requiredExtras.filter(e => e.id !== extraId).map(e => e.id);
+    if (group.isRequired && group.maxSelection === 1) {
+      // Radio behavior: deselect others in same group, select this one
+      const groupIds = group.items.map(e => e.id);
       setSelectedExtras(prev => {
-        const withoutOtherRequired = prev.filter(id => !otherRequiredIds.includes(id));
-        if (withoutOtherRequired.includes(extraId)) {
-          return withoutOtherRequired.filter(id => id !== extraId);
-        }
-        return [...withoutOtherRequired, extraId];
+        const withoutGroup = prev.filter(id => !groupIds.includes(id));
+        return [...withoutGroup, extraId];
       });
     } else {
-      setSelectedExtras((prev) =>
-        prev.includes(extraId)
-          ? prev.filter((id) => id !== extraId)
-          : canAddMore || !isRequired ? [...prev, extraId] : prev
-      );
+      // Checkbox behavior
+      const selectedInGroup = group.items.filter(e => selectedExtras.includes(e.id)).length;
+      setSelectedExtras(prev => {
+        if (prev.includes(extraId)) {
+          return prev.filter(id => id !== extraId);
+        }
+        if (group.maxSelection && selectedInGroup >= group.maxSelection) return prev;
+        return [...prev, extraId];
+      });
     }
   };
 
   const handleAddToCart = () => {
-    if (!isRequiredSatisfied) {
-      toast.error(`Selecione pelo menos ${minRequiredSelection} opção obrigatória`);
+    if (!allRequiredSatisfied) {
+      toast.error("Selecione as opções obrigatórias");
       return;
     }
 
@@ -220,31 +222,58 @@ export const PDVProductDrawer = ({
         </div>
 
         <div className="overflow-y-auto flex-1 px-4 py-4">
-          {/* Extras Obrigatórios */}
-          {hasRequiredExtras && (
-            <div className="mb-6">
-              <h3 className="font-bold text-foreground mb-1 flex items-center gap-1">
-                Escolha uma opção
-                <span className="text-destructive">*</span>
-              </h3>
-              <p className="text-xs text-muted-foreground mb-3">
-                Obrigatório • Escolha {minRequiredSelection === maxRequiredSelection 
-                  ? `${minRequiredSelection} opção` 
-                  : `${minRequiredSelection} a ${maxRequiredSelection} opções`}
-              </p>
-              <div className="space-y-2">
-                {maxRequiredSelection === 1 ? (
-                  <RadioGroup
-                    value={selectedExtras.find(id => requiredExtras.some(e => e.id === id)) || ""}
-                    onValueChange={(value) => {
-                      const otherRequiredIds = requiredExtras.map(e => e.id);
-                      setSelectedExtras(prev => {
-                        const withoutRequired = prev.filter(id => !otherRequiredIds.includes(id));
-                        return [...withoutRequired, value];
-                      });
-                    }}
-                  >
-                    {requiredExtras.map((extra) => {
+          {/* Extras agrupados por categoria */}
+          {groupedExtras.map(([catId, group]) => {
+            const selectedInGroup = group.items.filter(e => selectedExtras.includes(e.id)).length;
+            return (
+              <div key={catId} className="mb-6">
+                <h3 className="font-bold text-foreground mb-1 flex items-center gap-1">
+                  {group.name}
+                  {group.isRequired && <span className="text-destructive">*</span>}
+                </h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  {group.isRequired ? "Obrigatório • " : "Opcional • "}
+                  {group.minSelection === group.maxSelection && group.maxSelection > 0
+                    ? `Escolha ${group.minSelection} opção`
+                    : group.maxSelection > 0
+                      ? `Escolha ${group.minSelection} a ${group.maxSelection} opções`
+                      : "Escolha quantas quiser"}
+                  {group.isRequired && selectedInGroup < group.minSelection && (
+                    <span className="text-destructive ml-1">
+                      (falta {group.minSelection - selectedInGroup})
+                    </span>
+                  )}
+                </p>
+                <div className="space-y-2">
+                  {group.isRequired && group.maxSelection === 1 ? (
+                    <RadioGroup
+                      value={selectedExtras.find(id => group.items.some(e => e.id === id)) || ""}
+                      onValueChange={(value) => handleExtraToggle(value, catId)}
+                    >
+                      {group.items.map((extra) => {
+                        const isSelected = selectedExtras.includes(extra.id);
+                        return (
+                          <label
+                            key={extra.id}
+                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                              isSelected
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <RadioGroupItem value={extra.id} />
+                            <span className="flex-1 font-medium text-foreground">{extra.name}</span>
+                            {extra.price > 0 && (
+                              <span className="font-bold text-sm text-primary">
+                                + R$ {extra.price.toFixed(2)}
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </RadioGroup>
+                  ) : (
+                    group.items.map((extra) => {
                       const isSelected = selectedExtras.includes(extra.id);
                       return (
                         <label
@@ -255,82 +284,24 @@ export const PDVProductDrawer = ({
                               : "border-border hover:border-primary/50"
                           }`}
                         >
-                          <RadioGroupItem value={extra.id} />
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => handleExtraToggle(extra.id, catId)}
+                          />
                           <span className="flex-1 font-medium text-foreground">{extra.name}</span>
-                          <span className="font-bold text-sm text-primary">
-                            + R$ {extra.price.toFixed(2)}
-                          </span>
+                          {extra.price > 0 && (
+                            <span className="font-bold text-sm text-primary">
+                              + R$ {extra.price.toFixed(2)}
+                            </span>
+                          )}
                         </label>
                       );
-                    })}
-                  </RadioGroup>
-                ) : (
-                  requiredExtras.map((extra) => {
-                    const isSelected = selectedExtras.includes(extra.id);
-                    return (
-                      <label
-                        key={extra.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                          isSelected
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/50"
-                        }`}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => handleExtraToggle(extra.id, true)}
-                        />
-                        <span className="flex-1 font-medium text-foreground">{extra.name}</span>
-                        <span className="font-bold text-sm text-primary">
-                          + R$ {extra.price.toFixed(2)}
-                        </span>
-                      </label>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Extras Opcionais agrupados por categoria */}
-          {optionalExtras.length > 0 && (() => {
-            const grouped: Record<string, { name: string; items: ProductExtra[] }> = {};
-            optionalExtras.forEach((extra) => {
-              const catName = extra.extra_categories?.name || "Complementos";
-              const catId = extra.extra_category_id || "outros";
-              if (!grouped[catId]) grouped[catId] = { name: catName, items: [] };
-              grouped[catId].items.push(extra);
-            });
-            return Object.entries(grouped).map(([catId, group]) => (
-              <div key={catId} className="mb-6">
-                <h3 className="font-bold text-foreground mb-3">{group.name}</h3>
-                <div className="space-y-2">
-                  {group.items.map((extra) => {
-                    const isSelected = selectedExtras.includes(extra.id);
-                    return (
-                      <label
-                        key={extra.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                          isSelected
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/50"
-                        }`}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => handleExtraToggle(extra.id, false)}
-                        />
-                        <span className="flex-1 font-medium text-foreground">{extra.name}</span>
-                        <span className="font-bold text-sm text-primary">
-                          + R$ {extra.price.toFixed(2)}
-                        </span>
-                      </label>
-                    );
-                  })}
+                    })
+                  )}
                 </div>
               </div>
-            ));
-          })()}
+            );
+          })}
 
           {/* Observações */}
           <div>
