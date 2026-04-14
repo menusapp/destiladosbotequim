@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Camera } from "lucide-react";
 import ProductsGrid from "./ProductsGrid";
 import ComplementosTab from "./ComplementosTab";
 import CategoriesTab from "./CategoriesTab";
@@ -20,13 +18,6 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [complementsRefreshKey, setComplementsRefreshKey] = useState(0);
 
-  const showImportButton = activeTab === "produtos" || activeTab === "complementos";
-
-  const handleOpenDigitizer = () => {
-    setDigitizerMode(activeTab === "complementos" ? "complements" : "products");
-    setDigitizerOpen(true);
-  };
-
   const handleImportComplete = () => {
     if (digitizerMode === "complements") {
       setComplementsRefreshKey((k) => k + 1);
@@ -43,18 +34,6 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
           <h1 className="text-[32px] font-bold text-foreground leading-tight">Cardápio</h1>
           <p className="text-sm text-muted-foreground mt-1">Gerencie produtos, categorias, complementos e destaques</p>
         </div>
-        {showImportButton && (
-          <Button
-            onClick={handleOpenDigitizer}
-            variant="outline"
-            className="gap-2"
-            disabled={isRestaurantOpen}
-            title={isRestaurantOpen ? "Feche o restaurante para importar por foto" : undefined}
-          >
-            <Camera className="h-4 w-4" />
-            Importar por Foto
-          </Button>
-        )}
       </div>
 
       <MenuDigitizerDialog
@@ -95,7 +74,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
         </TabsList>
 
         <TabsContent value="produtos" className="mt-6">
-          <ProductsGrid key={refreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
+          <ProductsGrid key={refreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} onOpenDigitizer={() => { setDigitizerMode("products"); setDigitizerOpen(true); }} />
         </TabsContent>
 
         <TabsContent value="categorias" className="mt-6">
@@ -103,7 +82,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
         </TabsContent>
 
         <TabsContent value="complementos" className="mt-6">
-          <ComplementosTab key={complementsRefreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
+          <ComplementosTab key={complementsRefreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} onOpenDigitizer={() => { setDigitizerMode("complements"); setDigitizerOpen(true); }} />
         </TabsContent>
 
         <TabsContent value="destaques" className="mt-6">

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit2, Trash2, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Package, ChevronDown, ChevronUp, Camera } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,9 +27,9 @@ interface CategoryItemIngredient { id: string; stock_item_id: string; quantity: 
 interface CategoryItem { id: string; name: string; price: number; pdv_code?: string; ingredients: CategoryItemIngredient[]; is_active?: boolean | null; }
 interface ComplementCategory { id: string; name: string; items: CategoryItem[]; is_active?: boolean | null; is_required?: boolean; min_quantity?: number; max_quantity?: number; }
 interface SimpleProduct { id: string; name: string; }
-interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; }
+interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; onOpenDigitizer?: () => void; }
 
-const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProps) => {
+const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: ComplementosTabProps) => {
   const [categories, setCategories] = useState<ComplementCategory[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -289,7 +289,21 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen }: ComplementosTabProp
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar categorias ou itens..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
-        <Button onClick={openNewCategory}><Plus className="h-4 w-4 mr-2" />Nova Categoria</Button>
+        <div className="flex items-center gap-2">
+          {onOpenDigitizer && (
+            <Button
+              onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para importar"); return; } onOpenDigitizer(); }}
+              variant="outline"
+              className="gap-2 border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
+              disabled={isRestaurantOpen}
+              title={isRestaurantOpen ? "Feche o restaurante para importar por foto" : undefined}
+            >
+              <Camera className="h-4 w-4" />
+              Importar por Foto (IA)
+            </Button>
+          )}
+          <Button onClick={openNewCategory}><Plus className="h-4 w-4 mr-2" />Nova Categoria</Button>
+        </div>
       </div>
 
       {loading ? (
