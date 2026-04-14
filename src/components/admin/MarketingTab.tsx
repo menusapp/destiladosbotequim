@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AlertTriangle, Megaphone, Clock, History, Settings, Send, BarChart3, Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CampaignsList } from "./marketing/CampaignsList";
+import { CampaignForm } from "./marketing/CampaignForm";
 import { ScheduledMessages } from "./marketing/ScheduledMessages";
 import { MessageHistory } from "./marketing/MessageHistory";
 import { TrackingTab } from "./marketing/TrackingTab";
@@ -20,6 +21,13 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
   const [whatsappConnected, setWhatsappConnected] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ campaigns: 0, scheduled: 0, sent: 0 });
+  const [activeTab, setActiveTab] = useState("campaigns");
+  const [trackingFormOpen, setTrackingFormOpen] = useState(false);
+  const [trackingFormPrefill, setTrackingFormPrefill] = useState<{
+    triggerType: string;
+    name?: string;
+    messageTemplate?: string;
+  } | undefined>(undefined);
 
   useEffect(() => {
     checkWhatsAppStatus();
@@ -62,6 +70,31 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
         sent: sentRes.count || 0,
       });
     } catch (e) { console.error(e); }
+  };
+
+  const handleCreateCampaignFromTracking = (triggerType: string) => {
+    const templates: Record<string, { name: string; message: string }> = {
+      abandoned_cart: {
+        name: "Recuperação de Carrinho Abandonado",
+        message: "Olá {nome}! 🛒\n\nNotamos que você deixou alguns itens no carrinho. Não perca essa oportunidade!\n\nUse o cupom {cupom} e garanta {desconto} de desconto!\n\nVálido por {validade} dias. Te esperamos! 😊",
+      },
+      inactive_customer: {
+        name: "Reativação de Clientes Inativos",
+        message: "Olá {nome}! 👋\n\nFaz tempo que não te vemos por aqui! Sentimos sua falta.\n\nUse o cupom {cupom} e ganhe {desconto} no seu próximo pedido!\n\nVálido por {validade} dias. Volte logo! 🍽️",
+      },
+      no_purchase: {
+        name: "Primeira Compra",
+        message: "Olá {nome}! 🎉\n\nVimos que você se cadastrou mas ainda não fez seu primeiro pedido.\n\nUse o cupom {cupom} e ganhe {desconto} na sua primeira compra!\n\nVálido por {validade} dias. Experimente! 😋",
+      },
+    };
+
+    const template = templates[triggerType] || { name: "", message: "" };
+    setTrackingFormPrefill({
+      triggerType,
+      name: template.name,
+      messageTemplate: template.message,
+    });
+    setTrackingFormOpen(true);
   };
 
   const isWhatsAppReady = whatsappEnabled && whatsappConnected;
@@ -145,7 +178,7 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
         </Alert>
       )}
 
-      <Tabs defaultValue="campaigns" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="campaigns" className="gap-2">
             <Megaphone className="h-4 w-4" />
@@ -178,9 +211,29 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
         </TabsContent>
 
         <TabsContent value="tracking">
-          <TrackingTab restaurantId={restaurantId} />
+          <TrackingTab
+            restaurantId={restaurantId}
+            onCreateCampaign={(triggerType) => handleCreateCampaignFromTracking(triggerType)}
+          />
         </TabsContent>
       </Tabs>
+
+      {/* Campaign Form opened from Tracking */}
+      <CampaignForm
+        restaurantId={restaurantId}
+        open={trackingFormOpen}
+        onOpenChange={(open) => {
+          setTrackingFormOpen(open);
+          if (!open) setTrackingFormPrefill(undefined);
+        }}
+        prefill={trackingFormPrefill}
+        onSuccess={() => {
+          setTrackingFormOpen(false);
+          setTrackingFormPrefill(undefined);
+          setActiveTab("campaigns");
+          fetchStats();
+        }}
+      />
     </div>
   );
 }

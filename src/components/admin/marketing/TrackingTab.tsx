@@ -11,7 +11,7 @@ import { ptBR } from "date-fns/locale";
 
 interface TrackingTabProps {
   restaurantId: string;
-  onCreateCampaign?: (recipients: { name: string; phone: string }[]) => void;
+  onCreateCampaign?: (triggerType: string) => void;
 }
 
 interface AbandonedSession {
@@ -225,12 +225,8 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
     }
   };
 
-  const handleCreateCampaign = (recipients: { name: string; phone: string | null }[]) => {
-    const valid = recipients.filter((r) => r.phone) as { name: string; phone: string }[];
-    if (valid.length === 0) {
-      return;
-    }
-    onCreateCampaign?.(valid);
+  const handleCreateCampaign = (triggerType: string) => {
+    onCreateCampaign?.(triggerType);
   };
 
   const getTimestamp = (session: AbandonedSession) => {
@@ -320,8 +316,8 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
             </div>
             <Button
               size="sm"
-              onClick={() => handleCreateCampaign(abandonedSessions.map((s) => ({ name: s.name || "Cliente", phone: s.phone })))}
-              disabled={abandonedSessions.filter((s) => s.phone).length === 0}
+              onClick={() => handleCreateCampaign("abandoned_cart")}
+              disabled={!onCreateCampaign}
               className="gap-2"
             >
               <MessageSquare className="h-4 w-4" />
@@ -393,8 +389,8 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
           <div className="flex items-center justify-end">
             <Button
               size="sm"
-              onClick={() => handleCreateCampaign(inactiveCustomers.map((c) => ({ name: c.name, phone: c.phone })))}
-              disabled={inactiveCustomers.filter((c) => c.phone).length === 0}
+              onClick={() => handleCreateCampaign("inactive_customer")}
+              disabled={!onCreateCampaign}
               className="gap-2"
             >
               <MessageSquare className="h-4 w-4" />
@@ -443,8 +439,8 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
           <div className="flex items-center justify-end">
             <Button
               size="sm"
-              onClick={() => handleCreateCampaign(noPurchaseCustomers.map((c) => ({ name: c.name, phone: c.phone })))}
-              disabled={noPurchaseCustomers.filter((c) => c.phone).length === 0}
+              onClick={() => handleCreateCampaign("no_purchase")}
+              disabled={!onCreateCampaign}
               className="gap-2"
             >
               <MessageSquare className="h-4 w-4" />

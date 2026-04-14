@@ -29,6 +29,11 @@ interface CampaignFormProps {
   onOpenChange: (open: boolean) => void;
   editingCampaign?: any;
   onSuccess: () => void;
+  prefill?: {
+    triggerType: string;
+    name?: string;
+    messageTemplate?: string;
+  };
 }
 
 interface Category {
@@ -67,6 +72,7 @@ export function CampaignForm({
   onOpenChange,
   editingCampaign,
   onSuccess,
+  prefill,
 }: CampaignFormProps) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -75,7 +81,7 @@ export function CampaignForm({
 
   // Form state
   const [name, setName] = useState("");
-  const [triggerType, setTriggerType] = useState<"any_purchase" | "product_purchased" | "category_purchased">("any_purchase");
+  const [triggerType, setTriggerType] = useState<"any_purchase" | "product_purchased" | "category_purchased" | "abandoned_cart" | "inactive_customer" | "no_purchase">("any_purchase");
   const [triggerProductId, setTriggerProductId] = useState<string>("");
   const [triggerCategoryId, setTriggerCategoryId] = useState<string>("");
   const [delayValue, setDelayValue] = useState(3);
@@ -93,11 +99,16 @@ export function CampaignForm({
       
       if (editingCampaign) {
         populateForm(editingCampaign);
+      } else if (prefill) {
+        resetForm();
+        setTriggerType(prefill.triggerType as any);
+        if (prefill.name) setName(prefill.name);
+        if (prefill.messageTemplate) setMessageTemplate(prefill.messageTemplate);
       } else {
         resetForm();
       }
     }
-  }, [open, editingCampaign]);
+  }, [open, editingCampaign, prefill]);
 
   const fetchCategoriesAndProducts = async () => {
     try {
@@ -353,6 +364,18 @@ export function CampaignForm({
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="category_purchased" id="category" />
                 <Label htmlFor="category">Categoria específica</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="abandoned_cart" id="abandoned" />
+                <Label htmlFor="abandoned">Carrinho abandonado</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="inactive_customer" id="inactive" />
+                <Label htmlFor="inactive">Cliente inativo (30+ dias)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="no_purchase" id="nopurchase" />
+                <Label htmlFor="nopurchase">Nunca comprou</Label>
               </div>
             </RadioGroup>
 
