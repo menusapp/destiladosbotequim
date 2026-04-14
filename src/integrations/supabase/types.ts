@@ -940,6 +940,7 @@ export type Database = {
       }
       customers: {
         Row: {
+          birth_date: string | null
           cpf: string
           created_at: string | null
           email: string | null
@@ -951,6 +952,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          birth_date?: string | null
           cpf: string
           created_at?: string | null
           email?: string | null
@@ -962,6 +964,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          birth_date?: string | null
           cpf?: string
           created_at?: string | null
           email?: string | null
