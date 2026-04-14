@@ -81,7 +81,7 @@ export function CampaignForm({
 
   // Form state
   const [name, setName] = useState("");
-  const [triggerType, setTriggerType] = useState<"any_purchase" | "product_purchased" | "category_purchased">("any_purchase");
+  const [triggerType, setTriggerType] = useState<"any_purchase" | "product_purchased" | "category_purchased" | "abandoned_cart" | "inactive_customer" | "no_purchase">("any_purchase");
   const [triggerProductId, setTriggerProductId] = useState<string>("");
   const [triggerCategoryId, setTriggerCategoryId] = useState<string>("");
   const [delayValue, setDelayValue] = useState(3);
