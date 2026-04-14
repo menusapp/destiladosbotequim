@@ -15,9 +15,13 @@ export const useInactivityLogout = () => {
     }
 
     timeoutRef.current = setTimeout(async () => {
-      await supabase.auth.signOut();
+      // Only clear staff session, keep restaurant session so user can re-login faster
+      localStorage.removeItem('staff_id');
+      localStorage.removeItem('staff_name');
+      localStorage.removeItem('staff_role');
+      localStorage.removeItem('staff_allowed_sections');
       toast.info("Sessão expirada por inatividade");
-      navigate("/login");
+      navigate("/login/staff");
     }, INACTIVITY_TIMEOUT);
   };
 
