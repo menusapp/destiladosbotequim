@@ -583,7 +583,7 @@ export const ProfileView = ({
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="profile-birthdate" className="text-xs flex items-center gap-1">
+              <Label htmlFor="profile-birthdate" className="text-xs flex items-center gap-1 my-0">
                 <CalendarIcon className="w-3 h-3" />
                 Nascimento
               </Label>
