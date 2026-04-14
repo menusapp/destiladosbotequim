@@ -762,6 +762,15 @@ export const TableDetailDialog = ({
                               <p className="text-sm font-medium truncate">{comanda.customer_name}</p>
                               <p className="text-[10px] text-muted-foreground font-mono">{comanda.customer_cpf}</p>
                             </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 flex-shrink-0"
+                              onClick={(e) => { e.stopPropagation(); setEditingComandaId(comanda.id); }}
+                              title="Trocar cliente"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
                           </div>
                           {bill && (
                             <div className="mt-2 flex items-center gap-1.5">
