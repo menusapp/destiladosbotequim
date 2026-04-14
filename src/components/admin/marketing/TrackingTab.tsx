@@ -317,7 +317,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
             <Button
               size="sm"
               onClick={() => handleCreateCampaign("abandoned_cart")}
-              disabled={abandonedSessions.filter((s) => s.phone).length === 0}
+              disabled={!onCreateCampaign}
               className="gap-2"
             >
               <MessageSquare className="h-4 w-4" />
@@ -390,7 +390,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
             <Button
               size="sm"
               onClick={() => handleCreateCampaign("inactive_customer")}
-              disabled={inactiveCustomers.filter((c) => c.phone).length === 0}
+              disabled={!onCreateCampaign}
               className="gap-2"
             >
               <MessageSquare className="h-4 w-4" />
@@ -440,7 +440,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
             <Button
               size="sm"
               onClick={() => handleCreateCampaign("no_purchase")}
-              disabled={noPurchaseCustomers.filter((c) => c.phone).length === 0}
+              disabled={!onCreateCampaign}
               className="gap-2"
             >
               <MessageSquare className="h-4 w-4" />
