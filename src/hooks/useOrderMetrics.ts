@@ -223,9 +223,11 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
       .gte("created_at", start).lte("created_at", end);
     localOrderIds = (localOrders || []).map(o => o.id);
   }
+  // Include PDV paid order IDs in localOrderIds
+  localOrderIds = [...localOrderIds, ...pdvPaidOrderIds];
   const counterOrderIds = counterOrders.map(o => o.id);
 
-  const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length + totemOrders.length + uncoveredCashEntries.length;
+  const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length + totemOrders.length + pdvUncoveredOrders.length + uncoveredCashEntries.length;
   const averageTicket = totalCount > 0 ? totalSales / totalCount : 0;
 
   let hourlySales: { hour: string; total: number }[] = [];
