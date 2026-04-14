@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Minus, Plus, X } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 interface ProductExtra {
@@ -15,8 +15,10 @@ interface ProductExtra {
   is_required?: boolean;
   min_selection?: number;
   max_selection?: number;
-  extra_category_id?: string;
+  extra_category_id?: string | null;
+  extra_category_name?: string;
   extra_categories?: { name: string } | null;
+  group_order?: number;
 }
 
 interface Product {
@@ -68,9 +70,9 @@ export const PDVProductDrawer = ({
     }
   }, [open, product?.id]);
 
-  const extras = product?.product_extras || [];
+  const extras = useMemo(() => product?.product_extras ?? [], [product?.product_extras]);
 
-  // Agrupar TODOS os extras por categoria (obrigatórios e opcionais separados por grupo)
+  // Agrupar TODOS os extras por categoria real
   const groupedExtras = useMemo(() => {
     const groups: Record<string, {
       name: string;
@@ -78,11 +80,14 @@ export const PDVProductDrawer = ({
       isRequired: boolean;
       minSelection: number;
       maxSelection: number;
+      sortOrder: number;
     }> = {};
 
     extras.forEach((extra) => {
-      const catId = extra.extra_category_id || (extra.is_required ? "variations" : "outros");
-      const catName = extra.extra_categories?.name || (extra.is_required ? "Variações" : "Complementos");
+      const explicitCategoryName = extra.extra_categories?.name || extra.extra_category_name;
+      const catId = extra.extra_category_id || (explicitCategoryName ? `named:${explicitCategoryName}` : extra.is_required ? "variations" : "ungrouped");
+      const catName = explicitCategoryName || (extra.is_required ? "Variações" : "Complementos");
+      const sortOrder = extra.group_order ?? (catName === "Variações" ? -1 : 9999);
 
       if (!groups[catId]) {
         groups[catId] = {
@@ -91,18 +96,25 @@ export const PDVProductDrawer = ({
           isRequired: !!extra.is_required,
           minSelection: extra.min_selection || (extra.is_required ? 1 : 0),
           maxSelection: extra.max_selection || 0,
+          sortOrder,
         };
+      } else {
+        groups[catId].sortOrder = Math.min(groups[catId].sortOrder, sortOrder);
+        groups[catId].isRequired = groups[catId].isRequired || !!extra.is_required;
+        groups[catId].minSelection = Math.max(groups[catId].minSelection, extra.min_selection || 0);
+        groups[catId].maxSelection = Math.max(groups[catId].maxSelection, extra.max_selection || 0);
       }
+
       groups[catId].items.push(extra);
     });
 
-    // Sort: required groups first, then "Qual pão" priority
     return Object.entries(groups).sort(([, a], [, b]) => {
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      if (a.name === "Variações" && b.name !== "Variações") return -1;
+      if (a.name !== "Variações" && b.name === "Variações") return 1;
       if (a.isRequired && !b.isRequired) return -1;
       if (!a.isRequired && b.isRequired) return 1;
-      if (a.name.toLowerCase().includes("pão")) return -1;
-      if (b.name.toLowerCase().includes("pão")) return 1;
-      return 0;
+      return a.name.localeCompare(b.name, "pt-BR");
     });
   }, [extras]);
 
