@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef, useCallback } from "react";
+import { memo, useState, useEffect, useRef } from "react";
 import { Product, Category } from "@/types/menu";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
