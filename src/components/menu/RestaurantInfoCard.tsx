@@ -54,10 +54,10 @@ export const RestaurantInfoCard = ({
     <Card className="bg-white rounded-3xl shadow-lg overflow-visible -mt-8 mx-4 relative z-20">
       <div className="p-4">
         {/* Logo */}
-        <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-30">
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-30 my-0 py-0">
           {logoUrl ? (
             <div className="w-20 h-20 rounded-full bg-white shadow-lg overflow-hidden border-4 border-white p-1">
-              <img src={logoUrl} alt={name} className="w-full h-full object-contain rounded-full" />
+              <img src={logoUrl} alt={name} className="w-full h-full rounded-full object-fill py-0 pb-0 my-0 mt-0 mb-0" />
             </div>
           ) : (
             <div 
