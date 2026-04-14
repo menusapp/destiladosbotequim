@@ -597,6 +597,17 @@ export default function DeliveryMenu() {
             restaurantId={restaurant.id}
             onNameUpdate={handleNameUpdate}
             onPhoneUpdate={handlePhoneUpdate}
+            onLogout={() => {
+              sessionStorage.removeItem(`delivery-customer-${restaurantSlug}`);
+              sessionStorage.removeItem(`delivery-cpf-${restaurantSlug}`);
+              sessionStorage.removeItem(`delivery-phone-${restaurantSlug}`);
+              localStorage.removeItem(`delivery-cart-${restaurantSlug}`);
+              setCustomerName("");
+              setCustomerCPF("");
+              setCart([]);
+              setActiveTab("menu");
+              setShowCustomerDialog(true);
+            }}
           />
         </div>
       )}

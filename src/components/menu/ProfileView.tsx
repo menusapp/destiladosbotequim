@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { MapPin, Plus, Trash2, User, Gift, Check, Circle, Save, Loader2 } from "lucide-react";
+import { MapPin, Plus, Trash2, User, Gift, Check, Circle, Save, Loader2, LogOut } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { validatePhone } from "@/lib/cpfValidator";
 
@@ -17,6 +17,7 @@ interface ProfileViewProps {
   restaurantId: string;
   onNameUpdate: (name: string) => void;
   onPhoneUpdate?: (phone: string) => void;
+  onLogout?: () => void;
 }
 
 interface LoyaltyProgram {
@@ -46,6 +47,7 @@ export const ProfileView = ({
   restaurantId,
   onNameUpdate,
   onPhoneUpdate,
+  onLogout,
 }: ProfileViewProps) => {
   const [name, setName] = useState(customerName);
   const [phone, setPhone] = useState("");
@@ -729,6 +731,18 @@ export const ProfileView = ({
             )}
           </CardContent>
         </Card>
+
+        {/* Botão Sair */}
+        {onLogout && (
+          <Button
+            variant="outline"
+            className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            onClick={onLogout}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sair da conta
+          </Button>
+        )}
       </div>
     </ScrollArea>
   );
