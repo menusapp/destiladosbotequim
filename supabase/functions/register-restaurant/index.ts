@@ -155,9 +155,24 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Erro ao criar credenciais: " + credError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 3. Staff admin account is NOT created here.
-    // The first login via /login/staff will detect no staff exists
-    // and prompt the user to create their owner account with separate credentials.
+    // 3. Create staff admin account with separate credentials
+    const { data: staffData, error: staffError } = await supabase
+      .from("restaurant_staff")
+      .insert({
+        restaurant_id: restaurant.id,
+        display_name: adminUsername.trim(),
+        username: adminUsername.trim(),
+        password_hash: adminPasswordHash,
+        role: "admin",
+        allowed_sections: JSON.stringify([]),
+        is_active: true,
+      })
+      .select("id")
+      .single();
+
+    if (staffError) {
+      console.error("[register-restaurant] Staff creation error:", staffError);
+    }
 
     // 4. Create subscription
     const nextPayment = new Date();
