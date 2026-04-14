@@ -26,6 +26,7 @@ interface Settings {
   prep_time_minutes: number;
   login_require_name: boolean;
   login_require_phone: boolean;
+  login_require_birth_date: boolean;
   bill_request_enabled: boolean;
   show_prep_timer: boolean;
 }
@@ -46,6 +47,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     prep_time_minutes: 30,
     login_require_name: true,
     login_require_phone: false,
+    login_require_birth_date: false,
     bill_request_enabled: true,
     show_prep_timer: true,
   });
@@ -61,7 +63,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, bill_request_enabled, show_prep_timer")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, login_require_birth_date, bill_request_enabled, show_prep_timer")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -77,6 +79,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           prep_time_minutes: data.prep_time_minutes || 30,
           login_require_name: data.login_require_name ?? true,
           login_require_phone: data.login_require_phone ?? false,
+          login_require_birth_date: data.login_require_birth_date ?? false,
           bill_request_enabled: data.bill_request_enabled ?? true,
           show_prep_timer: data.show_prep_timer ?? true,
         });
@@ -142,6 +145,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           prep_time_minutes: settings.prep_time_minutes,
           login_require_name: settings.login_require_name,
           login_require_phone: settings.login_require_phone,
+          login_require_birth_date: settings.login_require_birth_date,
           bill_request_enabled: settings.bill_request_enabled,
           show_prep_timer: settings.show_prep_timer,
         })
@@ -448,7 +452,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                 </div>
 
                 {/* Telefone */}
-                <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                <div className="flex items-center justify-between py-4">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
                       <Phone className="h-4 w-4 text-muted-foreground" />
@@ -461,6 +465,23 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                   <Switch
                     checked={settings.login_require_phone}
                     onCheckedChange={(checked) => setSettings({ ...settings, login_require_phone: checked })}
+                  />
+                </div>
+
+                {/* Data de Nascimento */}
+                <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Data de Nascimento</p>
+                      <p className="text-xs text-muted-foreground">Solicitar data de nascimento para campanhas</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.login_require_birth_date}
+                    onCheckedChange={(checked) => setSettings({ ...settings, login_require_birth_date: checked })}
                   />
                 </div>
               </div>
