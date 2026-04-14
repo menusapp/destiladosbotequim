@@ -11,7 +11,7 @@ import { ptBR } from "date-fns/locale";
 
 interface TrackingTabProps {
   restaurantId: string;
-  onCreateCampaign?: (recipients: { name: string; phone: string }[]) => void;
+  onCreateCampaign?: (triggerType: string) => void;
 }
 
 interface AbandonedSession {
