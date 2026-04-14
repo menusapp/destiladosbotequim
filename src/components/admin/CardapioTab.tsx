@@ -68,7 +68,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
         </TabsList>
 
         <TabsContent value="produtos" className="mt-6">
-          <ProductsGrid restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
+          <ProductsGrid key={refreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
         </TabsContent>
 
         <TabsContent value="categorias" className="mt-6">
