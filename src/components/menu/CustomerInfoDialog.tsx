@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,7 @@ import {
 import { validateCPF, validatePhone } from "@/lib/cpfValidator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
-import { Loader2, UserCheck } from "lucide-react";
+import { Loader2, UserCheck, CalendarIcon } from "lucide-react";
 
 interface CustomerInfoDialogProps {
   open: boolean;
@@ -36,11 +37,13 @@ const CustomerInfoDialog = ({
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
   const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [birthDateConsent, setBirthDateConsent] = useState(false);
   const [cpfError, setCpfError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [isCheckingCpf, setIsCheckingCpf] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [existingCustomer, setExistingCustomer] = useState<{name: string; phone?: string} | null>(null);
+  const [existingCustomer, setExistingCustomer] = useState<{name: string; phone?: string; birth_date?: string | null} | null>(null);
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -48,6 +51,8 @@ const CustomerInfoDialog = ({
       setName("");
       setCpf("");
       setPhone("");
+      setBirthDate("");
+      setBirthDateConsent(false);
       setCpfError("");
       setPhoneError("");
       setExistingCustomer(null);
@@ -60,21 +65,19 @@ const CustomerInfoDialog = ({
   useEffect(() => {
     const sanitizedCPF = cpf.replace(/\D/g, "");
     
-    // Se CPF não está completo ou inválido, garantir que não está "checking"
     if (sanitizedCPF.length !== 11 || !validateCPF(sanitizedCPF) || !restaurantId) {
       setExistingCustomer(null);
       setIsCheckingCpf(false);
       return;
     }
 
-    // Setar como checking ANTES do debounce
     setIsCheckingCpf(true);
 
     const checkExistingCustomer = async () => {
       try {
         const { data, error } = await supabase
           .from("customers")
-          .select("name, phone")
+          .select("name, phone, birth_date")
           .eq("restaurant_id", restaurantId)
           .eq("cpf", sanitizedCPF)
           .maybeSingle();
@@ -83,6 +86,10 @@ const CustomerInfoDialog = ({
           setExistingCustomer(data);
           setName(data.name);
           if (data.phone) setPhone(data.phone);
+          if (data.birth_date) {
+            setBirthDate(data.birth_date);
+            setBirthDateConsent(true);
+          }
         } else {
           setExistingCustomer(null);
         }
@@ -114,6 +121,26 @@ const CustomerInfoDialog = ({
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   };
 
+  const formatBirthDateInput = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
+  const parseBirthDate = (formatted: string): string | null => {
+    const parts = formatted.split("/");
+    if (parts.length !== 3 || parts[2].length !== 4) return null;
+    const [day, month, year] = parts.map(Number);
+    if (!day || !month || !year) return null;
+    if (day < 1 || day > 31 || month < 1 || month > 12) return null;
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+    if (date > new Date()) return null;
+    if (year < 1900) return null;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  };
+
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCPFInput(e.target.value);
     setCpf(formatted);
@@ -123,7 +150,12 @@ const CustomerInfoDialog = ({
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneInput(e.target.value);
     setPhone(formatted);
-    setPhoneError(""); // Limpar erro ao digitar
+    setPhoneError("");
+  };
+
+  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatBirthDateInput(e.target.value);
+    setBirthDate(formatted);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -142,7 +174,6 @@ const CustomerInfoDialog = ({
       return;
     }
 
-    // If existing customer, use their saved name (ignore whatever was typed)
     const finalName = existingCustomer ? existingCustomer.name : name.trim();
 
     if (requireName && !finalName) {
@@ -150,7 +181,6 @@ const CustomerInfoDialog = ({
       return;
     }
 
-    // Validar telefone se preenchido
     const typedPhone = phone.replace(/\D/g, "");
     if (typedPhone && !validatePhone(typedPhone)) {
       setPhoneError("Número de telefone inválido");
@@ -158,45 +188,63 @@ const CustomerInfoDialog = ({
       return;
     }
 
-    // Validar telefone: se requirePhone e não tem telefone (nem salvo nem digitado)
     const finalPhone = existingCustomer?.phone || typedPhone || undefined;
     if (requirePhone && !finalPhone) {
       toast.error("Por favor, informe seu telefone");
       return;
     }
 
+    // Validar data de nascimento se preenchida
+    let finalBirthDate: string | null = null;
+    if (birthDate && birthDateConsent) {
+      finalBirthDate = parseBirthDate(birthDate);
+      if (!finalBirthDate) {
+        toast.error("Data de nascimento inválida. Use o formato DD/MM/AAAA.");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     
     try {
-      // Se cliente existente mas sem telefone e foi digitado um telefone, atualizar
-      if (existingCustomer && !existingCustomer.phone && typedPhone && restaurantId) {
-        // Verificar se telefone já existe em outro cliente
-        const { data: phoneExists } = await supabase
-          .from("customers")
-          .select("cpf, name")
-          .eq("restaurant_id", restaurantId)
-          .eq("phone", typedPhone)
-          .neq("cpf", sanitizedCPF)
-          .maybeSingle();
+      if (existingCustomer && restaurantId) {
+        const updateData: Record<string, string> = {};
+        
+        // Atualizar telefone se necessário
+        if (!existingCustomer.phone && typedPhone) {
+          const { data: phoneExists } = await supabase
+            .from("customers")
+            .select("cpf, name")
+            .eq("restaurant_id", restaurantId)
+            .eq("phone", typedPhone)
+            .neq("cpf", sanitizedCPF)
+            .maybeSingle();
 
-        if (phoneExists) {
-          setPhoneError("Este telefone já está cadastrado para outro cliente");
-          toast.error("Este telefone já está cadastrado para outro cliente");
-          setIsSubmitting(false);
-          return;
+          if (phoneExists) {
+            setPhoneError("Este telefone já está cadastrado para outro cliente");
+            toast.error("Este telefone já está cadastrado para outro cliente");
+            setIsSubmitting(false);
+            return;
+          }
+          updateData.phone = typedPhone;
         }
 
-        // Atualizar telefone do cliente existente
-        await supabase
-          .from("customers")
-          .update({ phone: typedPhone })
-          .eq("restaurant_id", restaurantId)
-          .eq("cpf", sanitizedCPF);
+        // Atualizar data de nascimento se fornecida e não existia
+        if (finalBirthDate && !existingCustomer.birth_date) {
+          updateData.birth_date = finalBirthDate;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await supabase
+            .from("customers")
+            .update(updateData)
+            .eq("restaurant_id", restaurantId)
+            .eq("cpf", sanitizedCPF);
+        }
       }
 
       // If new customer, create record in database
       if (!existingCustomer && restaurantId) {
-        // Verificar se telefone já existe em outro cliente
         if (finalPhone) {
           const { data: phoneExists } = await supabase
             .from("customers")
@@ -214,21 +262,20 @@ const CustomerInfoDialog = ({
           }
         }
 
-        const insertData: { restaurant_id: string; cpf: string; name: string; phone?: string } = {
+        const insertData: { restaurant_id: string; cpf: string; name: string; phone?: string; birth_date?: string } = {
           restaurant_id: restaurantId,
           cpf: sanitizedCPF,
           name: finalName || "Cliente",
         };
-        if (finalPhone) {
-          insertData.phone = finalPhone;
-        }
+        if (finalPhone) insertData.phone = finalPhone;
+        if (finalBirthDate) insertData.birth_date = finalBirthDate;
+
         await supabase
           .from("customers")
           .insert(insertData);
       }
     } catch (err) {
       console.error("Error saving customer:", err);
-      // Continue anyway - the customer will be created on order if this fails
     } finally {
       setIsSubmitting(false);
     }
@@ -236,9 +283,11 @@ const CustomerInfoDialog = ({
     onSubmit(finalName || "Cliente", sanitizedCPF, finalPhone);
   };
 
+  const showBirthDateField = !existingCustomer || !existingCustomer.birth_date;
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {existingCustomer ? "Bem-vindo de volta!" : "Bem-vindo!"}
@@ -281,6 +330,9 @@ const CustomerInfoDialog = ({
                 {existingCustomer.phone && (
                   <p className="text-sm text-green-600 dark:text-green-400">📞 {formatPhoneInput(existingCustomer.phone)}</p>
                 )}
+                {existingCustomer.birth_date && (
+                  <p className="text-sm text-green-600 dark:text-green-400">🎂 {new Date(existingCustomer.birth_date + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                )}
                 <p className="text-sm text-green-600 dark:text-green-400">Cliente cadastrado</p>
               </div>
             </div>
@@ -302,7 +354,7 @@ const CustomerInfoDialog = ({
             </div>
           )}
 
-          {/* Campo de telefone - para novos clientes OU clientes existentes sem telefone */}
+          {/* Campo de telefone */}
           {((!existingCustomer && requirePhone) || (existingCustomer && !existingCustomer.phone && requirePhone)) && (
             <div className="space-y-2">
               <Label htmlFor="customer-phone">Telefone</Label>
@@ -323,6 +375,41 @@ const CustomerInfoDialog = ({
                 <p className="text-xs text-muted-foreground">
                   Complete seu cadastro informando seu telefone
                 </p>
+              )}
+            </div>
+          )}
+
+          {/* Campo de data de nascimento */}
+          {showBirthDateField && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="customer-birth-date" className="flex items-center gap-1.5">
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                  Data de Nascimento
+                  <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
+                </Label>
+                <Input
+                  id="customer-birth-date"
+                  value={birthDate}
+                  onChange={handleBirthDateChange}
+                  placeholder="DD/MM/AAAA"
+                  disabled={isCheckingCpf}
+                  maxLength={10}
+                  inputMode="numeric"
+                />
+              </div>
+              {birthDate && (
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="birth-date-consent"
+                    checked={birthDateConsent}
+                    onCheckedChange={(checked) => setBirthDateConsent(!!checked)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="birth-date-consent" className="text-xs text-muted-foreground leading-tight cursor-pointer">
+                    Concordo com o uso da minha data de nascimento para campanhas de aniversário e benefícios exclusivos.
+                  </label>
+                </div>
               )}
             </div>
           )}
