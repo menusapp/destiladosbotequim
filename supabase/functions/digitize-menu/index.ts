@@ -23,13 +23,112 @@ const cuisinePrompts: Record<string, string> = {
     "Este é um cardápio de restaurante. Extraia todas as categorias, produtos, descrições e preços que conseguir identificar.",
 };
 
+const complementCuisinePrompts: Record<string, string> = {
+  pizzaria:
+    "Este é um cardápio de PIZZARIA. Foque em itens ADICIONAIS/COMPLEMENTARES como bordas recheadas, ingredientes extras, molhos adicionais, bebidas extras para combos.",
+  hamburgueria:
+    "Este é um cardápio de HAMBURGUERIA. Foque em itens ADICIONAIS/COMPLEMENTARES como bacon extra, queijo extra, molhos especiais, acompanhamentos extras, adicionais de hambúrguer.",
+  acai:
+    "Este é um cardápio de AÇAÍ/SORVETERIA. Foque em itens ADICIONAIS/COMPLEMENTARES como coberturas, frutas extras, granola, leite condensado, caldas.",
+  sushi:
+    "Este é um cardápio de SUSHI/COMIDA JAPONESA. Foque em itens ADICIONAIS/COMPLEMENTARES como molhos, wasabi extra, gengibre, complementos de pratos.",
+  cafeteria:
+    "Este é um cardápio de CAFETERIA. Foque em itens ADICIONAIS/COMPLEMENTARES como leite extra, chantilly, shots de café, coberturas.",
+  outros:
+    "Foque em itens ADICIONAIS/COMPLEMENTARES como ingredientes extras, molhos, acompanhamentos adicionais, complementos pagos.",
+};
+
+function getProductsTool() {
+  return {
+    type: "function",
+    function: {
+      name: "extract_menu",
+      description: "Extrai categorias e produtos de um cardápio fotografado",
+      parameters: {
+        type: "object",
+        properties: {
+          categories: {
+            type: "array",
+            description: "Lista de categorias do cardápio",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string", description: "Nome da categoria (ex: Pizzas, Bebidas, Sobremesas)" },
+                products: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", description: "Nome do produto" },
+                      description: { type: "string", description: "Descrição ou ingredientes do produto" },
+                      price: { type: "number", description: "Preço do produto em reais (0 se não visível)" },
+                    },
+                    required: ["name", "price"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["name", "products"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["categories"],
+        additionalProperties: false,
+      },
+    },
+  };
+}
+
+function getComplementsTool() {
+  return {
+    type: "function",
+    function: {
+      name: "extract_menu",
+      description: "Extrai categorias de complementos/adicionais de um cardápio fotografado",
+      parameters: {
+        type: "object",
+        properties: {
+          categories: {
+            type: "array",
+            description: "Lista de categorias de complementos/adicionais",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string", description: "Nome da categoria de complemento (ex: Adicionais, Molhos, Bordas)" },
+                items: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", description: "Nome do item complementar" },
+                      description: { type: "string", description: "Descrição do item" },
+                      price: { type: "number", description: "Preço do complemento em reais (0 se não visível)" },
+                    },
+                    required: ["name", "price"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["name", "items"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["categories"],
+        additionalProperties: false,
+      },
+    },
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { image_base64, cuisine_type, custom_cuisine } = await req.json();
+    const { image_base64, cuisine_type, custom_cuisine, mode } = await req.json();
 
     if (!image_base64) {
       return new Response(
@@ -46,11 +145,25 @@ serve(async (req) => {
       );
     }
 
-    const cuisineContext =
-      cuisinePrompts[cuisine_type] ||
-      `Este é um cardápio de ${custom_cuisine || "restaurante"}. Extraia todas as categorias, produtos, descrições e preços.`;
+    const isComplements = mode === "complements";
 
-    const systemPrompt = `Você é um especialista em digitalização de cardápios de restaurantes. Analise a foto do cardápio e extraia TODOS os produtos organizados por categoria.
+    const cuisineContext = isComplements
+      ? (complementCuisinePrompts[cuisine_type] || `Foque em itens ADICIONAIS/COMPLEMENTARES de ${custom_cuisine || "restaurante"}.`)
+      : (cuisinePrompts[cuisine_type] || `Este é um cardápio de ${custom_cuisine || "restaurante"}. Extraia todas as categorias, produtos, descrições e preços.`);
+
+    const systemPrompt = isComplements
+      ? `Você é um especialista em digitalização de cardápios de restaurantes. Analise a foto e extraia APENAS os itens que são COMPLEMENTOS/ADICIONAIS (extras pagos que acompanham um produto principal).
+
+${cuisineContext}
+
+Regras:
+- Extraia APENAS itens complementares/adicionais, NÃO produtos principais
+- Exemplos de complementos: bacon extra, queijo adicional, molho especial, borda recheada, cobertura extra
+- Organize por categorias lógicas (ex: "Adicionais de Proteína", "Molhos", "Coberturas")
+- Extraia preços em formato numérico (ex: 3.50)
+- Se o preço não estiver visível ou legível, use 0
+- NÃO invente itens que não estão na imagem`
+      : `Você é um especialista em digitalização de cardápios de restaurantes. Analise a foto do cardápio e extraia TODOS os produtos organizados por categoria.
 
 ${cuisineContext}
 
@@ -63,7 +176,6 @@ Regras:
 - Se o preço não estiver visível ou legível, use 0
 - NÃO invente produtos que não estão na imagem`;
 
-    // Detect mime type from base64 header or default to jpeg
     let mimeType = "image/jpeg";
     let cleanBase64 = image_base64;
     if (image_base64.startsWith("data:")) {
@@ -73,6 +185,8 @@ Regras:
         cleanBase64 = image_base64.split(",")[1];
       }
     }
+
+    const tool = isComplements ? getComplementsTool() : getProductsTool();
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -91,77 +205,19 @@ Regras:
               content: [
                 {
                   type: "image_url",
-                  image_url: {
-                    url: `data:${mimeType};base64,${cleanBase64}`,
-                  },
+                  image_url: { url: `data:${mimeType};base64,${cleanBase64}` },
                 },
                 {
                   type: "text",
-                  text: "Analise este cardápio e extraia todos os produtos usando a função extract_menu.",
+                  text: isComplements
+                    ? "Analise este cardápio e extraia os complementos/adicionais usando a função extract_menu."
+                    : "Analise este cardápio e extraia todos os produtos usando a função extract_menu.",
                 },
               ],
             },
           ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "extract_menu",
-                description:
-                  "Extrai categorias e produtos de um cardápio fotografado",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    categories: {
-                      type: "array",
-                      description: "Lista de categorias do cardápio",
-                      items: {
-                        type: "object",
-                        properties: {
-                          name: {
-                            type: "string",
-                            description: "Nome da categoria (ex: Pizzas, Bebidas, Sobremesas)",
-                          },
-                          products: {
-                            type: "array",
-                            items: {
-                              type: "object",
-                              properties: {
-                                name: {
-                                  type: "string",
-                                  description: "Nome do produto",
-                                },
-                                description: {
-                                  type: "string",
-                                  description:
-                                    "Descrição ou ingredientes do produto",
-                                },
-                                price: {
-                                  type: "number",
-                                  description:
-                                    "Preço do produto em reais (0 se não visível)",
-                                },
-                              },
-                              required: ["name", "price"],
-                              additionalProperties: false,
-                            },
-                          },
-                        },
-                        required: ["name", "products"],
-                        additionalProperties: false,
-                      },
-                    },
-                  },
-                  required: ["categories"],
-                  additionalProperties: false,
-                },
-              },
-            },
-          ],
-          tool_choice: {
-            type: "function",
-            function: { name: "extract_menu" },
-          },
+          tools: [tool],
+          tool_choice: { type: "function", function: { name: "extract_menu" } },
         }),
       }
     );

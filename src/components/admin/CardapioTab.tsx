@@ -6,7 +6,8 @@ import ProductsGrid from "./ProductsGrid";
 import ComplementosTab from "./ComplementosTab";
 import CategoriesTab from "./CategoriesTab";
 import DestaquesTab from "./DestaquesTab";
-import MenuDigitizerDialog from "./MenuDigitizerDialog";
+import MenuDigitizerDialog, { type ImportMode } from "./MenuDigitizerDialog";
+
 interface CardapioTabProps {
   restaurantId: string;
   isRestaurantOpen: boolean;
@@ -15,7 +16,24 @@ interface CardapioTabProps {
 const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
   const [activeTab, setActiveTab] = useState("produtos");
   const [digitizerOpen, setDigitizerOpen] = useState(false);
+  const [digitizerMode, setDigitizerMode] = useState<ImportMode>("products");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [complementsRefreshKey, setComplementsRefreshKey] = useState(0);
+
+  const showImportButton = activeTab === "produtos" || activeTab === "complementos";
+
+  const handleOpenDigitizer = () => {
+    setDigitizerMode(activeTab === "complementos" ? "complements" : "products");
+    setDigitizerOpen(true);
+  };
+
+  const handleImportComplete = () => {
+    if (digitizerMode === "complements") {
+      setComplementsRefreshKey((k) => k + 1);
+    } else {
+      setRefreshKey((k) => k + 1);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -25,17 +43,26 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
           <h1 className="text-[32px] font-bold text-foreground leading-tight">Cardápio</h1>
           <p className="text-sm text-muted-foreground mt-1">Gerencie produtos, categorias, complementos e destaques</p>
         </div>
-        <Button onClick={() => setDigitizerOpen(true)} variant="outline" className="gap-2">
-          <Camera className="h-4 w-4" />
-          Importar por Foto
-        </Button>
+        {showImportButton && (
+          <Button
+            onClick={handleOpenDigitizer}
+            variant="outline"
+            className="gap-2"
+            disabled={isRestaurantOpen}
+            title={isRestaurantOpen ? "Feche o restaurante para importar por foto" : undefined}
+          >
+            <Camera className="h-4 w-4" />
+            Importar por Foto
+          </Button>
+        )}
       </div>
 
       <MenuDigitizerDialog
         open={digitizerOpen}
         onOpenChange={setDigitizerOpen}
         restaurantId={restaurantId}
-        onImportComplete={() => setRefreshKey((k) => k + 1)}
+        onImportComplete={handleImportComplete}
+        mode={digitizerMode}
       />
 
       {/* Tabs */}
@@ -76,7 +103,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
         </TabsContent>
 
         <TabsContent value="complementos" className="mt-6">
-          <ComplementosTab restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
+          <ComplementosTab key={complementsRefreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
         </TabsContent>
 
         <TabsContent value="destaques" className="mt-6">
