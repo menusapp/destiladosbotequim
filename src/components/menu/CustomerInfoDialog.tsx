@@ -54,7 +54,6 @@ const CustomerInfoDialog = ({
       setCpf("");
       setPhone("");
       setBirthDate("");
-      setBirthDateConsent(false);
       setCpfError("");
       setPhoneError("");
       setExistingCustomer(null);
@@ -90,7 +89,7 @@ const CustomerInfoDialog = ({
           if (data.phone) setPhone(data.phone);
           if (data.birth_date) {
             setBirthDate(formatBirthDateForInput(data.birth_date));
-            setBirthDateConsent(true);
+            
           }
         } else {
           setExistingCustomer(null);
@@ -209,9 +208,6 @@ const CustomerInfoDialog = ({
   const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatBirthDateInput(e.target.value);
     setBirthDate(formatted);
-    if (!formatted) {
-      setBirthDateConsent(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
