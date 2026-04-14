@@ -95,7 +95,7 @@ export const ReviewsDrawer = ({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[85vh]">
+      <DrawerContent className="max-h-[85vh] flex flex-col">
         <DrawerHeader className="text-center pb-2">
           <DrawerTitle className="text-lg font-semibold">
             Avaliações
@@ -123,7 +123,7 @@ export const ReviewsDrawer = ({
           </div>
         </DrawerHeader>
 
-        <ScrollArea className="px-4 pb-6" style={{ maxHeight: "60vh" }}>
+        <ScrollArea className="px-4 pb-6 flex-1 overflow-hidden" style={{ height: "60vh" }}>
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <p className="text-muted-foreground text-sm">Carregando...</p>
