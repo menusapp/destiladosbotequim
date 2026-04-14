@@ -63,10 +63,18 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
     setActiveCategory(categories[0]?.id ?? null);
   }, [categories]);
 
+  const manualScrollTimer = useRef<number | null>(null);
+
   const handleCategoryClick = useCallback(
     (categoryId: string) => {
+      // Immediately set active and lock scroll spy
       setActiveCategory(categoryId);
       isManualScroll.current = true;
+
+      // Clear any previous timer
+      if (manualScrollTimer.current) {
+        window.clearTimeout(manualScrollTimer.current);
+      }
 
       const el = document.getElementById(`category-${categoryId}`);
       if (el) {
@@ -74,9 +82,15 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
         window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
       }
 
-      window.setTimeout(() => {
-        isManualScroll.current = false;
-      }, 900);
+      // Keep the guard active long enough for smooth scroll to finish,
+      // then re-assert the clicked category before unlocking
+      manualScrollTimer.current = window.setTimeout(() => {
+        setActiveCategory(categoryId);
+        // Small extra delay so the re-set above renders before spy resumes
+        window.requestAnimationFrame(() => {
+          isManualScroll.current = false;
+        });
+      }, 1200);
     },
     [getScrollOffset]
   );
