@@ -84,7 +84,7 @@ export const CategoryProducts = memo(({
       {showNav && categories.length > 0 && (
         <div
           ref={navContainerRef}
-          className="sticky top-0 z-30 bg-background border-b border-border px-3 py-3 my-1 flex gap-1.5 overflow-x-auto category-scroll-bar"
+          className="sticky top-0 z-40 bg-background border-b border-border px-3 py-3 my-1 flex gap-1.5 overflow-x-auto category-scroll-bar pointer-events-auto"
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
