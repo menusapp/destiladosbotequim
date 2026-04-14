@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
     console.log("[register-restaurant] Registration complete for slug:", slug.trim(), "plan:", planSlug);
 
     // Build response
-    const response: any = { success: true, restaurantId: restaurant.id, slug: slug.trim(), isTrial };
+    const response: any = { success: true, restaurantId: restaurant.id, slug: slug.trim(), isTrial, staffId: staffData?.id || null };
 
     // For paid plans, build MP redirect URL with external_reference
     if (isPaid && MP_PLAN_LINKS[planSlug]) {
