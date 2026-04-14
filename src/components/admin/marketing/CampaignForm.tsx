@@ -29,6 +29,11 @@ interface CampaignFormProps {
   onOpenChange: (open: boolean) => void;
   editingCampaign?: any;
   onSuccess: () => void;
+  prefill?: {
+    triggerType: string;
+    name?: string;
+    messageTemplate?: string;
+  };
 }
 
 interface Category {
