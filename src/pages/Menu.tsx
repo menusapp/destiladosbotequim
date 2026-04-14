@@ -55,6 +55,9 @@ const Menu = () => {
   const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
   const hiddenByRequiredChoices = inactiveData?.hiddenProductIdsByRequiredChoices || new Set<string>();
 
+  // Session tracking for abandoned cart metrics
+  const { trackCartUpdate: trackMenuCartUpdate } = useSessionTracking(restaurant?.id, restaurantSlug);
+
   // ⚡ Refs para manter valores atualizados nos listeners de realtime (evita stale closures)
   const tableIdRef = useRef<string | null>(null);
   const customerInfoRef = useRef<{name: string, cpf: string} | null>(null);
