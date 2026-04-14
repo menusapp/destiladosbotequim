@@ -58,6 +58,7 @@ interface CheckoutDrawerProps {
   onAddRewardItem?: (item: CartItem) => void;
   customerCPF?: string;
   onSuggestionClick?: (product: any) => void;
+  onRequireLogin?: () => void;
 }
 
 const primaryColorFromRestaurant = (restaurant: any) => restaurant?.primary_color || "#fe9516";
@@ -74,6 +75,7 @@ export const CheckoutDrawer = ({
   onAddRewardItem,
   customerCPF: customerCPFProp,
   onSuggestionClick,
+  onRequireLogin,
 }: CheckoutDrawerProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>("cart");
@@ -554,7 +556,14 @@ export const CheckoutDrawer = ({
             loyaltyPoints={loyaltyPoints}
             loyaltyPointsUsed={loyaltyPointsUsed}
             onRedeemPoints={setLoyaltyPointsUsed}
-            onContinue={() => setStep("delivery-type")}
+            onContinue={() => {
+              const cpf = getCustomerCPF();
+              if (!cpf && onRequireLogin) {
+                onRequireLogin();
+                return;
+              }
+              setStep("delivery-type");
+            }}
             minOrderValue={getMinOrderValue()}
             deliveryType={deliveryType}
             customerCPF={getCustomerCPF()}
