@@ -18,7 +18,7 @@ import { ReviewModal } from "@/components/menu/ReviewModal";
 import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/menu";
 import { isFeaturedVisible } from "@/lib/featuredUtils";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
-
+import { useSessionTracking } from "@/hooks/useSessionTracking";
 const Menu = () => {
   const { slug: restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
