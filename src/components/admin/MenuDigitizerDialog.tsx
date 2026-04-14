@@ -203,6 +203,7 @@ const MenuDigitizerDialog = ({
             description: p.description || null,
             price: p.price,
             category_id: newCat.id,
+            restaurant_id: restaurantId,
             available: true,
           }));
 
