@@ -310,7 +310,7 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
       </div>
 
       {/* Customers Grid */}
-      <ScrollArea className="max-h-[calc(100vh-280px)]">
+      <ScrollArea className="h-[calc(100vh-340px)]">
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Carregando...</div>
         ) : filteredCustomers.length === 0 ? (
