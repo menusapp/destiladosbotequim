@@ -87,7 +87,7 @@ const CustomerInfoDialog = ({
           setName(data.name);
           if (data.phone) setPhone(data.phone);
           if (data.birth_date) {
-            setBirthDate(data.birth_date);
+            setBirthDate(formatBirthDateForInput(data.birth_date));
             setBirthDateConsent(true);
           }
         } else {
@@ -207,6 +207,9 @@ const CustomerInfoDialog = ({
   const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatBirthDateInput(e.target.value);
     setBirthDate(formatted);
+    if (!formatted) {
+      setBirthDateConsent(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -245,10 +248,17 @@ const CustomerInfoDialog = ({
       return;
     }
 
+    const trimmedBirthDate = birthDate.trim();
+
+    if (trimmedBirthDate && !birthDateConsent) {
+      toast.error("Para continuar com a data informada, concorde com o uso da sua data de nascimento ou apague o campo.");
+      return;
+    }
+
     // Validar data de nascimento se preenchida
     let finalBirthDate: string | null = null;
-    if (birthDate && birthDateConsent) {
-      finalBirthDate = parseBirthDate(birthDate);
+    if (trimmedBirthDate) {
+      finalBirthDate = parseBirthDate(trimmedBirthDate);
       if (!finalBirthDate) {
         toast.error("Data de nascimento inválida. Use o formato DD/MM/AAAA.");
         return;
@@ -382,7 +392,7 @@ const CustomerInfoDialog = ({
                   <p className="text-sm text-green-600 dark:text-green-400">📞 {formatPhoneInput(existingCustomer.phone)}</p>
                 )}
                 {existingCustomer.birth_date && (
-                  <p className="text-sm text-green-600 dark:text-green-400">🎂 {new Date(existingCustomer.birth_date + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                  <p className="text-sm text-green-600 dark:text-green-400">🎂 {formatBirthDateForDisplay(existingCustomer.birth_date)}</p>
                 )}
                 <p className="text-sm text-green-600 dark:text-green-400">Cliente cadastrado</p>
               </div>
