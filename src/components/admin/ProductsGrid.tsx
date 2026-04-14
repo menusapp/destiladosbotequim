@@ -385,10 +385,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
   const handleRemoveVariation = (id: string) => { setVariations(variations.filter(v => v.id !== id)); };
 
-  const handleDuplicateVariation = (id: string) => {
+  const handleDuplicateVariation = async (id: string) => {
     const original = variations.find(v => v.id === id);
     if (!original) return;
-    const copy = { ...original, id: crypto.randomUUID(), name: `${original.name} (cópia)`, ingredients: original.ingredients.map(i => ({ ...i, id: crypto.randomUUID() })) };
+    const newPdvCode = await generateNextPdvCode(restaurantId);
+    const copy = { ...original, id: crypto.randomUUID(), name: `${original.name} (cópia)`, pdv_code: newPdvCode, ingredients: original.ingredients.map(i => ({ ...i, id: crypto.randomUUID() })) };
     setVariations([...variations, copy]);
     toast.success("Variação duplicada");
   };
