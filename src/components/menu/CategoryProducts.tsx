@@ -56,7 +56,7 @@ export const CategoryProducts = memo(({
           }
         }
       },
-      { threshold: 0.01, rootMargin: "0px 0px -70% 0px" }
+      { threshold: 0.01, rootMargin: "-60px 0px -40% 0px" }
     );
 
     categories.forEach((cat) => {
