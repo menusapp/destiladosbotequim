@@ -233,6 +233,7 @@ export default function DeliveryMenu() {
       localStorage.setItem(`delivery-customer-${restaurantSlug}`, finalName);
       localStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
       if (finalPhone) localStorage.setItem(`delivery-phone-${restaurantSlug}`, finalPhone);
+      localStorage.setItem(`delivery-expiry-${restaurantSlug}`, String(Date.now() + 60 * 60 * 1000));
       trackCustomerInfo(finalPhone || undefined, finalName);
     } else {
       setCustomerName(name);
@@ -240,6 +241,7 @@ export default function DeliveryMenu() {
       localStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
       localStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
       if (phone) localStorage.setItem(`delivery-phone-${restaurantSlug}`, phone);
+      localStorage.setItem(`delivery-expiry-${restaurantSlug}`, String(Date.now() + 60 * 60 * 1000));
       trackCustomerInfo(phone || undefined, name);
     }
     
@@ -611,6 +613,7 @@ export default function DeliveryMenu() {
               localStorage.removeItem(`delivery-customer-${restaurantSlug}`);
               localStorage.removeItem(`delivery-cpf-${restaurantSlug}`);
               localStorage.removeItem(`delivery-phone-${restaurantSlug}`);
+              localStorage.removeItem(`delivery-expiry-${restaurantSlug}`);
               localStorage.removeItem(`delivery-cart-${restaurantSlug}`);
               setCustomerName("");
               setCustomerCPF("");
