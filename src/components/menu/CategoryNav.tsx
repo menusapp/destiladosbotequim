@@ -7,7 +7,7 @@ interface CategoryNavProps {
 }
 
 export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps) => {
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(categories[0]?.id ?? null);
   const isManualScroll = useRef(false);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
