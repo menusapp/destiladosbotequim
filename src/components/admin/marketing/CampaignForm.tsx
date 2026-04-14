@@ -72,6 +72,7 @@ export function CampaignForm({
   onOpenChange,
   editingCampaign,
   onSuccess,
+  prefill,
 }: CampaignFormProps) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
