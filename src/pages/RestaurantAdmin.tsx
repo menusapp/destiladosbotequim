@@ -961,12 +961,14 @@ const RestaurantAdmin = () => {
             ) : (
               /* Expanded: scrollable list of all notifications */
               <div className="flex flex-col gap-2 max-h-[70vh] overflow-y-auto pr-1">
-                <button
-                  onClick={() => setCascadeExpanded(false)}
-                  className="self-end mb-1 text-xs text-orange-600 hover:text-orange-800 font-medium"
-                >
-                  Recolher
-                </button>
+                <div className="sticky top-0 z-10 bg-background py-1 flex justify-end">
+                  <button
+                    onClick={() => setCascadeExpanded(false)}
+                    className="text-xs text-orange-600 hover:text-orange-800 font-medium"
+                  >
+                    Recolher
+                  </button>
+                </div>
                 {notificationQueue.map((notification) => (
                   <NewOrderNotification
                     key={notification.orderId}
@@ -1052,12 +1054,14 @@ const RestaurantAdmin = () => {
               </div>
             ) : (
               <div className="flex flex-col gap-2 max-h-[70vh] overflow-y-auto pr-1">
-                <button
-                  onClick={() => setBillCascadeExpanded(false)}
-                  className="self-end mb-1 text-xs text-amber-600 hover:text-amber-800 font-medium"
-                >
-                  Recolher
-                </button>
+                <div className="sticky top-0 z-10 bg-background py-1 flex justify-end">
+                  <button
+                    onClick={() => setBillCascadeExpanded(false)}
+                    className="text-xs text-amber-600 hover:text-amber-800 font-medium"
+                  >
+                    Recolher
+                  </button>
+                </div>
                 {billNotificationQueue.map((notification) => (
                   <NewBillNotification
                     key={notification.billId}
