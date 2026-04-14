@@ -3784,6 +3784,7 @@ export type Database = {
           id: string
           inscricao_estadual: string | null
           is_open: boolean | null
+          login_require_birth_date: boolean | null
           login_require_name: boolean | null
           login_require_phone: boolean | null
           logo_url: string | null
@@ -3827,6 +3828,7 @@ export type Database = {
           id?: string
           inscricao_estadual?: string | null
           is_open?: boolean | null
+          login_require_birth_date?: boolean | null
           login_require_name?: boolean | null
           login_require_phone?: boolean | null
           logo_url?: string | null
@@ -3870,6 +3872,7 @@ export type Database = {
           id?: string
           inscricao_estadual?: string | null
           is_open?: boolean | null
+          login_require_birth_date?: boolean | null
           login_require_name?: boolean | null
           login_require_phone?: boolean | null
           logo_url?: string | null
