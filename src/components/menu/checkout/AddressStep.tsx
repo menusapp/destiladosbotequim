@@ -103,11 +103,11 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
         }
       }
       
-      // Fallback: sessionStorage (incluindo telefone)
+      // Fallback: localStorage (incluindo telefone)
       if (restaurantSlug) {
-        const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
-        const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
-        const storedPhone = sessionStorage.getItem(`delivery-phone-${restaurantSlug}`);
+        const storedName = localStorage.getItem(`delivery-customer-${restaurantSlug}`);
+        const storedCPF = localStorage.getItem(`delivery-cpf-${restaurantSlug}`);
+        const storedPhone = localStorage.getItem(`delivery-phone-${restaurantSlug}`);
         
         if (storedName) setCustomerName(storedName);
         if (storedCPF) setCustomerCPF(storedCPF);
@@ -319,11 +319,11 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
       return;
     }
 
-    // Salvar dados no sessionStorage para próximos pedidos
+    // Salvar dados no localStorage para próximos pedidos
     if (restaurantSlug) {
-      sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, customerName);
-      sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, customerCPF);
-      sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, customerPhone);
+      localStorage.setItem(`delivery-customer-${restaurantSlug}`, customerName);
+      localStorage.setItem(`delivery-cpf-${restaurantSlug}`, customerCPF);
+      localStorage.setItem(`delivery-phone-${restaurantSlug}`, customerPhone);
     }
 
     onContinue({
