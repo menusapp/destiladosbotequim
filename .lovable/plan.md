@@ -1,34 +1,26 @@
 
 
-## Plano: Botão de sair no perfil + Navegação de categorias inteligente
+## Plan: Fix 3 UI Issues
 
-### 1. Botão "Sair" na aba Perfil (delivery)
+### Issue 1: "Recolher" text overlapping notifications in admin panel
+The "Recolher" button sits inside the expanded notification list but uses `self-end mb-1` which can overlap notification cards. Fix: add proper positioning with `sticky top-0 z-10 bg-background` so it stays above the scrollable list and doesn't overlap.
 
-**Arquivo: `src/components/menu/ProfileView.tsx`**
-- Adicionar prop `onLogout` (callback)
-- Adicionar botão "Sair da conta" no final da página, com ícone `LogOut`, estilo destrutivo
-- Ao clicar, limpa `sessionStorage` (customer, cpf, phone) e chama `onLogout`
+**File:** `src/pages/RestaurantAdmin.tsx`
+- Both "Recolher" buttons (order notifications ~line 964-968, bill notifications ~line 1054-1058): wrap in a sticky header or add background and padding so the text doesn't overlap the cards below.
 
-**Arquivo: `src/pages/DeliveryMenu.tsx`**
-- Criar função `handleLogout` que:
-  - Remove `delivery-customer-{slug}`, `delivery-cpf-{slug}`, `delivery-phone-{slug}` do sessionStorage
-  - Remove `delivery-cart-{slug}` do localStorage
-  - Limpa estados (`customerName`, `customerCPF`, `cart`)
-  - Reabre o diálogo de identificação (`setShowCustomerDialog(true)`)
-  - Volta para aba "menu"
-- Passar `onLogout={handleLogout}` para `<ProfileView>`
+### Issue 2: Complement field in address form — label and placeholder
+Currently the label says "Complemento" and placeholder says "Opcional". Change to:
+- Label: `Complemento (opcional)`
+- Placeholder: `Ex: Casa, Apartamento, Bloco B`
 
-### 2. Navegação de categorias com scroll spy (IntersectionObserver)
+**Files:**
+- `src/components/menu/checkout/AddressStep.tsx` (~line 584, 591)
+- `src/components/kiosk/KioskDeliveryAddress.tsx` (~line 168-169) — same fix
 
-**Arquivos: `src/components/menu/CategoryProducts.tsx` e `src/components/menu/CategoryNav.tsx`**
+### Issue 3: Notifications should start collapsed (cascaded), not expanded
+Currently `cascadeExpanded` and `billCascadeExpanded` default to `false` (line 80, 88), which means they already start collapsed. However, the issue is that when new notifications arrive they may be auto-expanding. I'll verify the state isn't being set to `true` anywhere on arrival and ensure notifications always arrive in collapsed/cascaded mode.
 
-Ambos os componentes têm o mesmo padrão de navegação de categorias. A mudança é idêntica nos dois:
-
-- Adicionar `useEffect` com `IntersectionObserver` que observa cada `div#category-{id}`
-- Quando uma seção entra na viewport (threshold ~0.3, rootMargin no topo), atualiza `activeCategory` automaticamente
-- O botão de categoria ativa faz scroll horizontal automático para ficar visível (usando `scrollIntoView` no próprio botão via `ref`)
-- Manter o click-to-scroll existente funcionando normalmente
-- Adicionar flag `isManualScroll` para evitar conflito entre clique e observer durante o scroll programático
-
-**Resultado**: conforme o usuário rola a página, a pílula ativa na barra de categorias acompanha automaticamente. Clicar numa categoria continua scrollando até ela.
+**File:** `src/pages/RestaurantAdmin.tsx`
+- Confirm initial state is `false` (already is)
+- Check if any notification arrival logic sets expanded to `true` and remove it if so
 
