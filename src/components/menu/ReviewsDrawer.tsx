@@ -7,7 +7,6 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Review {
   id: string;
@@ -41,7 +40,6 @@ export const ReviewsDrawer = ({
     const fetchReviews = async () => {
       setLoading(true);
       try {
-        // Fetch reviews with order/counter_order join for customer name
         const { data, error } = await supabase
           .from("restaurant_reviews")
           .select(`
@@ -95,8 +93,8 @@ export const ReviewsDrawer = ({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[85vh] flex flex-col">
-        <DrawerHeader className="text-center pb-2">
+      <DrawerContent className="h-[85vh] max-h-[85vh] flex flex-col">
+        <DrawerHeader className="shrink-0 text-center pb-2">
           <DrawerTitle className="text-lg font-semibold">
             Avaliações
           </DrawerTitle>
@@ -123,7 +121,7 @@ export const ReviewsDrawer = ({
           </div>
         </DrawerHeader>
 
-        <ScrollArea className="px-4 pb-6 flex-1 overflow-hidden" style={{ height: "60vh" }}>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 overscroll-contain" data-vaul-no-drag>
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <p className="text-muted-foreground text-sm">Carregando...</p>
@@ -175,7 +173,7 @@ export const ReviewsDrawer = ({
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </DrawerContent>
     </Drawer>
   );
