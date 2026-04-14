@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,7 @@ const CustomerInfoDialog = ({
   const [cpf, setCpf] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [birthDateConsent, setBirthDateConsent] = useState(false);
+  
   const [cpfError, setCpfError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [isCheckingCpf, setIsCheckingCpf] = useState(false);
