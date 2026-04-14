@@ -82,6 +82,13 @@ const Menu = () => {
 
   useMenuInactivityLogout(tableId, tableNumber || "", restaurantSlug || "");
 
+  // Track cart changes for abandoned cart metrics
+  useEffect(() => {
+    if (cart.length > 0) {
+      trackMenuCartUpdate(cart);
+    }
+  }, [cart, trackMenuCartUpdate]);
+
   // Verificar se deve abrir modal de avaliação ao carregar
   useEffect(() => {
     const shouldShowReview = sessionStorage.getItem('shouldShowReview');
