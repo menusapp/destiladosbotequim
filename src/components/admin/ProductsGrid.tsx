@@ -110,6 +110,7 @@ interface IngredientVariation {
   name: string;
   description?: string;
   price: number;
+  pdv_code?: string;
   ingredients: ProductIngredient[];
 }
 
@@ -374,10 +375,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
   const handleRemoveVariationIngredient = (id: string) => { setVariationIngredients(variationIngredients.filter(i => i.id !== id)); };
 
-  const handleAddVariation = () => {
+  const handleAddVariation = async () => {
     if (!variationName) { toast.error("Informe o nome da variação"); return; }
     if (variationIngredients.length === 0) { toast.error("Adicione pelo menos um insumo à variação"); return; }
-    setVariations([...variations, { id: crypto.randomUUID(), name: variationName, description: variationDescription || undefined, price: parseFloat(variationPrice) || 0, ingredients: [...variationIngredients] }]);
+    const newPdvCode = await generateNextPdvCode(restaurantId);
+    setVariations([...variations, { id: crypto.randomUUID(), name: variationName, description: variationDescription || undefined, price: parseFloat(variationPrice) || 0, pdv_code: newPdvCode, ingredients: [...variationIngredients] }]);
     setVariationName(""); setVariationDescription(""); setVariationPrice(""); setVariationIngredients([]);
   };
 
