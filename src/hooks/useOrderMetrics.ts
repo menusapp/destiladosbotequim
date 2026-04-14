@@ -83,7 +83,7 @@ function calcTotemOrderTotal(order: any): number {
 async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Promise<OrderMetrics> {
   const { start, end } = getDateRange(dateRange);
 
-  const [deliveryRes, localBillsRes, counterRes, totemRes, paymentMethodsRes, cashMovementsRes] = await Promise.all([
+  const [deliveryRes, localBillsRes, counterRes, totemRes, paymentMethodsRes, cashMovementsRes, pdvPaidRes] = await Promise.all([
     supabase.from("orders")
       .select("id, created_at, order_type, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
       .eq("restaurant_id", restaurantId)
@@ -109,11 +109,18 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
     supabase.from("payment_methods")
       .select("id, name, method_type")
       .eq("restaurant_id", restaurantId),
-    // Query cash_movements to reconcile with overview
     supabase.from("cash_movements")
       .select("id, amount, order_id, bill_id, payment_method, category, created_at")
       .eq("restaurant_id", restaurantId)
       .eq("movement_type", "entrada")
+      .gte("created_at", start).lte("created_at", end),
+    // PDV paid orders (local/balcao with payment_status=paid, not totem)
+    supabase.from("orders")
+      .select("id, created_at, paid_at, order_type, payment_type, payment_status, coupon_discount, table_id, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
+      .eq("restaurant_id", restaurantId)
+      .in("order_type", ["local", "balcao"])
+      .eq("payment_status", "paid")
+      .neq("status", "cancelled")
       .gte("created_at", start).lte("created_at", end),
   ]);
 
@@ -123,6 +130,7 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   const totemOrders = totemRes.data || [];
   const paymentMethods = paymentMethodsRes.data || [];
   const cashMovements = cashMovementsRes.data || [];
+  const pdvPaidOrders = pdvPaidRes.data || [];
 
   // Build sets of known IDs from standard queries
   const knownOrderIds = new Set<string>();
@@ -131,17 +139,34 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   deliveryOrders.forEach(o => knownOrderIds.add(o.id));
   totemOrders.forEach(o => knownOrderIds.add(o.id));
   paidBills.forEach(b => knownBillIds.add(b.id));
-  // Counter orders use counter_orders table, not orders — tracked separately
+
+  // Identify table_ids covered by bills with real amounts
+  const billCoveredTableIds = new Set(paidBills.map(b => b.table_id));
+
+  // PDV paid orders NOT already covered by bills or totem
+  const pdvUncoveredOrders = pdvPaidOrders.filter(o => {
+    // Already counted as totem
+    if (knownOrderIds.has(o.id)) return false;
+    // If this order's table has a bill with total_amount > 0, it's covered
+    if (o.table_id && billCoveredTableIds.has(o.table_id)) return false;
+    return true;
+  });
+
+  // Calculate PDV uncovered totals
+  let pdvPaidLocalTotal = 0;
+  const pdvPaidOrderIds: string[] = [];
+  pdvUncoveredOrders.forEach(o => {
+    const total = calcTotemOrderTotal(o); // same calc: items - coupon
+    pdvPaidLocalTotal += total;
+    pdvPaidOrderIds.push(o.id);
+    knownOrderIds.add(o.id);
+  });
 
   // Find cash_movements entries NOT covered by standard queries
   const uncoveredCashEntries = cashMovements.filter(cm => {
-    // If it has an order_id that's already in our known sets, it's covered
     if (cm.order_id && knownOrderIds.has(cm.order_id)) return false;
-    // If it has a bill_id that's already in our known sets, it's covered
     if (cm.bill_id && knownBillIds.has(cm.bill_id)) return false;
-    // Manual cash entries (no order_id and no bill_id) that aren't order-related — skip
     if (!cm.order_id && !cm.bill_id) return false;
-    // This entry has an order_id or bill_id not captured by standard queries
     return true;
   });
 
@@ -183,7 +208,7 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
     if (cm.bill_id) knownBillIds.add(cm.bill_id);
   });
 
-  const localSales = billsTotal + counterTotal + totemLocalSales + uncoveredLocalTotal;
+  const localSales = billsTotal + counterTotal + totemLocalSales + pdvPaidLocalTotal + uncoveredLocalTotal;
   deliverySales += totemDeliverySales + uncoveredDeliveryTotal;
   const totalSales = localSales + deliverySales;
 
@@ -198,9 +223,11 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
       .gte("created_at", start).lte("created_at", end);
     localOrderIds = (localOrders || []).map(o => o.id);
   }
+  // Include PDV paid order IDs in localOrderIds
+  localOrderIds = [...localOrderIds, ...pdvPaidOrderIds];
   const counterOrderIds = counterOrders.map(o => o.id);
 
-  const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length + totemOrders.length + uncoveredCashEntries.length;
+  const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length + totemOrders.length + pdvUncoveredOrders.length + uncoveredCashEntries.length;
   const averageTicket = totalCount > 0 ? totalSales / totalCount : 0;
 
   let hourlySales: { hour: string; total: number }[] = [];
@@ -238,6 +265,13 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
         hourlyMap.set(h, (hourlyMap.get(h) || 0) + Number(cm.amount || 0));
       }
     });
+    pdvUncoveredOrders.forEach(o => {
+      const ts = o.paid_at || o.created_at;
+      if (ts) {
+        const h = new Date(ts).getHours().toString().padStart(2, "0") + ":00";
+        hourlyMap.set(h, (hourlyMap.get(h) || 0) + calcTotemOrderTotal(o));
+      }
+    });
     hourlySales = Array.from(hourlyMap.entries()).map(([hour, total]) => ({ hour, total })).sort((a, b) => a.hour.localeCompare(b.hour));
   } else {
     const dailyMap = new Map<string, number>();
@@ -272,6 +306,13 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
       if (cm.created_at) {
         const d = new Date(cm.created_at).toISOString().slice(0, 10);
         dailyMap.set(d, (dailyMap.get(d) || 0) + Number(cm.amount || 0));
+      }
+    });
+    pdvUncoveredOrders.forEach(o => {
+      const ts = o.paid_at || o.created_at;
+      if (ts) {
+        const d = new Date(ts).toISOString().slice(0, 10);
+        dailyMap.set(d, (dailyMap.get(d) || 0) + calcTotemOrderTotal(o));
       }
     });
     dailySales = Array.from(dailyMap.entries()).map(([day, total]) => ({ day, total })).sort((a, b) => a.day.localeCompare(b.day));
@@ -342,6 +383,10 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   // Add uncovered cash entries to payment method breakdown
   uncoveredCashEntries.forEach((cm: any) => {
     addMethodRevenue(methodTotals, cm.payment_method, Number(cm.amount || 0));
+  });
+  // Add PDV paid orders to payment method breakdown
+  pdvUncoveredOrders.forEach((o: any) => {
+    addMethodRevenue(methodTotals, o.payment_type, calcTotemOrderTotal(o));
   });
 
   const revenueByMethod = Object.entries(methodTotals)
