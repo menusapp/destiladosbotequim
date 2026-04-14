@@ -99,11 +99,16 @@ export function CampaignForm({
       
       if (editingCampaign) {
         populateForm(editingCampaign);
+      } else if (prefill) {
+        resetForm();
+        setTriggerType(prefill.triggerType as any);
+        if (prefill.name) setName(prefill.name);
+        if (prefill.messageTemplate) setMessageTemplate(prefill.messageTemplate);
       } else {
         resetForm();
       }
     }
-  }, [open, editingCampaign]);
+  }, [open, editingCampaign, prefill]);
 
   const fetchCategoriesAndProducts = async () => {
     try {
