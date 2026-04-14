@@ -384,6 +384,10 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   uncoveredCashEntries.forEach((cm: any) => {
     addMethodRevenue(methodTotals, cm.payment_method, Number(cm.amount || 0));
   });
+  // Add PDV paid orders to payment method breakdown
+  pdvUncoveredOrders.forEach((o: any) => {
+    addMethodRevenue(methodTotals, o.payment_type, calcTotemOrderTotal(o));
+  });
 
   const revenueByMethod = Object.entries(methodTotals)
     .filter(([_, total]) => total > 0)
