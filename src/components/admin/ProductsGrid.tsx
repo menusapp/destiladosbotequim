@@ -110,6 +110,7 @@ interface IngredientVariation {
   name: string;
   description?: string;
   price: number;
+  pdv_code?: string;
   ingredients: ProductIngredient[];
 }
 
@@ -320,7 +321,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit
       })) || [];
       if (extra.is_required && ings.length > 0) {
-        variationsFromDB.push({ id: crypto.randomUUID(), name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings });
+        variationsFromDB.push({ id: crypto.randomUUID(), name: extra.name, description: extra.description || undefined, price: extra.price, pdv_code: extra.pdv_code || undefined, ingredients: ings });
         if (variationsFromDB.length === 1) { setVariationMinSelection(extra.min_selection?.toString() || "1"); setVariationMaxSelection(extra.max_selection?.toString() || "1"); setVariationIsRequired(true); }
       } else {
         extrasFromDB.push({ id: crypto.randomUUID(), name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings, is_required: extra.is_required });
@@ -374,19 +375,21 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
   const handleRemoveVariationIngredient = (id: string) => { setVariationIngredients(variationIngredients.filter(i => i.id !== id)); };
 
-  const handleAddVariation = () => {
+  const handleAddVariation = async () => {
     if (!variationName) { toast.error("Informe o nome da variação"); return; }
     if (variationIngredients.length === 0) { toast.error("Adicione pelo menos um insumo à variação"); return; }
-    setVariations([...variations, { id: crypto.randomUUID(), name: variationName, description: variationDescription || undefined, price: parseFloat(variationPrice) || 0, ingredients: [...variationIngredients] }]);
+    const newPdvCode = await generateNextPdvCode(restaurantId);
+    setVariations([...variations, { id: crypto.randomUUID(), name: variationName, description: variationDescription || undefined, price: parseFloat(variationPrice) || 0, pdv_code: newPdvCode, ingredients: [...variationIngredients] }]);
     setVariationName(""); setVariationDescription(""); setVariationPrice(""); setVariationIngredients([]);
   };
 
   const handleRemoveVariation = (id: string) => { setVariations(variations.filter(v => v.id !== id)); };
 
-  const handleDuplicateVariation = (id: string) => {
+  const handleDuplicateVariation = async (id: string) => {
     const original = variations.find(v => v.id === id);
     if (!original) return;
-    const copy = { ...original, id: crypto.randomUUID(), name: `${original.name} (cópia)`, ingredients: original.ingredients.map(i => ({ ...i, id: crypto.randomUUID() })) };
+    const newPdvCode = await generateNextPdvCode(restaurantId);
+    const copy = { ...original, id: crypto.randomUUID(), name: `${original.name} (cópia)`, pdv_code: newPdvCode, ingredients: original.ingredients.map(i => ({ ...i, id: crypto.randomUUID() })) };
     setVariations([...variations, copy]);
     toast.success("Variação duplicada");
   };
@@ -526,7 +529,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
 
     if (ingredientType === "variable" && variations.length > 0) {
       for (const variation of variations) {
-        const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: variation.name, description: variation.description || null, price: variation.price, is_required: true, min_selection: parseInt(variationMinSelection) || 1, max_selection: parseInt(variationMaxSelection) || 1 }).select().single();
+        const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: variation.name, description: variation.description || null, price: variation.price, pdv_code: variation.pdv_code || null, is_required: true, min_selection: parseInt(variationMinSelection) || 1, max_selection: parseInt(variationMaxSelection) || 1 } as any).select().single();
         if (newExtra && variation.ingredients.length > 0) {
           await supabase.from("product_extra_ingredients").insert(variation.ingredients.map(ing => ({ product_extra_id: newExtra.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
         }
@@ -614,7 +617,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
         stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit
       })) || [];
       if (extra.is_required && ings.length > 0) {
-        variationsFromDB.push({ id: extra.id, name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings });
+        variationsFromDB.push({ id: extra.id, name: extra.name, description: extra.description || undefined, price: extra.price, pdv_code: extra.pdv_code || undefined, ingredients: ings });
         if (variationsFromDB.length === 1) { setVariationMinSelection(extra.min_selection?.toString() || "1"); setVariationMaxSelection(extra.max_selection?.toString() || "1"); setVariationIsRequired(true); }
       } else {
         extrasFromDB.push({ id: extra.id, name: extra.name, description: extra.description || undefined, price: extra.price, ingredients: ings, is_required: extra.is_required });
@@ -1022,7 +1025,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
                               return (
                                 <div key={v.id} className="p-3 bg-muted/30 rounded-lg border">
                                   <div className="flex items-center justify-between mb-1">
-                                    <div><span className="font-medium">{v.name}</span><span className="text-sm text-muted-foreground ml-2">{v.price > 0 ? `+R$ ${v.price.toFixed(2)}` : "Incluído"}</span></div>
+                                    <div className="flex items-center gap-2"><span className="font-medium">{v.name}</span>{v.pdv_code && <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">PDV: {v.pdv_code}</span>}<span className="text-sm text-muted-foreground ml-2">{v.price > 0 ? `+R$ ${v.price.toFixed(2)}` : "Incluído"}</span></div>
                                     <div className="flex items-center gap-1">
                                       <Button type="button" variant="ghost" size="sm" onClick={() => handleDuplicateVariation(v.id)} title="Duplicar variação"><Copy className="h-4 w-4" /></Button>
                                       <Button type="button" variant="ghost" size="sm" onClick={() => handleEditVariation(v.id)} title="Editar variação"><Pencil className="h-4 w-4" /></Button>
