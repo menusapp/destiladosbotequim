@@ -285,36 +285,36 @@ export const printOrder = async (
           font-family: '${fontFamily}', 'Courier New', monospace;
           width: ${paperSize};
           margin: 0 auto;
-          padding: 16px 12px 20px 12px;
+          padding: 24px 12px 28px 12px;
           font-size: ${fontSize}px;
           font-weight: ${fontBold ? "bold" : "normal"};
-          line-height: 1.5;
+          line-height: 1.6;
           color: #000;
         }
         .center { text-align: center; }
         .bold { font-weight: bold; }
-        .line { border-top: 1px dashed #000; margin: 10px 0; }
-        .double-line { border-top: 2px solid #000; margin: 12px 0; }
-        h1 { font-size: 16px; margin: 6px 0; }
+        .line { border-top: 1px dashed #000; margin: 14px 0; }
+        .double-line { border-top: 2px solid #000; margin: 16px 0; }
+        h1 { font-size: 16px; margin: 8px 0; }
         h2 { font-size: 14px; margin: 4px 0; }
         .origin {
           font-size: 14px;
           font-weight: bold;
           text-align: center;
-          padding: 6px 4px;
+          padding: 8px 4px;
           border: 1px solid #000;
-          margin: 10px 0;
+          margin: 14px 0;
         }
         .scheduled-alert {
           font-size: 14px;
           font-weight: bold;
           text-align: center;
-          padding: 6px 4px;
+          padding: 8px 4px;
           border: 2px solid #000;
-          margin: 6px 0;
+          margin: 10px 0;
           background: #f0f0f0;
         }
-        .item { margin: 8px 0; }
+        .item { margin: 12px 0; }
         .item-row {
           display: flex;
           justify-content: space-between;
@@ -337,11 +337,11 @@ export const printOrder = async (
           justify-content: space-between;
           font-size: 16px;
           font-weight: bold;
-          margin: 8px 0;
+          margin: 10px 0;
         }
-        .section { margin: 8px 0; }
-        .section p { margin: 4px 0; font-size: 11px; }
-        .footer { text-align: center; margin-top: 16px; font-size: 10px; }
+        .section { margin: 12px 0; }
+        .section p { margin: 5px 0; font-size: 11px; }
+        .footer { text-align: center; margin-top: 20px; font-size: 10px; }
       </style>
     </head>
     <body>
