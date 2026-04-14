@@ -394,6 +394,28 @@ export const TableDetailDialog = ({
     toast.success("Pagamento registrado!");
   };
 
+  const handleSwapCustomer = async (comandaId: string, newCustomer: { cpf: string; name: string; phone: string | null }) => {
+    const { error: e1 } = await supabase
+      .from("comandas")
+      .update({ customer_name: newCustomer.name, customer_cpf: newCustomer.cpf })
+      .eq("id", comandaId);
+
+    const { error: e2 } = await supabase
+      .from("orders")
+      .update({ customer_name: newCustomer.name, customer_cpf: newCustomer.cpf })
+      .eq("comanda_id", comandaId);
+
+    if (e1 || e2) {
+      toast.error("Erro ao trocar cliente");
+      return;
+    }
+
+    toast.success(`Cliente alterado para ${newCustomer.name}`);
+    setEditingComandaId(null);
+    refetchComandas();
+    refetchOrders();
+  };
+
   const handleSplitItem = (item: any, orderId: string) => {
     setSplittingItem(item);
     setSplittingOrderId(orderId);
