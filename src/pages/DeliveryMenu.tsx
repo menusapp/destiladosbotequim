@@ -106,9 +106,19 @@ export default function DeliveryMenu() {
   }, [restaurantSlug]);
 
   const loadCustomerInfo = useCallback(() => {
+    const expiry = localStorage.getItem(`delivery-expiry-${restaurantSlug}`);
+    const isExpired = expiry && Date.now() > Number(expiry);
+
+    if (isExpired) {
+      localStorage.removeItem(`delivery-customer-${restaurantSlug}`);
+      localStorage.removeItem(`delivery-cpf-${restaurantSlug}`);
+      localStorage.removeItem(`delivery-phone-${restaurantSlug}`);
+      localStorage.removeItem(`delivery-expiry-${restaurantSlug}`);
+    }
+
     const storedName = localStorage.getItem(`delivery-customer-${restaurantSlug}`);
     const storedCPF = localStorage.getItem(`delivery-cpf-${restaurantSlug}`);
-    if (storedName && storedCPF) {
+    if (storedName && storedCPF && !isExpired) {
       setCustomerName(storedName);
       setCustomerCPF(storedCPF);
     } else {
