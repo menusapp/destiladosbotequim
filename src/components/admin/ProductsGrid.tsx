@@ -44,6 +44,7 @@ interface Product {
   prep_time?: number;
   sku?: string;
   variableCosts?: VariableCostInfo[];
+  extraPdvCodes?: string[];
 }
 
 interface VariableCostInfo {
@@ -238,7 +239,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
     // Batch: fetch ALL ingredients and extras in 2 queries instead of N*2
     const [{ data: allIngredients }, { data: allExtras }] = await Promise.all([
       supabase.from("product_ingredients").select("product_id, quantity, stock_items(price_per_unit)").in("product_id", productIds),
-      supabase.from("product_extras").select("id, product_id, name, price, is_required, product_extra_ingredients(quantity, stock_items(price_per_unit))").in("product_id", productIds),
+      supabase.from("product_extras").select("id, product_id, name, price, is_required, pdv_code, product_extra_ingredients(quantity, stock_items(price_per_unit))").in("product_id", productIds),
     ]);
 
     // Group by product_id client-side
@@ -275,13 +276,16 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       const effectivePrice = product.promotional_price || product.price;
       const margin = effectivePrice > 0 ? ((effectivePrice - cost) / effectivePrice) * 100 : 0;
 
+      const extraPdvCodes = productExtras.map((e: any) => e.pdv_code).filter(Boolean) as string[];
+
       return {
         ...product,
         promotional_price: product.promotional_price,
         cost, margin,
         prep_time: product.prep_time_minutes || 30,
         sku: product.name.substring(0, 3).toUpperCase() + String(product.id).substring(0, 4).toUpperCase(),
-        variableCosts: variableCosts.length > 0 ? variableCosts : undefined
+        variableCosts: variableCosts.length > 0 ? variableCosts : undefined,
+        extraPdvCodes,
       };
     });
     setProducts(productsWithMetrics);
@@ -689,9 +693,14 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
   const effectivePriceForCMV = parsedPromoPrice > 0 ? parsedPromoPrice : parsedProductPrice;
   const cmvPercentage = effectivePriceForCMV > 0 ? (fixedCost / effectivePriceForCMV) * 100 : 0;
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProducts = products.filter(product => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    if (product.name.toLowerCase().includes(q)) return true;
+    if ((product as any).pdv_code && (product as any).pdv_code.toLowerCase().includes(q)) return true;
+    if (product.extraPdvCodes?.some(code => code.toLowerCase().includes(q))) return true;
+    return false;
+  });
 
   const groupedByCategory = useMemo(() => {
     const categoryMap = new Map<string, { name: string; products: Product[] }>();
@@ -728,7 +737,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen }: ProductsGridProps) => 
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar produtos..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+          <Input placeholder="Buscar por nome ou código PDV..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
         <Button onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para adicionar produtos"); return; } resetForm(); setDialogOpen(true); }}>
           <Plus className="h-4 w-4 mr-2" /> Novo Produto
