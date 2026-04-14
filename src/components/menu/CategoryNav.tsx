@@ -123,7 +123,7 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
   return (
     <div
       ref={navRef}
-      className="sticky z-40 bg-background border-b border-border px-3 py-3 my-1 flex gap-1.5 overflow-x-auto category-scroll-bar"
+      className="sticky z-40 bg-background border-b border-border px-3 py-3 flex gap-1.5 overflow-x-auto category-scroll-bar my-0"
       style={{
         top: `${FALLBACK_HEADER_HEIGHT}px`,
         scrollbarWidth: "none",
