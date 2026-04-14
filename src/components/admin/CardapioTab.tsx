@@ -83,7 +83,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
         </TabsList>
 
         <TabsContent value="produtos" className="mt-6">
-          <ProductsGrid key={refreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
+          <ProductsGrid key={refreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} onOpenDigitizer={() => { setDigitizerMode("products"); setDigitizerOpen(true); }} />
         </TabsContent>
 
         <TabsContent value="categorias" className="mt-6">
