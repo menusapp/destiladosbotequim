@@ -580,6 +580,7 @@ export default function DeliveryMenu() {
             restaurantId={restaurant?.id}
             requireName={restaurant?.login_require_name ?? true}
             requirePhone={restaurant?.login_require_phone ?? false}
+            requireBirthDate={restaurant?.login_require_birth_date ?? false}
           />
         </>
       )}

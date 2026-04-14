@@ -23,6 +23,7 @@ interface CustomerInfoDialogProps {
   restaurantId?: string;
   requireName?: boolean;
   requirePhone?: boolean;
+  requireBirthDate?: boolean;
 }
 
 const CustomerInfoDialog = ({ 
@@ -32,7 +33,8 @@ const CustomerInfoDialog = ({
   restaurantColor = "#FF6B35",
   restaurantId,
   requireName = true,
-  requirePhone = false
+  requirePhone = false,
+  requireBirthDate = false
 }: CustomerInfoDialogProps) => {
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -344,7 +346,7 @@ const CustomerInfoDialog = ({
     onSubmit(finalName || "Cliente", sanitizedCPF, finalPhone);
   };
 
-  const showBirthDateField = !existingCustomer || !existingCustomer.birth_date;
+  const showBirthDateField = requireBirthDate && (!existingCustomer || !existingCustomer.birth_date);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
