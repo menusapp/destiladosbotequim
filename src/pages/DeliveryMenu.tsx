@@ -38,6 +38,7 @@ export default function DeliveryMenu() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "reservas" | "perfil">("menu");
+  const [pendingTab, setPendingTab] = useState<"pedidos" | "reservas" | "perfil" | null>(null);
   const { trackCartUpdate, trackCheckoutStarted, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id);
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
@@ -121,8 +122,6 @@ export default function DeliveryMenu() {
     if (storedName && storedCPF && !isExpired) {
       setCustomerName(storedName);
       setCustomerCPF(storedCPF);
-    } else {
-      setShowCustomerDialog(true);
     }
   }, [restaurantSlug]);
 
@@ -246,6 +245,12 @@ export default function DeliveryMenu() {
     }
     
     setShowCustomerDialog(false);
+
+    // Navigate to pending tab if any
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+    }
   };
 
   const handleNameUpdate = (name: string) => {
@@ -627,7 +632,14 @@ export default function DeliveryMenu() {
 
       <DeliveryBottomNav
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={(tab) => {
+          if ((tab === "pedidos" || tab === "perfil" || tab === "reservas") && !customerCPF) {
+            setPendingTab(tab as "pedidos" | "perfil" | "reservas");
+            setShowCustomerDialog(true);
+            return;
+          }
+          setActiveTab(tab);
+        }}
         primaryColor={primaryColor}
         showReservations={!!restaurant.reservations_enabled}
       />
