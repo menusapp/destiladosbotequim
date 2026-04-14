@@ -98,8 +98,10 @@ Deno.serve(async (req) => {
 
     // Hash password
     let passwordHash: string;
+    let adminPasswordHash: string;
     try {
       passwordHash = hashSync(password);
+      adminPasswordHash = hashSync(adminPassword);
     } catch (hashError) {
       console.error("[register-restaurant] bcrypt hash failed:", hashError);
       return new Response(JSON.stringify({ error: "Erro ao processar senha. Tente novamente." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
