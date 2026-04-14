@@ -1,51 +1,66 @@
 
 
-## Plano: Digitalizador de Cardápio por Foto com IA
+## Plano: Melhorar Espaçamento da Impressão Térmica
 
-### Resumo
-O restaurante faz upload de uma foto do cardápio físico, seleciona o tipo de culinária, e a IA analisa a imagem retornando categorias, produtos, preços e variações. O usuário revisa, edita e confirma — os dados são inseridos nas tabelas `categories` e `products` existentes. Sem tocar em estoque/insumos.
+### Problema
+O recibo está saindo compactado demais — pouca margem no topo/rodapé e informações muito juntas entre si.
 
-### Fluxo
+### Mudanças no CSS (`printOrder.ts`)
+
+Todas as alterações são apenas nos valores de espaçamento do CSS inline:
+
+| Elemento | Atual | Novo | O que muda |
+|----------|-------|------|------------|
+| `body padding` | 6px | 12px | Margem geral maior nas laterais |
+| `body padding-top` | — | 16px | Margem maior no topo |
+| `body padding-bottom` | — | 20px | Margem maior no final |
+| `.line` margin | 6px 0 | 10px 0 | Linhas tracejadas mais espaçadas |
+| `.double-line` margin | 6px 0 | 12px 0 | Linhas duplas mais espaçadas |
+| `h1` margin | 2px 0 | 6px 0 | Nome do restaurante mais respirado |
+| `.origin` margin | 6px 0 | 10px 0 | Tipo do pedido mais destacado |
+| `.origin` padding | 4px | 6px 4px | Mais respiro interno |
+| `.item` margin | 4px 0 | 8px 0 | Itens separados entre si |
+| `.section` margin | 4px 0 | 8px 0 | Seções de info mais espaçadas |
+| `.section p` margin | 2px 0 | 4px 0 | Linhas de texto dentro de seções |
+| `.total-row` margin | 4px 0 | 8px 0 | Total mais destacado |
+| `.footer` margin-top | 8px | 16px | Rodapé mais separado |
+| `body line-height` | 1.4 | 1.5 | Entrelinhas levemente maior |
+
+### Layout visual do recibo (aproximado)
 
 ```text
-[Frontend: MenuDigitizerDialog]
-  → Upload foto + tipo de culinária
-  → Chama Edge Function
-      ↓
-[Edge Function: digitize-menu]
-  → Envia imagem (base64) ao Lovable AI (Gemini 2.5 Flash - visão)
-  → Retorna JSON estruturado via tool calling
-      ↓
-[Frontend: Tela de Revisão]
-  → Lista editável de categorias + produtos
-  → Confirmar → insere tudo no banco
+┌──────────────────────────┐
+│                          │  ← margem topo 16px
+│    NOME DO RESTAURANTE   │
+│                          │
+│ - - - - - - - - - - - -  │  ← margin 10px
+│                          │
+│ ┌──────────────────────┐ │
+│ │ PEDIDO LOCAL - MESA 5│ │  ← padding 6px, margin 10px
+│ └──────────────────────┘ │
+│                          │
+│  Pedido: #abc12345       │
+│  Data: 14/04/2026 18:30  │  ← margin entre linhas 4px
+│  Cliente: João Silva     │
+│                          │
+│ ════════════════════════ │  ← margin 12px
+│                          │
+│  2x X-Bacon      R$40,00│
+│    + Cheddar      R$ 3,00│  ← margin entre itens 8px
+│                          │
+│  1x Coca-Cola     R$8,00 │
+│                          │
+│ ════════════════════════ │  ← margin 12px
+│                          │
+│  TOTAL         R$ 51,00  │  ← margin 8px
+│                          │
+│ - - - - - - - - - - - -  │
+│                          │
+│  Impresso em 14/04 18:32 │  ← margin-top 16px
+│                          │  ← margem final 20px
+└──────────────────────────┘
 ```
 
-### O que será criado/editado
-
-**1. Edge Function `digitize-menu`** (novo)
-- Recebe imagem em base64 + tipo de culinária
-- Prompt contextualizado (pizzaria → espera tamanhos; hamburgueria → combos, etc.)
-- Usa Lovable AI Gateway com `google/gemini-2.5-flash` e tool calling para JSON estruturado
-- Retorna: `{ categories: [{ name, products: [{ name, description, price, variations? }] }] }`
-
-**2. Componente `MenuDigitizerDialog`** (novo)
-- Dialog com 3 etapas:
-  - **Etapa 1 — Tipo de culinária**: Pizzaria, Hamburgueria, Açaí/Sorveteria, Sushi, Cafeteria, Outros (campo livre)
-  - **Etapa 2 — Upload**: Foto do cardápio (JPG/PNG), preview, converte para base64
-  - **Etapa 3 — Revisão**: Lista editável de categorias e produtos extraídos. Nome, descrição e preço editáveis. Variações como sub-itens. Botão remover por item
-- Ao confirmar: insere categorias e produtos no banco via Supabase SDK
-
-**3. `CardapioTab.tsx`** (editar)
-- Botão "Importar por Foto" no header
-- Abre o dialog e recarrega produtos após importação
-
-**4. `supabase/config.toml`** (editar)
-- Adicionar `[functions.digitize-menu]` com `verify_jwt = false`
-
-### Detalhes técnicos
-- **Modelo**: `google/gemini-2.5-flash` — suporta visão, custo baixo (~1 crédito por foto)
-- **Sem migração SQL** — usa tabelas existentes
-- **Sem dependências novas**
-- **LOVABLE_API_KEY** já está configurada no projeto
+### Arquivo editado
+- `src/lib/printOrder.ts` — apenas valores CSS, sem mudança de lógica
 
