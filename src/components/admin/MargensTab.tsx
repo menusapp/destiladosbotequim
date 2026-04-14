@@ -61,6 +61,7 @@ export default function MargensTab({ restaurantId }: MargensTabProps) {
   const fetchProductsCost = async () => {
     setLoading(true);
     try {
+      // 1) Buscar todos os produtos do restaurante
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
@@ -73,144 +74,119 @@ export default function MargensTab({ restaurantId }: MargensTabProps) {
         .eq('categories.restaurant_id', restaurantId);
 
       if (productsError) throw productsError;
+      if (!productsData || productsData.length === 0) {
+        setProducts([]);
+        setAverageCMV(0);
+        return;
+      }
 
-      const productsWithCosts: ProductWithCost[] = await Promise.all(
-        (productsData || []).map(async (product: any) => {
-          // Buscar ingredientes base do produto
-          const { data: ingredients } = await supabase
-            .from('product_ingredients')
-            .select(`
-              quantity,
-              stock_items(price_per_unit)
-            `)
-            .eq('product_id', product.id);
+      const productIds = productsData.map((p: any) => p.id);
 
-          // Buscar extras com is_required para identificar variações
-          const { data: extras } = await supabase
-            .from('product_extras')
-            .select(`
-              id,
-              name,
-              price,
-              is_required
-            `)
-            .eq('product_id', product.id);
+      // 2) Buscar TUDO em paralelo com apenas 3 queries
+      const [ingredientsRes, extrasRes, extraIngredientsRes] = await Promise.all([
+        supabase
+          .from('product_ingredients')
+          .select('product_id, quantity, stock_items(price_per_unit)')
+          .in('product_id', productIds),
+        supabase
+          .from('product_extras')
+          .select('id, product_id, name, price, is_required')
+          .in('product_id', productIds),
+        supabase
+          .from('product_extra_ingredients')
+          .select('product_extra_id, quantity, stock_items(price_per_unit)')
+      ]);
 
-          // Calcular custo base (ingredientes fixos)
-          let baseCost = 0;
-          if (ingredients) {
-            for (const ing of ingredients) {
+      // 3) Indexar por produto/extra para acesso O(1)
+      const ingredientsByProduct = new Map<string, any[]>();
+      for (const ing of ingredientsRes.data || []) {
+        const list = ingredientsByProduct.get(ing.product_id) || [];
+        list.push(ing);
+        ingredientsByProduct.set(ing.product_id, list);
+      }
+
+      const extrasByProduct = new Map<string, any[]>();
+      const allExtraIds = new Set<string>();
+      for (const ext of extrasRes.data || []) {
+        const list = extrasByProduct.get(ext.product_id) || [];
+        list.push(ext);
+        extrasByProduct.set(ext.product_id, list);
+        allExtraIds.add(ext.id);
+      }
+
+      const ingredientsByExtra = new Map<string, any[]>();
+      for (const ei of extraIngredientsRes.data || []) {
+        if (!allExtraIds.has(ei.product_extra_id)) continue;
+        const list = ingredientsByExtra.get(ei.product_extra_id) || [];
+        list.push(ei);
+        ingredientsByExtra.set(ei.product_extra_id, list);
+      }
+
+      // 4) Processar tudo em memória (sem mais queries)
+      const productsWithCosts: ProductWithCost[] = productsData.map((product: any) => {
+        const ingredients = ingredientsByProduct.get(product.id) || [];
+        const extras = extrasByProduct.get(product.id) || [];
+
+        let baseCost = 0;
+        for (const ing of ingredients) {
+          if (ing.stock_items) {
+            baseCost += ing.quantity * ing.stock_items.price_per_unit;
+          }
+        }
+
+        const variations = extras.filter((e: any) => e.is_required);
+
+        if (variations.length > 0) {
+          const variationsWithCosts: ProductVariation[] = variations.map((variation: any) => {
+            const varIngredients = ingredientsByExtra.get(variation.id) || [];
+            let variationCost = baseCost;
+            for (const ing of varIngredients) {
               if (ing.stock_items) {
-                baseCost += ing.quantity * ing.stock_items.price_per_unit;
+                variationCost += ing.quantity * ing.stock_items.price_per_unit;
               }
             }
-          }
-
-          // Separar variações (is_required = true) de extras opcionais
-          const variations = extras?.filter(e => e.is_required) || [];
-          const optionalExtras = extras?.filter(e => !e.is_required) || [];
-
-          if (variations.length > 0) {
-            // Produto com INSUMOS VARIÁVEIS
-            const variationsWithCosts: ProductVariation[] = await Promise.all(
-              variations.map(async (variation) => {
-                // Buscar ingredientes dessa variação
-                const { data: variationIngredients } = await supabase
-                  .from('product_extra_ingredients')
-                  .select(`
-                    quantity,
-                    stock_items(price_per_unit)
-                  `)
-                  .eq('product_extra_id', variation.id);
-
-                let variationCost = baseCost; // Começa com custo base
-                if (variationIngredients) {
-                  for (const ing of variationIngredients) {
-                    if (ing.stock_items) {
-                      variationCost += ing.quantity * ing.stock_items.price_per_unit;
-                    }
-                  }
-                }
-
-                // Usar preço promocional se existir
-                const effectiveBasePrice = product.promotional_price || product.price;
-                const variationPrice = effectiveBasePrice + (variation.price || 0);
-                const cmv = variationPrice > 0 ? (variationCost / variationPrice) * 100 : 0;
-                const margin = variationPrice - variationCost;
-
-                return {
-                  name: variation.name,
-                  price: variationPrice,
-                  cost: variationCost,
-                  cmv_percentage: cmv,
-                  margin: margin
-                };
-              })
-            );
-
-            // Calcular média do produto baseado nas variações
-            const avgCost = variationsWithCosts.reduce((sum, v) => sum + v.cost, 0) / variationsWithCosts.length;
-            const avgPrice = variationsWithCosts.reduce((sum, v) => sum + v.price, 0) / variationsWithCosts.length;
-            const avgCMV = variationsWithCosts.reduce((sum, v) => sum + v.cmv_percentage, 0) / variationsWithCosts.length;
-            const avgMargin = variationsWithCosts.reduce((sum, v) => sum + v.margin, 0) / variationsWithCosts.length;
-
+            const effectiveBasePrice = product.promotional_price || product.price;
+            const variationPrice = effectiveBasePrice + (variation.price || 0);
+            const cmv = variationPrice > 0 ? (variationCost / variationPrice) * 100 : 0;
             return {
-              id: product.id,
-              name: product.name,
-              price: avgPrice,
-              cost: avgCost,
-              cmv_percentage: avgCMV,
-              margin: avgMargin,
-              hasVariations: true,
-              variations: variationsWithCosts
-            };
-          } else {
-            // Produto com INSUMOS FIXOS (comportamento original)
-            let productCost = baseCost;
-
-            // Adicionar custo de extras opcionais para referência
-            for (const extra of optionalExtras) {
-              const { data: extraIngredients } = await supabase
-                .from('product_extra_ingredients')
-                .select(`
-                  quantity,
-                  stock_items(price_per_unit)
-                `)
-                .eq('product_extra_id', extra.id);
-
-              if (extraIngredients) {
-                for (const ing of extraIngredients) {
-                  if (ing.stock_items) {
-                    productCost += ing.quantity * ing.stock_items.price_per_unit;
-                  }
-                }
-              }
-            }
-
-            // Usar preço promocional se existir
-            const effectivePrice = product.promotional_price || product.price;
-            const cmv = effectivePrice > 0 ? (baseCost / effectivePrice) * 100 : 0;
-            const margin = effectivePrice - baseCost;
-
-            return {
-              id: product.id,
-              name: product.name,
-              price: effectivePrice,
-              cost: baseCost,
+              name: variation.name,
+              price: variationPrice,
+              cost: variationCost,
               cmv_percentage: cmv,
-              margin: margin,
-              hasVariations: false
+              margin: variationPrice - variationCost
             };
-          }
-        })
-      );
+          });
+
+          const len = variationsWithCosts.length;
+          return {
+            id: product.id,
+            name: product.name,
+            price: variationsWithCosts.reduce((s, v) => s + v.price, 0) / len,
+            cost: variationsWithCosts.reduce((s, v) => s + v.cost, 0) / len,
+            cmv_percentage: variationsWithCosts.reduce((s, v) => s + v.cmv_percentage, 0) / len,
+            margin: variationsWithCosts.reduce((s, v) => s + v.margin, 0) / len,
+            hasVariations: true,
+            variations: variationsWithCosts
+          };
+        } else {
+          const effectivePrice = product.promotional_price || product.price;
+          const cmv = effectivePrice > 0 ? (baseCost / effectivePrice) * 100 : 0;
+          return {
+            id: product.id,
+            name: product.name,
+            price: effectivePrice,
+            cost: baseCost,
+            cmv_percentage: cmv,
+            margin: effectivePrice - baseCost,
+            hasVariations: false
+          };
+        }
+      });
 
       setProducts(productsWithCosts);
 
-      // Calcular CMV médio considerando cada variação individualmente
       let totalCMVItems = 0;
       let cmvCount = 0;
-      
       for (const product of productsWithCosts) {
         if (product.hasVariations && product.variations) {
           for (const v of product.variations) {
@@ -222,7 +198,6 @@ export default function MargensTab({ restaurantId }: MargensTabProps) {
           cmvCount++;
         }
       }
-
       setAverageCMV(cmvCount > 0 ? totalCMVItems / cmvCount : 0);
     } catch (error) {
       console.error('Error fetching products cost:', error);
