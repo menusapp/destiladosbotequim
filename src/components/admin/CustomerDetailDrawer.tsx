@@ -319,6 +319,9 @@ export const CustomerDetailDrawer = ({
                     <div className="space-y-2"><Label>Telefone</Label><Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} /></div>
                     <div className="space-y-2"><Label>E-mail</Label><Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></div>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Data de Nascimento</Label><Input value={editBirthDate} onChange={(e) => setEditBirthDate(formatBirthDateInput(e.target.value))} placeholder="DD/MM/AAAA" maxLength={10} inputMode="numeric" /></div>
+                  </div>
                   <div className="space-y-2"><Label>Observações</Label><Textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={3} /></div>
                 </div>
               ) : (
@@ -336,7 +339,13 @@ export const CustomerDetailDrawer = ({
                         <div><p className="text-xs text-muted-foreground">E-mail</p><p className="text-sm font-medium">{customer.email}</p></div>
                       </div>
                     )}
-                    {!customer.phone && !customer.email && (
+                    {customer.birth_date && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"><Cake className="w-4 h-4 text-muted-foreground" /></div>
+                        <div><p className="text-xs text-muted-foreground">Data de Nascimento</p><p className="text-sm font-medium">{formatBirthDateForInput(customer.birth_date)}</p></div>
+                      </div>
+                    )}
+                    {!customer.phone && !customer.email && !customer.birth_date && (
                       <p className="text-sm text-muted-foreground">Nenhum contato cadastrado</p>
                     )}
                   </div>
