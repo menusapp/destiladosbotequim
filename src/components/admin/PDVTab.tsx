@@ -162,7 +162,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     queryFn: async () => {
       const { data } = await supabase
         .from("products")
-        .select("*, categories!inner(id, name, restaurant_id), product_extras(*)")
+        .select("*, categories!inner(id, name, restaurant_id), product_extras(*, extra_categories(name))")
         .eq("categories.restaurant_id", restaurantId)
         .eq("available", true)
         .order("name");
