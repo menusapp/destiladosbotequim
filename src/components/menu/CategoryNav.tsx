@@ -139,7 +139,7 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
             buttonRefs.current[cat.id] = el;
           }}
           onClick={() => handleCategoryClick(cat.id)}
-          className="flex-shrink-0 px-3 py-2 rounded-full text-xs font-medium transition-colors whitespace-nowrap"
+          className="flex-shrink-0 font-medium transition-colors whitespace-nowrap text-sm px-[12px] rounded-lg py-[14px]"
           style={
             activeCategory === cat.id
               ? { backgroundColor: primaryColor, color: "#fff" }
