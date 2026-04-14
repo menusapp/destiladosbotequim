@@ -1,26 +1,28 @@
 
 
-## Plan: Fix 3 UI Issues
+## Plan: Separate Restaurant Credentials from Staff Account
 
-### Issue 1: "Recolher" text overlapping notifications in admin panel
-The "Recolher" button sits inside the expanded notification list but uses `self-end mb-1` which can overlap notification cards. Fix: add proper positioning with `sticky top-0 z-10 bg-background` so it stays above the scrollable list and doesn't overlap.
+### Problem
+Currently, when registering a restaurant, the `register-restaurant` edge function creates both `restaurant_credentials` (for restaurant login) AND a `restaurant_staff` admin account with the **same** username and password. This means the same credentials are used for both logins, which is incorrect.
 
-**File:** `src/pages/RestaurantAdmin.tsx`
-- Both "Recolher" buttons (order notifications ~line 964-968, bill notifications ~line 1054-1058): wrap in a sticky header or add background and padding so the text doesn't overlap the cards below.
+### Solution
 
-### Issue 2: Complement field in address form — label and placeholder
-Currently the label says "Complemento" and placeholder says "Opcional". Change to:
-- Label: `Complemento (opcional)`
-- Placeholder: `Ex: Casa, Apartamento, Bloco B`
+**1. Remove staff account creation from `register-restaurant` edge function**
+- Delete the step 3 block (lines ~149-163) that creates the `restaurant_staff` record
+- The registration form credentials will only be saved to `restaurant_credentials` (restaurant login)
 
-**Files:**
-- `src/components/menu/checkout/AddressStep.tsx` (~line 584, 591)
-- `src/components/kiosk/KioskDeliveryAddress.tsx` (~line 168-169) — same fix
+**2. Update registration form label**
+- In `RestaurantRegistration.tsx`, change the section title from "Dados de Acesso ao Painel" to "Credenciais do Restaurante" and add a helper text explaining these are for the restaurant login only
 
-### Issue 3: Notifications should start collapsed (cascaded), not expanded
-Currently `cascadeExpanded` and `billCascadeExpanded` default to `false` (line 80, 88), which means they already start collapsed. However, the issue is that when new notifications arrive they may be auto-expanding. I'll verify the state isn't being set to `true` anywhere on arrival and ensure notifications always arrive in collapsed/cascaded mode.
+**3. Fix post-registration redirect**
+- In `RestaurantRegistration.tsx`, after successful registration, store `restaurant_id`, `restaurant_name`, and `restaurant_slug` in localStorage, then redirect to `/login/staff` instead of directly to `/slug/admin`
+- Remove the premature `staff_role: "admin"` localStorage set (line 118) since no staff account exists yet
 
-**File:** `src/pages/RestaurantAdmin.tsx`
-- Confirm initial state is `false` (already is)
-- Check if any notification arrival logic sets expanded to `true` and remove it if so
+**4. First-time staff setup already works**
+- The `StaffLogin.tsx` page already has the first-time setup flow: it calls `admin_check_has_staff` RPC and shows the "Criar Conta de Proprietário" form when no staff exists
+- No changes needed here — it will naturally trigger after registration since no staff was created
+
+### Files Changed
+- `supabase/functions/register-restaurant/index.ts` — Remove staff creation block
+- `src/pages/RestaurantRegistration.tsx` — Update labels, fix redirect logic
 
