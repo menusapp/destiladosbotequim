@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Copy, Store } from "lucide-react";
+import { Copy, Store, Settings } from "lucide-react";
+import { AccountSettingsDialog } from "./AccountSettingsDialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
