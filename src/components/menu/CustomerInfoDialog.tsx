@@ -128,16 +128,67 @@ const CustomerInfoDialog = ({
     return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
   };
 
-  const parseBirthDate = (formatted: string): string | null => {
-    const parts = formatted.split("/");
-    if (parts.length !== 3 || parts[2].length !== 4) return null;
-    const [day, month, year] = parts.map(Number);
+  const getBirthDateParts = (value: string) => {
+    const normalizedValue = value.trim();
+
+    const formattedMatch = normalizedValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (formattedMatch) {
+      const [, day, month, year] = formattedMatch;
+      return {
+        day: Number(day),
+        month: Number(month),
+        year: Number(year),
+      };
+    }
+
+    const isoMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      const [, year, month, day] = isoMatch;
+      return {
+        day: Number(day),
+        month: Number(month),
+        year: Number(year),
+      };
+    }
+
+    return null;
+  };
+
+  const formatBirthDateForInput = (value: string) => {
+    const parts = getBirthDateParts(value);
+
+    if (!parts) return formatBirthDateInput(value);
+
+    return `${String(parts.day).padStart(2, "0")}/${String(parts.month).padStart(2, "0")}/${String(parts.year)}`;
+  };
+
+  const formatBirthDateForDisplay = (value: string) => {
+    const parts = getBirthDateParts(value);
+
+    if (!parts) return value;
+
+    return `${String(parts.day).padStart(2, "0")}/${String(parts.month).padStart(2, "0")}/${String(parts.year)}`;
+  };
+
+  const parseBirthDate = (value: string): string | null => {
+    const parts = getBirthDateParts(value);
+
+    if (!parts) return null;
+
+    const { day, month, year } = parts;
+
     if (!day || !month || !year) return null;
     if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-    const date = new Date(year, month - 1, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-    if (date > new Date()) return null;
+
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+
+    const now = new Date();
+    const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    if (date.getTime() > today) return null;
+
     if (year < 1900) return null;
+
     return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   };
 
