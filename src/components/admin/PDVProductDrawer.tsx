@@ -341,10 +341,10 @@ export const PDVProductDrawer = ({
 
             <Button
               onClick={handleAddToCart}
-              disabled={!isRequiredSatisfied}
+              disabled={!allRequiredSatisfied}
               className="flex-1 h-11"
             >
-              {isRequiredSatisfied ? `Adicionar • R$ ${getTotalPrice().toFixed(2)}` : "Selecione uma opção"}
+              {allRequiredSatisfied ? `Adicionar • R$ ${getTotalPrice().toFixed(2)}` : "Selecione as opções obrigatórias"}
             </Button>
           </div>
         </div>
