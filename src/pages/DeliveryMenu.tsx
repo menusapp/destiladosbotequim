@@ -106,8 +106,8 @@ export default function DeliveryMenu() {
   }, [restaurantSlug]);
 
   const loadCustomerInfo = useCallback(() => {
-    const storedName = sessionStorage.getItem(`delivery-customer-${restaurantSlug}`);
-    const storedCPF = sessionStorage.getItem(`delivery-cpf-${restaurantSlug}`);
+    const storedName = localStorage.getItem(`delivery-customer-${restaurantSlug}`);
+    const storedCPF = localStorage.getItem(`delivery-cpf-${restaurantSlug}`);
     if (storedName && storedCPF) {
       setCustomerName(storedName);
       setCustomerCPF(storedCPF);
@@ -220,16 +220,16 @@ export default function DeliveryMenu() {
       
       setCustomerName(finalName);
       setCustomerCPF(sanitizedCPF);
-      sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, finalName);
-      sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
-      if (finalPhone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, finalPhone);
+      localStorage.setItem(`delivery-customer-${restaurantSlug}`, finalName);
+      localStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
+      if (finalPhone) localStorage.setItem(`delivery-phone-${restaurantSlug}`, finalPhone);
       trackCustomerInfo(finalPhone || undefined, finalName);
     } else {
       setCustomerName(name);
       setCustomerCPF(sanitizedCPF);
-      sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
-      sessionStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
-      if (phone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, phone);
+      localStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
+      localStorage.setItem(`delivery-cpf-${restaurantSlug}`, sanitizedCPF);
+      if (phone) localStorage.setItem(`delivery-phone-${restaurantSlug}`, phone);
       trackCustomerInfo(phone || undefined, name);
     }
     
@@ -238,11 +238,11 @@ export default function DeliveryMenu() {
 
   const handleNameUpdate = (name: string) => {
     setCustomerName(name);
-    sessionStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
+    localStorage.setItem(`delivery-customer-${restaurantSlug}`, name);
   };
 
   const handlePhoneUpdate = (phone: string) => {
-    if (phone) sessionStorage.setItem(`delivery-phone-${restaurantSlug}`, phone);
+    if (phone) localStorage.setItem(`delivery-phone-${restaurantSlug}`, phone);
   };
 
   const saveCartToStorage = () => {
@@ -582,7 +582,7 @@ export default function DeliveryMenu() {
             restaurant={restaurant}
             customerCPF={customerCPF}
             customerName={customerName}
-            customerPhone={sessionStorage.getItem(`delivery-phone-${restaurantSlug}`) || ""}
+            customerPhone={localStorage.getItem(`delivery-phone-${restaurantSlug}`) || ""}
             primaryColor={primaryColor}
           />
         </div>
@@ -598,9 +598,9 @@ export default function DeliveryMenu() {
             onNameUpdate={handleNameUpdate}
             onPhoneUpdate={handlePhoneUpdate}
             onLogout={() => {
-              sessionStorage.removeItem(`delivery-customer-${restaurantSlug}`);
-              sessionStorage.removeItem(`delivery-cpf-${restaurantSlug}`);
-              sessionStorage.removeItem(`delivery-phone-${restaurantSlug}`);
+              localStorage.removeItem(`delivery-customer-${restaurantSlug}`);
+              localStorage.removeItem(`delivery-cpf-${restaurantSlug}`);
+              localStorage.removeItem(`delivery-phone-${restaurantSlug}`);
               localStorage.removeItem(`delivery-cart-${restaurantSlug}`);
               setCustomerName("");
               setCustomerCPF("");
