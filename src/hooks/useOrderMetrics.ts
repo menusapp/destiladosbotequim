@@ -265,6 +265,13 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
         hourlyMap.set(h, (hourlyMap.get(h) || 0) + Number(cm.amount || 0));
       }
     });
+    pdvUncoveredOrders.forEach(o => {
+      const ts = o.paid_at || o.created_at;
+      if (ts) {
+        const h = new Date(ts).getHours().toString().padStart(2, "0") + ":00";
+        hourlyMap.set(h, (hourlyMap.get(h) || 0) + calcTotemOrderTotal(o));
+      }
+    });
     hourlySales = Array.from(hourlyMap.entries()).map(([hour, total]) => ({ hour, total })).sort((a, b) => a.hour.localeCompare(b.hour));
   } else {
     const dailyMap = new Map<string, number>();
@@ -299,6 +306,13 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
       if (cm.created_at) {
         const d = new Date(cm.created_at).toISOString().slice(0, 10);
         dailyMap.set(d, (dailyMap.get(d) || 0) + Number(cm.amount || 0));
+      }
+    });
+    pdvUncoveredOrders.forEach(o => {
+      const ts = o.paid_at || o.created_at;
+      if (ts) {
+        const d = new Date(ts).toISOString().slice(0, 10);
+        dailyMap.set(d, (dailyMap.get(d) || 0) + calcTotemOrderTotal(o));
       }
     });
     dailySales = Array.from(dailyMap.entries()).map(([day, total]) => ({ day, total })).sort((a, b) => a.day.localeCompare(b.day));
