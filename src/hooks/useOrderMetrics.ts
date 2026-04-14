@@ -83,7 +83,7 @@ function calcTotemOrderTotal(order: any): number {
 async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Promise<OrderMetrics> {
   const { start, end } = getDateRange(dateRange);
 
-  const [deliveryRes, localBillsRes, counterRes, totemRes, paymentMethodsRes] = await Promise.all([
+  const [deliveryRes, localBillsRes, counterRes, totemRes, paymentMethodsRes, cashMovementsRes] = await Promise.all([
     supabase.from("orders")
       .select("id, created_at, order_type, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
       .eq("restaurant_id", restaurantId)
@@ -109,6 +109,12 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
     supabase.from("payment_methods")
       .select("id, name, method_type")
       .eq("restaurant_id", restaurantId),
+    // Query cash_movements to reconcile with overview
+    supabase.from("cash_movements")
+      .select("id, amount, order_id, bill_id, payment_method, category, created_at")
+      .eq("restaurant_id", restaurantId)
+      .eq("movement_type", "entrada")
+      .gte("created_at", start).lte("created_at", end),
   ]);
 
   const deliveryOrders = deliveryRes.data || [];
@@ -116,6 +122,28 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   const counterOrders = counterRes.data || [];
   const totemOrders = totemRes.data || [];
   const paymentMethods = paymentMethodsRes.data || [];
+  const cashMovements = cashMovementsRes.data || [];
+
+  // Build sets of known IDs from standard queries
+  const knownOrderIds = new Set<string>();
+  const knownBillIds = new Set<string>();
+
+  deliveryOrders.forEach(o => knownOrderIds.add(o.id));
+  totemOrders.forEach(o => knownOrderIds.add(o.id));
+  paidBills.forEach(b => knownBillIds.add(b.id));
+  // Counter orders use counter_orders table, not orders — tracked separately
+
+  // Find cash_movements entries NOT covered by standard queries
+  const uncoveredCashEntries = cashMovements.filter(cm => {
+    // If it has an order_id that's already in our known sets, it's covered
+    if (cm.order_id && knownOrderIds.has(cm.order_id)) return false;
+    // If it has a bill_id that's already in our known sets, it's covered
+    if (cm.bill_id && knownBillIds.has(cm.bill_id)) return false;
+    // Manual cash entries (no order_id and no bill_id) that aren't order-related — skip
+    if (!cm.order_id && !cm.bill_id) return false;
+    // This entry has an order_id or bill_id not captured by standard queries
+    return true;
+  });
 
   let deliverySales = 0;
   deliveryOrders.forEach(o => { deliverySales += calcDeliveryOrderTotal(o); });
@@ -136,8 +164,27 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   });
   const totemOrderIds = totemOrders.map(o => o.id);
 
-  const localSales = billsTotal + counterTotal + totemLocalSales;
-  deliverySales += totemDeliverySales;
+  // Add uncovered cash entries to the appropriate bucket
+  let uncoveredLocalTotal = 0;
+  let uncoveredDeliveryTotal = 0;
+  const uncoveredOrderIds: string[] = [];
+  uncoveredCashEntries.forEach(cm => {
+    const amount = Number(cm.amount || 0);
+    const isDelivery = cm.category === 'Delivery' || cm.category === 'Totem';
+    if (isDelivery) {
+      uncoveredDeliveryTotal += amount;
+    } else {
+      uncoveredLocalTotal += amount;
+    }
+    if (cm.order_id) {
+      uncoveredOrderIds.push(cm.order_id);
+      knownOrderIds.add(cm.order_id);
+    }
+    if (cm.bill_id) knownBillIds.add(cm.bill_id);
+  });
+
+  const localSales = billsTotal + counterTotal + totemLocalSales + uncoveredLocalTotal;
+  deliverySales += totemDeliverySales + uncoveredDeliveryTotal;
   const totalSales = localSales + deliverySales;
 
   const tableIds = [...new Set(paidBills.map(b => b.table_id))];
@@ -153,7 +200,7 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   }
   const counterOrderIds = counterOrders.map(o => o.id);
 
-  const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length + totemOrders.length;
+  const totalCount = paidBills.length + deliveryOrders.length + counterOrders.length + totemOrders.length + uncoveredCashEntries.length;
   const averageTicket = totalCount > 0 ? totalSales / totalCount : 0;
 
   let hourlySales: { hour: string; total: number }[] = [];
@@ -185,6 +232,12 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
         hourlyMap.set(h, (hourlyMap.get(h) || 0) + calcTotemOrderTotal(o));
       }
     });
+    uncoveredCashEntries.forEach(cm => {
+      if (cm.created_at) {
+        const h = new Date(cm.created_at).getHours().toString().padStart(2, "0") + ":00";
+        hourlyMap.set(h, (hourlyMap.get(h) || 0) + Number(cm.amount || 0));
+      }
+    });
     hourlySales = Array.from(hourlyMap.entries()).map(([hour, total]) => ({ hour, total })).sort((a, b) => a.hour.localeCompare(b.hour));
   } else {
     const dailyMap = new Map<string, number>();
@@ -213,6 +266,12 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
       if (o.paid_at) {
         const d = new Date(o.paid_at).toISOString().slice(0, 10);
         dailyMap.set(d, (dailyMap.get(d) || 0) + calcTotemOrderTotal(o));
+      }
+    });
+    uncoveredCashEntries.forEach(cm => {
+      if (cm.created_at) {
+        const d = new Date(cm.created_at).toISOString().slice(0, 10);
+        dailyMap.set(d, (dailyMap.get(d) || 0) + Number(cm.amount || 0));
       }
     });
     dailySales = Array.from(dailyMap.entries()).map(([day, total]) => ({ day, total })).sort((a, b) => a.day.localeCompare(b.day));
@@ -279,6 +338,10 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   });
   totemOrders.forEach((o: any) => {
     addMethodRevenue(methodTotals, o.payment_type, calcTotemOrderTotal(o));
+  });
+  // Add uncovered cash entries to payment method breakdown
+  uncoveredCashEntries.forEach((cm: any) => {
+    addMethodRevenue(methodTotals, cm.payment_method, Number(cm.amount || 0));
   });
 
   const revenueByMethod = Object.entries(methodTotals)
