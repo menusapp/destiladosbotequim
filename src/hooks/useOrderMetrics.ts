@@ -130,6 +130,7 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   const totemOrders = totemRes.data || [];
   const paymentMethods = paymentMethodsRes.data || [];
   const cashMovements = cashMovementsRes.data || [];
+  const pdvPaidOrders = pdvPaidRes.data || [];
 
   // Build sets of known IDs from standard queries
   const knownOrderIds = new Set<string>();
@@ -138,17 +139,34 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
   deliveryOrders.forEach(o => knownOrderIds.add(o.id));
   totemOrders.forEach(o => knownOrderIds.add(o.id));
   paidBills.forEach(b => knownBillIds.add(b.id));
-  // Counter orders use counter_orders table, not orders — tracked separately
+
+  // Identify table_ids covered by bills with real amounts
+  const billCoveredTableIds = new Set(paidBills.map(b => b.table_id));
+
+  // PDV paid orders NOT already covered by bills or totem
+  const pdvUncoveredOrders = pdvPaidOrders.filter(o => {
+    // Already counted as totem
+    if (knownOrderIds.has(o.id)) return false;
+    // If this order's table has a bill with total_amount > 0, it's covered
+    if (o.table_id && billCoveredTableIds.has(o.table_id)) return false;
+    return true;
+  });
+
+  // Calculate PDV uncovered totals
+  let pdvPaidLocalTotal = 0;
+  const pdvPaidOrderIds: string[] = [];
+  pdvUncoveredOrders.forEach(o => {
+    const total = calcTotemOrderTotal(o); // same calc: items - coupon
+    pdvPaidLocalTotal += total;
+    pdvPaidOrderIds.push(o.id);
+    knownOrderIds.add(o.id);
+  });
 
   // Find cash_movements entries NOT covered by standard queries
   const uncoveredCashEntries = cashMovements.filter(cm => {
-    // If it has an order_id that's already in our known sets, it's covered
     if (cm.order_id && knownOrderIds.has(cm.order_id)) return false;
-    // If it has a bill_id that's already in our known sets, it's covered
     if (cm.bill_id && knownBillIds.has(cm.bill_id)) return false;
-    // Manual cash entries (no order_id and no bill_id) that aren't order-related — skip
     if (!cm.order_id && !cm.bill_id) return false;
-    // This entry has an order_id or bill_id not captured by standard queries
     return true;
   });
 
@@ -190,7 +208,7 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
     if (cm.bill_id) knownBillIds.add(cm.bill_id);
   });
 
-  const localSales = billsTotal + counterTotal + totemLocalSales + uncoveredLocalTotal;
+  const localSales = billsTotal + counterTotal + totemLocalSales + pdvPaidLocalTotal + uncoveredLocalTotal;
   deliverySales += totemDeliverySales + uncoveredDeliveryTotal;
   const totalSales = localSales + deliverySales;
 
