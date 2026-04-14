@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getAllUsedPdvCodes } from "@/lib/pdvCodeGenerator";
 import {
   Camera,
   Upload,
@@ -201,6 +202,16 @@ const MenuDigitizerDialog = ({
   };
 
   const importProducts = async () => {
+    const usedCodes = await getAllUsedPdvCodes(restaurantId);
+    let nextCode = 1;
+    const getNextPdvCode = () => {
+      while (usedCodes.has(nextCode)) nextCode++;
+      const code = String(nextCode).padStart(3, "0");
+      usedCodes.add(nextCode);
+      nextCode++;
+      return code;
+    };
+
     for (const category of extractedData) {
       const items = getItems(category);
       const { data: existingCats } = await supabase
@@ -224,14 +235,25 @@ const MenuDigitizerDialog = ({
           category_id: newCat.id,
           restaurant_id: restaurantId,
           available: true,
+          pdv_code: getNextPdvCode(),
         }));
-        const { error: prodError } = await supabase.from("products").insert(productsToInsert);
+        const { error: prodError } = await supabase.from("products").insert(productsToInsert as any);
         if (prodError) throw prodError;
       }
     }
   };
 
   const importComplements = async () => {
+    const usedCodes = await getAllUsedPdvCodes(restaurantId);
+    let nextCode = 1;
+    const getNextPdvCode = () => {
+      while (usedCodes.has(nextCode)) nextCode++;
+      const code = String(nextCode).padStart(3, "0");
+      usedCodes.add(nextCode);
+      nextCode++;
+      return code;
+    };
+
     for (const category of extractedData) {
       const items = getItems(category);
       const { data: newCat, error: catError } = await supabase
@@ -253,6 +275,7 @@ const MenuDigitizerDialog = ({
           price: item.price,
           category_id: newCat.id,
           is_active: true,
+          pdv_code: getNextPdvCode(),
         }));
         const { error: itemError } = await supabase.from("extra_category_items").insert(itemsToInsert);
         if (itemError) throw itemError;
