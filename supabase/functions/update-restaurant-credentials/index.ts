@@ -1,4 +1,4 @@
-import { compare, hash } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+import { compareSync, hashSync } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") || "*";
