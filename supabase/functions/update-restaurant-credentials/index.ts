@@ -1,4 +1,4 @@
-import { compare, hash } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+import { compareSync, hashSync } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") || "*";
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const isBcrypt = creds.password_hash.startsWith("$2a$") || creds.password_hash.startsWith("$2b$") || creds.password_hash.startsWith("$2y$");
     let valid = false;
     if (isBcrypt) {
-      valid = await compare(current_password, creds.password_hash);
+      valid = compareSync(current_password, creds.password_hash);
     } else {
       valid = current_password === creds.password_hash;
     }
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     }
 
     if (new_password) {
-      credUpdate.password_hash = await hash(new_password);
+      credUpdate.password_hash = hashSync(new_password);
     }
 
     if (Object.keys(credUpdate).length > 0) {
