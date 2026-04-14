@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { MapPin, Plus, Trash2, User, Gift, Check, Circle, Save, Loader2, LogOut } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { validatePhone } from "@/lib/cpfValidator";
 
@@ -51,6 +52,7 @@ export const ProfileView = ({
 }: ProfileViewProps) => {
   const [name, setName] = useState(customerName);
   const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [addresses, setAddresses] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -77,11 +79,12 @@ export const ProfileView = ({
   const fetchCustomerPhone = async () => {
     const { data } = await supabase
       .from("customers")
-      .select("phone")
+      .select("phone, birth_date")
       .eq("restaurant_id", restaurantId)
       .eq("cpf", customerCPF)
       .maybeSingle();
     if (data?.phone) setPhone(data.phone);
+    if (data?.birth_date) setBirthDate(formatBirthDateForInput(data.birth_date));
   };
 
   const fetchAddresses = async () => {
@@ -229,6 +232,34 @@ export const ProfileView = ({
     return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
   };
 
+  const formatBirthDateInput = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
+  const formatBirthDateForInput = (value: string) => {
+    const isoMatch = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      const [, year, month, day] = isoMatch;
+      return `${day}/${month}/${year}`;
+    }
+    return formatBirthDateInput(value);
+  };
+
+  const parseBirthDateToISO = (value: string): string | null => {
+    const trimmed = value.trim();
+    const match = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return null;
+    const [, d, m, y] = match.map(Number);
+    if (d < 1 || d > 31 || m < 1 || m > 12 || y < 1900) return null;
+    const date = new Date(Date.UTC(y, m - 1, d));
+    if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return null;
+    if (date.getTime() > Date.now()) return null;
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  };
+
   const handleSaveProfile = async () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
@@ -242,11 +273,21 @@ export const ProfileView = ({
       return;
     }
 
+    let birthDateISO: string | null = null;
+    const trimmedBirth = birthDate.trim();
+    if (trimmedBirth) {
+      birthDateISO = parseBirthDateToISO(trimmedBirth);
+      if (!birthDateISO) {
+        toast.error("Data de nascimento inválida. Use o formato DD/MM/AAAA.");
+        return;
+      }
+    }
+
     setSavingProfile(true);
     try {
       await supabase
         .from("customers")
-        .update({ name: trimmedName, phone: phoneDigits || null })
+        .update({ name: trimmedName, phone: phoneDigits || null, birth_date: birthDateISO })
         .eq("restaurant_id", restaurantId)
         .eq("cpf", customerCPF);
 
@@ -505,28 +546,32 @@ export const ProfileView = ({
       <div className="space-y-4 p-4 pb-20">
         {/* Informações Pessoais */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
               <User className="w-5 h-5" />
               Informações Pessoais
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome</Label>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="name" className="text-xs">Nome</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Seu nome"
+                className="h-9"
               />
             </div>
-            <div className="space-y-2">
-              <Label>CPF</Label>
-              <Input value={customerCPF} disabled className="bg-muted" />
+            <div className="space-y-1">
+              <Label className="text-xs">CPF</Label>
+              <Input value={customerCPF} disabled className="bg-muted h-9" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="profile-phone">Telefone</Label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="profile-phone" className="text-xs">Telefone</Label>
               <Input
                 id="profile-phone"
                 value={formatPhoneDisplay(phone)}
@@ -534,13 +579,30 @@ export const ProfileView = ({
                 placeholder="(00) 00000-0000"
                 maxLength={15}
                 inputMode="tel"
+                className="h-9"
               />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="profile-birthdate" className="text-xs flex items-center gap-1">
+                <CalendarIcon className="w-3 h-3" />
+                Nascimento
+              </Label>
+              <Input
+                id="profile-birthdate"
+                value={birthDate}
+                onChange={(e) => setBirthDate(formatBirthDateInput(e.target.value))}
+                placeholder="DD/MM/AAAA"
+                maxLength={10}
+                inputMode="numeric"
+                className="h-9"
+              />
+            </div>
             </div>
             <Button
               onClick={handleSaveProfile}
               disabled={savingProfile}
               className="w-full"
-              size="sm"
+              size="sm" 
             >
               {savingProfile ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</>
