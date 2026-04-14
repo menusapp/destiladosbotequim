@@ -19,7 +19,7 @@ export const CartBottomBar = ({
   if (itemCount === 0) return null;
 
   return (
-    <div className="fixed bottom-16 left-0 right-0 z-40 bg-white border-t border-border shadow-lg">
+    <div className="fixed bottom-16 left-0 right-0 z-40 shadow-lg">
       <div className="px-3 py-2">
         <Button
           onClick={onViewCart}
