@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.mercadopago-point]
 verify_jwt = false
+
+[functions.digitize-menu]
+verify_jwt = false

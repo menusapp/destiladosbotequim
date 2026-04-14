@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Camera } from "lucide-react";
 import ProductsGrid from "./ProductsGrid";
 import ComplementosTab from "./ComplementosTab";
 import CategoriesTab from "./CategoriesTab";
 import DestaquesTab from "./DestaquesTab";
-
+import MenuDigitizerDialog from "./MenuDigitizerDialog";
 interface CardapioTabProps {
   restaurantId: string;
   isRestaurantOpen: boolean;
@@ -12,14 +14,29 @@ interface CardapioTabProps {
 
 const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
   const [activeTab, setActiveTab] = useState("produtos");
+  const [digitizerOpen, setDigitizerOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-[32px] font-bold text-foreground leading-tight">Cardápio</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gerencie produtos, categorias, complementos e destaques</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-[32px] font-bold text-foreground leading-tight">Cardápio</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gerencie produtos, categorias, complementos e destaques</p>
+        </div>
+        <Button onClick={() => setDigitizerOpen(true)} variant="outline" className="gap-2">
+          <Camera className="h-4 w-4" />
+          Importar por Foto
+        </Button>
       </div>
+
+      <MenuDigitizerDialog
+        open={digitizerOpen}
+        onOpenChange={setDigitizerOpen}
+        restaurantId={restaurantId}
+        onImportComplete={() => setRefreshKey((k) => k + 1)}
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -51,7 +68,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
         </TabsList>
 
         <TabsContent value="produtos" className="mt-6">
-          <ProductsGrid restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
+          <ProductsGrid key={refreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} />
         </TabsContent>
 
         <TabsContent value="categorias" className="mt-6">
