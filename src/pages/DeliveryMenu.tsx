@@ -121,8 +121,6 @@ export default function DeliveryMenu() {
     if (storedName && storedCPF && !isExpired) {
       setCustomerName(storedName);
       setCustomerCPF(storedCPF);
-    } else {
-      setShowCustomerDialog(true);
     }
   }, [restaurantSlug]);
 
