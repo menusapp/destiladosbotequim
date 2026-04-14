@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "@/components/ui/sonner";
+import { validateCPF, validatePhone } from "@/lib/cpfValidator";
 import { Switch } from "@/components/ui/switch";
 import { Printer } from "lucide-react";
 import { PDVProductDrawer } from "./PDVProductDrawer";
@@ -375,6 +376,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   }, [discountType, discountValue, discountTarget, cartSubtotal, cart]);
 
   const cartTotal = cartSubtotal - calculatedDiscount;
+  const hasSelectedCustomer = !!selectedCustomer && customerName.trim().length > 0 && validateCPF(customerCpf);
 
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
@@ -441,22 +443,23 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
   const handleSaveNewClient = async () => {
     if (!newClientName.trim()) { toast.error("Nome é obrigatório"); return; }
+    if (!validateCPF(newClientCpf)) { toast.error("Informe um CPF válido"); return; }
+    if (!validatePhone(newClientPhone)) { toast.error("Informe um celular válido"); return; }
     setSavingNewClient(true);
     try {
-      const cpf = newClientCpf.replace(/\D/g, "");
-      const finalCpf = cpf.length >= 11 ? newClientCpf : "000.000.000-00";
+      const finalCpf = newClientCpf;
+      const finalName = newClientName.trim();
+      const finalPhone = newClientPhone.trim();
 
-      if (cpf.length >= 11) {
-        const { data: existing } = await supabase
-          .from("customers").select("id").eq("restaurant_id", restaurantId).eq("cpf", newClientCpf).maybeSingle();
-        if (existing) {
-          await supabase.from("customers").update({ name: newClientName, phone: newClientPhone || null }).eq("id", existing.id);
-        } else {
-          await supabase.from("customers").insert({ restaurant_id: restaurantId, cpf: finalCpf, name: newClientName, phone: newClientPhone || null });
-        }
+      const { data: existing } = await supabase
+        .from("customers").select("id").eq("restaurant_id", restaurantId).eq("cpf", finalCpf).maybeSingle();
+      if (existing) {
+        await supabase.from("customers").update({ name: finalName, phone: finalPhone }).eq("id", existing.id);
+      } else {
+        await supabase.from("customers").insert({ restaurant_id: restaurantId, cpf: finalCpf, name: finalName, phone: finalPhone });
       }
 
-      applyCustomer({ name: newClientName, cpf: finalCpf, phone: newClientPhone });
+      applyCustomer({ name: finalName, cpf: finalCpf, phone: finalPhone });
       setNewClientCpf("");
       setNewClientName("");
       setNewClientPhone("");
@@ -470,7 +473,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
   // Fetch customer addresses when opening address dialog
   const fetchCustomerAddresses = async () => {
-    if (!selectedCustomer?.cpf || selectedCustomer.cpf === "000.000.000-00") {
+    if (!selectedCustomer?.cpf) {
       setCustomerAddresses([]);
       return;
     }
@@ -501,7 +504,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     };
 
     // Save to DB if customer has CPF
-    if (selectedCustomer && selectedCustomer.cpf !== "000.000.000-00") {
+    if (selectedCustomer) {
       await supabase.from("customer_addresses").insert({
         customer_cpf: selectedCustomer.cpf,
         customer_name: selectedCustomer.name,
@@ -564,7 +567,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const upsertCustomerCRM = async () => {
     const cpf = customerCpf?.replace(/\D/g, "");
     if (!cpf || cpf.length < 11) return;
-    const name = customerName || "Cliente PDV";
+    const name = customerName.trim();
     const phone = customerPhone || null;
 
     const { data: existing } = await supabase
@@ -589,8 +592,12 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   };
 
   const handleSubmit = async () => {
+    if (!hasSelectedCustomer) {
+      toast.error("Selecione ou cadastre um cliente com CPF válido antes de criar o pedido");
+      setIsCustomerSelectOpen(true);
+      return;
+    }
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
-    if (!customerName && orderType !== "mesa") { toast.error("Nome do cliente é obrigatório"); return; }
 
     setSubmitting(true);
     try {
@@ -602,8 +609,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
-          status: "preparing", customer_name: customerName,
-          customer_cpf: customerCpf || "000.000.000-00",
+          status: "preparing", customer_name: customerName.trim(),
+          customer_cpf: customerCpf,
           delivery_phone: customerPhone,
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
           notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
@@ -631,8 +638,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
-          status: "preparing", customer_name: customerName || "Cliente",
-          customer_cpf: customerCpf || "000.000.000-00",
+          status: "preparing", customer_name: customerName.trim(),
+          customer_cpf: customerCpf,
           notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
           coupon_discount: discountForOrder,
           pdv_source: true,
@@ -661,17 +668,14 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         if (!table) throw new Error("Mesa não encontrada");
 
         let comandaId: string | null = null;
-        const currentCustomerName = customerName || "Cliente PDV";
-        const currentCustomerCpf = customerCpf || "000.000.000-00";
+        const currentCustomerName = customerName.trim();
+        const currentCustomerCpf = customerCpf;
 
         if (table.is_occupied) {
-          let query = supabase.from("comandas")
+          const { data: existingComanda } = await supabase.from("comandas")
             .select("*").eq("table_id", tableId).eq("status", "active")
-            .eq("customer_name", currentCustomerName);
-          if (currentCustomerCpf !== "000.000.000-00") {
-            query = query.eq("customer_cpf", currentCustomerCpf);
-          }
-          const { data: existingComanda } = await query
+            .eq("customer_name", currentCustomerName)
+            .eq("customer_cpf", currentCustomerCpf)
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
           if (existingComanda) {
             comandaId = existingComanda.id;
@@ -773,7 +777,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         const printOrderObj = {
           id: "PDV-" + Date.now(),
           created_at: new Date().toISOString(),
-          customer_name: customerName || "Cliente PDV",
+          customer_name: customerName.trim(),
           order_type: orderType === "mesa" ? "local" : "delivery",
           delivery_type: orderType === "delivery" ? "delivery" : orderType === "retirada" ? "pickup" : undefined,
           tables: table ? { table_number: table.table_number } : null,
@@ -1126,17 +1130,18 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     <Collapsible open={showNewClientForm} onOpenChange={setShowNewClientForm}>
                       <CollapsibleContent className="mt-3 space-y-3">
                         <div>
-                          <Label className="text-xs mb-1.5 block">CPF (opcional)</Label>
+                          <Label className="text-xs mb-1.5 block">CPF *</Label>
                           <Input placeholder="000.000.000-00" value={newClientCpf} onChange={e => setNewClientCpf(e.target.value)} className="h-9 text-sm" />
                         </div>
                         <div>
-                          <Label className="text-xs mb-1.5 block">Nome</Label>
+                          <Label className="text-xs mb-1.5 block">Nome *</Label>
                           <Input placeholder="Nome do cliente" value={newClientName} onChange={e => setNewClientName(e.target.value)} className="h-9 text-sm" />
                         </div>
                         <div>
-                          <Label className="text-xs mb-1.5 block">Celular</Label>
+                          <Label className="text-xs mb-1.5 block">Celular *</Label>
                           <Input placeholder="(00) 00000-0000" value={newClientPhone} onChange={e => setNewClientPhone(e.target.value)} className="h-9 text-sm" />
                         </div>
+                        <p className="text-xs text-muted-foreground">Salve o cliente para liberar a criação do pedido.</p>
                         <Button size="sm" onClick={handleSaveNewClient} disabled={savingNewClient} className="w-full">
                           {savingNewClient ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
                           Salvar Cliente
@@ -1152,7 +1157,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       <p className="text-sm font-medium">{selectedCustomer.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {selectedCustomer.phone || "Sem telefone"}
-                        {selectedCustomer.cpf && selectedCustomer.cpf !== "000.000.000-00" && ` • ${selectedCustomer.cpf}`}
+                        {selectedCustomer.cpf && ` • ${selectedCustomer.cpf}`}
                       </p>
                     </div>
                     <Button variant="ghost" size="sm" onClick={clearCustomer} className="h-8 w-8 p-0">
@@ -1490,7 +1495,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
               {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
             </div>
-            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0}>
+            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !hasSelectedCustomer}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               Criar Pedido
             </Button>

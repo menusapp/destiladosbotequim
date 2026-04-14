@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, ShoppingCart, UserPlus, X, Loader2, Percent, DollarSign, AlertTriangle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { validateCPF } from "@/lib/cpfValidator";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 
@@ -177,6 +178,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
 
   const resolvedDeliveryFeeVal = orderType === "delivery" ? (parseFloat(deliveryFee) || 0) : 0;
   const cartTotal = cartSubtotal - discountAmount + resolvedDeliveryFeeVal;
+  const hasValidCustomer = customerName.trim().length > 0 && validateCPF(customerCpf);
 
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
@@ -294,7 +296,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       await upsertCustomerCRM();
 
       // Save delivery address to CRM if applicable
-      if (orderType === "delivery" && customerCpf && deliveryAddress) {
+      if (orderType === "delivery" && deliveryAddress) {
         try {
           const cleanCpf = customerCpf.replace(/\D/g, "");
           const { data: existing } = await supabase
@@ -312,8 +314,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
             }
             await supabase.from("customer_addresses").insert({
               customer_cpf: cleanCpf,
-              customer_name: customerName || "Cliente PDV",
-              customer_phone: customerPhone || "0",
+              customer_name: customerName.trim(),
+              customer_phone: customerPhone || "",
               street: deliveryAddress,
               number: "S/N",
               neighborhood: deliveryNeighborhood || "",
@@ -332,8 +334,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
-          status: "preparing", customer_name: customerName || "Cliente PDV",
-          customer_cpf: customerCpf || "000.000.000-00",
+          status: "preparing", customer_name: customerName.trim(),
+          customer_cpf: customerCpf,
           delivery_phone: customerPhone,
           delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
           notes: notes || null, payment_type: resolvedPaymentType,
@@ -348,8 +350,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       } else if (orderType === "retirada") {
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
-          status: "preparing", customer_name: customerName || "Cliente PDV",
-          customer_cpf: customerCpf || "000.000.000-00",
+          status: "preparing", customer_name: customerName.trim(),
+          customer_cpf: customerCpf,
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
           coupon_discount: discountAmount > 0 ? discountAmount : null,
@@ -366,17 +368,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         if (!table) throw new Error("Mesa não encontrada");
 
         let comandaId: string | null = null;
-        const currentCustomerName = customerName || "Cliente PDV";
-        const currentCustomerCpf = customerCpf || "000.000.000-00";
+        const currentCustomerName = customerName.trim();
+        const currentCustomerCpf = customerCpf;
 
         if (table.is_occupied) {
-          let query = supabase.from("comandas")
+          const { data: existingComanda } = await supabase.from("comandas")
             .select("*").eq("table_id", tableId).eq("status", "active")
-            .eq("customer_name", currentCustomerName);
-          if (currentCustomerCpf !== "000.000.000-00") {
-            query = query.eq("customer_cpf", currentCustomerCpf);
-          }
-          const { data: existingComanda } = await query
+            .eq("customer_name", currentCustomerName)
+            .eq("customer_cpf", currentCustomerCpf)
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
 
           if (existingComanda) {
@@ -512,7 +511,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       <UserPlus className="w-3.5 h-3.5 mr-1" /> Buscar
                     </Button>
                   </div>
-                  <Input placeholder="CPF (opcional)" value={customerCpf} onChange={e => {
+                  <Input placeholder="CPF do cliente *" value={customerCpf} onChange={e => {
                     setCustomerCpf(e.target.value);
                     const clean = e.target.value.replace(/\D/g, "");
                     if (clean.length === 11) {
@@ -525,8 +524,13 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                         });
                     }
                   }} />
-                  <Input placeholder="Nome do cliente" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                  <Input placeholder="Celular" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                  <Input placeholder="Nome do cliente *" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                  <Input placeholder="Celular do cliente" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                  {!hasValidCustomer && (
+                    <p className="text-xs text-muted-foreground">
+                      Selecione ou cadastre um cliente com CPF válido para liberar o pedido.
+                    </p>
+                  )}
                 </div>
 
                 {/* Type-specific fields */}
@@ -767,7 +771,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
               <ShoppingCart className="w-4 h-4 inline mr-1" />
               {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
             </div>
-            <Button onClick={handleSubmit} disabled={submitting || cart.length === 0}>
+            <Button onClick={handleSubmit} disabled={submitting || cart.length === 0 || !hasValidCustomer}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               Criar Pedido
             </Button>
