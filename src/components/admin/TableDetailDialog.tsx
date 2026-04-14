@@ -76,6 +76,7 @@ export const TableDetailDialog = ({
   const [splittingItem, setSplittingItem] = useState<any>(null);
   const [splittingOrderId, setSplittingOrderId] = useState<string>("");
   const [payingSplit, setPayingSplit] = useState<Split | null>(null);
+  const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
 
   // Fetch active comandas for the table
   const { data: comandas, refetch: refetchComandas } = useQuery({
