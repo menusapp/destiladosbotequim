@@ -225,12 +225,8 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
     }
   };
 
-  const handleCreateCampaign = (recipients: { name: string; phone: string | null }[]) => {
-    const valid = recipients.filter((r) => r.phone) as { name: string; phone: string }[];
-    if (valid.length === 0) {
-      return;
-    }
-    onCreateCampaign?.(valid);
+  const handleCreateCampaign = (triggerType: string) => {
+    onCreateCampaign?.(triggerType);
   };
 
   const getTimestamp = (session: AbandonedSession) => {
