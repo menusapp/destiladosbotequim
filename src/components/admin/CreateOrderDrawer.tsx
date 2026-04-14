@@ -245,6 +245,10 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   };
 
   const handleSubmit = async () => {
+    if (!customerName.trim() || !customerCpf.trim()) {
+      toast.error("Selecione ou cadastre um cliente antes de criar o pedido");
+      return;
+    }
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
 
     // Validate delivery address for delivery orders
