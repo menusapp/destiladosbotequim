@@ -30,6 +30,9 @@ const RestaurantRegistration = () => {
     username: "",
     password: "",
     confirmPassword: "",
+    adminUsername: "",
+    adminPassword: "",
+    adminConfirmPassword: "",
   });
   const [loading, setLoading] = useState(false);
   const [slugChecking, setSlugChecking] = useState(false);
@@ -60,11 +63,23 @@ const RestaurantRegistration = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.password !== form.confirmPassword) {
-      toast.error("As senhas não coincidem");
+      toast.error("As senhas do restaurante não coincidem");
       return;
     }
     if (form.password.length < 6) {
-      toast.error("A senha deve ter pelo menos 6 caracteres");
+      toast.error("A senha do restaurante deve ter pelo menos 6 caracteres");
+      return;
+    }
+    if (form.adminPassword !== form.adminConfirmPassword) {
+      toast.error("As senhas da conta admin não coincidem");
+      return;
+    }
+    if (form.adminPassword.length < 6) {
+      toast.error("A senha da conta admin deve ter pelo menos 6 caracteres");
+      return;
+    }
+    if (form.adminUsername.trim().length < 3) {
+      toast.error("O usuário da conta admin deve ter pelo menos 3 caracteres");
       return;
     }
     if (form.slug.length < 3) {
@@ -83,6 +98,8 @@ const RestaurantRegistration = () => {
           address: form.address,
           username: form.username,
           password: form.password,
+          adminUsername: form.adminUsername,
+          adminPassword: form.adminPassword,
           planSlug,
         },
       });
@@ -110,12 +127,19 @@ const RestaurantRegistration = () => {
         return;
       }
 
-      // Save restaurant context (but NOT staff session — no staff account exists yet)
+      // Save full session (restaurant + staff admin)
       const restaurantId = res.data?.restaurantId;
       if (restaurantId) {
         localStorage.setItem("restaurant_id", restaurantId);
         localStorage.setItem("restaurant_name", form.name.trim());
         localStorage.setItem("restaurant_slug", form.slug.trim());
+        // Auto-login as admin staff
+        if (res.data?.staffId) {
+          localStorage.setItem("staff_id", res.data.staffId);
+          localStorage.setItem("staff_name", form.adminUsername.trim());
+          localStorage.setItem("staff_role", "admin");
+          localStorage.setItem("staff_allowed_sections", JSON.stringify([]));
+        }
       }
 
       // Check if there's a payment redirect (paid plans)
@@ -128,10 +152,10 @@ const RestaurantRegistration = () => {
         return;
       }
 
-      // Trial flow: redirect to staff login where first-time setup will trigger
+      // Trial flow: go directly to admin
       setSuccess(true);
-      toast.success("Restaurante cadastrado! Crie sua conta de administrador.");
-      setTimeout(() => navigate(`/login/staff`), 3000);
+      toast.success("Restaurante cadastrado com sucesso!");
+      setTimeout(() => navigate(`/${form.slug}/admin`), 3000);
     } catch {
       toast.error("Erro inesperado. Tente novamente.");
     } finally {
@@ -274,17 +298,17 @@ const RestaurantRegistration = () => {
 
             <div className="border-t pt-4 mt-2">
               <p className="text-sm font-semibold text-foreground mb-1">Credenciais do Restaurante</p>
-              <p className="text-xs text-muted-foreground mb-3">Essas credenciais são usadas para acessar o restaurante. Após o primeiro login, você criará uma conta de administrador separada.</p>
+              <p className="text-xs text-muted-foreground mb-3">Usadas para abrir/acessar o restaurante no sistema.</p>
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label>Usuário *</Label>
+                  <Label>Usuário do Restaurante *</Label>
                   <Input
                     required
                     minLength={3}
                     maxLength={100}
                     value={form.username}
                     onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-                    placeholder="admin"
+                    placeholder="meu-restaurante"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -307,6 +331,48 @@ const RestaurantRegistration = () => {
                       type="password"
                       value={form.confirmPassword}
                       onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                      placeholder="••••••"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4 mt-2">
+              <p className="text-sm font-semibold text-foreground mb-1">Credenciais da Conta Admin</p>
+              <p className="text-xs text-muted-foreground mb-3">Usadas para fazer login como administrador dentro do restaurante. Devem ser diferentes das credenciais acima.</p>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Usuário Admin *</Label>
+                  <Input
+                    required
+                    minLength={3}
+                    maxLength={100}
+                    value={form.adminUsername}
+                    onChange={(e) => setForm((f) => ({ ...f, adminUsername: e.target.value }))}
+                    placeholder="admin"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Senha Admin *</Label>
+                    <Input
+                      required
+                      type="password"
+                      minLength={6}
+                      maxLength={100}
+                      value={form.adminPassword}
+                      onChange={(e) => setForm((f) => ({ ...f, adminPassword: e.target.value }))}
+                      placeholder="••••••"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Confirmar Senha Admin *</Label>
+                    <Input
+                      required
+                      type="password"
+                      value={form.adminConfirmPassword}
+                      onChange={(e) => setForm((f) => ({ ...f, adminConfirmPassword: e.target.value }))}
                       placeholder="••••••"
                     />
                   </div>
