@@ -262,7 +262,7 @@ const CustomerInfoDialog = ({
           }
         }
 
-        const insertData: Record<string, string> = {
+        const insertData: { restaurant_id: string; cpf: string; name: string; phone?: string; birth_date?: string } = {
           restaurant_id: restaurantId,
           cpf: sanitizedCPF,
           name: finalName || "Cliente",
