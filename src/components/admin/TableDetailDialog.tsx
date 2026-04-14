@@ -1048,6 +1048,16 @@ export const TableDetailDialog = ({
           onPaid={handleSplitPaid}
         />
       )}
+
+      {/* Customer Edit Dialog */}
+      {editingComandaId && (
+        <CustomerSelectDialog
+          restaurantId={restaurantId}
+          open={!!editingComandaId}
+          onOpenChange={(o) => { if (!o) setEditingComandaId(null); }}
+          onSelect={(customer) => handleSwapCustomer(editingComandaId, customer)}
+        />
+      )}
     </>
   );
 };
