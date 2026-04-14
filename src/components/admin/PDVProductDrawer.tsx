@@ -70,21 +70,50 @@ export const PDVProductDrawer = ({
 
   const extras = product?.product_extras || [];
 
-  // Separar extras obrigatórios dos opcionais
-  const { requiredExtras, optionalExtras } = useMemo(() => {
-    const required = extras.filter(e => e.is_required);
-    const optional = extras.filter(e => !e.is_required);
-    return { requiredExtras: required, optionalExtras: optional };
+  // Agrupar TODOS os extras por categoria (obrigatórios e opcionais separados por grupo)
+  const groupedExtras = useMemo(() => {
+    const groups: Record<string, {
+      name: string;
+      items: ProductExtra[];
+      isRequired: boolean;
+      minSelection: number;
+      maxSelection: number;
+    }> = {};
+
+    extras.forEach((extra) => {
+      const catId = extra.extra_category_id || (extra.is_required ? "variations" : "outros");
+      const catName = extra.extra_categories?.name || (extra.is_required ? "Variações" : "Complementos");
+
+      if (!groups[catId]) {
+        groups[catId] = {
+          name: catName,
+          items: [],
+          isRequired: !!extra.is_required,
+          minSelection: extra.min_selection || (extra.is_required ? 1 : 0),
+          maxSelection: extra.max_selection || 0,
+        };
+      }
+      groups[catId].items.push(extra);
+    });
+
+    // Sort: required groups first, then "Qual pão" priority
+    return Object.entries(groups).sort(([, a], [, b]) => {
+      if (a.isRequired && !b.isRequired) return -1;
+      if (!a.isRequired && b.isRequired) return 1;
+      if (a.name.toLowerCase().includes("pão")) return -1;
+      if (b.name.toLowerCase().includes("pão")) return 1;
+      return 0;
+    });
   }, [extras]);
 
-  // Verificar se há extras obrigatórios e se foram selecionados
-  const hasRequiredExtras = requiredExtras.length > 0;
-  const minRequiredSelection = hasRequiredExtras ? (requiredExtras[0]?.min_selection || 1) : 0;
-  const maxRequiredSelection = hasRequiredExtras ? (requiredExtras[0]?.max_selection || 1) : 0;
-  
-  const selectedRequiredCount = requiredExtras.filter(e => selectedExtras.includes(e.id)).length;
-  const isRequiredSatisfied = !hasRequiredExtras || selectedRequiredCount >= minRequiredSelection;
-  const canAddMore = !maxRequiredSelection || selectedRequiredCount < maxRequiredSelection;
+  // Verificar se todos os grupos obrigatórios foram satisfeitos
+  const allRequiredSatisfied = useMemo(() => {
+    return groupedExtras.every(([, group]) => {
+      if (!group.isRequired) return true;
+      const selectedInGroup = group.items.filter(e => selectedExtras.includes(e.id)).length;
+      return selectedInGroup >= group.minSelection;
+    });
+  }, [groupedExtras, selectedExtras]);
 
   if (!product) return null;
 
