@@ -23,7 +23,7 @@ export const MenuHeader = ({
   return (
     <div
       data-menu-header
-      className="fixed top-0 left-0 right-0 z-50 pointer-events-none bg-gradient-to-b from-black/60 to-transparent px-4 py-3"
+      className="absolute top-0 left-0 right-0 z-30 pointer-events-none bg-gradient-to-b from-black/60 to-transparent px-4 py-3"
     >
       {searchOpen ? (
         <div className="flex items-center gap-2 pointer-events-auto">
