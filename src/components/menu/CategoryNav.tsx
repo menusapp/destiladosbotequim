@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useRef, useCallback } from "react";
 import { Category } from "@/types/menu";
 
 interface CategoryNavProps {
@@ -11,15 +11,17 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
   const isManualScroll = useRef(false);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const handleCategoryClick = (categoryId: string) => {
+  const handleCategoryClick = useCallback((categoryId: string) => {
     setActiveCategory(categoryId);
     isManualScroll.current = true;
     const el = document.getElementById(`category-${categoryId}`);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      const yOffset = -60;
+      const y = el.getBoundingClientRect().top + window.scrollY + yOffset;
+      window.scrollTo({ top: y, behavior: "smooth" });
     }
-    setTimeout(() => { isManualScroll.current = false; }, 1000);
-  };
+    setTimeout(() => { isManualScroll.current = false; }, 1200);
+  }, []);
 
   // Scroll spy via IntersectionObserver
   useEffect(() => {
@@ -38,14 +40,19 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
             visibleIds.delete(id);
           }
         }
+        // Pick the first visible category in DOM order
         for (const cat of categories) {
           if (visibleIds.has(cat.id)) {
             setActiveCategory(cat.id);
             return;
           }
         }
+        // If nothing visible and at top of page, select first
+        if (visibleIds.size === 0 && window.scrollY < 300) {
+          setActiveCategory(categories[0]?.id ?? null);
+        }
       },
-      { threshold: 0.01, rootMargin: "0px 0px -70% 0px" }
+      { threshold: 0.01, rootMargin: "-60px 0px -40% 0px" }
     );
 
     categories.forEach((cat) => {
@@ -71,7 +78,7 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
 
   return (
     <div
-      className="sticky top-0 z-30 bg-background border-b border-border px-3 py-3 my-1 flex gap-1.5 overflow-x-auto category-scroll-bar"
+      className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border px-3 py-3 my-1 flex gap-1.5 overflow-x-auto category-scroll-bar"
       style={{
         scrollbarWidth: "none",
         msOverflowStyle: "none",
@@ -84,7 +91,7 @@ export const CategoryNav = memo(({ categories, primaryColor }: CategoryNavProps)
           key={cat.id}
           ref={(el) => { buttonRefs.current[cat.id] = el; }}
           onClick={() => handleCategoryClick(cat.id)}
-          className="flex-shrink-0 px-3 py-2 rounded-full text-xs font-medium transition-colors whitespace-nowrap"
+          className="flex-shrink-0 px-3 py-2 rounded-full text-xs font-medium transition-colors whitespace-nowrap relative z-10"
           style={
             activeCategory === cat.id
               ? { backgroundColor: primaryColor, color: "#fff" }
