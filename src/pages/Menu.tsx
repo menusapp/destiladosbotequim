@@ -51,6 +51,7 @@ const Menu = () => {
   const [featuredSectionTitle, setFeaturedSectionTitle] = useState("Destaques");
 
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
+  useFacebookPixel(restaurant?.facebook_pixel_id);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
   const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();

@@ -42,6 +42,7 @@ export default function DeliveryMenu() {
   const [pendingTab, setPendingTab] = useState<"pedidos" | "reservas" | "perfil" | null>(null);
   const { trackCartUpdate, trackCheckoutStarted, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id, restaurantSlug);
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
+  useFacebookPixel(restaurant?.facebook_pixel_id);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
   const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
