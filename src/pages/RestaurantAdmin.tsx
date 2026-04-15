@@ -548,13 +548,18 @@ const RestaurantAdmin = () => {
         .from("restaurants")
         .select("id, name, slug, is_open, prep_time_minutes, pickup_time_minutes, auto_open_close, primary_color, show_prep_timer")
         .eq("id", restaurantId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error("Restaurante não encontrado");
+
       setRestaurant(data);
+      localStorage.setItem("restaurant_id", data.id);
+      localStorage.setItem("restaurant_name", data.name);
+      localStorage.setItem("restaurant_slug", data.slug);
       
       // Verificar horário automaticamente após carregar restaurante
-      if (data?.auto_open_close) {
+      if (data.auto_open_close) {
         checkAndUpdateOpenStatus(data);
       }
     } catch (error) {
