@@ -91,23 +91,37 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
 
   const fetchIfoodConfig = async () => {
     setIfoodLoading(true);
-    const { data } = await supabase
-      .from("ifood_config" as any)
-      .select("id, restaurant_id, enabled, merchant_id, token_expires_at, access_token")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
-    setIfoodConfig(data as unknown as IfoodConfig | null);
+    try {
+      const { data } = await supabase.rpc("admin_get_ifood_config", {
+        p_restaurant_id: restaurantId,
+      });
+      if (data) {
+        const parsed = typeof data === "string" ? JSON.parse(data) : data;
+        setIfoodConfig(parsed as IfoodConfig);
+      } else {
+        setIfoodConfig(null);
+      }
+    } catch {
+      setIfoodConfig(null);
+    }
     setIfoodLoading(false);
   };
 
   const fetchDdConfig = async () => {
     setDdLoading(true);
-    const { data } = await supabase
-      .from("deliverydireto_config" as any)
-      .select("id, restaurant_id, enabled, store_id, username, access_token, token_expires_at")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
-    setDdConfig(data as unknown as DDConfig | null);
+    try {
+      const { data } = await supabase.rpc("admin_get_dd_config", {
+        p_restaurant_id: restaurantId,
+      });
+      if (data) {
+        const parsed = typeof data === "string" ? JSON.parse(data) : data;
+        setDdConfig(parsed as DDConfig);
+      } else {
+        setDdConfig(null);
+      }
+    } catch {
+      setDdConfig(null);
+    }
     setDdLoading(false);
   };
 
@@ -223,12 +237,11 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleIfoodToggle = async (enabled: boolean) => {
-    await supabase
-      .from("ifood_config" as any)
-      .update({ enabled, updated_at: new Date().toISOString() } as any)
-      .eq("restaurant_id", restaurantId);
-    setIfoodConfig((prev) => (prev ? { ...prev, enabled } : null));
-    toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
+    try {
+      await supabase.rpc("admin_toggle_ifood" as any, { p_restaurant_id: restaurantId, p_enabled: enabled });
+      setIfoodConfig((prev) => (prev ? { ...prev, enabled } : null));
+      toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
+    } catch (err: any) { toast.error(err.message); }
   };
 
   const maskId = (id: string) => id.length > 8 ? `${id.slice(0, 4)}****${id.slice(-4)}` : id;
@@ -280,12 +293,11 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleDdToggle = async (enabled: boolean) => {
-    await supabase
-      .from("deliverydireto_config" as any)
-      .update({ enabled, updated_at: new Date().toISOString() } as any)
-      .eq("restaurant_id", restaurantId);
-    setDdConfig((prev) => (prev ? { ...prev, enabled } : null));
-    toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
+    try {
+      await supabase.rpc("admin_toggle_dd", { p_restaurant_id: restaurantId, p_enabled: enabled });
+      setDdConfig((prev) => (prev ? { ...prev, enabled } : null));
+      toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
+    } catch (err: any) { toast.error(err.message); }
   };
 
   // === Mercado Pago handlers ===
