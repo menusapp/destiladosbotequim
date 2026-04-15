@@ -200,7 +200,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/dd-auth`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
         body: JSON.stringify({
           action: "connect",
           restaurant_id: restaurantId,
@@ -227,7 +227,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/dd-auth`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
         body: JSON.stringify({ action: "disconnect", restaurant_id: restaurantId }),
       });
       if (!res.ok) throw new Error("Erro ao desconectar");
