@@ -1213,39 +1213,54 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                 <div className="border rounded-lg p-4 bg-muted/30">
                   <p className="text-sm font-medium text-muted-foreground mb-3">Endereço de Entrega</p>
 
-                  {!selectedCustomer && (
+                  {!selectedCustomer && !hasSelectedCustomer && (
                     <p className="text-sm text-muted-foreground italic">
-                      Selecione um cliente para ver os endereços salvos
+                      Preencha o CPF do cliente para ver os endereços salvos
                     </p>
                   )}
 
-                  {selectedCustomer && !selectedAddress && (
-                    <div className="border border-dashed rounded-lg p-3 text-center text-sm text-muted-foreground">
-                      Endereço do cliente buscado aparecerá aqui
+                  {/* Show all addresses inline for selection */}
+                  {(selectedCustomer || hasSelectedCustomer) && customerAddresses.length > 0 && (
+                    <div className="space-y-2">
+                      {customerAddresses.map((addr: any) => {
+                        const isSelected = selectedAddress?.street === addr.street && selectedAddress?.number === addr.number && selectedAddress?.zip_code === addr.zip_code;
+                        return (
+                          <div
+                            key={addr.id}
+                            className={`p-3 rounded-lg border text-sm cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 border-primary' : 'bg-background hover:bg-muted/50'}`}
+                            onClick={() => applyAddress({
+                              street: addr.street, number: addr.number || "",
+                              complement: addr.complement || "", neighborhood: addr.neighborhood || "",
+                              city: addr.city || "", state: addr.state || "", zip_code: addr.zip_code || "",
+                            })}
+                          >
+                            <div className="flex items-start gap-2">
+                              <MapPin className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium">{addr.street}{addr.number ? `, ${addr.number}` : ""}</p>
+                                <p className="text-muted-foreground text-xs">{addr.neighborhood} — {addr.city}{addr.state ? ` - ${addr.state}` : ""}</p>
+                                {addr.complement && <p className="text-muted-foreground text-xs">{addr.complement}</p>}
+                              </div>
+                              {addr.is_default && <Badge variant="secondary" className="text-[10px] flex-shrink-0">Padrão</Badge>}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
-                  {selectedAddress && (
-                    <div className="p-3 bg-background rounded-lg border text-sm">
-                      <div className="flex items-start gap-2">
-                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">{selectedAddress.street}{selectedAddress.number ? `, ${selectedAddress.number}` : ""}</p>
-                          <p className="text-muted-foreground">{selectedAddress.neighborhood} — {selectedAddress.city}{selectedAddress.state ? ` - ${selectedAddress.state}` : ""}</p>
-                          {selectedAddress.complement && <p className="text-muted-foreground text-xs">{selectedAddress.complement}</p>}
-                        </div>
-                      </div>
-                    </div>
+                  {(selectedCustomer || hasSelectedCustomer) && customerAddresses.length === 0 && (
+                    <p className="text-sm text-muted-foreground italic">Nenhum endereço cadastrado</p>
                   )}
 
-                  {selectedCustomer && (
+                  {(selectedCustomer || hasSelectedCustomer) && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="mt-3 w-full"
                       onClick={() => { fetchCustomerAddresses(); setShowAddressDialog(true); }}
                     >
-                      {selectedAddress ? "Alterar endereço" : "Selecionar endereço"}
+                      <Plus className="w-4 h-4 mr-1" /> Adicionar novo endereço
                     </Button>
                   )}
                 </div>
