@@ -76,10 +76,18 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   const [startingOAuth, setStartingOAuth] = useState(false);
   const [disconnectingMp, setDisconnectingMp] = useState(false);
 
+  // Facebook Pixel state
+  const [fbPixelSheetOpen, setFbPixelSheetOpen] = useState(false);
+  const [fbPixelId, setFbPixelId] = useState("");
+  const [fbPixelSaved, setFbPixelSaved] = useState(false);
+  const [fbPixelLoading, setFbPixelLoading] = useState(true);
+  const [fbPixelSaving, setFbPixelSaving] = useState(false);
+
   useEffect(() => {
     fetchIfoodConfig();
     fetchDdConfig();
     fetchMpConfig();
+    fetchFbPixel();
   }, [restaurantId]);
 
   const fetchIfoodConfig = async () => {
