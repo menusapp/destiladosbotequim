@@ -153,7 +153,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
         body: JSON.stringify({ action: "exchange_token", restaurant_id: restaurantId, authorization_code: authCode.trim() }),
       });
       const data = await res.json();
@@ -170,7 +170,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
         body: JSON.stringify({ action: "disconnect", restaurant_id: restaurantId }),
       });
       if (!res.ok) throw new Error("Erro ao desconectar");
