@@ -357,7 +357,7 @@ const MenuDigitizerDialog = ({
               >
                 <Image className="h-10 w-10 text-primary" />
                 <div className="text-center">
-                  <p className="font-semibold">Foto do Cardápio</p>
+                  <p className="font-semibold">🪄 Importar por AI</p>
                   <p className="text-xs text-muted-foreground mt-1">Envie uma foto do cardápio físico</p>
                 </div>
               </button>
