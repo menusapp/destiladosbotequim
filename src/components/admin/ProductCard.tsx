@@ -1,9 +1,11 @@
-import { memo } from "react";
+import { memo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Copy, Trash2 } from "lucide-react";
+import { Pencil, Copy, Trash2, Camera, Loader2 } from "lucide-react";
+import { toast } from "@/components/ui/sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,23 +37,58 @@ interface ProductCardProps {
     margin?: number;
     prep_time?: number;
     sku?: string;
+    image_url?: string | null;
     variableCosts?: VariableCostInfo[];
   };
   onEdit: (product: any) => void;
   onToggleAvailable: (id: string, available: boolean) => void;
   onDuplicate?: (product: any) => void;
   onDelete?: (productId: string) => void;
+  onImageUpdated?: () => void;
 }
 
-const ProductCard = memo(({ product, onEdit, onToggleAvailable, onDuplicate, onDelete }: ProductCardProps) => {
+const ProductCard = memo(({ product, onEdit, onToggleAvailable, onDuplicate, onDelete, onImageUpdated }: ProductCardProps) => {
   const hasVariableCosts = product.variableCosts && product.variableCosts.length > 0;
   const margin = product.margin || 0;
   const marginColor = margin >= 70 ? "text-success" : margin >= 50 ? "text-warning" : "text-foreground";
   const hasPromoPrice = product.promotional_price !== null && product.promotional_price !== undefined;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('product-images').upload(fileName, file);
+      if (uploadError) { toast.error("Erro ao fazer upload da imagem"); return; }
+      const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(fileName);
+      const { error: updateError } = await supabase.from("products").update({ image_url: publicUrl }).eq("id", product.id);
+      if (updateError) { toast.error("Erro ao salvar imagem"); return; }
+      toast.success("Foto adicionada com sucesso");
+      onImageUpdated?.();
+    } catch {
+      toast.error("Erro ao enviar foto");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   return (
     <Card className="p-3 hover:shadow-md transition-shadow">
       <div className="space-y-2">
+        {/* Thumbnail */}
+        {product.image_url && (
+          <img src={product.image_url} alt={product.name} className="w-full h-20 object-cover rounded" />
+        )}
+
         {/* Header */}
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
@@ -145,9 +182,8 @@ const ProductCard = memo(({ product, onEdit, onToggleAvailable, onDuplicate, onD
           {onDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="flex-1 h-8 text-xs">
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  Excluir
+                <Button variant="outline" size="icon" className="h-8 w-8">
+                  <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -166,10 +202,25 @@ const ProductCard = memo(({ product, onEdit, onToggleAvailable, onDuplicate, onD
               </AlertDialogContent>
             </AlertDialog>
           )}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoUpload}
+          />
           {onDuplicate && (
-            <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => onDuplicate(product)}>
-              <Copy className="h-3 w-3 mr-1" />
-              Duplicar
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onDuplicate(product)}>
+              <Copy className="h-3 w-3" />
             </Button>
           )}
           <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => onEdit(product)}>
