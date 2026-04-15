@@ -113,6 +113,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const [newClientName, setNewClientName] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
   const [savingNewClient, setSavingNewClient] = useState(false);
+  const [cpfSearching, setCpfSearching] = useState(false);
+  const [cpfSearched, setCpfSearched] = useState(false);
 
   // Address UX states
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null);
