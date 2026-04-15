@@ -454,7 +454,7 @@ Deno.serve(async (req) => {
               if (entry.extras.length > 0 && insertedItem) {
                 const extrasToInsert = entry.extras.map((ex) => ({
                   order_item_id: insertedItem.id,
-                  product_extra_id: ex.matchedExtraId,
+                  product_extra_id: null,
                   price_at_order: ex.price,
                   extra_name: ex.name,
                 }));
