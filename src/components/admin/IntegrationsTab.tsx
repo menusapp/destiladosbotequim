@@ -423,16 +423,20 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
           </CardContent>
         </Card>
 
-        {/* Facebook Pixel Card */}
+        {/* Meta Pixel Card */}
         <Card className="cursor-pointer hover:shadow-md transition-shadow border" onClick={() => setFbPixelSheetOpen(true)}>
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-[#1877F2]/10 flex items-center justify-center">
-                  <BarChart3 className="h-5 w-5 text-[#1877F2]" />
+                <div className="h-10 w-10 rounded-lg bg-[#0081FB]/10 flex items-center justify-center">
+                  <svg className="h-5 w-5" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6.403 5.076c-2.302 2.456-3.527 6.066-3.527 10.763v4.32c0 4.698 1.225 8.308 3.527 10.764C8.707 33.382 12.111 34.8 16.5 34.8h3c4.389 0 7.793-1.418 10.097-3.877 2.302-2.456 3.527-6.066 3.527-10.763v-4.32c0-4.698-1.225-8.308-3.527-10.764C27.293 2.618 23.889 1.2 19.5 1.2h-3c-4.389 0-7.793 1.418-10.097 3.876z" fill="url(#meta-gradient)"/>
+                    <path d="M10.74 23.452c0 .982.204 1.681.546 2.126.338.44.795.622 1.35.622.705 0 1.32-.348 1.975-1.276.527-.746 1.074-1.804 1.736-3.14l.88-1.778c.873-1.763 1.88-3.285 3.09-4.338 1.01-.878 2.1-1.368 3.24-1.368 1.603 0 2.946.763 3.968 2.218 1.104 1.572 1.675 3.636 1.675 6.102 0 1.42-.224 2.525-.616 3.352-.37.782-.953 1.378-1.722 1.738l-.987-1.268c.5-.266.866-.66 1.1-1.238.244-.6.385-1.385.385-2.378 0-1.97-.376-3.648-1.12-4.876-.638-1.052-1.466-1.63-2.456-1.63-.838 0-1.614.47-2.38 1.37-.612.72-1.228 1.736-1.895 3.004l-.868 1.654c-1.056 2.012-1.88 3.3-2.65 4.192-.926 1.076-1.915 1.56-3.14 1.56-1.098 0-1.974-.42-2.604-1.22-.608-.77-.997-1.892-.997-3.442 0-1.744.345-3.504 1.003-5.188l1.352.532c-.576 1.488-.864 2.99-.864 4.578z" fill="white"/>
+                    <defs><linearGradient id="meta-gradient" x1="18" y1="1.2" x2="18" y2="34.8" gradientUnits="userSpaceOnUse"><stop stopColor="#0081FB"/><stop offset="1" stopColor="#0064E0"/></linearGradient></defs>
+                  </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm">Facebook Pixel</h3>
+                  <h3 className="font-semibold text-sm">Meta Pixel</h3>
                   <p className="text-xs text-muted-foreground">Rastreamento e campanhas</p>
                 </div>
               </div>
@@ -660,15 +664,19 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
         </SheetContent>
       </Sheet>
 
-      {/* Facebook Pixel Config Sheet */}
+      {/* Meta Pixel Config Sheet */}
       <Sheet open={fbPixelSheetOpen} onOpenChange={setFbPixelSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-[#1877F2]" />
-              Facebook Pixel
+              <svg className="h-5 w-5" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6.403 5.076c-2.302 2.456-3.527 6.066-3.527 10.763v4.32c0 4.698 1.225 8.308 3.527 10.764C8.707 33.382 12.111 34.8 16.5 34.8h3c4.389 0 7.793-1.418 10.097-3.877 2.302-2.456 3.527-6.066 3.527-10.763v-4.32c0-4.698-1.225-8.308-3.527-10.764C27.293 2.618 23.889 1.2 19.5 1.2h-3c-4.389 0-7.793 1.418-10.097 3.876z" fill="url(#meta-gradient2)"/>
+                <path d="M10.74 23.452c0 .982.204 1.681.546 2.126.338.44.795.622 1.35.622.705 0 1.32-.348 1.975-1.276.527-.746 1.074-1.804 1.736-3.14l.88-1.778c.873-1.763 1.88-3.285 3.09-4.338 1.01-.878 2.1-1.368 3.24-1.368 1.603 0 2.946.763 3.968 2.218 1.104 1.572 1.675 3.636 1.675 6.102 0 1.42-.224 2.525-.616 3.352-.37.782-.953 1.378-1.722 1.738l-.987-1.268c.5-.266.866-.66 1.1-1.238.244-.6.385-1.385.385-2.378 0-1.97-.376-3.648-1.12-4.876-.638-1.052-1.466-1.63-2.456-1.63-.838 0-1.614.47-2.38 1.37-.612.72-1.228 1.736-1.895 3.004l-.868 1.654c-1.056 2.012-1.88 3.3-2.65 4.192-.926 1.076-1.915 1.56-3.14 1.56-1.098 0-1.974-.42-2.604-1.22-.608-.77-.997-1.892-.997-3.442 0-1.744.345-3.504 1.003-5.188l1.352.532c-.576 1.488-.864 2.99-.864 4.578z" fill="white"/>
+                <defs><linearGradient id="meta-gradient2" x1="18" y1="1.2" x2="18" y2="34.8" gradientUnits="userSpaceOnUse"><stop stopColor="#0081FB"/><stop offset="1" stopColor="#0064E0"/></linearGradient></defs>
+              </svg>
+              Meta Pixel
             </SheetTitle>
-            <SheetDescription>Configure o Pixel do Facebook para rastrear conversões e criar campanhas</SheetDescription>
+            <SheetDescription>Configure o Meta Pixel para rastrear conversões e criar campanhas no Facebook, Instagram e toda a rede Meta</SheetDescription>
           </SheetHeader>
           <div className="mt-6 space-y-6">
             {fbPixelLoading ? (
