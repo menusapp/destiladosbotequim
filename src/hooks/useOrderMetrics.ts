@@ -91,7 +91,7 @@ async function fetchOrderMetrics(restaurantId: string, dateRange: DateRange): Pr
       .select("id, created_at, order_type, delivery_fee, coupon_discount, loyalty_points_used, payment_type, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
       .eq("restaurant_id", restaurantId)
       .eq("order_type", "delivery")
-      .in("status", FINALIZED_ORDER_STATUSES)
+      .in("status", CONFIRMED_ORDER_STATUSES)
       .gte("created_at", start).lte("created_at", end),
     supabase.from("bills")
       .select("id, total_amount, payment_method, payment_splits, paid_at, table_id, tables!inner(restaurant_id)")
