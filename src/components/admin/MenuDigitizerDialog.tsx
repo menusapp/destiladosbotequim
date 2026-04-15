@@ -27,6 +27,8 @@ import {
   Fish,
   Coffee,
   UtensilsCrossed,
+  Link,
+  Image,
 } from "lucide-react";
 
 interface ExtractedItem {
@@ -60,6 +62,8 @@ const cuisineTypes = [
   { id: "outros", label: "Outros", icon: UtensilsCrossed },
 ];
 
+type ImportSource = "photo" | "url";
+
 const MenuDigitizerDialog = ({
   open,
   onOpenChange,
@@ -68,10 +72,12 @@ const MenuDigitizerDialog = ({
   mode,
 }: MenuDigitizerDialogProps) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [importSource, setImportSource] = useState<ImportSource | null>(null);
   const [cuisineType, setCuisineType] = useState("");
   const [customCuisine, setCustomCuisine] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [menuUrl, setMenuUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedCategory[]>([]);
@@ -85,10 +91,12 @@ const MenuDigitizerDialog = ({
 
   const reset = () => {
     setStep(1);
+    setImportSource(null);
     setCuisineType("");
     setCustomCuisine("");
     setImagePreview(null);
     setImageBase64(null);
+    setMenuUrl("");
     setIsAnalyzing(false);
     setIsSaving(false);
     setExtractedData([]);
@@ -119,7 +127,7 @@ const MenuDigitizerDialog = ({
     reader.readAsDataURL(file);
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyzePhoto = async () => {
     if (!imageBase64) return;
     setIsAnalyzing(true);
     try {
@@ -144,6 +152,36 @@ const MenuDigitizerDialog = ({
     } catch (err: any) {
       console.error("Analyze error:", err);
       toast.error(err.message || "Erro ao analisar cardápio");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAnalyzeUrl = async () => {
+    if (!menuUrl.trim()) return;
+    setIsAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("digitize-menu-url", {
+        body: {
+          url: menuUrl.trim(),
+          cuisine_type: cuisineType,
+          custom_cuisine: cuisineType === "outros" ? customCuisine : undefined,
+          mode,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.categories?.length) {
+        toast.error(`Nenhum ${isComplements ? "complemento" : "produto"} encontrado no site. Tente outro link.`);
+        return;
+      }
+      setExtractedData(data.categories);
+      setStep(3);
+      const total = data.categories.reduce((acc: number, c: ExtractedCategory) => acc + (c.items || c.products || []).length, 0);
+      toast.success(`${total} ${isComplements ? "complementos" : "produtos"} encontrados!`);
+    } catch (err: any) {
+      console.error("URL analyze error:", err);
+      toast.error(err.message || "Erro ao analisar cardápio pelo link");
     } finally {
       setIsAnalyzing(false);
     }
@@ -285,24 +323,59 @@ const MenuDigitizerDialog = ({
 
   const totalItems = extractedData.reduce((acc, c) => acc + getItems(c).length, 0);
 
+  const getStepTitle = () => {
+    if (step === 1 && !importSource) return `Importar ${modeLabel}`;
+    if (step === 1) return `Tipo de Culinária`;
+    if (step === 2 && importSource === "url") return "Importar por Link";
+    if (step === 2) return "Enviar Foto do Cardápio";
+    return `Revisar ${modeLabel} Extraídos`;
+  };
+
+  const getStepDescription = () => {
+    if (step === 1 && !importSource) return "Escolha como deseja importar o cardápio";
+    if (step === 1) return "Selecione o tipo de culinária para uma extração mais precisa";
+    if (step === 2 && importSource === "url") return "Cole o link do cardápio digital";
+    if (step === 2) return "Envie uma foto clara do cardápio físico";
+    return `${totalItems} ${isComplements ? "complementos" : "produtos"} em ${extractedData.length} categorias. Edite antes de importar.`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {step === 1 && `Importar ${modeLabel} por Foto`}
-            {step === 2 && "Enviar Foto do Cardápio"}
-            {step === 3 && `Revisar ${modeLabel} Extraídos`}
-          </DialogTitle>
-          <DialogDescription>
-            {step === 1 && "Selecione o tipo de culinária para uma extração mais precisa"}
-            {step === 2 && "Envie uma foto clara do cardápio físico"}
-            {step === 3 && `${totalItems} ${isComplements ? "complementos" : "produtos"} em ${extractedData.length} categorias. Edite antes de importar.`}
-          </DialogDescription>
+          <DialogTitle>{getStepTitle()}</DialogTitle>
+          <DialogDescription>{getStepDescription()}</DialogDescription>
         </DialogHeader>
 
-        {/* Step 1: Cuisine Selection */}
-        {step === 1 && (
+        {/* Step 1: Source Selection + Cuisine */}
+        {step === 1 && !importSource && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => setImportSource("photo")}
+                className="flex flex-col items-center gap-3 p-6 rounded-lg border-2 border-border hover:border-primary/50 transition-all"
+              >
+                <Image className="h-10 w-10 text-primary" />
+                <div className="text-center">
+                  <p className="font-semibold">Foto do Cardápio</p>
+                  <p className="text-xs text-muted-foreground mt-1">Envie uma foto do cardápio físico</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setImportSource("url")}
+                className="flex flex-col items-center gap-3 p-6 rounded-lg border-2 border-border hover:border-primary/50 transition-all"
+              >
+                <Link className="h-10 w-10 text-primary" />
+                <div className="text-center">
+                  <p className="font-semibold">Link do Cardápio</p>
+                  <p className="text-xs text-muted-foreground mt-1">Cole o link de um cardápio digital</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 1 && importSource && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {cuisineTypes.map((ct) => {
@@ -333,7 +406,11 @@ const MenuDigitizerDialog = ({
                 />
               </div>
             )}
-            <div className="flex justify-end">
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => { setImportSource(null); setCuisineType(""); setCustomCuisine(""); }}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Voltar
+              </Button>
               <Button onClick={() => setStep(2)} disabled={!cuisineType || (cuisineType === "outros" && !customCuisine)}>
                 Próximo
                 <ChevronRight className="h-4 w-4 ml-1" />
@@ -343,7 +420,7 @@ const MenuDigitizerDialog = ({
         )}
 
         {/* Step 2: Photo Upload */}
-        {step === 2 && (
+        {step === 2 && importSource === "photo" && (
           <div className="space-y-4">
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
             {!imagePreview ? (
@@ -373,11 +450,42 @@ const MenuDigitizerDialog = ({
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Voltar
               </Button>
-              <Button onClick={handleAnalyze} disabled={!imageBase64 || isAnalyzing}>
+              <Button onClick={handleAnalyzePhoto} disabled={!imageBase64 || isAnalyzing}>
                 {isAnalyzing ? (
                   <><Loader2 className="h-4 w-4 animate-spin mr-1" />Analisando...</>
                 ) : (
                   <><Camera className="h-4 w-4 mr-1" />Analisar Cardápio</>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: URL Input */}
+        {step === 2 && importSource === "url" && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Link do cardápio digital</Label>
+              <Input
+                type="url"
+                placeholder="https://exemplo.com/cardapio"
+                value={menuUrl}
+                onChange={(e) => setMenuUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Cole o link completo do cardápio digital. Funciona melhor com sites que exibem os produtos diretamente na página (sem login).
+              </p>
+            </div>
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(1)}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Voltar
+              </Button>
+              <Button onClick={handleAnalyzeUrl} disabled={!menuUrl.trim() || isAnalyzing}>
+                {isAnalyzing ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-1" />Analisando...</>
+                ) : (
+                  <><Link className="h-4 w-4 mr-1" />Analisar Link</>
                 )}
               </Button>
             </div>
@@ -417,7 +525,7 @@ const MenuDigitizerDialog = ({
             <div className="flex justify-between pt-2">
               <Button variant="outline" onClick={() => setStep(2)}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Nova Foto
+                {importSource === "url" ? "Novo Link" : "Nova Foto"}
               </Button>
               <Button onClick={handleConfirmImport} disabled={isSaving || !totalItems}>
                 {isSaving ? (
