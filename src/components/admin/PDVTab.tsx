@@ -425,6 +425,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     setCustomerName("");
     setCustomerCpf("");
     setCustomerPhone("");
+    setCpfSearched(false);
     setSelectedAddress(null);
     setDeliveryAddress("");
     setDeliveryCep("");
