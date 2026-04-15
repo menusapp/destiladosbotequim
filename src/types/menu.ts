@@ -45,6 +45,7 @@ export interface Restaurant {
   login_require_name?: boolean;
   login_require_phone?: boolean;
   login_require_birth_date?: boolean;
+  facebook_pixel_id?: string | null;
 }
 
 export interface CartItemExtra {
