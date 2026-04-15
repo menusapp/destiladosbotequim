@@ -1,49 +1,38 @@
 
 
-## Plano: Importar Cardápio do iFood
-
-### Contexto
-O iFood possui uma API de catálogo (`/merchant-api/catalog/v2.0/merchants/{merchantId}/catalogs`) que permite buscar os produtos cadastrados na loja. Atualmente o sistema já tem integração com iFood para **pedidos** (polling), mas não utiliza a API de catálogo.
+## Plano: Sugestão Fiscal por IA nos Produtos
 
 ### O que será feito
-Criar um botão "Importar do iFood" na aba de Cardápio que busca todos os produtos do catálogo iFood do restaurante e os importa como categorias e produtos na base local.
+Adicionar um botão "Sugerir com IA" na aba Fiscal do diálogo de edição de produto (em `ProductsTab.tsx` e `ProductsGrid.tsx`). Ao clicar, a IA recebe o nome do produto, descrição e UF do restaurante, e retorna os campos fiscais preenchidos automaticamente (NCM, CEST, CFOP, CSOSN, PIS, COFINS, etc.).
 
 ### Fluxo
-
-1. Usuário clica em "Importar do iFood" (botão ao lado do digitalizador existente)
-2. Sistema verifica se o iFood está conectado (via `ifood_config`)
-3. Se conectado, chama uma nova Edge Function `ifood-catalog` que:
-   - Usa o `access_token` do iFood para buscar o catálogo via API
-   - Retorna categorias e produtos com nomes, descrições e preços
-4. Exibe preview dos itens encontrados (reutilizando o padrão do digitalizador)
-5. Usuário confirma e os produtos são criados no banco com códigos PDV únicos
+1. Usuário abre a edição de um produto e vai na aba "Fiscal"
+2. Clica no botão "Sugerir Tributação com IA"
+3. Sistema envia nome, descrição e UF para uma Edge Function
+4. A Edge Function usa Lovable AI para classificar o produto fiscalmente
+5. Os campos são preenchidos automaticamente — o usuário pode revisar e ajustar antes de salvar
 
 ### Arquivos
 
-1. **Nova Edge Function: `supabase/functions/ifood-catalog/index.ts`**
-   - Recebe `restaurant_id`
-   - Busca `access_token` e `merchant_id` da `ifood_config`
-   - Chama `GET /merchant-api/catalog/v2.0/merchants/{merchantId}/catalogs` para listar catálogos
-   - Para cada catálogo, busca os itens via `/catalog/v2.0/merchants/{merchantId}/catalogs/{catalogId}/categories`
-   - Retorna as categorias e produtos formatados
+1. **Nova Edge Function: `supabase/functions/fiscal-ai-suggest/index.ts`**
+   - Recebe: `product_name`, `product_description`, `restaurant_id`
+   - Busca a UF do restaurante na `fiscal_configs`
+   - Chama Lovable AI com um prompt especializado em tributação brasileira para alimentos (Simples Nacional, NFC-e)
+   - Usa tool calling para extrair saída estruturada com os campos: NCM, CEST, CFOP, CSOSN, Origem, PIS CST, COFINS CST, alíquotas
+   - Retorna JSON com os valores sugeridos
 
-2. **`src/components/admin/ProductsGrid.tsx`**
-   - Adicionar botão "Importar do iFood" ao lado do botão de digitalizar
-   - Só aparece se o restaurante tiver iFood configurado e conectado
+2. **`src/components/admin/ProductsTab.tsx`**
+   - Na aba "Fiscal" do dialog de edição, adicionar botão "Sugerir com IA" (ícone de varinha/sparkles)
+   - Ao clicar, chama a Edge Function e preenche os campos fiscais com os valores retornados
+   - Loading state enquanto processa
 
-3. **`src/components/admin/ImportIfoodDialog.tsx`** (novo)
-   - Dialog que mostra loading enquanto busca o catálogo
-   - Exibe preview das categorias/produtos encontrados com checkboxes
-   - Permite editar preços antes de importar
-   - Ao confirmar, cria categorias e produtos no banco com PDV únicos
-
-4. **`supabase/config.toml`**
-   - Adicionar `[functions.ifood-catalog]` com `verify_jwt = false`
+3. **`src/components/admin/ProductsGrid.tsx`**
+   - Mesmo botão na aba Fiscal do dialog de edição/criação do ProductsGrid
 
 ### Detalhes técnicos
-- A API do iFood usa endpoints `merchant-api.ifood.com.br/catalog/v2.0/`
-- O token de acesso já existe na tabela `ifood_config` e é renovado pelo `ifood-refresh-token`
-- Produtos importados respeitam a regra de PDV único (sem duplicatas)
-- Categorias existentes com mesmo nome serão reutilizadas (sem duplicar)
-- Respeita a regra de não criar produtos com o restaurante aberto
+- Modelo: `google/gemini-3-flash-preview` (rápido e preciso para classificação)
+- O prompt inclui contexto de Simples Nacional (CRT 1), operação NFC-e, e tabela NCM para alimentos/bebidas
+- Tool calling garante resposta estruturada sem parsing manual
+- UF é buscada para contextualizar CFOP e regras estaduais
+- Os valores são apenas sugestões — o usuário sempre pode editar antes de salvar
 
