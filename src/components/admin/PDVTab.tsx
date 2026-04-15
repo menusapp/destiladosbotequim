@@ -620,11 +620,14 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   };
 
   const handleSubmit = async () => {
-    if (!hasSelectedCustomer) {
-      toast.error("Selecione ou cadastre um cliente com CPF válido antes de criar o pedido");
-      setIsCustomerSelectOpen(true);
+    if (!customerName.trim() || !validateCPF(customerCpf)) {
+      toast.error("Preencha o nome e CPF válido do cliente");
       return;
     }
+    if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
+
+    // Auto-create/update customer in CRM
+    await upsertCustomerCRM();
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
 
     setSubmitting(true);
