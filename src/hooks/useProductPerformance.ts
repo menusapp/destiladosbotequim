@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getDateRange, type DateRange, FINALIZED_ORDER_STATUSES } from "./useOrderMetrics";
+import { getDateRange, type DateRange, CONFIRMED_ORDER_STATUSES } from "./useOrderMetrics";
 
 export interface ProductPerformanceItem {
   productId: string;
@@ -35,7 +35,7 @@ async function fetchProductPerformance(
       "id, order_items(id, product_id, quantity, price_at_order, order_item_extras(price_at_order))"
     )
     .eq("restaurant_id", restaurantId)
-    .in("status", FINALIZED_ORDER_STATUSES)
+    .in("status", CONFIRMED_ORDER_STATUSES)
     .gte("created_at", start)
     .lte("created_at", end);
 
