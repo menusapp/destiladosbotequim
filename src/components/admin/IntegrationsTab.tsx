@@ -410,6 +410,30 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Facebook Pixel Card */}
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border" onClick={() => setFbPixelSheetOpen(true)}>
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-[#1877F2]/10 flex items-center justify-center">
+                  <BarChart3 className="h-5 w-5 text-[#1877F2]" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">Facebook Pixel</h3>
+                  <p className="text-xs text-muted-foreground">Rastreamento e campanhas</p>
+                </div>
+              </div>
+              {fbPixelLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : isFbPixelConfigured ? (
+                <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">Ativo</Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px]">Não configurado</Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* iFood Config Sheet */}
@@ -618,6 +642,75 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
                     <><ExternalLink className="mr-2 h-4 w-4" />Conectar com Mercado Pago</>
                   )}
                 </Button>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Facebook Pixel Config Sheet */}
+      <Sheet open={fbPixelSheetOpen} onOpenChange={setFbPixelSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-[#1877F2]" />
+              Facebook Pixel
+            </SheetTitle>
+            <SheetDescription>Configure o Pixel do Facebook para rastrear conversões e criar campanhas</SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            {fbPixelLoading ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : (
+              <div className="space-y-5">
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm">Como obter o Pixel ID:</h4>
+                  <div className="space-y-2">
+                    {[
+                      "Acesse o Gerenciador de Eventos do Facebook (Meta Business Suite)",
+                      "Crie ou selecione um Pixel existente",
+                      "Copie o ID do Pixel (número de 15-16 dígitos)",
+                      "Cole o ID abaixo e salve"
+                    ].map((text, i) => (
+                      <div key={i} className="flex gap-3 items-start">
+                        <span className="flex-shrink-0 h-6 w-6 rounded-full bg-[#1877F2] text-white text-xs flex items-center justify-center font-bold">{i + 1}</span>
+                        <p className="text-sm text-muted-foreground">{text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <Separator />
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Pixel ID</Label>
+                    <Input
+                      placeholder="Ex: 123456789012345"
+                      value={fbPixelId}
+                      onChange={(e) => setFbPixelId(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    className="w-full bg-[#1877F2] hover:bg-[#1565C0]"
+                    onClick={handleSaveFbPixel}
+                    disabled={fbPixelSaving}
+                  >
+                    {fbPixelSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                    {fbPixelId.trim() ? "Salvar Pixel" : "Remover Pixel"}
+                  </Button>
+                </div>
+                {isFbPixelConfigured && (
+                  <>
+                    <Separator />
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-700">Pixel ativo nos cardápios</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      O Pixel será carregado automaticamente nos cardápios de Delivery e Mesa, rastreando visualizações de página. 
+                      Use o Gerenciador de Eventos do Facebook para criar públicos personalizados e campanhas.
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>
