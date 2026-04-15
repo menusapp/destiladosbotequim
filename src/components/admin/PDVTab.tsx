@@ -627,13 +627,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     }
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
 
-    // Auto-create/update customer in CRM
-    await upsertCustomerCRM();
-    if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
-
     setSubmitting(true);
     try {
-      // Save customer to CRM
+      // Auto-create/update customer in CRM
       await upsertCustomerCRM();
       if (orderType === "delivery") {
         if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
