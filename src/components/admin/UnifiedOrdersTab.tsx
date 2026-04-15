@@ -124,7 +124,22 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   useEffect(() => {
     supabase.from('printer_settings').select('auto_print_orders').eq('restaurant_id', restaurantId).maybeSingle()
       .then(({ data }) => { if (data) setAutoPrint(data.auto_print_orders); });
+    supabase.from('restaurants').select('auto_accept_orders').eq('id', restaurantId).single()
+      .then(({ data }) => { if (data) setAutoAccept(data.auto_accept_orders ?? false); });
   }, [restaurantId]);
+
+  // Auto-accept: when orders change and autoAccept is on, accept all pending orders
+  const autoAcceptRef = { current: autoAccept };
+  autoAcceptRef.current = autoAccept;
+
+  useEffect(() => {
+    if (!autoAccept) return;
+    const pendingOrders = orders.filter(o => o.status === "pending");
+    if (pendingOrders.length === 0) return;
+    pendingOrders.forEach(async (order) => {
+      await advanceStatus(order, "accepted");
+    });
+  }, [orders, autoAccept]);
 
   // iFood polling every 30 seconds
   useEffect(() => {
