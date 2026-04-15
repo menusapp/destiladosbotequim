@@ -494,6 +494,15 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-muted-foreground" />
+            <Label htmlFor="auto-accept" className="text-xs">Aceitar automaticamente</Label>
+            <Switch id="auto-accept" checked={autoAccept} onCheckedChange={async (v) => {
+              setAutoAccept(v);
+              await supabase.from('restaurants').update({ auto_accept_orders: v }).eq('id', restaurantId);
+              toast.success(v ? "Pedidos serão aceitos automaticamente" : "Aceite automático desativado");
+            }} />
+          </div>
+          <div className="flex items-center gap-2">
             <Printer className="w-4 h-4 text-muted-foreground" />
             <Label htmlFor="auto-print" className="text-xs">Impressão automática</Label>
             <Switch id="auto-print" checked={autoPrint} onCheckedChange={async (v) => {
