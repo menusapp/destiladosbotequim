@@ -1197,6 +1197,21 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
               </TabsContent>
 
               <TabsContent value="fiscal" className="space-y-4 mt-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 mb-2"
+                  disabled={fiscalAiLoading || !productName}
+                  onClick={handleFiscalAiSuggest}
+                >
+                  {fiscalAiLoading ? (
+                    <span className="animate-spin">⏳</span>
+                  ) : (
+                    <span>✨</span>
+                  )}
+                  {fiscalAiLoading ? "Analisando..." : "Sugerir Tributação com IA"}
+                </Button>
                 <Card className="border-border/50">
                   <CardContent className="pt-5 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
