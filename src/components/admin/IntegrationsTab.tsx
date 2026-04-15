@@ -131,9 +131,43 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     }
   };
 
+  const fetchFbPixel = async () => {
+    setFbPixelLoading(true);
+    try {
+      const { data } = await supabase
+        .from("restaurants")
+        .select("facebook_pixel_id")
+        .eq("id", restaurantId)
+        .single();
+      const pixelId = data?.facebook_pixel_id || "";
+      setFbPixelId(pixelId);
+      setFbPixelSaved(!!pixelId);
+    } catch { /* ignore */ }
+    finally { setFbPixelLoading(false); }
+  };
+
+  const handleSaveFbPixel = async () => {
+    setFbPixelSaving(true);
+    try {
+      const value = fbPixelId.trim() || null;
+      const { error } = await supabase
+        .from("restaurants")
+        .update({ facebook_pixel_id: value } as any)
+        .eq("id", restaurantId);
+      if (error) throw error;
+      setFbPixelSaved(!!value);
+      toast.success(value ? "Pixel do Facebook salvo!" : "Pixel do Facebook removido!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao salvar");
+    } finally {
+      setFbPixelSaving(false);
+    }
+  };
+
   const isIfoodConnected = ifoodConfig?.access_token && ifoodConfig?.merchant_id;
   const isDdConnected = ddConfig?.access_token && ddConfig?.store_id && ddConfig?.enabled;
   const isMpConnected = !!mpConfig;
+  const isFbPixelConfigured = fbPixelSaved;
 
   // === iFood handlers ===
   const handleGenerateCode = async () => {
