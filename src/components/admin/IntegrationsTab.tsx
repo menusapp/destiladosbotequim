@@ -109,12 +109,19 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
 
   const fetchDdConfig = async () => {
     setDdLoading(true);
-    const { data } = await supabase
-      .from("deliverydireto_config" as any)
-      .select("id, restaurant_id, enabled, store_id, username, access_token, token_expires_at")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
-    setDdConfig(data as unknown as DDConfig | null);
+    try {
+      const { data } = await supabase.rpc("admin_get_dd_config", {
+        p_restaurant_id: restaurantId,
+      });
+      if (data) {
+        const parsed = typeof data === "string" ? JSON.parse(data) : data;
+        setDdConfig(parsed as DDConfig);
+      } else {
+        setDdConfig(null);
+      }
+    } catch {
+      setDdConfig(null);
+    }
     setDdLoading(false);
   };
 
