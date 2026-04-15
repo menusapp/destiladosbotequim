@@ -1,21 +1,26 @@
 
 
-## Plano: Fix — Extras do iFood não inseridos (FK violation)
+## Plano: Vincular todos os complementos a todos os produtos do Julio's Lanches
 
-### Problema
-O matching de extras funciona corretamente (o log mostra `✓ OPTION "Sim, quero Combo" matched by code "040"`), mas a inserção falha porque o campo `product_extra_id` na tabela `order_item_extras` tem uma foreign key para `product_extras`, e estamos inserindo o ID de `extra_category_items` — que é outra tabela.
+### Contexto
+O restaurante `julios-lanches` possui **114 produtos** e **3 categorias de complementos**:
+- Adicionais de Proteína
+- Adicionais de Queijo
+- Outros Adicionais
 
-Erro exato:
-```
-Key (product_extra_id)=(3adf923b...) is not present in table "product_extras".
-```
+Atualmente, quase nenhum produto tem esses complementos vinculados.
 
-### Solução
-No `ifood-polling/index.ts`, ao montar os extras para inserção (linha ~455-459), setar `product_extra_id: null` em vez de usar o ID do `extra_category_items`. O campo `extra_name` e `price_at_order` já são preenchidos corretamente e são suficientes para exibição no sistema.
+### O que será feito
+Executar um script SQL (via migration) que insere na tabela `product_extras` um registro para cada combinação de produto × categoria de complemento que ainda não exista, vinculando todas as 3 categorias a todos os 114 produtos.
+
+Cada registro será criado com:
+- `is_required = false` (opcional)
+- `price = 0` (preço vem dos itens da categoria)
+- `name` = nome da categoria de complemento
 
 ### Arquivo alterado
-- `supabase/functions/ifood-polling/index.ts` — linha 457: trocar `ex.matchedExtraId` por `null`
+- 1 migration SQL — `INSERT INTO product_extras ... SELECT` com filtro `WHERE NOT EXISTS` para evitar duplicatas
 
 ### Impacto
-Correção pontual de 1 linha. Nenhuma outra mudança necessária. O nome e preço do extra já ficam salvos corretamente.
+Apenas o restaurante `c9740e47-...` (julios-lanches) será afetado. Nenhum outro restaurante é tocado.
 
