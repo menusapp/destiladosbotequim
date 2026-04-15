@@ -35,6 +35,7 @@ interface ExtractedItem {
   name: string;
   description?: string;
   price: number;
+  image_url?: string;
 }
 
 interface ExtractedCategory {
@@ -274,6 +275,7 @@ const MenuDigitizerDialog = ({
           restaurant_id: restaurantId,
           available: true,
           pdv_code: getNextPdvCode(),
+          image_url: p.image_url || null,
         }));
         const { error: prodError } = await supabase.from("products").insert(productsToInsert as any);
         if (prodError) throw prodError;
@@ -506,6 +508,45 @@ const MenuDigitizerDialog = ({
                 <div className="space-y-2 pl-2">
                   {getItems(cat).map((item, itemIdx) => (
                     <div key={itemIdx} className="flex items-start gap-2 p-2 rounded bg-muted/50">
+                      {/* Image upload */}
+                      {!isComplements && (
+                        <label className="shrink-0 w-14 h-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer overflow-hidden hover:border-primary/50 transition-colors relative group">
+                          {item.image_url ? (
+                            <>
+                              <img src={item.image_url} alt="" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Camera className="h-4 w-4 text-white" />
+                              </div>
+                            </>
+                          ) : (
+                            <Camera className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) {
+                                toast.error("Imagem muito grande (máx 5MB)");
+                                return;
+                              }
+                              const ext = file.name.split(".").pop() || "jpg";
+                              const path = `${restaurantId}/${Date.now()}_${itemIdx}.${ext}`;
+                              const { error: uploadErr } = await supabase.storage
+                                .from("products")
+                                .upload(path, file, { upsert: true });
+                              if (uploadErr) {
+                                toast.error("Erro ao enviar imagem");
+                                return;
+                              }
+                              const { data: urlData } = supabase.storage.from("products").getPublicUrl(path);
+                              updateItem(catIdx, itemIdx, "image_url", urlData.publicUrl);
+                            }}
+                          />
+                        </label>
+                      )}
                       <div className="flex-1 space-y-1">
                         <Input value={item.name} onChange={(e) => updateItem(catIdx, itemIdx, "name", e.target.value)} placeholder={`Nome do ${isComplements ? "complemento" : "produto"}`} className="h-8 text-sm" />
                         <Textarea value={item.description || ""} onChange={(e) => updateItem(catIdx, itemIdx, "description", e.target.value)} placeholder="Descrição (opcional)" className="min-h-[40px] text-xs resize-none" rows={1} />
