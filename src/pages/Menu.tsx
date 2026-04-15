@@ -19,6 +19,7 @@ import { Product, ProductExtra, Category, Restaurant, CartItem } from "@/types/m
 import { isFeaturedVisible } from "@/lib/featuredUtils";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
+import { useFacebookPixel } from "@/hooks/useFacebookPixel";
 const Menu = () => {
   const { slug: restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
@@ -125,6 +126,7 @@ const Menu = () => {
           prep_time_minutes, service_fee_enabled, service_fee_percentage,
           featured_section_enabled, featured_section_title,
           login_require_name, login_require_phone, login_require_birth_date,
+          facebook_pixel_id,
           categories (
             id, name, display_order,
             products (
