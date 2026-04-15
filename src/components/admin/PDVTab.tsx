@@ -376,7 +376,35 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   }, [discountType, discountValue, discountTarget, cartSubtotal, cart]);
 
   const cartTotal = cartSubtotal - calculatedDiscount;
-  const hasSelectedCustomer = !!selectedCustomer && customerName.trim().length > 0 && validateCPF(customerCpf);
+  const hasSelectedCustomer = customerName.trim().length > 0 && validateCPF(customerCpf);
+  const [cpfSearching, setCpfSearching] = useState(false);
+  const [cpfSearched, setCpfSearched] = useState(false);
+
+  // Auto-search customer by CPF
+  const handleCpfAutoSearch = async (rawCpf: string) => {
+    setCustomerCpf(rawCpf);
+    setCpfSearched(false);
+    const clean = rawCpf.replace(/\D/g, "");
+    if (clean.length !== 11 || !validateCPF(rawCpf)) return;
+    setCpfSearching(true);
+    try {
+      const { data } = await supabase
+        .from("customers")
+        .select("id, cpf, name, phone")
+        .eq("restaurant_id", restaurantId)
+        .eq("cpf", rawCpf)
+        .maybeSingle();
+      if (data) {
+        setCustomerName(data.name);
+        setCustomerPhone(data.phone || "");
+        setSelectedCustomer({ name: data.name, cpf: data.cpf, phone: data.phone || "" });
+        toast.success("Cliente encontrado!");
+      } else {
+        setCpfSearched(true);
+      }
+    } catch { /* ignore */ }
+    finally { setCpfSearching(false); }
+  };
 
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
