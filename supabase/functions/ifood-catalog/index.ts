@@ -1,7 +1,6 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 
-const IFOOD_API = "https://merchant-api.ifood.com.br";
+const CATALOG_API = "https://cw-marketplace.ifood.com.br/v1/merchants/restaurant";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -9,122 +8,85 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { restaurant_id } = await req.json();
-    if (!restaurant_id) {
-      return new Response(JSON.stringify({ error: "restaurant_id required" }), {
+    const { url } = await req.json();
+    if (!url) {
+      return new Response(JSON.stringify({ error: "url é obrigatório" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    // Extract merchant ID from iFood URL
+    // Formats: 
+    // https://www.ifood.com.br/delivery/cidade/nome-restaurante/UUID
+    // https://www.ifood.com.br/delivery/cidade/nome-restaurante/UUID?param=value
+    const uuidRegex = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+    const match = url.match(uuidRegex);
 
-    // Get iFood config
-    const { data: config, error: cfgErr } = await supabase
-      .from("ifood_config")
-      .select("access_token, merchant_id")
-      .eq("restaurant_id", restaurant_id)
-      .single();
-
-    if (cfgErr || !config?.access_token || !config?.merchant_id) {
+    if (!match) {
       return new Response(
-        JSON.stringify({ error: "iFood não configurado ou sem token" }),
+        JSON.stringify({ error: "Não foi possível identificar o restaurante no link. Cole o link completo do iFood." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const headers = {
-      Authorization: `Bearer ${config.access_token}`,
-      "Content-Type": "application/json",
-    };
+    const merchantId = match[1];
+    console.log("Fetching catalog for merchant:", merchantId);
 
-    // 1. List catalogs
-    const catalogsRes = await fetch(
-      `${IFOOD_API}/catalog/v2.0/merchants/${config.merchant_id}/catalogs`,
-      { headers }
-    );
+    // Fetch public catalog
+    const catalogRes = await fetch(`${CATALOG_API}/${merchantId}/catalog`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+        "platform": "Desktop",
+        "app_version": "9.0",
+      },
+    });
 
-    if (!catalogsRes.ok) {
-      const errText = await catalogsRes.text();
-      console.error("Catalogs error:", catalogsRes.status, errText);
+    if (!catalogRes.ok) {
+      const errText = await catalogRes.text();
+      console.error("Catalog error:", catalogRes.status, errText);
       return new Response(
-        JSON.stringify({ error: "Erro ao buscar catálogos do iFood", detail: errText }),
-        { status: catalogsRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Erro ao buscar cardápio do iFood. Verifique se o link está correto." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const catalogs = await catalogsRes.json();
-    console.log("Catalogs found:", catalogs.length || 0);
+    const catalog = await catalogRes.json();
 
-    const allCategories: any[] = [];
+    // Parse catalog structure
+    // The public API returns { catalog: [{ code, name, itens: [...] }] } or similar
+    const categories: { name: string; items: any[] }[] = [];
 
-    // 2. For each catalog, get categories with items
-    for (const catalog of catalogs) {
-      const catalogId = catalog.catalogId || catalog.id;
-      if (!catalogId) continue;
+    // Try different response structures
+    const menuSections = catalog.catalog || catalog.menu || catalog.data?.menu || [];
 
-      const catRes = await fetch(
-        `${IFOOD_API}/catalog/v2.0/merchants/${config.merchant_id}/catalogs/${catalogId}/categories`,
-        { headers }
-      );
+    for (const section of menuSections) {
+      const categoryName = section.name || section.description || "Sem Categoria";
+      const items: any[] = [];
 
-      if (!catRes.ok) {
-        console.error("Category fetch error for catalog", catalogId, await catRes.text());
-        continue;
+      const sectionItems = section.itens || section.items || [];
+      for (const item of sectionItems) {
+        const price = item.unitPrice ?? item.unitMinPrice ?? item.price ?? 0;
+        // Price comes in cents from public API
+        const priceValue = price > 100 ? price / 100 : price;
+
+        items.push({
+          name: item.description || item.name || "",
+          description: item.details || item.additionalInfo || "",
+          price: priceValue,
+          image_url: item.logoUrl || item.imageUrl || item.image || null,
+        });
       }
 
-      const categories = await catRes.json();
-
-      for (const cat of categories) {
-        const categoryName = cat.name || cat.friendlyName || "Sem Categoria";
-        const items: any[] = [];
-
-        // Items can be nested in category or need separate fetch
-        if (cat.items && Array.isArray(cat.items)) {
-          for (const item of cat.items) {
-            items.push({
-              name: item.name || item.description || "",
-              description: item.description || item.additionalInfo || "",
-              price: item.price?.value ?? item.unitPrice?.value ?? 0,
-              image_url: item.imagePath || item.image || null,
-            });
-          }
-        }
-
-        // Also try unsold items endpoint for this category
-        if (items.length === 0 && (cat.id || cat.categoryId)) {
-          const itemsRes = await fetch(
-            `${IFOOD_API}/catalog/v2.0/merchants/${config.merchant_id}/catalogs/${catalogId}/categories/${cat.id || cat.categoryId}/items`,
-            { headers }
-          );
-          if (itemsRes.ok) {
-            const fetchedItems = await itemsRes.json();
-            for (const item of fetchedItems) {
-              items.push({
-                name: item.name || item.description || "",
-                description: item.description || item.additionalInfo || "",
-                price: item.price?.value ?? item.unitPrice?.value ?? 0,
-                image_url: item.imagePath || item.image || null,
-              });
-            }
-          }
-        }
-
-        if (items.length > 0) {
-          allCategories.push({
-            name: categoryName,
-            items,
-          });
-        }
+      if (items.length > 0) {
+        categories.push({ name: categoryName, items });
       }
     }
 
-    console.log("Total categories with items:", allCategories.length);
+    console.log("Parsed categories:", categories.length, "total items:", categories.reduce((a, c) => a + c.items.length, 0));
 
-    return new Response(JSON.stringify({ categories: allCategories }), {
+    return new Response(JSON.stringify({ categories }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
