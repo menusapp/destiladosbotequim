@@ -50,67 +50,66 @@ const ProductCard = memo(({ product, onEdit, onToggleAvailable, onDuplicate, onD
   const hasPromoPrice = product.promotional_price !== null && product.promotional_price !== undefined;
 
   return (
-    <Card className="p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 pr-4">
-          <h3 className="font-semibold text-foreground text-base leading-tight mb-1">
-            {product.name}
-          </h3>
-          {product.description && (
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {product.description}
-            </p>
-          )}
+    <Card className="p-3 hover:shadow-md transition-shadow">
+      <div className="space-y-2">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-1">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-foreground truncate">
+              {product.name}
+            </h3>
+            {product.description && (
+              <p className="text-[11px] text-muted-foreground line-clamp-2">
+                {product.description}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Badge 
+              variant={product.available ? "default" : "secondary"}
+              className={`text-[10px] px-1.5 py-0 ${product.available ? "bg-foreground text-background" : ""}`}
+            >
+              {product.available ? "Ativo" : "Inativo"}
+            </Badge>
+            <Switch
+              checked={product.available}
+              onCheckedChange={(checked) => onToggleAvailable(product.id, checked)}
+              className="h-4 w-8 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-4"
+            />
+          </div>
         </div>
-        <Switch
-          checked={product.available}
-          onCheckedChange={(checked) => onToggleAvailable(product.id, checked)}
-        />
-      </div>
 
-      <div className="flex items-center justify-between mb-4">
+        {/* Preço */}
         <div className="flex items-center gap-2">
           {hasPromoPrice ? (
             <>
-              <span className="text-lg text-muted-foreground line-through">
+              <span className="text-sm text-muted-foreground line-through">
                 R$ {product.price.toFixed(2)}
               </span>
-              <span className="text-[28px] font-bold text-primary leading-none">
+              <span className="text-xl font-bold text-primary leading-none">
                 R$ {product.promotional_price!.toFixed(2)}
               </span>
             </>
           ) : (
-            <span className="text-[28px] font-bold text-primary leading-none">
+            <span className="text-xl font-bold text-primary leading-none">
               R$ {product.price.toFixed(2)}
             </span>
           )}
         </div>
-        <Badge 
-          variant={product.available ? "default" : "secondary"}
-          className={product.available ? "bg-foreground text-background" : ""}
-        >
-          {product.available ? "Disponível" : "Indisponível"}
-        </Badge>
-      </div>
 
-      <div className="pt-4 border-t border-border space-y-3">
-        {/* Custos Variáveis */}
+        {/* Custos */}
         {hasVariableCosts ? (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Custos por Variação:</p>
-            <div className="space-y-1.5">
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium text-muted-foreground">Custos por Variação:</p>
+            <div className="space-y-1">
               {product.variableCosts!.map((vc, idx) => {
                 const vcMarginColor = vc.margin >= 70 ? "text-success" : vc.margin >= 50 ? "text-warning" : "text-foreground";
                 return (
-                  <div key={idx} className="flex items-center justify-between text-sm bg-muted/50 p-2 rounded">
+                  <div key={idx} className="flex items-center justify-between text-xs bg-muted/50 p-1.5 rounded">
                     <span className="font-medium">{vc.name}</span>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className="text-muted-foreground">
-                        R$ {vc.cost.toFixed(2)}
-                      </span>
-                      <span className={`font-medium ${vcMarginColor}`}>
-                        {vc.margin.toFixed(0)}%
-                      </span>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="text-muted-foreground">R$ {vc.cost.toFixed(2)}</span>
+                      <span className={`font-medium ${vcMarginColor}`}>{vc.margin.toFixed(0)}%</span>
                     </div>
                   </div>
                 );
@@ -118,43 +117,36 @@ const ProductCard = memo(({ product, onEdit, onToggleAvailable, onDuplicate, onD
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <div className="flex justify-between">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>
               <span className="text-muted-foreground">Custo:</span>
-              <span className="font-medium text-foreground">
-                R$ {(product.cost || 0).toFixed(2)}
-              </span>
+              <p className="font-medium text-foreground">R$ {(product.cost || 0).toFixed(2)}</p>
             </div>
-            <div className="flex justify-between">
+            <div>
               <span className="text-muted-foreground">Margem:</span>
-              <span className={`font-medium ${marginColor}`}>
-                {margin.toFixed(1)}%
-              </span>
+              <p className={`font-medium ${marginColor}`}>{margin.toFixed(1)}%</p>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div className="flex justify-between">
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
             <span className="text-muted-foreground">Preparo:</span>
-            <span className="font-medium text-foreground">
-              {product.prep_time || 0} min
-            </span>
+            <p className="font-medium text-foreground">{product.prep_time || 0} min</p>
           </div>
-          <div className="flex justify-between">
+          <div>
             <span className="text-muted-foreground">SKU:</span>
-            <span className="font-medium text-foreground">
-              {product.sku || "-"}
-            </span>
+            <p className="font-medium text-foreground">{product.sku || "-"}</p>
           </div>
         </div>
 
-        <div className="flex gap-2 mt-3">
+        {/* Botões */}
+        <div className="flex gap-1.5 pt-1">
           {onDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Trash2 className="h-4 w-4 mr-1" />
+                <Button variant="outline" size="sm" className="flex-1 h-8 text-xs">
+                  <Trash2 className="h-3 w-3 mr-1" />
                   Excluir
                 </Button>
               </AlertDialogTrigger>
@@ -175,23 +167,13 @@ const ProductCard = memo(({ product, onEdit, onToggleAvailable, onDuplicate, onD
             </AlertDialog>
           )}
           {onDuplicate && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={() => onDuplicate(product)}
-            >
-              <Copy className="h-4 w-4 mr-1" />
+            <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => onDuplicate(product)}>
+              <Copy className="h-3 w-3 mr-1" />
               Duplicar
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={() => onEdit(product)}
-          >
-            <Pencil className="h-4 w-4 mr-1" />
+          <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => onEdit(product)}>
+            <Pencil className="h-3 w-3 mr-1" />
             Editar
           </Button>
         </div>
