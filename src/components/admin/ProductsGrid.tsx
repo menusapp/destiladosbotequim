@@ -119,9 +119,11 @@ interface ProductsGridProps {
   restaurantId: string;
   isRestaurantOpen: boolean;
   onOpenDigitizer?: () => void;
+  onOpenIfoodImport?: () => void;
+  ifoodConnected?: boolean;
 }
 
-const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: ProductsGridProps) => {
+const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenIfoodImport, ifoodConnected }: ProductsGridProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
@@ -741,6 +743,18 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Produ
           <Input placeholder="Buscar por nome ou código PDV..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
         <div className="flex items-center gap-2">
+          {ifoodConnected && onOpenIfoodImport && (
+            <Button
+              onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para importar"); return; } onOpenIfoodImport(); }}
+              variant="outline"
+              className="gap-2 border-orange-500/50 text-orange-600 hover:bg-orange-500/10 hover:text-orange-600"
+              disabled={isRestaurantOpen}
+              title={isRestaurantOpen ? "Feche o restaurante para importar do iFood" : undefined}
+            >
+              <Package className="h-4 w-4" />
+              Importar do iFood
+            </Button>
+          )}
           {onOpenDigitizer && (
             <Button
               onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para importar"); return; } onOpenDigitizer(); }}

@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProductsGrid from "./ProductsGrid";
 import ComplementosTab from "./ComplementosTab";
 import CategoriesTab from "./CategoriesTab";
 import DestaquesTab from "./DestaquesTab";
 import MenuDigitizerDialog, { type ImportMode } from "./MenuDigitizerDialog";
+import ImportIfoodDialog from "./ImportIfoodDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CardapioTabProps {
   restaurantId: string;
@@ -17,6 +19,18 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
   const [digitizerMode, setDigitizerMode] = useState<ImportMode>("products");
   const [refreshKey, setRefreshKey] = useState(0);
   const [complementsRefreshKey, setComplementsRefreshKey] = useState(0);
+  const [ifoodImportOpen, setIfoodImportOpen] = useState(false);
+  const [ifoodConnected, setIfoodConnected] = useState(false);
+
+  useEffect(() => {
+    const checkIfood = async () => {
+      const { data } = await supabase.rpc("admin_get_ifood_config", { p_restaurant_id: restaurantId });
+      if (data && typeof data === "object" && (data as any).access_token === "connected") {
+        setIfoodConnected(true);
+      }
+    };
+    checkIfood();
+  }, [restaurantId]);
 
   const handleImportComplete = () => {
     if (digitizerMode === "complements") {
@@ -42,6 +56,13 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
         restaurantId={restaurantId}
         onImportComplete={handleImportComplete}
         mode={digitizerMode}
+      />
+
+      <ImportIfoodDialog
+        open={ifoodImportOpen}
+        onOpenChange={setIfoodImportOpen}
+        restaurantId={restaurantId}
+        onImportComplete={() => setRefreshKey((k) => k + 1)}
       />
 
       {/* Tabs */}
@@ -74,7 +95,14 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
         </TabsList>
 
         <TabsContent value="produtos" className="mt-6">
-          <ProductsGrid key={refreshKey} restaurantId={restaurantId} isRestaurantOpen={isRestaurantOpen} onOpenDigitizer={() => { setDigitizerMode("products"); setDigitizerOpen(true); }} />
+          <ProductsGrid
+            key={refreshKey}
+            restaurantId={restaurantId}
+            isRestaurantOpen={isRestaurantOpen}
+            onOpenDigitizer={() => { setDigitizerMode("products"); setDigitizerOpen(true); }}
+            onOpenIfoodImport={() => setIfoodImportOpen(true)}
+            ifoodConnected={ifoodConnected}
+          />
         </TabsContent>
 
         <TabsContent value="categorias" className="mt-6">
