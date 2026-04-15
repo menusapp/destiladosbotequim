@@ -91,12 +91,19 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
 
   const fetchIfoodConfig = async () => {
     setIfoodLoading(true);
-    const { data } = await supabase
-      .from("ifood_config" as any)
-      .select("id, restaurant_id, enabled, merchant_id, token_expires_at, access_token")
-      .eq("restaurant_id", restaurantId)
-      .maybeSingle();
-    setIfoodConfig(data as unknown as IfoodConfig | null);
+    try {
+      const { data } = await supabase.rpc("admin_get_ifood_config", {
+        p_restaurant_id: restaurantId,
+      });
+      if (data) {
+        const parsed = typeof data === "string" ? JSON.parse(data) : data;
+        setIfoodConfig(parsed as IfoodConfig);
+      } else {
+        setIfoodConfig(null);
+      }
+    } catch {
+      setIfoodConfig(null);
+    }
     setIfoodLoading(false);
   };
 
