@@ -1,38 +1,32 @@
 
 
-## Plano: Sugestão Fiscal por IA nos Produtos
+## Plano: Matching de Produtos iFood por PDV Code + Taxa de Entrega por Origem
+
+### Problema Atual
+1. **Itens do iFood chegam como observação** — o `ifood-polling` salva todos os itens com `product_id: null` e coloca nome + complementos no campo `notes`. Não tenta vincular ao produto real do sistema pelo código PDV.
+2. **Taxa de entrega** — não identifica a origem (iFood vs Delivery Direto vs sistema).
 
 ### O que será feito
-Adicionar um botão "Sugerir com IA" na aba Fiscal do diálogo de edição de produto (em `ProductsTab.tsx` e `ProductsGrid.tsx`). Ao clicar, a IA recebe o nome do produto, descrição e UF do restaurante, e retorna os campos fiscais preenchidos automaticamente (NCM, CEST, CFOP, CSOSN, PIS, COFINS, etc.).
 
-### Fluxo
-1. Usuário abre a edição de um produto e vai na aba "Fiscal"
-2. Clica no botão "Sugerir Tributação com IA"
-3. Sistema envia nome, descrição e UF para uma Edge Function
-4. A Edge Function usa Lovable AI para classificar o produto fiscalmente
-5. Os campos são preenchidos automaticamente — o usuário pode revisar e ajustar antes de salvar
+**1. Adicionar matching de produtos no `ifood-polling`** (mesma lógica já funcional no `dd-polling`):
+- Antes de processar itens, carregar todos os produtos do restaurante (via categories) com `pdv_code`, e todos os `extra_category_items` com `pdv_code`
+- Para cada item do iFood, tentar vincular pelo `externalCode` do iFood → `pdv_code` do produto
+- Fallback: tentar match por nome normalizado (uppercase, trim, sem espaços duplos)
+- Para cada option/customization do item iFood, tentar vincular pelo `externalCode` → `pdv_code` do extra_category_item
+- Inserir `order_item_extras` para complementos vinculados (como já faz o DD polling)
+- Manter o `notes` apenas para observações reais, não para nomes de produtos
 
-### Arquivos
+**2. Identificar origem da taxa de entrega**:
+- Adicionar no campo `notes` do pedido a indicação da origem da taxa (ex: "Taxa de entrega: iFood" ou "Taxa de entrega: Delivery Direto")
+- Usar a taxa de entrega real que vem do iFood/DD, não a do sistema
 
-1. **Nova Edge Function: `supabase/functions/fiscal-ai-suggest/index.ts`**
-   - Recebe: `product_name`, `product_description`, `restaurant_id`
-   - Busca a UF do restaurante na `fiscal_configs`
-   - Chama Lovable AI com um prompt especializado em tributação brasileira para alimentos (Simples Nacional, NFC-e)
-   - Usa tool calling para extrair saída estruturada com os campos: NCM, CEST, CFOP, CSOSN, Origem, PIS CST, COFINS CST, alíquotas
-   - Retorna JSON com os valores sugeridos
-
-2. **`src/components/admin/ProductsTab.tsx`**
-   - Na aba "Fiscal" do dialog de edição, adicionar botão "Sugerir com IA" (ícone de varinha/sparkles)
-   - Ao clicar, chama a Edge Function e preenche os campos fiscais com os valores retornados
-   - Loading state enquanto processa
-
-3. **`src/components/admin/ProductsGrid.tsx`**
-   - Mesmo botão na aba Fiscal do dialog de edição/criação do ProductsGrid
+### Arquivos alterados
+- `supabase/functions/ifood-polling/index.ts` — reescrever a seção de processamento de itens com lógica de matching
 
 ### Detalhes técnicos
-- Modelo: `google/gemini-3-flash-preview` (rápido e preciso para classificação)
-- O prompt inclui contexto de Simples Nacional (CRT 1), operação NFC-e, e tabela NCM para alimentos/bebidas
-- Tool calling garante resposta estruturada sem parsing manual
-- UF é buscada para contextualizar CFOP e regras estaduais
-- Os valores são apenas sugestões — o usuário sempre pode editar antes de salvar
+- iFood API expõe `externalCode` nos items e options — esse é o campo que o restaurante configura no portal iFood com o código PDV
+- A lógica de normalização: `str.trim().toUpperCase().replace(/\s+/g, " ")`
+- Matching: `externalCode` → `pdv_code` (prioridade), depois nome normalizado (fallback)
+- Complementos iFood ficam em `item.options[]` e `item.options[].customization[]`, cada um pode ter `externalCode`
+- Os extras do sistema estão em `extra_category_items` (não `product_extras`)
 
