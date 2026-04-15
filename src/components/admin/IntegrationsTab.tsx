@@ -238,12 +238,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
 
   const handleIfoodToggle = async (enabled: boolean) => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
-        body: JSON.stringify({ action: "toggle", restaurant_id: restaurantId, enabled }),
-      });
-      if (!res.ok) throw new Error("Erro ao alterar status");
+      await supabase.rpc("admin_toggle_ifood" as any, { p_restaurant_id: restaurantId, p_enabled: enabled });
       setIfoodConfig((prev) => (prev ? { ...prev, enabled } : null));
       toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
     } catch (err: any) { toast.error(err.message); }
