@@ -17,11 +17,11 @@ export default {
         sans: ['Outfit', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
       fontSize: {
-        'page-title': ['20px', { lineHeight: '28px', fontWeight: '600' }],
-        'section-title': ['16px', { lineHeight: '24px', fontWeight: '600' }],
-        'body': ['14px', { lineHeight: '20px', fontWeight: '400' }],
-        'label': ['13px', { lineHeight: '18px', fontWeight: '400' }],
-        'small': ['12px', { lineHeight: '16px', fontWeight: '400' }],
+        'page-title': ['22px', { lineHeight: '30px', fontWeight: '600' }],
+        'section-title': ['17px', { lineHeight: '26px', fontWeight: '600' }],
+        'body': ['15px', { lineHeight: '22px', fontWeight: '400' }],
+        'label': ['14px', { lineHeight: '20px', fontWeight: '400' }],
+        'small': ['13px', { lineHeight: '18px', fontWeight: '400' }],
       },
       colors: {
         "primary-orange": "hsl(var(--primary))",
