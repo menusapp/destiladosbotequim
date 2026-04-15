@@ -134,6 +134,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
+        body: JSON.stringify({ action: "generate_code", restaurant_id: restaurantId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao gerar código");
