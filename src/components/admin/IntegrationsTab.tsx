@@ -16,6 +16,7 @@ import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface IfoodConfig {
   id: string;
@@ -132,8 +133,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "generate_code", restaurant_id: restaurantId }),
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao gerar código");
@@ -153,7 +153,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
         body: JSON.stringify({ action: "exchange_token", restaurant_id: restaurantId, authorization_code: authCode.trim() }),
       });
       const data = await res.json();
@@ -170,7 +170,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
         body: JSON.stringify({ action: "disconnect", restaurant_id: restaurantId }),
       });
       if (!res.ok) throw new Error("Erro ao desconectar");
@@ -200,7 +200,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/dd-auth`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
         body: JSON.stringify({
           action: "connect",
           restaurant_id: restaurantId,
@@ -227,7 +227,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/dd-auth`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
         body: JSON.stringify({ action: "disconnect", restaurant_id: restaurantId }),
       });
       if (!res.ok) throw new Error("Erro ao desconectar");
