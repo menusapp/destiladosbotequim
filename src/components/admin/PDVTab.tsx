@@ -379,8 +379,6 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
   const cartTotal = cartSubtotal - calculatedDiscount;
   const hasSelectedCustomer = customerName.trim().length > 0 && validateCPF(customerCpf);
-  const [cpfSearching, setCpfSearching] = useState(false);
-  const [cpfSearched, setCpfSearched] = useState(false);
 
   // Auto-search customer by CPF
   const handleCpfAutoSearch = async (rawCpf: string) => {
