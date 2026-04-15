@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.digitize-menu]
 verify_jwt = false
+
+[functions.ifood-catalog]
+verify_jwt = false
