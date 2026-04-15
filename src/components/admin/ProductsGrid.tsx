@@ -773,9 +773,9 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Produ
                 <Separator className="flex-1" />
                 <span className="text-xs text-muted-foreground whitespace-nowrap">{group.products.length} {group.products.length === 1 ? "produto" : "produtos"}</span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {group.products.map((product) => (
-                  <ProductCard key={product.id} product={product} onEdit={openEditDialog} onToggleAvailable={handleToggleAvailable} onDuplicate={handleDuplicateProduct} onDelete={handleDeleteProduct} />
+                  <ProductCard key={product.id} product={product} onEdit={openEditDialog} onToggleAvailable={handleToggleAvailable} onDuplicate={handleDuplicateProduct} onDelete={handleDeleteProduct} onImageUpdated={fetchProducts} />
                 ))}
               </div>
             </div>
