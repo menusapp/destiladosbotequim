@@ -563,6 +563,18 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
       return;
     }
 
+    // Validate PDV code uniqueness
+    if (pdvCode) {
+      const usedCodes = await getAllUsedPdvCodes(restaurantId);
+      const codeNum = parseInt(pdvCode, 10);
+      if (!isNaN(codeNum) && usedCodes.has(codeNum)) {
+        if (!editingProduct || (editingProduct as any).pdv_code !== pdvCode) {
+          toast.error(`Código PDV '${pdvCode}' já está em uso por outro item`);
+          return;
+        }
+      }
+    }
+
     let imageUrl = productImageUrl;
 
     // Upload da imagem se houver
