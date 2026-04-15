@@ -399,6 +399,22 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         setCustomerPhone(data.phone || "");
         setSelectedCustomer({ name: data.name, cpf: data.cpf, phone: data.phone || "" });
         toast.success("Cliente encontrado!");
+        // Auto-fetch addresses
+        const { data: addrs } = await supabase
+          .from("customer_addresses")
+          .select("*")
+          .eq("customer_cpf", data.cpf)
+          .order("is_default", { ascending: false });
+        setCustomerAddresses(addrs || []);
+        // Auto-select default address
+        const defaultAddr = addrs?.find((a: any) => a.is_default) || addrs?.[0];
+        if (defaultAddr) {
+          applyAddress({
+            street: defaultAddr.street, number: defaultAddr.number || "",
+            complement: defaultAddr.complement || "", neighborhood: defaultAddr.neighborhood || "",
+            city: defaultAddr.city || "", state: defaultAddr.state || "", zip_code: defaultAddr.zip_code || "",
+          });
+        }
       } else {
         setCpfSearched(true);
       }
