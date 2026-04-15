@@ -119,6 +119,8 @@ interface ProductsGridProps {
   restaurantId: string;
   isRestaurantOpen: boolean;
   onOpenDigitizer?: () => void;
+  onOpenIfoodImport?: () => void;
+  ifoodConnected?: boolean;
 }
 
 const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: ProductsGridProps) => {
