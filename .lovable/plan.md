@@ -1,32 +1,21 @@
 
 
-## Plano: Matching de Produtos iFood por PDV Code + Taxa de Entrega por Origem
+## Plano: Fix — Extras do iFood não inseridos (FK violation)
 
-### Problema Atual
-1. **Itens do iFood chegam como observação** — o `ifood-polling` salva todos os itens com `product_id: null` e coloca nome + complementos no campo `notes`. Não tenta vincular ao produto real do sistema pelo código PDV.
-2. **Taxa de entrega** — não identifica a origem (iFood vs Delivery Direto vs sistema).
+### Problema
+O matching de extras funciona corretamente (o log mostra `✓ OPTION "Sim, quero Combo" matched by code "040"`), mas a inserção falha porque o campo `product_extra_id` na tabela `order_item_extras` tem uma foreign key para `product_extras`, e estamos inserindo o ID de `extra_category_items` — que é outra tabela.
 
-### O que será feito
+Erro exato:
+```
+Key (product_extra_id)=(3adf923b...) is not present in table "product_extras".
+```
 
-**1. Adicionar matching de produtos no `ifood-polling`** (mesma lógica já funcional no `dd-polling`):
-- Antes de processar itens, carregar todos os produtos do restaurante (via categories) com `pdv_code`, e todos os `extra_category_items` com `pdv_code`
-- Para cada item do iFood, tentar vincular pelo `externalCode` do iFood → `pdv_code` do produto
-- Fallback: tentar match por nome normalizado (uppercase, trim, sem espaços duplos)
-- Para cada option/customization do item iFood, tentar vincular pelo `externalCode` → `pdv_code` do extra_category_item
-- Inserir `order_item_extras` para complementos vinculados (como já faz o DD polling)
-- Manter o `notes` apenas para observações reais, não para nomes de produtos
+### Solução
+No `ifood-polling/index.ts`, ao montar os extras para inserção (linha ~455-459), setar `product_extra_id: null` em vez de usar o ID do `extra_category_items`. O campo `extra_name` e `price_at_order` já são preenchidos corretamente e são suficientes para exibição no sistema.
 
-**2. Identificar origem da taxa de entrega**:
-- Adicionar no campo `notes` do pedido a indicação da origem da taxa (ex: "Taxa de entrega: iFood" ou "Taxa de entrega: Delivery Direto")
-- Usar a taxa de entrega real que vem do iFood/DD, não a do sistema
+### Arquivo alterado
+- `supabase/functions/ifood-polling/index.ts` — linha 457: trocar `ex.matchedExtraId` por `null`
 
-### Arquivos alterados
-- `supabase/functions/ifood-polling/index.ts` — reescrever a seção de processamento de itens com lógica de matching
-
-### Detalhes técnicos
-- iFood API expõe `externalCode` nos items e options — esse é o campo que o restaurante configura no portal iFood com o código PDV
-- A lógica de normalização: `str.trim().toUpperCase().replace(/\s+/g, " ")`
-- Matching: `externalCode` → `pdv_code` (prioridade), depois nome normalizado (fallback)
-- Complementos iFood ficam em `item.options[]` e `item.options[].customization[]`, cada um pode ter `externalCode`
-- Os extras do sistema estão em `extra_category_items` (não `product_extras`)
+### Impacto
+Correção pontual de 1 linha. Nenhuma outra mudança necessária. O nome e preço do extra já ficam salvos corretamente.
 
