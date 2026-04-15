@@ -195,6 +195,35 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
   const [fiscalBeneficioCode, setFiscalBeneficioCode] = useState("");
   const [fiscalIndiceProducao, setFiscalIndiceProducao] = useState("");
   const [fiscalAliquotaTransparencia, setFiscalAliquotaTransparencia] = useState("");
+  const [fiscalAiLoading, setFiscalAiLoading] = useState(false);
+
+  const handleFiscalAiSuggest = async () => {
+    if (!productName) { toast.error("Informe o nome do produto primeiro"); return; }
+    setFiscalAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("fiscal-ai-suggest", {
+        body: { product_name: productName, product_description: productDescription, restaurant_id: restaurantId },
+      });
+      if (error) throw error;
+      if (data?.error) { toast.error(data.error); return; }
+      const s = data.suggestion;
+      if (s) {
+        setFiscalNcm(s.ncm || "");
+        setFiscalCest(s.cest || "");
+        setFiscalCfop(s.cfop || "");
+        setFiscalIcmsCsosn(s.csosn || "");
+        setFiscalIcmsOrigin(s.origin || "0");
+        setFiscalPisCst(s.pis_cst || "");
+        setFiscalCofinsCst(s.cofins_cst || "");
+        toast.success("Tributação sugerida pela IA! Revise antes de salvar.", { description: s.explanation });
+      }
+    } catch (e: any) {
+      console.error("Fiscal AI error:", e);
+      toast.error("Erro ao consultar IA fiscal");
+    } finally {
+      setFiscalAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchCategories();
@@ -1197,6 +1226,21 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
               </TabsContent>
 
               <TabsContent value="fiscal" className="space-y-4 mt-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 mb-2"
+                  disabled={fiscalAiLoading || !productName}
+                  onClick={handleFiscalAiSuggest}
+                >
+                  {fiscalAiLoading ? (
+                    <span className="animate-spin">⏳</span>
+                  ) : (
+                    <span>✨</span>
+                  )}
+                  {fiscalAiLoading ? "Analisando..." : "Sugerir Tributação com IA"}
+                </Button>
                 <Card className="border-border/50">
                   <CardContent className="pt-5 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
