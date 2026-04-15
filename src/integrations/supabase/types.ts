@@ -3779,6 +3779,7 @@ export type Database = {
           cnpj: string | null
           created_at: string | null
           endereco_fiscal: string | null
+          facebook_pixel_id: string | null
           featured_section_enabled: boolean | null
           featured_section_title: string | null
           id: string
@@ -3823,6 +3824,7 @@ export type Database = {
           cnpj?: string | null
           created_at?: string | null
           endereco_fiscal?: string | null
+          facebook_pixel_id?: string | null
           featured_section_enabled?: boolean | null
           featured_section_title?: string | null
           id?: string
@@ -3867,6 +3869,7 @@ export type Database = {
           cnpj?: string | null
           created_at?: string | null
           endereco_fiscal?: string | null
+          facebook_pixel_id?: string | null
           featured_section_enabled?: boolean | null
           featured_section_title?: string | null
           id?: string

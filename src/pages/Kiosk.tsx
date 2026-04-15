@@ -16,6 +16,7 @@ import { KioskConfirmation } from "@/components/kiosk/KioskConfirmation";
 import { KioskDeliveryAddress } from "@/components/kiosk/KioskDeliveryAddress";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
+import { useFacebookPixel } from "@/hooks/useFacebookPixel";
 
 export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "delivery_address" | "payment" | "confirmation";
 
@@ -43,6 +44,7 @@ export default function Kiosk() {
   const [kioskDisabled, setKioskDisabled] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
+  useFacebookPixel(restaurant?.facebook_pixel_id);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
   const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
