@@ -123,7 +123,7 @@ interface ProductsGridProps {
   ifoodConnected?: boolean;
 }
 
-const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: ProductsGridProps) => {
+const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenIfoodImport, ifoodConnected }: ProductsGridProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
