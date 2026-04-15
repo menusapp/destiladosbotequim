@@ -1,21 +1,32 @@
 
 
-## Plano: Fix — Extras do iFood não inseridos (FK violation)
+# Corrigir duplicados — Julio's Lanches (manter em ambas categorias)
 
-### Problema
-O matching de extras funciona corretamente (o log mostra `✓ OPTION "Sim, quero Combo" matched by code "040"`), mas a inserção falha porque o campo `product_extra_id` na tabela `order_item_extras` tem uma foreign key para `product_extras`, e estamos inserindo o ID de `extra_category_items` — que é outra tabela.
+## Problema
+Os 11 produtos na categoria "MAIS VENDIDOS" são cópias sem descrição dos produtos originais que estão em suas categorias corretas.
 
-Erro exato:
-```
-Key (product_extra_id)=(3adf923b...) is not present in table "product_extras".
-```
+## Solução
+Em vez de deletar, **atualizar** os 11 produtos da MAIS VENDIDOS copiando a descrição e image_url dos originais. Assim os produtos ficam nas duas categorias — a original e a MAIS VENDIDOS.
 
-### Solução
-No `ifood-polling/index.ts`, ao montar os extras para inserção (linha ~455-459), setar `product_extra_id: null` em vez de usar o ID do `extra_category_items`. O campo `extra_name` e `price_at_order` já são preenchidos corretamente e são suficientes para exibição no sistema.
+## Ação
+Executar UPDATE nos 11 produtos da categoria MAIS VENDIDOS (`e74c541d-36b4-4a1a-808c-791e1155cd9d`), preenchendo `description` e `image_url` com os valores dos produtos originais correspondentes.
 
-### Arquivo alterado
-- `supabase/functions/ifood-polling/index.ts` — linha 457: trocar `ex.matchedExtraId` por `null`
+| Produto (MAIS VENDIDOS) | ID a atualizar | Copia de |
+|---|---|---|
+| BRUTOS | d11c2fd9 | 8807fd6b |
+| CACHORRO-QUENTE ESPECIAL | 4bde2cd3 | cb00961a |
+| COMBO BRUTO DA COSTELA | 60566026 | 65e6f145 |
+| COMBO NATALINO | 93557455 | 7d8f1e10 |
+| COMBO NATALINO CASAL | 7144fc0f | 693f85a4 |
+| COSTELA BACON | 684ab917 | d1de1403 |
+| COSTELA DUPLO | a814055a | fffc4912 |
+| COSTELA SALADA | fa846f11 | 84ed23ed |
+| PORÇÃO FAMÍLIA | 6aef8bd3 | 15f60552 / 11320456 |
+| PORÇÃO PICANHA COMPLETA | c40aae3d | db83f59d |
+| SENHOR COSTELA | 20102c2f | 7cefb4cf |
 
-### Impacto
-Correção pontual de 1 linha. Nenhuma outra mudança necessária. O nome e preço do extra já ficam salvos corretamente.
+## Detalhes técnicos
+- Usar ferramenta de inserção/update do banco (não migration, pois é alteração de dados)
+- 11 comandos UPDATE copiando `description` e `image_url` dos originais
+- Nenhuma alteração de código necessária
 
