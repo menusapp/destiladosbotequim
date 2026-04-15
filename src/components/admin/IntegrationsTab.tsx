@@ -10,7 +10,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import {
-  Loader2, ExternalLink, Copy, CheckCircle2, XCircle, Plug, Truck, CreditCard, BarChart3,
+  Loader2, ExternalLink, Copy, CheckCircle2, XCircle, Plug, Truck, CreditCard,
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
