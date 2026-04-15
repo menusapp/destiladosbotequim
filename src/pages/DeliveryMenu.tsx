@@ -20,6 +20,7 @@ import { toast } from "@/components/ui/sonner";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
 import { isFeaturedVisible } from "@/lib/featuredUtils";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
+import { useFacebookPixel } from "@/hooks/useFacebookPixel";
 
 export default function DeliveryMenu() {
   const { slug: restaurantSlug } = useParams<{ slug: string }>();
