@@ -35,11 +35,16 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // Check for restaurant session in localStorage (restaurant login)
+  // Check custom admin login flow persisted in localStorage
   const restaurantId = localStorage.getItem('restaurant_id');
+  const staffId = localStorage.getItem('staff_id');
   
   if (!session && !restaurantId) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (!session && restaurantId && !staffId) {
+    return <Navigate to="/login/staff" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

@@ -14,6 +14,13 @@ const Landing = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const clearStaffSession = () => {
+    localStorage.removeItem('staff_id');
+    localStorage.removeItem('staff_name');
+    localStorage.removeItem('staff_role');
+    localStorage.removeItem('staff_allowed_sections');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -29,6 +36,7 @@ const Landing = () => {
 
       if (data && Array.isArray(data) && data.length > 0) {
         const { restaurant_id, restaurant_name } = data[0];
+        clearStaffSession();
         localStorage.setItem('restaurant_id', restaurant_id);
         localStorage.setItem('restaurant_name', restaurant_name);
         // Also store slug for route navigation
