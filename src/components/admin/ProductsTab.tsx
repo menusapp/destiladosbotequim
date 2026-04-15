@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, Search, ChevronDown } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getAllUsedPdvCodes } from "@/lib/pdvCodeGenerator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -560,6 +561,18 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     if (ingredients.length === 0) {
       toast.error("Adicione pelo menos 1 insumo ao produto");
       return;
+    }
+
+    // Validate PDV code uniqueness
+    if (pdvCode) {
+      const usedCodes = await getAllUsedPdvCodes(restaurantId);
+      const codeNum = parseInt(pdvCode, 10);
+      if (!isNaN(codeNum) && usedCodes.has(codeNum)) {
+        if (!editingProduct || (editingProduct as any).pdv_code !== pdvCode) {
+          toast.error(`Código PDV '${pdvCode}' já está em uso por outro item`);
+          return;
+        }
+      }
     }
 
     let imageUrl = productImageUrl;
