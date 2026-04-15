@@ -21,6 +21,22 @@ const Landing = () => {
     localStorage.removeItem('staff_allowed_sections');
   };
 
+  const cacheRestaurantSlug = async (restaurantId: string) => {
+    try {
+      const { data } = await supabase
+        .from('restaurants')
+        .select('slug')
+        .eq('id', restaurantId)
+        .maybeSingle();
+
+      if (data?.slug) {
+        localStorage.setItem('restaurant_slug', data.slug);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar slug do restaurante:', error);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -37,13 +53,10 @@ const Landing = () => {
       if (data && Array.isArray(data) && data.length > 0) {
         const { restaurant_id, restaurant_name } = data[0];
         clearStaffSession();
+        localStorage.removeItem('restaurant_slug');
         localStorage.setItem('restaurant_id', restaurant_id);
         localStorage.setItem('restaurant_name', restaurant_name);
-        // Also store slug for route navigation
-        const slugData = await supabase.from('restaurants').select('slug').eq('id', restaurant_id).single();
-        if (slugData.data?.slug) {
-          localStorage.setItem('restaurant_slug', slugData.data.slug);
-        }
+        void cacheRestaurantSlug(restaurant_id);
         toast.success(`Bem-vindo ao ${restaurant_name}!`);
         navigate('/login/staff');
       } else if (username.trim().toUpperCase() === "CEO" && password === "CEO123") {

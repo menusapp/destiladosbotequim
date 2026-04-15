@@ -31,21 +31,37 @@ const StaffLogin = () => {
   useEffect(() => {
     if (!restaurantId) return;
 
-    // Load logo and check staff count in parallel
+    let isActive = true;
+
     const loadData = async () => {
-      const [logoRes, hasStaffRes] = await Promise.all([
-        supabase.from("restaurants").select("logo_url").eq("id", restaurantId).single(),
+      setCheckingStaff(true);
+
+      const [logoRes, hasStaffRes] = await Promise.allSettled([
+        supabase.from("restaurants").select("logo_url").eq("id", restaurantId).maybeSingle(),
         supabase.rpc("admin_check_has_staff", { p_restaurant_id: restaurantId }),
       ]);
 
-      if (logoRes.data?.logo_url) setRestaurantLogo(logoRes.data.logo_url);
+      if (!isActive) return;
 
-      const hasStaff = hasStaffRes.data === true;
-      setIsFirstTime(!hasStaff);
+      if (logoRes.status === "fulfilled" && logoRes.value.data?.logo_url) {
+        setRestaurantLogo(logoRes.value.data.logo_url);
+      }
+
+      if (hasStaffRes.status === "fulfilled") {
+        setIsFirstTime(hasStaffRes.value.data !== true);
+      } else {
+        console.error("Erro ao verificar equipe do restaurante:", hasStaffRes.reason);
+        setIsFirstTime(false);
+      }
+
       setCheckingStaff(false);
     };
 
-    loadData();
+    void loadData();
+
+    return () => {
+      isActive = false;
+    };
   }, [restaurantId]);
 
   // If no restaurant session, redirect to login
