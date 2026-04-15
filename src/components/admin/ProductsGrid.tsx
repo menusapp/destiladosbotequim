@@ -214,7 +214,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
         setFiscalIcmsCsosn(s.csosn || "");
         setFiscalIcmsOrigin(s.origin || "0");
         setFiscalPisCst(s.pis_cst || "");
+        setFiscalPisAliquota(s.pis_aliquota || "");
         setFiscalCofinsCst(s.cofins_cst || "");
+        setFiscalCofinsAliquota(s.cofins_aliquota || "");
+        setFiscalIbsAliquota(s.ibs_aliquota || "");
+        setFiscalCbsAliquota(s.cbs_aliquota || "");
         toast.success("Tributação sugerida pela IA! Revise antes de salvar.", { description: s.explanation });
       }
     } catch (e: any) {
