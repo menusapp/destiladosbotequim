@@ -112,7 +112,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   const allConfig = menuStructure.configSubItems;
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background w-[240px]">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background w-[260px]">
       <SidebarContent className="bg-sidebar-background">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -133,7 +133,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                           onMouseEnter={() => onPrefetch?.(item.id)}
                           isActive={activeSection === item.id}
                           tooltip={item.label}
-                          className={`relative h-9 px-3 rounded-button text-[13px] transition-colors ${
+                          className={`relative h-10 px-3 rounded-button text-[15px] transition-colors ${
                             activeSection === item.id 
                               ? "font-medium" 
                               : blocked
@@ -142,7 +142,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                           }`}
                           style={activeSection === item.id ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                         >
-                          <item.icon className="h-4 w-4" />
+                          <item.icon className="h-5 w-5" />
                           {!collapsed && <span>{item.label}</span>}
                           {blocked && !collapsed && (
                             <Lock className="absolute right-2 h-3 w-3 text-muted-foreground/60" />
@@ -166,10 +166,10 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                   <CollapsibleTrigger asChild>
                      <SidebarMenuButton
                       tooltip="Configurações"
-                      className={`w-full h-9 px-3 rounded-button text-[13px] ${isConfigActive ? "font-medium" : "text-sidebar-foreground hover:bg-muted"}`}
+                      className={`w-full h-10 px-3 rounded-button text-[15px] ${isConfigActive ? "font-medium" : "text-sidebar-foreground hover:bg-muted"}`}
                       style={isConfigActive ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                     >
-                      <Settings className="h-4 w-4" />
+                      <Settings className="h-5 w-5" />
                       {!collapsed && (
                         <>
                           <span className="flex-1 text-left">Configurações</span>
@@ -188,7 +188,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                             onClick={() => onSectionChange(subItem.id)}
                             onMouseEnter={() => onPrefetch?.(subItem.id)}
                             isActive={activeSection === subItem.id}
-                           className={`w-full h-8 px-3 rounded-button text-[13px] ${
+                           className={`w-full h-9 px-3 rounded-button text-[14px] ${
                               activeSection === subItem.id
                                 ? "font-medium"
                                 : subBlocked
@@ -197,7 +197,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
                             }`}
                             style={activeSection === subItem.id ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                           >
-                            <subItem.icon className="h-3.5 w-3.5" />
+                            <subItem.icon className="h-4 w-4" />
                             <span>{subItem.label}</span>
                             {subBlocked && (
                               <Lock className="ml-auto h-3 w-3 text-muted-foreground/60" />
