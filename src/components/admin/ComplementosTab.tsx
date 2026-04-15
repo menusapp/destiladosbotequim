@@ -299,7 +299,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
               title={isRestaurantOpen ? "Feche o restaurante para importar por foto" : undefined}
             >
               <Camera className="h-4 w-4" />
-              Importar por Foto (IA)
+              🪄 Importar por AI
             </Button>
           )}
           <Button onClick={openNewCategory}><Plus className="h-4 w-4 mr-2" />Nova Categoria</Button>
