@@ -113,6 +113,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const [newClientName, setNewClientName] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
   const [savingNewClient, setSavingNewClient] = useState(false);
+  const [cpfSearching, setCpfSearching] = useState(false);
+  const [cpfSearched, setCpfSearched] = useState(false);
 
   // Address UX states
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null);
@@ -376,7 +378,33 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   }, [discountType, discountValue, discountTarget, cartSubtotal, cart]);
 
   const cartTotal = cartSubtotal - calculatedDiscount;
-  const hasSelectedCustomer = !!selectedCustomer && customerName.trim().length > 0 && validateCPF(customerCpf);
+  const hasSelectedCustomer = customerName.trim().length > 0 && validateCPF(customerCpf);
+
+  // Auto-search customer by CPF
+  const handleCpfAutoSearch = async (rawCpf: string) => {
+    setCustomerCpf(rawCpf);
+    setCpfSearched(false);
+    const clean = rawCpf.replace(/\D/g, "");
+    if (clean.length !== 11 || !validateCPF(rawCpf)) return;
+    setCpfSearching(true);
+    try {
+      const { data } = await supabase
+        .from("customers")
+        .select("id, cpf, name, phone")
+        .eq("restaurant_id", restaurantId)
+        .eq("cpf", rawCpf)
+        .maybeSingle();
+      if (data) {
+        setCustomerName(data.name);
+        setCustomerPhone(data.phone || "");
+        setSelectedCustomer({ name: data.name, cpf: data.cpf, phone: data.phone || "" });
+        toast.success("Cliente encontrado!");
+      } else {
+        setCpfSearched(true);
+      }
+    } catch { /* ignore */ }
+    finally { setCpfSearching(false); }
+  };
 
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
@@ -397,6 +425,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     setCustomerName("");
     setCustomerCpf("");
     setCustomerPhone("");
+    setCpfSearched(false);
     setSelectedAddress(null);
     setDeliveryAddress("");
     setDeliveryCep("");
@@ -533,6 +562,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     setNotes(""); setPaymentType(""); setSelectedTableId("");
     setSelectedCustomer(null);
     setSelectedAddress(null);
+    setCpfSearched(false);
     setShowNewClientForm(false);
     setDiscountExpanded(false);
     setDiscountType("value");
@@ -592,16 +622,15 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   };
 
   const handleSubmit = async () => {
-    if (!hasSelectedCustomer) {
-      toast.error("Selecione ou cadastre um cliente com CPF válido antes de criar o pedido");
-      setIsCustomerSelectOpen(true);
+    if (!customerName.trim() || !validateCPF(customerCpf)) {
+      toast.error("Preencha o nome e CPF válido do cliente");
       return;
     }
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
 
     setSubmitting(true);
     try {
-      // Save customer to CRM
+      // Auto-create/update customer in CRM
       await upsertCustomerCRM();
       if (orderType === "delivery") {
         if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
@@ -1110,61 +1139,57 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                 </TabsList>
               </Tabs>
 
-              {/* Customer Section — Compact */}
+              {/* Customer Section — Inline Fields */}
               <div className="border rounded-lg p-4 bg-muted/30">
-                <p className="text-sm font-medium text-muted-foreground mb-3">Cliente</p>
-
-                {!selectedCustomer && (
-                  <>
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1" onClick={() => setIsCustomerSelectOpen(true)}>
-                        <Search className="w-4 h-4 mr-2" />
-                        Buscar Cliente
-                      </Button>
-                      <Button variant="outline" className="flex-1" onClick={() => setShowNewClientForm(!showNewClientForm)}>
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Criar Novo
-                      </Button>
-                    </div>
-
-                    <Collapsible open={showNewClientForm} onOpenChange={setShowNewClientForm}>
-                      <CollapsibleContent className="mt-3 space-y-3">
-                        <div>
-                          <Label className="text-xs mb-1.5 block">CPF *</Label>
-                          <Input placeholder="000.000.000-00" value={newClientCpf} onChange={e => setNewClientCpf(e.target.value)} className="h-9 text-sm" />
-                        </div>
-                        <div>
-                          <Label className="text-xs mb-1.5 block">Nome *</Label>
-                          <Input placeholder="Nome do cliente" value={newClientName} onChange={e => setNewClientName(e.target.value)} className="h-9 text-sm" />
-                        </div>
-                        <div>
-                          <Label className="text-xs mb-1.5 block">Celular *</Label>
-                          <Input placeholder="(00) 00000-0000" value={newClientPhone} onChange={e => setNewClientPhone(e.target.value)} className="h-9 text-sm" />
-                        </div>
-                        <p className="text-xs text-muted-foreground">Salve o cliente para liberar a criação do pedido.</p>
-                        <Button size="sm" onClick={handleSaveNewClient} disabled={savingNewClient} className="w-full">
-                          {savingNewClient ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                          Salvar Cliente
-                        </Button>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </>
-                )}
-
-                {selectedCustomer && (
-                  <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
-                    <div>
-                      <p className="text-sm font-medium">{selectedCustomer.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {selectedCustomer.phone || "Sem telefone"}
-                        {selectedCustomer.cpf && ` • ${selectedCustomer.cpf}`}
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={clearCustomer} className="h-8 w-8 p-0">
-                      <X className="w-4 h-4" />
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-medium text-muted-foreground">Cliente</p>
+                  {(customerName || customerCpf || customerPhone) && (
+                    <Button variant="ghost" size="sm" onClick={clearCustomer} className="h-6 px-2 text-xs text-muted-foreground">
+                      <X className="w-3 h-3 mr-1" /> Limpar
                     </Button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Label className="text-xs mb-1.5 block">CPF *</Label>
+                    <Input
+                      placeholder="000.000.000-00"
+                      value={customerCpf}
+                      onChange={e => handleCpfAutoSearch(e.target.value)}
+                      className="h-9 text-sm pr-8"
+                    />
+                    {cpfSearching && (
+                      <Loader2 className="w-4 h-4 animate-spin absolute right-2.5 top-[34px] text-muted-foreground" />
+                    )}
+                    {cpfSearched && !selectedCustomer && (
+                      <p className="text-xs text-amber-600 mt-1">Cliente não encontrado — preencha os dados para cadastrar automaticamente</p>
+                    )}
                   </div>
-                )}
+                  <div>
+                    <Label className="text-xs mb-1.5 block">Nome *</Label>
+                    <Input
+                      placeholder="Nome do cliente"
+                      value={customerName}
+                      onChange={e => setCustomerName(e.target.value)}
+                      className="h-9 text-sm"
+                      disabled={!!selectedCustomer}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1.5 block">Celular</Label>
+                    <Input
+                      placeholder="(00) 00000-0000"
+                      value={customerPhone}
+                      onChange={e => setCustomerPhone(e.target.value)}
+                      className="h-9 text-sm"
+                      disabled={!!selectedCustomer}
+                    />
+                  </div>
+                  {selectedCustomer && (
+                    <Badge variant="secondary" className="text-xs">✓ Cliente cadastrado</Badge>
+                  )}
+                </div>
               </div>
 
               {/* Delivery Address Section */}
