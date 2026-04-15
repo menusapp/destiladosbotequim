@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllUsedPdvCodes } from "@/lib/pdvCodeGenerator";
-import { Loader2, ChevronDown, ChevronRight, Link2 } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 
 interface IfoodItem {
   name: string;
@@ -35,31 +35,28 @@ const ImportIfoodDialog = ({ open, onOpenChange, restaurantId, onImportComplete 
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [categories, setCategories] = useState<IfoodCategory[]>([]);
-  const [ifoodUrl, setIfoodUrl] = useState("");
   const [fetched, setFetched] = useState(false);
 
   useEffect(() => {
+    if (open && !fetched) {
+      fetchCatalog();
+    }
     if (!open) {
       setFetched(false);
       setCategories([]);
-      setIfoodUrl("");
     }
   }, [open]);
 
   const fetchCatalog = async () => {
-    if (!ifoodUrl.trim()) {
-      toast.error("Cole o link do restaurante no iFood");
-      return;
-    }
-
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("ifood-catalog", {
-        body: { url: ifoodUrl.trim() },
+        body: { restaurant_id: restaurantId },
       });
 
       if (error || data?.error) {
-        toast.error(data?.error || "Erro ao buscar cardápio do iFood");
+        toast.error(data?.error || "Erro ao buscar catálogo do iFood");
+        onOpenChange(false);
         return;
       }
 
@@ -81,11 +78,12 @@ const ImportIfoodDialog = ({ open, onOpenChange, restaurantId, onImportComplete 
       setFetched(true);
 
       if (cats.length === 0) {
-        toast.info("Nenhum produto encontrado no cardápio");
+        toast.info("Nenhum produto encontrado no catálogo do iFood");
       }
     } catch (err) {
       console.error(err);
       toast.error("Erro ao conectar com o iFood");
+      onOpenChange(false);
     } finally {
       setLoading(false);
     }
@@ -211,39 +209,18 @@ const ImportIfoodDialog = ({ open, onOpenChange, restaurantId, onImportComplete 
         <DialogHeader>
           <DialogTitle>Importar Cardápio do iFood</DialogTitle>
           <DialogDescription>
-            Cole o link do restaurante no iFood para importar os produtos
+            Selecione os produtos que deseja importar do seu catálogo iFood
           </DialogDescription>
         </DialogHeader>
 
-        {!fetched ? (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Link do restaurante no iFood</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="https://www.ifood.com.br/delivery/cidade/restaurante/..."
-                    value={ifoodUrl}
-                    onChange={(e) => setIfoodUrl(e.target.value)}
-                    className="pl-9"
-                    disabled={loading}
-                  />
-                </div>
-                <Button onClick={fetchCatalog} disabled={loading || !ifoodUrl.trim()}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Buscar
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Abra o restaurante no iFood, copie o link da barra de endereço e cole aqui
-              </p>
-            </div>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Buscando catálogo do iFood...</p>
           </div>
-        ) : categories.length === 0 ? (
-          <div className="text-center py-12 space-y-3">
-            <p className="text-muted-foreground">Nenhum produto encontrado no cardápio</p>
-            <Button variant="outline" onClick={() => setFetched(false)}>Tentar outro link</Button>
+        ) : categories.length === 0 && fetched ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Nenhum produto encontrado no catálogo do iFood</p>
           </div>
         ) : (
           <>
@@ -296,14 +273,9 @@ const ImportIfoodDialog = ({ open, onOpenChange, restaurantId, onImportComplete 
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => setFetched(false)}>
-                  ← Outro link
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  {totalSelected} produto(s) selecionado(s)
-                </span>
-              </div>
+              <span className="text-sm text-muted-foreground">
+                {totalSelected} produto(s) selecionado(s)
+              </span>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => onOpenChange(false)} disabled={importing}>
                   Cancelar
