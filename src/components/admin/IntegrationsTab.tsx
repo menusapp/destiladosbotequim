@@ -237,12 +237,16 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleIfoodToggle = async (enabled: boolean) => {
-    await supabase
-      .from("ifood_config" as any)
-      .update({ enabled, updated_at: new Date().toISOString() } as any)
-      .eq("restaurant_id", restaurantId);
-    setIfoodConfig((prev) => (prev ? { ...prev, enabled } : null));
-    toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/ifood-auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": ANON_KEY },
+        body: JSON.stringify({ action: "toggle", restaurant_id: restaurantId, enabled }),
+      });
+      if (!res.ok) throw new Error("Erro ao alterar status");
+      setIfoodConfig((prev) => (prev ? { ...prev, enabled } : null));
+      toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
+    } catch (err: any) { toast.error(err.message); }
   };
 
   const maskId = (id: string) => id.length > 8 ? `${id.slice(0, 4)}****${id.slice(-4)}` : id;
@@ -294,12 +298,11 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleDdToggle = async (enabled: boolean) => {
-    await supabase
-      .from("deliverydireto_config" as any)
-      .update({ enabled, updated_at: new Date().toISOString() } as any)
-      .eq("restaurant_id", restaurantId);
-    setDdConfig((prev) => (prev ? { ...prev, enabled } : null));
-    toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
+    try {
+      await supabase.rpc("admin_toggle_dd", { p_restaurant_id: restaurantId, p_enabled: enabled });
+      setDdConfig((prev) => (prev ? { ...prev, enabled } : null));
+      toast.success(enabled ? "Recebimento de pedidos ativado" : "Recebimento de pedidos desativado");
+    } catch (err: any) { toast.error(err.message); }
   };
 
   // === Mercado Pago handlers ===
