@@ -794,10 +794,10 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
               variant="outline"
               className="gap-2 border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
               disabled={isRestaurantOpen}
-              title={isRestaurantOpen ? "Feche o restaurante para importar por foto" : undefined}
+              title={isRestaurantOpen ? "Feche o restaurante para importar por AI" : undefined}
             >
               <Camera className="h-4 w-4" />
-              Importar por Foto (IA)
+              🪄 Importar por AI
             </Button>
           )}
           <Button onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para adicionar produtos"); return; } resetForm(); setDialogOpen(true); }}>
