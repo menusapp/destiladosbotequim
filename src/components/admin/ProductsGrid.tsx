@@ -360,7 +360,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
         id: crypto.randomUUID(), stock_item_id: ing.stock_item_id, quantity: ing.quantity,
         stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit
       })) || [];
-      if (extra.is_required && ings.length > 0) {
+      if (extra.is_required) {
         variationsFromDB.push({ id: crypto.randomUUID(), name: extra.name, description: extra.description || undefined, price: extra.price, pdv_code: extra.pdv_code || undefined, ingredients: ings });
         if (variationsFromDB.length === 1) { setVariationMinSelection(extra.min_selection?.toString() || "1"); setVariationMaxSelection(extra.max_selection?.toString() || "1"); setVariationIsRequired(true); }
       } else {
@@ -417,7 +417,6 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
 
   const handleAddVariation = async () => {
     if (!variationName) { toast.error("Informe o nome da variação"); return; }
-    if (variationIngredients.length === 0) { toast.error("Adicione pelo menos um insumo à variação"); return; }
     const newPdvCode = await generateNextPdvCode(restaurantId);
     setVariations([...variations, { id: crypto.randomUUID(), name: variationName, description: variationDescription || undefined, price: parseFloat(variationPrice) || 0, pdv_code: newPdvCode, ingredients: [...variationIngredients] }]);
     setVariationName(""); setVariationDescription(""); setVariationPrice(""); setVariationIngredients([]);
