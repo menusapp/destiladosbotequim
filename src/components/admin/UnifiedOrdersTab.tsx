@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package, Store,
   Printer, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock,
-  MoreVertical, Loader2, Eye
+  MoreVertical, Loader2, Eye, Zap
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useOrderStatusAdvance, getNextStatus } from "@/hooks/useOrderStatusAdvance";
@@ -97,6 +97,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { advanceStatus, loadingOrderId } = useOrderStatusAdvance(restaurantId);
   const [autoPrint, setAutoPrint] = useState(false);
+  const [autoAccept, setAutoAccept] = useState(false);
   const [dateRange, setDateRange] = useState(() => ({
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
@@ -123,7 +124,22 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   useEffect(() => {
     supabase.from('printer_settings').select('auto_print_orders').eq('restaurant_id', restaurantId).maybeSingle()
       .then(({ data }) => { if (data) setAutoPrint(data.auto_print_orders); });
+    supabase.from('restaurants').select('auto_accept_orders').eq('id', restaurantId).single()
+      .then(({ data }) => { if (data) setAutoAccept(data.auto_accept_orders ?? false); });
   }, [restaurantId]);
+
+  // Auto-accept: when orders change and autoAccept is on, accept all pending orders
+  const autoAcceptRef = { current: autoAccept };
+  autoAcceptRef.current = autoAccept;
+
+  useEffect(() => {
+    if (!autoAccept) return;
+    const pendingOrders = orders.filter(o => o.status === "pending");
+    if (pendingOrders.length === 0) return;
+    pendingOrders.forEach(async (order) => {
+      await advanceStatus(order, "accepted");
+    });
+  }, [orders, autoAccept]);
 
   // iFood polling every 30 seconds
   useEffect(() => {
@@ -477,6 +493,15 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
           <p className="text-sm text-muted-foreground">{totalPendingCount} aguardando • {orders.length} no total</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-muted-foreground" />
+            <Label htmlFor="auto-accept" className="text-xs">Aceitar automaticamente</Label>
+            <Switch id="auto-accept" checked={autoAccept} onCheckedChange={async (v) => {
+              setAutoAccept(v);
+              await supabase.from('restaurants').update({ auto_accept_orders: v }).eq('id', restaurantId);
+              toast.success(v ? "Pedidos serão aceitos automaticamente" : "Aceite automático desativado");
+            }} />
+          </div>
           <div className="flex items-center gap-2">
             <Printer className="w-4 h-4 text-muted-foreground" />
             <Label htmlFor="auto-print" className="text-xs">Impressão automática</Label>

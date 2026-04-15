@@ -1,0 +1,1 @@
+ALTER TABLE public.restaurants ADD COLUMN auto_accept_orders boolean NOT NULL DEFAULT false;

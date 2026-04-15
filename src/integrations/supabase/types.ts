@@ -3772,6 +3772,7 @@ export type Database = {
       }
       restaurants: {
         Row: {
+          auto_accept_orders: boolean
           auto_open_close: boolean | null
           banner_url: string | null
           bill_request_enabled: boolean | null
@@ -3817,6 +3818,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          auto_accept_orders?: boolean
           auto_open_close?: boolean | null
           banner_url?: string | null
           bill_request_enabled?: boolean | null
@@ -3862,6 +3864,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          auto_accept_orders?: boolean
           auto_open_close?: boolean | null
           banner_url?: string | null
           bill_request_enabled?: boolean | null
