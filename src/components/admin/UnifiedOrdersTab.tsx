@@ -97,6 +97,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { advanceStatus, loadingOrderId } = useOrderStatusAdvance(restaurantId);
   const [autoPrint, setAutoPrint] = useState(false);
+  const [autoAccept, setAutoAccept] = useState(false);
   const [dateRange, setDateRange] = useState(() => ({
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
