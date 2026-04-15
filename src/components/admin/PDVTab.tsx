@@ -562,6 +562,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     setNotes(""); setPaymentType(""); setSelectedTableId("");
     setSelectedCustomer(null);
     setSelectedAddress(null);
+    setCpfSearched(false);
     setShowNewClientForm(false);
     setDiscountExpanded(false);
     setDiscountType("value");
