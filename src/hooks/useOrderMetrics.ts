@@ -8,6 +8,9 @@ export type DateRange = "today" | "yesterday" | "7days" | "30days" | "thisMonth"
 /** ÚNICA fonte de verdade para status finalizados */
 export const FINALIZED_ORDER_STATUSES = ["delivered", "picked_up"];
 
+/** Status que representam vendas confirmadas (para visão geral) */
+export const CONFIRMED_ORDER_STATUSES = ["accepted", "preparing", "ready", "out_for_delivery", "delivered", "picked_up"];
+
 export function getDateRange(range: DateRange): { start: string; end: string } {
   const now = new Date();
   switch (range) {
