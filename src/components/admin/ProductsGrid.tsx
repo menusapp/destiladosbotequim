@@ -892,6 +892,9 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
                               {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
                             </SelectContent>
                           </Select>
+                          <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                            ⚠️ Se não colocar em nenhuma categoria, o produto não aparecerá em nenhum cardápio (digital, totem ou mesa). Só aparecerá se estiver marcado como Destaque.
+                          </p>
                         </div>
                       </CardContent>
                     </Card>
