@@ -407,7 +407,9 @@ export function useOrderMetrics(restaurantId: string, dateRange: DateRange) {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["order-metrics", restaurantId, dateRange],
     queryFn: () => fetchOrderMetrics(restaurantId, dateRange),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnMount: "always",
+    refetchInterval: 60 * 1000,
     enabled: !!restaurantId,
   });
 
