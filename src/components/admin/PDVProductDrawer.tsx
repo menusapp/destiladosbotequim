@@ -192,7 +192,7 @@ export const PDVProductDrawer = ({
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+      <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col">
         {/* Header */}
         <div className="relative border-b border-border">
           <div className="flex gap-4 p-4">

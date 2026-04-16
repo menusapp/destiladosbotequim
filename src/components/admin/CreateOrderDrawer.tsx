@@ -740,26 +740,70 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {filteredProducts.map(product => (
-                    <Card
-                      key={product.id}
-                      className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => { setSelectedProduct(product); setIsProductDrawerOpen(true); }}
-                    >
-                      <CardContent className="p-2 space-y-1">
-                        {product.image_url ? (
-                          <img src={product.image_url} alt={product.name} className="w-full h-16 object-cover rounded" />
-                        ) : (
-                          <div className="w-full h-16 bg-muted rounded flex items-center justify-center text-lg font-bold text-muted-foreground">
-                            {product.name.charAt(0)}
+                <div className="min-h-[300px]">
+                  {(() => {
+                    const categoryMap = new Map<string, { name: string; products: typeof filteredProducts }>();
+                    const uncategorized: typeof filteredProducts = [];
+                    
+                    filteredProducts.forEach(product => {
+                      const cat = (product as any).categories;
+                      if (cat?.id) {
+                        if (!categoryMap.has(cat.id)) {
+                          categoryMap.set(cat.id, { name: cat.name, products: [] });
+                        }
+                        categoryMap.get(cat.id)!.products.push(product);
+                      } else {
+                        uncategorized.push(product);
+                      }
+                    });
+
+                    const categoriesArr = Array.from(categoryMap.entries());
+
+                    const renderProduct = (product: any) => (
+                      <Card
+                        key={product.id}
+                        className="cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => { setSelectedProduct(product); setIsProductDrawerOpen(true); }}
+                      >
+                        <CardContent className="p-2 space-y-1">
+                          {product.image_url ? (
+                            <img src={product.image_url} alt={product.name} className="w-full h-16 object-cover rounded" />
+                          ) : (
+                            <div className="w-full h-16 bg-muted rounded flex items-center justify-center text-lg font-bold text-muted-foreground">
+                              {product.name.charAt(0)}
+                            </div>
+                          )}
+                          <p className="text-xs font-medium truncate">{product.name}</p>
+                          <p className="text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
+                        </CardContent>
+                      </Card>
+                    );
+
+                    return (
+                      <>
+                        {categoriesArr.map(([catId, { name, products: catProducts }]) => (
+                          <div key={catId} className="mb-4">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded mb-2 sticky top-0 z-10">
+                              {name}
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {catProducts.map(renderProduct)}
+                            </div>
+                          </div>
+                        ))}
+                        {uncategorized.length > 0 && (
+                          <div className="mb-4">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded mb-2">
+                              Outros
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {uncategorized.map(renderProduct)}
+                            </div>
                           </div>
                         )}
-                        <p className="text-xs font-medium truncate">{product.name}</p>
-                        <p className="text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

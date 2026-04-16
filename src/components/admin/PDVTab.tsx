@@ -1134,7 +1134,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         </div>
 
         {/* Right: Order Creation Panel (always visible) */}
-        <div className="w-[520px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0">
+        <div className="w-[640px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-lg">Novo Pedido</h3>
             {cart.length > 0 && (
@@ -1444,57 +1444,102 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8 h-9 text-sm" />
                 </div>
-                <div className="grid grid-cols-2 gap-2 max-h-[260px] overflow-y-auto">
-                  {filteredProducts.map(product => (
-                    <Card
-                      key={product.id}
-                      className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={async () => {
-                        const { data: complementGroups } = await supabase
-                          .from("product_complement_groups")
-                          .select("extra_category_id, display_order, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
-                          .eq("product_id", product.id)
-                          .order("display_order");
+                <div className="max-h-[50vh] min-h-[300px] overflow-y-auto pr-1">
+                  {(() => {
+                    // Group products by category
+                    const categoryMap = new Map<string, { name: string; products: typeof filteredProducts }>();
+                    const uncategorized: typeof filteredProducts = [];
+                    
+                    filteredProducts.forEach(product => {
+                      const cat = (product as any).categories;
+                      if (cat?.id) {
+                        if (!categoryMap.has(cat.id)) {
+                          categoryMap.set(cat.id, { name: cat.name, products: [] });
+                        }
+                        categoryMap.get(cat.id)!.products.push(product);
+                      } else {
+                        uncategorized.push(product);
+                      }
+                    });
 
-                        const complementExtras = (complementGroups || []).flatMap((g: any) => {
-                          const cat = g.extra_categories;
-                          if (!cat?.extra_category_items) return [];
-                          return cat.extra_category_items.map((item: any) => ({
-                            id: item.id,
-                            name: item.name,
-                            price: item.price,
-                            is_required: g.is_required,
-                            min_selection: g.min_selection,
-                            max_selection: g.max_selection,
-                            extra_category_id: g.extra_category_id,
-                            extra_category_name: cat.name,
-                            group_order: g.display_order ?? 9999,
-                            is_complement: true,
-                          }));
-                        });
+                    const categoriesArr = Array.from(categoryMap.entries());
 
-                        const combinedExtras = [
-                          ...(product.product_extras || []),
-                          ...complementExtras,
-                        ];
+                    const renderProduct = (product: any) => (
+                      <Card
+                        key={product.id}
+                        className="cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={async () => {
+                          const { data: complementGroups } = await supabase
+                            .from("product_complement_groups")
+                            .select("extra_category_id, display_order, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
+                            .eq("product_id", product.id)
+                            .order("display_order");
 
-                        setSelectedProduct({ ...product, product_extras: combinedExtras });
-                        setIsProductDrawerOpen(true);
-                      }}
-                    >
-                      <CardContent className="p-2 space-y-0.5">
-                        {product.image_url ? (
-                          <img src={product.image_url} alt={product.name} className="w-full h-14 object-cover rounded" />
-                        ) : (
-                          <div className="w-full h-14 bg-muted rounded flex items-center justify-center text-sm font-bold text-muted-foreground">
-                            {product.name.charAt(0)}
+                          const complementExtras = (complementGroups || []).flatMap((g: any) => {
+                            const cat = g.extra_categories;
+                            if (!cat?.extra_category_items) return [];
+                            return cat.extra_category_items.map((item: any) => ({
+                              id: item.id,
+                              name: item.name,
+                              price: item.price,
+                              is_required: g.is_required,
+                              min_selection: g.min_selection,
+                              max_selection: g.max_selection,
+                              extra_category_id: g.extra_category_id,
+                              extra_category_name: cat.name,
+                              group_order: g.display_order ?? 9999,
+                              is_complement: true,
+                            }));
+                          });
+
+                          const combinedExtras = [
+                            ...(product.product_extras || []),
+                            ...complementExtras,
+                          ];
+
+                          setSelectedProduct({ ...product, product_extras: combinedExtras });
+                          setIsProductDrawerOpen(true);
+                        }}
+                      >
+                        <CardContent className="p-2 space-y-0.5">
+                          {product.image_url ? (
+                            <img src={product.image_url} alt={product.name} className="w-full h-14 object-cover rounded" />
+                          ) : (
+                            <div className="w-full h-14 bg-muted rounded flex items-center justify-center text-sm font-bold text-muted-foreground">
+                              {product.name.charAt(0)}
+                            </div>
+                          )}
+                          <p className="text-xs font-medium truncate">{product.name}</p>
+                          <p className="text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
+                        </CardContent>
+                      </Card>
+                    );
+
+                    return (
+                      <>
+                        {categoriesArr.map(([catId, { name, products: catProducts }]) => (
+                          <div key={catId} className="mb-4">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded mb-2 sticky top-0 z-10">
+                              {name}
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {catProducts.map(renderProduct)}
+                            </div>
+                          </div>
+                        ))}
+                        {uncategorized.length > 0 && (
+                          <div className="mb-4">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 bg-muted/50 rounded mb-2">
+                              Outros
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {uncategorized.map(renderProduct)}
+                            </div>
                           </div>
                         )}
-                        <p className="text-xs font-medium truncate">{product.name}</p>
-                        <p className="text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
