@@ -448,7 +448,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
               />
             </div>
           </div>
-          <ScrollArea className="flex-1 h-[500px]">
+          <ScrollArea className="flex-1">
             <div className="p-3">
               <PendingOrdersPanel
                 restaurantId={restaurantId}
