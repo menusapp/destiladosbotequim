@@ -26,7 +26,8 @@ interface StockItem { id: string; name: string; unit: string; price_per_unit: nu
 interface CategoryItemIngredient { id: string; stock_item_id: string; quantity: number; stock_item_name?: string; stock_item_unit?: string; stock_item_price?: number; }
 interface CategoryItem { id: string; name: string; price: number; pdv_code?: string; ingredients: CategoryItemIngredient[]; is_active?: boolean | null; }
 interface ComplementCategory { id: string; name: string; items: CategoryItem[]; is_active?: boolean | null; is_required?: boolean; min_quantity?: number; max_quantity?: number; }
-interface SimpleProduct { id: string; name: string; }
+interface SimpleProduct { id: string; name: string; category_id?: string; }
+interface SimpleCategory { id: string; name: string; product_count: number; }
 interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; onOpenDigitizer?: () => void; }
 
 const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: ComplementosTabProps) => {
