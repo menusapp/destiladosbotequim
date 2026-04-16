@@ -45,6 +45,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -272,13 +273,23 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
             className="pl-9"
           />
         </div>
-        <Button onClick={() => {
-          resetForms();
-          setItemDialogOpen(true);
-        }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Insumo
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setBulkDeleteOpen(true)}
+            title="Exclusão em massa"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button onClick={() => {
+            resetForms();
+            setItemDialogOpen(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Insumo
+          </Button>
+        </div>
       </div>
 
       {/* Grid de cards */}
