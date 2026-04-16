@@ -427,9 +427,9 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       </div>
 
       {/* Split layout: left = pending, right = emitted */}
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4" style={{ minHeight: "500px" }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4" style={{ height: "calc(100vh - 420px)", minHeight: "400px" }}>
         {/* Left: A Emitir */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col overflow-hidden">
           <div className="p-4 border-b space-y-2">
             <div>
               <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -448,7 +448,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
               />
             </div>
           </div>
-          <ScrollArea className="flex-1 h-[500px]">
+          <ScrollArea className="flex-1">
             <div className="p-3">
               <PendingOrdersPanel
                 restaurantId={restaurantId}
@@ -461,7 +461,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
         </Card>
 
         {/* Right: Emitidas */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col overflow-hidden">
           <div className="p-4 border-b">
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -469,7 +469,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">Notas fiscais já processadas</p>
           </div>
-          <ScrollArea className="flex-1 h-[500px]">
+          <ScrollArea className="flex-1">
             <CardContent className="p-0">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
