@@ -51,6 +51,9 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
+  const [editBrandsOpen, setEditBrandsOpen] = useState(false);
+  const [editBrands, setEditBrands] = useState<string[]>([]);
   
   // Form state
   const [methodType, setMethodType] = useState("");
