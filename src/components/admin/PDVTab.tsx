@@ -461,8 +461,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         }
       } else {
         setSelectedCustomer(null);
-        setCustomerAddresses([]);
-        setSelectedAddress(null);
+        if (!selectedAddress) {
+          setCustomerAddresses([]);
+        }
       }
     } catch { /* ignore */ }
     finally { setPhoneSearching(false); }
