@@ -108,26 +108,48 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     enabled: open,
   });
 
-  // Auto-calculate delivery fee based on neighborhood
+  // Auto-calculate delivery fee based on CEP or neighborhood
   useEffect(() => {
-    if (orderType !== "delivery" || !deliveryNeighborhood) {
+    if (orderType !== "delivery") {
       setDeliveryFeeAuto(null);
       return;
     }
+
+    const cleanCep = deliveryCep.replace(/\D/g, "");
     const normalizedNeighborhood = deliveryNeighborhood.toLowerCase().trim();
-    const matchingZone = deliveryZones?.find(zone =>
-      zone.neighborhoods?.some((n: string) => n.toLowerCase().trim() === normalizedNeighborhood)
-    );
-    if (matchingZone) {
-      setDeliveryFeeAuto(matchingZone.delivery_fee || 0);
-      setDeliveryFee((matchingZone.delivery_fee || 0).toFixed(2));
-    } else if (deliveryConfig?.delivery_fee) {
+
+    // 1) Try CEP match first
+    if (cleanCep.length === 8 && deliveryZones?.length) {
+      const cepZone = deliveryZones.find(zone =>
+        zone.zip_codes?.some((z: string) => z.replace(/\D/g, "") === cleanCep)
+      );
+      if (cepZone) {
+        setDeliveryFeeAuto(cepZone.delivery_fee || 0);
+        setDeliveryFee((cepZone.delivery_fee || 0).toFixed(2));
+        return;
+      }
+    }
+
+    // 2) Try neighborhood match
+    if (normalizedNeighborhood && deliveryZones?.length) {
+      const neighborhoodZone = deliveryZones.find(zone =>
+        zone.neighborhoods?.some((n: string) => n.toLowerCase().trim() === normalizedNeighborhood)
+      );
+      if (neighborhoodZone) {
+        setDeliveryFeeAuto(neighborhoodZone.delivery_fee || 0);
+        setDeliveryFee((neighborhoodZone.delivery_fee || 0).toFixed(2));
+        return;
+      }
+    }
+
+    // 3) Fallback to default delivery config
+    if (deliveryConfig?.delivery_fee) {
       setDeliveryFeeAuto(deliveryConfig.delivery_fee);
       setDeliveryFee(deliveryConfig.delivery_fee.toFixed(2));
     } else {
       setDeliveryFeeAuto(null);
     }
-  }, [deliveryNeighborhood, deliveryZones, deliveryConfig, orderType]);
+  }, [deliveryCep, deliveryNeighborhood, deliveryZones, deliveryConfig, orderType]);
 
 
 
