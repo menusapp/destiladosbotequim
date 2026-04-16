@@ -1251,7 +1251,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
                   {!selectedCustomer && !hasSelectedCustomer && (
                     <p className="text-sm text-muted-foreground italic">
-                      Preencha o CPF do cliente para ver os endereços salvos
+                      Preencha o celular ou CPF do cliente para ver os endereços salvos
                     </p>
                   )}
 
