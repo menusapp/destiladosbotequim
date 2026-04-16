@@ -302,9 +302,24 @@ export default function Kiosk() {
   };
 
   // After consumption type selection, route to address step if delivery, else payment
-  const handleConsumptionNext = () => {
+  const handleConsumptionNext = async () => {
     if (consumptionMode === "delivery") {
       setStep("delivery_address");
+    } else if (consumptionMode === "counter" && customer?.cpf) {
+      // Check if customer has phone for WhatsApp notification
+      const { data: cust } = await supabase
+        .from("customers")
+        .select("phone")
+        .eq("cpf", customer.cpf)
+        .eq("restaurant_id", restaurant.id)
+        .maybeSingle();
+      const hasPhone = !!cust?.phone?.trim();
+      if (hasPhone) {
+        setCustomer(prev => prev ? { ...prev, phone: cust!.phone! } : prev);
+        setStep("payment");
+      } else {
+        setStep("phone_collection");
+      }
     } else {
       setStep("payment");
     }
