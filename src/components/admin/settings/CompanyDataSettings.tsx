@@ -47,6 +47,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     service_fee_enabled: false,
     service_fee_percentage: 10,
     prep_time_minutes: 30,
+    pickup_time_minutes: 15,
     login_require_cpf: true,
     login_require_name: true,
     login_require_phone: false,
