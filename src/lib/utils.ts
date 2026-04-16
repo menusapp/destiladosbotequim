@@ -139,20 +139,3 @@ export function formatPaymentForDisplay(type: string | null | undefined, brand: 
   }
   // Pagamento local: uppercase + sufixo
   return `${base.toUpperCase()} - PAGAMENTO NO LOCAL`;
-}
-  if (!type) return "—";
-  // If already contains brand info (e.g. "Crédito - Visa"), just normalize
-  if (type.includes(" - ") || type.includes("-")) {
-    return formatPaymentMethod(type);
-  }
-  const formatted = formatPaymentMethod(type);
-  if (brand) {
-    // Capitalize brand name
-    const brandName = brand.charAt(0).toUpperCase() + brand.slice(1);
-    // Don't duplicate if formatted already contains brand
-    if (!formatted.toLowerCase().includes(brand.toLowerCase())) {
-      return `${formatted} - ${brandName}`;
-    }
-  }
-  return formatted;
-}
