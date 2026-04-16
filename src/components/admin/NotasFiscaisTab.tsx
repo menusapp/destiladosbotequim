@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Plus, Printer, RotateCcw, Ban } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Printer, RotateCcw, Ban } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
-import NovaEmissaoModal from "./NovaEmissaoModal";
+import PendingOrdersPanel from "./PendingOrdersPanel";
 import FiscalNoteDetailSheet from "./FiscalNoteDetailSheet";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/components/ui/sonner";
@@ -54,7 +55,6 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [showEmissaoModal, setShowEmissaoModal] = useState(false);
   const [selectedNote, setSelectedNote] = useState<FiscalNote | null>(null);
   const [cancelModal, setCancelModal] = useState<{ open: boolean; note: FiscalNote | null }>({ open: false, note: null });
   const [cancelJustificativa, setCancelJustificativa] = useState("");
@@ -241,7 +241,6 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       const from = startOfDay(exportDateRange.from);
       const to = endOfDay(exportDateRange.to);
 
-      // Fetch authorized notes in the period
       const { data: authorizedNotes, error } = await supabase
         .from("order_fiscal_notes")
         .select("id, nfe_number, nuvem_fiscal_ref, created_at")
@@ -343,7 +342,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   }), [notes]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -353,10 +352,6 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
             <p className="text-sm text-muted-foreground">Gerencie todas as NFC-e emitidas pelo sistema</p>
           </div>
         </div>
-        <Button onClick={() => setShowEmissaoModal(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nova Emissão
-        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -367,7 +362,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
         <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-red-600">{stats.error}</p><p className="text-xs text-muted-foreground">Com Erro</p></CardContent></Card>
       </div>
 
-      {/* Filters */}
+      {/* Date filter + status filter + export */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap gap-3 items-center">
           <Popover
@@ -429,99 +424,131 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
         </Button>
       </div>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Carregando notas...</span>
+      {/* Split layout: left = pending, right = emitted */}
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4" style={{ minHeight: "500px" }}>
+        {/* Left: A Emitir */}
+        <Card className="flex flex-col">
+          <div className="p-4 border-b">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4 text-yellow-600" />
+              A Emitir
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Pedidos aguardando emissão de nota</p>
+          </div>
+          <ScrollArea className="flex-1 h-[500px]">
+            <div className="p-3">
+              <PendingOrdersPanel
+                restaurantId={restaurantId}
+                dateRange={dateRange}
+                onEmitted={fetchNotes}
+              />
             </div>
-          ) : notes.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">Nenhuma nota fiscal encontrada</p>
-              <p className="text-sm">As notas emitidas aparecerão aqui</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pedido</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead>Nº Nota</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {notes.map((note) => (
-                  <TableRow
-                    key={note.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => setSelectedNote(note)}
-                  >
-                    <TableCell className="font-mono text-sm">#{note.order_id.slice(0, 8)}</TableCell>
-                    <TableCell className="text-sm">{format(new Date(note.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
-                    <TableCell className="text-sm">{note.orders?.customer_name || "—"}</TableCell>
-                    <TableCell className="text-right font-medium">R$ {calculateOrderTotal(note).toFixed(2)}</TableCell>
-                    <TableCell className="text-sm">{note.nfe_number || "—"}</TableCell>
-                    <TableCell>
-                      {getStatusBadge(note.status)}
-                      {note.status === "error" && note.error_message && (
-                        <p className="text-xs text-red-500 mt-1 max-w-[300px] truncate" title={note.error_message}>
-                          {note.error_message}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        {note.status === "authorized" && note.nuvem_fiscal_ref && (
-                          <>
-                            <Button
-                              variant="ghost" size="sm"
-                              onClick={() => handleDownload(note, "pdf")}
-                              disabled={downloading.has(`${note.id}-pdf`)}
-                              title="Baixar PDF/DANFE"
-                            >
-                              {downloading.has(`${note.id}-pdf`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-red-600" />}
-                            </Button>
-                            <Button
-                              variant="ghost" size="sm"
-                              onClick={() => handleDownload(note, "xml")}
-                              disabled={downloading.has(`${note.id}-xml`)}
-                              title="Baixar XML"
-                            >
-                              {downloading.has(`${note.id}-xml`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode className="h-4 w-4 text-blue-600" />}
-                            </Button>
-                            <Button
-                              variant="ghost" size="sm"
-                              onClick={() => { setCancelModal({ open: true, note }); setCancelJustificativa(""); }}
-                              title="Cancelar Nota"
-                            >
-                              <Ban className="h-4 w-4 text-gray-600" />
-                            </Button>
-                          </>
-                        )}
-                        {(note.status === "error" || note.status === "pending") && !note.nuvem_fiscal_ref && (
-                          <Button variant="ghost" size="sm" onClick={() => handleRetry(note)} disabled={retrying.has(note.id)} title="Retentar emissão">
-                            {retrying.has(note.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 text-amber-600" />}
-                          </Button>
-                        )}
-                        {note.status === "canceled" && (
-                          <span className="text-xs text-muted-foreground">Cancelada</span>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+          </ScrollArea>
+        </Card>
+
+        {/* Right: Emitidas */}
+        <Card className="flex flex-col">
+          <div className="p-4 border-b">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              Emitidas
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Notas fiscais já processadas</p>
+          </div>
+          <ScrollArea className="flex-1 h-[500px]">
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Carregando notas...</span>
+                </div>
+              ) : notes.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm font-medium">Nenhuma nota fiscal encontrada</p>
+                  <p className="text-xs">As notas emitidas aparecerão aqui</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Pedido</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead>Nº Nota</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {notes.map((note) => (
+                      <TableRow
+                        key={note.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedNote(note)}
+                      >
+                        <TableCell className="font-mono text-sm">#{note.order_id.slice(0, 8)}</TableCell>
+                        <TableCell className="text-sm">{format(new Date(note.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
+                        <TableCell className="text-sm">{note.orders?.customer_name || "—"}</TableCell>
+                        <TableCell className="text-right font-medium">R$ {calculateOrderTotal(note).toFixed(2)}</TableCell>
+                        <TableCell className="text-sm">{note.nfe_number || "—"}</TableCell>
+                        <TableCell>
+                          {getStatusBadge(note.status)}
+                          {note.status === "error" && note.error_message && (
+                            <p className="text-xs text-red-500 mt-1 max-w-[300px] truncate" title={note.error_message}>
+                              {note.error_message}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            {note.status === "authorized" && note.nuvem_fiscal_ref && (
+                              <>
+                                <Button
+                                  variant="ghost" size="sm"
+                                  onClick={() => handleDownload(note, "pdf")}
+                                  disabled={downloading.has(`${note.id}-pdf`)}
+                                  title="Baixar PDF/DANFE"
+                                >
+                                  {downloading.has(`${note.id}-pdf`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-red-600" />}
+                                </Button>
+                                <Button
+                                  variant="ghost" size="sm"
+                                  onClick={() => handleDownload(note, "xml")}
+                                  disabled={downloading.has(`${note.id}-xml`)}
+                                  title="Baixar XML"
+                                >
+                                  {downloading.has(`${note.id}-xml`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode className="h-4 w-4 text-blue-600" />}
+                                </Button>
+                                <Button
+                                  variant="ghost" size="sm"
+                                  onClick={() => { setCancelModal({ open: true, note }); setCancelJustificativa(""); }}
+                                  title="Cancelar Nota"
+                                >
+                                  <Ban className="h-4 w-4 text-gray-600" />
+                                </Button>
+                              </>
+                            )}
+                            {(note.status === "error" || note.status === "pending") && !note.nuvem_fiscal_ref && (
+                              <Button variant="ghost" size="sm" onClick={() => handleRetry(note)} disabled={retrying.has(note.id)} title="Retentar emissão">
+                                {retrying.has(note.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 text-amber-600" />}
+                              </Button>
+                            )}
+                            {note.status === "canceled" && (
+                              <span className="text-xs text-muted-foreground">Cancelada</span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </ScrollArea>
+        </Card>
+      </div>
 
       {/* Cancel Modal */}
       <Dialog open={cancelModal.open} onOpenChange={(o) => { if (!o) setCancelModal({ open: false, note: null }); }}>
@@ -601,7 +628,6 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
         </DialogContent>
       </Dialog>
 
-      <NovaEmissaoModal open={showEmissaoModal} onClose={() => setShowEmissaoModal(false)} restaurantId={restaurantId} onEmitted={fetchNotes} />
       <FiscalNoteDetailSheet note={selectedNote} open={!!selectedNote} onClose={() => setSelectedNote(null)} />
     </div>
   );
