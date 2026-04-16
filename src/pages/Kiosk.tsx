@@ -403,6 +403,7 @@ export default function Kiosk() {
               ...cat,
               products: cat.products.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id))
             })).filter(cat => cat.products.length > 0)}
+          featuredProducts={featuredProducts.filter(p => !disabledProductIds.has(p.id) && !hiddenByRequiredChoices.has(p.id))}
           primaryColor={primaryColor}
           onSelectProduct={openProduct}
           cartCount={cartCount}
