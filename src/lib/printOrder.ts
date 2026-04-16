@@ -51,6 +51,7 @@ export const printOrder = async (
     delivery_address?: string;
     delivery_phone?: string;
     payment_type?: string;
+    payment_brand?: string;
     notes?: string;
     tables?: { table_number: number } | null;
     dd_scheduled_for?: string;
@@ -212,7 +213,7 @@ export const printOrder = async (
 
   // Payment line
   const paymentLine = order.payment_type
-    ? `<p><strong>Pagamento:</strong> ${formatPaymentType(order.payment_type)}</p>`
+    ? `<p><strong>Pagamento:</strong> ${formatPaymentType(order.payment_type, order.payment_brand)}</p>`
     : "";
 
   // Notes section

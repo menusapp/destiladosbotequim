@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { formatPaymentWithBrand } from "@/lib/utils";
+import { formatPaymentWithBrand, formatPaymentForDisplay } from "@/lib/utils";
 import { getOrderOriginLabel } from "@/lib/orderOrigin";
 import { useOrderStatusAdvance } from "@/hooks/useOrderStatusAdvance";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
