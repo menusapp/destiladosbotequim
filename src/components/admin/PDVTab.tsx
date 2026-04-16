@@ -1164,6 +1164,29 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
                 <div className="space-y-3">
                   <div className="relative">
+                    <Label className="text-xs mb-1.5 block">Celular</Label>
+                    <Input
+                      placeholder="(00) 00000-0000"
+                      value={customerPhone}
+                      onChange={e => handlePhoneAutoSearch(e.target.value)}
+                      className="h-9 text-sm pr-8"
+                      disabled={!!selectedCustomer}
+                    />
+                    {phoneSearching && (
+                      <Loader2 className="w-4 h-4 animate-spin absolute right-2.5 top-[34px] text-muted-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1.5 block">Nome *</Label>
+                    <Input
+                      placeholder="Nome do cliente"
+                      value={customerName}
+                      onChange={e => setCustomerName(e.target.value)}
+                      className="h-9 text-sm"
+                      disabled={!!selectedCustomer}
+                    />
+                  </div>
+                  <div className="relative">
                     <Label className="text-xs mb-1.5 block">CPF *</Label>
                     <Input
                       placeholder="000.000.000-00"
@@ -1177,26 +1200,6 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     {cpfSearched && !selectedCustomer && (
                       <p className="text-xs text-amber-600 mt-1">Cliente não encontrado — preencha os dados para cadastrar automaticamente</p>
                     )}
-                  </div>
-                  <div>
-                    <Label className="text-xs mb-1.5 block">Nome *</Label>
-                    <Input
-                      placeholder="Nome do cliente"
-                      value={customerName}
-                      onChange={e => setCustomerName(e.target.value)}
-                      className="h-9 text-sm"
-                      disabled={!!selectedCustomer}
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs mb-1.5 block">Celular</Label>
-                    <Input
-                      placeholder="(00) 00000-0000"
-                      value={customerPhone}
-                      onChange={e => setCustomerPhone(e.target.value)}
-                      className="h-9 text-sm"
-                      disabled={!!selectedCustomer}
-                    />
                   </div>
                   {selectedCustomer && (
                     <Badge variant="secondary" className="text-xs">✓ Cliente cadastrado</Badge>
