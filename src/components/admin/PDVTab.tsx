@@ -419,8 +419,10 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       } else {
         setCpfSearched(true);
         setSelectedCustomer(null);
-        setCustomerAddresses([]);
-        setSelectedAddress(null);
+        // Only clear addresses if none were manually added
+        if (!selectedAddress) {
+          setCustomerAddresses([]);
+        }
       }
     } catch { /* ignore */ }
     finally { setCpfSearching(false); }
