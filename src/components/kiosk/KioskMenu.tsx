@@ -8,6 +8,7 @@ import { isFeaturedVisible } from "@/lib/featuredUtils";
 
 interface Props {
   categories: Category[];
+  featuredProducts?: Product[];
   primaryColor: string;
   onSelectProduct: (product: Product) => void;
   cartCount: number;
@@ -18,13 +19,18 @@ interface Props {
   restaurant?: any;
 }
 
-export function KioskMenu({ categories, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant }: Props) {
+export function KioskMenu({ categories, featuredProducts: featuredProductsProp, primaryColor, onSelectProduct, cartCount, cartTotal, onOpenCart, customerName, onCancel, restaurant }: Props) {
   const featuredProducts = useMemo(() => {
+    if (featuredProductsProp && featuredProductsProp.length >= 0) {
+      // When parent provides the curated list, trust it (already filtered by channel + visibility + schedule)
+      return featuredProductsProp;
+    }
     return categories.flatMap(c => c.products).filter(p => (p.is_featured || p.promotional_price != null) && isFeaturedVisible(p));
-  }, [categories]);
+  }, [categories, featuredProductsProp]);
 
+  const featuredSectionEnabled = restaurant?.featured_section_enabled !== false;
   const featuredSectionTitle = restaurant?.featured_section_title || "Destaques";
-  const hasFeatured = featuredProducts.length > 0;
+  const hasFeatured = featuredSectionEnabled && featuredProducts.length > 0;
 
   const [activeCategory, setActiveCategory] = useState<string>(hasFeatured ? "__featured__" : (categories[0]?.id || ""));
   const [searchQuery, setSearchQuery] = useState("");
