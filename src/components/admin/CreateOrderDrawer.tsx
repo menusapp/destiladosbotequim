@@ -564,6 +564,17 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                     <Input placeholder="Bairro" value={deliveryNeighborhood} onChange={e => setDeliveryNeighborhood(e.target.value)} />
                     <Input placeholder="Cidade" value={deliveryCity} onChange={e => setDeliveryCity(e.target.value)} />
                     
+                    <div className="flex justify-between items-center p-3 bg-muted/30 rounded border">
+                      <span className="text-sm font-medium">Taxa de entrega</span>
+                      {deliveryFeeAuto !== null ? (
+                        <span className="font-medium text-green-600">
+                          {deliveryFeeAuto === 0 ? 'Grátis' : `R$ ${deliveryFeeAuto.toFixed(2)}`}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Sem zona configurada</span>
+                      )}
+                    </div>
+
                     <Label>Taxa de Entrega (R$)</Label>
                     <Input
                       type="number"
@@ -574,10 +585,10 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       onChange={e => setDeliveryFee(e.target.value)}
                     />
                     {deliveryFeeAuto !== null && (
-                      <p className="text-xs text-muted-foreground">Taxa calculada automaticamente pelo bairro/configuração</p>
+                      <p className="text-xs text-muted-foreground">Taxa calculada automaticamente por CEP/bairro/configuração</p>
                     )}
                     {deliveryFeeAuto === null && !deliveryFee && (
-                      <p className="text-xs text-amber-600">Nenhuma configuração de entrega encontrada. Insira manualmente.</p>
+                      <p className="text-xs text-amber-600">CEP/bairro fora da área cadastrada. Insira a taxa manualmente.</p>
                     )}
                   </div>
                 )}
