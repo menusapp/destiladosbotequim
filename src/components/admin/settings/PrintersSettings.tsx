@@ -67,6 +67,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           fontSize: (data as any).font_size || 12,
           fontBold: (data as any).font_bold !== undefined ? Boolean((data as any).font_bold) : true,
           printCopies: (data as any).print_copies || 1,
+          supportsAutoCut: Boolean((data as any).supports_auto_cut),
         });
       }
     } catch (error) {
