@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, Printer, RotateCcw, Ban } from "lucide-react";
+import { CalendarIcon, FileText, Download, FileCode, AlertCircle, CheckCircle2, Clock, XCircle, Loader2, FileArchive, RotateCcw, Ban } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import PendingOrdersPanel from "./PendingOrdersPanel";
 import FiscalNoteDetailSheet from "./FiscalNoteDetailSheet";
