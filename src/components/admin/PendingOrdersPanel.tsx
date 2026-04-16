@@ -193,6 +193,16 @@ const PendingOrdersPanel = ({ restaurantId, dateRange, onEmitted, searchTerm = "
     }
   };
 
+  const filteredOrders = useMemo(() => {
+    if (!searchTerm.trim()) return orders;
+    const term = searchTerm.toLowerCase().trim();
+    return orders.filter(o =>
+      o.customer_name?.toLowerCase().includes(term) ||
+      o.customer_cpf?.includes(term) ||
+      o.id.toLowerCase().includes(term)
+    );
+  }, [orders, searchTerm]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -202,19 +212,19 @@ const PendingOrdersPanel = ({ restaurantId, dateRange, onEmitted, searchTerm = "
     );
   }
 
-  if (orders.length === 0) {
+  if (filteredOrders.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
-        <p className="text-sm font-medium">Nenhum pedido pendente</p>
-        <p className="text-xs">Todos os pedidos já possuem nota</p>
+        <p className="text-sm font-medium">{searchTerm ? "Nenhum pedido encontrado" : "Nenhum pedido pendente"}</p>
+        <p className="text-xs">{searchTerm ? "Tente outro termo de busca" : "Todos os pedidos já possuem nota"}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      {orders.map((order) => {
+      {filteredOrders.map((order) => {
         const isChecked = deliveryChecks[order.id] || false;
         return (
           <div key={order.id} className="border rounded-lg p-3 space-y-2 bg-card">
