@@ -456,27 +456,73 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
               <p className="text-xs text-muted-foreground">Máximo 0 = ilimitado. Essas regras serão aplicadas a todos os produtos vinculados.</p>
             </div>
 
-            <div className="space-y-2">
-              <Label>Produtos vinculados ({selectedProductIds.size} selecionados)</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar produtos..." value={productSearchQuery} onChange={(e) => setProductSearchQuery(e.target.value)} className="pl-9" />
+            <div className="space-y-3">
+              <Label>Vincular produtos por</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={linkMode === 'products' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setLinkMode('products')}
+                >
+                  Produtos avulsos
+                </Button>
+                <Button
+                  type="button"
+                  variant={linkMode === 'category' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setLinkMode('category')}
+                >
+                  Por categoria
+                </Button>
               </div>
-              <ScrollArea className="h-48 border rounded-lg">
-                <div className="p-2 space-y-1">
-                  {allProducts
-                    .filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
-                    .map(product => (
-                      <label key={product.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer text-sm">
-                        <Checkbox
-                          checked={selectedProductIds.has(product.id)}
-                          onCheckedChange={() => toggleProductSelection(product.id)}
-                        />
-                        <span>{product.name}</span>
-                      </label>
-                    ))}
+              <p className="text-xs text-muted-foreground">
+                {selectedProductIds.size} produto{selectedProductIds.size !== 1 ? 's' : ''} vinculado{selectedProductIds.size !== 1 ? 's' : ''}
+              </p>
+
+              {linkMode === 'products' && (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar produtos..." value={productSearchQuery} onChange={(e) => setProductSearchQuery(e.target.value)} className="pl-9" />
+                  </div>
+                  <ScrollArea className="h-48 border rounded-lg">
+                    <div className="p-2 space-y-1">
+                      {allProducts
+                        .filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
+                        .map(product => (
+                          <label key={product.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer text-sm">
+                            <Checkbox
+                              checked={selectedProductIds.has(product.id)}
+                              onCheckedChange={() => toggleProductSelection(product.id)}
+                            />
+                            <span>{product.name}</span>
+                          </label>
+                        ))}
+                    </div>
+                  </ScrollArea>
+                </>
+              )}
+
+              {linkMode === 'category' && (
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                  {menuCategories.map(cat => (
+                    <div key={cat.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`menucat-${cat.id}`}
+                        checked={selectedCategoryIds.has(cat.id)}
+                        onCheckedChange={(checked) => toggleMenuCategory(cat.id, !!checked)}
+                      />
+                      <Label htmlFor={`menucat-${cat.id}`} className="cursor-pointer text-sm">
+                        {cat.name}
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({cat.product_count} produtos)
+                        </span>
+                      </Label>
+                    </div>
+                  ))}
                 </div>
-              </ScrollArea>
+              )}
             </div>
 
             <Button onClick={handleSaveCategory} className="w-full">{editingCategory ? "Atualizar" : "Criar Categoria"}</Button>
