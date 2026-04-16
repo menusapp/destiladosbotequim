@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { CreditCard, Plus, Trash2, Banknote, Smartphone, Receipt } from "lucide-react";
+import { CreditCard, Plus, Trash2, Banknote, Smartphone, Receipt, Pencil } from "lucide-react";
 
 interface PaymentMethod {
   id: string;
