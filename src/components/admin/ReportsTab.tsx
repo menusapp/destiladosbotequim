@@ -128,6 +128,8 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         { data: paymentMethods },
         { data: cashMovements },
         { data: payrollCredits },
+        { data: pdvPaidOrders },
+        { data: cashEntries },
       ] = await Promise.all([
         supabase.from("fixed_costs").select("name, amount").eq("restaurant_id", restaurantId),
         supabase.from("variable_costs").select("name, type, amount, percentage").eq("restaurant_id", restaurantId),
@@ -157,6 +159,20 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         supabase.from("employee_credits").select("paid_amount")
           .eq("restaurant_id", restaurantId).eq("status", "paid").eq("paid_method", "payroll")
           .gte("paid_at", startDate.toISOString()).lte("paid_at", endDate.toISOString()),
+        // PDV paid orders (local/balcao with payment_status=paid, not totem) — same as useOrderMetrics
+        supabase.from("orders")
+          .select("id, created_at, paid_at, order_type, payment_type, payment_status, coupon_discount, table_id, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
+          .eq("restaurant_id", restaurantId)
+          .in("order_type", ["local", "balcao"])
+          .eq("payment_status", "paid")
+          .neq("status", "cancelled")
+          .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+        // Cash movement entries (entrada) for reconciliation
+        supabase.from("cash_movements")
+          .select("id, amount, order_id, bill_id, payment_method, category, created_at")
+          .eq("restaurant_id", restaurantId)
+          .eq("movement_type", "entrada")
+          .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
       ]);
 
       setFixedCosts(fixedData.data || []);
@@ -164,13 +180,19 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       setLaborCosts(laborData.data || []);
       setPayrollRecovery((payrollCredits || []).reduce((sum, c) => sum + Number(c.paid_amount || 0), 0));
 
+      // Build sets of known IDs (same logic as useOrderMetrics)
+      const knownOrderIds = new Set<string>();
+      const knownBillIds = new Set<string>();
+
       let billsTotal = 0;
       let billsCount = 0;
       let localOrderIds: string[] = [];
+      const billCoveredTableIds = new Set<string>();
       
       if (paidBills && paidBills.length > 0) {
         billsTotal = paidBills.reduce((sum, bill) => sum + Number(bill.total_amount), 0);
         billsCount = paidBills.length;
+        paidBills.forEach(b => { knownBillIds.add(b.id); billCoveredTableIds.add(b.table_id); });
         
         const tableIds = paidBills.map(b => b.table_id);
         const { data: localOrders } = await supabase
@@ -182,6 +204,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
 
       let deliveryTotal = 0;
       const deliveryOrderIds = (deliveryOrders || []).map(o => o.id);
+      deliveryOrders?.forEach(o => knownOrderIds.add(o.id));
       
       deliveryOrders?.forEach((order: any) => {
         let orderSubtotal = 0;
@@ -214,10 +237,43 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         orderSubtotal -= Number(order.coupon_discount || 0);
         totemTotal += orderSubtotal;
         totemOrderIds.push(order.id);
+        knownOrderIds.add(order.id);
       });
-      
-      const salesTotal = billsTotal + deliveryTotal + counterTotal + totemTotal;
-      const ordersCount = billsCount + (deliveryOrders?.length || 0) + (counterOrders?.length || 0) + (totemOrders?.length || 0);
+
+      // PDV paid orders NOT covered by bills or totem (same as useOrderMetrics)
+      let pdvPaidLocalTotal = 0;
+      const pdvPaidOrderIds: string[] = [];
+      (pdvPaidOrders || []).forEach((o: any) => {
+        if (knownOrderIds.has(o.id)) return;
+        if (o.table_id && billCoveredTableIds.has(o.table_id)) return;
+        let subtotal = 0;
+        (o.order_items || []).forEach((item: any) => {
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0), 0);
+          subtotal += (item.price_at_order * item.quantity) + extrasTotal;
+        });
+        subtotal -= Number(o.coupon_discount || 0);
+        pdvPaidLocalTotal += subtotal;
+        pdvPaidOrderIds.push(o.id);
+        knownOrderIds.add(o.id);
+      });
+
+      // Uncovered cash entries (same as useOrderMetrics)
+      let uncoveredTotal = 0;
+      const uncoveredCount = (cashEntries || []).filter((cm: any) => {
+        if (cm.order_id && knownOrderIds.has(cm.order_id)) return false;
+        if (cm.bill_id && knownBillIds.has(cm.bill_id)) return false;
+        if (!cm.order_id && !cm.bill_id) return false;
+        return true;
+      });
+      uncoveredCount.forEach((cm: any) => {
+        uncoveredTotal += Number(cm.amount || 0);
+        if (cm.order_id) knownOrderIds.add(cm.order_id);
+        if (cm.bill_id) knownBillIds.add(cm.bill_id);
+      });
+
+      const salesTotal = billsTotal + deliveryTotal + counterTotal + totemTotal + pdvPaidLocalTotal + uncoveredTotal;
+      const ordersCount = billsCount + (deliveryOrders?.length || 0) + (counterOrders?.length || 0) + (totemOrders?.length || 0) + pdvPaidOrderIds.length + uncoveredCount.length;
       const avgTicket = ordersCount > 0 ? salesTotal / ordersCount : 0;
 
       setTotalRevenue(salesTotal);
@@ -328,6 +384,25 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         addToPaymentTotal(order.payment_type, orderTotal);
       });
 
+      // Somar PDV paid orders por payment_type
+      pdvPaidOrderIds.forEach(id => {
+        const order = (pdvPaidOrders || []).find((o: any) => o.id === id);
+        if (!order) return;
+        let orderTotal = 0;
+        (order.order_items || []).forEach((item: any) => {
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0), 0);
+          orderTotal += (item.price_at_order * item.quantity) + extrasTotal;
+        });
+        orderTotal -= Number(order.coupon_discount || 0);
+        addToPaymentTotal(order.payment_type, orderTotal);
+      });
+
+      // Somar uncovered cash entries
+      uncoveredCount.forEach((cm: any) => {
+        addToPaymentTotal(cm.payment_method, Number(cm.amount || 0));
+      });
+
       // Converter para array de exibição (apenas os que têm valor > 0)
       const paymentsByMethod: PaymentMethodSummary[] = Object.entries(paymentTotals)
         .filter(([_, total]) => total > 0)
@@ -346,7 +421,7 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
       });
 
       // Calcular CMV (operational expenses already computed above)
-      await calculateCMV([...localOrderIds, ...deliveryOrderIds, ...totemOrderIds], counterOrderIds);
+      await calculateCMV([...localOrderIds, ...deliveryOrderIds, ...totemOrderIds, ...pdvPaidOrderIds], counterOrderIds);
 
     } catch (error: any) {
       toast.error("Erro ao carregar dados: " + error.message);
