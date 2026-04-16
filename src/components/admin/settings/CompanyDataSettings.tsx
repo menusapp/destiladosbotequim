@@ -24,6 +24,7 @@ interface Settings {
   service_fee_enabled: boolean;
   service_fee_percentage: number;
   prep_time_minutes: number;
+  pickup_time_minutes: number;
   login_require_cpf: boolean;
   login_require_name: boolean;
   login_require_phone: boolean;
