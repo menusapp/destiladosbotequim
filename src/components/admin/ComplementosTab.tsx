@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit2, Trash2, Package, ChevronDown, ChevronUp, Camera } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Package, ChevronDown, ChevronUp, Camera, Copy } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -176,6 +176,74 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
     if (error) { toast.error("Erro ao excluir categoria"); return; }
     toast.success("Categoria excluída!");
     setDeleteDialogOpen(false); setDeletingCategory(null); fetchCategories();
+  };
+
+  const handleDuplicateCategory = async (category: ComplementCategory) => {
+    if (isRestaurantOpen) { toast.error("Feche o restaurante para duplicar"); return; }
+    try {
+      const { data: newCat, error: catErr } = await supabase.from("extra_categories").insert({
+        name: `${category.name} (cópia)`,
+        restaurant_id: restaurantId,
+        is_required: category.is_required,
+        min_quantity: category.min_quantity || 0,
+        max_quantity: category.max_quantity || 0,
+        is_active: category.is_active,
+      } as any).select().single();
+      if (catErr || !newCat) { toast.error("Erro ao duplicar categoria"); return; }
+
+      const usedCodes = await getAllUsedPdvCodes(restaurantId);
+      let nextCode = 1;
+      const getNextCode = () => {
+        while (usedCodes.has(nextCode)) nextCode++;
+        const code = String(nextCode).padStart(3, "0");
+        usedCodes.add(nextCode);
+        nextCode++;
+        return code;
+      };
+
+      for (const item of category.items) {
+        const newPdvCode = getNextCode();
+        const { data: newItem } = await supabase.from("extra_category_items").insert({
+          category_id: newCat.id,
+          name: item.name,
+          price: item.price,
+          pdv_code: newPdvCode,
+          is_active: item.is_active,
+        } as any).select().single();
+
+        if (newItem && item.ingredients.length > 0) {
+          await supabase.from("extra_category_item_ingredients").insert(
+            item.ingredients.map(ing => ({
+              category_item_id: newItem.id,
+              stock_item_id: ing.stock_item_id,
+              quantity: ing.quantity,
+            }))
+          );
+        }
+      }
+
+      const { data: linkedGroups } = await supabase
+        .from("product_complement_groups")
+        .select("product_id, is_required, min_selection, max_selection, display_order")
+        .eq("extra_category_id", category.id);
+      if (linkedGroups && linkedGroups.length > 0) {
+        await supabase.from("product_complement_groups").insert(
+          linkedGroups.map((g: any) => ({
+            product_id: g.product_id,
+            extra_category_id: newCat.id,
+            is_required: g.is_required,
+            min_selection: g.min_selection,
+            max_selection: g.max_selection,
+            display_order: g.display_order,
+          }))
+        );
+      }
+
+      toast.success("Categoria duplicada com sucesso!");
+      fetchCategories();
+    } catch (err) {
+      toast.error("Erro ao duplicar categoria");
+    }
   };
 
   const handleAddIngredient = () => {
@@ -387,8 +455,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
                             fetchCategories();
                           }}
                         />
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEditCategory(category); }}><Edit2 className="h-4 w-4" /></Button>
-                        <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } setDeletingCategory(category); setDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEditCategory(category); }} title="Editar"><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleDuplicateCategory(category); }} title="Duplicar"><Copy className="h-4 w-4" /></Button>
+                        <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } setDeletingCategory(category); setDeleteDialogOpen(true); }} title="Excluir"><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </div>
                   </CardHeader>
