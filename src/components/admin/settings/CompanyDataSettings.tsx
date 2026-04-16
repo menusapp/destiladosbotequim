@@ -24,6 +24,7 @@ interface Settings {
   service_fee_enabled: boolean;
   service_fee_percentage: number;
   prep_time_minutes: number;
+  login_require_cpf: boolean;
   login_require_name: boolean;
   login_require_phone: boolean;
   login_require_birth_date: boolean;
@@ -45,6 +46,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     service_fee_enabled: false,
     service_fee_percentage: 10,
     prep_time_minutes: 30,
+    login_require_cpf: true,
     login_require_name: true,
     login_require_phone: false,
     login_require_birth_date: false,
@@ -63,7 +65,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, login_require_birth_date, bill_request_enabled, show_prep_timer")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_cpf, login_require_name, login_require_phone, login_require_birth_date, bill_request_enabled, show_prep_timer")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -77,6 +79,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
           prep_time_minutes: data.prep_time_minutes || 30,
+          login_require_cpf: data.login_require_cpf ?? true,
           login_require_name: data.login_require_name ?? true,
           login_require_phone: data.login_require_phone ?? false,
           login_require_birth_date: data.login_require_birth_date ?? false,
@@ -143,6 +146,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: settings.service_fee_enabled,
           service_fee_percentage: settings.service_fee_percentage,
           prep_time_minutes: settings.prep_time_minutes,
+          login_require_cpf: settings.login_require_cpf,
           login_require_name: settings.login_require_name,
           login_require_phone: settings.login_require_phone,
           login_require_birth_date: settings.login_require_birth_date,
