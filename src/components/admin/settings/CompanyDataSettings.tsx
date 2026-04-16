@@ -463,7 +463,13 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                   </div>
                   <Switch
                     checked={settings.login_require_name}
-                    onCheckedChange={(checked) => setSettings({ ...settings, login_require_name: checked })}
+                    onCheckedChange={(checked) => {
+                      if (!checked && !settings.login_require_cpf && !settings.login_require_phone) {
+                        toast.error("Pelo menos um campo deve estar ativo");
+                        return;
+                      }
+                      setSettings({ ...settings, login_require_name: checked });
+                    }}
                   />
                 </div>
 
@@ -480,7 +486,13 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                   </div>
                   <Switch
                     checked={settings.login_require_phone}
-                    onCheckedChange={(checked) => setSettings({ ...settings, login_require_phone: checked })}
+                    onCheckedChange={(checked) => {
+                      if (!checked && !settings.login_require_cpf && !settings.login_require_name) {
+                        toast.error("Pelo menos um campo deve estar ativo");
+                        return;
+                      }
+                      setSettings({ ...settings, login_require_phone: checked });
+                    }}
                   />
                 </div>
 
