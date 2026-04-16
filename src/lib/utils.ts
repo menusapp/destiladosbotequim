@@ -139,3 +139,4 @@ export function formatPaymentForDisplay(type: string | null | undefined, brand: 
   }
   // Pagamento local: uppercase + sufixo
   return `${base.toUpperCase()} - PAGAMENTO NO LOCAL`;
+}
