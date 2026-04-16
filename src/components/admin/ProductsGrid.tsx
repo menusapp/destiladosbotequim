@@ -804,10 +804,10 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
           <Button
             variant="outline"
             size="icon"
-            onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir produtos"); return; } setBulkDeleteOpen(true); }}
-            title="Exclusão em massa"
+            onClick={() => setBulkDeleteOpen(true)}
+            title="Edição em massa"
           >
-            <Trash2 className="h-4 w-4" />
+            <Pencil className="h-4 w-4" />
           </Button>
           <Button onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para adicionar produtos"); return; } resetForm(); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Novo Produto

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Trash2, Loader2 } from "lucide-react";
+import { Search, Trash2, Loader2, Pencil, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 interface BulkDeleteProductsDialogProps {
@@ -22,14 +22,18 @@ interface ProductItem {
   name: string;
   category_id: string | null;
   category_name: string;
+  available: boolean;
 }
+
+type BulkAction = "activate" | "deactivate" | "delete";
 
 const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted, isRestaurantOpen }: BulkDeleteProductsDialogProps) => {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<BulkAction>("delete");
 
   useEffect(() => {
     if (open) {
@@ -42,7 +46,7 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
   const fetchProducts = async () => {
     const { data } = await supabase
       .from("products")
-      .select("id, name, category_id, categories(name)")
+      .select("id, name, category_id, available, categories(name)")
       .eq("restaurant_id", restaurantId)
       .order("name");
     
@@ -52,6 +56,7 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
         name: p.name,
         category_id: p.category_id,
         category_name: p.categories?.name || "Sem categoria",
+        available: p.available ?? true,
       }))
     );
   };
@@ -89,39 +94,85 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
     });
   };
 
-  const handleConfirmDelete = async () => {
+  const requestAction = (action: BulkAction) => {
     if (isRestaurantOpen) {
-      toast.error("Feche o restaurante para excluir produtos");
+      toast.error("Feche o restaurante para editar produtos");
       return;
     }
-    setDeleting(true);
+    setPendingAction(action);
+    setConfirmOpen(true);
+  };
+
+  const confirmationText: Record<BulkAction, { title: string; description: string; button: string }> = {
+    activate: {
+      title: "Confirmar Ativação",
+      description: `Tem certeza que deseja ativar ${selected.size} produto(s)?`,
+      button: `Ativar ${selected.size} produto(s)`,
+    },
+    deactivate: {
+      title: "Confirmar Desativação",
+      description: `Tem certeza que deseja desativar ${selected.size} produto(s)?`,
+      button: `Desativar ${selected.size} produto(s)`,
+    },
+    delete: {
+      title: "Confirmar Exclusão",
+      description: `Tem certeza que deseja excluir ${selected.size} produto(s)? Esta ação não pode ser desfeita.`,
+      button: `Excluir ${selected.size} produto(s)`,
+    },
+  };
+
+  const handleConfirm = async () => {
+    setProcessing(true);
     let errors = 0;
-    for (const id of selected) {
-      const { error } = await supabase.rpc("admin_delete_product", {
-        p_product_id: id,
-        p_restaurant_id: restaurantId,
-      });
-      if (error) errors++;
-    }
-    setDeleting(false);
-    setConfirmOpen(false);
-    if (errors > 0) {
-      toast.error(`${errors} produto(s) não puderam ser excluídos`);
+
+    if (pendingAction === "delete") {
+      for (const id of selected) {
+        const { error } = await supabase.rpc("admin_delete_product", {
+          p_product_id: id,
+          p_restaurant_id: restaurantId,
+        });
+        if (error) errors++;
+      }
     } else {
-      toast.success(`${selected.size} produto(s) excluído(s)`);
+      const newAvailable = pendingAction === "activate";
+      for (const id of selected) {
+        const { error } = await supabase
+          .from("products")
+          .update({ available: newAvailable })
+          .eq("id", id)
+          .eq("restaurant_id", restaurantId);
+        if (error) errors++;
+      }
+    }
+
+    setProcessing(false);
+    setConfirmOpen(false);
+
+    const labels: Record<BulkAction, string> = {
+      activate: "ativado(s)",
+      deactivate: "desativado(s)",
+      delete: "excluído(s)",
+    };
+
+    if (errors > 0) {
+      toast.error(`${errors} produto(s) não puderam ser ${labels[pendingAction]}`);
+    } else {
+      toast.success(`${selected.size} produto(s) ${labels[pendingAction]}`);
     }
     onOpenChange(false);
     onDeleted();
   };
 
+  const ct = confirmationText[pendingAction];
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-lg flex flex-col" style={{ maxHeight: "80vh" }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-destructive" />
-              Exclusão em Massa — Produtos
+              <Pencil className="h-5 w-5 text-primary" />
+              Edição em Massa — Produtos
             </DialogTitle>
           </DialogHeader>
 
@@ -135,7 +186,7 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
             />
           </div>
 
-          <ScrollArea className="flex-1 min-h-0" style={{ maxHeight: "400px" }}>
+          <ScrollArea className="flex-1 min-h-0">
             <div className="space-y-4 pr-4">
               {grouped.map(([cat, items]) => {
                 const allSelected = items.every(i => selected.has(i.id));
@@ -155,7 +206,10 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
                             checked={selected.has(p.id)}
                             onCheckedChange={() => toggleItem(p.id)}
                           />
-                          <span className="text-sm">{p.name}</span>
+                          <span className="text-sm flex-1">{p.name}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${p.available ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
+                            {p.available ? "Ativo" : "Inativo"}
+                          </span>
                         </label>
                       ))}
                     </div>
@@ -168,16 +222,37 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
             </div>
           </ScrollArea>
 
-          <div className="flex items-center justify-between pt-2 border-t">
+          <div className="flex items-center justify-between pt-2 border-t gap-2 flex-wrap">
             <span className="text-sm text-muted-foreground">{selected.size} selecionado(s)</span>
-            <Button
-              variant="destructive"
-              disabled={selected.size === 0}
-              onClick={() => setConfirmOpen(true)}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Excluir Selecionados
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selected.size === 0}
+                onClick={() => requestAction("activate")}
+              >
+                <ToggleRight className="h-4 w-4 mr-1" />
+                Ativar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selected.size === 0}
+                onClick={() => requestAction("deactivate")}
+              >
+                <ToggleLeft className="h-4 w-4 mr-1" />
+                Desativar
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={selected.size === 0}
+                onClick={() => requestAction("delete")}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Excluir
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -185,20 +260,18 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir {selected.size} produto(s)? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{ct.title}</AlertDialogTitle>
+            <AlertDialogDescription>{ct.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={processing}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleConfirmDelete}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirm}
+              disabled={processing}
+              className={pendingAction === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
             >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Excluir {selected.size} produto(s)
+              {processing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {ct.button}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
