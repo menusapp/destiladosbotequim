@@ -139,7 +139,12 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
 
   const handleSaveSettings = async () => {
     try {
-      const { error } = await supabase
+      // Validate at least one customer field is active
+      if (!settings.login_require_cpf && !settings.login_require_name && !settings.login_require_phone) {
+        toast.error("É obrigatório manter pelo menos um campo de cadastro ativo (CPF, Nome ou Telefone)");
+        return;
+      }
+
         .from('restaurants')
         .update({
           primary_color: settings.primary_color,
