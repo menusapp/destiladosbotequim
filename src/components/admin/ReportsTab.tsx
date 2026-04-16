@@ -128,6 +128,8 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         { data: paymentMethods },
         { data: cashMovements },
         { data: payrollCredits },
+        { data: pdvPaidOrders },
+        { data: cashEntries },
       ] = await Promise.all([
         supabase.from("fixed_costs").select("name, amount").eq("restaurant_id", restaurantId),
         supabase.from("variable_costs").select("name, type, amount, percentage").eq("restaurant_id", restaurantId),
@@ -157,6 +159,20 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         supabase.from("employee_credits").select("paid_amount")
           .eq("restaurant_id", restaurantId).eq("status", "paid").eq("paid_method", "payroll")
           .gte("paid_at", startDate.toISOString()).lte("paid_at", endDate.toISOString()),
+        // PDV paid orders (local/balcao with payment_status=paid, not totem) — same as useOrderMetrics
+        supabase.from("orders")
+          .select("id, created_at, paid_at, order_type, payment_type, payment_status, coupon_discount, table_id, order_items(price_at_order, quantity, order_item_extras(price_at_order))")
+          .eq("restaurant_id", restaurantId)
+          .in("order_type", ["local", "balcao"])
+          .eq("payment_status", "paid")
+          .neq("status", "cancelled")
+          .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+        // Cash movement entries (entrada) for reconciliation
+        supabase.from("cash_movements")
+          .select("id, amount, order_id, bill_id, payment_method, category, created_at")
+          .eq("restaurant_id", restaurantId)
+          .eq("movement_type", "entrada")
+          .gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
       ]);
 
       setFixedCosts(fixedData.data || []);
