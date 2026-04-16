@@ -14,6 +14,7 @@ import { KioskConsumptionType, ConsumptionMode } from "@/components/kiosk/KioskC
 import { KioskPayment } from "@/components/kiosk/KioskPayment";
 import { KioskConfirmation } from "@/components/kiosk/KioskConfirmation";
 import { KioskDeliveryAddress } from "@/components/kiosk/KioskDeliveryAddress";
+import { KioskPhoneCollection } from "@/components/kiosk/KioskPhoneCollection";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
