@@ -585,12 +585,15 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       neighborhood: newAddrNeighborhood, city: newAddrCity, state: newAddrState, zip_code: newAddrCep,
     };
 
-    // Save to DB if customer has CPF
-    if (selectedCustomer) {
+    // Save to DB if customer has CPF (registered or not — will be saved to CRM on order creation)
+    const cpfToUse = selectedCustomer?.cpf || customerCpf;
+    const nameToUse = selectedCustomer?.name || customerName.trim();
+    const phoneToUse = selectedCustomer?.phone || customerPhone;
+    if (cpfToUse && validateCPF(cpfToUse)) {
       await supabase.from("customer_addresses").insert({
-        customer_cpf: selectedCustomer.cpf,
-        customer_name: selectedCustomer.name,
-        customer_phone: selectedCustomer.phone,
+        customer_cpf: cpfToUse,
+        customer_name: nameToUse || "Cliente",
+        customer_phone: phoneToUse || "",
         street: addr.street, number: addr.number, complement: addr.complement,
         neighborhood: addr.neighborhood, city: addr.city, state: addr.state, zip_code: addr.zip_code,
       });
@@ -1206,11 +1209,20 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       placeholder="(00) 00000-0000"
                       value={customerPhone}
                       onChange={e => handlePhoneAutoSearch(e.target.value)}
-                      className="h-9 text-sm pr-8"
+                      className={`h-9 text-sm pr-8 ${customerPhone.replace(/\D/g, "").length >= 10 ? (validatePhone(customerPhone) ? "border-green-500 focus-visible:ring-green-500" : "border-destructive focus-visible:ring-destructive") : ""}`}
                       disabled={!!selectedCustomer}
                     />
-                    {phoneSearching && (
+                    {phoneSearching ? (
                       <Loader2 className="w-4 h-4 animate-spin absolute right-2.5 top-[34px] text-muted-foreground" />
+                    ) : customerPhone.replace(/\D/g, "").length >= 10 ? (
+                      validatePhone(customerPhone) ? (
+                        <span className="absolute right-2.5 top-[34px] text-green-500 text-xs font-bold">✓</span>
+                      ) : (
+                        <span className="absolute right-2.5 top-[34px] text-destructive text-xs font-bold">✗</span>
+                      )
+                    ) : null}
+                    {customerPhone.replace(/\D/g, "").length >= 10 && !validatePhone(customerPhone) && (
+                      <p className="text-xs text-destructive mt-1">Celular inválido</p>
                     )}
                   </div>
                   <div>
@@ -1229,13 +1241,22 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       placeholder="000.000.000-00"
                       value={customerCpf}
                       onChange={e => handleCpfAutoSearch(e.target.value)}
-                      className="h-9 text-sm pr-8"
+                      className={`h-9 text-sm pr-8 ${customerCpf.replace(/\D/g, "").length === 11 ? (validateCPF(customerCpf) ? "border-green-500 focus-visible:ring-green-500" : "border-destructive focus-visible:ring-destructive") : ""}`}
                     />
-                    {cpfSearching && (
+                    {cpfSearching ? (
                       <Loader2 className="w-4 h-4 animate-spin absolute right-2.5 top-[34px] text-muted-foreground" />
+                    ) : customerCpf.replace(/\D/g, "").length === 11 ? (
+                      validateCPF(customerCpf) ? (
+                        <span className="absolute right-2.5 top-[34px] text-green-500 text-xs font-bold">✓</span>
+                      ) : (
+                        <span className="absolute right-2.5 top-[34px] text-destructive text-xs font-bold">✗</span>
+                      )
+                    ) : null}
+                    {customerCpf.replace(/\D/g, "").length === 11 && !validateCPF(customerCpf) && (
+                      <p className="text-xs text-destructive mt-1">CPF inválido</p>
                     )}
-                    {cpfSearched && !selectedCustomer && (
-                      <p className="text-xs text-amber-600 mt-1">Cliente não encontrado — preencha os dados para cadastrar automaticamente</p>
+                    {cpfSearched && !selectedCustomer && validateCPF(customerCpf) && (
+                      <p className="text-xs text-amber-600 mt-1">Cliente não encontrado — será cadastrado ao criar o pedido</p>
                     )}
                   </div>
                   {selectedCustomer && (
@@ -1249,13 +1270,53 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                 <div className="border rounded-lg p-4 bg-muted/30">
                   <p className="text-sm font-medium text-muted-foreground mb-3">Endereço de Entrega</p>
 
-                  {!selectedCustomer && !hasSelectedCustomer && (
+                  {/* No customer data at all */}
+                  {!selectedCustomer && !hasSelectedCustomer && !customerName.trim() && !customerPhone.replace(/\D/g, "") && !customerCpf.replace(/\D/g, "") && (
                     <p className="text-sm text-muted-foreground italic">
                       Preencha o celular ou CPF do cliente para ver os endereços salvos
                     </p>
                   )}
 
-                  {/* Show all addresses inline for selection */}
+                  {/* Customer data partially filled but not registered — show add address button */}
+                  {!selectedCustomer && !hasSelectedCustomer && (customerName.trim() || customerPhone.replace(/\D/g, "").length >= 10 || customerCpf.replace(/\D/g, "").length === 11) && customerAddresses.length === 0 && !selectedAddress && (
+                    <div>
+                      <p className="text-sm text-muted-foreground italic mb-3">Cliente não cadastrado — adicione um endereço</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => { setShowAddressDialog(true); setShowNewAddressForm(true); }}
+                      >
+                        <Plus className="w-4 h-4 mr-1" /> Adicionar endereço
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Show selected address for unregistered customer */}
+                  {!selectedCustomer && !hasSelectedCustomer && selectedAddress && (
+                    <div className="space-y-2">
+                      <div className="p-3 rounded-lg border bg-primary/10 border-primary text-sm">
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium">{selectedAddress.street}{selectedAddress.number ? `, ${selectedAddress.number}` : ""}</p>
+                            <p className="text-muted-foreground text-xs">{selectedAddress.neighborhood} — {selectedAddress.city}{selectedAddress.state ? ` - ${selectedAddress.state}` : ""}</p>
+                            {selectedAddress.complement && <p className="text-muted-foreground text-xs">{selectedAddress.complement}</p>}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => { setShowAddressDialog(true); setShowNewAddressForm(true); }}
+                      >
+                        <Plus className="w-4 h-4 mr-1" /> Alterar endereço
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Show all addresses inline for registered customer */}
                   {(selectedCustomer || hasSelectedCustomer) && customerAddresses.length > 0 && (
                     <div className="space-y-2">
                       {customerAddresses.map((addr: any) => {
