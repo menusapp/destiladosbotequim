@@ -167,6 +167,41 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
     }
   };
 
+  const handleOpenEditBrands = (method: PaymentMethod) => {
+    setEditingMethod(method);
+    setEditBrands(method.accepted_brands || []);
+    setEditBrandsOpen(true);
+  };
+
+  const toggleEditBrand = (brandCode: string, checked: boolean) => {
+    if (checked) {
+      setEditBrands(prev => [...prev, brandCode]);
+    } else {
+      setEditBrands(prev => prev.filter(b => b !== brandCode));
+    }
+  };
+
+  const handleSaveEditBrands = async () => {
+    if (!editingMethod) return;
+    try {
+      const { error } = await supabase
+        .from("payment_methods")
+        .update({ accepted_brands: editBrands })
+        .eq("id", editingMethod.id);
+
+      if (error) throw error;
+      toast.success("Bandeiras atualizadas!");
+      setEditBrandsOpen(false);
+      setEditingMethod(null);
+      await fetchMethods();
+    } catch (error) {
+      toast.error("Erro ao atualizar bandeiras");
+      console.error(error);
+    }
+  };
+
+  const hasBrands = (type: string) => ["credit", "debit", "meal_voucher"].includes(type);
+
   const getMethodIcon = (type: string) => {
     const found = METHOD_TYPES.find(m => m.value === type);
     if (found) {
