@@ -1298,6 +1298,14 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
           </form>
         </DialogContent>
       </Dialog>
+
+      <BulkDeleteProductsDialog
+        restaurantId={restaurantId}
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        onDeleted={fetchProducts}
+        isRestaurantOpen={isRestaurantOpen}
+      />
     </div>
   );
 };
