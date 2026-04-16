@@ -174,6 +174,13 @@ export default function DeliveryMenu() {
       }, () => {
         fetchRestaurantData();
       })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'categories'
+      }, () => {
+        fetchRestaurantData();
+      })
       .subscribe();
 
     return () => {
