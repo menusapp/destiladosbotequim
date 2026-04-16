@@ -313,7 +313,9 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
               <Button onClick={() => updateStatus("picked_up")} className="gap-2"><Play className="w-4 h-4" />Confirmar Retirada</Button>
             )}
             
-            <Button variant="destructive" onClick={() => setShowCancelDialog(true)} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
+            {!isFinalized && order.status !== "cancelled" && (
+              <Button variant="destructive" onClick={() => setShowCancelDialog(true)} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
+            )}
             
             {canAddItems && (
               <Button variant="outline" className="gap-2" onClick={handleAddItems}><Plus className="w-4 h-4" />Adicionar Itens</Button>
