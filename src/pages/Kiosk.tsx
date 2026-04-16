@@ -19,7 +19,7 @@ import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
 
-export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "delivery_address" | "payment" | "confirmation";
+export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "phone_collection" | "delivery_address" | "payment" | "confirmation";
 
 export interface KioskCustomer {
   name: string;
