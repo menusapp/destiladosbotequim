@@ -246,6 +246,16 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
     setSelectedProductIds(linkedIds);
     setOriginalProductIds(new Set(linkedIds));
     setProductSearchQuery("");
+    setLinkMode('products');
+    // Detect which menu categories are fully selected
+    const catIds = new Set<string>();
+    menuCategories.forEach(cat => {
+      const prodsInCat = allProducts.filter(p => p.category_id === cat.id);
+      if (prodsInCat.length > 0 && prodsInCat.every(p => linkedIds.has(p.id))) {
+        catIds.add(cat.id);
+      }
+    });
+    setSelectedCategoryIds(catIds);
     setCategoryDialogOpen(true);
   };
 
