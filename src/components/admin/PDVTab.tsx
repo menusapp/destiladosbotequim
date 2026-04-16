@@ -1689,9 +1689,47 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
           {/* Footer */}
           <div className="border-t pt-3 mt-2 flex items-center justify-between">
-            <div className="text-xs">
-              <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
-              {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
+            <div className="text-xs flex items-center gap-2">
+              <span>
+                <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
+                {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
+              </span>
+              {cart.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  title="Copiar resumo do pedido"
+                  onClick={() => {
+                    let text = "📋 *Resumo do Pedido*\n\n";
+                    cart.forEach((item, i) => {
+                      const itemTotal = (item.price + item.extras.reduce((s, e) => s + e.price, 0)) * item.quantity;
+                      text += `${i + 1}. *${item.productName}* x${item.quantity} — R$ ${itemTotal.toFixed(2)}\n`;
+                      if (item.price > 0) text += `   Preço unit.: R$ ${item.price.toFixed(2)}\n`;
+                      if (item.extras.length > 0) {
+                        item.extras.forEach(e => {
+                          text += `   ➕ ${e.name}${e.price > 0 ? ` (+R$ ${e.price.toFixed(2)})` : ""}\n`;
+                        });
+                      }
+                      if (item.notes) text += `   📝 ${item.notes}\n`;
+                      text += "\n";
+                    });
+                    if (calculatedDiscount > 0) {
+                      text += `🏷️ Desconto: -R$ ${calculatedDiscount.toFixed(2)}\n`;
+                    }
+                    if (orderType === "delivery" && deliveryAddress) {
+                      text += `📍 Endereço: ${deliveryAddress}${deliveryNeighborhood ? `, ${deliveryNeighborhood}` : ""}${deliveryCity ? ` - ${deliveryCity}` : ""}\n`;
+                    }
+                    text += `\n💰 *Total: R$ ${cartTotal.toFixed(2)}*`;
+                    if (customerName) text += `\n👤 Cliente: ${customerName}`;
+                    if (customerPhone) text += `\n📱 Tel: ${customerPhone}`;
+                    navigator.clipboard.writeText(text);
+                    toast.success("Resumo copiado!");
+                  }}
+                >
+                  <ClipboardList className="w-4 h-4" />
+                </Button>
+              )}
             </div>
             <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !hasSelectedCustomer}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
