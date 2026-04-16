@@ -56,6 +56,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [pendingSearch, setPendingSearch] = useState("");
   const [selectedNote, setSelectedNote] = useState<FiscalNote | null>(null);
   const [cancelModal, setCancelModal] = useState<{ open: boolean; note: FiscalNote | null }>({ open: false, note: null });
   const [cancelJustificativa, setCancelJustificativa] = useState("");
