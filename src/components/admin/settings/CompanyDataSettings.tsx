@@ -423,11 +423,11 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           <Card>
             <CardHeader>
               <CardTitle>Campos de Cadastro de Clientes</CardTitle>
-              <CardDescription>Defina quais informações são solicitadas ao cliente no login do cardápio</CardDescription>
+              <CardDescription>Defina quais informações são solicitadas ao cliente no login do cardápio. É obrigatório manter pelo menos um campo ativo.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="divide-y">
-                {/* CPF - Always required */}
+                {/* CPF */}
                 <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -438,10 +438,16 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                       <p className="text-xs text-muted-foreground">Identificação única do cliente</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Obrigatório</span>
-                    <Switch checked disabled />
-                  </div>
+                  <Switch
+                    checked={settings.login_require_cpf}
+                    onCheckedChange={(checked) => {
+                      if (!checked && !settings.login_require_name && !settings.login_require_phone) {
+                        toast.error("Pelo menos um campo deve estar ativo");
+                        return;
+                      }
+                      setSettings({ ...settings, login_require_cpf: checked });
+                    }}
+                  />
                 </div>
 
                 {/* Nome */}
