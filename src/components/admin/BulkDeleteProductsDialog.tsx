@@ -5,7 +5,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Trash2, Loader2, Pencil, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
@@ -168,7 +167,7 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg flex flex-col overflow-hidden" style={{ maxHeight: "80vh" }}>
+        <DialogContent className="max-w-lg h-[80vh] max-h-[80vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5 text-primary" />
@@ -186,8 +185,8 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
             />
           </div>
 
-          <ScrollArea className="flex-1 min-h-0" style={{ maxHeight: "calc(80vh - 200px)" }}>
-            <div className="space-y-4 pr-4">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-2">
+            <div className="space-y-4 pr-2">
               {grouped.map(([cat, items]) => {
                 const allSelected = items.every(i => selected.has(i.id));
                 return (
@@ -220,7 +219,7 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
                 <p className="text-sm text-muted-foreground text-center py-8">Nenhum produto encontrado</p>
               )}
             </div>
-          </ScrollArea>
+          </div>
 
           <div className="flex items-center justify-between pt-2 border-t gap-2 flex-wrap">
             <span className="text-sm text-muted-foreground">{selected.size} selecionado(s)</span>
