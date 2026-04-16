@@ -427,9 +427,9 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       </div>
 
       {/* Split layout: left = pending, right = emitted */}
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4" style={{ minHeight: "500px" }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4" style={{ height: "calc(100vh - 420px)", minHeight: "400px" }}>
         {/* Left: A Emitir */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col overflow-hidden">
           <div className="p-4 border-b space-y-2">
             <div>
               <h3 className="font-semibold text-sm flex items-center gap-2">
