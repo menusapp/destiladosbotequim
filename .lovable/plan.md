@@ -1,32 +1,66 @@
 
+Objetivo: corrigir o bug do drawer do PDV para que, após limpar um cliente já carregado, o botão “Adicionar endereço” volte a aparecer corretamente quando o próximo celular/CPF não existir no CRM.
 
-# Corrigir duplicados — Julio's Lanches (manter em ambas categorias)
+Diagnóstico
+- A causa mais provável está em `src/components/admin/PDVTab.tsx`.
+- Hoje a exibição do botão depende desta condição:
+  - cliente não selecionado
+  - dados preenchidos
+  - `customerAddresses.length === 0`
+  - `!selectedAddress`
+- Quando um cliente já cadastrado é carregado, `customerAddresses` recebe os endereços desse cliente.
+- Ao clicar em “Limpar”, o helper `clearCustomer()` limpa nome/CPF/telefone/endereço selecionado, mas não limpa `customerAddresses` nem o estado do formulário de endereço.
+- Resultado: o próximo cliente inexistente entra com estado antigo “preso”, então a condição do botão falha até sair e voltar da aba.
 
-## Problema
-Os 11 produtos na categoria "MAIS VENDIDOS" são cópias sem descrição dos produtos originais que estão em suas categorias corretas.
+Implementação
+1. Ajustar o reset completo do cliente no PDV
+- Atualizar `clearCustomer()` para também limpar:
+  - `customerAddresses`
+  - `showNewAddressForm`
+  - campos temporários do novo endereço
+  - qualquer estado visual relacionado ao endereço
+- Fazer o mesmo em `clearForm()`, para evitar o mesmo bug em outros fluxos.
 
-## Solução
-Em vez de deletar, **atualizar** os 11 produtos da MAIS VENDIDOS copiando a descrição e image_url dos originais. Assim os produtos ficam nas duas categorias — a original e a MAIS VENDIDOS.
+2. Fortalecer a troca entre cliente existente e cliente inexistente
+- Nos handlers `handlePhoneAutoSearch` e `handleCpfAutoSearch`, quando:
+  - o valor estiver incompleto/inválido, ou
+  - a busca não encontrar cliente
+- limpar explicitamente os estados herdados do cliente anterior:
+  - `selectedCustomer`
+  - `customerAddresses`
+  - `selectedAddress`
+- Preservar apenas o que o usuário digitou manualmente, para não apagar nome/celular/CPF que ele acabou de informar.
 
-## Ação
-Executar UPDATE nos 11 produtos da categoria MAIS VENDIDOS (`e74c541d-36b4-4a1a-808c-791e1155cd9d`), preenchendo `description` e `image_url` com os valores dos produtos originais correspondentes.
+3. Deixar a regra do botão mais robusta
+- Extrair a lógica para booleanos derivados, algo como:
+  - `hasTypedCustomerData`
+  - `isRegisteredCustomer`
+  - `hasSavedAddresses`
+  - `shouldShowAddAddressButton`
+- Assim a UI deixa de depender de combinações frágeis espalhadas no JSX e passa a refletir o estado atual de forma previsível.
 
-| Produto (MAIS VENDIDOS) | ID a atualizar | Copia de |
-|---|---|---|
-| BRUTOS | d11c2fd9 | 8807fd6b |
-| CACHORRO-QUENTE ESPECIAL | 4bde2cd3 | cb00961a |
-| COMBO BRUTO DA COSTELA | 60566026 | 65e6f145 |
-| COMBO NATALINO | 93557455 | 7d8f1e10 |
-| COMBO NATALINO CASAL | 7144fc0f | 693f85a4 |
-| COSTELA BACON | 684ab917 | d1de1403 |
-| COSTELA DUPLO | a814055a | fffc4912 |
-| COSTELA SALADA | fa846f11 | 84ed23ed |
-| PORÇÃO FAMÍLIA | 6aef8bd3 | 15f60552 / 11320456 |
-| PORÇÃO PICANHA COMPLETA | c40aae3d | db83f59d |
-| SENHOR COSTELA | 20102c2f | 7cefb4cf |
+4. Revisar o bloco “Endereço de Entrega”
+- Garantir estes comportamentos:
+  - sem dados: mostrar mensagem “preencha celular ou CPF...”
+  - cliente não cadastrado com dados digitados: mostrar botão “Adicionar endereço”
+  - cliente cadastrado com endereços: listar endereços
+  - cliente cadastrado sem endereços: mostrar “Nenhum endereço cadastrado” + botão para adicionar
 
-## Detalhes técnicos
-- Usar ferramenta de inserção/update do banco (não migration, pois é alteração de dados)
-- 11 comandos UPDATE copiando `description` e `image_url` dos originais
-- Nenhuma alteração de código necessária
+Arquivo a alterar
+- `src/components/admin/PDVTab.tsx`
 
+Detalhes técnicos
+- Não precisa migration nem mudança no backend.
+- O problema é de estado local do React, não de banco.
+- O foco será centralizar e normalizar o reset do bloco de cliente/endereço, evitando estado “vazando” entre uma busca e outra.
+
+Validação que farei depois de implementar
+1. Digitar celular existente → cliente e endereço carregam.
+2. Clicar em limpar.
+3. Digitar celular inexistente → botão “Adicionar endereço” aparece imediatamente.
+4. Repetir o mesmo teste com CPF existente/inexistente.
+5. Alternar várias vezes entre cliente existente e inexistente sem trocar de aba.
+6. Criar novo endereço para cliente inexistente e confirmar que o pedido continua salvando cliente + endereço corretamente no CRM.
+
+Resultado esperado
+- O botão de adicionar endereço volta a aparecer no mesmo momento em que um celular/CPF inexistente é digitado, mesmo após ter limpado um cliente que já estava carregado anteriormente.
