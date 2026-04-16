@@ -1,26 +1,28 @@
 import { supabase } from "@/integrations/supabase/client";
 
-interface PrintOrderItem {
-  name: string;
-  quantity: number;
-  price: number;
-  notes?: string;
-  extras: { name: string; price: number }[];
+/**
+ * Formats a raw phone string (e.g. "5511999998888") to (XX) XXXXX-XXXX
+ */
+function formatPhoneDisplay(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  // Remove country code 55 if present
+  const local = digits.startsWith("55") && digits.length >= 12 ? digits.slice(2) : digits;
+  if (local.length === 11) return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+  if (local.length === 10) return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+  return local;
 }
 
-interface PrintOrderData {
-  orderId: string;
-  createdAt: string;
-  customerName: string;
-  orderType: "local" | "delivery";
-  deliveryType?: "delivery" | "pickup";
-  tableNumber?: number;
-  items: PrintOrderItem[];
-  subtotal: number;
-  deliveryAddress?: string;
-  deliveryPhone?: string;
-  paymentType?: string;
-  notes?: string;
+function formatPaymentType(type: string): string {
+  const map: Record<string, string> = {
+    cash: "Dinheiro",
+    credit: "Cartão de Crédito",
+    debit: "Cartão de Débito",
+    pix: "PIX",
+    pix_online: "PIX Online",
+    card_online: "Cartão Online",
+  };
+  return map[type] || type;
 }
 
 /**
@@ -42,6 +44,8 @@ export const printOrder = async (
     dd_scheduled_for?: string;
     cancellation_reason?: string;
     coupon_discount?: number;
+    order_channel?: string;
+    customer_cpf?: string;
     order_items: {
       id: string;
       quantity: number;
@@ -59,6 +63,7 @@ export const printOrder = async (
   let fontSize = 12;
   let fontBold = true;
   let printCopies = 1;
+  let supportsAutoCut = false;
   try {
     const { data } = await supabase
       .from("printer_settings")
@@ -70,6 +75,7 @@ export const printOrder = async (
     if ((data as any)?.font_size) fontSize = (data as any).font_size;
     if ((data as any)?.font_bold !== undefined) fontBold = Boolean((data as any).font_bold);
     if ((data as any)?.print_copies) printCopies = (data as any).print_copies;
+    if ((data as any)?.supports_auto_cut) supportsAutoCut = Boolean((data as any).supports_auto_cut);
   } catch {}
 
   // Fetch restaurant name
@@ -83,11 +89,39 @@ export const printOrder = async (
     if (data) restaurantName = data.name;
   } catch {}
 
+  // Fetch customer phone if not already available
+  let customerPhone = order.delivery_phone || "";
+  if (!customerPhone && order.customer_cpf) {
+    try {
+      const { data } = await supabase
+        .from("customers")
+        .select("phone")
+        .eq("cpf", order.customer_cpf)
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
+      if (data?.phone) customerPhone = data.phone;
+    } catch {}
+  }
+
   const isLocal = order.order_type === "local";
   const isDelivery = order.delivery_type === "delivery";
   const isPickup = order.delivery_type === "pickup";
   const tableNumber = order.tables?.table_number;
   const dateStr = new Date(order.created_at).toLocaleString("pt-BR");
+
+  // Build origin label
+  let originLabel = "";
+  if (isLocal) {
+    originLabel = `MESA ${tableNumber || "?"}`;
+  } else if (order.order_type === "balcao" || order.order_channel === "totem") {
+    originLabel = order.order_channel === "totem" ? "TOTEM - BALCÃO" : "BALCÃO";
+  } else if (isPickup) {
+    originLabel = "RETIRADA";
+  } else if (isDelivery) {
+    originLabel = "ENTREGA";
+  } else {
+    originLabel = "PEDIDO";
+  }
 
   // Calculate items
   const items = order.order_items.map((item) => {
@@ -109,16 +143,6 @@ export const printOrder = async (
     return sum + (item.price + extrasTotal) * item.quantity;
   }, 0);
 
-  // Build origin label
-  let originLabel = "";
-  if (isLocal) {
-    originLabel = `PEDIDO LOCAL - MESA ${tableNumber || "?"}`;
-  } else if (isPickup) {
-    originLabel = "PEDIDO ONLINE - RETIRADA";
-  } else {
-    originLabel = "PEDIDO ONLINE - ENTREGA";
-  }
-
   // Scheduled order section
   let scheduledSection = "";
   if (order.dd_scheduled_for) {
@@ -127,14 +151,14 @@ export const printOrder = async (
     });
     scheduledSection = `
       <div class="scheduled-alert">
-        ⏰ PEDIDO AGENDADO PARA: ${scheduledDate}
+        ⏰ AGENDADO PARA: ${scheduledDate}
       </div>
     `;
   }
 
-  // Build items HTML
+  // Build items HTML with separators between items
   const itemsHtml = items
-    .map((item) => {
+    .map((item, idx) => {
       const extrasHtml = item.extras
         .map(
           (e) =>
@@ -148,6 +172,8 @@ export const printOrder = async (
         (item.price + item.extras.reduce((s, e) => s + e.price, 0)) *
         item.quantity;
 
+      const separator = idx < items.length - 1 ? '<div class="item-separator"></div>' : '';
+
       return `
         <div class="item">
           <div class="item-row">
@@ -157,34 +183,25 @@ export const printOrder = async (
           ${extrasHtml}
           ${notesHtml}
         </div>
+        ${separator}
       `;
     })
     .join("");
 
-  // Delivery-specific section
-  let deliverySection = "";
-  if (!isLocal) {
-    const addressLine = order.delivery_address
-      ? `<p><strong>Endereço:</strong> ${order.delivery_address}</p>`
-      : "";
-    const phoneLine = order.delivery_phone
-      ? `<p><strong>Telefone:</strong> ${order.delivery_phone}</p>`
-      : "";
-    const paymentLine = order.payment_type
-      ? `<p><strong>Pagamento:</strong> ${formatPaymentType(order.payment_type)}</p>`
-      : "";
+  // Phone line
+  const phoneLine = customerPhone
+    ? `<p><strong>Telefone:</strong> ${formatPhoneDisplay(customerPhone)}</p>`
+    : "";
 
-    if (addressLine || phoneLine || paymentLine) {
-      deliverySection = `
-        <div class="line"></div>
-        <div class="section">
-          ${addressLine}
-          ${phoneLine}
-          ${paymentLine}
-        </div>
-      `;
-    }
-  }
+  // Address line (only for delivery)
+  const addressLine = isDelivery && order.delivery_address
+    ? `<p><strong>Endereço:</strong> ${order.delivery_address}</p>`
+    : "";
+
+  // Payment line
+  const paymentLine = order.payment_type
+    ? `<p><strong>Pagamento:</strong> ${formatPaymentType(order.payment_type)}</p>`
+    : "";
 
   // Notes section
   const notesSection = order.notes
@@ -206,20 +223,55 @@ export const printOrder = async (
     `
     : "";
 
-  // Build copy content
+  // Build totals
+  const totalsHtml = (() => {
+    const discount = order.coupon_discount || 0;
+    const finalTotal = subtotal - discount;
+    const discountReasonMatch = order.notes?.match(/\[Desconto: (.+?)\]/);
+    const discountReason = discountReasonMatch ? discountReasonMatch[1] : "";
+    if (discount > 0) {
+      return `
+        <div class="total-row" style="font-size:12px;">
+          <span>Subtotal</span>
+          <span>R$ ${subtotal.toFixed(2)}</span>
+        </div>
+        <div class="total-row" style="font-size:12px;">
+          <span>Desconto</span>
+          <span>- R$ ${discount.toFixed(2)}</span>
+        </div>
+        ${discountReason ? `<div style="font-size:10px;font-style:italic;margin-bottom:4px;">Motivo: ${discountReason}</div>` : ""}
+        <div class="total-row">
+          <span>TOTAL</span>
+          <span>R$ ${finalTotal.toFixed(2)}</span>
+        </div>
+      `;
+    }
+    return `
+      <div class="total-row">
+        <span>TOTAL</span>
+        <span>R$ ${subtotal.toFixed(2)}</span>
+      </div>
+    `;
+  })();
+
+  // Build single copy content — new header order
   const copyContent = `
       <div class="center">
         <h1>${restaurantName || "Restaurante"}</h1>
       </div>
       <div class="line"></div>
       
+      <div class="section">
+        <p><strong>Pedido:</strong> #${order.id.slice(0, 8)} — ${dateStr}</p>
+      </div>
+      
       <div class="origin">${originLabel}</div>
       ${scheduledSection}
       
       <div class="section">
-        <p><strong>Pedido:</strong> #${order.id.slice(0, 8)}</p>
-        <p><strong>Data:</strong> ${dateStr}</p>
         <p><strong>Cliente:</strong> ${order.customer_name}</p>
+        ${phoneLine}
+        ${addressLine}
       </div>
       
       <div class="double-line"></div>
@@ -228,38 +280,9 @@ export const printOrder = async (
       
       <div class="double-line"></div>
       
-      ${(() => {
-        const discount = order.coupon_discount || 0;
-        const finalTotal = subtotal - discount;
-        // Extract discount reason from notes
-        const discountReasonMatch = order.notes?.match(/\[Desconto: (.+?)\]/);
-        const discountReason = discountReasonMatch ? discountReasonMatch[1] : "";
-        if (discount > 0) {
-          return `
-            <div class="total-row" style="font-size:12px;">
-              <span>Subtotal</span>
-              <span>R$ ${subtotal.toFixed(2)}</span>
-            </div>
-            <div class="total-row" style="font-size:12px;">
-              <span>Desconto</span>
-              <span>- R$ ${discount.toFixed(2)}</span>
-            </div>
-            ${discountReason ? `<div style="font-size:10px;font-style:italic;margin-bottom:2px;">Motivo: ${discountReason}</div>` : ""}
-            <div class="total-row">
-              <span>TOTAL</span>
-              <span>R$ ${finalTotal.toFixed(2)}</span>
-            </div>
-          `;
-        }
-        return `
-          <div class="total-row">
-            <span>TOTAL</span>
-            <span>R$ ${subtotal.toFixed(2)}</span>
-          </div>
-        `;
-      })()}
+      ${totalsHtml}
       
-      ${deliverySection}
+      ${paymentLine ? `<div class="line"></div><div class="section">${paymentLine}</div>` : ""}
       ${notesSection}
       ${cancelSection}
       
@@ -267,11 +290,25 @@ export const printOrder = async (
       <div class="footer">
         <p>Impresso em ${new Date().toLocaleString("pt-BR")}</p>
       </div>
+      <div class="footer-margin"></div>
   `;
 
+  // Build copies with cut marks between them
+  const cutMark = supportsAutoCut
+    ? `<div class="cut-section">
+        <div class="footer-margin"></div>
+        <div class="cut-line">--- CORTE AQUI ---</div>
+        <div class="footer-margin"></div>
+       </div>`
+    : `<div class="cut-section">
+        <div class="footer-margin"></div>
+        <div class="cut-line">--- CORTE AQUI ---</div>
+        <div class="footer-margin"></div>
+       </div>`;
+
   const allCopies = Array.from({ length: printCopies }, (_, i) => {
-    const pageBreak = i > 0 ? 'style="page-break-before: always;"' : '';
-    return `<div class="copy" ${pageBreak}>${copyContent}</div>`;
+    const pageBreak = i > 0 ? `${cutMark}<div style="page-break-before: always;"></div>` : '';
+    return `${pageBreak}<div class="copy">${copyContent}</div>`;
   }).join('\n');
 
   const html = `
@@ -285,18 +322,17 @@ export const printOrder = async (
           font-family: '${fontFamily}', 'Courier New', monospace;
           width: ${paperSize};
           margin: 0 auto;
-          padding: 24px 12px 28px 12px;
+          padding: 24px 12px 0 12px;
           font-size: ${fontSize}px;
           font-weight: ${fontBold ? "bold" : "normal"};
-          line-height: 1.6;
+          line-height: 1.7;
           color: #000;
         }
         .center { text-align: center; }
         .bold { font-weight: bold; }
-        .line { border-top: 1px dashed #000; margin: 14px 0; }
-        .double-line { border-top: 2px solid #000; margin: 16px 0; }
+        .line { border-top: 1px dashed #000; margin: 16px 0; }
+        .double-line { border-top: 2px solid #000; margin: 18px 0; }
         h1 { font-size: 16px; margin: 8px 0; }
-        h2 { font-size: 14px; margin: 4px 0; }
         .origin {
           font-size: 14px;
           font-weight: bold;
@@ -314,22 +350,28 @@ export const printOrder = async (
           margin: 10px 0;
           background: #f0f0f0;
         }
-        .item { margin: 12px 0; }
+        .item { margin: 14px 0; }
         .item-row {
           display: flex;
           justify-content: space-between;
           font-weight: bold;
+        }
+        .item-separator {
+          border-top: 1px dashed #aaa;
+          margin: 10px 0;
         }
         .extra {
           font-size: 11px;
           display: flex;
           justify-content: space-between;
           padding-left: 8px;
+          margin-top: 2px;
         }
         .obs {
           font-size: 11px;
           font-style: italic;
           padding-left: 8px;
+          margin-top: 2px;
         }
         .price { text-align: right; }
         .total-row {
@@ -339,9 +381,17 @@ export const printOrder = async (
           font-weight: bold;
           margin: 10px 0;
         }
-        .section { margin: 12px 0; }
-        .section p { margin: 5px 0; font-size: 11px; }
+        .section { margin: 14px 0; }
+        .section p { margin: 6px 0; font-size: 11px; }
         .footer { text-align: center; margin-top: 20px; font-size: 10px; }
+        .footer-margin { height: 60px; }
+        .cut-section { text-align: center; }
+        .cut-line {
+          font-size: 10px;
+          letter-spacing: 2px;
+          color: #999;
+          margin: 4px 0;
+        }
       </style>
     </head>
     <body>
@@ -361,15 +411,3 @@ export const printOrder = async (
     printWindow.print();
   }, 300);
 };
-
-function formatPaymentType(type: string): string {
-  const map: Record<string, string> = {
-    cash: "Dinheiro",
-    credit: "Cartão de Crédito",
-    debit: "Cartão de Débito",
-    pix: "PIX",
-    pix_online: "PIX Online",
-    card_online: "Cartão Online",
-  };
-  return map[type] || type;
-}
