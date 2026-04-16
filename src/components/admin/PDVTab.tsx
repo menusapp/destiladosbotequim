@@ -379,7 +379,17 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   }, [discountType, discountValue, discountTarget, cartSubtotal, cart]);
 
   const cartTotal = cartSubtotal - calculatedDiscount;
-  const hasSelectedCustomer = customerName.trim().length > 0 && validateCPF(customerCpf);
+  const phoneDigits = customerPhone.replace(/\D/g, "");
+  const cpfDigits = customerCpf.replace(/\D/g, "");
+  const hasTypedCustomerData = Boolean(customerName.trim() || phoneDigits || cpfDigits);
+  const isRegisteredCustomer = !!selectedCustomer;
+  const hasSavedAddresses = customerAddresses.length > 0;
+  const hasManualSelectedAddress = !isRegisteredCustomer && !!selectedAddress;
+  const shouldShowAddAddressButton =
+    !isRegisteredCustomer &&
+    !hasSavedAddresses &&
+    !selectedAddress &&
+    (customerName.trim() || phoneDigits.length >= 10 || cpfDigits.length === 11);
 
   // Auto-search customer by CPF
   const handleCpfAutoSearch = async (rawCpf: string) => {
@@ -1285,14 +1295,14 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                   <p className="text-sm font-medium text-muted-foreground mb-3">Endereço de Entrega</p>
 
                   {/* No customer data at all */}
-                  {!selectedCustomer && !hasSelectedCustomer && !customerName.trim() && !customerPhone.replace(/\D/g, "") && !customerCpf.replace(/\D/g, "") && (
+                  {!isRegisteredCustomer && !hasTypedCustomerData && (
                     <p className="text-sm text-muted-foreground italic">
                       Preencha o celular ou CPF do cliente para ver os endereços salvos
                     </p>
                   )}
 
                   {/* Customer data partially filled but not registered — show add address button */}
-                  {!selectedCustomer && !hasSelectedCustomer && (customerName.trim() || customerPhone.replace(/\D/g, "").length >= 10 || customerCpf.replace(/\D/g, "").length === 11) && customerAddresses.length === 0 && !selectedAddress && (
+                  {shouldShowAddAddressButton && (
                     <div>
                       <p className="text-sm text-muted-foreground italic mb-3">Cliente não cadastrado — adicione um endereço</p>
                       <Button
@@ -1307,7 +1317,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                   )}
 
                   {/* Show selected address for unregistered customer */}
-                  {!selectedCustomer && !hasSelectedCustomer && selectedAddress && (
+                  {hasManualSelectedAddress && (
                     <div className="space-y-2">
                       <div className="p-3 rounded-lg border bg-primary/10 border-primary text-sm">
                         <div className="flex items-start gap-2">
@@ -1331,7 +1341,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                   )}
 
                   {/* Show all addresses inline for registered customer */}
-                  {(selectedCustomer || hasSelectedCustomer) && customerAddresses.length > 0 && (
+                  {isRegisteredCustomer && hasSavedAddresses && (
                     <div className="space-y-2">
                       {customerAddresses.map((addr: any) => {
                         const isSelected = selectedAddress?.street === addr.street && selectedAddress?.number === addr.number && selectedAddress?.zip_code === addr.zip_code;
@@ -1360,11 +1370,11 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     </div>
                   )}
 
-                  {(selectedCustomer || hasSelectedCustomer) && customerAddresses.length === 0 && (
+                  {isRegisteredCustomer && !hasSavedAddresses && (
                     <p className="text-sm text-muted-foreground italic">Nenhum endereço cadastrado</p>
                   )}
 
-                  {(selectedCustomer || hasSelectedCustomer) && (
+                  {isRegisteredCustomer && (
                     <Button
                       variant="outline"
                       size="sm"
