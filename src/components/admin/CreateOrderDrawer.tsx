@@ -530,12 +530,16 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       <UserPlus className="w-3.5 h-3.5 mr-1" /> Buscar
                     </Button>
                   </div>
-                  <Input placeholder="CPF do cliente *" value={customerCpf} onChange={e => {
-                    setCustomerCpf(e.target.value);
+                  <Input placeholder="CPF do cliente *" value={customerCpf} maxLength={14} inputMode="numeric" onChange={e => {
+                    const d = e.target.value.replace(/\D/g, "").slice(0, 11);
+                    let formatted = d;
+                    if (d.length > 9) formatted = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+                    else if (d.length > 6) formatted = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
+                    else if (d.length > 3) formatted = `${d.slice(0,3)}.${d.slice(3)}`;
+                    setCustomerCpf(formatted);
                     setFoundCustomer(null);
-                    const clean = e.target.value.replace(/\D/g, "");
-                    if (clean.length === 11) {
-                      supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", e.target.value).maybeSingle()
+                    if (d.length === 11) {
+                      supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", d).maybeSingle()
                         .then(({ data }) => {
                           if (data) {
                             setFoundCustomer({ name: data.name, phone: data.phone || "" });
@@ -564,7 +568,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                     </div>
                   )}
                   <Input placeholder="Nome do cliente *" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                  <Input placeholder="Celular do cliente" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                  <Input placeholder="Celular do cliente" value={customerPhone} maxLength={15} inputMode="tel" onChange={e => {
+                    const d = e.target.value.replace(/\D/g, "").slice(0, 11);
+                    let f = d;
+                    if (d.length > 10) f = `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+                    else if (d.length > 6) f = `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+                    else if (d.length > 2) f = `(${d.slice(0,2)}) ${d.slice(2)}`;
+                    setCustomerPhone(f);
+                  }} />
                   {!hasValidCustomer && (
                     <p className="text-xs text-muted-foreground">
                       Selecione ou cadastre um cliente com CPF válido para liberar o pedido.
