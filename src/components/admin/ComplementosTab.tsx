@@ -455,8 +455,9 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
                             fetchCategories();
                           }}
                         />
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEditCategory(category); }}><Edit2 className="h-4 w-4" /></Button>
-                        <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } setDeletingCategory(category); setDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEditCategory(category); }} title="Editar"><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleDuplicateCategory(category); }} title="Duplicar"><Copy className="h-4 w-4" /></Button>
+                        <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir"); return; } setDeletingCategory(category); setDeleteDialogOpen(true); }} title="Excluir"><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </div>
                   </CardHeader>
