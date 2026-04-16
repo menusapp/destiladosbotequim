@@ -18,6 +18,7 @@ import { KioskPhoneCollection } from "@/components/kiosk/KioskPhoneCollection";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
+import { isFeaturedVisible } from "@/lib/featuredUtils";
 
 export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "phone_collection" | "delivery_address" | "payment" | "confirmation";
 
@@ -34,6 +35,7 @@ export default function Kiosk() {
   const [step, setStep] = useState<KioskStep>("idle");
   const [restaurant, setRestaurant] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customer, setCustomer] = useState<KioskCustomer | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -168,25 +170,42 @@ export default function Kiosk() {
         return;
       }
 
-      const { data: cats, error: catsErr } = await supabase
-        .from("categories")
-        .select("*, products(*)")
-        .eq("restaurant_id", r.id)
-        .order("display_order");
+      const [catsResult, featuredResult] = await Promise.all([
+        supabase
+          .from("categories")
+          .select("*, products(*)")
+          .eq("restaurant_id", r.id)
+          .order("display_order"),
+        supabase
+          .from("products")
+          .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, featured_active, featured_schedule, visibility_channels, categories!inner(restaurant_id)")
+          .eq("categories.restaurant_id", r.id)
+          .eq("is_featured", true)
+          .eq("available", true)
+          .order("featured_display_order"),
+      ]);
 
-      if (catsErr) console.error("[Kiosk] Erro ao carregar categorias:", catsErr);
+      if (catsResult.error) console.error("[Kiosk] Erro ao carregar categorias:", catsResult.error);
 
-      const filtered = (cats || [])
+      const filtered = (catsResult.data || [])
         .filter((cat: any) => cat.is_active !== false)
         .map((cat: any) => ({
         ...cat,
         products: (cat.products || []).filter((p: any) => {
           if (!p.available) return false;
+          if (p.is_featured) return false;
           const channels = p.visibility_channels || ['all'];
           return channels.includes('all') || channels.includes('totem');
         }),
       })).filter((cat: any) => cat.products.length > 0);
       setCategories(filtered);
+
+      const filteredFeatured = (featuredResult.data || []).filter((p: any) => {
+        if (!isFeaturedVisible(p)) return false;
+        const channels = p.visibility_channels || ['all'];
+        return channels.includes('all') || channels.includes('totem');
+      });
+      setFeaturedProducts(filteredFeatured as Product[]);
     } catch (err) {
       console.error("[Kiosk] Erro crítico no bootstrap:", err);
       toast.error("Erro ao carregar dados do restaurante");
