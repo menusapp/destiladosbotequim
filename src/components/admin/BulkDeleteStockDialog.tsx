@@ -162,7 +162,7 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg flex flex-col" style={{ maxHeight: "80vh" }}>
+        <DialogContent className="max-w-lg flex flex-col overflow-hidden" style={{ maxHeight: "80vh" }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5 text-primary" />
@@ -180,7 +180,7 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
             />
           </div>
 
-          <ScrollArea className="flex-1 min-h-0">
+          <ScrollArea className="flex-1 min-h-0" style={{ maxHeight: "calc(80vh - 200px)" }}>
             <div className="space-y-4 pr-4">
               {grouped.map(([cat, catItems]) => {
                 const allSelected = catItems.every(i => selected.has(i.id));
