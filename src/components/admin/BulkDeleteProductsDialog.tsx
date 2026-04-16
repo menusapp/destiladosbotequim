@@ -167,15 +167,15 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg h-[80vh] max-h-[80vh] flex flex-col overflow-hidden">
-          <DialogHeader>
+        <DialogContent className="max-w-lg h-[90vh] max-h-[90vh] min-h-0 !flex !flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5 text-primary" />
               Edição em Massa — Produtos
             </DialogTitle>
           </DialogHeader>
 
-          <div className="relative">
+          <div className="relative shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar produto..."
@@ -221,7 +221,7 @@ const BulkDeleteProductsDialog = ({ restaurantId, open, onOpenChange, onDeleted,
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t gap-2 flex-wrap">
+          <div className="flex items-center justify-between pt-2 border-t gap-2 flex-wrap shrink-0">
             <span className="text-sm text-muted-foreground">{selected.size} selecionado(s)</span>
             <div className="flex items-center gap-2">
               <Button
