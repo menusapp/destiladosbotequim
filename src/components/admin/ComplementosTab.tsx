@@ -26,7 +26,8 @@ interface StockItem { id: string; name: string; unit: string; price_per_unit: nu
 interface CategoryItemIngredient { id: string; stock_item_id: string; quantity: number; stock_item_name?: string; stock_item_unit?: string; stock_item_price?: number; }
 interface CategoryItem { id: string; name: string; price: number; pdv_code?: string; ingredients: CategoryItemIngredient[]; is_active?: boolean | null; }
 interface ComplementCategory { id: string; name: string; items: CategoryItem[]; is_active?: boolean | null; is_required?: boolean; min_quantity?: number; max_quantity?: number; }
-interface SimpleProduct { id: string; name: string; }
+interface SimpleProduct { id: string; name: string; category_id?: string; }
+interface SimpleCategory { id: string; name: string; product_count: number; }
 interface ComplementosTabProps { restaurantId: string; isRestaurantOpen: boolean; onOpenDigitizer?: () => void; }
 
 const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: ComplementosTabProps) => {
@@ -48,9 +49,12 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
   const [categoryMinQty, setCategoryMinQty] = useState("0");
   const [categoryMaxQty, setCategoryMaxQty] = useState("0");
   const [allProducts, setAllProducts] = useState<SimpleProduct[]>([]);
+  const [menuCategories, setMenuCategories] = useState<SimpleCategory[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [originalProductIds, setOriginalProductIds] = useState<Set<string>>(new Set());
   const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [linkMode, setLinkMode] = useState<'products' | 'category'>('products');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
   const [itemName, setItemName] = useState("");
   const [itemPrice, setItemPrice] = useState("");
   const [itemPdvCode, setItemPdvCode] = useState("");
@@ -64,7 +68,17 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
 
   const fetchAllProducts = async () => {
     const { data } = await supabase.from("products").select("id, name, category_id, categories!inner(restaurant_id)").eq("categories.restaurant_id", restaurantId).order("name");
-    setAllProducts((data || []).map((p: any) => ({ id: p.id, name: p.name })));
+    setAllProducts((data || []).map((p: any) => ({ id: p.id, name: p.name, category_id: p.category_id })));
+    // Build menu categories with product counts
+    const catMap = new Map<string, { name: string; count: number }>();
+    const { data: cats } = await supabase.from("categories").select("id, name").eq("restaurant_id", restaurantId).eq("is_active", true).order("display_order");
+    (cats || []).forEach((c: any) => catMap.set(c.id, { name: c.name, count: 0 }));
+    (data || []).forEach((p: any) => {
+      if (p.category_id && catMap.has(p.category_id)) {
+        catMap.get(p.category_id)!.count++;
+      }
+    });
+    setMenuCategories(Array.from(catMap.entries()).map(([id, v]) => ({ id, name: v.name, product_count: v.count })));
   };
 
   const fetchStockItems = async () => {
@@ -232,6 +246,16 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
     setSelectedProductIds(linkedIds);
     setOriginalProductIds(new Set(linkedIds));
     setProductSearchQuery("");
+    setLinkMode('products');
+    // Detect which menu categories are fully selected
+    const catIds = new Set<string>();
+    menuCategories.forEach(cat => {
+      const prodsInCat = allProducts.filter(p => p.category_id === cat.id);
+      if (prodsInCat.length > 0 && prodsInCat.every(p => linkedIds.has(p.id))) {
+        catIds.add(cat.id);
+      }
+    });
+    setSelectedCategoryIds(catIds);
     setCategoryDialogOpen(true);
   };
 
@@ -256,12 +280,28 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
     setCategoryDialogOpen(false); setEditingCategory(null); setCategoryName("");
     setCategoryIsRequired(false); setCategoryMinQty("0"); setCategoryMaxQty("0");
     setSelectedProductIds(new Set()); setOriginalProductIds(new Set()); setProductSearchQuery("");
+    setLinkMode('products'); setSelectedCategoryIds(new Set());
   };
 
   const toggleProductSelection = (productId: string) => {
     const newSet = new Set(selectedProductIds);
     if (newSet.has(productId)) newSet.delete(productId); else newSet.add(productId);
     setSelectedProductIds(newSet);
+  };
+
+  const toggleMenuCategory = (categoryId: string, checked: boolean) => {
+    const newSet = new Set(selectedCategoryIds);
+    const newProducts = new Set(selectedProductIds);
+    const productsInCat = allProducts.filter(p => p.category_id === categoryId);
+    if (checked) {
+      newSet.add(categoryId);
+      productsInCat.forEach(p => newProducts.add(p.id));
+    } else {
+      newSet.delete(categoryId);
+      productsInCat.forEach(p => newProducts.delete(p.id));
+    }
+    setSelectedCategoryIds(newSet);
+    setSelectedProductIds(newProducts);
   };
   const resetItemForm = () => {
     setItemDialogOpen(false); setEditingItem(null); setSelectedCategoryId(null);
@@ -426,27 +466,73 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
               <p className="text-xs text-muted-foreground">Máximo 0 = ilimitado. Essas regras serão aplicadas a todos os produtos vinculados.</p>
             </div>
 
-            <div className="space-y-2">
-              <Label>Produtos vinculados ({selectedProductIds.size} selecionados)</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar produtos..." value={productSearchQuery} onChange={(e) => setProductSearchQuery(e.target.value)} className="pl-9" />
+            <div className="space-y-3">
+              <Label>Vincular produtos por</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={linkMode === 'products' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setLinkMode('products')}
+                >
+                  Produtos avulsos
+                </Button>
+                <Button
+                  type="button"
+                  variant={linkMode === 'category' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setLinkMode('category')}
+                >
+                  Por categoria
+                </Button>
               </div>
-              <ScrollArea className="h-48 border rounded-lg">
-                <div className="p-2 space-y-1">
-                  {allProducts
-                    .filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
-                    .map(product => (
-                      <label key={product.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer text-sm">
-                        <Checkbox
-                          checked={selectedProductIds.has(product.id)}
-                          onCheckedChange={() => toggleProductSelection(product.id)}
-                        />
-                        <span>{product.name}</span>
-                      </label>
-                    ))}
+              <p className="text-xs text-muted-foreground">
+                {selectedProductIds.size} produto{selectedProductIds.size !== 1 ? 's' : ''} vinculado{selectedProductIds.size !== 1 ? 's' : ''}
+              </p>
+
+              {linkMode === 'products' && (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar produtos..." value={productSearchQuery} onChange={(e) => setProductSearchQuery(e.target.value)} className="pl-9" />
+                  </div>
+                  <ScrollArea className="h-48 border rounded-lg">
+                    <div className="p-2 space-y-1">
+                      {allProducts
+                        .filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
+                        .map(product => (
+                          <label key={product.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer text-sm">
+                            <Checkbox
+                              checked={selectedProductIds.has(product.id)}
+                              onCheckedChange={() => toggleProductSelection(product.id)}
+                            />
+                            <span>{product.name}</span>
+                          </label>
+                        ))}
+                    </div>
+                  </ScrollArea>
+                </>
+              )}
+
+              {linkMode === 'category' && (
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                  {menuCategories.map(cat => (
+                    <div key={cat.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`menucat-${cat.id}`}
+                        checked={selectedCategoryIds.has(cat.id)}
+                        onCheckedChange={(checked) => toggleMenuCategory(cat.id, !!checked)}
+                      />
+                      <Label htmlFor={`menucat-${cat.id}`} className="cursor-pointer text-sm">
+                        {cat.name}
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({cat.product_count} produtos)
+                        </span>
+                      </Label>
+                    </div>
+                  ))}
                 </div>
-              </ScrollArea>
+              )}
             </div>
 
             <Button onClick={handleSaveCategory} className="w-full">{editingCategory ? "Atualizar" : "Criar Categoria"}</Button>
