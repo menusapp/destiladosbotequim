@@ -1,26 +1,45 @@
 
 
-## Correção: "column oie.quantity does not exist"
+## Exclusão em Massa — Cardápio (Produtos) e Estoque (Insumos)
 
-### Problema
-As funções de banco `process_order_stock_movement` e `deduct_stock_for_order_item` referenciam `oie.quantity` na tabela `order_item_extras`, mas essa coluna **não existe**. Isso causa erro ao avançar pedidos para "entregue" ou "retirado".
+### O que será feito
+Adicionar um botão pequeno "Excluir em massa" ao lado da barra de busca em ambas as telas (ProductsGrid e StockItemsGrid). Ao clicar, abre um Dialog com:
+- Lista de todos os itens agrupados por categoria
+- Checkbox em cada item + "selecionar todos" por categoria
+- Contador de selecionados
+- Botão "Excluir selecionados" com confirmação
 
-### Solução
-Uma única migration SQL que faz `CREATE OR REPLACE FUNCTION` nas duas funções, trocando:
-```sql
-COALESCE(oie.quantity, 1) AS qty
-```
-por:
-```sql
-1 AS qty
-```
+### Componentes
 
-### Impacto
-- **Zero risco de quebra**: a coluna nunca existiu, então nenhum código depende dela. O valor `1` já era o comportamento esperado (cada registro = 1 extra).
-- **Nenhuma alteração de tabela** — apenas correção de funções existentes.
-- **Nenhuma alteração no frontend** — o problema é 100% no banco de dados.
+**1. Novo componente: `BulkDeleteProductsDialog.tsx`**
+- Recebe `restaurantId`, `open`, `onOpenChange`, `onDeleted`
+- Busca produtos agrupados por categoria
+- Checkbox por produto + "selecionar categoria inteira"
+- Barra de busca interna para filtrar
+- Ao confirmar, chama `admin_delete_product` em loop para cada ID selecionado
+- Respeita a regra de restaurante aberto (bloqueia se `isRestaurantOpen`)
 
-### Arquivo
-- Nenhum arquivo de código alterado
-- 1 migration SQL via ferramenta de banco
+**2. Novo componente: `BulkDeleteStockDialog.tsx`**
+- Mesma estrutura, busca insumos agrupados por `stock_categories`
+- Usa `admin_delete_stock_item` RPC para cada item
+
+**3. Alteração em `ProductsGrid.tsx`**
+- Adicionar botão `Trash2` pequeno (variant="outline", size="icon") ao lado do botão "Novo Produto"
+- Abre `BulkDeleteProductsDialog`
+
+**4. Alteração em `StockItemsGrid.tsx`**
+- Mesmo botão ao lado de "Novo Insumo"
+- Abre `BulkDeleteStockDialog`
+
+### Detalhes técnicos
+- Exclusão sequencial com `Promise.all` limitado ou loop `for...of` para evitar sobrecarga
+- ScrollArea com altura fixa no dialog para listas longas
+- AlertDialog de confirmação final antes de executar ("Tem certeza que deseja excluir X itens?")
+- Após exclusão, chama callback `onDeleted` para refresh da lista principal
+
+### Arquivos
+- Criar: `src/components/admin/BulkDeleteProductsDialog.tsx`
+- Criar: `src/components/admin/BulkDeleteStockDialog.tsx`
+- Editar: `src/components/admin/ProductsGrid.tsx` (adicionar botão + import)
+- Editar: `src/components/admin/StockItemsGrid.tsx` (adicionar botão + import)
 
