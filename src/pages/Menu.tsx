@@ -445,6 +445,15 @@ const Menu = () => {
         }
       })
       .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'categories'
+      }, () => {
+        if (restaurantRef.current?.id) {
+          fetchData();
+        }
+      })
+      .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
         table: 'restaurants',

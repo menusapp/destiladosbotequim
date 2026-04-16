@@ -215,12 +215,12 @@ export default function Kiosk() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Track is_open in realtime
+  // Track is_open + products/categories in realtime
   const isOpen = restaurant?.is_open !== false;
   useEffect(() => {
     if (!restaurant?.id) return;
     const channel = supabase
-      .channel(`kiosk-restaurant-${restaurant.id}`)
+      .channel(`kiosk-realtime-${restaurant.id}`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -229,9 +229,23 @@ export default function Kiosk() {
       }, (payload) => {
         setRestaurant((prev: any) => prev ? { ...prev, ...payload.new } : prev);
       })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'products',
+      }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'categories',
+      }, () => {
+        fetchData();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [restaurant?.id]);
+  }, [restaurant?.id, fetchData]);
 
   const openProduct = useCallback(async (product: Product) => {
     setSelectedProduct(product);
