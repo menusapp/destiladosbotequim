@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { CreditCard, Plus, Trash2, Banknote, Smartphone, Receipt } from "lucide-react";
+import { CreditCard, Plus, Trash2, Banknote, Smartphone, Receipt, Pencil } from "lucide-react";
 
 interface PaymentMethod {
   id: string;
@@ -51,6 +51,9 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
+  const [editBrandsOpen, setEditBrandsOpen] = useState(false);
+  const [editBrands, setEditBrands] = useState<string[]>([]);
   
   // Form state
   const [methodType, setMethodType] = useState("");
@@ -163,6 +166,41 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
       console.error(error);
     }
   };
+
+  const handleOpenEditBrands = (method: PaymentMethod) => {
+    setEditingMethod(method);
+    setEditBrands(method.accepted_brands || []);
+    setEditBrandsOpen(true);
+  };
+
+  const toggleEditBrand = (brandCode: string, checked: boolean) => {
+    if (checked) {
+      setEditBrands(prev => [...prev, brandCode]);
+    } else {
+      setEditBrands(prev => prev.filter(b => b !== brandCode));
+    }
+  };
+
+  const handleSaveEditBrands = async () => {
+    if (!editingMethod) return;
+    try {
+      const { error } = await supabase
+        .from("payment_methods")
+        .update({ accepted_brands: editBrands })
+        .eq("id", editingMethod.id);
+
+      if (error) throw error;
+      toast.success("Bandeiras atualizadas!");
+      setEditBrandsOpen(false);
+      setEditingMethod(null);
+      await fetchMethods();
+    } catch (error) {
+      toast.error("Erro ao atualizar bandeiras");
+      console.error(error);
+    }
+  };
+
+  const hasBrands = (type: string) => ["credit", "debit", "meal_voucher"].includes(type);
 
   const getMethodIcon = (type: string) => {
     const found = METHOD_TYPES.find(m => m.value === type);
@@ -314,6 +352,16 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {hasBrands(method.method_type) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEditBrands(method)}
+                          title="Editar bandeiras"
+                        >
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      )}
                       <Switch
                         checked={method.is_active}
                         onCheckedChange={() => toggleActive(method)}
@@ -359,6 +407,52 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog para editar bandeiras */}
+      <Dialog open={editBrandsOpen} onOpenChange={(open) => { setEditBrandsOpen(open); if (!open) setEditingMethod(null); }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Bandeiras — {editingMethod?.name}</DialogTitle>
+            <DialogDescription>
+              Selecione as bandeiras aceitas para esta forma de pagamento
+            </DialogDescription>
+          </DialogHeader>
+          {editingMethod && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                {getBrandsForType(editingMethod.method_type).map((brand) => (
+                  <div
+                    key={brand.code}
+                    className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      editBrands.includes(brand.code)
+                        ? "border-primary bg-primary/5"
+                        : "hover:border-muted-foreground/50"
+                    }`}
+                    onClick={() => toggleEditBrand(brand.code, !editBrands.includes(brand.code))}
+                  >
+                    <Checkbox
+                      checked={editBrands.includes(brand.code)}
+                      onCheckedChange={(checked) => toggleEditBrand(brand.code, !!checked)}
+                    />
+                    <img
+                      src={brand.logo}
+                      alt={brand.name}
+                      className="h-6 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <span className="text-sm font-medium">{brand.name}</span>
+                  </div>
+                ))}
+              </div>
+              <Button onClick={handleSaveEditBrands} className="w-full">
+                Salvar Bandeiras
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
