@@ -352,6 +352,16 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {hasBrands(method.method_type) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEditBrands(method)}
+                          title="Editar bandeiras"
+                        >
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      )}
                       <Switch
                         checked={method.is_active}
                         onCheckedChange={() => toggleActive(method)}
