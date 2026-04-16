@@ -1069,9 +1069,9 @@ const Menu = () => {
   const cartItemCount = getTotalItemCount();
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
-      {/* Fixed header area */}
-      <div className="relative shrink-0">
+    <div className="min-h-screen bg-background">
+      {/* Header area */}
+      <div className="relative">
         <div className="h-48 overflow-hidden relative">
           {restaurant.banner_url ? (
             <div
