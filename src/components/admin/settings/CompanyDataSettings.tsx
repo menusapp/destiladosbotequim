@@ -315,132 +315,90 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
 
         {/* Tab 2: Operacional (merged: Operacional + Cadastro de Clientes + Cardápio) */}
         <TabsContent value="operational" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Taxa de Serviço */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Percent className="h-5 w-5" />
-                  Taxa de Serviço
-                </CardTitle>
-                <CardDescription>Configure a cobrança de taxa de serviço nos pedidos</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <Label htmlFor="service-fee-enabled" className="font-medium cursor-pointer">Cobrar Taxa de Serviço</Label>
+          {/* SEÇÃO 1: Cardápio Digital */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Cardápio Digital
+              </CardTitle>
+              <CardDescription>Funcionalidades e comportamento do cardápio para os clientes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y">
+                {/* Pedir Conta */}
+                <div className="flex items-center justify-between py-3 first:pt-0">
+                  <div>
+                    <p className="text-sm font-medium">Permitir clientes pedirem conta</p>
+                    <p className="text-xs text-muted-foreground">Exibe o botão "Pedir Conta" no cardápio de mesa</p>
+                  </div>
                   <Switch
-                    id="service-fee-enabled"
-                    checked={settings.service_fee_enabled}
-                    onCheckedChange={(checked) => setSettings({ ...settings, service_fee_enabled: checked })}
+                    checked={settings.bill_request_enabled}
+                    onCheckedChange={(checked) => setSettings({ ...settings, bill_request_enabled: checked })}
                   />
                 </div>
-                {settings.service_fee_enabled && (
-                  <div className="space-y-2">
-                    <Label htmlFor="service-fee-percentage">Porcentagem (%)</Label>
-                    <Input
-                      id="service-fee-percentage"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={settings.service_fee_percentage}
-                      onChange={(e) => setSettings({ ...settings, service_fee_percentage: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
-            {/* Tempo de Preparo */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Timer className="h-5 w-5" />
-                  Tempo de Preparo nos Pedidos
-                </CardTitle>
-                <CardDescription>Exibe o tempo de preparo individual de cada produto nos pedidos de mesa</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <Label htmlFor="show-prep-timer" className="font-medium cursor-pointer">Ativar tempo de preparo</Label>
+                {/* Tempo de Preparo */}
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium">Tempo de preparo por produto</p>
+                    <p className="text-xs text-muted-foreground">Contagem regressiva ao lado de cada item na comanda</p>
+                  </div>
                   <Switch
-                    id="show-prep-timer"
                     checked={settings.show_prep_timer}
                     onCheckedChange={(checked) => setSettings({ ...settings, show_prep_timer: checked })}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Quando ativado, exibe uma contagem regressiva ao lado de cada item pedido na comanda, baseada no tempo de preparo cadastrado em cada produto.
-                </p>
-                <Button
-                  variant="outline"
-                  className="gap-2 w-full"
-                  onClick={async () => {
-                    try {
-                      const { error } = await supabase
-                        .from('tables')
-                        .update({ occupied_at: new Date().toISOString() })
-                        .eq('restaurant_id', restaurantId)
-                        .eq('is_occupied', true);
-                      if (error) throw error;
-                      toast.success("Tempo de todas as mesas zerado!");
-                    } catch {
-                      toast.error("Erro ao zerar tempo");
-                    }
-                  }}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Zerar tempo de todas as mesas
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Tempo Estimado Delivery/Retirada */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5" />
-                Tempo Estimado para Delivery / Retirada
-              </CardTitle>
-              <CardDescription>Tempo informado ao cliente nas notificações e no checkout</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="prep-time-delivery">Preparo + Entrega (minutos)</Label>
-                  <Input
-                    id="prep-time-delivery"
-                    type="number"
-                    min="1"
-                    max="180"
-                    value={settings.prep_time_minutes}
-                    onChange={(e) => setSettings({ ...settings, prep_time_minutes: parseInt(e.target.value) || 30 })}
-                  />
-                  <p className="text-xs text-muted-foreground">Usado como tempo estimado nos pedidos delivery</p>
+                {/* Taxa de Serviço */}
+                <div className="py-3 last:pb-0 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Taxa de serviço</p>
+                      <p className="text-xs text-muted-foreground">Cobrar taxa de serviço nos pedidos de mesa</p>
+                    </div>
+                    <Switch
+                      checked={settings.service_fee_enabled}
+                      onCheckedChange={(checked) => setSettings({ ...settings, service_fee_enabled: checked })}
+                    />
+                  </div>
+                  {settings.service_fee_enabled && (
+                    <div className="pl-0 space-y-1.5">
+                      <Label htmlFor="service-fee-percentage" className="text-xs">Porcentagem (%)</Label>
+                      <Input
+                        id="service-fee-percentage"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={settings.service_fee_percentage}
+                        onChange={(e) => setSettings({ ...settings, service_fee_percentage: parseFloat(e.target.value) || 0 })}
+                        className="max-w-[120px]"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Cadastro de Clientes (merged) */}
+          {/* SEÇÃO 2: Cadastro de Clientes */}
           <Card>
             <CardHeader>
-              <CardTitle>Campos de Cadastro de Clientes</CardTitle>
-              <CardDescription>Defina quais informações são solicitadas ao cliente no login do cardápio. É obrigatório manter pelo menos um campo ativo.</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Cadastro de Clientes
+              </CardTitle>
+              <CardDescription>Campos solicitados no login do cardápio. Pelo menos um deve estar ativo.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="divide-y">
-                {/* CPF */}
-                <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                <div className="flex items-center justify-between py-3 first:pt-0">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                    <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
                       <CreditCard className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">CPF</p>
-                      <p className="text-xs text-muted-foreground">Identificação única do cliente</p>
-                    </div>
+                    <p className="text-sm font-medium">CPF</p>
                   </div>
                   <Switch
                     checked={settings.login_require_cpf}
@@ -453,17 +411,12 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                     }}
                   />
                 </div>
-
-                {/* Nome */}
-                <div className="flex items-center justify-between py-4">
+                <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                    <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
                       <User className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">Nome do Cliente</p>
-                      <p className="text-xs text-muted-foreground">Solicitar nome no cadastro</p>
-                    </div>
+                    <p className="text-sm font-medium">Nome</p>
                   </div>
                   <Switch
                     checked={settings.login_require_name}
@@ -476,17 +429,12 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                     }}
                   />
                 </div>
-
-                {/* Telefone */}
-                <div className="flex items-center justify-between py-4">
+                <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                    <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
                       <Phone className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">Telefone</p>
-                      <p className="text-xs text-muted-foreground">Solicitar número de telefone</p>
-                    </div>
+                    <p className="text-sm font-medium">Telefone</p>
                   </div>
                   <Switch
                     checked={settings.login_require_phone}
@@ -499,17 +447,12 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                     }}
                   />
                 </div>
-
-                {/* Data de Nascimento */}
-                <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                <div className="flex items-center justify-between py-3 last:pb-0">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                    <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
                       <CalendarDays className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">Data de Nascimento</p>
-                      <p className="text-xs text-muted-foreground">Solicitar data de nascimento para campanhas</p>
-                    </div>
+                    <p className="text-sm font-medium">Data de Nascimento</p>
                   </div>
                   <Switch
                     checked={settings.login_require_birth_date}
@@ -520,30 +463,74 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             </CardContent>
           </Card>
 
-          {/* Cardápio config (merged) */}
+          {/* SEÇÃO 3: Delivery & Retirada */}
           <Card>
             <CardHeader>
-              <CardTitle>Configurações do Cardápio</CardTitle>
-              <CardDescription>Controle funcionalidades disponíveis no cardápio digital</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Delivery & Retirada
+              </CardTitle>
+              <CardDescription>Tempos estimados informados ao cliente no checkout e notificações</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="divide-y">
-                <div className="flex items-center justify-between py-4 first:pt-0">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Permitir clientes pedirem conta</p>
-                      <p className="text-xs text-muted-foreground">Exibe o botão "Pedir Conta" no cardápio digital dos clientes nas mesas</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={settings.bill_request_enabled}
-                    onCheckedChange={(checked) => setSettings({ ...settings, bill_request_enabled: checked })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="prep-time-delivery">Tempo de Delivery (min)</Label>
+                  <Input
+                    id="prep-time-delivery"
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={settings.prep_time_minutes}
+                    onChange={(e) => setSettings({ ...settings, prep_time_minutes: parseInt(e.target.value) || 30 })}
                   />
+                  <p className="text-xs text-muted-foreground">Preparo + entrega</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pickup-time">Tempo de Retirada (min)</Label>
+                  <Input
+                    id="pickup-time"
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={settings.pickup_time_minutes}
+                    onChange={(e) => setSettings({ ...settings, pickup_time_minutes: parseInt(e.target.value) || 15 })}
+                  />
+                  <p className="text-xs text-muted-foreground">Preparo para retirada no balcão</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* SEÇÃO 4: Ferramentas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <RotateCcw className="h-5 w-5" />
+                Ferramentas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={async () => {
+                  try {
+                    const { error } = await supabase
+                      .from('tables')
+                      .update({ occupied_at: new Date().toISOString() })
+                      .eq('restaurant_id', restaurantId)
+                      .eq('is_occupied', true);
+                    if (error) throw error;
+                    toast.success("Tempo de todas as mesas zerado!");
+                  } catch {
+                    toast.error("Erro ao zerar tempo");
+                  }
+                }}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Zerar tempo de todas as mesas
+              </Button>
             </CardContent>
           </Card>
 
