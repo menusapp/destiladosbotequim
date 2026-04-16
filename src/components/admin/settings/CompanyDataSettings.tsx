@@ -67,7 +67,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_cpf, login_require_name, login_require_phone, login_require_birth_date, bill_request_enabled, show_prep_timer")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, pickup_time_minutes, login_require_cpf, login_require_name, login_require_phone, login_require_birth_date, bill_request_enabled, show_prep_timer")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -81,6 +81,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
           prep_time_minutes: data.prep_time_minutes || 30,
+          pickup_time_minutes: (data as any).pickup_time_minutes ?? 15,
           login_require_cpf: data.login_require_cpf ?? true,
           login_require_name: data.login_require_name ?? true,
           login_require_phone: data.login_require_phone ?? false,
