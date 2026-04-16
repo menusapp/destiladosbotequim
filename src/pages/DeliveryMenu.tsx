@@ -68,8 +68,8 @@ export default function DeliveryMenu() {
           .order("display_order"),
         supabase
           .from("products")
-          .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, featured_active, featured_schedule, visibility_channels, categories!inner(restaurant_id)")
-          .eq("categories.restaurant_id", restaurantData.id)
+          .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, featured_active, featured_schedule, visibility_channels")
+          .eq("restaurant_id", restaurantData.id)
           .eq("is_featured", true)
           .order("featured_display_order"),
       ]);

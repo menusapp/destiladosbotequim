@@ -199,18 +199,22 @@ const Menu = () => {
         .filter((cat: Category) => cat.products.length > 0);
       setCategories(sortedCategories);
 
-      // ⚡ Extrair produtos em destaque dos dados JÁ CARREGADOS (sem query adicional!)
+      // ⚡ Buscar destaques separadamente (inclui produtos SEM categoria)
       if (restaurantData.featured_section_enabled) {
-        const allProducts = restaurantData.categories?.flatMap((cat: any) => cat.products) || [];
-        const featured = allProducts
+        const { data: featuredData } = await supabase
+          .from("products")
+          .select("id, name, description, price, promotional_price, available, image_url, prep_time_minutes, is_featured, featured_display_order, featured_active, featured_schedule, visibility_channels")
+          .eq("restaurant_id", restaurantData.id)
+          .eq("is_featured", true)
+          .order("featured_display_order");
+
+        const featured = (featuredData || [])
           .filter((p: any) => {
-            if (!p.is_featured) return false;
             if (!isFeaturedVisible(p)) return false;
             const channels = p.visibility_channels || ['all'];
             return channels.includes('all') || channels.includes('mesa');
-          })
-          .sort((a: any, b: any) => (a.featured_display_order || 0) - (b.featured_display_order || 0));
-        setFeaturedProducts(featured);
+          });
+        setFeaturedProducts(featured as any);
       } else {
         setFeaturedProducts([]);
       }
