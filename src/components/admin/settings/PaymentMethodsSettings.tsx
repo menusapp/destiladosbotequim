@@ -407,6 +407,52 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog para editar bandeiras */}
+      <Dialog open={editBrandsOpen} onOpenChange={(open) => { setEditBrandsOpen(open); if (!open) setEditingMethod(null); }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Bandeiras — {editingMethod?.name}</DialogTitle>
+            <DialogDescription>
+              Selecione as bandeiras aceitas para esta forma de pagamento
+            </DialogDescription>
+          </DialogHeader>
+          {editingMethod && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                {getBrandsForType(editingMethod.method_type).map((brand) => (
+                  <div
+                    key={brand.code}
+                    className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      editBrands.includes(brand.code)
+                        ? "border-primary bg-primary/5"
+                        : "hover:border-muted-foreground/50"
+                    }`}
+                    onClick={() => toggleEditBrand(brand.code, !editBrands.includes(brand.code))}
+                  >
+                    <Checkbox
+                      checked={editBrands.includes(brand.code)}
+                      onCheckedChange={(checked) => toggleEditBrand(brand.code, !!checked)}
+                    />
+                    <img
+                      src={brand.logo}
+                      alt={brand.name}
+                      className="h-6 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <span className="text-sm font-medium">{brand.name}</span>
+                  </div>
+                ))}
+              </div>
+              <Button onClick={handleSaveEditBrands} className="w-full">
+                Salvar Bandeiras
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
