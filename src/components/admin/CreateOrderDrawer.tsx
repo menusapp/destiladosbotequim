@@ -532,17 +532,37 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                   </div>
                   <Input placeholder="CPF do cliente *" value={customerCpf} onChange={e => {
                     setCustomerCpf(e.target.value);
+                    setFoundCustomer(null);
                     const clean = e.target.value.replace(/\D/g, "");
                     if (clean.length === 11) {
                       supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", e.target.value).maybeSingle()
                         .then(({ data }) => {
                           if (data) {
-                            setCustomerName(data.name);
-                            setCustomerPhone(data.phone || "");
+                            setFoundCustomer({ name: data.name, phone: data.phone || "" });
                           }
                         });
                     }
                   }} />
+                  {foundCustomer && (
+                    <div className="flex items-center justify-between gap-2 p-2 rounded-md border border-primary/30 bg-primary/5 text-xs">
+                      <span className="text-foreground">
+                        Cliente já cadastrado: <strong>{foundCustomer.name}</strong>
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          setCustomerName(foundCustomer.name);
+                          setCustomerPhone(foundCustomer.phone);
+                          setFoundCustomer(null);
+                        }}
+                      >
+                        Preencher
+                      </Button>
+                    </div>
+                  )}
                   <Input placeholder="Nome do cliente *" value={customerName} onChange={e => setCustomerName(e.target.value)} />
                   <Input placeholder="Celular do cliente" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
                   {!hasValidCustomer && (
