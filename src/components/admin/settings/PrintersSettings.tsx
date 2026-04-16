@@ -16,6 +16,7 @@ interface WebPrinterConfig {
   fontSize: number;
   fontBold: boolean;
   printCopies: number;
+  supportsAutoCut: boolean;
 }
 
 const FONT_OPTIONS = [
