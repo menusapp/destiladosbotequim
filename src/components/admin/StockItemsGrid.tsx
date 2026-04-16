@@ -451,6 +451,13 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BulkDeleteStockDialog
+        restaurantId={restaurantId}
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        onDeleted={fetchStockItems}
+      />
     </div>
   );
 };
