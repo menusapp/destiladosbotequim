@@ -270,12 +270,28 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
     setCategoryDialogOpen(false); setEditingCategory(null); setCategoryName("");
     setCategoryIsRequired(false); setCategoryMinQty("0"); setCategoryMaxQty("0");
     setSelectedProductIds(new Set()); setOriginalProductIds(new Set()); setProductSearchQuery("");
+    setLinkMode('products'); setSelectedCategoryIds(new Set());
   };
 
   const toggleProductSelection = (productId: string) => {
     const newSet = new Set(selectedProductIds);
     if (newSet.has(productId)) newSet.delete(productId); else newSet.add(productId);
     setSelectedProductIds(newSet);
+  };
+
+  const toggleMenuCategory = (categoryId: string, checked: boolean) => {
+    const newSet = new Set(selectedCategoryIds);
+    const newProducts = new Set(selectedProductIds);
+    const productsInCat = allProducts.filter(p => p.category_id === categoryId);
+    if (checked) {
+      newSet.add(categoryId);
+      productsInCat.forEach(p => newProducts.add(p.id));
+    } else {
+      newSet.delete(categoryId);
+      productsInCat.forEach(p => newProducts.delete(p.id));
+    }
+    setSelectedCategoryIds(newSet);
+    setSelectedProductIds(newProducts);
   };
   const resetItemForm = () => {
     setItemDialogOpen(false); setEditingItem(null); setSelectedCategoryId(null);
