@@ -238,7 +238,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
 
   const clearForm = () => {
     setCart([]);
-    setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
+    setCustomerName(""); setCustomerPhone(""); setCustomerCpf(""); setFoundCustomer(null);
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
     setDiscountType("percentage"); setDiscountValue("");
