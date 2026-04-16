@@ -155,13 +155,14 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: settings.service_fee_enabled,
           service_fee_percentage: settings.service_fee_percentage,
           prep_time_minutes: settings.prep_time_minutes,
+          pickup_time_minutes: settings.pickup_time_minutes,
           login_require_cpf: settings.login_require_cpf,
           login_require_name: settings.login_require_name,
           login_require_phone: settings.login_require_phone,
           login_require_birth_date: settings.login_require_birth_date,
           bill_request_enabled: settings.bill_request_enabled,
           show_prep_timer: settings.show_prep_timer,
-        })
+        } as any)
         .eq('id', restaurantId);
       if (error) throw error;
       toast.success("Configurações salvas!");
