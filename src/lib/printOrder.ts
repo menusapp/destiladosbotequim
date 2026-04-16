@@ -13,7 +13,7 @@ function formatPhoneDisplay(raw: string | null | undefined): string {
   return local;
 }
 
-function formatPaymentType(type: string): string {
+function formatPaymentType(type: string, brand?: string | null): string {
   const map: Record<string, string> = {
     cash: "Dinheiro",
     credit: "Cartão de Crédito",
@@ -21,8 +21,20 @@ function formatPaymentType(type: string): string {
     pix: "PIX",
     pix_online: "PIX Online",
     card_online: "Cartão Online",
+    credit_card_online: "Cartão Online",
+    voucher: "Vale Refeição",
+    meal_voucher: "Vale Refeição",
   };
-  return map[type] || type;
+  let base = map[type] || type;
+  if (brand) {
+    const brandName = brand.charAt(0).toUpperCase() + brand.slice(1);
+    base = `${base} - ${brandName}`;
+  }
+  const onlineTypes = ["pix_online", "card_online", "credit_card_online", "online", "ifood_online"];
+  if (onlineTypes.includes(type.toLowerCase())) {
+    return base;
+  }
+  return `${base.toUpperCase()} - PAGAMENTO NO LOCAL`;
 }
 
 /**
@@ -39,6 +51,7 @@ export const printOrder = async (
     delivery_address?: string;
     delivery_phone?: string;
     payment_type?: string;
+    payment_brand?: string;
     notes?: string;
     tables?: { table_number: number } | null;
     dd_scheduled_for?: string;
@@ -200,7 +213,7 @@ export const printOrder = async (
 
   // Payment line
   const paymentLine = order.payment_type
-    ? `<p><strong>Pagamento:</strong> ${formatPaymentType(order.payment_type)}</p>`
+    ? `<p><strong>Pagamento:</strong> ${formatPaymentType(order.payment_type, order.payment_brand)}</p>`
     : "";
 
   // Notes section

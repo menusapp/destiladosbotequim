@@ -99,6 +99,15 @@ export function formatPaymentMethod(method: string | null | undefined): string {
  * Ex: formatPaymentWithBrand("credit", "visa") → "Crédito - Visa"
  *     formatPaymentWithBrand("Crédito - Visa", null) → "Crédito - Visa" (já formatado)
  */
+/**
+ * Identifica se o pagamento foi feito online (não presencialmente).
+ */
+export function isOnlinePayment(type: string | null | undefined): boolean {
+  if (!type) return false;
+  const onlineTypes = ["pix_online", "card_online", "credit_card_online", "online", "ifood_online", "pago pelo ifood", "pago delivery direto"];
+  return onlineTypes.includes(type.toLowerCase());
+}
+
 export function formatPaymentWithBrand(type: string | null | undefined, brand: string | null | undefined): string {
   if (!type) return "—";
   // If already contains brand info (e.g. "Crédito - Visa"), just normalize
@@ -115,4 +124,19 @@ export function formatPaymentWithBrand(type: string | null | undefined, brand: s
     }
   }
   return formatted;
+}
+
+/**
+ * Formata pagamento para exibição com sufixo "PAGAMENTO NO LOCAL"
+ * quando o método NÃO é online.
+ * Retorna tudo em UPPERCASE para pagamentos locais.
+ */
+export function formatPaymentForDisplay(type: string | null | undefined, brand: string | null | undefined): string {
+  if (!type) return "—";
+  const base = formatPaymentWithBrand(type, brand);
+  if (isOnlinePayment(type)) {
+    return base;
+  }
+  // Pagamento local: uppercase + sufixo
+  return `${base.toUpperCase()} - PAGAMENTO NO LOCAL`;
 }

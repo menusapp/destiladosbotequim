@@ -15,7 +15,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useOrderStatusAdvance, getNextStatus } from "@/hooks/useOrderStatusAdvance";
 import { toast } from "@/components/ui/sonner";
-import { formatPaymentWithBrand } from "@/lib/utils";
+import { formatPaymentForDisplay } from "@/lib/utils";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { OrderDetailModal } from "./OrderDetailModal";
@@ -312,7 +312,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     if (!paymentType || paymentType === "pending") {
       return { label: "Falta pagamento", className: "text-red-600 bg-red-50 dark:bg-red-950/30", icon: <AlertTriangle className="w-3 h-3" /> };
     }
-    const formatted = formatPaymentWithBrand(paymentType, paymentBrand);
+    const formatted = formatPaymentForDisplay(paymentType, paymentBrand);
     let icon: React.ReactNode = <CreditCard className="w-3 h-3" />;
     if (formatted === "Dinheiro") icon = <Banknote className="w-3 h-3" />;
     else if (formatted === "PIX" || formatted.startsWith("Pago")) icon = <Smartphone className="w-3 h-3" />;

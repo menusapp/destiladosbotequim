@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { formatPaymentWithBrand } from "@/lib/utils";
+import { formatPaymentForDisplay } from "@/lib/utils";
 import { getOrderOriginLabel } from "@/lib/orderOrigin";
 import { useOrderStatusAdvance } from "@/hooks/useOrderStatusAdvance";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -256,7 +256,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
             <span>Origem: <strong className="text-foreground">{getOrderOrigin()}</strong></span>
             <span>Total: <strong className="text-foreground text-base">R$ {grandTotal.toFixed(2)}</strong></span>
             {order.payment_type && order.payment_type !== "pending" && (
-              <span>Pgto: <strong className="text-foreground">{formatPaymentWithBrand(order.payment_type, order.payment_brand)}</strong></span>
+              <span>Pgto: <strong className="text-foreground">{formatPaymentForDisplay(order.payment_type, order.payment_brand)}</strong></span>
             )}
             {needsPayment && <Badge variant="destructive" className="text-xs">Falta pagamento</Badge>}
           </div>
@@ -446,7 +446,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                   <div className="flex items-center gap-2">
                     {order.payment_type && order.payment_type !== "pending" ? (
                       <>
-                        <p className="font-medium">{formatPaymentWithBrand(order.payment_type, order.payment_brand)}</p>
+                        <p className="font-medium">{formatPaymentForDisplay(order.payment_type, order.payment_brand)}</p>
                         <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" onClick={() => setShowChangePaymentModal(true)}>
                           <RefreshCw className="w-3 h-3" /> Alterar
                         </Button>
