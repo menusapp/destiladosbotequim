@@ -30,9 +30,10 @@ interface PendingOrdersPanelProps {
   restaurantId: string;
   dateRange: { from: Date; to: Date };
   onEmitted: () => void;
+  searchTerm?: string;
 }
 
-const PendingOrdersPanel = ({ restaurantId, dateRange, onEmitted }: PendingOrdersPanelProps) => {
+const PendingOrdersPanel = ({ restaurantId, dateRange, onEmitted, searchTerm = "" }: PendingOrdersPanelProps) => {
   const [orders, setOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [emitting, setEmitting] = useState<Set<string>>(new Set());
