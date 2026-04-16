@@ -418,6 +418,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         }
       } else {
         setCpfSearched(true);
+        setSelectedCustomer(null);
+        setCustomerAddresses([]);
+        setSelectedAddress(null);
       }
     } catch { /* ignore */ }
     finally { setCpfSearching(false); }
@@ -454,6 +457,10 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           setDeliveryAddress(`${def.street}, ${def.number}${def.complement ? ` - ${def.complement}` : ""}`);
           setDeliveryNeighborhood(def.neighborhood || "");
         }
+      } else {
+        setSelectedCustomer(null);
+        setCustomerAddresses([]);
+        setSelectedAddress(null);
       }
     } catch { /* ignore */ }
     finally { setPhoneSearching(false); }
@@ -480,6 +487,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     setCustomerPhone("");
     setCpfSearched(false);
     setSelectedAddress(null);
+    setCustomerAddresses([]);
+    setShowNewAddressForm(false);
     setDeliveryAddress("");
     setDeliveryCep("");
     setDeliveryNeighborhood("");
@@ -618,6 +627,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     setNotes(""); setPaymentType(""); setSelectedTableId("");
     setSelectedCustomer(null);
     setSelectedAddress(null);
+    setCustomerAddresses([]);
+    setShowNewAddressForm(false);
     setCpfSearched(false);
     setShowNewClientForm(false);
     setDiscountExpanded(false);
