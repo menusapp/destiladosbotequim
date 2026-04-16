@@ -568,7 +568,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                     </div>
                   )}
                   <Input placeholder="Nome do cliente *" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                  <Input placeholder="Celular do cliente" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                  <Input placeholder="Celular do cliente" value={customerPhone} maxLength={15} inputMode="tel" onChange={e => {
+                    const d = e.target.value.replace(/\D/g, "").slice(0, 11);
+                    let f = d;
+                    if (d.length > 10) f = `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+                    else if (d.length > 6) f = `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+                    else if (d.length > 2) f = `(${d.slice(0,2)}) ${d.slice(2)}`;
+                    setCustomerPhone(f);
+                  }} />
                   {!hasValidCustomer && (
                     <p className="text-xs text-muted-foreground">
                       Selecione ou cadastre um cliente com CPF válido para liberar o pedido.
