@@ -115,6 +115,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const [savingNewClient, setSavingNewClient] = useState(false);
   const [cpfSearching, setCpfSearching] = useState(false);
   const [cpfSearched, setCpfSearched] = useState(false);
+  const [phoneSearching, setPhoneSearching] = useState(false);
 
   // Address UX states
   const [selectedAddress, setSelectedAddress] = useState<SelectedAddress | null>(null);
@@ -420,6 +421,42 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       }
     } catch { /* ignore */ }
     finally { setCpfSearching(false); }
+  };
+
+  // Auto-search customer by phone
+  const handlePhoneAutoSearch = async (rawPhone: string) => {
+    setCustomerPhone(rawPhone);
+    const clean = rawPhone.replace(/\D/g, "");
+    if (clean.length < 10 || clean.length > 11) return;
+    if (selectedCustomer) return;
+    setPhoneSearching(true);
+    try {
+      const { data } = await supabase
+        .from("customers")
+        .select("id, cpf, name, phone")
+        .eq("restaurant_id", restaurantId)
+        .eq("phone", rawPhone)
+        .maybeSingle();
+      if (data) {
+        setCustomerName(data.name);
+        setCustomerCpf(data.cpf || "");
+        setSelectedCustomer({ name: data.name, cpf: data.cpf, phone: data.phone || "" });
+        toast.success("Cliente encontrado!");
+        const { data: addrs } = await supabase
+          .from("customer_addresses")
+          .select("*")
+          .eq("customer_cpf", data.cpf)
+          .order("is_default", { ascending: false });
+        setCustomerAddresses(addrs || []);
+        if (addrs && addrs.length > 0) {
+          const def = addrs.find((a: any) => a.is_default) || addrs[0];
+          setSelectedAddress(def);
+          setDeliveryAddress(`${def.street}, ${def.number}${def.complement ? ` - ${def.complement}` : ""}`);
+          setDeliveryNeighborhood(def.neighborhood || "");
+        }
+      }
+    } catch { /* ignore */ }
+    finally { setPhoneSearching(false); }
   };
 
   const handleAddToCart = (item: CartItem) => {
@@ -1164,6 +1201,29 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
                 <div className="space-y-3">
                   <div className="relative">
+                    <Label className="text-xs mb-1.5 block">Celular</Label>
+                    <Input
+                      placeholder="(00) 00000-0000"
+                      value={customerPhone}
+                      onChange={e => handlePhoneAutoSearch(e.target.value)}
+                      className="h-9 text-sm pr-8"
+                      disabled={!!selectedCustomer}
+                    />
+                    {phoneSearching && (
+                      <Loader2 className="w-4 h-4 animate-spin absolute right-2.5 top-[34px] text-muted-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1.5 block">Nome *</Label>
+                    <Input
+                      placeholder="Nome do cliente"
+                      value={customerName}
+                      onChange={e => setCustomerName(e.target.value)}
+                      className="h-9 text-sm"
+                      disabled={!!selectedCustomer}
+                    />
+                  </div>
+                  <div className="relative">
                     <Label className="text-xs mb-1.5 block">CPF *</Label>
                     <Input
                       placeholder="000.000.000-00"
@@ -1178,26 +1238,6 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       <p className="text-xs text-amber-600 mt-1">Cliente não encontrado — preencha os dados para cadastrar automaticamente</p>
                     )}
                   </div>
-                  <div>
-                    <Label className="text-xs mb-1.5 block">Nome *</Label>
-                    <Input
-                      placeholder="Nome do cliente"
-                      value={customerName}
-                      onChange={e => setCustomerName(e.target.value)}
-                      className="h-9 text-sm"
-                      disabled={!!selectedCustomer}
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs mb-1.5 block">Celular</Label>
-                    <Input
-                      placeholder="(00) 00000-0000"
-                      value={customerPhone}
-                      onChange={e => setCustomerPhone(e.target.value)}
-                      className="h-9 text-sm"
-                      disabled={!!selectedCustomer}
-                    />
-                  </div>
                   {selectedCustomer && (
                     <Badge variant="secondary" className="text-xs">✓ Cliente cadastrado</Badge>
                   )}
@@ -1211,7 +1251,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
                   {!selectedCustomer && !hasSelectedCustomer && (
                     <p className="text-sm text-muted-foreground italic">
-                      Preencha o CPF do cliente para ver os endereços salvos
+                      Preencha o celular ou CPF do cliente para ver os endereços salvos
                     </p>
                   )}
 
