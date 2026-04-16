@@ -423,6 +423,42 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     finally { setCpfSearching(false); }
   };
 
+  // Auto-search customer by phone
+  const handlePhoneAutoSearch = async (rawPhone: string) => {
+    setCustomerPhone(rawPhone);
+    const clean = rawPhone.replace(/\D/g, "");
+    if (clean.length < 10 || clean.length > 11) return;
+    if (selectedCustomer) return;
+    setPhoneSearching(true);
+    try {
+      const { data } = await supabase
+        .from("customers")
+        .select("id, cpf, name, phone")
+        .eq("restaurant_id", restaurantId)
+        .eq("phone", rawPhone)
+        .maybeSingle();
+      if (data) {
+        setCustomerName(data.name);
+        setCustomerCpf(data.cpf || "");
+        setSelectedCustomer({ name: data.name, cpf: data.cpf, phone: data.phone || "" });
+        toast.success("Cliente encontrado!");
+        const { data: addrs } = await supabase
+          .from("customer_addresses")
+          .select("*")
+          .eq("customer_cpf", data.cpf)
+          .order("is_default", { ascending: false });
+        setCustomerAddresses(addrs || []);
+        if (addrs && addrs.length > 0) {
+          const def = addrs.find((a: any) => a.is_default) || addrs[0];
+          setSelectedAddress(def);
+          setDeliveryAddress(`${def.street}, ${def.number}${def.complement ? ` - ${def.complement}` : ""}`);
+          setDeliveryNeighborhood(def.neighborhood || "");
+        }
+      }
+    } catch { /* ignore */ }
+    finally { setPhoneSearching(false); }
+  };
+
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
