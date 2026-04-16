@@ -454,6 +454,19 @@ export default function Kiosk() {
         />
       )}
 
+      {step === "phone_collection" && customer?.cpf && (
+        <KioskPhoneCollection
+          primaryColor={primaryColor}
+          customerCpf={customer.cpf}
+          restaurantId={restaurant.id}
+          onPhoneSaved={(savedPhone) => {
+            setCustomer(prev => prev ? { ...prev, phone: savedPhone } : prev);
+            setStep("payment");
+          }}
+          onBack={() => setStep("consumption")}
+        />
+      )}
+
       {step === "payment" && (
         <KioskPayment
           cart={cart}
