@@ -244,6 +244,14 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
             </Select>
           </div>
 
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Corte Automático (ESC/POS)</Label>
+              <p className="text-sm text-muted-foreground">Envia comando de corte entre vias (impressoras térmicas compatíveis)</p>
+            </div>
+            <Switch checked={webConfig.supportsAutoCut} onCheckedChange={(checked) => setWebConfig(prev => ({ ...prev, supportsAutoCut: checked }))} />
+          </div>
+
           <Button variant="outline" onClick={testWebPrint} disabled={testing === 'web'}>
             <Printer className="h-4 w-4 mr-2" />
             {testing === 'web' ? 'Abrindo...' : 'Testar Impressão'}
