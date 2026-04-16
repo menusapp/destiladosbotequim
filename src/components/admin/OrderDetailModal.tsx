@@ -211,8 +211,9 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
 
   const getOrderOrigin = () => getOrderOriginLabel(order as any);
 
-  const canAddItems = order.status !== "cancelled";
-  const canRemoveItems = ["pending", "accepted", "preparing"].includes(order.status);
+  const isFinalized = ["delivered", "picked_up", "completed"].includes(order.status);
+  const canAddItems = !isFinalized && order.status !== "cancelled";
+  const canRemoveItems = ["pending", "accepted", "preparing", "ready", "out_for_delivery"].includes(order.status);
 
   const handleAddItems = () => { setShowAddItems(true); };
 
