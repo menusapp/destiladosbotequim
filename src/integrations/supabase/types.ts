@@ -2943,6 +2943,7 @@ export type Database = {
           paper_size: string
           print_copies: number
           restaurant_id: string
+          supports_auto_cut: boolean
           updated_at: string | null
         }
         Insert: {
@@ -2956,6 +2957,7 @@ export type Database = {
           paper_size?: string
           print_copies?: number
           restaurant_id: string
+          supports_auto_cut?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -2969,6 +2971,7 @@ export type Database = {
           paper_size?: string
           print_copies?: number
           restaurant_id?: string
+          supports_auto_cut?: boolean
           updated_at?: string | null
         }
         Relationships: [

@@ -16,6 +16,7 @@ interface WebPrinterConfig {
   fontSize: number;
   fontBold: boolean;
   printCopies: number;
+  supportsAutoCut: boolean;
 }
 
 const FONT_OPTIONS = [
@@ -43,6 +44,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     fontSize: 12,
     fontBold: true,
     printCopies: 1,
+    supportsAutoCut: false,
   });
 
   useEffect(() => {
@@ -65,6 +67,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           fontSize: (data as any).font_size || 12,
           fontBold: (data as any).font_bold !== undefined ? Boolean((data as any).font_bold) : true,
           printCopies: (data as any).print_copies || 1,
+          supportsAutoCut: Boolean((data as any).supports_auto_cut),
         });
       }
     } catch (error) {
@@ -86,6 +89,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           font_size: webConfig.fontSize,
           font_bold: webConfig.fontBold,
           print_copies: webConfig.printCopies,
+          supports_auto_cut: webConfig.supportsAutoCut,
           updated_at: new Date().toISOString(),
         } as any, { onConflict: 'restaurant_id' });
       if (error) throw error;
@@ -238,6 +242,14 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
                 <SelectItem value="4">4 vias</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Corte Automático (ESC/POS)</Label>
+              <p className="text-sm text-muted-foreground">Envia comando de corte entre vias (impressoras térmicas compatíveis)</p>
+            </div>
+            <Switch checked={webConfig.supportsAutoCut} onCheckedChange={(checked) => setWebConfig(prev => ({ ...prev, supportsAutoCut: checked }))} />
           </div>
 
           <Button variant="outline" onClick={testWebPrint} disabled={testing === 'web'}>

@@ -1,0 +1,1 @@
+ALTER TABLE public.printer_settings ADD COLUMN IF NOT EXISTS supports_auto_cut boolean NOT NULL DEFAULT false;
