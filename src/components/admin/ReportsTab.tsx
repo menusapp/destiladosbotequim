@@ -384,6 +384,25 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
         addToPaymentTotal(order.payment_type, orderTotal);
       });
 
+      // Somar PDV paid orders por payment_type
+      pdvPaidOrderIds.forEach(id => {
+        const order = (pdvPaidOrders || []).find((o: any) => o.id === id);
+        if (!order) return;
+        let orderTotal = 0;
+        (order.order_items || []).forEach((item: any) => {
+          const extrasTotal = (item.order_item_extras || []).reduce(
+            (sum: number, extra: any) => sum + Number(extra.price_at_order || 0), 0);
+          orderTotal += (item.price_at_order * item.quantity) + extrasTotal;
+        });
+        orderTotal -= Number(order.coupon_discount || 0);
+        addToPaymentTotal(order.payment_type, orderTotal);
+      });
+
+      // Somar uncovered cash entries
+      uncoveredCount.forEach((cm: any) => {
+        addToPaymentTotal(cm.payment_method, Number(cm.amount || 0));
+      });
+
       // Converter para array de exibição (apenas os que têm valor > 0)
       const paymentsByMethod: PaymentMethodSummary[] = Object.entries(paymentTotals)
         .filter(([_, total]) => total > 0)
