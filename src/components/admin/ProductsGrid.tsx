@@ -29,6 +29,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import ProductCard from "./ProductCard";
+import BulkDeleteProductsDialog from "./BulkDeleteProductsDialog";
 
 interface Product {
   id: string;
@@ -132,6 +133,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [visibilityChannels, setVisibilityChannels] = useState<string[]>(["all"]);
   const [kioskEnabled, setKioskEnabled] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -799,6 +801,14 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
               🪄 Importar por AI
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para excluir produtos"); return; } setBulkDeleteOpen(true); }}
+            title="Exclusão em massa"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
           <Button onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para adicionar produtos"); return; } resetForm(); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Novo Produto
           </Button>
