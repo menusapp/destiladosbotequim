@@ -155,8 +155,7 @@ export const AddItemsToOrderDrawer = ({
         if (extrasError) throw extrasError;
       }
 
-      // Deduct stock for the newly added item
-      await supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: orderItem.id });
+      // Stock deduction is handled by DB trigger on status change to delivered/picked_up
 
       toast.success(`${item.productName} adicionado ao pedido!`);
       setShowProductDrawer(false);
