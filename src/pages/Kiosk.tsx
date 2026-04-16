@@ -14,11 +14,12 @@ import { KioskConsumptionType, ConsumptionMode } from "@/components/kiosk/KioskC
 import { KioskPayment } from "@/components/kiosk/KioskPayment";
 import { KioskConfirmation } from "@/components/kiosk/KioskConfirmation";
 import { KioskDeliveryAddress } from "@/components/kiosk/KioskDeliveryAddress";
+import { KioskPhoneCollection } from "@/components/kiosk/KioskPhoneCollection";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
 
-export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "delivery_address" | "payment" | "confirmation";
+export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "phone_collection" | "delivery_address" | "payment" | "confirmation";
 
 export interface KioskCustomer {
   name: string;
@@ -301,9 +302,24 @@ export default function Kiosk() {
   };
 
   // After consumption type selection, route to address step if delivery, else payment
-  const handleConsumptionNext = () => {
+  const handleConsumptionNext = async () => {
     if (consumptionMode === "delivery") {
       setStep("delivery_address");
+    } else if (consumptionMode === "counter" && customer?.cpf) {
+      // Check if customer has phone for WhatsApp notification
+      const { data: cust } = await supabase
+        .from("customers")
+        .select("phone")
+        .eq("cpf", customer.cpf)
+        .eq("restaurant_id", restaurant.id)
+        .maybeSingle();
+      const hasPhone = !!cust?.phone?.trim();
+      if (hasPhone) {
+        setCustomer(prev => prev ? { ...prev, phone: cust!.phone! } : prev);
+        setStep("payment");
+      } else {
+        setStep("phone_collection");
+      }
     } else {
       setStep("payment");
     }
@@ -435,6 +451,19 @@ export default function Kiosk() {
             setDeliveryAddress(addr);
             setStep("payment");
           }}
+        />
+      )}
+
+      {step === "phone_collection" && customer?.cpf && (
+        <KioskPhoneCollection
+          primaryColor={primaryColor}
+          customerCpf={customer.cpf}
+          restaurantId={restaurant.id}
+          onPhoneSaved={(savedPhone) => {
+            setCustomer(prev => prev ? { ...prev, phone: savedPhone } : prev);
+            setStep("payment");
+          }}
+          onBack={() => setStep("consumption")}
         />
       )}
 
