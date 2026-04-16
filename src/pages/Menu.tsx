@@ -1069,9 +1069,9 @@ const Menu = () => {
   const cartItemCount = getTotalItemCount();
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
-      {/* Fixed header area */}
-      <div className="relative shrink-0">
+    <div className="min-h-screen bg-background">
+      {/* Header area */}
+      <div className="relative">
         <div className="h-48 overflow-hidden relative">
           {restaurant.banner_url ? (
             <div
@@ -1115,7 +1115,7 @@ const Menu = () => {
 
       {/* Restaurant closed banner */}
       {!restaurant.is_open && (
-        <div className="shrink-0 mx-4 mt-2 mb-1 px-4 py-3 rounded-lg bg-destructive/5 border border-destructive/20 flex items-center gap-3">
+        <div className="mx-4 mt-2 mb-1 px-4 py-3 rounded-lg bg-destructive/5 border border-destructive/20 flex items-center gap-3">
           <Clock className="w-5 h-5 text-destructive shrink-0" />
           <p className="text-sm text-destructive/80">
             Restaurante fechado no momento. Não é possível realizar pedidos.
@@ -1123,8 +1123,8 @@ const Menu = () => {
         </div>
       )}
 
-      {/* Scrollable product content */}
-      <div className="flex-1 overflow-y-auto min-h-0" style={{ paddingBottom: customerName ? '80px' : '0px' }}>
+      {/* Product content */}
+      <div style={{ paddingBottom: customerName ? '80px' : '0px' }}>
 
       {searchQuery.trim() ? (
         <div className="px-4 py-6">
