@@ -24,6 +24,7 @@ interface Settings {
   service_fee_enabled: boolean;
   service_fee_percentage: number;
   prep_time_minutes: number;
+  login_require_cpf: boolean;
   login_require_name: boolean;
   login_require_phone: boolean;
   login_require_birth_date: boolean;
@@ -45,6 +46,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     service_fee_enabled: false,
     service_fee_percentage: 10,
     prep_time_minutes: 30,
+    login_require_cpf: true,
     login_require_name: true,
     login_require_phone: false,
     login_require_birth_date: false,
@@ -63,7 +65,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_name, login_require_phone, login_require_birth_date, bill_request_enabled, show_prep_timer")
+        .select("logo_url, banner_url, primary_color, service_fee_enabled, service_fee_percentage, prep_time_minutes, login_require_cpf, login_require_name, login_require_phone, login_require_birth_date, bill_request_enabled, show_prep_timer")
         .eq("id", restaurantId)
         .maybeSingle();
 
@@ -77,6 +79,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: data.service_fee_enabled || false,
           service_fee_percentage: data.service_fee_percentage || 10,
           prep_time_minutes: data.prep_time_minutes || 30,
+          login_require_cpf: data.login_require_cpf ?? true,
           login_require_name: data.login_require_name ?? true,
           login_require_phone: data.login_require_phone ?? false,
           login_require_birth_date: data.login_require_birth_date ?? false,
@@ -136,6 +139,12 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
 
   const handleSaveSettings = async () => {
     try {
+      // Validate at least one customer field is active
+      if (!settings.login_require_cpf && !settings.login_require_name && !settings.login_require_phone) {
+        toast.error("É obrigatório manter pelo menos um campo de cadastro ativo (CPF, Nome ou Telefone)");
+        return;
+      }
+
       const { error } = await supabase
         .from('restaurants')
         .update({
@@ -143,6 +152,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           service_fee_enabled: settings.service_fee_enabled,
           service_fee_percentage: settings.service_fee_percentage,
           prep_time_minutes: settings.prep_time_minutes,
+          login_require_cpf: settings.login_require_cpf,
           login_require_name: settings.login_require_name,
           login_require_phone: settings.login_require_phone,
           login_require_birth_date: settings.login_require_birth_date,
@@ -413,11 +423,11 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
           <Card>
             <CardHeader>
               <CardTitle>Campos de Cadastro de Clientes</CardTitle>
-              <CardDescription>Defina quais informações são solicitadas ao cliente no login do cardápio</CardDescription>
+              <CardDescription>Defina quais informações são solicitadas ao cliente no login do cardápio. É obrigatório manter pelo menos um campo ativo.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="divide-y">
-                {/* CPF - Always required */}
+                {/* CPF */}
                 <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -428,10 +438,16 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                       <p className="text-xs text-muted-foreground">Identificação única do cliente</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Obrigatório</span>
-                    <Switch checked disabled />
-                  </div>
+                  <Switch
+                    checked={settings.login_require_cpf}
+                    onCheckedChange={(checked) => {
+                      if (!checked && !settings.login_require_name && !settings.login_require_phone) {
+                        toast.error("Pelo menos um campo deve estar ativo");
+                        return;
+                      }
+                      setSettings({ ...settings, login_require_cpf: checked });
+                    }}
+                  />
                 </div>
 
                 {/* Nome */}
@@ -447,7 +463,13 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                   </div>
                   <Switch
                     checked={settings.login_require_name}
-                    onCheckedChange={(checked) => setSettings({ ...settings, login_require_name: checked })}
+                    onCheckedChange={(checked) => {
+                      if (!checked && !settings.login_require_cpf && !settings.login_require_phone) {
+                        toast.error("Pelo menos um campo deve estar ativo");
+                        return;
+                      }
+                      setSettings({ ...settings, login_require_name: checked });
+                    }}
                   />
                 </div>
 
@@ -464,7 +486,13 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                   </div>
                   <Switch
                     checked={settings.login_require_phone}
-                    onCheckedChange={(checked) => setSettings({ ...settings, login_require_phone: checked })}
+                    onCheckedChange={(checked) => {
+                      if (!checked && !settings.login_require_cpf && !settings.login_require_name) {
+                        toast.error("Pelo menos um campo deve estar ativo");
+                        return;
+                      }
+                      setSettings({ ...settings, login_require_phone: checked });
+                    }}
                   />
                 </div>
 

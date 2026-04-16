@@ -1,0 +1,1 @@
+ALTER TABLE public.restaurants ADD COLUMN login_require_cpf boolean NOT NULL DEFAULT true;
