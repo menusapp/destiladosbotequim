@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, AlertTriangle, Package, Trash2 } from "lucide-react";
+import { Plus, Search, AlertTriangle, Package, Pencil } from "lucide-react";
 import StockCard from "./StockCard";
 import BulkDeleteStockDialog from "./BulkDeleteStockDialog";
 
@@ -278,9 +278,9 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
             variant="outline"
             size="icon"
             onClick={() => setBulkDeleteOpen(true)}
-            title="Exclusão em massa"
+            title="Edição em massa"
           >
-            <Trash2 className="h-4 w-4" />
+            <Pencil className="h-4 w-4" />
           </Button>
           <Button onClick={() => {
             resetForms();

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Trash2, Loader2 } from "lucide-react";
+import { Search, Trash2, Loader2, Pencil, ToggleLeft, ToggleRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BulkDeleteStockDialogProps {
@@ -20,14 +20,18 @@ interface StockItem {
   id: string;
   name: string;
   category_name: string;
+  is_active: boolean;
 }
+
+type BulkAction = "activate" | "deactivate" | "delete";
 
 const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: BulkDeleteStockDialogProps) => {
   const [items, setItems] = useState<StockItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<BulkAction>("delete");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,7 +45,7 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
   const fetchItems = async () => {
     const { data } = await supabase
       .from("stock_items")
-      .select("id, name, stock_categories(name)")
+      .select("id, name, is_active, stock_categories(name)")
       .eq("restaurant_id", restaurantId)
       .order("name");
     
@@ -50,6 +54,7 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
         id: i.id,
         name: i.name,
         category_name: i.stock_categories?.name || "Sem categoria",
+        is_active: i.is_active ?? true,
       }))
     );
   };
@@ -87,35 +92,81 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
     });
   };
 
-  const handleConfirmDelete = async () => {
-    setDeleting(true);
+  const requestAction = (action: BulkAction) => {
+    setPendingAction(action);
+    setConfirmOpen(true);
+  };
+
+  const confirmationText: Record<BulkAction, { title: string; description: string; button: string }> = {
+    activate: {
+      title: "Confirmar Ativação",
+      description: `Tem certeza que deseja ativar ${selected.size} insumo(s)?`,
+      button: `Ativar ${selected.size} insumo(s)`,
+    },
+    deactivate: {
+      title: "Confirmar Desativação",
+      description: `Tem certeza que deseja desativar ${selected.size} insumo(s)?`,
+      button: `Desativar ${selected.size} insumo(s)`,
+    },
+    delete: {
+      title: "Confirmar Exclusão",
+      description: `Tem certeza que deseja excluir ${selected.size} insumo(s)? Esta ação não pode ser desfeita.`,
+      button: `Excluir ${selected.size} insumo(s)`,
+    },
+  };
+
+  const handleConfirm = async () => {
+    setProcessing(true);
     let errors = 0;
-    for (const id of selected) {
-      const { error } = await supabase.rpc("admin_delete_stock_item", {
-        p_stock_item_id: id,
-        p_restaurant_id: restaurantId,
-      });
-      if (error) errors++;
-    }
-    setDeleting(false);
-    setConfirmOpen(false);
-    if (errors > 0) {
-      toast({ title: `${errors} insumo(s) não puderam ser excluídos`, variant: "destructive" });
+
+    if (pendingAction === "delete") {
+      for (const id of selected) {
+        const { error } = await supabase.rpc("admin_delete_stock_item", {
+          p_stock_item_id: id,
+          p_restaurant_id: restaurantId,
+        });
+        if (error) errors++;
+      }
     } else {
-      toast({ title: `${selected.size} insumo(s) excluído(s)` });
+      const newActive = pendingAction === "activate";
+      for (const id of selected) {
+        const { error } = await supabase
+          .from("stock_items")
+          .update({ is_active: newActive })
+          .eq("id", id)
+          .eq("restaurant_id", restaurantId);
+        if (error) errors++;
+      }
+    }
+
+    setProcessing(false);
+    setConfirmOpen(false);
+
+    const labels: Record<BulkAction, string> = {
+      activate: "ativado(s)",
+      deactivate: "desativado(s)",
+      delete: "excluído(s)",
+    };
+
+    if (errors > 0) {
+      toast({ title: `${errors} insumo(s) não puderam ser ${labels[pendingAction]}`, variant: "destructive" });
+    } else {
+      toast({ title: `${selected.size} insumo(s) ${labels[pendingAction]}` });
     }
     onOpenChange(false);
     onDeleted();
   };
 
+  const ct = confirmationText[pendingAction];
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-lg flex flex-col" style={{ maxHeight: "80vh" }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-destructive" />
-              Exclusão em Massa — Insumos
+              <Pencil className="h-5 w-5 text-primary" />
+              Edição em Massa — Insumos
             </DialogTitle>
           </DialogHeader>
 
@@ -129,7 +180,7 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
             />
           </div>
 
-          <ScrollArea className="flex-1 min-h-0" style={{ maxHeight: "400px" }}>
+          <ScrollArea className="flex-1 min-h-0">
             <div className="space-y-4 pr-4">
               {grouped.map(([cat, catItems]) => {
                 const allSelected = catItems.every(i => selected.has(i.id));
@@ -149,7 +200,10 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
                             checked={selected.has(item.id)}
                             onCheckedChange={() => toggleItem(item.id)}
                           />
-                          <span className="text-sm">{item.name}</span>
+                          <span className="text-sm flex-1">{item.name}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${item.is_active ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
+                            {item.is_active ? "Ativo" : "Inativo"}
+                          </span>
                         </label>
                       ))}
                     </div>
@@ -162,16 +216,37 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
             </div>
           </ScrollArea>
 
-          <div className="flex items-center justify-between pt-2 border-t">
+          <div className="flex items-center justify-between pt-2 border-t gap-2 flex-wrap">
             <span className="text-sm text-muted-foreground">{selected.size} selecionado(s)</span>
-            <Button
-              variant="destructive"
-              disabled={selected.size === 0}
-              onClick={() => setConfirmOpen(true)}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Excluir Selecionados
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selected.size === 0}
+                onClick={() => requestAction("activate")}
+              >
+                <ToggleRight className="h-4 w-4 mr-1" />
+                Ativar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selected.size === 0}
+                onClick={() => requestAction("deactivate")}
+              >
+                <ToggleLeft className="h-4 w-4 mr-1" />
+                Desativar
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={selected.size === 0}
+                onClick={() => requestAction("delete")}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Excluir
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -179,20 +254,18 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir {selected.size} insumo(s)? Esta ação não pode ser desfeita e removerá os insumos de todas as receitas.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{ct.title}</AlertDialogTitle>
+            <AlertDialogDescription>{ct.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={processing}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleConfirmDelete}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirm}
+              disabled={processing}
+              className={pendingAction === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
             >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Excluir {selected.size} insumo(s)
+              {processing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {ct.button}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
