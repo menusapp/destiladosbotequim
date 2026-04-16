@@ -1755,7 +1755,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                 </Button>
               )}
             </div>
-            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !hasSelectedCustomer}>
+            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim() || !validateCPF(customerCpf)}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               Criar Pedido
             </Button>
