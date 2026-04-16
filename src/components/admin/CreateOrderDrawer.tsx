@@ -64,6 +64,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerCpf, setCustomerCpf] = useState("");
+  const [foundCustomer, setFoundCustomer] = useState<{ name: string; phone: string } | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryCep, setDeliveryCep] = useState("");
   const [deliveryNeighborhood, setDeliveryNeighborhood] = useState("");
@@ -237,7 +238,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
 
   const clearForm = () => {
     setCart([]);
-    setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
+    setCustomerName(""); setCustomerPhone(""); setCustomerCpf(""); setFoundCustomer(null);
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
     setDiscountType("percentage"); setDiscountValue("");
@@ -531,17 +532,37 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                   </div>
                   <Input placeholder="CPF do cliente *" value={customerCpf} onChange={e => {
                     setCustomerCpf(e.target.value);
+                    setFoundCustomer(null);
                     const clean = e.target.value.replace(/\D/g, "");
                     if (clean.length === 11) {
                       supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", e.target.value).maybeSingle()
                         .then(({ data }) => {
                           if (data) {
-                            setCustomerName(data.name);
-                            setCustomerPhone(data.phone || "");
+                            setFoundCustomer({ name: data.name, phone: data.phone || "" });
                           }
                         });
                     }
                   }} />
+                  {foundCustomer && (
+                    <div className="flex items-center justify-between gap-2 p-2 rounded-md border border-primary/30 bg-primary/5 text-xs">
+                      <span className="text-foreground">
+                        Cliente já cadastrado: <strong>{foundCustomer.name}</strong>
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          setCustomerName(foundCustomer.name);
+                          setCustomerPhone(foundCustomer.phone);
+                          setFoundCustomer(null);
+                        }}
+                      >
+                        Preencher
+                      </Button>
+                    </div>
+                  )}
                   <Input placeholder="Nome do cliente *" value={customerName} onChange={e => setCustomerName(e.target.value)} />
                   <Input placeholder="Celular do cliente" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
                   {!hasValidCustomer && (
