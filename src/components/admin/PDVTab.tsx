@@ -585,12 +585,15 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       neighborhood: newAddrNeighborhood, city: newAddrCity, state: newAddrState, zip_code: newAddrCep,
     };
 
-    // Save to DB if customer has CPF
-    if (selectedCustomer) {
+    // Save to DB if customer has CPF (registered or not — will be saved to CRM on order creation)
+    const cpfToUse = selectedCustomer?.cpf || customerCpf;
+    const nameToUse = selectedCustomer?.name || customerName.trim();
+    const phoneToUse = selectedCustomer?.phone || customerPhone;
+    if (cpfToUse && validateCPF(cpfToUse)) {
       await supabase.from("customer_addresses").insert({
-        customer_cpf: selectedCustomer.cpf,
-        customer_name: selectedCustomer.name,
-        customer_phone: selectedCustomer.phone,
+        customer_cpf: cpfToUse,
+        customer_name: nameToUse || "Cliente",
+        customer_phone: phoneToUse || "",
         street: addr.street, number: addr.number, complement: addr.complement,
         neighborhood: addr.neighborhood, city: addr.city, state: addr.state, zip_code: addr.zip_code,
       });
