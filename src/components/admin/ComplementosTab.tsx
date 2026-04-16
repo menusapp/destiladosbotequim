@@ -68,7 +68,17 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
 
   const fetchAllProducts = async () => {
     const { data } = await supabase.from("products").select("id, name, category_id, categories!inner(restaurant_id)").eq("categories.restaurant_id", restaurantId).order("name");
-    setAllProducts((data || []).map((p: any) => ({ id: p.id, name: p.name })));
+    setAllProducts((data || []).map((p: any) => ({ id: p.id, name: p.name, category_id: p.category_id })));
+    // Build menu categories with product counts
+    const catMap = new Map<string, { name: string; count: number }>();
+    const { data: cats } = await supabase.from("categories").select("id, name").eq("restaurant_id", restaurantId).eq("is_active", true).order("display_order");
+    (cats || []).forEach((c: any) => catMap.set(c.id, { name: c.name, count: 0 }));
+    (data || []).forEach((p: any) => {
+      if (p.category_id && catMap.has(p.category_id)) {
+        catMap.get(p.category_id)!.count++;
+      }
+    });
+    setMenuCategories(Array.from(catMap.entries()).map(([id, v]) => ({ id, name: v.name, product_count: v.count })));
   };
 
   const fetchStockItems = async () => {
