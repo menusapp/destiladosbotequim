@@ -145,6 +145,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
         return;
       }
 
+      const { error } = await supabase
         .from('restaurants')
         .update({
           primary_color: settings.primary_color,
