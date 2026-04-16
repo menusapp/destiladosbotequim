@@ -44,6 +44,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     fontSize: 12,
     fontBold: true,
     printCopies: 1,
+    supportsAutoCut: false,
   });
 
   useEffect(() => {
