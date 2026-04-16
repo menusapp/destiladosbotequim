@@ -807,11 +807,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           .order("created_at", { ascending: false })
           .limit(1)
           .single();
-        if (lastOrder.data?.order_items) {
-          for (const oi of lastOrder.data.order_items) {
-            await supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: oi.id });
-          }
-        }
+        // Stock deduction is handled by DB trigger on status change to delivered/picked_up
       }
 
       toast.success("Pedido criado com sucesso!");

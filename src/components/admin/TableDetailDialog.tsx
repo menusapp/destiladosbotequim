@@ -347,17 +347,10 @@ export const TableDetailDialog = ({
       )
     );
 
-    // Deduct stock for pending orders + mark all as delivered in parallel
+    // Mark all orders as delivered - stock deduction handled by DB trigger
     await Promise.all(
       orderDataResults.map(async ({ data: orderData }) => {
         if (!orderData) return;
-        if (orderData.status === "pending") {
-          await Promise.all(
-            (orderData.order_items || []).map((oi: any) =>
-              supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: oi.id })
-            )
-          );
-        }
         await supabase.from("orders").update({ status: "delivered" }).eq("id", orderData.id);
       })
     );
@@ -465,18 +458,8 @@ export const TableDetailDialog = ({
       // All splits paid for this comanda — auto-close using existing flow
       const orderIdsToClose = comandaOrders.map((o: any) => o.id);
 
-      // Deduct stock for pending orders and mark delivered
+      // Mark all orders as delivered - stock deduction handled by DB trigger
       for (const oid of orderIdsToClose) {
-        const { data: orderData } = await supabase.from("orders")
-          .select("id, status, order_items(id)")
-          .eq("id", oid)
-          .single();
-
-        if (orderData && ["pending"].includes(orderData.status)) {
-          for (const oi of (orderData.order_items || [])) {
-            await supabase.rpc("deduct_stock_for_order_item", { p_order_item_id: oi.id });
-          }
-        }
         await supabase.from("orders").update({ status: "delivered" }).eq("id", oid);
       }
 
