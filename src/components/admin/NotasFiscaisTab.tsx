@@ -430,12 +430,23 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
       <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4" style={{ minHeight: "500px" }}>
         {/* Left: A Emitir */}
         <Card className="flex flex-col">
-          <div className="p-4 border-b">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-600" />
-              A Emitir
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Pedidos aguardando emissão de nota</p>
+          <div className="p-4 border-b space-y-2">
+            <div>
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Clock className="h-4 w-4 text-yellow-600" />
+                A Emitir
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Pedidos aguardando emissão de nota</p>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, CPF ou ID..."
+                value={pendingSearch}
+                onChange={(e) => setPendingSearch(e.target.value)}
+                className="h-8 text-xs pl-8"
+              />
+            </div>
           </div>
           <ScrollArea className="flex-1 h-[500px]">
             <div className="p-3">
@@ -443,6 +454,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
                 restaurantId={restaurantId}
                 dateRange={dateRange}
                 onEmitted={fetchNotes}
+                searchTerm={pendingSearch}
               />
             </div>
           </ScrollArea>
