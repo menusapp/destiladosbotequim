@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     if (!restaurant_id) {
       return new Response(
         JSON.stringify({ success: false, error: "restaurant_id é obrigatório" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       if (fetchError || !creds) {
         return new Response(
           JSON.stringify({ success: false, error: "Credenciais do restaurante não encontradas" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       if (!valid) {
         return new Response(
           JSON.stringify({ success: false, error: "Senha atual do restaurante incorreta", section: "restaurant" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
         if (existing && existing.length > 0) {
           return new Response(
             JSON.stringify({ success: false, error: "Este usuário de restaurante já está em uso", section: "restaurant" }),
-            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         credUpdate.username = new_restaurant_username;
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
         if (slugExisting && slugExisting.length > 0) {
           return new Response(
             JSON.stringify({ success: false, error: "Este slug já está em uso", section: "restaurant" }),
-            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         restUpdate.slug = new_restaurant_slug;
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
       if (staffFetchError || !staff) {
         return new Response(
           JSON.stringify({ success: false, error: "Conta de staff não encontrada", section: "staff" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
       if (!validStaff) {
         return new Response(
           JSON.stringify({ success: false, error: "Senha atual da conta incorreta", section: "staff" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
         if (existingStaff && existingStaff.length > 0) {
           return new Response(
             JSON.stringify({ success: false, error: "Este usuário de conta já está em uso", section: "staff" }),
-            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         staffUpdate.username = new_staff_username;
@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
     return new Response(
       JSON.stringify({ success: false, error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
