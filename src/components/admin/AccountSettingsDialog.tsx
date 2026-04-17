@@ -165,7 +165,7 @@ export const AccountSettingsDialog = ({ open, onOpenChange, restaurantId }: Acco
         if (restUsername) localStorage.setItem("restaurant_username", restUsername);
       }
       if (hasStaffChanges) {
-        if (staffUsername) localStorage.setItem("staff_username", staffUsername);
+        if (staffUsername) localStorage.setItem("staff_name", staffUsername);
       }
 
       toast.success("Dados atualizados com sucesso!");
