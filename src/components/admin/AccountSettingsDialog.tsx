@@ -51,6 +51,7 @@ const PasswordField = ({
 );
 
 export const AccountSettingsDialog = ({ open, onOpenChange, restaurantId }: AccountSettingsDialogProps) => {
+  const isAdmin = (localStorage.getItem("staff_role") || "") === "admin";
   // Restaurant side
   const [restName, setRestName] = useState("");
   const [restSlug, setRestSlug] = useState("");
