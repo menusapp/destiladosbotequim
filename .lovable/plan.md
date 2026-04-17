@@ -1,45 +1,71 @@
 
+## Plano: Corrigir Realtime Multi-Tenant
 
-## Exclusão em Massa — Cardápio (Produtos) e Estoque (Insumos)
+### Problema
+Canais Supabase Realtime com nomes genéricos (sem `restaurantId`) podem causar vazamento de eventos entre restaurantes diferentes quando rodando 3+ contas simultâneas. Exemplo: operador do Restaurante A recebe notificação de pedido do Restaurante B.
 
-### O que será feito
-Adicionar um botão pequeno "Excluir em massa" ao lado da barra de busca em ambas as telas (ProductsGrid e StockItemsGrid). Ao clicar, abre um Dialog com:
-- Lista de todos os itens agrupados por categoria
-- Checkbox em cada item + "selecionar todos" por categoria
-- Contador de selecionados
-- Botão "Excluir selecionados" com confirmação
+### Investigação necessária
+Vou varrer todos os `supabase.channel(...)` do projeto e identificar quais não incluem `restaurantId` no nome. Já mapeados na auditoria anterior:
+- `pdv-tables-rt`
+- `menu-changes`
+- E outros a confirmar (PendingOrdersPanel, NewOrderNotification, RealtimeStatusIndicator, hooks de polling, etc.)
 
-### Componentes
+### Correção (padrão único)
+Renomear cada canal para incluir o ID do restaurante:
+```ts
+// ANTES (vulnerável):
+supabase.channel('pdv-tables-rt')
 
-**1. Novo componente: `BulkDeleteProductsDialog.tsx`**
-- Recebe `restaurantId`, `open`, `onOpenChange`, `onDeleted`
-- Busca produtos agrupados por categoria
-- Checkbox por produto + "selecionar categoria inteira"
-- Barra de busca interna para filtrar
-- Ao confirmar, chama `admin_delete_product` em loop para cada ID selecionado
-- Respeita a regra de restaurante aberto (bloqueia se `isRestaurantOpen`)
+// DEPOIS (isolado):
+supabase.channel(`pdv-tables-rt-${restaurantId}`)
+```
 
-**2. Novo componente: `BulkDeleteStockDialog.tsx`**
-- Mesma estrutura, busca insumos agrupados por `stock_categories`
-- Usa `admin_delete_stock_item` RPC para cada item
+E no filtro do `.on('postgres_changes', ...)` adicionar `filter: 'restaurant_id=eq.${restaurantId}'` quando a tabela tiver essa coluna, para reduzir tráfego além de garantir isolamento.
 
-**3. Alteração em `ProductsGrid.tsx`**
-- Adicionar botão `Trash2` pequeno (variant="outline", size="icon") ao lado do botão "Novo Produto"
-- Abre `BulkDeleteProductsDialog`
+### Arquivos prováveis a editar
+- `src/components/admin/PDVTab.tsx`
+- `src/components/admin/UnifiedOrdersTab.tsx`
+- `src/components/admin/PendingOrdersPanel.tsx`
+- `src/components/admin/NewOrderNotification.tsx`
+- `src/components/admin/NewBillNotification.tsx`
+- `src/components/admin/NewReservationNotification.tsx`
+- `src/components/admin/TablesTab.tsx`
+- `src/components/admin/OverviewTab.tsx`
+- `src/components/admin/FluxoCaixaTab.tsx`
+- `src/components/menu/*` (cardápio digital — listeners de status de pedido)
+- `src/components/kiosk/*` (totem)
+- `src/hooks/useRealtimeStatus.ts`
+- Outros que aparecerem na busca
 
-**4. Alteração em `StockItemsGrid.tsx`**
-- Mesmo botão ao lado de "Novo Insumo"
-- Abre `BulkDeleteStockDialog`
+(Lista exata será confirmada com `grep` de `supabase.channel(` no momento da execução.)
 
-### Detalhes técnicos
-- Exclusão sequencial com `Promise.all` limitado ou loop `for...of` para evitar sobrecarga
-- ScrollArea com altura fixa no dialog para listas longas
-- AlertDialog de confirmação final antes de executar ("Tem certeza que deseja excluir X itens?")
-- Após exclusão, chama callback `onDeleted` para refresh da lista principal
+### O que pode quebrar / efeitos colaterais
 
-### Arquivos
-- Criar: `src/components/admin/BulkDeleteProductsDialog.tsx`
-- Criar: `src/components/admin/BulkDeleteStockDialog.tsx`
-- Editar: `src/components/admin/ProductsGrid.tsx` (adicionar botão + import)
-- Editar: `src/components/admin/StockItemsGrid.tsx` (adicionar botão + import)
+**Risco real: BAIXO**, desde que feito com cuidado. Detalhes:
 
+1. **Reconexão automática** — ao mudar nome de canal, clientes já abertos (operadores logados no momento do deploy) precisam recarregar a aba para pegar o novo canal. Sem reload, ficam ouvindo o canal antigo (que ninguém mais publica). **Mitigação:** avisar operadores para dar F5 após o deploy, ou já estará resolvido no próximo login.
+
+2. **Cardápio digital de cliente** — clientes com a aba aberta no momento do deploy também precisam recarregar. Mitigação: refresh natural quando trocam de tela.
+
+3. **Filtros `restaurant_id=eq.X`** — se aplicados em tabelas que não têm essa coluna (raro), o canal não sobe. **Mitigação:** só aplicar filtro em tabelas que comprovadamente têm `restaurant_id` (orders, tables, bills, products, etc.). Tabelas filhas (order_items, order_item_extras) ficarão sem filtro de coluna mas ainda terão isolamento pelo nome do canal.
+
+4. **Notificações de novo pedido / nova mesa / nova reserva** — se o canal antigo era ouvido em múltiplos lugares, todos precisam ser renomeados juntos. Vou garantir busca completa antes de editar.
+
+5. **Não afeta:**
+   - Lógica de negócio (criação/edição de pedidos, pagamentos, estoque, fiscal)
+   - Banco de dados (zero migrations)
+   - Edge functions
+   - Autenticação
+   - iFood/Delivery Direto polling (não usa realtime)
+   - WhatsApp bot
+
+### Plano de execução (3 passos)
+1. **Mapear** todos os `supabase.channel(...)` do projeto com `code--search_files`
+2. **Renomear** cada canal incluindo `${restaurantId}` e adicionar `filter` quando aplicável
+3. **Validar** que cada `useEffect` que cria canal tem `restaurantId` nas dependências e cleanup correto no return
+
+### Esforço
+~15-25 arquivos editados, mudanças mecânicas e seguras. ~30 min de trabalho. Zero risco para banco/lógica.
+
+### Recomendação pós-deploy
+Pedir para os operadores logados darem F5 uma única vez após o deploy. A partir daí, isolamento garantido.
