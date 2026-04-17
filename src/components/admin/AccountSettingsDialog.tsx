@@ -250,6 +250,7 @@ export const AccountSettingsDialog = ({ open, onOpenChange, restaurantId }: Acco
                   placeholder="Mínimo 6 caracteres"
                 />
               </div>
+              )}
 
               {/* RIGHT: Staff account */}
               <div className="space-y-3 border border-border rounded-lg p-4">
