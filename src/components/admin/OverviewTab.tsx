@@ -73,7 +73,7 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
 
     const ch = supabase.channel(`overview-rt-${restaurantId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => debouncedRefetch())
-      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, () => debouncedRefetch())
+      .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements", filter: `restaurant_id=eq.${restaurantId}` }, () => debouncedRefetch())
       .subscribe();
     return () => {
       supabase.removeChannel(ch);

@@ -107,10 +107,10 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
     fetchCurrentSession();
     fetchClosedSessions();
     const ch = supabase.channel(`cash-rt-${restaurantId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements", filter: `restaurant_id=eq.${restaurantId}` }, () => {
         if (currentSession) fetchMovements();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "cash_register_sessions" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "cash_register_sessions", filter: `restaurant_id=eq.${restaurantId}` }, () => {
         fetchCurrentSession();
         fetchClosedSessions();
       })
