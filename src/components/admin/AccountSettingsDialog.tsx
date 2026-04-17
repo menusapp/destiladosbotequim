@@ -158,12 +158,14 @@ export const AccountSettingsDialog = ({ open, onOpenChange, restaurantId }: Acco
       if (data && !data.success) throw new Error(data.error || "Erro desconhecido ao atualizar dados");
 
       // Sync localStorage
+      const previousSlug = localStorage.getItem("restaurant_slug");
       if (hasRestChanges) {
         if (restName) localStorage.setItem("restaurant_name", restName);
         if (restSlug) localStorage.setItem("restaurant_slug", restSlug);
+        if (restUsername) localStorage.setItem("restaurant_username", restUsername);
       }
-      if (hasStaffChanges && staffUsername) {
-        localStorage.setItem("staff_name", staffUsername);
+      if (hasStaffChanges) {
+        if (staffUsername) localStorage.setItem("staff_username", staffUsername);
       }
 
       toast.success("Dados atualizados com sucesso!");
@@ -173,10 +175,14 @@ export const AccountSettingsDialog = ({ open, onOpenChange, restaurantId }: Acco
       setStaffNewPw("");
       onOpenChange(false);
 
-      // If slug changed, redirect
-      if (hasRestChanges && restSlug && restSlug !== (localStorage.getItem("restaurant_slug"))) {
+      // If slug changed, redirect to new slug URL
+      if (hasRestChanges && restSlug && restSlug !== previousSlug) {
         window.location.href = `/${restSlug}/admin`;
+        return;
       }
+
+      // Force reload so header/sidebar reflect updated name/username immediately
+      window.location.reload();
     } catch (err: any) {
       toast.error(err.message || "Erro ao atualizar dados");
     } finally {
