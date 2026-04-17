@@ -201,8 +201,9 @@ export const AccountSettingsDialog = ({ open, onOpenChange, restaurantId }: Acco
           <p className="text-center text-muted-foreground py-6">Carregando...</p>
         ) : (
           <form onSubmit={handleSave}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* LEFT: Restaurant */}
+            <div className={`grid grid-cols-1 ${isAdmin ? "md:grid-cols-2" : ""} gap-6`}>
+              {/* LEFT: Restaurant — admin only */}
+              {isAdmin && (
               <div className="space-y-3 border border-border rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Store className="h-4 w-4 text-primary" />
