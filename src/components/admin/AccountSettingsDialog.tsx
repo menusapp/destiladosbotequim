@@ -143,8 +143,19 @@ export const AccountSettingsDialog = ({ open, onOpenChange, restaurantId }: Acco
       }
 
       const { data, error } = await supabase.functions.invoke("update-restaurant-credentials", { body });
-      if (error) throw error;
-      if (data && !data.success) throw new Error(data.error);
+      // Try to extract structured error from FunctionsHttpError context
+      if (error) {
+        let detailedMsg = error.message;
+        try {
+          const ctxRes = (error as any)?.context;
+          if (ctxRes && typeof ctxRes.json === "function") {
+            const parsed = await ctxRes.json();
+            if (parsed?.error) detailedMsg = parsed.error;
+          }
+        } catch { /* ignore */ }
+        throw new Error(detailedMsg);
+      }
+      if (data && !data.success) throw new Error(data.error || "Erro desconhecido ao atualizar dados");
 
       // Sync localStorage
       if (hasRestChanges) {
