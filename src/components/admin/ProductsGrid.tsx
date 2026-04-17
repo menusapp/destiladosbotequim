@@ -570,11 +570,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
     }
 
     // Cria tudo em PARALELO (ingredientes fixos + variações + complementos avulsos + grupos vinculados)
-    const insertOps: Promise<any>[] = [];
+    const insertOps: Promise<unknown>[] = [];
 
     if (ingredientType === "fixed" && ingredients.length > 0) {
       insertOps.push(
-        supabase.from("product_ingredients").insert(ingredients.map(ing => ({ product_id: productId, stock_item_id: ing.stock_item_id, quantity: ing.quantity })))
+        Promise.resolve(supabase.from("product_ingredients").insert(ingredients.map(ing => ({ product_id: productId, stock_item_id: ing.stock_item_id, quantity: ing.quantity }))))
       );
     }
 
@@ -608,7 +608,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
         display_order: index,
       }));
       insertOps.push(
-        supabase.from("product_complement_groups").insert(groupsData).then(({ error: groupError }) => {
+        Promise.resolve(supabase.from("product_complement_groups").insert(groupsData)).then(({ error: groupError }) => {
           if (groupError) {
             console.error("Erro ao salvar complementos:", groupError);
             toast.error("Erro ao salvar complementos vinculados");
