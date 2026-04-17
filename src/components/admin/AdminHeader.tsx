@@ -170,12 +170,10 @@ export const AdminHeader = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {staffRole && <DropdownMenuItem className="text-xs text-muted-foreground" disabled>{staffRole === 'admin' ? 'Administrador' : staffRole.charAt(0).toUpperCase() + staffRole.slice(1)}</DropdownMenuItem>}
-          {staffRole === 'admin' && (
-            <DropdownMenuItem onClick={() => setAccountDialogOpen(true)}>
-              <Settings className="h-4 w-4 mr-2" />
-              Dados da Conta
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem onClick={() => setAccountDialogOpen(true)}>
+            <Settings className="h-4 w-4 mr-2" />
+            Dados da Conta
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={handleLogout}>Trocar Conta</DropdownMenuItem>
           <DropdownMenuItem onClick={handleFullLogout}>Sair do Restaurante</DropdownMenuItem>
         </DropdownMenuContent>
