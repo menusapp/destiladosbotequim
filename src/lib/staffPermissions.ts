@@ -37,7 +37,7 @@ export const STAFF_ROLES: { value: StaffRole; label: string; description: string
 export const ROLE_DEFAULT_SECTIONS: Record<StaffRole, string[]> = {
   admin: ALL_SECTIONS.map(s => s.id),
   gerente: ALL_SECTIONS.map(s => s.id).filter(id => id !== "modulos"),
-  caixa: ["pedidos", "pdv", "caixa"],
+  caixa: ["visao-geral", "pedidos", "pdv", "caixa"],
   garcom: ["pedidos", "mesas-reservas", "pdv"],
   cozinha: ["pedidos"],
   atendente: ["pedidos", "clientes", "mesas-reservas"],
