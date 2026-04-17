@@ -13,7 +13,10 @@ interface CardapioTabProps {
   isRestaurantOpen: boolean;
 }
 
-const CardapioTab = ({ restaurantId, isRestaurantOpen }: CardapioTabProps) => {
+const CardapioTab = ({ restaurantId, isRestaurantOpen: _isRestaurantOpen }: CardapioTabProps) => {
+  // Edição de cardápio liberada mesmo com restaurante aberto.
+  // Alterações são salvas direto no banco e propagadas via realtime para Delivery, Mesa e Totem.
+  const isRestaurantOpen = false;
   const [activeTab, setActiveTab] = useState("produtos");
   const [digitizerOpen, setDigitizerOpen] = useState(false);
   const [digitizerMode, setDigitizerMode] = useState<ImportMode>("products");
