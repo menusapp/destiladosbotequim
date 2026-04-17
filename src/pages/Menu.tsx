@@ -434,7 +434,7 @@ const Menu = () => {
     const savedCustomerInfo = sessionStorage.getItem("customerInfo");
     const currentCustomer = savedCustomerInfo ? JSON.parse(savedCustomerInfo) : null;
     
-    const channel = supabase.channel('menu-changes')
+    const channel = supabase.channel(`menu-changes-${restaurantSlug}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 

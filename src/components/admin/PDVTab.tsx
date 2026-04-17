@@ -318,7 +318,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
   // Realtime for tables and orders — filtered by restaurant_id
   useEffect(() => {
-    const ch = supabase.channel("pdv-tables-rt")
+    const ch = supabase.channel(`pdv-tables-rt-${restaurantId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tables", filter: `restaurant_id=eq.${restaurantId}` }, () => refetchTables())
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas", filter: `restaurant_id=eq.${restaurantId}` }, () => refetchTables())
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => { refetchPendingOrders(); refetchActiveOrders(); queryClient.invalidateQueries({ queryKey: ["pdv-searchable-orders"] }); })
