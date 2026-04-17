@@ -253,8 +253,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
   }, [restaurantId]);
 
   const fetchStockItems = async () => {
-    const { data } = await supabase.from("stock_items").select("id, name, unit, price_per_unit").eq("restaurant_id", restaurantId);
-    setStockItems(data || []);
+    const { data } = await supabase.from("stock_items").select("id, name, unit, price_per_unit").eq("restaurant_id", restaurantId).order("name");
+    setStockItems((data || []).sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt-BR")));
   };
 
   const fetchComplementCategories = async () => {
@@ -1091,7 +1091,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
                             <Button type="button" variant="outline" size="icon" onClick={handleAddVariationIngredient}><Plus className="h-4 w-4" /></Button>
                           </div>
                           {variationIngredients.length > 0 && (
-                            <div className="space-y-1">{variationIngredients.map((ing) => (
+                            <div className="space-y-1">{[...variationIngredients].sort((a, b) => (a.stock_item_name || "").localeCompare(b.stock_item_name || "", "pt-BR")).map((ing) => (
                               <div key={ing.id} className="flex items-center justify-between p-2 bg-background rounded text-xs">
                                 <span>{ing.stock_item_name} — {ing.quantity} {ing.stock_item_unit} — <b>R$ {((ing.stock_item_price || 0) * ing.quantity).toFixed(2)}</b></span>
                                 <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveVariationIngredient(ing.id)}><Trash2 className="h-3 w-3" /></Button>

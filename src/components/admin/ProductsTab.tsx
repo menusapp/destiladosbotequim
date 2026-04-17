@@ -1028,7 +1028,7 @@ const handleDelete = async (id: string) => {
 
                       {categoryItemIngredients.length > 0 && (
                         <div className="space-y-1 mt-2">
-                          {categoryItemIngredients.map((ing) => (
+                          {[...categoryItemIngredients].sort((a, b) => (a.stock_item_name || "").localeCompare(b.stock_item_name || "", "pt-BR")).map((ing) => (
                             <div key={ing.id} className="flex items-center justify-between p-1.5 bg-background rounded text-xs">
                               <div className="flex-1">
                                 <span className="font-medium">{ing.stock_item_name}</span>
@@ -1349,7 +1349,7 @@ const handleDelete = async (id: string) => {
                 
                 {ingredients.length > 0 && (
                   <div className="space-y-2 mt-3">
-                    {ingredients.map((ing) => (
+                    {[...ingredients].sort((a, b) => (a.stock_item_name || "").localeCompare(b.stock_item_name || "", "pt-BR")).map((ing) => (
                       <div key={ing.id} className="flex items-center justify-between p-2 bg-background rounded">
                         <div className="flex-1">
                           <span className="text-sm font-medium">{ing.stock_item_name}</span>
@@ -1454,7 +1454,7 @@ const handleDelete = async (id: string) => {
 
                     {extraIngredients.length > 0 && (
                       <div className="space-y-1 mt-2">
-                        {extraIngredients.map((ing) => (
+                        {[...extraIngredients].sort((a, b) => (a.stock_item_name || "").localeCompare(b.stock_item_name || "", "pt-BR")).map((ing) => (
                           <div key={ing.id} className="flex items-center justify-between p-1.5 bg-background rounded text-xs">
                             <div className="flex-1">
                               <span className="font-medium">{ing.stock_item_name}</span>
