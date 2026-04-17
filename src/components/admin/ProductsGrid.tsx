@@ -510,16 +510,13 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
       finalPdvCode = await generateNextPdvCode(restaurantId);
     }
 
-    // Validate PDV code uniqueness
-    if (finalPdvCode) {
+    // Validate PDV code uniqueness — só consulta quando código mudou (evita query pesada desnecessária)
+    if (finalPdvCode && (!editingProduct || (editingProduct as any).pdv_code !== finalPdvCode)) {
       const usedCodes = await getAllUsedPdvCodes(restaurantId);
       const codeNum = parseInt(finalPdvCode, 10);
       if (!isNaN(codeNum) && usedCodes.has(codeNum)) {
-        // If editing, check it's not our own code
-        if (!editingProduct || (editingProduct as any).pdv_code !== finalPdvCode) {
-          toast.error(`Código PDV '${finalPdvCode}' já está em uso por outro item`);
-          return;
-        }
+        toast.error(`Código PDV '${finalPdvCode}' já está em uso por outro item`);
+        return;
       }
     }
 
@@ -551,56 +548,80 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
       const { error } = await supabase.from("products").update(productData).eq("id", editingProduct.id);
       if (error) { toast.error("Erro ao atualizar produto"); return; }
       productId = editingProduct.id;
-      await supabase.from("product_ingredients").delete().eq("product_id", productId);
     } else {
-      const { data: newProduct, error } = await supabase.from("products").insert(productData).select().single();
+      const { data: newProduct, error } = await supabase.from("products").insert(productData).select("id").single();
       if (error) { toast.error("Erro ao criar produto"); return; }
       productId = newProduct.id;
     }
 
-    if (ingredientType === "fixed" && ingredients.length > 0) {
-      await supabase.from("product_ingredients").insert(ingredients.map(ing => ({ product_id: productId, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
-    }
-
+    // Limpa antigos em paralelo (ingredientes do produto, ingredientes dos extras antigos, grupos vinculados)
     const { data: oldExtras } = await supabase.from("product_extras").select("id").eq("product_id", productId);
-    if (oldExtras && oldExtras.length > 0) {
-      for (const extra of oldExtras) { await supabase.from("product_extra_ingredients").delete().eq("product_extra_id", extra.id); }
+    const oldExtraIds = (oldExtras || []).map(e => e.id);
+
+    await Promise.all([
+      supabase.from("product_ingredients").delete().eq("product_id", productId),
+      oldExtraIds.length > 0
+        ? supabase.from("product_extra_ingredients").delete().in("product_extra_id", oldExtraIds)
+        : Promise.resolve(),
+      supabase.from("product_complement_groups").delete().eq("product_id", productId),
+    ]);
+    if (oldExtraIds.length > 0) {
       await supabase.from("product_extras").delete().eq("product_id", productId);
     }
 
+    // Cria tudo em PARALELO (ingredientes fixos + variações + complementos avulsos + grupos vinculados)
+    const insertOps: Promise<any>[] = [];
+
+    if (ingredientType === "fixed" && ingredients.length > 0) {
+      insertOps.push(
+        supabase.from("product_ingredients").insert(ingredients.map(ing => ({ product_id: productId, stock_item_id: ing.stock_item_id, quantity: ing.quantity })))
+      );
+    }
+
+    const createExtraWithIngredients = async (payload: any, ings: ProductIngredient[]) => {
+      const { data: newExtra } = await supabase.from("product_extras").insert(payload).select("id").single();
+      if (newExtra && ings.length > 0) {
+        await supabase.from("product_extra_ingredients").insert(ings.map(ing => ({ product_extra_id: newExtra.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
+      }
+    };
+
     if (ingredientType === "variable" && variations.length > 0) {
       for (const variation of variations) {
-        const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: variation.name, description: variation.description || null, price: variation.price, pdv_code: variation.pdv_code || null, is_required: true, min_selection: parseInt(variationMinSelection) || 1, max_selection: parseInt(variationMaxSelection) || 1 } as any).select().single();
-        if (newExtra && variation.ingredients.length > 0) {
-          await supabase.from("product_extra_ingredients").insert(variation.ingredients.map(ing => ({ product_extra_id: newExtra.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
-        }
+        insertOps.push(createExtraWithIngredients(
+          { product_id: productId, name: variation.name, description: variation.description || null, price: variation.price, pdv_code: variation.pdv_code || null, is_required: true, min_selection: parseInt(variationMinSelection) || 1, max_selection: parseInt(variationMaxSelection) || 1 },
+          variation.ingredients
+        ));
       }
     }
 
     for (const extra of extras) {
-      const { data: newExtra } = await supabase.from("product_extras").insert({ product_id: productId, name: extra.name, description: extra.description || null, price: extra.price, is_required: extra.is_required || false }).select().single();
-      if (newExtra && extra.ingredients && extra.ingredients.length > 0) {
-        await supabase.from("product_extra_ingredients").insert(extra.ingredients.map(ing => ({ product_extra_id: newExtra.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity })));
-      }
+      insertOps.push(createExtraWithIngredients(
+        { product_id: productId, name: extra.name, description: extra.description || null, price: extra.price, is_required: extra.is_required || false },
+        extra.ingredients || []
+      ));
     }
 
-    // Save linked complement groups
-    await supabase.from("product_complement_groups").delete().eq("product_id", productId);
     if (linkedGroups.length > 0) {
       const groupsData = linkedGroups.map((group, index) => ({
         product_id: productId, extra_category_id: group.extra_category_id,
         is_required: group.is_required, min_selection: group.min_selection, max_selection: group.max_selection,
         display_order: index,
       }));
-      const { error: groupError } = await supabase.from("product_complement_groups").insert(groupsData);
-      if (groupError) {
-        console.error("Erro ao salvar complementos:", groupError);
-        toast.error("Erro ao salvar complementos vinculados");
-      }
+      insertOps.push(
+        supabase.from("product_complement_groups").insert(groupsData).then(({ error: groupError }) => {
+          if (groupError) {
+            console.error("Erro ao salvar complementos:", groupError);
+            toast.error("Erro ao salvar complementos vinculados");
+          }
+        })
+      );
     }
+
+    await Promise.all(insertOps);
 
     toast.success(editingProduct ? "Produto atualizado!" : "Produto criado!");
     resetForm();
+    // realtime channel já dispara refetch — não bloqueia UI esperando
     fetchProducts();
   };
 
@@ -642,13 +663,22 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
     setFiscalIndiceProducao((product as any).fiscal_indice_producao?.toString() || "");
     setFiscalAliquotaTransparencia((product as any).fiscal_aliquota_transparencia?.toString() || "");
 
-    const { data: ingredientsData } = await supabase.from("product_ingredients").select("*, stock_items(name, unit, price_per_unit)").eq("product_id", product.id);
+    // Carrega ingredientes, extras e grupos vinculados em PARALELO
+    const [
+      { data: ingredientsData },
+      { data: extrasData },
+      { data: groupsData, error: groupsError },
+    ] = await Promise.all([
+      supabase.from("product_ingredients").select("*, stock_items(name, unit, price_per_unit)").eq("product_id", product.id),
+      supabase.from("product_extras").select("*, product_extra_ingredients(*, stock_items(name, unit, price_per_unit))").eq("product_id", product.id),
+      supabase.from("product_complement_groups").select("*, extra_categories(id, name, extra_category_items(id, name, price))").eq("product_id", product.id).order("display_order"),
+    ]);
+
     const formattedIngredients = ingredientsData?.map((ing: any) => ({
       id: ing.id, stock_item_id: ing.stock_item_id, quantity: ing.quantity,
       stock_item_name: ing.stock_items?.name, stock_item_unit: ing.stock_items?.unit, stock_item_price: ing.stock_items?.price_per_unit
     })) || [];
 
-    const { data: extrasData } = await supabase.from("product_extras").select("*, product_extra_ingredients(*, stock_items(name, unit, price_per_unit))").eq("product_id", product.id);
     const variationsFromDB: IngredientVariation[] = [];
     const extrasFromDB: ProductExtra[] = [];
 
@@ -668,13 +698,6 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
     if (variationsFromDB.length > 0) { setIngredientType("variable"); setVariations(variationsFromDB); setIngredients([]); }
     else { setIngredientType("fixed"); setIngredients(formattedIngredients); setVariations([]); }
     setExtras(extrasFromDB);
-
-    // Fetch linked complement groups
-    const { data: groupsData, error: groupsError } = await supabase
-      .from("product_complement_groups")
-      .select("*, extra_categories(id, name, extra_category_items(id, name, price))")
-      .eq("product_id", product.id)
-      .order("display_order");
 
     if (groupsError) {
       console.error("Erro ao buscar complementos vinculados:", groupsError);
