@@ -478,7 +478,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
                                </div>
                               <div className="text-xs text-muted-foreground mt-1">
                                 {item.ingredients.length > 0 ? (
-                                  <>{item.ingredients.map(ing => `${ing.stock_item_name} (${ing.quantity} ${ing.stock_item_unit})`).join(", ")}<span className="ml-2">• Custo: R$ {cost.toFixed(2)}</span></>
+                                  <>{[...item.ingredients].sort((a, b) => (a.stock_item_name || "").localeCompare(b.stock_item_name || "", "pt-BR")).map(ing => `${ing.stock_item_name} (${ing.quantity} ${ing.stock_item_unit})`).join(", ")}<span className="ml-2">• Custo: R$ {cost.toFixed(2)}</span></>
                                 ) : ("Sem insumos vinculados")}
                               </div>
                             </div>
@@ -644,7 +644,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
               </div>
               {itemIngredients.length > 0 && (
                 <div className="space-y-2">
-                  {itemIngredients.map((ing) => (
+                  {[...itemIngredients].sort((a, b) => (a.stock_item_name || "").localeCompare(b.stock_item_name || "", "pt-BR")).map((ing) => (
                     <div key={ing.id} className="flex items-center justify-between p-2 bg-background rounded text-sm">
                       <span>{ing.stock_item_name} - {ing.quantity} {ing.stock_item_unit}</span>
                       <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveIngredient(ing.id)}>Remover</Button>
