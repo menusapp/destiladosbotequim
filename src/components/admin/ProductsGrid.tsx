@@ -1103,16 +1103,25 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
                         {variations.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-sm font-medium">Variações:</p>
-                            {variations.map((v) => {
+                            {variations.map((v, vIdx) => {
                               const vc = variationCosts.find(c => c.name === v.name);
+                              const moveVariation = (dir: 'up' | 'down') => {
+                                const newArr = [...variations];
+                                const target = dir === 'up' ? vIdx - 1 : vIdx + 1;
+                                if (target < 0 || target >= newArr.length) return;
+                                [newArr[vIdx], newArr[target]] = [newArr[target], newArr[vIdx]];
+                                setVariations(newArr);
+                              };
                               return (
                                 <div key={v.id} className="p-3 bg-muted/30 rounded-lg border">
                                   <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-2"><span className="font-medium">{v.name}</span>{v.pdv_code && <span className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">PDV: {v.pdv_code}</span>}<span className="text-sm text-muted-foreground ml-2">{v.price > 0 ? `+R$ ${v.price.toFixed(2)}` : "Incluído"}</span></div>
-                                    <div className="flex items-center gap-1">
-                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleDuplicateVariation(v.id)} title="Duplicar variação"><Copy className="h-4 w-4" /></Button>
-                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleEditVariation(v.id)} title="Editar variação"><Pencil className="h-4 w-4" /></Button>
-                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveVariation(v.id)} title="Excluir variação"><Trash2 className="h-4 w-4" /></Button>
+                                    <div className="flex items-center gap-0.5">
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => moveVariation('up')} disabled={vIdx === 0} title="Mover para cima" className="h-6 w-6 p-0"><ArrowUp className="h-3 w-3" /></Button>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => moveVariation('down')} disabled={vIdx === variations.length - 1} title="Mover para baixo" className="h-6 w-6 p-0"><ArrowDown className="h-3 w-3" /></Button>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleDuplicateVariation(v.id)} title="Duplicar variação" className="h-6 w-6 p-0"><Copy className="h-3 w-3" /></Button>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleEditVariation(v.id)} title="Editar variação" className="h-6 w-6 p-0"><Pencil className="h-3 w-3" /></Button>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveVariation(v.id)} title="Excluir variação" className="h-6 w-6 p-0"><Trash2 className="h-3 w-3" /></Button>
                                     </div>
                                   </div>
                                   <div className="text-xs text-muted-foreground">{v.ingredients.map(i => `${i.stock_item_name} — ${i.quantity}${i.stock_item_unit} (R$ ${((i.stock_item_price || 0) * i.quantity).toFixed(2)})`).join(", ")}</div>
