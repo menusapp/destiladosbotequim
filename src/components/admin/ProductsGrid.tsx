@@ -253,8 +253,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
   }, [restaurantId]);
 
   const fetchStockItems = async () => {
-    const { data } = await supabase.from("stock_items").select("id, name, unit, price_per_unit").eq("restaurant_id", restaurantId);
-    setStockItems(data || []);
+    const { data } = await supabase.from("stock_items").select("id, name, unit, price_per_unit").eq("restaurant_id", restaurantId).order("name");
+    setStockItems((data || []).sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt-BR")));
   };
 
   const fetchComplementCategories = async () => {
