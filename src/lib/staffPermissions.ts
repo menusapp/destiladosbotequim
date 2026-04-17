@@ -1,5 +1,6 @@
 // All available sections in the system
 export const ALL_SECTIONS = [
+  { id: "visao-geral", label: "Visão Geral" },
   { id: "pedidos", label: "Pedidos" },
   { id: "pdv", label: "PDV" },
   { id: "mesas-reservas", label: "Reservas" },
