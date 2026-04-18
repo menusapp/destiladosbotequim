@@ -5,7 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
  * checking across products, product_extras, and extra_category_items (complements)
  * to ensure global uniqueness within a restaurant.
  */
-export async function generateNextPdvCode(restaurantId: string): Promise<string> {
+export async function generateNextPdvCode(
+  restaurantId: string,
+  extraReservedCodes?: Iterable<string | number | null | undefined>
+): Promise<string> {
   // Get category IDs for this restaurant (needed to query products & product_extras)
   const { data: categories } = await supabase
     .from("categories")
