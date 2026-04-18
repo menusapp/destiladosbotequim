@@ -74,9 +74,6 @@ export function usePageAccess(
   if (ALWAYS_AVAILABLE.includes(sectionId)) {
     // Still check staff permission
     if (staffRole && staffRole !== "admin") {
-      if (sectionId === "contas") {
-        return { hasAccess: false, reason: 'permission', currentPlanName: null, requiredPlanName: null };
-      }
       if (staffAllowedSections && !staffAllowedSections.includes(sectionId)) {
         return { hasAccess: false, reason: 'permission', currentPlanName: null, requiredPlanName: null };
       }
@@ -93,9 +90,6 @@ export function usePageAccess(
 
   // Check staff permission
   if (staffRole && staffRole !== "admin") {
-    if (sectionId === "contas") {
-      return { hasAccess: false, reason: 'permission', currentPlanName: null, requiredPlanName: null };
-    }
     if (staffAllowedSections && !staffAllowedSections.includes(sectionId)) {
       return { hasAccess: false, reason: 'permission', currentPlanName: null, requiredPlanName: null };
     }
