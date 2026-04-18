@@ -62,6 +62,15 @@ export async function generateNextPdvCode(
     addCodes(res.data);
   }
 
+  // Merge any locally-reserved codes (e.g. variations/extras not yet persisted)
+  if (extraReservedCodes) {
+    for (const c of extraReservedCodes) {
+      if (c === null || c === undefined || c === "") continue;
+      const num = parseInt(String(c), 10);
+      if (!isNaN(num)) usedCodes.add(num);
+    }
+  }
+
   let next = 1;
   while (usedCodes.has(next)) {
     next++;
