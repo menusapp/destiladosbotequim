@@ -419,7 +419,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
 
   const handleAddVariation = async () => {
     if (!variationName) { toast.error("Informe o nome da variação"); return; }
-    const newPdvCode = await generateNextPdvCode(restaurantId);
+    const localCodes = variations.map(v => v.pdv_code).filter(Boolean) as string[];
+    const newPdvCode = await generateNextPdvCode(restaurantId, localCodes);
     setVariations([...variations, { id: crypto.randomUUID(), name: variationName, description: variationDescription || undefined, price: parseFloat(variationPrice) || 0, pdv_code: newPdvCode, ingredients: [...variationIngredients] }]);
     setVariationName(""); setVariationDescription(""); setVariationPrice(""); setVariationIngredients([]);
   };
@@ -429,7 +430,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
   const handleDuplicateVariation = async (id: string) => {
     const original = variations.find(v => v.id === id);
     if (!original) return;
-    const newPdvCode = await generateNextPdvCode(restaurantId);
+    const localCodes = variations.map(v => v.pdv_code).filter(Boolean) as string[];
+    const newPdvCode = await generateNextPdvCode(restaurantId, localCodes);
     const copy = { ...original, id: crypto.randomUUID(), name: `${original.name} (cópia)`, pdv_code: newPdvCode, ingredients: original.ingredients.map(i => ({ ...i, id: crypto.randomUUID() })) };
     setVariations([...variations, copy]);
     toast.success("Variação duplicada");
