@@ -83,7 +83,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
     [
       { id: "integracoes", label: "Integrações", icon: Plug },
       { id: "fiscal", label: "Fiscal", icon: FileText },
-      ...(staffRole === "admin" ? [{ id: "contas", label: "Contas", icon: Users }] : []),
+      { id: "contas", label: "Contas", icon: Users },
       { id: "modulos", label: "Planos", icon: Construction },
     ],
   ];
@@ -101,8 +101,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   
   const isStaffAllowed = (id: string) => {
     if (!staffRole || staffRole === "admin") return true;
-    if (id === "contas") return false;
-    return staffAllowedSections?.includes(id) ?? true;
+    return staffAllowedSections?.includes(id) ?? false;
   };
 
   const isBlocked = (id: string) => !checkAllowed(id) || !isStaffAllowed(id);
