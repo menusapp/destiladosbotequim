@@ -32,7 +32,7 @@ export interface KioskCustomer {
 export default function Kiosk() {
   const { slug: pathSlug } = useParams<{ slug: string }>();
   const slug = resolveSlug(pathSlug);
-  const [step, setStep] = useState<KioskStep>("idle");
+  const [step, setStep] = useState<KioskStep>("menu");
   const [restaurant, setRestaurant] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
@@ -100,7 +100,7 @@ export default function Kiosk() {
   }, [customer?.cpf, restaurant?.id, restaurant?.loyalty_enabled]);
 
   const resetSession = useCallback(() => {
-    setStep("idle");
+    setStep("menu");
     setCart([]);
     setCustomer(null);
     setSelectedProduct(null);
@@ -117,13 +117,15 @@ export default function Kiosk() {
 
   // Inactivity timer
   const resetInactivityTimer = useCallback(() => {
-    if (step === "idle" || step === "confirmation") return;
+    if (step === "confirmation") return;
+    // No menu, só reseta se houver carrinho ou cliente identificado
+    if (step === "menu" && cart.length === 0 && !customer) return;
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     inactivityTimer.current = setTimeout(() => {
       toast.info("Sessão encerrada por inatividade");
       resetSession();
     }, timeoutMs);
-  }, [step, resetSession, timeoutMs]);
+  }, [step, cart.length, customer, resetSession, timeoutMs]);
 
   useEffect(() => {
     const events = ["touchstart", "mousedown", "keydown", "scroll"];
@@ -324,10 +326,17 @@ export default function Kiosk() {
     setCart(prev => prev.filter(i => i.id !== itemId));
   }, []);
 
-  const handleStartOrder = () => {
+  // Acionado quando o usuário clica "Continuar" no carrinho.
+  // Se já está identificado, segue direto. Se CPF não é exigido, cria cliente anônimo.
+  // Caso contrário, abre tela de identificação.
+  const handleCartContinue = () => {
+    if (customer) {
+      setStep("consumption");
+      return;
+    }
     if (kioskConfig?.require_cpf === false) {
       setCustomer({ name: "Cliente", cpf: "", isExisting: false });
-      setStep("menu");
+      setStep("consumption");
     } else {
       setStep("identification");
     }
@@ -398,15 +407,11 @@ export default function Kiosk() {
 
   return (
     <KioskLayout primaryColor={primaryColor}>
-      {step === "idle" && (
-        <KioskIdleScreen restaurant={restaurant} onStart={handleStartOrder} />
-      )}
-
       {step === "identification" && (
         <KioskIdentification
           restaurant={restaurant}
-          onIdentified={(c) => { setCustomer(c); setStep("menu"); }}
-          onBack={() => setStep("idle")}
+          onIdentified={(c) => { setCustomer(c); setStep("consumption"); }}
+          onBack={() => setStep("cart")}
         />
       )}
 
@@ -446,7 +451,7 @@ export default function Kiosk() {
           onRemove={removeItem}
           cartTotal={cartTotal}
           onBack={() => setStep("menu")}
-          onNext={() => setStep("consumption")}
+          onNext={handleCartContinue}
           customerCpf={customer?.cpf}
           restaurantId={restaurant.id}
           appliedCoupon={appliedCoupon}

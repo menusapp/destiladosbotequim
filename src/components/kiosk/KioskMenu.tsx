@@ -72,10 +72,16 @@ export function KioskMenu({ categories, featuredProducts: featuredProductsProp, 
           {!restaurant?.banner_url && restaurant?.logo_url && (
             <img src={restaurant.logo_url} alt={restaurant.name} className="h-10 w-10 rounded-lg object-contain" />
           )}
-          <Button variant="ghost" size="icon" onClick={onCancel} className="h-10 w-10 rounded-full text-muted-foreground">
-            <LogOut className="h-5 w-5" />
-          </Button>
-          <span className="text-base font-medium text-foreground">Olá, <span className="font-bold">{customerName}</span>!</span>
+          {customerName ? (
+            <>
+              <Button variant="ghost" size="icon" onClick={onCancel} className="h-10 w-10 rounded-full text-muted-foreground">
+                <LogOut className="h-5 w-5" />
+              </Button>
+              <span className="text-base font-medium text-foreground">Olá, <span className="font-bold">{customerName}</span>!</span>
+            </>
+          ) : (
+            <span className="text-base font-medium text-foreground">Bem-vindo!</span>
+          )}
         </div>
         <Button variant="ghost" size="icon" onClick={() => setSearchOpen(!searchOpen)} className="h-10 w-10 rounded-full">
           {searchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
