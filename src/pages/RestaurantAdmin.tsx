@@ -756,8 +756,7 @@ const RestaurantAdmin = () => {
       const checkAllowed = (id: string) => !isSectionAllowed || isSectionAllowed(id);
       const isStaffOk = (id: string) => {
         if (!staffRole || staffRole === "admin") return true;
-        if (id === "contas") return false;
-        return staffAllowedSections?.includes(id) ?? true;
+        return staffAllowedSections?.includes(id) ?? false;
       };
       if (!checkAllowed(sectionId)) return { blocked: true, reason: 'plan' as const };
       if (!isStaffOk(sectionId)) return { blocked: true, reason: 'permission' as const };
@@ -815,7 +814,7 @@ const RestaurantAdmin = () => {
         case "modulos":
           return <ModulosTab restaurantId={restaurant.id} />;
         case "contas":
-          return staffRole === "admin" ? <ContasTab restaurantId={restaurant.id} /> : null;
+          return <ContasTab restaurantId={restaurant.id} />;
         case "config-dados":
           return <CompanyDataSettings restaurantId={restaurant.id} />;
         case "config-whatsapp":

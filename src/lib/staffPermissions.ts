@@ -20,6 +20,7 @@ export const ALL_SECTIONS = [
   { id: "config-dados", label: "Configurações — Geral" },
   { id: "config-totem", label: "Configurações — Totem" },
   { id: "config-whatsapp", label: "Configurações — WhatsApp" },
+  { id: "contas", label: "Contas (Funcionários)" },
 ] as const;
 
 export type StaffRole = "admin" | "gerente" | "caixa" | "garcom" | "cozinha" | "atendente";
@@ -46,6 +47,5 @@ export const ROLE_DEFAULT_SECTIONS: Record<StaffRole, string[]> = {
 // Check if a staff member can access a section
 export function canAccessSection(staffRole: string, allowedSections: string[], sectionId: string): boolean {
   if (staffRole === "admin") return true;
-  if (sectionId === "contas") return staffRole === "admin";
   return allowedSections.includes(sectionId);
 }
