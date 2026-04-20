@@ -27,6 +27,7 @@ const PAYMENT_BASE_LABELS: Record<string, string> = {
   "pago pelo ifood": "iFood Online",
   "pago delivery direto": "Pago DD",
   online: "Pago Online",
+  totem_online: "Totem Online",
   outros: "Outros",
 };
 
@@ -104,7 +105,7 @@ export function formatPaymentMethod(method: string | null | undefined): string {
  */
 export function isOnlinePayment(type: string | null | undefined): boolean {
   if (!type) return false;
-  const onlineTypes = ["pix_online", "card_online", "credit_card_online", "online", "ifood_online", "pago pelo ifood", "pago delivery direto"];
+  const onlineTypes = ["pix_online", "card_online", "credit_card_online", "online", "ifood_online", "pago pelo ifood", "pago delivery direto", "totem_online"];
   return onlineTypes.includes(type.toLowerCase());
 }
 
