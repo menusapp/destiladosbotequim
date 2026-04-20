@@ -98,8 +98,8 @@ export function KioskPayment({
 
   const getPaymentTypeForDB = () => {
     if (paymentMethod === "cash") return "cash";
-    // Terminal payment — generic "card" until webhook provides details
-    return "card";
+    // Pagamentos do totem via maquininha caem na conta MP — tratamos como Totem Online
+    return "totem_online";
   };
 
   const createOrderInDB = useCallback(async (alreadyPaid = false): Promise<string | null> => {

@@ -25,6 +25,7 @@ const getMethodColor = (method: string): string => {
   if (method.startsWith("Débito")) return "bg-amber-500";
   if (method.startsWith("Vale")) return "bg-purple-500";
   if (method.startsWith("iFood")) return "bg-red-500";
+  if (method.startsWith("Totem")) return "bg-violet-500";
   if (method === "Misto") return "bg-indigo-500";
   if (method === "Crédito Funcionário") return "bg-orange-500";
   return "bg-gray-400";
