@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "@/components/ui/sonner";
-import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle, ChevronDown, Receipt, Coins, Search, Calendar as CalendarIcon } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Wallet, FileText, PlusCircle, MinusCircle, ChevronDown, Receipt, Coins, Search, Calendar as CalendarIcon, Printer } from "lucide-react";
 import { formatPaymentMethod } from "@/lib/utils";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -223,6 +223,134 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   const handleSelectSession = (session: CashSession) => {
     setSelectedSession(session);
     fetchSessionMovements(session.id);
+  };
+
+  const handlePrintSession = async (session: CashSession, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      const { data: movs, error } = await supabase
+        .from("cash_movements")
+        .select("*")
+        .eq("cash_session_id", session.id)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      const sessionMovements = (movs || []) as CashMovement[];
+
+      const paymentTotals: Record<string, { total: number; count: number }> = {};
+      let totalEntradas = 0;
+      let totalSaidas = 0;
+
+      sessionMovements.forEach((mov) => {
+        if (mov.movement_type === "entrada") {
+          totalEntradas += Number(mov.amount);
+          const method = mov.payment_method || "outros";
+          if (!paymentTotals[method]) paymentTotals[method] = { total: 0, count: 0 };
+          paymentTotals[method].total += Number(mov.amount);
+          paymentTotals[method].count += 1;
+        } else if (mov.movement_type === "saida") {
+          totalSaidas += Number(mov.amount);
+        }
+      });
+
+      const fmt = (v: number) => `R$ ${Number(v || 0).toFixed(2).replace(".", ",")}`;
+      const fmtDate = (d: string | null) => d ? format(new Date(d), "dd/MM/yyyy 'às' HH:mm") : "—";
+      const diff = Number(session.difference || 0);
+      const diffColor = diff >= 0 ? "#16a34a" : "#dc2626";
+
+      const paymentRows = Object.entries(paymentTotals)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([method, info]) => `
+          <tr>
+            <td style="padding:6px 8px;border-bottom:1px dashed #ccc;">${formatPaymentMethod(method)}</td>
+            <td style="padding:6px 8px;border-bottom:1px dashed #ccc;text-align:center;color:#666;">${info.count}x</td>
+            <td style="padding:6px 8px;border-bottom:1px dashed #ccc;text-align:right;font-family:monospace;">${fmt(info.total)}</td>
+          </tr>
+        `).join("");
+
+      const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Relatório de Caixa - ${fmtDate(session.opened_at)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0 auto; padding: 24px; color: #111; max-width: 720px; }
+    h1 { font-size: 20px; margin: 0 0 4px; text-align: center; }
+    h2 { font-size: 14px; margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #111; text-transform: uppercase; letter-spacing: 0.5px; }
+    .subtitle { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 13px; }
+    .info-grid div { padding: 4px 0; }
+    .info-grid strong { color: #555; }
+    .summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
+    .summary .box { border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
+    .summary .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+    .summary .value { font-size: 18px; font-weight: 700; font-family: monospace; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #111; font-size: 11px; text-transform: uppercase; }
+    .totals { margin-top: 12px; border-top: 2px solid #111; padding-top: 8px; }
+    .totals-row { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 13px; }
+    .totals-row.final { font-weight: 700; font-size: 15px; border-top: 1px dashed #999; margin-top: 4px; padding-top: 8px; }
+    .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 12px; }
+    @media print { body { padding: 12px; } .no-print { display: none !important; } }
+  </style>
+</head>
+<body>
+  <h1>Relatório de Fechamento de Caixa</h1>
+  <div class="subtitle">Emitido em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}</div>
+
+  <h2>Sessão</h2>
+  <div class="info-grid">
+    <div><strong>Aberto por:</strong> ${session.opened_by}</div>
+    <div><strong>Abertura:</strong> ${fmtDate(session.opened_at)}</div>
+    <div><strong>Fechado por:</strong> ${session.closed_by || "—"}</div>
+    <div><strong>Fechamento:</strong> ${fmtDate(session.closed_at)}</div>
+    <div><strong>Status:</strong> ${session.status === "closed" ? "Fechado" : session.status}</div>
+    <div><strong>Movimentações:</strong> ${sessionMovements.length}</div>
+  </div>
+  ${session.notes ? `<div style="margin-top:8px;font-size:12px;font-style:italic;color:#555;"><strong>Observações:</strong> ${session.notes}</div>` : ""}
+
+  <h2>Saldos</h2>
+  <div class="summary">
+    <div class="box"><div class="label">Saldo Inicial</div><div class="value">${fmt(session.opening_balance)}</div></div>
+    <div class="box"><div class="label">Saldo Esperado</div><div class="value">${fmt(session.expected_balance || 0)}</div></div>
+    <div class="box"><div class="label">Saldo Final (contado)</div><div class="value">${fmt(session.closing_balance || 0)}</div></div>
+    <div class="box" style="border-color:${diffColor};"><div class="label">Diferença</div><div class="value" style="color:${diffColor};">${fmt(diff)}</div></div>
+  </div>
+
+  <h2>Vendas por Método de Pagamento</h2>
+  ${Object.keys(paymentTotals).length === 0 ? `
+    <p style="text-align:center;color:#666;font-size:13px;padding:12px 0;">Nenhuma entrada registrada nesta sessão.</p>
+  ` : `
+    <table>
+      <thead><tr><th>Método</th><th style="text-align:center;">Qtd.</th><th style="text-align:right;">Valor</th></tr></thead>
+      <tbody>${paymentRows}</tbody>
+    </table>
+  `}
+
+  <div class="totals">
+    <div class="totals-row"><span>Total de Entradas</span><span style="font-family:monospace;color:#16a34a;">+ ${fmt(totalEntradas)}</span></div>
+    <div class="totals-row"><span>Total de Saídas</span><span style="font-family:monospace;color:#dc2626;">- ${fmt(totalSaidas)}</span></div>
+    <div class="totals-row final"><span>Resultado Líquido</span><span style="font-family:monospace;">${fmt(totalEntradas - totalSaidas)}</span></div>
+  </div>
+
+  <div class="footer">Relatório gerado pelo sistema Menu's</div>
+
+  <script>window.onload = function() { setTimeout(function() { window.print(); }, 200); };</script>
+</body>
+</html>`;
+
+      const printWindow = window.open("", "_blank", "width=820,height=900");
+      if (!printWindow) {
+        toast.error("Permita pop-ups para imprimir o relatório");
+        return;
+      }
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+    } catch (error: any) {
+      toast.error("Erro ao gerar relatório: " + error.message);
+    }
   };
 
   const handleOpenCashRegister = async () => {
@@ -954,9 +1082,19 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                       <div
                         key={session.id}
                         onClick={() => handleSelectSession(session)}
-                        className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                        className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors relative"
                       >
-                        <div className="flex items-center gap-2 text-sm">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={(e) => handlePrintSession(session, e)}
+                          title="Imprimir relatório do caixa"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <div className="flex items-center gap-2 text-sm pr-10">
                           <Wallet className="h-4 w-4 text-green-600" />
                           <span className="font-medium">{session.opened_by}</span>
                           <span className="text-muted-foreground">abriu</span>
@@ -986,9 +1124,23 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       <Dialog open={!!selectedSession} onOpenChange={() => setSelectedSession(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Caixa - {selectedSession && format(new Date(selectedSession.opened_at), "dd/MM/yyyy")}
+            <DialogTitle className="flex items-center justify-between gap-2 pr-8">
+              <span className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Caixa - {selectedSession && format(new Date(selectedSession.opened_at), "dd/MM/yyyy")}
+              </span>
+              {selectedSession && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => handlePrintSession(selectedSession)}
+                >
+                  <Printer className="h-4 w-4" />
+                  Imprimir
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
           
