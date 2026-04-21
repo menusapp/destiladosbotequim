@@ -1082,9 +1082,19 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
                       <div
                         key={session.id}
                         onClick={() => handleSelectSession(session)}
-                        className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                        className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors relative"
                       >
-                        <div className="flex items-center gap-2 text-sm">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={(e) => handlePrintSession(session, e)}
+                          title="Imprimir relatório do caixa"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <div className="flex items-center gap-2 text-sm pr-10">
                           <Wallet className="h-4 w-4 text-green-600" />
                           <span className="font-medium">{session.opened_by}</span>
                           <span className="text-muted-foreground">abriu</span>
