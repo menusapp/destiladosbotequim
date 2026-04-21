@@ -275,63 +275,67 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   <title>Relatório de Caixa - ${fmtDate(session.opened_at)}</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0 auto; padding: 24px; color: #111; max-width: 720px; }
-    h1 { font-size: 20px; margin: 0 0 4px; text-align: center; }
-    h2 { font-size: 14px; margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #111; text-transform: uppercase; letter-spacing: 0.5px; }
-    .subtitle { text-align: center; font-size: 12px; color: #666; margin-bottom: 16px; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 13px; }
-    .info-grid div { padding: 4px 0; }
-    .info-grid strong { color: #555; }
-    .summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
-    .summary .box { border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
-    .summary .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-    .summary .value { font-size: 18px; font-weight: 700; font-family: monospace; margin-top: 2px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #111; font-size: 11px; text-transform: uppercase; }
-    .totals { margin-top: 12px; border-top: 2px solid #111; padding-top: 8px; }
-    .totals-row { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 13px; }
-    .totals-row.final { font-weight: 700; font-size: 15px; border-top: 1px dashed #999; margin-top: 4px; padding-top: 8px; }
-    .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 12px; }
-    @media print { body { padding: 12px; } .no-print { display: none !important; } }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0 auto; padding: 32px 40px; color: #111; max-width: 600px; font-size: 16px; }
+    h1 { font-size: 28px; margin: 0 0 8px; text-align: center; }
+    h2 { font-size: 18px; margin: 32px 0 16px; padding-bottom: 6px; border-bottom: 2px solid #111; text-transform: uppercase; letter-spacing: 0.5px; }
+    .subtitle { text-align: center; font-size: 14px; color: #666; margin-bottom: 24px; }
+    .section { margin-bottom: 24px; }
+    .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dotted #ccc; }
+    .row.label { font-weight: 600; color: #333; }
+    .row.value { font-family: monospace; font-size: 18px; }
+    .row.total { font-weight: 700; font-size: 20px; padding-top: 12px; border-top: 2px solid #111; border-bottom: none; }
+    .method-row { display: flex; justify-content: space-between; padding: 6px 0 6px 20px; border-bottom: 1px dotted #ddd; }
+    .method-name { flex: 1; }
+    .method-count { width: 60px; text-align: center; color: #666; }
+    .method-value { width: 120px; text-align: right; font-family: monospace; }
+    .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 16px; }
+    @media print { body { padding: 24px 32px; } .no-print { display: none !important; } }
   </style>
 </head>
 <body>
   <h1>Relatório de Fechamento de Caixa</h1>
   <div class="subtitle">Emitido em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}</div>
 
-  <h2>Sessão</h2>
-  <div class="info-grid">
-    <div><strong>Aberto por:</strong> ${session.opened_by}</div>
-    <div><strong>Abertura:</strong> ${fmtDate(session.opened_at)}</div>
-    <div><strong>Fechado por:</strong> ${session.closed_by || "—"}</div>
-    <div><strong>Fechamento:</strong> ${fmtDate(session.closed_at)}</div>
-    <div><strong>Status:</strong> ${session.status === "closed" ? "Fechado" : session.status}</div>
-    <div><strong>Movimentações:</strong> ${sessionMovements.length}</div>
+  <h2>Informações da Sessão</h2>
+  <div class="section">
+    <div class="row"><span>Aberto por:</span><strong>${session.opened_by}</strong></div>
+    <div class="row"><span>Data/hora de abertura:</span><span>${fmtDate(session.opened_at)}</span></div>
+    <div class="row"><span>Fechado por:</span><strong>${session.closed_by || "—"}</strong></div>
+    <div class="row"><span>Data/hora de fechamento:</span><span>${fmtDate(session.closed_at)}</span></div>
+    <div class="row"><span>Status:</span><span>${session.status === "closed" ? "Fechado" : session.status}</span></div>
+    <div class="row"><span>Total de movimentações:</span><span>${sessionMovements.length}</span></div>
   </div>
-  ${session.notes ? `<div style="margin-top:8px;font-size:12px;font-style:italic;color:#555;"><strong>Observações:</strong> ${session.notes}</div>` : ""}
+  ${session.notes ? `<div style="margin-top:16px;font-size:14px;font-style:italic;color:#555;"><strong>Observações:</strong> ${session.notes}</div>` : ""}
 
   <h2>Saldos</h2>
-  <div class="summary">
-    <div class="box"><div class="label">Saldo Inicial</div><div class="value">${fmt(session.opening_balance)}</div></div>
-    <div class="box"><div class="label">Saldo Esperado</div><div class="value">${fmt(session.expected_balance || 0)}</div></div>
-    <div class="box"><div class="label">Saldo Final (contado)</div><div class="value">${fmt(session.closing_balance || 0)}</div></div>
-    <div class="box" style="border-color:${diffColor};"><div class="label">Diferença</div><div class="value" style="color:${diffColor};">${fmt(diff)}</div></div>
+  <div class="section">
+    <div class="row"><span>Saldo Inicial:</span><span class="row value">${fmt(session.opening_balance)}</span></div>
+    <div class="row"><span>Saldo Esperado:</span><span class="row value">${fmt(session.expected_balance || 0)}</span></div>
+    <div class="row"><span>Saldo Final (contado):</span><span class="row value">${fmt(session.closing_balance || 0)}</span></div>
+    <div class="row total" style="color:${diff >= 0 ? '#16a34a' : '#dc2626'};"><span>Diferença:</span><span class="row value">${fmt(diff)}</span></div>
   </div>
 
   <h2>Vendas por Método de Pagamento</h2>
-  ${Object.keys(paymentTotals).length === 0 ? `
-    <p style="text-align:center;color:#666;font-size:13px;padding:12px 0;">Nenhuma entrada registrada nesta sessão.</p>
-  ` : `
-    <table>
-      <thead><tr><th>Método</th><th style="text-align:center;">Qtd.</th><th style="text-align:right;">Valor</th></tr></thead>
-      <tbody>${paymentRows}</tbody>
-    </table>
-  `}
+  <div class="section">
+    ${Object.keys(paymentTotals).length === 0 ? `
+      <p style="text-align:center;color:#666;font-size:14px;padding:12px 0;">Nenhuma entrada registrada nesta sessão.</p>
+    ` : Object.entries(paymentTotals)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([method, info]) => `
+          <div class="method-row">
+            <span class="method-name">${formatPaymentMethod(method)}</span>
+            <span class="method-count">${info.count}x</span>
+            <span class="method-value">${fmt(info.total)}</span>
+          </div>
+        `).join("")
+    }
+  </div>
 
-  <div class="totals">
-    <div class="totals-row"><span>Total de Entradas</span><span style="font-family:monospace;color:#16a34a;">+ ${fmt(totalEntradas)}</span></div>
-    <div class="totals-row"><span>Total de Saídas</span><span style="font-family:monospace;color:#dc2626;">- ${fmt(totalSaidas)}</span></div>
-    <div class="totals-row final"><span>Resultado Líquido</span><span style="font-family:monospace;">${fmt(totalEntradas - totalSaidas)}</span></div>
+  <h2>Resumo Financeiro</h2>
+  <div class="section">
+    <div class="row"><span>Total de Entradas:</span><span class="row value" style="color:#16a34a;">+ ${fmt(totalEntradas)}</span></div>
+    <div class="row"><span>Total de Saídas:</span><span class="row value" style="color:#dc2626;">- ${fmt(totalSaidas)}</span></div>
+    <div class="row total"><span>Resultado Líquido:</span><span class="row value">${fmt(totalEntradas - totalSaidas)}</span></div>
   </div>
 
   <div class="footer">Relatório gerado pelo sistema Menu's</div>
