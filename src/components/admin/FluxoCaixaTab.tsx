@@ -256,17 +256,6 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       const fmt = (v: number) => `R$ ${Number(v || 0).toFixed(2).replace(".", ",")}`;
       const fmtDate = (d: string | null) => d ? format(new Date(d), "dd/MM/yyyy 'às' HH:mm") : "—";
       const diff = Number(session.difference || 0);
-      const diffColor = diff >= 0 ? "#16a34a" : "#dc2626";
-
-      const paymentRows = Object.entries(paymentTotals)
-        .sort((a, b) => b[1].total - a[1].total)
-        .map(([method, info]) => `
-          <tr>
-            <td style="padding:6px 8px;border-bottom:1px dashed #ccc;">${formatPaymentMethod(method)}</td>
-            <td style="padding:6px 8px;border-bottom:1px dashed #ccc;text-align:center;color:#666;">${info.count}x</td>
-            <td style="padding:6px 8px;border-bottom:1px dashed #ccc;text-align:right;font-family:monospace;">${fmt(info.total)}</td>
-          </tr>
-        `).join("");
 
       const html = `<!DOCTYPE html>
 <html lang="pt-BR">
