@@ -1124,9 +1124,23 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
       <Dialog open={!!selectedSession} onOpenChange={() => setSelectedSession(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Caixa - {selectedSession && format(new Date(selectedSession.opened_at), "dd/MM/yyyy")}
+            <DialogTitle className="flex items-center justify-between gap-2 pr-8">
+              <span className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Caixa - {selectedSession && format(new Date(selectedSession.opened_at), "dd/MM/yyyy")}
+              </span>
+              {selectedSession && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => handlePrintSession(selectedSession)}
+                >
+                  <Printer className="h-4 w-4" />
+                  Imprimir
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
           
