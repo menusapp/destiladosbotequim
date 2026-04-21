@@ -306,23 +306,30 @@ export const printOrder = async (
       <div class="footer-margin"></div>
   `;
 
-  // Build copies with cut marks between them
-  const cutMark = supportsAutoCut
-    ? `<div class="cut-section">
-        <div class="footer-margin"></div>
-        <div class="cut-line">--- CORTE AQUI ---</div>
-        <div class="footer-margin"></div>
-       </div>`
-    : `<div class="cut-section">
-        <div class="footer-margin"></div>
-        <div class="cut-line">--- CORTE AQUI ---</div>
-        <div class="footer-margin"></div>
-       </div>`;
+  // ESC/POS auto-cut command (GS V 1 = partial cut). Many thermal printer drivers
+  // (Bematech, Epson, Elgin, etc.) interpret these raw bytes and trigger the
+  // physical cutter even when printing via the browser. Drivers that don't
+  // support it will simply ignore the characters.
+  const ESC_POS_FEED_AND_CUT = "\x1B\x64\x05\x1D\x56\x01"; // ESC d 5 (feed 5 lines) + GS V 1
 
+  // Build copies — each via separated by a hard page break so the printer
+  // treats each cópia como página independente, evitando duas vias no mesmo papel.
   const allCopies = Array.from({ length: printCopies }, (_, i) => {
-    const pageBreak = i > 0 ? `${cutMark}<div style="page-break-before: always;"></div>` : '';
-    return `${pageBreak}<div class="copy">${copyContent}</div>`;
-  }).join('\n');
+    const isLast = i === printCopies - 1;
+    const cutBlock = !isLast
+      ? `<div class="cut-section">
+           <div class="footer-margin"></div>
+           ${supportsAutoCut ? `<div class="esc-pos-cut">${ESC_POS_FEED_AND_CUT}</div>` : `<div class="cut-line">--- CORTE AQUI ---</div>`}
+           <div class="footer-margin"></div>
+         </div>
+         <div class="page-break"></div>`
+      : `<div class="cut-section">
+           <div class="footer-margin"></div>
+           ${supportsAutoCut ? `<div class="esc-pos-cut">${ESC_POS_FEED_AND_CUT}</div>` : ""}
+         </div>`;
+
+    return `<div class="copy">${copyContent}</div>${cutBlock}`;
+  }).join("\n");
 
   const html = `
     <html>
@@ -404,6 +411,28 @@ export const printOrder = async (
           letter-spacing: 2px;
           color: #999;
           margin: 4px 0;
+        }
+        /* ESC/POS bytes ficam invisíveis na tela mas são enviados como
+           caracteres ao driver da impressora, que pode interpretá-los
+           como comando de corte automático. */
+        .esc-pos-cut {
+          font-size: 1px;
+          line-height: 1px;
+          color: #fff;
+          opacity: 0;
+          height: 1px;
+          overflow: hidden;
+        }
+        /* Quebra de página forte entre as vias — força o driver a tratar
+           cada cópia como página separada, evitando duas vias no mesmo papel. */
+        .page-break {
+          page-break-after: always;
+          break-after: page;
+          height: 0;
+        }
+        .copy {
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
       </style>
     </head>
