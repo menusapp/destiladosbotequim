@@ -33,7 +33,6 @@ import { printOrder } from "@/lib/printOrder";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { TableDetailDialog } from "./TableDetailDialog";
 import { ManageTablesDrawer } from "./ManageTablesDrawer";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CartItem {
