@@ -54,18 +54,25 @@ Deno.serve(async (req) => {
     const instanceName = instance;
     const event = normalizeEvent(rawEvent);
 
-    // Find restaurant by instance name
-    const { data: config } = await supabase
+    // Find restaurant by instance name (prefer enabled + connected; tolerate duplicates)
+    const { data: configs } = await supabase
       .from('whatsapp_config')
-      .select('restaurant_id')
+      .select('restaurant_id, enabled, instance_status, updated_at')
       .eq('instance_name', instanceName)
-      .maybeSingle();
+      .order('enabled', { ascending: false })
+      .order('updated_at', { ascending: false });
+
+    const config = (configs || []).find(c => c.enabled) || (configs || [])[0];
 
     if (!config) {
       console.log(`[WEBHOOK] No config found for instance: ${instanceName}`);
       return new Response(JSON.stringify({ received: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+    }
+
+    if ((configs?.length || 0) > 1) {
+      console.log(`[WEBHOOK] Multiple configs (${configs!.length}) for instance ${instanceName}, picked restaurant ${config.restaurant_id} (enabled=${config.enabled})`);
     }
 
     const restaurantId = config.restaurant_id;
