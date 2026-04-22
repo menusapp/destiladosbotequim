@@ -240,10 +240,6 @@ const RestaurantAdmin = () => {
           const shouldNotify = status === 'pending' || (order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status));
           
           if (orderRestaurantId === restaurantId && shouldNotify) {
-            // Skip PDV-sourced orders
-            const isPdvSource = order.pdv_source === true;
-            if (isPdvSource) return;
-            
             // Verificar se já foi notificado (usar ref para evitar stale closure)
             if (notifiedOrdersRef.current.has(orderId)) return;
 
