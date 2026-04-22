@@ -817,23 +817,55 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       return;
     }
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
+    if (orderType === "delivery" && !customerPhone.trim()) {
+      toast.error("Telefone é obrigatório para delivery");
+      return;
+    }
+    if (orderType === "delivery" && !deliveryAddress.trim()) {
+      toast.error("Informe o endereço de entrega");
+      return;
+    }
+    if (orderType === "delivery" && (deliveryZones?.length ?? 0) > 0 && !matchedZone) {
+      toast.error("Endereço fora das regiões de entrega cadastradas. Verifique CEP/bairro ou cadastre a região.");
+      return;
+    }
+    if (belowMinimum) {
+      toast.error(`Pedido mínimo para essa região: R$ ${minOrderValue.toFixed(2)}. Subtotal atual: R$ ${cartSubtotal.toFixed(2)}.`);
+      return;
+    }
 
     setSubmitting(true);
     try {
       // Auto-create/update customer in CRM
       await upsertCustomerCRM();
       if (orderType === "delivery") {
-        if (!customerPhone) throw new Error("Telefone é obrigatório para delivery");
         const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
         const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
+        const cityParts = (deliveryCity || "").split(" - ");
+        const resolvedCityName = (selectedAddress?.city || cityParts[0] || matchedZone?.zone_name || "").trim();
+        const resolvedState = (selectedAddress?.state || cityParts[1] || "").trim();
+        const resolvedCityLabel = resolvedCityName
+          ? `${resolvedCityName}${resolvedState ? ` - ${resolvedState}` : ""}`
+          : "";
+        const fullAddress = [
+          resolvedCityLabel,
+          deliveryAddress || "",
+          deliveryNeighborhood || selectedAddress?.neighborhood || "",
+          deliveryCep ? `CEP ${deliveryCep}` : "",
+        ].filter(Boolean).join(" - ");
+        const finalDeliveryFee = Math.round(resolvedDeliveryFee * 100) / 100;
+
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
           status: "preparing", customer_name: customerName.trim(),
           customer_cpf: customerCpf,
           delivery_phone: customerPhone,
-          delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
+          delivery_address: fullAddress || null,
+          delivery_city: resolvedCityName || null,
+          delivery_neighborhood: deliveryNeighborhood || selectedAddress?.neighborhood || null,
           notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
           coupon_discount: discountForOrder,
+          delivery_fee: finalDeliveryFee,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
@@ -972,23 +1004,27 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         }
       }
 
-      // Deduct stock for PDV orders that start in 'preparing' (trigger misses them)
-      if (orderType !== "mesa") {
-        const lastOrder = await supabase.from("orders")
-          .select("id, order_items(id)")
-          .eq("restaurant_id", restaurantId)
-          .eq("pdv_source", true)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-        // Stock deduction is handled by DB trigger on status change to delivered/picked_up
-      }
+      // Stock deduction is handled by DB trigger on status change to delivered/picked_up
 
       toast.success("Pedido criado com sucesso!");
 
       // Auto-print if enabled
       if (autoPrint) {
         const table = orderType === "mesa" ? tables?.find(t => t.id === selectedTableId) : undefined;
+        const cityParts = (deliveryCity || "").split(" - ");
+        const resolvedCityName = (selectedAddress?.city || cityParts[0] || matchedZone?.zone_name || "").trim();
+        const resolvedState = (selectedAddress?.state || cityParts[1] || "").trim();
+        const resolvedCityLabel = resolvedCityName
+          ? `${resolvedCityName}${resolvedState ? ` - ${resolvedState}` : ""}`
+          : "";
+        const printableDeliveryAddress = orderType === "delivery"
+          ? [
+              resolvedCityLabel,
+              deliveryAddress || "",
+              deliveryNeighborhood || selectedAddress?.neighborhood || "",
+              deliveryCep ? `CEP ${deliveryCep}` : "",
+            ].filter(Boolean).join(" - ") || undefined
+          : undefined;
         const printOrderObj = {
           id: "PDV-" + Date.now(),
           created_at: new Date().toISOString(),
@@ -996,11 +1032,12 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           order_type: orderType === "mesa" ? "local" : "delivery",
           delivery_type: orderType === "delivery" ? "delivery" : orderType === "retirada" ? "pickup" : undefined,
           tables: table ? { table_number: table.table_number } : null,
-          delivery_address: deliveryAddress || undefined,
+          delivery_address: printableDeliveryAddress,
           delivery_phone: customerPhone || undefined,
           payment_type: paymentType || undefined,
           notes: (notes || "") + (discountNotes ? ` [Desconto: ${discountNotes}]` : ""),
           coupon_discount: calculatedDiscount > 0 ? calculatedDiscount : undefined,
+          delivery_fee: orderType === "delivery" ? resolvedDeliveryFee : undefined,
           order_items: cart.map((item, i) => ({
             id: `item-${i}`,
             quantity: item.quantity,
@@ -1826,6 +1863,12 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                         <span>- R$ {calculatedDiscount.toFixed(2)}</span>
                       </div>
                     )}
+                    {orderType === "delivery" && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Taxa de entrega</span>
+                        <span>{resolvedDeliveryFee > 0 ? `R$ ${resolvedDeliveryFee.toFixed(2)}` : "Grátis"}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between font-bold text-sm">
                       <span>Total</span>
                       <span>R$ {cartTotal.toFixed(2)}</span>
@@ -1866,8 +1909,15 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     if (calculatedDiscount > 0) {
                       text += `🏷️ Desconto: -R$ ${calculatedDiscount.toFixed(2)}\n`;
                     }
-                    if (orderType === "delivery" && deliveryAddress) {
-                      text += `📍 Endereço: ${deliveryAddress}${deliveryNeighborhood ? `, ${deliveryNeighborhood}` : ""}${deliveryCity ? ` - ${deliveryCity}` : ""}\n`;
+                    if (orderType === "delivery") {
+                      const cityParts = (deliveryCity || "").split(" - ");
+                      const cityName = (selectedAddress?.city || cityParts[0] || matchedZone?.zone_name || "").trim();
+                      const state = (selectedAddress?.state || cityParts[1] || "").trim();
+                      const cityLabel = cityName ? `${cityName}${state ? ` - ${state}` : ""}` : "";
+                      text += `🚚 Taxa de entrega: ${resolvedDeliveryFee > 0 ? `R$ ${resolvedDeliveryFee.toFixed(2)}` : "Grátis"}\n`;
+                      if (deliveryAddress) {
+                        text += `📍 Endereço: ${[cityLabel, deliveryAddress, deliveryNeighborhood || selectedAddress?.neighborhood || "", deliveryCep ? `CEP ${deliveryCep}` : ""].filter(Boolean).join(" - ")}\n`;
+                      }
                     }
                     text += `\n💰 *Total: R$ ${cartTotal.toFixed(2)}*`;
                     if (customerName) text += `\n👤 Cliente: ${customerName}`;
