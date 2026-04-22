@@ -706,8 +706,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   };
 
   const handleSubmit = async () => {
-    if (!customerName.trim() || !validateCPF(customerCpf)) {
-      toast.error("Preencha o nome e CPF válido do cliente");
+    if (!customerName.trim()) {
+      toast.error("Informe o nome do cliente");
       return;
     }
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
