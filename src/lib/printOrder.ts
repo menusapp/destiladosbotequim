@@ -57,6 +57,7 @@ export const printOrder = async (
     dd_scheduled_for?: string;
     cancellation_reason?: string;
     coupon_discount?: number;
+    delivery_fee?: number;
     order_channel?: string;
     customer_cpf?: string;
     order_items: {
@@ -239,20 +240,26 @@ export const printOrder = async (
   // Build totals
   const totalsHtml = (() => {
     const discount = order.coupon_discount || 0;
-    const finalTotal = subtotal - discount;
+    const deliveryFee = order.delivery_fee || 0;
+    const finalTotal = subtotal - discount + deliveryFee;
     const discountReasonMatch = order.notes?.match(/\[Desconto: (.+?)\]/);
     const discountReason = discountReasonMatch ? discountReasonMatch[1] : "";
-    if (discount > 0) {
+    const showBreakdown = discount > 0 || deliveryFee > 0;
+    if (showBreakdown) {
       return `
         <div class="total-row" style="font-size:12px;">
           <span>Subtotal</span>
           <span>R$ ${subtotal.toFixed(2)}</span>
         </div>
-        <div class="total-row" style="font-size:12px;">
+        ${discount > 0 ? `<div class="total-row" style="font-size:12px;">
           <span>Desconto</span>
           <span>- R$ ${discount.toFixed(2)}</span>
-        </div>
+        </div>` : ""}
         ${discountReason ? `<div style="font-size:10px;font-style:italic;margin-bottom:4px;">Motivo: ${discountReason}</div>` : ""}
+        ${deliveryFee > 0 ? `<div class="total-row" style="font-size:12px;">
+          <span>Taxa de entrega</span>
+          <span>R$ ${deliveryFee.toFixed(2)}</span>
+        </div>` : ""}
         <div class="total-row">
           <span>TOTAL</span>
           <span>R$ ${finalTotal.toFixed(2)}</span>
