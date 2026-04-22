@@ -537,21 +537,47 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       <UserPlus className="w-3.5 h-3.5 mr-1" /> Buscar
                     </Button>
                   </div>
-                  <Input placeholder="CPF do cliente *" value={customerCpf} maxLength={14} inputMode="numeric" onChange={e => {
+                  <Input placeholder="CPF do cliente" value={customerCpf} maxLength={14} inputMode="numeric" onChange={e => {
                     const d = e.target.value.replace(/\D/g, "").slice(0, 11);
                     let formatted = d;
                     if (d.length > 9) formatted = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
                     else if (d.length > 6) formatted = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
                     else if (d.length > 3) formatted = `${d.slice(0,3)}.${d.slice(3)}`;
                     setCustomerCpf(formatted);
-                    setFoundCustomer(null);
                     if (d.length === 11) {
                       supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("cpf", d).maybeSingle()
-                        .then(({ data }) => {
-                          if (data) {
-                            setFoundCustomer({ name: data.name, phone: data.phone || "" });
+                        .then(async ({ data }) => {
+                          if (!data) { setFoundCustomer(null); return; }
+                          // Auto-fill any missing fields without clearing existing data
+                          if (!customerName.trim()) setCustomerName(data.name);
+                          if (!customerPhone.trim() && data.phone) {
+                            const dp = data.phone.replace(/\D/g, "").slice(0, 11);
+                            let f = dp;
+                            if (dp.length > 10) f = `(${dp.slice(0,2)}) ${dp.slice(2,7)}-${dp.slice(7)}`;
+                            else if (dp.length > 6) f = `(${dp.slice(0,2)}) ${dp.slice(2,6)}-${dp.slice(6)}`;
+                            else if (dp.length > 2) f = `(${dp.slice(0,2)}) ${dp.slice(2)}`;
+                            setCustomerPhone(f);
+                          }
+                          setFoundCustomer({ name: data.name, phone: data.phone || "" });
+                          // Auto-fill address if delivery and no address yet
+                          if (orderType === "delivery" && !deliveryAddress.trim()) {
+                            const { data: addr } = await supabase
+                              .from("customer_addresses")
+                              .select("*")
+                              .eq("customer_cpf", d)
+                              .order("is_default", { ascending: false })
+                              .limit(1)
+                              .maybeSingle();
+                            if (addr) {
+                              setDeliveryAddress(addr.street + (addr.number ? `, ${addr.number}` : ""));
+                              setDeliveryCep(addr.zip_code || "");
+                              setDeliveryNeighborhood(addr.neighborhood || "");
+                              setDeliveryCity(addr.city ? `${addr.city}${addr.state ? ` - ${addr.state}` : ""}` : "");
+                            }
                           }
                         });
+                    } else {
+                      setFoundCustomer(null);
                     }
                   }} />
                   {foundCustomer && (
@@ -582,10 +608,41 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                     else if (d.length > 6) f = `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
                     else if (d.length > 2) f = `(${d.slice(0,2)}) ${d.slice(2)}`;
                     setCustomerPhone(f);
+                    // Auto-lookup by phone (10-11 digits)
+                    if (d.length >= 10) {
+                      supabase.from("customers").select("id, cpf, name, phone").eq("restaurant_id", restaurantId).eq("phone", f).maybeSingle()
+                        .then(async ({ data }) => {
+                          if (!data) return;
+                          if (!customerName.trim()) setCustomerName(data.name);
+                          if (!customerCpf.trim() && data.cpf) {
+                            const dc = data.cpf.replace(/\D/g, "");
+                            let cf = dc;
+                            if (dc.length === 11) cf = `${dc.slice(0,3)}.${dc.slice(3,6)}.${dc.slice(6,9)}-${dc.slice(9)}`;
+                            setCustomerCpf(cf);
+                          }
+                          setFoundCustomer({ name: data.name, phone: data.phone || "" });
+                          if (orderType === "delivery" && !deliveryAddress.trim() && data.cpf) {
+                            const cleanCpf = data.cpf.replace(/\D/g, "");
+                            const { data: addr } = await supabase
+                              .from("customer_addresses")
+                              .select("*")
+                              .eq("customer_cpf", cleanCpf)
+                              .order("is_default", { ascending: false })
+                              .limit(1)
+                              .maybeSingle();
+                            if (addr) {
+                              setDeliveryAddress(addr.street + (addr.number ? `, ${addr.number}` : ""));
+                              setDeliveryCep(addr.zip_code || "");
+                              setDeliveryNeighborhood(addr.neighborhood || "");
+                              setDeliveryCity(addr.city ? `${addr.city}${addr.state ? ` - ${addr.state}` : ""}` : "");
+                            }
+                          }
+                        });
+                    }
                   }} />
                   {!hasValidCustomer && (
                     <p className="text-xs text-muted-foreground">
-                      Selecione ou cadastre um cliente com CPF válido para liberar o pedido.
+                      Informe ao menos o nome do cliente para liberar o pedido.
                     </p>
                   )}
                 </div>
