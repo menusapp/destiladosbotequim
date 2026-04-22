@@ -993,16 +993,16 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   return (
     <div className="h-[calc(100vh-7rem)] flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2 flex-shrink-0">
-        <div>
-          <h2 className="text-2xl font-bold">PDV</h2>
-          <p className="text-sm text-muted-foreground">
-            {tables?.length || 0} mesas • {occupiedTables} ocupadas • {availableTables} livres
+      <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold">PDV</h2>
+          <p className="text-[11px] sm:text-sm text-muted-foreground truncate">
+            {tables?.length || 0} mesas • {occupiedTables} ocup. • {availableTables} livres
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Printer className="h-4 w-4 text-muted-foreground" />
-          <label htmlFor="auto-print-toggle" className="text-xs text-muted-foreground cursor-pointer">Auto-print</label>
+          <label htmlFor="auto-print-toggle" className="text-xs text-muted-foreground cursor-pointer hidden sm:inline">Auto-print</label>
           <Switch
             id="auto-print-toggle"
             checked={autoPrint}
