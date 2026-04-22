@@ -706,8 +706,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   };
 
   const handleSubmit = async () => {
-    if (!customerName.trim() || !validateCPF(customerCpf)) {
-      toast.error("Preencha o nome e CPF válido do cliente");
+    if (!customerName.trim()) {
+      toast.error("Informe o nome do cliente");
       return;
     }
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
@@ -1774,7 +1774,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                 </Button>
               )}
             </div>
-            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim() || !validateCPF(customerCpf)}>
+            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               Criar Pedido
             </Button>
