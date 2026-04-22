@@ -189,29 +189,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     enabled: open,
   });
 
-  // Auto-calculate delivery fee based on CEP / neighborhood / city
-  useEffect(() => {
-    if (orderType !== "delivery") {
-      setDeliveryFeeAuto(null);
-      return;
-    }
-
-    if (matchedZone) {
-      const zoneFee = Number(matchedZone.delivery_fee ?? 0);
-      setDeliveryFeeAuto(zoneFee);
-      setDeliveryFee(zoneFee.toFixed(2));
-      return;
-    }
-
-    // Fallback to default delivery config
-    if (deliveryConfig?.delivery_fee !== null && deliveryConfig?.delivery_fee !== undefined) {
-      setDeliveryFeeAuto(deliveryConfig.delivery_fee);
-      setDeliveryFee(Number(deliveryConfig.delivery_fee).toFixed(2));
-    } else {
-      setDeliveryFeeAuto(null);
-      setDeliveryFee("");
-    }
-  }, [matchedZone, deliveryConfig, orderType]);
 
 
 
