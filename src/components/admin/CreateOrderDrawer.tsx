@@ -210,6 +210,35 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const cartTotal = cartSubtotal - discountAmount + resolvedDeliveryFeeVal;
   const hasValidCustomer = customerName.trim().length > 0;
 
+  // Detect matching zone to enforce min_order_value
+  const matchedZone = useMemo(() => {
+    if (orderType !== "delivery" || !deliveryZones?.length) return null;
+    const cleanCep = deliveryCep.replace(/\D/g, "");
+    const normalizedNeighborhood = deliveryNeighborhood.toLowerCase().trim();
+    if (cleanCep.length >= 5) {
+      const z = deliveryZones.find(zone =>
+        zone.zip_codes?.some((zc: string) => {
+          const p = (zc || "").replace(/\D/g, "");
+          return p && cleanCep.startsWith(p);
+        })
+      );
+      if (z) return z;
+    }
+    if (normalizedNeighborhood) {
+      const z = deliveryZones.find(zone =>
+        zone.neighborhoods?.some((n: string) => {
+          const t = (n || "").toLowerCase().trim();
+          return t && (normalizedNeighborhood.includes(t) || t.includes(normalizedNeighborhood));
+        })
+      );
+      if (z) return z;
+    }
+    return null;
+  }, [deliveryZones, deliveryCep, deliveryNeighborhood, orderType]);
+
+  const minOrderValue = Number(matchedZone?.min_order_value ?? deliveryConfig?.min_order_value ?? 0);
+  const belowMinimum = orderType === "delivery" && minOrderValue > 0 && cartSubtotal > 0 && cartSubtotal < minOrderValue;
+
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
