@@ -245,9 +245,8 @@ const StaffLogin = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="ownerPassword">Senha</Label>
-                  <Input
+                  <PasswordInput
                     id="ownerPassword"
-                    type="password"
                     placeholder="••••••"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -257,9 +256,8 @@ const StaffLogin = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ownerConfirm">Confirmar</Label>
-                  <Input
+                  <PasswordInput
                     id="ownerConfirm"
-                    type="password"
                     placeholder="••••••"
                     value={newConfirmPassword}
                     onChange={(e) => setNewConfirmPassword(e.target.value)}
@@ -292,9 +290,8 @@ const StaffLogin = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
                   placeholder="Digite sua senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

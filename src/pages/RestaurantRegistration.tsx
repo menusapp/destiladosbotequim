@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
@@ -314,9 +315,8 @@ const RestaurantRegistration = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Senha *</Label>
-                    <Input
+                    <PasswordInput
                       required
-                      type="password"
                       minLength={6}
                       maxLength={100}
                       value={form.password}
@@ -326,9 +326,8 @@ const RestaurantRegistration = () => {
                   </div>
                   <div className="space-y-2">
                     <Label>Confirmar Senha *</Label>
-                    <Input
+                    <PasswordInput
                       required
-                      type="password"
                       value={form.confirmPassword}
                       onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
                       placeholder="••••••"
@@ -356,9 +355,8 @@ const RestaurantRegistration = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Senha Admin *</Label>
-                    <Input
+                    <PasswordInput
                       required
-                      type="password"
                       minLength={6}
                       maxLength={100}
                       value={form.adminPassword}
@@ -368,9 +366,8 @@ const RestaurantRegistration = () => {
                   </div>
                   <div className="space-y-2">
                     <Label>Confirmar Senha Admin *</Label>
-                    <Input
+                    <PasswordInput
                       required
-                      type="password"
                       value={form.adminConfirmPassword}
                       onChange={(e) => setForm((f) => ({ ...f, adminConfirmPassword: e.target.value }))}
                       placeholder="••••••"

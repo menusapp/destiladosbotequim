@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -407,7 +408,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Senha do Certificado</Label>
-              <Input type="password" placeholder="Senha do .pfx" value={config.certificate_password} onChange={(e) => handleChange("certificate_password", e.target.value)} />
+              <PasswordInput placeholder="Senha do .pfx" value={config.certificate_password} onChange={(e) => handleChange("certificate_password", e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Certificado (.pfx)</Label>

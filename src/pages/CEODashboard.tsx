@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LogOut, Plus, Store, Trash2, Edit, CreditCard, Package, BarChart3, Loader2, UserCog } from "lucide-react";
@@ -266,7 +267,7 @@ const CEODashboard = () => {
                       {!editingRestaurant && (
                         <>
                           <div className="space-y-2"><Label>Usuário do Restaurante</Label><Input value={formUsername} onChange={(e) => setFormUsername(e.target.value)} placeholder="usuario_restaurante" required /></div>
-                          <div className="space-y-2"><Label>Senha do Restaurante</Label><Input type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="Mínimo 6 caracteres" required minLength={6} /></div>
+                          <div className="space-y-2"><Label>Senha do Restaurante</Label><PasswordInput value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="Mínimo 6 caracteres" required minLength={6} /></div>
                         </>
                       )}
                       <Button type="submit" className="w-full">{editingRestaurant ? "Atualizar" : "Criar"}</Button>
