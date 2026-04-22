@@ -130,6 +130,19 @@ Deno.serve(async (req) => {
     const menuLink = buildPublicUrl(restaurant.slug);
     const welcomeType = aiConfig.welcome_message_type || 'numeric_menu';
 
+    // ── Link-only cooldown: only send the menu link once every 2 hours ──
+    if (welcomeType === 'link_only') {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const lastSentAt = conversation?.last_message_at ? new Date(conversation.last_message_at) : null;
+      const alreadyGreeted = conversation?.current_step === 'menu';
+      if (alreadyGreeted && lastSentAt && lastSentAt > twoHoursAgo) {
+        console.log(`[AI-BOT] link_only cooldown active for ${customer_phone}, skipping`);
+        return new Response(JSON.stringify({ skipped: true, reason: 'link_only_cooldown' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     let responseText = '';
     let newStep = conversation.current_step;
 
