@@ -318,6 +318,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       return;
     }
 
+    // Enforce minimum order value for the matched delivery zone
+    if (belowMinimum) {
+      toast.error(
+        `Pedido mínimo para essa região: R$ ${minOrderValue.toFixed(2)}. Subtotal atual: R$ ${cartSubtotal.toFixed(2)}.`
+      );
+      return;
+    }
+
     // Resolve payment type
     let resolvedPaymentType: string | null = null;
     let resolvedPaymentBrand: string | null = null;
@@ -884,6 +892,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       <span>Total</span>
                       <span>R$ {cartTotal.toFixed(2)}</span>
                     </div>
+                    {belowMinimum && (
+                      <div className="flex items-start gap-2 p-2 mt-2 rounded border border-destructive/40 bg-destructive/10 text-destructive text-xs">
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>
+                          Pedido mínimo desta região: <strong>R$ {minOrderValue.toFixed(2)}</strong>. Adicione mais itens para liberar.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -969,7 +985,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
               <ShoppingCart className="w-4 h-4 inline mr-1" />
               {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
             </div>
-            <Button onClick={handleSubmit} disabled={submitting || cart.length === 0 || !hasValidCustomer}>
+            <Button onClick={handleSubmit} disabled={submitting || cart.length === 0 || !hasValidCustomer || belowMinimum}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               Criar Pedido
             </Button>
