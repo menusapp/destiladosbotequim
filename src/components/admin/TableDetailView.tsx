@@ -271,6 +271,62 @@ export const TableDetailView = () => {
     }
   };
 
+  const cancelOrderItem = async (orderItemId: string, productName: string) => {
+    if (!confirm(`Cancelar "${productName}"? O item será removido do pedido e devolvido ao estoque.`)) return;
+    setCancellingItemId(orderItemId);
+    try {
+      const { error } = await supabase.rpc("admin_cancel_order_item", {
+        p_order_item_id: orderItemId,
+        p_restaurant_id: restaurantId,
+      });
+      if (error) throw error;
+      toast.success("Item cancelado e devolvido ao estoque");
+      fetchTableData();
+    } catch (err: any) {
+      console.error("Erro ao cancelar item:", err);
+      toast.error(err.message || "Erro ao cancelar item");
+    } finally {
+      setCancellingItemId(null);
+    }
+  };
+
+  // Abre o drawer de adicionar itens. Usa o pedido ativo mais recente da comanda;
+  // se não houver, cria um novo pedido vazio (status 'accepted') para a comanda.
+  const openAddItemsForComanda = async (comanda: ComandaWithDetails) => {
+    try {
+      const activeOrder = comanda.orders.find((o) =>
+        ["pending", "accepted", "preparing", "ready"].includes(o.status)
+      );
+
+      if (activeOrder) {
+        setAddItemsOrderId(activeOrder.id);
+        return;
+      }
+
+      // Cria pedido novo vinculado à comanda
+      const { data: newOrder, error: createError } = await supabase
+        .from("orders")
+        .insert({
+          restaurant_id: restaurantId,
+          table_id: tableId,
+          comanda_id: comanda.id,
+          customer_name: comanda.customer_name,
+          customer_cpf: comanda.customer_cpf,
+          status: "accepted",
+          order_type: "local",
+          pdv_source: true,
+        })
+        .select("id")
+        .single();
+
+      if (createError) throw createError;
+      setAddItemsOrderId(newOrder.id);
+    } catch (err: any) {
+      console.error("Erro ao abrir adicionar itens:", err);
+      toast.error(err.message || "Erro ao abrir adicionar itens");
+    }
+  };
+
   const printOrderForThermal = async (order: Order) => {
     const thermalOrder = {
       id: order.id,
