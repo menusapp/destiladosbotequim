@@ -33,6 +33,7 @@ import { printOrder } from "@/lib/printOrder";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { TableDetailDialog } from "./TableDetailDialog";
 import { ManageTablesDrawer } from "./ManageTablesDrawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CartItem {
   productId: string;
@@ -82,6 +83,8 @@ interface PDVTabProps {
 
 const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, onTableOpened, showPrepTimer = true }: PDVTabProps) => {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
 
   // Order creation state
   const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada">("mesa");
@@ -482,6 +485,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
+    if (isMobile) setMobileOrderPanelOpen(true);
   };
 
   // Sync selectedCustomer to source-of-truth states
@@ -911,6 +915,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       clearForm();
       refetchTables();
       queryClient.invalidateQueries({ queryKey: ["unified-orders"] });
+      if (isMobile) setMobileOrderPanelOpen(false);
     } catch (err: any) {
       toast.error(err.message || "Erro ao criar pedido");
     } finally {
@@ -989,16 +994,16 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   return (
     <div className="h-[calc(100vh-7rem)] flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2 flex-shrink-0">
-        <div>
-          <h2 className="text-2xl font-bold">PDV</h2>
-          <p className="text-sm text-muted-foreground">
-            {tables?.length || 0} mesas • {occupiedTables} ocupadas • {availableTables} livres
+      <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold">PDV</h2>
+          <p className="text-[11px] sm:text-sm text-muted-foreground truncate">
+            {tables?.length || 0} mesas • {occupiedTables} ocup. • {availableTables} livres
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Printer className="h-4 w-4 text-muted-foreground" />
-          <label htmlFor="auto-print-toggle" className="text-xs text-muted-foreground cursor-pointer">Auto-print</label>
+          <label htmlFor="auto-print-toggle" className="text-xs text-muted-foreground cursor-pointer hidden sm:inline">Auto-print</label>
           <Switch
             id="auto-print-toggle"
             checked={autoPrint}
@@ -1193,15 +1198,29 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           </div>
         </div>
 
-        {/* Right: Order Creation Panel (always visible) */}
-        <div className="w-[640px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-4">
+        {/* Right: Order Creation Panel — desktop inline, mobile slide-over */}
+        <div
+          className={`
+            ${isMobile
+              ? `fixed inset-0 z-50 bg-background flex flex-col p-4 transition-transform duration-300 ${mobileOrderPanelOpen ? "translate-x-0" : "translate-x-full"}`
+              : "w-[640px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0"
+            }
+          `}
+        >
+          <div className="flex items-center justify-between mb-4 gap-2">
             <h3 className="font-bold text-lg">Novo Pedido</h3>
-            {cart.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
-                Limpar
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {cart.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
+                  Limpar
+                </Button>
+              )}
+              {isMobile && (
+                <Button variant="ghost" size="icon" onClick={() => setMobileOrderPanelOpen(false)} className="h-8 w-8">
+                  <X className="w-5 h-5" />
+                </Button>
+              )}
+            </div>
           </div>
 
           <ScrollArea className="flex-1">
@@ -1763,6 +1782,23 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         </div>
       </div>
 
+      {/* Mobile floating "Novo Pedido" button */}
+      {isMobile && !mobileOrderPanelOpen && (
+        <Button
+          onClick={() => setMobileOrderPanelOpen(true)}
+          className="fixed bottom-4 right-4 z-40 h-14 rounded-full shadow-lg flex items-center gap-2 px-5"
+          size="lg"
+        >
+          <ShoppingCart className="w-5 h-5" />
+          <span className="font-bold">Novo Pedido</span>
+          {cart.length > 0 && (
+            <Badge variant="secondary" className="ml-1 h-6 min-w-6 px-1.5">
+              {cart.length}
+            </Badge>
+          )}
+        </Button>
+      )}
+
       {/* Product Drawer */}
       <PDVProductDrawer
         product={selectedProduct}
@@ -1870,6 +1906,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           setSelectedTableForDrawer(null);
           setOrderType("mesa");
           setSelectedTableId(tableId);
+          if (isMobile) setMobileOrderPanelOpen(true);
         }}
         onTableCleared={() => refetchTables()}
       />
