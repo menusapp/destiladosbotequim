@@ -4623,6 +4623,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_cancel_order_item: {
+        Args: { p_order_item_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_check_has_staff: {
         Args: { p_restaurant_id: string }
         Returns: boolean
