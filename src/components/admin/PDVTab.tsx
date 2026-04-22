@@ -884,6 +884,14 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           });
         }
 
+        // Trigger WhatsApp "order accepted" notification (PDV orders skip pending->accepted transition)
+        notifyOrderAcceptedFromPDV({
+          restaurantId,
+          orderId: order.id,
+          customerName: customerName.trim(),
+          customerPhone,
+        });
+
       } else if (orderType === "retirada") {
         const discountForOrder = calculatedDiscount > 0 ? calculatedDiscount : null;
         const discountNotesText = discountNotes ? ` [Desconto: ${discountNotes}]` : "";
