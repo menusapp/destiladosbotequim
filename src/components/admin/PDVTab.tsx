@@ -1782,6 +1782,23 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         </div>
       </div>
 
+      {/* Mobile floating "Novo Pedido" button */}
+      {isMobile && !mobileOrderPanelOpen && (
+        <Button
+          onClick={() => setMobileOrderPanelOpen(true)}
+          className="fixed bottom-4 right-4 z-40 h-14 rounded-full shadow-lg flex items-center gap-2 px-5"
+          size="lg"
+        >
+          <ShoppingCart className="w-5 h-5" />
+          <span className="font-bold">Novo Pedido</span>
+          {cart.length > 0 && (
+            <Badge variant="secondary" className="ml-1 h-6 min-w-6 px-1.5">
+              {cart.length}
+            </Badge>
+          )}
+        </Button>
+      )}
+
       {/* Product Drawer */}
       <PDVProductDrawer
         product={selectedProduct}
