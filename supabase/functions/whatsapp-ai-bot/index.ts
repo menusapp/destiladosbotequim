@@ -9,15 +9,12 @@ const corsHeaders = {
 const PUBLIC_DOMAIN = 'https://menusapp.com.br';
 const SUPABASE_URL_ENV = Deno.env.get('SUPABASE_URL') || '';
 
-// Build a public link that, when shared on WhatsApp, shows the
-// restaurant's own logo as the preview image. We point to the
-// 'menu-link-preview' edge function which renders restaurant-specific
-// og:image meta tags and then redirects users to the actual SPA.
+// Build the public menu URL using the production domain so customers
+// see the actual restaurant link (e.g. https://menusapp.com.br/<slug>)
+// instead of an internal Supabase functions URL.
 function buildPublicUrl(slug: string, path?: string): string {
-  const fnBase = SUPABASE_URL_ENV
-    ? `${SUPABASE_URL_ENV}/functions/v1/menu-link-preview/${slug}`
-    : `${PUBLIC_DOMAIN}/${slug}`;
-  return path ? `${fnBase}/${path}` : fnBase;
+  const base = `${PUBLIC_DOMAIN}/${slug}`;
+  return path ? `${base}/${path}` : base;
 }
 
 Deno.serve(async (req) => {
