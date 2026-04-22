@@ -1197,15 +1197,29 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           </div>
         </div>
 
-        {/* Right: Order Creation Panel (always visible) */}
-        <div className="w-[640px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-4">
+        {/* Right: Order Creation Panel — desktop inline, mobile slide-over */}
+        <div
+          className={`
+            ${isMobile
+              ? `fixed inset-0 z-50 bg-background flex flex-col p-4 transition-transform duration-300 ${mobileOrderPanelOpen ? "translate-x-0" : "translate-x-full"}`
+              : "w-[640px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0"
+            }
+          `}
+        >
+          <div className="flex items-center justify-between mb-4 gap-2">
             <h3 className="font-bold text-lg">Novo Pedido</h3>
-            {cart.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
-                Limpar
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {cart.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
+                  Limpar
+                </Button>
+              )}
+              {isMobile && (
+                <Button variant="ghost" size="icon" onClick={() => setMobileOrderPanelOpen(false)} className="h-8 w-8">
+                  <X className="w-5 h-5" />
+                </Button>
+              )}
+            </div>
           </div>
 
           <ScrollArea className="flex-1">
