@@ -83,3 +83,6 @@ verify_jwt = false
 
 [functions.ifood-catalog]
 verify_jwt = false
+
+[functions.menu-link-preview]
+verify_jwt = false
