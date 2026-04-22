@@ -208,7 +208,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
 
   const resolvedDeliveryFeeVal = orderType === "delivery" ? (parseFloat(deliveryFee) || 0) : 0;
   const cartTotal = cartSubtotal - discountAmount + resolvedDeliveryFeeVal;
-  const hasValidCustomer = customerName.trim().length > 0 && validateCPF(customerCpf);
+  const hasValidCustomer = customerName.trim().length > 0;
 
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
@@ -277,8 +277,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   };
 
   const handleSubmit = async () => {
-    if (!customerName.trim() || !customerCpf.trim()) {
-      toast.error("Selecione ou cadastre um cliente antes de criar o pedido");
+    if (!customerName.trim()) {
+      toast.error("Informe ao menos o nome do cliente");
       return;
     }
     if (cart.length === 0) { toast.error("Adicione produtos ao carrinho"); return; }
