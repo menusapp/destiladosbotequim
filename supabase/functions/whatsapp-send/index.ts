@@ -38,17 +38,20 @@ Deno.serve(async (req) => {
 
     console.log(`[SEND] Restaurant: ${restaurantId}, Phone: ${phone}, Type: ${messageType}`);
 
-    // Get restaurant WhatsApp config
-    const { data: config, error: configError } = await supabase
+    // Get restaurant WhatsApp config (tolerate duplicates: prefer enabled + most recent)
+    const { data: configs, error: configError } = await supabase
       .from('whatsapp_config')
       .select('*')
       .eq('restaurant_id', restaurantId)
-      .maybeSingle();
+      .order('enabled', { ascending: false })
+      .order('updated_at', { ascending: false });
 
     if (configError) {
       console.error('[SEND] Config error:', configError);
       throw new Error('Failed to fetch WhatsApp config');
     }
+
+    const config = (configs || []).find((c: any) => c.enabled) || (configs || [])[0];
 
     if (!config) {
       return new Response(
