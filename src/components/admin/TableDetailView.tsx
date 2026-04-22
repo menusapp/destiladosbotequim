@@ -529,40 +529,76 @@ export const TableDetailView = () => {
                       </CollapsibleTrigger>
 
                       <CollapsibleContent>
-                        {comanda.orders.length > 0 && (
-                          <div className="mt-4 pt-4 border-t space-y-2">
+                        <div className="mt-4 pt-4 border-t space-y-2">
+                          <div className="flex items-center justify-between">
                             <p className="text-xs font-medium text-muted-foreground uppercase">
-                              Itens pedidos
+                              Pedidos da Comanda
                             </p>
-                            {comanda.orders.map((order) => (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-primary hover:bg-primary/10"
+                              title="Adicionar itens à comanda"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openAddItemsForComanda(comanda);
+                              }}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          {comanda.orders.length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-2">
+                              Nenhum pedido ainda. Clique no + para adicionar itens.
+                            </p>
+                          ) : (
+                            comanda.orders.map((order) => (
                               <div key={order.id} className="text-sm space-y-1">
                                 {order.payment_type && (
                                   <Badge variant="outline" className="text-[10px] mb-1 border-green-500 text-green-700 dark:text-green-400">
                                     Pago - {formatPaymentMethod(order.payment_type)}
                                   </Badge>
                                 )}
-                                {order.order_items.map((item) => (
-                                  <div key={item.id}>
-                                    <div className="flex justify-between">
-                                      <span>
-                                        {item.quantity}x {item.products?.name || "Produto"}
-                                      </span>
-                                      <span className="text-muted-foreground">
-                                        R$ {(item.price_at_order * item.quantity).toFixed(2)}
-                                      </span>
+                                {order.order_items.map((item) => {
+                                  const isPaid = !!order.payment_type;
+                                  return (
+                                    <div key={item.id}>
+                                      <div className="flex justify-between items-start gap-2">
+                                        <span className="flex-1">
+                                          {item.quantity}x {item.products?.name || "Produto"}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          R$ {(item.price_at_order * item.quantity).toFixed(2)}
+                                        </span>
+                                        {!isPaid && (
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-6 w-6 text-destructive hover:bg-destructive/10 shrink-0"
+                                            title="Cancelar item"
+                                            disabled={cancellingItemId === item.id}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              cancelOrderItem(item.id, item.products?.name || "Item");
+                                            }}
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                      {item.notes && (
+                                        <p className="text-sm text-muted-foreground italic ml-4">
+                                          Obs: {item.notes}
+                                        </p>
+                                      )}
+                                      {item.order_item_extras.map((extra, idx) => (
+                                        <p key={idx} className="text-sm text-muted-foreground ml-4">
+                                          + {extra.extra_name || extra.product_extras?.name || "Extra"} (R$ {extra.price_at_order.toFixed(2)})
+                                        </p>
+                                      ))}
                                     </div>
-                                    {item.notes && (
-                                      <p className="text-sm text-muted-foreground italic ml-4">
-                                        Obs: {item.notes}
-                                      </p>
-                                    )}
-                                    {item.order_item_extras.map((extra, idx) => (
-                                      <p key={idx} className="text-sm text-muted-foreground ml-4">
-                                        + {extra.extra_name || extra.product_extras?.name || "Extra"} (R$ {extra.price_at_order.toFixed(2)})
-                                      </p>
-                                    ))}
-                                  </div>
-                                ))}
+                                  );
+                                })}
                                 {(() => {
                                   const orderDiscount = order.coupon_discount || 0;
                                   if (orderDiscount > 0) {
@@ -576,9 +612,9 @@ export const TableDetailView = () => {
                                   return null;
                                 })()}
                               </div>
-                            ))}
-                          </div>
-                        )}
+                            ))
+                          )}
+                        </div>
                       </CollapsibleContent>
                     </div>
                   </Collapsible>
