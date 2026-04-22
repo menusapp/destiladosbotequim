@@ -244,7 +244,8 @@ export const printOrder = async (
     const finalTotal = subtotal - discount + deliveryFee;
     const discountReasonMatch = order.notes?.match(/\[Desconto: (.+?)\]/);
     const discountReason = discountReasonMatch ? discountReasonMatch[1] : "";
-    const showBreakdown = discount > 0 || deliveryFee > 0;
+    // Sempre mostra breakdown para entrega, mesmo com taxa 0 (transparência)
+    const showBreakdown = discount > 0 || deliveryFee > 0 || isDelivery;
     if (showBreakdown) {
       return `
         <div class="total-row" style="font-size:12px;">
@@ -256,10 +257,13 @@ export const printOrder = async (
           <span>- R$ ${discount.toFixed(2)}</span>
         </div>` : ""}
         ${discountReason ? `<div style="font-size:10px;font-style:italic;margin-bottom:4px;">Motivo: ${discountReason}</div>` : ""}
-        ${deliveryFee > 0 ? `<div class="total-row" style="font-size:12px;">
+        ${isDelivery ? `<div class="total-row" style="font-size:12px;">
+          <span>Taxa de entrega</span>
+          <span>${deliveryFee > 0 ? `R$ ${deliveryFee.toFixed(2)}` : "Grátis"}</span>
+        </div>` : (deliveryFee > 0 ? `<div class="total-row" style="font-size:12px;">
           <span>Taxa de entrega</span>
           <span>R$ ${deliveryFee.toFixed(2)}</span>
-        </div>` : ""}
+        </div>` : "")}
         <div class="total-row">
           <span>TOTAL</span>
           <span>R$ ${finalTotal.toFixed(2)}</span>
