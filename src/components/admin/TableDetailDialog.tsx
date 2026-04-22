@@ -873,7 +873,7 @@ export const TableDetailDialog = ({
                                       -{((order.coupon_discount || 0)).toFixed(2)}
                                     </Badge>
                                   )}
-                                  {order.status === "pending" && !order.pdv_source && (
+                                  {order.status === "pending" && !(order as any).pdv_source && (
                                     <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleAcceptOrder(order.id)}>
                                       Aceitar
                                     </Button>
