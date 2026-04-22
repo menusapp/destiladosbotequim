@@ -98,8 +98,8 @@ export const AdminHeader = ({
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 sm:gap-3 border-b border-border bg-card px-2 sm:px-4">
-      {/* Mobile sidebar trigger — opens nav as offcanvas sheet */}
-      <SidebarTrigger className="md:hidden h-9 w-9 shrink-0" aria-label="Abrir menu">
+      {/* Sidebar trigger — visible on all screens to allow collapsing the menu */}
+      <SidebarTrigger className="h-9 w-9 shrink-0" aria-label="Abrir/fechar menu">
         <Menu className="h-5 w-5" />
       </SidebarTrigger>
 
