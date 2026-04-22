@@ -6,20 +6,21 @@ import { printOrder as printOrderThermal } from "@/lib/printOrder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  ArrowLeft, 
-  Plus, 
-  Users, 
-  DollarSign, 
-  ShoppingBag, 
-  Clock, 
-  Check, 
-  ChefHat, 
-  PackageCheck, 
-  Printer, 
+import {
+  ArrowLeft,
+  Plus,
+  Users,
+  DollarSign,
+  ShoppingBag,
+  Clock,
+  Check,
+  ChefHat,
+  PackageCheck,
+  Printer,
   Trash2,
   ChevronDown,
   ChevronUp,
+  X,
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -29,6 +30,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 
 interface ComandaWithDetails {
   id: string;
