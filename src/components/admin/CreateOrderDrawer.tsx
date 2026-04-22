@@ -43,6 +43,85 @@ interface CartItem {
   extras: { extraId: string; name: string; price: number }[];
 }
 
+const normalizeZoneText = (value?: string | null) =>
+  (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const normalizeCityName = (value?: string | null) => {
+  const raw = (value || "").trim();
+  if (!raw) return "";
+  return normalizeZoneText(raw.split(" - ")[0]);
+};
+
+const findMatchingDeliveryZone = ({
+  orderType,
+  deliveryCep,
+  deliveryNeighborhood,
+  deliveryCity,
+  deliveryAddress,
+  zones,
+}: {
+  orderType: "delivery" | "mesa" | "retirada";
+  deliveryCep: string;
+  deliveryNeighborhood: string;
+  deliveryCity: string;
+  deliveryAddress: string;
+  zones?: any[] | null;
+}) => {
+  if (orderType !== "delivery" || !zones?.length) return null;
+
+  const cleanCep = deliveryCep.replace(/\D/g, "");
+  const normalizedNeighborhood = normalizeZoneText(deliveryNeighborhood);
+  const normalizedCity = normalizeCityName(deliveryCity);
+  const normalizedAddress = normalizeZoneText(
+    [deliveryAddress, deliveryNeighborhood, deliveryCity].filter(Boolean).join(" ")
+  );
+
+  if (cleanCep.length >= 5) {
+    const cepMatches = zones.flatMap((zone) =>
+      (zone.zip_codes || [])
+        .map((zipCode: string) => ({
+          zone,
+          prefix: (zipCode || "").replace(/\D/g, ""),
+        }))
+        .filter(({ prefix }: { prefix: string }) => prefix && cleanCep.startsWith(prefix))
+    );
+
+    if (cepMatches.length > 0) {
+      return cepMatches.sort((a, b) => b.prefix.length - a.prefix.length)[0].zone;
+    }
+  }
+
+  if (normalizedNeighborhood) {
+    const neighborhoodZone = zones.find((zone) =>
+      zone.neighborhoods?.some((neighborhood: string) => {
+        const target = normalizeZoneText(neighborhood);
+        return target && (
+          normalizedNeighborhood.includes(target) ||
+          target.includes(normalizedNeighborhood)
+        );
+      })
+    );
+    if (neighborhoodZone) return neighborhoodZone;
+  }
+
+  if (normalizedCity) {
+    const cityZone = zones.find((zone) => {
+      const zoneName = normalizeZoneText(zone.zone_name);
+      return zoneName && (
+        zoneName === normalizedCity ||
+        normalizedAddress.includes(zoneName)
+      );
+    });
+    if (cityZone) return cityZone;
+  }
+
+  return null;
+};
+
 interface CreateOrderDrawerProps {
   restaurantId: string;
   open: boolean;
@@ -110,55 +189,6 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     enabled: open,
   });
 
-  // Auto-calculate delivery fee based on CEP or neighborhood
-  useEffect(() => {
-    if (orderType !== "delivery") {
-      setDeliveryFeeAuto(null);
-      return;
-    }
-
-    const cleanCep = deliveryCep.replace(/\D/g, "");
-    const normalizedNeighborhood = deliveryNeighborhood.toLowerCase().trim();
-
-    // 1) Try CEP match first (prefix-based, aligned with delivery menu logic)
-    if (cleanCep.length >= 5 && deliveryZones?.length) {
-      const cepZone = deliveryZones.find(zone =>
-        zone.zip_codes?.some((z: string) => {
-          const cleanPrefix = (z || "").replace(/\D/g, "");
-          return cleanPrefix && cleanCep.startsWith(cleanPrefix);
-        })
-      );
-      if (cepZone) {
-        setDeliveryFeeAuto(cepZone.delivery_fee || 0);
-        setDeliveryFee((cepZone.delivery_fee || 0).toFixed(2));
-        return;
-      }
-    }
-
-    // 2) Try neighborhood match (substring, case-insensitive)
-    if (normalizedNeighborhood && deliveryZones?.length) {
-      const neighborhoodZone = deliveryZones.find(zone =>
-        zone.neighborhoods?.some((n: string) => {
-          const target = (n || "").toLowerCase().trim();
-          if (!target) return false;
-          return normalizedNeighborhood.includes(target) || target.includes(normalizedNeighborhood);
-        })
-      );
-      if (neighborhoodZone) {
-        setDeliveryFeeAuto(neighborhoodZone.delivery_fee || 0);
-        setDeliveryFee((neighborhoodZone.delivery_fee || 0).toFixed(2));
-        return;
-      }
-    }
-
-    // 3) Fallback to default delivery config
-    if (deliveryConfig?.delivery_fee) {
-      setDeliveryFeeAuto(deliveryConfig.delivery_fee);
-      setDeliveryFee(deliveryConfig.delivery_fee.toFixed(2));
-    } else {
-      setDeliveryFeeAuto(null);
-    }
-  }, [deliveryCep, deliveryNeighborhood, deliveryZones, deliveryConfig, orderType]);
 
 
 
@@ -207,38 +237,45 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     return Math.min(val, cartSubtotal);
   }, [discountValue, discountType, cartSubtotal]);
 
-  const resolvedDeliveryFeeVal = orderType === "delivery" ? (parseFloat(deliveryFee) || 0) : 0;
+  const matchedZone = useMemo(() => findMatchingDeliveryZone({
+    orderType,
+    deliveryCep,
+    deliveryNeighborhood,
+    deliveryCity,
+    deliveryAddress,
+    zones: deliveryZones,
+  }), [deliveryZones, deliveryAddress, deliveryCep, deliveryNeighborhood, deliveryCity, orderType]);
+
+  const resolvedDeliveryFeeVal = orderType === "delivery"
+    ? Number(matchedZone?.delivery_fee ?? (parseFloat(deliveryFee) || deliveryFeeAuto || deliveryConfig?.delivery_fee || 0))
+    : 0;
   const cartTotal = cartSubtotal - discountAmount + resolvedDeliveryFeeVal;
   const hasValidCustomer = customerName.trim().length > 0;
 
-  // Detect matching zone to enforce min_order_value
-  const matchedZone = useMemo(() => {
-    if (orderType !== "delivery" || !deliveryZones?.length) return null;
-    const cleanCep = deliveryCep.replace(/\D/g, "");
-    const normalizedNeighborhood = deliveryNeighborhood.toLowerCase().trim();
-    if (cleanCep.length >= 5) {
-      const z = deliveryZones.find(zone =>
-        zone.zip_codes?.some((zc: string) => {
-          const p = (zc || "").replace(/\D/g, "");
-          return p && cleanCep.startsWith(p);
-        })
-      );
-      if (z) return z;
-    }
-    if (normalizedNeighborhood) {
-      const z = deliveryZones.find(zone =>
-        zone.neighborhoods?.some((n: string) => {
-          const t = (n || "").toLowerCase().trim();
-          return t && (normalizedNeighborhood.includes(t) || t.includes(normalizedNeighborhood));
-        })
-      );
-      if (z) return z;
-    }
-    return null;
-  }, [deliveryZones, deliveryCep, deliveryNeighborhood, orderType]);
-
   const minOrderValue = Number(matchedZone?.min_order_value ?? deliveryConfig?.min_order_value ?? 0);
   const belowMinimum = orderType === "delivery" && minOrderValue > 0 && cartSubtotal > 0 && cartSubtotal < minOrderValue;
+
+  useEffect(() => {
+    if (orderType !== "delivery") {
+      setDeliveryFeeAuto(null);
+      return;
+    }
+
+    if (matchedZone) {
+      const zoneFee = Number(matchedZone.delivery_fee ?? 0);
+      setDeliveryFeeAuto(zoneFee);
+      setDeliveryFee(zoneFee.toFixed(2));
+      return;
+    }
+
+    if (deliveryConfig?.delivery_fee !== null && deliveryConfig?.delivery_fee !== undefined) {
+      setDeliveryFeeAuto(deliveryConfig.delivery_fee);
+      setDeliveryFee(Number(deliveryConfig.delivery_fee).toFixed(2));
+    } else {
+      setDeliveryFeeAuto(null);
+      setDeliveryFee("");
+    }
+  }, [matchedZone, deliveryConfig, orderType]);
 
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
