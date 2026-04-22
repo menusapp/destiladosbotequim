@@ -1,71 +1,29 @@
 
-## Plano: Corrigir Realtime Multi-Tenant
+## Toggle de visibilidade nas senhas
 
-### Problema
-Canais Supabase Realtime com nomes genéricos (sem `restaurantId`) podem causar vazamento de eventos entre restaurantes diferentes quando rodando 3+ contas simultâneas. Exemplo: operador do Restaurante A recebe notificação de pedido do Restaurante B.
+Adicionar ícone de olho (Eye/EyeOff do lucide-react) em todos os campos de senha do sistema, permitindo que o usuário alterne entre ver/ocultar a senha digitada. Mudança puramente visual, sem alterações em backend ou lógica de validação.
 
-### Investigação necessária
-Vou varrer todos os `supabase.channel(...)` do projeto e identificar quais não incluem `restaurantId` no nome. Já mapeados na auditoria anterior:
-- `pdv-tables-rt`
-- `menu-changes`
-- E outros a confirmar (PendingOrdersPanel, NewOrderNotification, RealtimeStatusIndicator, hooks de polling, etc.)
+### Componente reutilizável
+Criar `src/components/ui/password-input.tsx` — wrapper sobre o `<Input>` existente que:
+- Mantém todas as props do Input nativo (ref, value, onChange, placeholder, required, minLength, etc.)
+- Adiciona estado interno `showPassword` (boolean)
+- Renderiza o input com `type={showPassword ? "text" : "password"}` e um botão posicionado à direita (`absolute right-2`) com ícone `Eye`/`EyeOff`
+- `type="button"` no toggle para não submeter formulários
+- `tabIndex={-1}` no botão para não atrapalhar navegação por Tab
+- Padding-right extra no input para o ícone não sobrepor o texto
 
-### Correção (padrão único)
-Renomear cada canal para incluir o ID do restaurante:
-```ts
-// ANTES (vulnerável):
-supabase.channel('pdv-tables-rt')
+### Substituições (somente trocar `<Input type="password" .../>` por `<PasswordInput .../>`)
 
-// DEPOIS (isolado):
-supabase.channel(`pdv-tables-rt-${restaurantId}`)
-```
+1. **`src/pages/RestaurantLogin.tsx`** — campo de login do restaurante
+2. **`src/pages/CEOLogin.tsx`** — campo de login do CEO
+3. **`src/pages/StaffLogin.tsx`** — 3 campos: senha do funcionário + criar nova senha do owner + confirmar senha
+4. **`src/pages/RestaurantRegistration.tsx`** — 4 campos: senha/confirmar senha do restaurante + senha/confirmar do admin
+5. **`src/pages/CEODashboard.tsx`** — campo "Senha do Restaurante" no formulário CEO
+6. **`src/components/admin/ContasTab.tsx`** — senha de funcionário (criar/editar)
+7. **`src/components/admin/IntegrationsTab.tsx`** — senha do Delivery Direto
+8. **`src/components/admin/FiscalSettingsTab.tsx`** — senha do certificado fiscal (.pfx)
 
-E no filtro do `.on('postgres_changes', ...)` adicionar `filter: 'restaurant_id=eq.${restaurantId}'` quando a tabela tiver essa coluna, para reduzir tráfego além de garantir isolamento.
-
-### Arquivos prováveis a editar
-- `src/components/admin/PDVTab.tsx`
-- `src/components/admin/UnifiedOrdersTab.tsx`
-- `src/components/admin/PendingOrdersPanel.tsx`
-- `src/components/admin/NewOrderNotification.tsx`
-- `src/components/admin/NewBillNotification.tsx`
-- `src/components/admin/NewReservationNotification.tsx`
-- `src/components/admin/TablesTab.tsx`
-- `src/components/admin/OverviewTab.tsx`
-- `src/components/admin/FluxoCaixaTab.tsx`
-- `src/components/menu/*` (cardápio digital — listeners de status de pedido)
-- `src/components/kiosk/*` (totem)
-- `src/hooks/useRealtimeStatus.ts`
-- Outros que aparecerem na busca
-
-(Lista exata será confirmada com `grep` de `supabase.channel(` no momento da execução.)
-
-### O que pode quebrar / efeitos colaterais
-
-**Risco real: BAIXO**, desde que feito com cuidado. Detalhes:
-
-1. **Reconexão automática** — ao mudar nome de canal, clientes já abertos (operadores logados no momento do deploy) precisam recarregar a aba para pegar o novo canal. Sem reload, ficam ouvindo o canal antigo (que ninguém mais publica). **Mitigação:** avisar operadores para dar F5 após o deploy, ou já estará resolvido no próximo login.
-
-2. **Cardápio digital de cliente** — clientes com a aba aberta no momento do deploy também precisam recarregar. Mitigação: refresh natural quando trocam de tela.
-
-3. **Filtros `restaurant_id=eq.X`** — se aplicados em tabelas que não têm essa coluna (raro), o canal não sobe. **Mitigação:** só aplicar filtro em tabelas que comprovadamente têm `restaurant_id` (orders, tables, bills, products, etc.). Tabelas filhas (order_items, order_item_extras) ficarão sem filtro de coluna mas ainda terão isolamento pelo nome do canal.
-
-4. **Notificações de novo pedido / nova mesa / nova reserva** — se o canal antigo era ouvido em múltiplos lugares, todos precisam ser renomeados juntos. Vou garantir busca completa antes de editar.
-
-5. **Não afeta:**
-   - Lógica de negócio (criação/edição de pedidos, pagamentos, estoque, fiscal)
-   - Banco de dados (zero migrations)
-   - Edge functions
-   - Autenticação
-   - iFood/Delivery Direto polling (não usa realtime)
-   - WhatsApp bot
-
-### Plano de execução (3 passos)
-1. **Mapear** todos os `supabase.channel(...)` do projeto com `code--search_files`
-2. **Renomear** cada canal incluindo `${restaurantId}` e adicionar `filter` quando aplicável
-3. **Validar** que cada `useEffect` que cria canal tem `restaurantId` nas dependências e cleanup correto no return
-
-### Esforço
-~15-25 arquivos editados, mudanças mecânicas e seguras. ~30 min de trabalho. Zero risco para banco/lógica.
-
-### Recomendação pós-deploy
-Pedir para os operadores logados darem F5 uma única vez após o deploy. A partir daí, isolamento garantido.
+### O que NÃO muda
+- Nenhuma lógica de autenticação, validação ou backend
+- Nenhuma RPC, edge function ou tabela
+- Comportamento padrão continua oculto (`type="password"`); o usuário precisa clicar no olho para revelar
