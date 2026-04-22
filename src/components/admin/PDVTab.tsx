@@ -242,6 +242,30 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       });
   }, [restaurantId, restaurantSlug]);
 
+  const { data: deliveryConfig } = useQuery({
+    queryKey: ["pdv-delivery-config", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("delivery_config")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const { data: deliveryZones } = useQuery({
+    queryKey: ["pdv-delivery-zones", restaurantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("delivery_zones")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true);
+      return data || [];
+    },
+  });
+
   // Fetch products
   const { data: products } = useQuery({
     queryKey: ["pdv-products-create", restaurantId],
@@ -389,9 +413,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     const map = new Map<string, { time: string; customerName: string }>();
     todayReservations?.forEach(r => {
       if (r.table_id) {
-        map.set(r.table_id, { 
-          time: r.reservation_time?.slice(0, 5) || "", 
-          customerName: r.customer_name 
+        map.set(r.table_id, {
+          time: r.reservation_time?.slice(0, 5) || "",
+          customerName: r.customer_name
         });
       }
     });
@@ -407,18 +431,6 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [restaurantId, refetchTables, refetchPendingOrders, refetchActiveOrders, queryClient]);
-
-  // Auto-open table from notification — only consume when table is actually found
-  useEffect(() => {
-    if (pendingTableToOpen && tables && tables.length > 0) {
-      const table = tables.find(t => t.id === pendingTableToOpen);
-      if (table) {
-        setSelectedTableForDrawer(table);
-        onTableOpened?.();
-      }
-      // If table not found yet, don't call onTableOpened — let it retry on next tables update
-    }
-  }, [pendingTableToOpen, tables]);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -460,7 +472,22 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     }
   }, [discountType, discountValue, discountTarget, cartSubtotal, cart]);
 
-  const cartTotal = cartSubtotal - calculatedDiscount;
+  const matchedZone = useMemo(() => findMatchingDeliveryZone({
+    orderType,
+    deliveryCep,
+    deliveryNeighborhood,
+    deliveryCity,
+    deliveryAddress,
+    zones: deliveryZones,
+  }), [deliveryZones, deliveryAddress, deliveryCep, deliveryNeighborhood, deliveryCity, orderType]);
+
+  const resolvedDeliveryFee = orderType === "delivery"
+    ? Number(matchedZone?.delivery_fee ?? deliveryConfig?.delivery_fee ?? 0)
+    : 0;
+  const minOrderValue = Number(matchedZone?.min_order_value ?? deliveryConfig?.min_order_value ?? 0);
+  const belowMinimum = orderType === "delivery" && minOrderValue > 0 && cartSubtotal > 0 && cartSubtotal < minOrderValue;
+
+  const cartTotal = cartSubtotal - calculatedDiscount + resolvedDeliveryFee;
   const phoneDigits = customerPhone.replace(/\D/g, "");
   const cpfDigits = customerCpf.replace(/\D/g, "");
   const hasTypedCustomerData = Boolean(customerName.trim() || phoneDigits || cpfDigits);
