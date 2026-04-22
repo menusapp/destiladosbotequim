@@ -16,6 +16,7 @@ import { toast } from "@/components/ui/sonner";
 import { validateCPF } from "@/lib/cpfValidator";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
+import { notifyOrderAcceptedFromPDV } from "@/lib/pdvNotifications";
 
 const CARD_BRANDS_PDV = [
   { code: "visa", name: "Visa" },
@@ -487,6 +488,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         if (error) throw error;
         await insertOrderItems(order.id);
 
+        // Trigger WhatsApp "order accepted" notification (PDV delivery)
+        notifyOrderAcceptedFromPDV({
+          restaurantId,
+          orderId: order.id,
+          customerName: customerName.trim(),
+          customerPhone,
+        });
+
       } else if (orderType === "retirada") {
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
@@ -499,6 +508,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         }).select().single();
         if (error) throw error;
         await insertOrderItems(order.id);
+
+        // Trigger WhatsApp "order accepted" notification (PDV pickup)
+        notifyOrderAcceptedFromPDV({
+          restaurantId,
+          orderId: order.id,
+          customerName: customerName.trim(),
+          customerPhone,
+        });
 
       } else {
         // Mesa / Balcão

@@ -580,7 +580,7 @@ export const TableDetailView = () => {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {order.status === "pending" && (
+                      {order.status === "pending" && !(order as any).pdv_source && (
                         <Button
                           size="sm"
                           onClick={() => updateOrderStatus(order.id, "accepted")}
