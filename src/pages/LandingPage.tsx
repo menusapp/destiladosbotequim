@@ -118,10 +118,10 @@ const LandingPage = () => {
             ))}
           </nav>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-base font-medium" onClick={() => navigate("/login")}>
+            <Button variant="ghost" size="sm" className="text-sm sm:text-base font-medium px-2 sm:px-3" onClick={() => navigate("/login")}>
               Entrar
             </Button>
-            <Button size="sm" className="font-semibold text-base shadow-md shadow-primary/20" onClick={() => navigate("/registro/trial")}>
+            <Button size="sm" className="font-semibold text-sm sm:text-base shadow-md shadow-primary/20 px-3 sm:px-4" onClick={() => navigate("/registro/trial")}>
               Começar agora
             </Button>
           </div>

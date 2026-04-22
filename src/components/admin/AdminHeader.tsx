@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Copy, Store, Settings } from "lucide-react";
+import { Copy, Store, Settings, Menu } from "lucide-react";
 import { AccountSettingsDialog } from "./AccountSettingsDialog";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -96,18 +97,31 @@ export const AdminHeader = ({
   const staffRole = localStorage.getItem('staff_role');
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-4">
-      {/* Logo */}
-      <div className="flex items-center gap-2">
+    <header className="flex h-14 shrink-0 items-center gap-2 sm:gap-3 border-b border-border bg-card px-2 sm:px-4">
+      {/* Mobile sidebar trigger — opens nav as offcanvas sheet */}
+      <SidebarTrigger className="md:hidden h-9 w-9 shrink-0" aria-label="Abrir menu">
+        <Menu className="h-5 w-5" />
+      </SidebarTrigger>
+
+      {/* Logo — also acts as menu trigger on mobile */}
+      <button
+        type="button"
+        onClick={() => {
+          // Trigger sidebar via SidebarTrigger click for consistency on mobile
+          const trigger = document.querySelector<HTMLButtonElement>('[data-sidebar="trigger"]');
+          if (window.matchMedia('(max-width: 767px)').matches) trigger?.click();
+        }}
+        className="flex items-center gap-2 shrink-0"
+      >
         <img src="/logo-menus.png" alt="Menus" className="h-7 w-7" />
-        <span className="font-semibold text-sm text-foreground">Menus</span>
-      </div>
+        <span className="font-semibold text-sm text-foreground hidden sm:inline">Menus</span>
+      </button>
 
       {/* Divider */}
       <div className="h-5 w-px bg-border" />
 
-      {/* Link do Cardápio */}
-      <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-button">
+      {/* Link do Cardápio — hidden on mobile to save space */}
+      <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-muted rounded-button">
         <a
           href={menuUrl}
           target="_blank"
