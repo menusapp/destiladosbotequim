@@ -210,6 +210,35 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const cartTotal = cartSubtotal - discountAmount + resolvedDeliveryFeeVal;
   const hasValidCustomer = customerName.trim().length > 0;
 
+  // Detect matching zone to enforce min_order_value
+  const matchedZone = useMemo(() => {
+    if (orderType !== "delivery" || !deliveryZones?.length) return null;
+    const cleanCep = deliveryCep.replace(/\D/g, "");
+    const normalizedNeighborhood = deliveryNeighborhood.toLowerCase().trim();
+    if (cleanCep.length >= 5) {
+      const z = deliveryZones.find(zone =>
+        zone.zip_codes?.some((zc: string) => {
+          const p = (zc || "").replace(/\D/g, "");
+          return p && cleanCep.startsWith(p);
+        })
+      );
+      if (z) return z;
+    }
+    if (normalizedNeighborhood) {
+      const z = deliveryZones.find(zone =>
+        zone.neighborhoods?.some((n: string) => {
+          const t = (n || "").toLowerCase().trim();
+          return t && (normalizedNeighborhood.includes(t) || t.includes(normalizedNeighborhood));
+        })
+      );
+      if (z) return z;
+    }
+    return null;
+  }, [deliveryZones, deliveryCep, deliveryNeighborhood, orderType]);
+
+  const minOrderValue = Number(matchedZone?.min_order_value ?? deliveryConfig?.min_order_value ?? 0);
+  const belowMinimum = orderType === "delivery" && minOrderValue > 0 && cartSubtotal > 0 && cartSubtotal < minOrderValue;
+
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
@@ -286,6 +315,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     // Validate delivery address for delivery orders
     if (orderType === "delivery" && !deliveryAddress.trim()) {
       toast.error("Informe o endereço de entrega");
+      return;
+    }
+
+    // Enforce minimum order value for the matched delivery zone
+    if (belowMinimum) {
+      toast.error(
+        `Pedido mínimo para essa região: R$ ${minOrderValue.toFixed(2)}. Subtotal atual: R$ ${cartSubtotal.toFixed(2)}.`
+      );
       return;
     }
 
@@ -855,6 +892,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       <span>Total</span>
                       <span>R$ {cartTotal.toFixed(2)}</span>
                     </div>
+                    {belowMinimum && (
+                      <div className="flex items-start gap-2 p-2 mt-2 rounded border border-destructive/40 bg-destructive/10 text-destructive text-xs">
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>
+                          Pedido mínimo desta região: <strong>R$ {minOrderValue.toFixed(2)}</strong>. Adicione mais itens para liberar.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -940,7 +985,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
               <ShoppingCart className="w-4 h-4 inline mr-1" />
               {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
             </div>
-            <Button onClick={handleSubmit} disabled={submitting || cart.length === 0 || !hasValidCustomer}>
+            <Button onClick={handleSubmit} disabled={submitting || cart.length === 0 || !hasValidCustomer || belowMinimum}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               Criar Pedido
             </Button>
