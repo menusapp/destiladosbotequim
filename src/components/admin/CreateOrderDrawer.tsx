@@ -251,7 +251,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     setCustomerPhone(customer.phone || "");
     // Auto-fill address if delivery and address available
     if (customer.defaultAddress && orderType === "delivery") {
-      setDeliveryAddress(customer.defaultAddress.street + (customer.defaultAddress.number ? `, ${customer.defaultAddress.number}` : ""));
+      setDeliveryAddress(customer.defaultAddress.street || "");
+      setDeliveryNumber(customer.defaultAddress.number || "");
       setDeliveryCep(customer.defaultAddress.zip_code || "");
       setDeliveryNeighborhood(customer.defaultAddress.neighborhood || "");
       setDeliveryCity(`${customer.defaultAddress.city} - ${customer.defaultAddress.state}`);
@@ -276,7 +277,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const clearForm = () => {
     setCart([]);
     setCustomerName(""); setCustomerPhone(""); setCustomerCpf(""); setFoundCustomer(null);
-    setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
+    setDeliveryAddress(""); setDeliveryNumber(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
     setNotes(""); setPaymentMethod(""); setPaymentBrand(""); setSelectedTableId("");
     setDiscountType("percentage"); setDiscountValue("");
     setDeliveryFee(""); setDeliveryFeeAuto(null);
@@ -316,6 +317,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     // Validate delivery address for delivery orders
     if (orderType === "delivery" && !deliveryAddress.trim()) {
       toast.error("Informe o endereço de entrega");
+      return;
+    }
+
+    // Block when delivery zone is configured but address doesn't match any zone
+    if (orderType === "delivery" && (deliveryZones?.length ?? 0) > 0 && !matchedZone) {
+      toast.error(
+        "Endereço fora das regiões de entrega cadastradas. Verifique CEP/bairro ou cadastre a região."
+      );
       return;
     }
 
@@ -385,7 +394,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
               customer_name: customerName.trim(),
               customer_phone: customerPhone || "",
               street: deliveryAddress,
-              number: "S/N",
+              number: deliveryNumber || "S/N",
               neighborhood: deliveryNeighborhood || "",
               city,
               state,
@@ -399,13 +408,24 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       }
 
       if (orderType === "delivery") {
-        
+        // Build complete address: Rua, Número - Bairro - Cidade - CEP
+        const fullAddressParts: string[] = [];
+        if (deliveryAddress) {
+          fullAddressParts.push(
+            deliveryNumber ? `${deliveryAddress}, ${deliveryNumber}` : deliveryAddress
+          );
+        }
+        if (deliveryNeighborhood) fullAddressParts.push(deliveryNeighborhood);
+        if (deliveryCity) fullAddressParts.push(deliveryCity);
+        if (deliveryCep) fullAddressParts.push(`CEP ${deliveryCep}`);
+        const fullAddress = fullAddressParts.join(" - ");
+
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
           status: "preparing", customer_name: customerName.trim(),
           customer_cpf: customerCpf,
           delivery_phone: customerPhone,
-          delivery_address: deliveryAddress ? `${deliveryAddress}, ${deliveryNeighborhood}, ${deliveryCity}` : null,
+          delivery_address: fullAddress || null,
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
           coupon_discount: discountAmount > 0 ? discountAmount : null,
@@ -607,7 +627,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                               .limit(1)
                               .maybeSingle();
                             if (addr) {
-                              setDeliveryAddress(addr.street + (addr.number ? `, ${addr.number}` : ""));
+                              setDeliveryAddress(addr.street || "");
+                              setDeliveryNumber(addr.number || "");
                               setDeliveryCep(addr.zip_code || "");
                               setDeliveryNeighborhood(addr.neighborhood || "");
                               setDeliveryCity(addr.city ? `${addr.city}${addr.state ? ` - ${addr.state}` : ""}` : "");
@@ -669,7 +690,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                               .limit(1)
                               .maybeSingle();
                             if (addr) {
-                              setDeliveryAddress(addr.street + (addr.number ? `, ${addr.number}` : ""));
+                              setDeliveryAddress(addr.street || "");
+                              setDeliveryNumber(addr.number || "");
                               setDeliveryCep(addr.zip_code || "");
                               setDeliveryNeighborhood(addr.neighborhood || "");
                               setDeliveryCity(addr.city ? `${addr.city}${addr.state ? ` - ${addr.state}` : ""}` : "");
@@ -690,10 +712,32 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                   <div className="space-y-2">
                     <Label>Endereço</Label>
                     <Input placeholder="CEP" value={deliveryCep} onChange={e => handleCepLookup(e.target.value)} />
-                    <Input placeholder="Rua" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
+                    <div className="grid grid-cols-[1fr_100px] gap-2">
+                      <Input placeholder="Rua" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
+                      <Input placeholder="Número" value={deliveryNumber} onChange={e => setDeliveryNumber(e.target.value)} />
+                    </div>
                     <Input placeholder="Bairro" value={deliveryNeighborhood} onChange={e => setDeliveryNeighborhood(e.target.value)} />
                     <Input placeholder="Cidade" value={deliveryCity} onChange={e => setDeliveryCity(e.target.value)} />
                     
+                    {orderType === "delivery" && (deliveryZones?.length ?? 0) > 0 && (deliveryCep || deliveryNeighborhood) && !matchedZone && (
+                      <div className="p-3 rounded border border-destructive/40 bg-destructive/10 text-xs text-destructive">
+                        ⚠ Endereço fora das regiões de entrega cadastradas.
+                      </div>
+                    )}
+                    {matchedZone && (
+                      <div className="p-3 rounded border border-primary/30 bg-primary/5 text-xs">
+                        Região: <strong>{matchedZone.zone_name}</strong>
+                        {Number(matchedZone.min_order_value ?? 0) > 0 && (
+                          <> · Pedido mínimo: <strong>R$ {Number(matchedZone.min_order_value).toFixed(2)}</strong></>
+                        )}
+                      </div>
+                    )}
+                    {belowMinimum && (
+                      <div className="p-3 rounded border border-amber-500/40 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-400">
+                        Subtotal abaixo do mínimo da região (R$ {minOrderValue.toFixed(2)}).
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center p-3 bg-muted/30 rounded border">
                       <span className="text-sm font-medium">Taxa de entrega</span>
                       {deliveryFeeAuto !== null ? (
