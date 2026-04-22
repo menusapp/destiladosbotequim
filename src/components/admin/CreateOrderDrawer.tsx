@@ -66,6 +66,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const [customerCpf, setCustomerCpf] = useState("");
   const [foundCustomer, setFoundCustomer] = useState<{ name: string; phone: string } | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryNumber, setDeliveryNumber] = useState("");
   const [deliveryCep, setDeliveryCep] = useState("");
   const [deliveryNeighborhood, setDeliveryNeighborhood] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
