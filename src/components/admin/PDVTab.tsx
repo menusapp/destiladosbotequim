@@ -84,6 +84,8 @@ interface PDVTabProps {
 
 const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, onTableOpened, showPrepTimer = true }: PDVTabProps) => {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
 
   // Order creation state
   const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada">("mesa");
