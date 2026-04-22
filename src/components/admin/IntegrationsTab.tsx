@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -598,7 +599,7 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-sm">Password</Label>
-                    <Input type="password" placeholder="Senha gerada no painel DD" value={ddPassword} onChange={(e) => setDdPassword(e.target.value)} />
+                    <PasswordInput placeholder="Senha gerada no painel DD" value={ddPassword} onChange={(e) => setDdPassword(e.target.value)} />
                   </div>
                   <Button className="w-full bg-[#0066CC] hover:bg-[#0055AA]" onClick={handleDdConnect} disabled={ddConnecting || !ddStoreId.trim() || !ddUsername.trim() || !ddPassword.trim()}>
                     {ddConnecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}Conectar
