@@ -119,10 +119,13 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     const cleanCep = deliveryCep.replace(/\D/g, "");
     const normalizedNeighborhood = deliveryNeighborhood.toLowerCase().trim();
 
-    // 1) Try CEP match first
-    if (cleanCep.length === 8 && deliveryZones?.length) {
+    // 1) Try CEP match first (prefix-based, aligned with delivery menu logic)
+    if (cleanCep.length >= 5 && deliveryZones?.length) {
       const cepZone = deliveryZones.find(zone =>
-        zone.zip_codes?.some((z: string) => z.replace(/\D/g, "") === cleanCep)
+        zone.zip_codes?.some((z: string) => {
+          const cleanPrefix = (z || "").replace(/\D/g, "");
+          return cleanPrefix && cleanCep.startsWith(cleanPrefix);
+        })
       );
       if (cepZone) {
         setDeliveryFeeAuto(cepZone.delivery_fee || 0);
@@ -131,10 +134,14 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       }
     }
 
-    // 2) Try neighborhood match
+    // 2) Try neighborhood match (substring, case-insensitive)
     if (normalizedNeighborhood && deliveryZones?.length) {
       const neighborhoodZone = deliveryZones.find(zone =>
-        zone.neighborhoods?.some((n: string) => n.toLowerCase().trim() === normalizedNeighborhood)
+        zone.neighborhoods?.some((n: string) => {
+          const target = (n || "").toLowerCase().trim();
+          if (!target) return false;
+          return normalizedNeighborhood.includes(target) || target.includes(normalizedNeighborhood);
+        })
       );
       if (neighborhoodZone) {
         setDeliveryFeeAuto(neighborhoodZone.delivery_fee || 0);
