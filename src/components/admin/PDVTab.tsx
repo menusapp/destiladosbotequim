@@ -916,6 +916,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       clearForm();
       refetchTables();
       queryClient.invalidateQueries({ queryKey: ["unified-orders"] });
+      if (isMobile) setMobileOrderPanelOpen(false);
     } catch (err: any) {
       toast.error(err.message || "Erro ao criar pedido");
     } finally {
