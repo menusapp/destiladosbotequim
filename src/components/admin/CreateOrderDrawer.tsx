@@ -255,6 +255,28 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const minOrderValue = Number(matchedZone?.min_order_value ?? deliveryConfig?.min_order_value ?? 0);
   const belowMinimum = orderType === "delivery" && minOrderValue > 0 && cartSubtotal > 0 && cartSubtotal < minOrderValue;
 
+  useEffect(() => {
+    if (orderType !== "delivery") {
+      setDeliveryFeeAuto(null);
+      return;
+    }
+
+    if (matchedZone) {
+      const zoneFee = Number(matchedZone.delivery_fee ?? 0);
+      setDeliveryFeeAuto(zoneFee);
+      setDeliveryFee(zoneFee.toFixed(2));
+      return;
+    }
+
+    if (deliveryConfig?.delivery_fee !== null && deliveryConfig?.delivery_fee !== undefined) {
+      setDeliveryFeeAuto(deliveryConfig.delivery_fee);
+      setDeliveryFee(Number(deliveryConfig.delivery_fee).toFixed(2));
+    } else {
+      setDeliveryFeeAuto(null);
+      setDeliveryFee("");
+    }
+  }, [matchedZone, deliveryConfig, orderType]);
+
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
