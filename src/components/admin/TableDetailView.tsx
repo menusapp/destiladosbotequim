@@ -79,6 +79,8 @@ export const TableDetailView = () => {
   const [loading, setLoading] = useState(true);
   const [restaurantId, setRestaurantId] = useState<string>("");
   const [expandedComandas, setExpandedComandas] = useState<Set<string>>(new Set());
+  const [addItemsOrderId, setAddItemsOrderId] = useState<string | null>(null);
+  const [cancellingItemId, setCancellingItemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (tableId) {
