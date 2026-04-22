@@ -408,15 +408,18 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       }
 
       if (orderType === "delivery") {
-        // Build complete address: Rua, Número - Bairro - Cidade - CEP
+        // Resolve city: use typed city, or fallback to matched delivery zone name
+        const resolvedCity = (deliveryCity || matchedZone?.zone_name || "").trim();
+
+        // Build complete address: Cidade - Rua, Número - Bairro - CEP
         const fullAddressParts: string[] = [];
+        if (resolvedCity) fullAddressParts.push(resolvedCity);
         if (deliveryAddress) {
           fullAddressParts.push(
             deliveryNumber ? `${deliveryAddress}, ${deliveryNumber}` : deliveryAddress
           );
         }
         if (deliveryNeighborhood) fullAddressParts.push(deliveryNeighborhood);
-        if (deliveryCity) fullAddressParts.push(deliveryCity);
         if (deliveryCep) fullAddressParts.push(`CEP ${deliveryCep}`);
         const fullAddress = fullAddressParts.join(" - ");
 
@@ -429,7 +432,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
           coupon_discount: discountAmount > 0 ? discountAmount : null,
-          delivery_fee: resolvedDeliveryFeeVal > 0 ? resolvedDeliveryFeeVal : null,
+          delivery_fee: resolvedDeliveryFeeVal,
           pdv_source: true,
         }).select().single();
         if (error) throw error;
