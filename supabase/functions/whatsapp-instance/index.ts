@@ -243,6 +243,8 @@ Deno.serve(async (req) => {
         };
         if (normalizedStatus === 'connected') {
           updateData.connected_at = new Date().toISOString();
+          // Auto-enable on first successful connection so test/AI bot work immediately
+          updateData.enabled = true;
         }
 
         await supabase
