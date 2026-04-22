@@ -558,10 +558,10 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
           comandaId = nc?.id || null;
         }
 
-        // Insert order with null payment_type first (trigger fires on UPDATE)
+        // Insert order already accepted (PDV orders skip pending stage)
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "local", table_id: tableId,
-          comanda_id: comandaId, status: "pending",
+          comanda_id: comandaId, status: "accepted",
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
           notes: notes || null, payment_type: null,
@@ -584,6 +584,28 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
             paid_at: new Date().toISOString(),
           }).eq("id", order.id);
         }
+
+        // Trigger WhatsApp "order accepted" notification (lookup phone by CPF in CRM)
+        try {
+          let phoneForNotify: string | null = null;
+          if (currentCustomerCpf) {
+            const { data: cust } = await supabase
+              .from("customers")
+              .select("phone")
+              .eq("restaurant_id", restaurantId)
+              .eq("cpf", currentCustomerCpf)
+              .maybeSingle();
+            phoneForNotify = cust?.phone || null;
+          }
+          if (phoneForNotify) {
+            notifyOrderAcceptedFromPDV({
+              restaurantId,
+              orderId: order.id,
+              customerName: currentCustomerName,
+              customerPhone: phoneForNotify,
+            });
+          }
+        } catch {}
 
         // Insert employee credit record if payment type is employee_credit
         if (paymentMethod === "employee_credit") {
