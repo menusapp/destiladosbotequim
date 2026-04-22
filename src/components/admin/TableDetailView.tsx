@@ -723,6 +723,16 @@ export const TableDetailView = () => {
           </CardContent>
         </Card>
       </div>
+
+      <AddItemsToOrderDrawer
+        open={!!addItemsOrderId}
+        onClose={() => setAddItemsOrderId(null)}
+        orderId={addItemsOrderId || ""}
+        restaurantId={restaurantId}
+        onItemsAdded={() => {
+          fetchTableData();
+        }}
+      />
     </div>
   );
 };
