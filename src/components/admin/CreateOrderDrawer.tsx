@@ -110,55 +110,95 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
     enabled: open,
   });
 
-  // Auto-calculate delivery fee based on CEP or neighborhood
+  const normalizeZoneText = (value?: string | null) =>
+    (value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+  const normalizeCityName = (value?: string | null) => {
+    const raw = (value || "").trim();
+    if (!raw) return "";
+    return normalizeZoneText(raw.split(" - ")[0]);
+  };
+
+  const matchDeliveryZone = (zones?: any[] | null) => {
+    if (orderType !== "delivery" || !zones?.length) return null;
+
+    const cleanCep = deliveryCep.replace(/\D/g, "");
+    const normalizedNeighborhood = normalizeZoneText(deliveryNeighborhood);
+    const normalizedCity = normalizeCityName(deliveryCity);
+    const normalizedAddress = normalizeZoneText(
+      [deliveryAddress, deliveryNeighborhood, deliveryCity].filter(Boolean).join(" ")
+    );
+
+    if (cleanCep.length >= 5) {
+      const cepMatches = zones.flatMap((zone) =>
+        (zone.zip_codes || [])
+          .map((zipCode: string) => ({
+            zone,
+            prefix: (zipCode || "").replace(/\D/g, ""),
+          }))
+          .filter(({ prefix }: { prefix: string }) => prefix && cleanCep.startsWith(prefix))
+      );
+
+      if (cepMatches.length > 0) {
+        return cepMatches.sort((a, b) => b.prefix.length - a.prefix.length)[0].zone;
+      }
+    }
+
+    if (normalizedNeighborhood) {
+      const neighborhoodZone = zones.find((zone) =>
+        zone.neighborhoods?.some((neighborhood: string) => {
+          const target = normalizeZoneText(neighborhood);
+          return target && (
+            normalizedNeighborhood.includes(target) ||
+            target.includes(normalizedNeighborhood)
+          );
+        })
+      );
+      if (neighborhoodZone) return neighborhoodZone;
+    }
+
+    if (normalizedCity) {
+      const cityZone = zones.find((zone) => {
+        const zoneName = normalizeZoneText(zone.zone_name);
+        return zoneName && (
+          zoneName === normalizedCity ||
+          normalizedAddress.includes(zoneName)
+        );
+      });
+      if (cityZone) return cityZone;
+    }
+
+    return null;
+  };
+
+  // Auto-calculate delivery fee based on CEP / neighborhood / city
   useEffect(() => {
     if (orderType !== "delivery") {
       setDeliveryFeeAuto(null);
       return;
     }
 
-    const cleanCep = deliveryCep.replace(/\D/g, "");
-    const normalizedNeighborhood = deliveryNeighborhood.toLowerCase().trim();
-
-    // 1) Try CEP match first (prefix-based, aligned with delivery menu logic)
-    if (cleanCep.length >= 5 && deliveryZones?.length) {
-      const cepZone = deliveryZones.find(zone =>
-        zone.zip_codes?.some((z: string) => {
-          const cleanPrefix = (z || "").replace(/\D/g, "");
-          return cleanPrefix && cleanCep.startsWith(cleanPrefix);
-        })
-      );
-      if (cepZone) {
-        setDeliveryFeeAuto(cepZone.delivery_fee || 0);
-        setDeliveryFee((cepZone.delivery_fee || 0).toFixed(2));
-        return;
-      }
+    const zoneMatch = matchDeliveryZone(deliveryZones);
+    if (zoneMatch) {
+      const zoneFee = Number(zoneMatch.delivery_fee ?? 0);
+      setDeliveryFeeAuto(zoneFee);
+      setDeliveryFee(zoneFee.toFixed(2));
+      return;
     }
 
-    // 2) Try neighborhood match (substring, case-insensitive)
-    if (normalizedNeighborhood && deliveryZones?.length) {
-      const neighborhoodZone = deliveryZones.find(zone =>
-        zone.neighborhoods?.some((n: string) => {
-          const target = (n || "").toLowerCase().trim();
-          if (!target) return false;
-          return normalizedNeighborhood.includes(target) || target.includes(normalizedNeighborhood);
-        })
-      );
-      if (neighborhoodZone) {
-        setDeliveryFeeAuto(neighborhoodZone.delivery_fee || 0);
-        setDeliveryFee((neighborhoodZone.delivery_fee || 0).toFixed(2));
-        return;
-      }
-    }
-
-    // 3) Fallback to default delivery config
-    if (deliveryConfig?.delivery_fee) {
+    // Fallback to default delivery config
+    if (deliveryConfig?.delivery_fee !== null && deliveryConfig?.delivery_fee !== undefined) {
       setDeliveryFeeAuto(deliveryConfig.delivery_fee);
-      setDeliveryFee(deliveryConfig.delivery_fee.toFixed(2));
+      setDeliveryFee(Number(deliveryConfig.delivery_fee).toFixed(2));
     } else {
       setDeliveryFeeAuto(null);
+      setDeliveryFee("");
     }
-  }, [deliveryCep, deliveryNeighborhood, deliveryZones, deliveryConfig, orderType]);
+  }, [deliveryAddress, deliveryCep, deliveryNeighborhood, deliveryCity, deliveryZones, deliveryConfig, orderType]);
 
 
 
