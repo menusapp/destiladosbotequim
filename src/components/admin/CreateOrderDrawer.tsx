@@ -423,16 +423,28 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         if (deliveryCep) fullAddressParts.push(`CEP ${deliveryCep}`);
         const fullAddress = fullAddressParts.join(" - ");
 
+        // Garante que a taxa de entrega seja persistida: prioriza valor digitado,
+        // depois valor auto da zona, depois config padrão. Sempre número (não null).
+        const finalDeliveryFee = Number(
+          resolvedDeliveryFeeVal ||
+          deliveryFeeAuto ||
+          matchedZone?.delivery_fee ||
+          deliveryConfig?.delivery_fee ||
+          0
+        );
+
         const { data: order, error } = await supabase.from("orders").insert({
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "delivery",
           status: "preparing", customer_name: customerName.trim(),
           customer_cpf: customerCpf,
           delivery_phone: customerPhone,
           delivery_address: fullAddress || null,
+          delivery_city: resolvedCity || null,
+          delivery_neighborhood: deliveryNeighborhood || null,
           notes: notes || null, payment_type: resolvedPaymentType,
           payment_brand: resolvedPaymentBrand,
           coupon_discount: discountAmount > 0 ? discountAmount : null,
-          delivery_fee: resolvedDeliveryFeeVal,
+          delivery_fee: finalDeliveryFee,
           pdv_source: true,
         }).select().single();
         if (error) throw error;

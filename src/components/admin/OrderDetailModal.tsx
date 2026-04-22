@@ -385,7 +385,12 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                 </Table>
                 <div className="mt-4 space-y-1 text-right">
                   <p className="text-sm text-muted-foreground">Subtotal itens: R$ {calculateTotal().toFixed(2)}</p>
-                  {(order.delivery_fee ?? 0) > 0 && (
+                  {order.delivery_type === "delivery" && (
+                    <p className="text-sm text-muted-foreground">
+                      Taxa de entrega: {(order.delivery_fee ?? 0) > 0 ? `R$ ${(order.delivery_fee ?? 0).toFixed(2)}` : "Grátis"}
+                    </p>
+                  )}
+                  {order.delivery_type !== "delivery" && (order.delivery_fee ?? 0) > 0 && (
                     <p className="text-sm text-muted-foreground">Taxa de entrega: R$ {order.delivery_fee!.toFixed(2)}</p>
                   )}
                   {(order.coupon_discount ?? 0) > 0 && (
