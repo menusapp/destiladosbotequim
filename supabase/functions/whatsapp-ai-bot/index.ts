@@ -9,15 +9,12 @@ const corsHeaders = {
 const PUBLIC_DOMAIN = 'https://menusapp.com.br';
 const SUPABASE_URL_ENV = Deno.env.get('SUPABASE_URL') || '';
 
-// Build a public link that, when shared on WhatsApp, shows the
-// restaurant's own logo as the preview image. We point to the
-// 'menu-link-preview' edge function which renders restaurant-specific
-// og:image meta tags and then redirects users to the actual SPA.
+// Build the public menu URL using the production domain so customers
+// see the actual restaurant link (e.g. https://menusapp.com.br/<slug>)
+// instead of an internal Supabase functions URL.
 function buildPublicUrl(slug: string, path?: string): string {
-  const fnBase = SUPABASE_URL_ENV
-    ? `${SUPABASE_URL_ENV}/functions/v1/menu-link-preview/${slug}`
-    : `${PUBLIC_DOMAIN}/${slug}`;
-  return path ? `${fnBase}/${path}` : fnBase;
+  const base = `${PUBLIC_DOMAIN}/${slug}`;
+  return path ? `${base}/${path}` : base;
 }
 
 Deno.serve(async (req) => {
@@ -132,6 +129,19 @@ Deno.serve(async (req) => {
 
     const menuLink = buildPublicUrl(restaurant.slug);
     const welcomeType = aiConfig.welcome_message_type || 'numeric_menu';
+
+    // ── Link-only cooldown: only send the menu link once every 2 hours ──
+    if (welcomeType === 'link_only') {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const lastSentAt = conversation?.last_message_at ? new Date(conversation.last_message_at) : null;
+      const alreadyGreeted = conversation?.current_step === 'menu';
+      if (alreadyGreeted && lastSentAt && lastSentAt > twoHoursAgo) {
+        console.log(`[AI-BOT] link_only cooldown active for ${customer_phone}, skipping`);
+        return new Response(JSON.stringify({ skipped: true, reason: 'link_only_cooldown' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
 
     let responseText = '';
     let newStep = conversation.current_step;
