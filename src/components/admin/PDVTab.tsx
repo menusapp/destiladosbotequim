@@ -486,6 +486,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
+    if (isMobile) setMobileOrderPanelOpen(true);
   };
 
   // Sync selectedCustomer to source-of-truth states
