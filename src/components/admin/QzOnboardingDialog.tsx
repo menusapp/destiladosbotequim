@@ -238,8 +238,8 @@ export const QzOnboardingDialog = ({ open, onClose }: Props) => {
         {step === "done" && (
           <>
             <DialogHeader>
-              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <CheckCircle2 className="h-6 w-6 text-primary" />
               </div>
               <DialogTitle className="text-center">Tudo certo!</DialogTitle>
               <DialogDescription className="text-center">
