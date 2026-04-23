@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { CalendarCheck, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -14,8 +13,16 @@ interface NewReservationNotificationProps {
   onDismiss: () => void;
 }
 
+/**
+ * Notificação compacta de nova reserva.
+ *
+ * Mostra apenas o essencial em até 3 linhas. Detalhes completos ficam
+ * no drawer de reservas, acessível ao clicar em "Ver".
+ *
+ * O som é controlado globalmente pelo RestaurantAdmin
+ * (mesmo MP3 usado para novos pedidos e novas contas).
+ */
 export const NewReservationNotification = ({
-  reservationId,
   customerName,
   tableName,
   date,
@@ -24,134 +31,59 @@ export const NewReservationNotification = ({
   onView,
   onDismiss,
 }: NewReservationNotificationProps) => {
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Hoje / Amanhã / data
+  const formatDateLabel = (dateStr: string) => {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const target = new Date(year, month - 1, day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-  useEffect(() => {
-    playBeepSound();
-
-    return () => {
-      stopSound();
-    };
-  }, []);
-
-  const playBeepSound = () => {
-    try {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      const playBeep = () => {
-        if (!audioContextRef.current) return;
-
-        const oscillator = audioContextRef.current.createOscillator();
-        const gainNode = audioContextRef.current.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContextRef.current.destination);
-        
-        // Som diferente para reservas - frequência mais baixa
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        
-        gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.3);
-        
-        oscillator.start(audioContextRef.current.currentTime);
-        oscillator.stop(audioContextRef.current.currentTime + 0.3);
-      };
-
-      playBeep();
-
-      intervalRef.current = setInterval(() => {
-        playBeep();
-      }, 500);
-    } catch (error) {
-      console.error("Erro ao reproduzir som:", error);
-    }
+    if (target.getTime() === today.getTime()) return "Hoje";
+    if (target.getTime() === tomorrow.getTime()) return "Amanhã";
+    return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}`;
   };
 
-  const stopSound = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-  };
-
-  const handleStopSound = () => {
-    stopSound();
-  };
-
-  const handleView = () => {
-    stopSound();
-    onView();
-  };
-
-  const handleClose = () => {
-    stopSound();
-    onDismiss();
-  };
-
-  // Formatar data para exibição
-  const formatDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
-  };
+  const dateLabel = formatDateLabel(date);
+  const timeLabel = time.slice(0, 5);
+  const summary = `${customerName} • ${tableName} • ${dateLabel} ${timeLabel} • ${partySize} ${
+    partySize === 1 ? "pessoa" : "pessoas"
+  }`;
 
   return (
-    <div className="fixed top-4 right-4 z-[100] w-96 animate-in slide-in-from-top-5">
-      <Card className="bg-orange-50 border-orange-200 shadow-2xl">
-        <div className="p-6 space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center animate-bounce">
-                <CalendarCheck className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-orange-900">Nova Reserva!</h3>
-                <p className="text-sm text-orange-700">
-                  📅 {formatDate(date)} às {time.slice(0, 5)}
-                </p>
-              </div>
+    <div className="fixed top-4 right-4 z-[100] w-80 animate-in slide-in-from-top-5">
+      <Card className="bg-orange-50 border-orange-200 shadow-2xl dark:bg-orange-950 dark:border-orange-800">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-orange-200 dark:border-orange-800">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
+              <CalendarCheck className="w-3.5 h-3.5 text-white" />
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="h-8 w-8 text-orange-700 hover:text-orange-900 hover:bg-orange-100"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <div className="space-y-1">
-            <p className="text-lg font-semibold text-orange-800">
-              {tableName}
-            </p>
-            <p className="text-orange-700">{customerName}</p>
-            <p className="text-sm text-orange-600">
-              👥 {partySize} {partySize === 1 ? 'pessoa' : 'pessoas'}
+            <p className="text-sm font-semibold text-orange-900 dark:text-orange-100">
+              🗓️ Nova Reserva
             </p>
           </div>
+          <button
+            onClick={onDismiss}
+            className="p-1 rounded hover:bg-orange-100 dark:hover:bg-orange-900"
+            aria-label="Dispensar"
+          >
+            <X className="w-3.5 h-3.5 text-orange-500" />
+          </button>
+        </div>
 
-          <div className="flex gap-2">
-            <Button
-              onClick={handleView}
-              className="flex-1 bg-orange-600 hover:bg-orange-700"
-            >
-              VER RESERVA
-            </Button>
-            <Button
-              onClick={handleStopSound}
-              variant="outline"
-              className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-100"
-            >
-              Parar Som
-            </Button>
-          </div>
+        <div className="px-3 py-2 space-y-2">
+          <p className="text-sm text-orange-800 dark:text-orange-200 line-clamp-2">
+            {summary}
+          </p>
+
+          <Button
+            onClick={onView}
+            size="sm"
+            className="w-full h-8 bg-orange-600 hover:bg-orange-700 text-white"
+          >
+            Ver reserva
+          </Button>
         </div>
       </Card>
     </div>

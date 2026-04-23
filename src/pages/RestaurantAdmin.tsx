@@ -131,21 +131,37 @@ const RestaurantAdmin = () => {
     }
   }, []);
 
-  // Auto-start/stop sound based on notification queue
+  // Auto-start/stop sound based on ALL notification types (orders, bills, reservations)
   useEffect(() => {
-    if (notificationQueue.length > 0 && !soundMuted) {
+    const hasAnyNotification =
+      notificationQueue.length > 0 ||
+      billNotificationQueue.length > 0 ||
+      reservationNotification !== null;
+
+    if (hasAnyNotification && !soundMuted) {
       startGlobalSound();
     } else {
       stopGlobalSound();
     }
-  }, [notificationQueue.length, soundMuted, startGlobalSound, stopGlobalSound]);
+  }, [
+    notificationQueue.length,
+    billNotificationQueue.length,
+    reservationNotification,
+    soundMuted,
+    startGlobalSound,
+    stopGlobalSound,
+  ]);
 
-  // Reset mute when all notifications cleared
+  // Reset mute when ALL notifications cleared
   useEffect(() => {
-    if (notificationQueue.length === 0) {
+    if (
+      notificationQueue.length === 0 &&
+      billNotificationQueue.length === 0 &&
+      reservationNotification === null
+    ) {
       setSoundMuted(false);
     }
-  }, [notificationQueue.length]);
+  }, [notificationQueue.length, billNotificationQueue.length, reservationNotification]);
 
   // Cleanup on unmount
   useEffect(() => {
