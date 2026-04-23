@@ -1126,6 +1126,7 @@ const RestaurantAdmin = () => {
           />
         )}
         <SupportChatWidget />
+        {restaurant?.id && <QzOnboardingGate restaurantId={restaurant.id} />}
 
         {/* Mobile bottom nav — only on screens < md */}
         <MobileBottomNav
