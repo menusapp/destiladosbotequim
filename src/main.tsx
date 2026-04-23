@@ -5,5 +5,6 @@ import "./index.css";
 // NÃO altera o fluxo de impressão atual.
 import "./lib/qzTrayTest";
 import "./lib/qzTrayPrintTest";
+import "./lib/printOrderWithQz";
 
 createRoot(document.getElementById("root")!).render(<App />);
