@@ -1,16 +1,9 @@
 /**
  * Indicador discreto de status do QZ Tray + impressora salva.
  *
- * Mostra um pequeno badge na tela de pedidos:
- *   🟢 QZ pronto       → conectado + impressora salva existe
- *   🟡 Sem impressora  → QZ conectado, mas nenhuma impressora salva
- *   🔴 QZ desconectado → não conseguiu conectar
- *
- * Usa a infra existente:
- *   - getSavedQzPrinter() de qzPrinterConfig
- *   - checkQzTrayConnection() de qzConnectionCheck
- *
- * Não interfere na impressão antiga nem no fluxo de pedidos.
+ * Este badge faz apenas checagem PASSIVA por padrão para não disparar popup
+ * inesperado. A conexão real acontece apenas quando o usuário precisa imprimir
+ * ou quando clica explicitamente para testar/conectar.
  */
 import { useEffect, useState, useCallback } from "react";
 import { Printer, RefreshCw } from "lucide-react";
@@ -41,7 +34,7 @@ export const QzTrayStatusBadge = ({
     setStatus("checking");
     const saved = getSavedQzPrinter();
     setPrinter(saved);
-    const conn = await checkQzTrayConnection();
+    const conn = await checkQzTrayConnection({ connectIfNeeded: false });
     if (!conn.ok) {
       setStatus("disconnected");
       return;
@@ -63,7 +56,7 @@ export const QzTrayStatusBadge = ({
         return {
           dot: "bg-muted-foreground/40",
           label: "Verificando QZ...",
-          tip: "Verificando conexão com QZ Tray",
+          tip: "Verificando status do QZ Tray sem abrir conexão automaticamente",
         };
       case "ready":
         return {
@@ -82,7 +75,7 @@ export const QzTrayStatusBadge = ({
         return {
           dot: "bg-destructive",
           label: "QZ desconectado",
-          tip: "QZ Tray não está em execução. Abra o aplicativo na sua máquina.",
+          tip: "QZ Tray não está conectado no momento. A conexão só será aberta quando necessária.",
         };
     }
   })();
