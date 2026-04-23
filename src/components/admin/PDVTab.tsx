@@ -1125,7 +1125,16 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   };
 
   const handleClearTable = async (table: TableData) => {
-    if (!confirm(`Limpar Mesa ${table.table_number}? Isso irá cancelar pedidos ativos, fechar comandas e liberar a mesa.`)) return;
+    const warnings = await checkUnpaidBeforeTableClear(table.id);
+    const ok = await confirm({
+      variant: "destructive",
+      title: `Limpar Mesa ${table.table_number}?`,
+      description: "Isso irá cancelar pedidos ativos, fechar comandas e liberar a mesa para um novo cliente.",
+      consequence: "Esta ação não pode ser desfeita.",
+      warnings,
+      confirmLabel: "Sim, limpar mesa",
+    });
+    if (!ok) return;
     await supabase.from("orders").update({ status: "cancelled" })
       .eq("table_id", table.id).in("status", ["pending", "accepted", "preparing", "ready"]);
     await supabase.from("bills").update({ status: "cancelled" })
