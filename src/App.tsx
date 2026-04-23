@@ -77,6 +77,8 @@ const App = () => (
               {/* Restaurant-scoped routes (slug-based) */}
               <Route path="/:slug/kiosk" element={<Kiosk />} />
               <Route path="/:slug" element={<DeliveryMenu />} />
+              {/* Pretty alias for subdomain links: rods.menusapp.com.br/menus */}
+              <Route path="/:slug/menus" element={<DeliveryMenu />} />
               <Route path="/:slug/mesa/:tableNumber" element={<Menu />} />
               <Route path="/:slug/comanda/:tableNumber" element={<Comanda />} />
               <Route path="/:slug/pedido/:orderId" element={<OrderConfirmation />} />

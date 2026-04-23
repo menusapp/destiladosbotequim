@@ -20,6 +20,7 @@ import { isFeaturedVisible } from "@/lib/featuredUtils";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
+import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 const Menu = () => {
   const { slug: restaurantSlug, tableNumber } = useParams();
   const navigate = useNavigate();
@@ -52,6 +53,7 @@ const Menu = () => {
 
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   useFacebookPixel(restaurant?.facebook_pixel_id);
+  useDynamicFavicon(restaurant?.logo_url, restaurant?.name);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
   const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();

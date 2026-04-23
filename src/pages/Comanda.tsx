@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
 // Ícones por tipo de método
 const METHOD_ICONS: Record<string, any> = {
@@ -131,9 +132,13 @@ const Comanda = () => {
   const [restaurantColor, setRestaurantColor] = useState("#FF6B35");
   const [orderNotes, setOrderNotes] = useState("");
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const [restaurantLogo, setRestaurantLogo] = useState<string | null>(null);
+  const [restaurantName, setRestaurantName] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [billRequestEnabled, setBillRequestEnabled] = useState(true);
   const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
+
+  useDynamicFavicon(restaurantLogo, restaurantName);
 
   useEffect(() => {
     fetchData();
@@ -440,7 +445,7 @@ const Comanda = () => {
       
       const restResult = await supabase
         .from("restaurants")
-        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled, show_prep_timer, is_open")
+        .select("id, name, logo_url, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled, show_prep_timer, is_open")
         .eq("slug", restaurantSlug)
         .maybeSingle();
 
@@ -457,6 +462,8 @@ const Comanda = () => {
       setShowPrepTimer(restData.show_prep_timer ?? true);
       setRestaurantColor(restData.primary_color || "#FF6B35");
       setRestaurantId(restData.id);
+      setRestaurantLogo(restData.logo_url);
+      setRestaurantName(restData.name);
       setBillRequestEnabled(restData.bill_request_enabled ?? true);
       setIsRestaurantOpen(restData.is_open ?? true);
 

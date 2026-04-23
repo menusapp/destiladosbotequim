@@ -21,6 +21,7 @@ import { useSessionTracking } from "@/hooks/useSessionTracking";
 import { isFeaturedVisible } from "@/lib/featuredUtils";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
+import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
 export default function DeliveryMenu() {
   const { slug: restaurantSlug } = useParams<{ slug: string }>();
@@ -43,6 +44,7 @@ export default function DeliveryMenu() {
   const { trackCartUpdate, trackCheckoutStarted, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id, restaurantSlug);
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   useFacebookPixel(restaurant?.facebook_pixel_id);
+  useDynamicFavicon(restaurant?.logo_url, restaurant?.name);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
   const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();

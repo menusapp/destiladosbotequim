@@ -38,6 +38,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { notifyOrderAcceptedFromPDV } from "@/lib/pdvNotifications";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { checkUnpaidBeforeTableClear } from "@/lib/dangerChecks";
+import { getTableMenuLink } from "@/lib/shareableLinks";
 
 interface CartItem {
   productId: string;
@@ -1125,7 +1126,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
   // Table actions
   const getTableMenuUrl = (tableNumber: number) => {
-    return restaurantSlug ? `https://menusapp.com.br/${restaurantSlug}/mesa/${tableNumber}` : null;
+    if (!restaurantSlug) return null;
+    // Use the shareable link helper so WhatsApp previews show the restaurant's logo
+    return getTableMenuLink(restaurantSlug, tableNumber);
   };
 
   const handleCopyLink = (table: TableData) => {

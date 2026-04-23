@@ -16,6 +16,7 @@ const PaymentMethodsSettings = lazy(() => import("./PaymentMethodsSettings"));
 const OnlinePaymentsSettings = lazy(() => import("./OnlinePaymentsSettings"));
 const PrintersSettings = lazy(() => import("./PrintersSettings"));
 const BackupSettings = lazy(() => import("./BackupSettings"));
+const ShareableLinksSection = lazy(() => import("./ShareableLinksSection"));
 
 interface Settings {
   logo_url: string | null;
@@ -306,6 +307,10 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
               </CardContent>
             </Card>
           </div>
+
+          <Suspense fallback={<SubTabLoading />}>
+            <ShareableLinksSection restaurantId={restaurantId} />
+          </Suspense>
 
           <Button onClick={handleSaveSettings} className="w-full sm:w-auto gap-2">
             <Save className="h-4 w-4" />
