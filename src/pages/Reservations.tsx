@@ -33,6 +33,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
+import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
 interface Restaurant {
   id: string;
@@ -85,6 +86,8 @@ const Reservations = () => {
   const [partySize, setPartySize] = useState(2);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useDynamicFavicon(restaurant?.logo_url, restaurant?.name);
 
   useEffect(() => {
     if (restaurantSlug) {

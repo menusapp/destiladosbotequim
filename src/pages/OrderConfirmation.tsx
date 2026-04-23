@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { Clock, Phone, CheckCircle2, Package, Truck, MapPin, XCircle } from "lucide-react";
 import { ReviewModal } from "@/components/menu/ReviewModal";
+import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -106,6 +107,8 @@ export default function OrderConfirmation() {
   const [loading, setLoading] = useState(true);
   const [showReview, setShowReview] = useState(false);
   const [hasReviewed, setHasReviewed] = useState(false);
+
+  useDynamicFavicon(restaurant?.logo_url, restaurant?.name);
 
   useEffect(() => {
     fetchOrderDetails();
