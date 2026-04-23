@@ -27,6 +27,7 @@ import { printDocument } from "@/lib/printDispatcher";
 import { QzTrayStatusBadge } from "./QzTrayStatusBadge";
 import { ReceiptPreviewDialog } from "./ReceiptPreviewDialog";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
+import { OrderCard } from "./orders/OrderCard";
 import type { DateRange } from "react-day-picker";
 
 interface OrderItemExtra {
@@ -359,6 +360,9 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     setSelectedOrder(order);
   };
 
+  const handleSelectOrder = (order: Order) => setSelectedOrder(order);
+  const handlePreviewOrder = (orderId: string) => setPreviewOrderId(orderId);
+
   const renderOrderCard = (order: Order) => {
     const total = calculateTotal(order);
     const grandTotal = total + (order.delivery_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0);
@@ -366,109 +370,27 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     const payment = getPaymentDisplay(order.payment_type, order.payment_brand);
     const next = getNextStatus(order);
     const isAdvancing = loadingOrderId === order.id;
-    const deliveryAddress = order.delivery_address;
-    const addressSummary = deliveryAddress ? deliveryAddress.split(",").slice(0, 2).join(",") : null;
 
     return (
-      <Card
+      <OrderCard
         key={order.id}
-        className="cursor-pointer bg-card hover:shadow-md transition-all border border-border/50 hover:border-border min-h-[180px]"
-        onClick={() => setSelectedOrder(order)}
-      >
-        <CardContent className="p-3 space-y-1.5 flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
-            {showPrepTimer && !['delivered', 'picked_up', 'cancelled'].includes(order.status) && (
-              <Badge className={`text-[10px] px-1.5 py-0 ${getElapsedColor(elapsed)}`}>
-                {elapsed}min
-              </Badge>
-            )}
-          </div>
-          {/* Type + Source badges */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {getOrderTypeIcon(order)}
-            <span className="text-xs font-medium">{getOrderTypeLabel(order)}</span>
-            {order.ifood_source && (
-              <Badge className="bg-[#EA1D2C] text-white text-[10px] px-1.5 py-0 border-0">iFood</Badge>
-            )}
-            {order.dd_source && (
-              <Badge className="bg-[#0066CC] text-white text-[10px] px-1.5 py-0 border-0">Delivery Direto</Badge>
-            )}
-            {order.dd_scheduled_for && (
-              <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 border-0 gap-0.5">
-                <CalendarClock className="w-2.5 h-2.5" />
-                Agendado {new Date(order.dd_scheduled_for).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-              </Badge>
-            )}
-          </div>
-          {/* Customer */}
-          <p className="text-sm font-semibold truncate">{order.customer_name}</p>
-          {/* Items (show 3) */}
-          <div className="text-xs text-muted-foreground">
-            {order.order_items.slice(0, 3).map((item, i) => (
-              <p key={i} className="truncate">{item.quantity}x {item.products?.name || "Produto"}</p>
-            ))}
-            {order.order_items.length > 3 && <p className="text-muted-foreground">+{order.order_items.length - 3} itens</p>}
-          </div>
-          {/* Address summary for delivery */}
-          {addressSummary && order.delivery_type === "delivery" && (
-            <p className="text-[10px] text-muted-foreground truncate">📍 {addressSummary}</p>
-          )}
-          {/* Payment */}
-          <div className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${payment.className}`}>
-            {payment.icon}
-            <span>{payment.label}</span>
-          </div>
-          {(order.delivery_fee ?? 0) > 0 && (
-            <div className="text-[10px] text-muted-foreground">
-              Taxa entrega: R$ {order.delivery_fee!.toFixed(2)}
-            </div>
-          )}
-          {/* Total + time */}
-          <div className="flex items-center justify-between pt-1 border-t border-border/30">
-            <span className="text-xs text-muted-foreground">
-              {format(new Date(order.created_at), "HH:mm")}
-            </span>
-            <span className="font-bold text-sm">R$ {grandTotal.toFixed(2)}</span>
-          </div>
-          {/* Quick action footer — hidden if no permission to manage orders */}
-          {next && !['delivered', 'picked_up', 'cancelled'].includes(order.status) && canManageOrders && (
-            <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/30 mt-auto">
-              <Button
-                size="sm"
-                className="flex-1 h-11 md:h-7 text-sm md:text-xs gap-1"
-                disabled={isAdvancing}
-                onClick={(e) => handleQuickAdvance(e, order)}
-              >
-                {isAdvancing ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                {next.label}
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-11 w-11 md:h-7 md:w-7 p-0" onClick={(e) => e.stopPropagation()}>
-                    <MoreVertical className="w-4 h-4 md:w-3.5 md:h-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[140px]">
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}>
-                    <Eye className="w-3.5 h-3.5 mr-2" /> Ver detalhes
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => handleQuickPrint(e, order)}>
-                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewOrderId(order.id); }}>
-                    <ScrollText className="w-3.5 h-3.5 mr-2" /> Visualizar cupom
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive" onClick={(e) => handleQuickCancel(e, order)}>
-                    <XCircle className="w-3.5 h-3.5 mr-2" /> Cancelar pedido
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        order={order as any}
+        showPrepTimer={showPrepTimer}
+        canManageOrders={canManageOrders}
+        isAdvancing={isAdvancing}
+        next={next}
+        payment={payment}
+        typeIcon={getOrderTypeIcon(order)}
+        typeLabel={getOrderTypeLabel(order)}
+        grandTotal={grandTotal}
+        elapsed={elapsed}
+        elapsedClass={getElapsedColor(elapsed)}
+        onSelect={handleSelectOrder as any}
+        onAdvance={handleQuickAdvance as any}
+        onPrint={handleQuickPrint as any}
+        onPreview={handlePreviewOrder}
+        onCancel={handleQuickCancel as any}
+      />
     );
   };
 
