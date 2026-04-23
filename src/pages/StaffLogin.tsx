@@ -158,6 +158,10 @@ const StaffLogin = () => {
         localStorage.setItem("staff_name", staff.display_name);
         localStorage.setItem("staff_role", staff.role);
         localStorage.setItem("staff_allowed_sections", JSON.stringify(staff.allowed_sections));
+        // Order permissions (admin always = true via DB trigger)
+        const isAdmin = staff.role === "admin";
+        localStorage.setItem("staff_can_manage_orders", String(isAdmin || staff.can_manage_orders !== false));
+        localStorage.setItem("staff_receives_order_notifications", String(isAdmin || staff.receives_order_notifications !== false));
         const slug = localStorage.getItem("restaurant_slug") || restaurantId;
         toast.success(`Bem-vindo, ${staff.display_name}!`);
         navigate(`/${slug}/admin`);
