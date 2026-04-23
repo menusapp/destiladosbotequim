@@ -1153,20 +1153,27 @@ export const TableDetailDialog = ({
         }}
       />
 
-      {/* Cancel Comanda Confirmation */}
-      <AlertDialog open={!!cancellingComanda} onOpenChange={(o) => { if (!o) setCancellingComanda(null); }}>
+      {/* Cancel Item Confirmation */}
+      <AlertDialog open={!!cancellingItem} onOpenChange={(o) => { if (!o) setCancellingItem(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancelar pedidos da comanda?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deseja cancelar todos os pedidos de <strong>{cancellingComanda?.name}</strong> nesta mesa?
-              Os itens voltarão ao estoque e os pedidos sairão das métricas.
+            <AlertDialogTitle>Remover este item do pedido?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <div>O item será removido da comanda, voltará ao estoque e sairá das métricas.</div>
+                {cancellingItem && (
+                  <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm font-medium text-foreground flex justify-between">
+                    <span>{cancellingItem.name}</span>
+                    <span>R$ {cancellingItem.total.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmCancelComanda} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Confirmar
+            <AlertDialogAction onClick={confirmCancelItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Remover
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
