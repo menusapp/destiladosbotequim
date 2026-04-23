@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { clearSessionTimestamp } from "@/lib/sessionExpiry";
 
 import { RealtimeStatusIndicator } from "./RealtimeStatusIndicator";
 
@@ -93,6 +94,7 @@ export const AdminHeader = ({
     localStorage.removeItem('staff_allowed_sections');
     localStorage.removeItem('staff_can_manage_orders');
     localStorage.removeItem('staff_receives_order_notifications');
+    clearSessionTimestamp();
     toast.success("Logout realizado com sucesso");
     navigate("/login");
   };
