@@ -49,7 +49,7 @@ const OVERRIDE_CRT_URL = "/qz-tray/override.crt";
 const PATHS = {
   windows: String.raw`C:\Program Files\QZ Tray\resources\override.crt`,
   mac: "/Applications/QZ Tray.app/Contents/Resources/override.crt",
-  linux: "/opt/qz-tray/override.crt",
+  linux: "/opt/qz-tray/resources/override.crt",
 };
 
 type TestStatus =
