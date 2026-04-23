@@ -79,7 +79,7 @@ export const TableDetailDialog = ({
   const [payingSplit, setPayingSplit] = useState<Split | null>(null);
   const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
   const [addItemsOrderId, setAddItemsOrderId] = useState<string | null>(null);
-  const [cancellingComanda, setCancellingComanda] = useState<{ id: string; name: string } | null>(null);
+  const [cancellingItem, setCancellingItem] = useState<{ id: string; name: string; total: number } | null>(null);
 
   // Fetch active comandas for the table
   const { data: comandas, refetch: refetchComandas } = useQuery({
@@ -306,37 +306,27 @@ export const TableDetailDialog = ({
     }
   };
 
-  // Cancela todos os pedidos ativos da comanda. Se a mesa ficar sem pedidos
-  // ativos e sem contas pendentes, libera a mesa automaticamente.
-  const confirmCancelComanda = async () => {
-    if (!cancellingComanda || !table) return;
+  // Cancela um item individual da comanda. Restaura estoque via RPC e
+  // libera a mesa caso não restem mais pedidos/itens ativos.
+  const confirmCancelItem = async () => {
+    if (!cancellingItem || !table) return;
     try {
-      const comandaOrders = (orders || []).filter((o: any) => o.comanda_id === cancellingComanda.id);
-      const activeOrderIds = comandaOrders
-        .filter((o: any) => ["pending", "accepted", "preparing", "ready"].includes(o.status))
-        .map((o: any) => o.id);
+      const { error } = await supabase.rpc("admin_cancel_order_item", {
+        p_order_item_id: cancellingItem.id,
+        p_restaurant_id: restaurantId,
+      });
+      if (error) throw error;
 
-      if (activeOrderIds.length === 0) {
-        toast.info("Não há pedidos ativos para cancelar");
-        setCancellingComanda(null);
-        return;
-      }
+      toast.success("Item removido da comanda");
 
-      const { error: cancelErr } = await supabase
-        .from("orders")
-        .update({ status: "cancelled", cancellation_reason: "Cancelado pelo PDV" })
-        .in("id", activeOrderIds);
-      if (cancelErr) throw cancelErr;
-
-      toast.success(`Pedidos de ${cancellingComanda.name} cancelados`);
-
-      // Verifica se restam pedidos ativos ou contas pendentes
+      // Verifica se restam itens ativos na mesa. Se não restar nada, libera a mesa.
       const { data: remainingOrders } = await supabase
         .from("orders")
-        .select("id")
+        .select("id, order_items(id)")
         .eq("table_id", table.id)
-        .in("status", ["pending", "accepted", "preparing", "ready"])
-        .limit(1);
+        .in("status", ["pending", "accepted", "preparing", "ready"]);
+
+      const hasAnyItems = (remainingOrders || []).some((o: any) => (o.order_items || []).length > 0);
 
       const { data: pendingBills } = await supabase
         .from("bills")
@@ -345,7 +335,14 @@ export const TableDetailDialog = ({
         .neq("status", "paid")
         .limit(1);
 
-      if ((!remainingOrders || remainingOrders.length === 0) && (!pendingBills || pendingBills.length === 0)) {
+      if (!hasAnyItems && (!pendingBills || pendingBills.length === 0)) {
+        // Cancela orders vazios e libera a mesa
+        if (remainingOrders && remainingOrders.length > 0) {
+          await supabase
+            .from("orders")
+            .update({ status: "cancelled", cancellation_reason: "Sem itens" })
+            .in("id", remainingOrders.map((o: any) => o.id));
+        }
         await supabase.from("tables").update({
           is_occupied: false,
           occupied_at: null,
@@ -356,12 +353,12 @@ export const TableDetailDialog = ({
         onTableCleared();
       }
 
-      setCancellingComanda(null);
+      setCancellingItem(null);
       refetchOrders();
       refetchComandas();
     } catch (err: any) {
-      console.error("Erro ao cancelar comanda:", err);
-      toast.error(err.message || "Erro ao cancelar comanda");
+      console.error("Erro ao cancelar item:", err);
+      toast.error(err.message || "Erro ao cancelar item");
     }
   };
 
