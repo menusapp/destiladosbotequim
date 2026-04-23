@@ -838,34 +838,20 @@ export const TableDetailDialog = ({
 
   return (
     <>
-      {isMobile ? (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent
-            side="bottom"
-            className="h-[92vh] rounded-t-2xl p-0 overflow-hidden flex flex-col gap-0"
-          >
-            <SheetHeader className="p-4 border-b flex-shrink-0 space-y-0">
-              <SheetTitle asChild>
-                <div>{headerContent}</div>
-              </SheetTitle>
-              <SheetDescription className="sr-only">Detalhes da mesa</SheetDescription>
-            </SheetHeader>
-            {tableContent}
-          </SheetContent>
-        </Sheet>
-      ) : (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader className="flex-shrink-0">
-              <DialogDescription className="sr-only">Detalhes da mesa</DialogDescription>
-              <DialogTitle asChild>
-                <div>{headerContent}</div>
-              </DialogTitle>
-            </DialogHeader>
-            {tableContent}
-          </DialogContent>
-        </Dialog>
-      )}
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className={
+            isMobile
+              ? "max-w-full w-screen h-[92vh] max-h-[92vh] rounded-t-2xl rounded-b-none p-4 overflow-hidden flex flex-col bottom-0 top-auto translate-y-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom"
+              : "max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col"
+          }
+        >
+          <DialogHeader className="flex-shrink-0">
+            <DialogDescription className="sr-only">Detalhes da mesa</DialogDescription>
+            <DialogTitle asChild>
+              <div>{headerContent}</div>
+            </DialogTitle>
+          </DialogHeader>
 
           <div className="flex-1 min-h-0">
             <ScrollArea className="relative h-full overflow-hidden -mx-6 px-[24px] py-0 my-0">
