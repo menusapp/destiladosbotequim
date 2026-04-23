@@ -1827,50 +1827,54 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     const renderProduct = (product: any) => (
                       <Card
                         key={product.id}
-                        className="cursor-pointer hover:shadow-md transition-shadow"
+                        className="cursor-pointer hover:shadow-md active:scale-[0.98] transition-all touch-manipulation"
                         onClick={async () => {
-                          const { data: complementGroups } = await supabase
-                            .from("product_complement_groups")
-                            .select("extra_category_id, display_order, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
-                            .eq("product_id", product.id)
-                            .order("display_order");
-
-                          const complementExtras = (complementGroups || []).flatMap((g: any) => {
-                            const cat = g.extra_categories;
-                            if (!cat?.extra_category_items) return [];
-                            return cat.extra_category_items.map((item: any) => ({
-                              id: item.id,
-                              name: item.name,
-                              price: item.price,
-                              is_required: g.is_required,
-                              min_selection: g.min_selection,
-                              max_selection: g.max_selection,
-                              extra_category_id: g.extra_category_id,
-                              extra_category_name: cat.name,
-                              group_order: g.display_order ?? 9999,
-                              is_complement: true,
-                            }));
-                          });
-
-                          const combinedExtras = [
-                            ...(product.product_extras || []),
-                            ...complementExtras,
-                          ];
-
-                          setSelectedProduct({ ...product, product_extras: combinedExtras });
+                          // Optimistic open: show drawer immediately with what we have, then enrich
+                          setSelectedProduct(product);
                           setIsProductDrawerOpen(true);
+                          try {
+                            const { data: complementGroups } = await supabase
+                              .from("product_complement_groups")
+                              .select("extra_category_id, display_order, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
+                              .eq("product_id", product.id)
+                              .order("display_order");
+
+                            const complementExtras = (complementGroups || []).flatMap((g: any) => {
+                              const cat = g.extra_categories;
+                              if (!cat?.extra_category_items) return [];
+                              return cat.extra_category_items.map((item: any) => ({
+                                id: item.id,
+                                name: item.name,
+                                price: item.price,
+                                is_required: g.is_required,
+                                min_selection: g.min_selection,
+                                max_selection: g.max_selection,
+                                extra_category_id: g.extra_category_id,
+                                extra_category_name: cat.name,
+                                group_order: g.display_order ?? 9999,
+                                is_complement: true,
+                              }));
+                            });
+
+                            const combinedExtras = [
+                              ...(product.product_extras || []),
+                              ...complementExtras,
+                            ];
+
+                            setSelectedProduct({ ...product, product_extras: combinedExtras });
+                          } catch (_) { /* keep base extras on error */ }
                         }}
                       >
-                        <CardContent className="p-2 space-y-0.5">
+                        <CardContent className="p-2 space-y-1">
                           {product.image_url ? (
-                            <img src={product.image_url} alt={product.name} className="w-full h-14 object-cover rounded" />
+                            <img src={product.image_url} alt={product.name} loading="lazy" className="w-full h-20 sm:h-14 object-cover rounded" />
                           ) : (
-                            <div className="w-full h-14 bg-muted rounded flex items-center justify-center text-sm font-bold text-muted-foreground">
+                            <div className="w-full h-20 sm:h-14 bg-muted rounded flex items-center justify-center text-base font-bold text-muted-foreground">
                               {product.name.charAt(0)}
                             </div>
                           )}
-                          <p className="text-xs font-medium truncate">{product.name}</p>
-                          <p className="text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
+                          <p className="text-sm sm:text-xs font-medium line-clamp-2 leading-tight min-h-[2.25rem] sm:min-h-0">{product.name}</p>
+                          <p className="text-sm sm:text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
                         </CardContent>
                       </Card>
                     );
