@@ -224,6 +224,8 @@ Deno.serve(async (req) => {
     for (const [key, value] of Object.entries(enrichedContext)) {
       message = message.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value ?? ''));
     }
+    // Strip any remaining {{var}} placeholders to avoid sending literal template tokens
+    message = message.replace(/\{\{\s*[\w-]+\s*\}\}/g, '').replace(/\n{3,}/g, '\n\n').trim();
 
     // Determine recipient phone
     const ownerTypes = ['cashier_open', 'cashier_close', 'daily_summary'];
