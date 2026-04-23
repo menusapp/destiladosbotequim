@@ -939,40 +939,44 @@ export const TableDetailDialog = ({
                   return (
                     <div key={comanda.id}>
                       <Separator className="mb-4" />
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-sm flex items-center gap-2">
-                          <ShoppingBag className="w-4 h-4" />
-                          Pedidos de {comanda.customer_name}
+                      <div className="no-min-tap flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <h3 className="font-semibold text-sm flex items-center gap-1.5 min-w-0 flex-1">
+                          <ShoppingBag className="w-4 h-4 shrink-0" />
+                          <span className="truncate">Pedidos de {comanda.customer_name}</span>
                           {comandaOrders.length > 0 && (
-                            <Badge variant="outline" className="ml-1 text-[10px]">{comandaOrders.length}</Badge>
+                            <Badge variant="outline" className="ml-1 text-[10px] shrink-0">{comandaOrders.length}</Badge>
+                          )}
+                        </h3>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {comandaOrders.length > 0 && (
+                            <span className="text-sm font-bold">R$ {comandaTotal.toFixed(2)}</span>
                           )}
                           <Button
                             size="icon"
-                            variant="ghost"
-                            className="h-6 w-6"
+                            variant="outline"
+                            className="h-7 w-7 shrink-0"
                             title="Adicionar item à comanda"
                             onClick={() => openAddItemsForComanda(comanda)}
                           >
                             <Plus className="w-4 h-4" />
                           </Button>
-                        </h3>
-                        {comandaOrders.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold">R$ {comandaTotal.toFixed(2)}</span>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Imprimir comanda" onClick={() => printFullComanda(comanda)}>
-                              <Printer className="w-4 h-4" />
-                            </Button>
-                            {unpaidComandaTotal > 0.01 ? (
-                              <Button size="sm" variant="outline" onClick={() => handlePayComanda(comanda)}>
-                                <CreditCard className="w-3.5 h-3.5 mr-1" /> Pagar
+                          {comandaOrders.length > 0 && (
+                            <>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0" title="Imprimir comanda" onClick={() => printFullComanda(comanda)}>
+                                <Printer className="w-4 h-4" />
                               </Button>
-                            ) : (
-                              <Badge variant="outline" className="border-green-500 text-green-700 dark:text-green-400">
-                                Pago
-                              </Badge>
-                            )}
-                          </div>
-                        )}
+                              {unpaidComandaTotal > 0.01 ? (
+                                <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => handlePayComanda(comanda)}>
+                                  <CreditCard className="w-3.5 h-3.5 mr-1" /> Pagar
+                                </Button>
+                              ) : (
+                                <Badge variant="outline" className="border-green-500 text-green-700 dark:text-green-400">
+                                  Pago
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {comandaOrders.length === 0 ? (

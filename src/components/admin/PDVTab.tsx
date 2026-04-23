@@ -1195,9 +1195,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             {tables?.length || 0} mesas • {occupiedTables} ocup. • {availableTables} livres
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0" data-tour="pdv-auto-print">
-          <Printer className="h-4 w-4 text-muted-foreground" />
-          <label htmlFor="auto-print-toggle" className="text-xs text-muted-foreground cursor-pointer hidden sm:inline">Auto-print</label>
+        <div className="no-min-tap flex items-center gap-1.5 flex-shrink-0 h-8 px-2 rounded-button border border-border" data-tour="pdv-auto-print">
+          <Printer className="h-3.5 w-3.5 text-muted-foreground" />
+          <label htmlFor="auto-print-toggle" className="text-[11px] sm:text-xs text-muted-foreground cursor-pointer">Auto-print</label>
           <Switch
             id="auto-print-toggle"
             checked={autoPrint}
@@ -1206,6 +1206,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               localStorage.setItem("pdv_auto_print", String(checked));
               toast.success(checked ? "Impressão automática ativada" : "Impressão automática desativada");
             }}
+            className="h-4 w-7 scale-90"
           />
         </div>
       </div>

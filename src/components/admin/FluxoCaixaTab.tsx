@@ -537,18 +537,18 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
       <Tabs defaultValue="fluxo" className="w-full">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
           <div>
-            <h2 className="text-3xl font-bold">Caixa</h2>
-            <p className="text-muted-foreground">Controle completo do fluxo de caixa</p>
+            <h2 className="text-xl sm:text-3xl font-bold">Caixa</h2>
+            <p className="text-xs sm:text-base text-muted-foreground">Controle completo do fluxo de caixa</p>
           </div>
           
-          <div className="flex items-center gap-4">
-            <TabsList className="grid grid-cols-2">
-              <TabsTrigger value="fluxo">Fluxo de Caixa</TabsTrigger>
-              <TabsTrigger value="historico">Histórico de Caixa</TabsTrigger>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+            <TabsList className="grid grid-cols-2 w-full sm:w-auto h-9">
+              <TabsTrigger value="fluxo" className="text-xs sm:text-sm px-2">Fluxo de Caixa</TabsTrigger>
+              <TabsTrigger value="historico" className="text-xs sm:text-sm px-2">Histórico</TabsTrigger>
             </TabsList>
             
             {!currentSession ? (
