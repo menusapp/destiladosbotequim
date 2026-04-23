@@ -268,7 +268,102 @@ export const TableDetailDialog = ({
     onTableCleared();
   };
 
-  const handleClearTable = async () => {
+  // Abre o drawer de adicionar itens. Usa o pedido ativo mais recente da comanda;
+  // se não houver, cria um novo pedido vazio (status 'accepted') para a comanda.
+  const openAddItemsForComanda = async (comanda: any) => {
+    if (!table) return;
+    try {
+      const comandaOrders = (orders || []).filter((o: any) => o.comanda_id === comanda.id);
+      const activeOrder = comandaOrders.find((o: any) =>
+        ["pending", "accepted", "preparing", "ready"].includes(o.status)
+      );
+
+      if (activeOrder) {
+        setAddItemsOrderId(activeOrder.id);
+        return;
+      }
+
+      const { data: newOrder, error: createError } = await supabase
+        .from("orders")
+        .insert({
+          restaurant_id: restaurantId,
+          table_id: table.id,
+          comanda_id: comanda.id,
+          customer_name: comanda.customer_name,
+          customer_cpf: comanda.customer_cpf,
+          status: "accepted",
+          order_type: "local",
+          pdv_source: true,
+        })
+        .select("id")
+        .single();
+
+      if (createError) throw createError;
+      setAddItemsOrderId(newOrder.id);
+    } catch (err: any) {
+      console.error("Erro ao abrir adicionar itens:", err);
+      toast.error(err.message || "Erro ao abrir adicionar itens");
+    }
+  };
+
+  // Cancela todos os pedidos ativos da comanda. Se a mesa ficar sem pedidos
+  // ativos e sem contas pendentes, libera a mesa automaticamente.
+  const confirmCancelComanda = async () => {
+    if (!cancellingComanda || !table) return;
+    try {
+      const comandaOrders = (orders || []).filter((o: any) => o.comanda_id === cancellingComanda.id);
+      const activeOrderIds = comandaOrders
+        .filter((o: any) => ["pending", "accepted", "preparing", "ready"].includes(o.status))
+        .map((o: any) => o.id);
+
+      if (activeOrderIds.length === 0) {
+        toast.info("Não há pedidos ativos para cancelar");
+        setCancellingComanda(null);
+        return;
+      }
+
+      const { error: cancelErr } = await supabase
+        .from("orders")
+        .update({ status: "cancelled", cancellation_reason: "Cancelado pelo PDV" })
+        .in("id", activeOrderIds);
+      if (cancelErr) throw cancelErr;
+
+      toast.success(`Pedidos de ${cancellingComanda.name} cancelados`);
+
+      // Verifica se restam pedidos ativos ou contas pendentes
+      const { data: remainingOrders } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("table_id", table.id)
+        .in("status", ["pending", "accepted", "preparing", "ready"])
+        .limit(1);
+
+      const { data: pendingBills } = await supabase
+        .from("bills")
+        .select("id")
+        .eq("table_id", table.id)
+        .neq("status", "paid")
+        .limit(1);
+
+      if ((!remainingOrders || remainingOrders.length === 0) && (!pendingBills || pendingBills.length === 0)) {
+        await supabase.from("tables").update({
+          is_occupied: false,
+          occupied_at: null,
+          occupied_by: null,
+        }).eq("id", table.id);
+        await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() })
+          .eq("table_id", table.id).eq("status", "active");
+        onTableCleared();
+      }
+
+      setCancellingComanda(null);
+      refetchOrders();
+      refetchComandas();
+    } catch (err: any) {
+      console.error("Erro ao cancelar comanda:", err);
+      toast.error(err.message || "Erro ao cancelar comanda");
+    }
+  };
     if (!table) return;
     await supabase.from("orders").update({ status: "cancelled" })
       .eq("table_id", table.id).in("status", ["pending", "accepted", "preparing", "ready"]);
