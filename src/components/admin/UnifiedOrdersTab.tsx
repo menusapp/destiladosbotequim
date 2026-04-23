@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package, Store,
   Printer, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock,
-  MoreVertical, Loader2, Eye, Zap
+  MoreVertical, Loader2, Eye, Zap, ScrollText
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useOrderStatusAdvance, getNextStatus } from "@/hooks/useOrderStatusAdvance";
