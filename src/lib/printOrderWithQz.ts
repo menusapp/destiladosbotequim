@@ -21,6 +21,15 @@ import {
   type OrderForPrinting,
 } from "@/lib/fetchOrderForPrinting";
 import { resolveQzPrinter } from "@/lib/qzPrinterConfig";
+import {
+  buildOriginLabel,
+  formatDateTimeFull,
+  formatDateTimeShort,
+  formatPaymentType,
+  formatPhoneDisplay,
+  formatPrice,
+  shortOrderId,
+} from "@/lib/receiptFormatters";
 
 export interface PrintOrderQzResult {
   success: boolean;
