@@ -41,6 +41,7 @@ import {
   setSavedQzPrinter,
   clearSavedQzPrinter,
 } from "@/lib/qzPrinterConfig";
+import { ensureQzConnected } from "@/lib/qzConnectionManager";
 
 type ConnStatus = "idle" | "connecting" | "connected" | "error";
 
@@ -80,9 +81,7 @@ export const QzTraySection = () => {
   }, [printers]);
 
   const ensureConnected = async () => {
-    if (!qz.websocket.isActive()) {
-      await qz.websocket.connect();
-    }
+    await ensureQzConnected();
   };
 
   const handleConnect = async () => {
