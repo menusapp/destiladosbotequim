@@ -22,6 +22,8 @@ import { OrderDetailModal } from "./OrderDetailModal";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { printOrder } from "@/lib/printOrder";
+import { printOrderWithQz } from "@/lib/printOrderWithQz";
+import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import type { DateRange } from "react-day-picker";
 
@@ -342,6 +344,40 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     try { await printOrder(order as any, restaurantId); } catch (err: any) { toast.error(err.message || "Erro ao imprimir"); }
   };
 
+  const handleQuickPrintQz = async (e: React.MouseEvent, order: Order) => {
+    e.stopPropagation();
+    const saved = getSavedQzPrinter();
+    if (!saved) {
+      toast.warning("Nenhuma impressora térmica configurada", {
+        description: "Vá em Configurações Gerais → Impressoras para selecionar uma impressora QZ Tray.",
+        duration: 6000,
+      });
+      return;
+    }
+    const toastId = toast.loading("Enviando para impressão...", {
+      description: `Impressora: ${saved}`,
+    });
+    try {
+      const result = await printOrderWithQz(order.id);
+      if (result.success) {
+        toast.success("Pedido enviado para impressora", {
+          id: toastId,
+          description: result.printer ?? saved,
+        });
+      } else {
+        toast.error("Erro ao imprimir via QZ Tray", {
+          id: toastId,
+          description: result.error ?? "Falha desconhecida",
+        });
+      }
+    } catch (err: any) {
+      toast.error("Erro ao imprimir via QZ Tray", {
+        id: toastId,
+        description: err?.message ?? String(err),
+      });
+    }
+  };
+
   const handleQuickCancel = (e: React.MouseEvent, order: Order) => {
     e.stopPropagation();
     setSelectedOrder(order);
@@ -444,6 +480,9 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={(e) => handleQuickPrint(e, order)}>
                     <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => handleQuickPrintQz(e, order)}>
+                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir (QZ Tray)
                   </DropdownMenuItem>
                   <DropdownMenuItem className="text-destructive" onClick={(e) => handleQuickCancel(e, order)}>
                     <XCircle className="w-3.5 h-3.5 mr-2" /> Cancelar pedido
