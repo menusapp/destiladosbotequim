@@ -1097,6 +1097,17 @@ const RestaurantAdmin = () => {
           />
         )}
         <SupportChatWidget />
+
+        {/* Mobile bottom nav — only on screens < md */}
+        <MobileBottomNav
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          hasNewDeliveryOrders={hasNewDeliveryOrders}
+          hasNewBills={hasNewBills}
+          hasNewLocalOrders={hasNewLocalOrders}
+          primaryColor={restaurant.primary_color}
+        />
+
       </div>
     </SidebarProvider>
   );
