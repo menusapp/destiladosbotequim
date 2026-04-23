@@ -442,7 +442,7 @@ const Comanda = () => {
       
       const restResult = await supabase
         .from("restaurants")
-        .select("id, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled, show_prep_timer, is_open")
+        .select("id, name, logo_url, service_fee_enabled, service_fee_percentage, prep_time_minutes, primary_color, bill_request_enabled, show_prep_timer, is_open")
         .eq("slug", restaurantSlug)
         .maybeSingle();
 
@@ -459,6 +459,8 @@ const Comanda = () => {
       setShowPrepTimer(restData.show_prep_timer ?? true);
       setRestaurantColor(restData.primary_color || "#FF6B35");
       setRestaurantId(restData.id);
+      setRestaurantLogo(restData.logo_url);
+      setRestaurantName(restData.name);
       setBillRequestEnabled(restData.bill_request_enabled ?? true);
       setIsRestaurantOpen(restData.is_open ?? true);
 
