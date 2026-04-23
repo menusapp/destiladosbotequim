@@ -395,9 +395,37 @@ export async function printOrderWithQz(
 
     if (!qz.websocket.isActive()) {
       console.log("⏳ Conectando ao QZ Tray (ws://localhost:8181)…");
-      await qz.websocket.connect();
+      try {
+        await withTimeout(qz.websocket.connect(), 5000, "conexão com QZ Tray");
+      } catch (e: any) {
+        console.error("❌ Falha ao conectar ao QZ Tray:", e?.message ?? e);
+        return {
+          success: false,
+          printer: null,
+          orderId,
+          escposLikely: false,
+          error: "Não foi possível conectar ao QZ Tray. Verifique se o aplicativo está aberto.",
+          errorCode: "qz_connect_failed",
+        };
+      }
     } else {
       console.log("ℹ️ Já estava conectado ao QZ Tray.");
+    }
+
+    // ---------- Lista impressoras disponíveis ----------
+    let availablePrinters: string[] = [];
+    try {
+      availablePrinters = (await withTimeout(
+        qz.printers.find() as Promise<string[]>,
+        5000,
+        "listagem de impressoras"
+      )) as string[];
+      console.log(
+        `🖨️ [QZ] ${availablePrinters.length} impressora(s) disponíveis:`,
+        availablePrinters
+      );
+    } catch (e: any) {
+      console.warn("⚠️ Falha ao listar impressoras:", e?.message ?? e);
     }
 
     if (printerName) {
@@ -409,19 +437,55 @@ export async function printOrderWithQz(
       console.log(`📌 [QZ] Origem da impressora: ${resolved.source}`);
     }
 
-    if (!usedPrinter) {
-      throw new Error(
-        "Nenhuma impressora encontrada. Defina uma padrão no SO ou passe o nome."
-      );
+    // ---------- Validação: nenhuma impressora no sistema ----------
+    if (availablePrinters.length === 0) {
+      console.error("❌ Nenhuma impressora disponível no sistema.");
+      return {
+        success: false,
+        printer: usedPrinter,
+        orderId,
+        escposLikely: false,
+        error:
+          "Nenhuma impressora encontrada no sistema. Conecte uma impressora e tente novamente.",
+        errorCode: "no_printers_found",
+      };
     }
+
+    if (!usedPrinter) {
+      return {
+        success: false,
+        printer: null,
+        orderId,
+        escposLikely: false,
+        error:
+          "Nenhuma impressora configurada. Vá em Configurações Gerais → Impressoras.",
+        errorCode: "no_printer_configured",
+      };
+    }
+
+    // ---------- Validação: impressora salva ainda existe ----------
+    if (availablePrinters.length > 0 && !availablePrinters.includes(usedPrinter)) {
+      console.error(
+        `❌ Impressora "${usedPrinter}" não está mais disponível. Disponíveis:`,
+        availablePrinters
+      );
+      return {
+        success: false,
+        printer: usedPrinter,
+        orderId,
+        escposLikely: false,
+        error: `A impressora configurada "${usedPrinter}" não está disponível. Vá em Configurações Gerais → Impressoras e escolha outra.`,
+        errorCode: "printer_not_available",
+      };
+    }
+
     console.log("🖨️ Impressora utilizada:", usedPrinter);
 
     escposLikely = looksLikeEscposPrinter(usedPrinter);
     if (!escposLikely) {
       console.warn(
         "⚠️ A impressora selecionada NÃO parece ser ESC/POS térmica.\n" +
-          "Os comandos de corte e negrito podem ser ignorados ou impressos como caracteres estranhos.\n" +
-          "Use uma impressora térmica (Epson TM-, Bematech, Elgin i9, etc.) para o resultado final."
+          "Os comandos de corte e negrito podem ser ignorados ou impressos como caracteres estranhos."
       );
     } else {
       console.log("✅ Impressora compatível com ESC/POS detectada.");
@@ -440,8 +504,28 @@ export async function printOrderWithQz(
       { type: "raw", format: "plain", data: kitchen },
     ];
 
-    console.log("🚀 Iniciando impressão das duas vias…");
-    await qz.print(config, data);
+    console.log(`🚀 Iniciando impressão (timeout: ${PRINT_TIMEOUT_MS}ms)…`);
+    try {
+      await withTimeout(
+        qz.print(config, data),
+        PRINT_TIMEOUT_MS,
+        "envio para impressora"
+      );
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      const isTimeout = msg.toLowerCase().includes("timeout");
+      console.error("❌ Falha no envio para impressora:", msg);
+      return {
+        success: false,
+        printer: usedPrinter,
+        orderId,
+        escposLikely,
+        error: isTimeout
+          ? `Tempo esgotado ao enviar para "${usedPrinter}". A impressora pode estar offline ou desconectada.`
+          : msg,
+        errorCode: isTimeout ? "print_timeout" : "unknown",
+      };
+    }
 
     console.log("✅ Impressão enviada com sucesso.");
     console.groupEnd();
@@ -456,6 +540,7 @@ export async function printOrderWithQz(
       orderId,
       escposLikely,
       error: message,
+      errorCode: "unknown",
     };
   } finally {
     try {
