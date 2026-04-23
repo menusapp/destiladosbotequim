@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/useDebounce";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -447,11 +448,14 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     return () => { clearTimeout(tablesTimer); clearTimeout(ordersTimer); supabase.removeChannel(ch); };
   }, [restaurantId, refetchTables, refetchPendingOrders, refetchActiveOrders, queryClient]);
 
+  // Debounced search keeps typing snappy on large product lists
+  const debouncedSearchTerm = useDebounce(searchTerm, 180);
   const filteredProducts = useMemo(() => {
     if (!products) return [];
-    if (!searchTerm) return products;
-    return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [products, searchTerm]);
+    const q = debouncedSearchTerm.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(p => p.name.toLowerCase().includes(q));
+  }, [products, debouncedSearchTerm]);
 
   const cartSubtotal = useMemo(() => {
     return cart.reduce((sum, item) => {
