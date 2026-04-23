@@ -860,7 +860,7 @@ const RestaurantAdmin = () => {
             onPickupTimeUpdate={(time) => setRestaurant({ ...restaurant, pickup_time_minutes: time })}
             onIsOpenUpdate={(isOpen) => setRestaurant({ ...restaurant, is_open: isOpen })}
           />
-          <main className="flex-1 overflow-auto p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4">
+          <main className="flex-1 overflow-auto p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-4">
             {isDelinquent ? (
               <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
                 <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
