@@ -226,7 +226,7 @@ export const QzTrustSetup = () => {
           </div>
           <p className="text-sm text-muted-foreground pl-1">
             Cole o arquivo <code className="bg-muted px-1 py-0.5 rounded text-xs">override.crt</code>{" "}
-            na pasta correspondente ao seu sistema:
+            na pasta de instalação correspondente ao seu sistema:
           </p>
 
           <div className="space-y-2 pl-1">
@@ -261,10 +261,21 @@ export const QzTrustSetup = () => {
 
           <Alert className="mt-2">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle className="text-sm">Permissão de administrador</AlertTitle>
+            <AlertTitle className="text-sm">Substitua qualquer arquivo antigo</AlertTitle>
             <AlertDescription className="text-xs">
-              No Windows pode ser necessário "Executar como administrador" o
-              Explorador de Arquivos para colar nessa pasta.
+              Se já existir um <code>override.crt</code> antigo nessa pasta,
+              substitua pelo novo. Manter o arquivo antigo causa erro de
+              <strong> Invalid Certificate</strong>.
+            </AlertDescription>
+          </Alert>
+
+          <Alert className="mt-2">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle className="text-sm">Permissão no Windows</AlertTitle>
+            <AlertDescription className="text-xs">
+              No Windows, pode ser necessário abrir o Explorador de Arquivos como
+              administrador (clique direito → "Executar como administrador") ou
+              confirmar a permissão ao colar o arquivo nessa pasta.
             </AlertDescription>
           </Alert>
         </div>
