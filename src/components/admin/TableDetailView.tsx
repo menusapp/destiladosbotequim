@@ -31,6 +31,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
+import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 
 interface ComandaWithDetails {
   id: string;

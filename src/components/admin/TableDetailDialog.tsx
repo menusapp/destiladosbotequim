@@ -37,6 +37,7 @@ import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { SplitPaymentDialog } from "./SplitPaymentDialog";
 import { SplitPaymentSelect } from "./SplitPaymentSelect";
 import { printOrder as printOrderThermal } from "@/lib/printOrder";
+import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 
 interface TableDetailDialogProps {
   restaurantId: string;
