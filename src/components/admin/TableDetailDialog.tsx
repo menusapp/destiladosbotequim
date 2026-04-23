@@ -909,30 +909,21 @@ export const TableDetailDialog = ({
                           {comandaOrders.length > 0 && (
                             <Badge variant="outline" className="ml-1 text-[10px]">{comandaOrders.length}</Badge>
                           )}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6"
+                            title="Adicionar item à comanda"
+                            onClick={() => openAddItemsForComanda(comanda)}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
                         </h3>
                         {comandaOrders.length > 0 && (
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold">R$ {comandaTotal.toFixed(2)}</span>
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Imprimir comanda" onClick={() => printFullComanda(comanda)}>
                               <Printer className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0"
-                              title="Adicionar item à comanda"
-                              onClick={() => openAddItemsForComanda(comanda)}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              title="Cancelar comanda"
-                              onClick={() => setCancellingComanda({ id: comanda.id, name: comanda.customer_name })}
-                            >
-                              <XCircle className="w-4 h-4" />
                             </Button>
                             {unpaidComandaTotal > 0.01 ? (
                               <Button size="sm" variant="outline" onClick={() => handlePayComanda(comanda)}>
