@@ -331,21 +331,25 @@ export const PDVProductDrawer = ({
         </div>
 
         {/* Bottom Actions */}
-        <div className="border-t border-border p-4 bg-background">
+        <div className="border-t border-border p-4 bg-background pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-3 bg-muted rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 bg-muted rounded-lg px-2 py-1">
               <button
+                type="button"
+                aria-label="Diminuir quantidade"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="text-foreground hover:text-primary"
+                className="h-11 w-11 flex items-center justify-center rounded-md text-foreground hover:bg-background active:scale-95 transition-all touch-manipulation"
               >
                 <Minus className="w-5 h-5" />
               </button>
-              <span className="font-bold text-lg text-foreground min-w-[30px] text-center">
+              <span className="font-bold text-lg text-foreground min-w-[28px] text-center">
                 {quantity}
               </span>
               <button
+                type="button"
+                aria-label="Aumentar quantidade"
                 onClick={() => setQuantity(quantity + 1)}
-                className="text-primary"
+                className="h-11 w-11 flex items-center justify-center rounded-md text-primary hover:bg-background active:scale-95 transition-all touch-manipulation"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -354,7 +358,7 @@ export const PDVProductDrawer = ({
             <Button
               onClick={handleAddToCart}
               disabled={!allRequiredSatisfied}
-              className="flex-1 h-11"
+              className="flex-1 h-12 text-base font-semibold"
             >
               {allRequiredSatisfied ? `Adicionar • R$ ${getTotalPrice().toFixed(2)}` : "Selecione as opções obrigatórias"}
             </Button>
