@@ -70,8 +70,8 @@ const CLIENT_NOTIFICATION_DEFAULTS: Record<string, { label: string; icon: any; t
   order_accepted: {
     label: "Confirmação ao Cliente",
     icon: CheckCircle2,
-    template: "✅ Olá {{nome}}! Seu pedido #{{numero_pedido}} foi aceito e está sendo preparado. Tempo estimado: {{tempo_estimado}} minutos.",
-    variables: "{{nome}}, {{numero_pedido}}, {{tempo_estimado}}",
+    template: "✅ Olá {{nome}}! Seu pedido foi aceito e está sendo preparado.\n\n{{resumo_pedido}}\n\n⏱️ Tempo estimado: {{tempo_estimado}} minutos.",
+    variables: "{{nome}}, {{numero_pedido}}, {{tempo_estimado}}, {{resumo_pedido}}, {{total_pedido}}",
     color: "text-green-600",
   },
   order_out_for_delivery: {
