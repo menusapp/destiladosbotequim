@@ -161,27 +161,8 @@ function labeled(label: string, value: string, width = LINE_WIDTH): string {
   return out;
 }
 
-function formatPrice(value: number): string {
-  return `R$ ${value.toFixed(2).replace(".", ",")}`;
-}
+// Helpers de formatação importados de @/lib/receiptFormatters
 
-function formatDateTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function shortOrderId(id: string): string {
-  return "#" + id.slice(0, 8).toUpperCase();
-}
 
 // =============================================================
 // Restaurante (nome da loja)
