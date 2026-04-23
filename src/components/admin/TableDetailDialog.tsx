@@ -36,7 +36,7 @@ import { ptBR } from "date-fns/locale";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { SplitPaymentDialog } from "./SplitPaymentDialog";
 import { SplitPaymentSelect } from "./SplitPaymentSelect";
-import { printOrder as printOrderThermal } from "@/lib/printOrder";
+import { printDocument } from "@/lib/printDispatcher";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 
 interface TableDetailDialogProps {
@@ -627,7 +627,7 @@ export const TableDetailDialog = ({
           })),
         })),
       };
-      await printOrderThermal(thermalOrder, restaurantId);
+      await printDocument(thermalOrder as any, restaurantId);
     } catch {
       toast.error("Erro ao imprimir pedido");
     }
@@ -665,7 +665,7 @@ export const TableDetailDialog = ({
         order_items: allItems,
         coupon_discount: totalDiscount > 0 ? totalDiscount : undefined,
       };
-      await printOrderThermal(virtualOrder, restaurantId);
+      await printDocument(virtualOrder as any, restaurantId);
     } catch {
       toast.error("Erro ao imprimir comanda");
     }
