@@ -16,6 +16,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -27,6 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, Trash2 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { toast } from "@/components/ui/sonner";
