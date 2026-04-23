@@ -1,5 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export interface OrderItemExtraForPrinting {
+  name: string;
+  price: number;
+}
+
 export interface OrderItemForPrinting {
   id: string;
   quantity: number;
@@ -8,6 +13,7 @@ export interface OrderItemForPrinting {
   products: {
     name: string;
   };
+  order_item_extras: OrderItemExtraForPrinting[];
 }
 
 export interface OrderForPrinting {
@@ -16,6 +22,20 @@ export interface OrderForPrinting {
   created_at: string;
   customer_name: string;
   customer_cpf: string;
+  customer_phone: string | null;
+  // Tipo / canal / agendamento
+  order_type: string | null; // 'local' | 'delivery' | 'balcao' | ...
+  order_channel: string | null; // 'totem' | 'ifood' | 'delivery_direto' | 'balcao' | ...
+  delivery_type: string | null; // 'delivery' | 'pickup'
+  delivery_address: string | null;
+  delivery_phone: string | null;
+  delivery_fee: number;
+  coupon_discount: number;
+  payment_type: string | null;
+  payment_brand: string | null;
+  notes: string | null;
+  cancellation_reason: string | null;
+  dd_scheduled_for: string | null;
   table_id: string | null;
   tables: {
     table_name: string | null;
@@ -27,14 +47,15 @@ export interface OrderForPrinting {
 /**
  * Busca um pedido completo, pronto para impressão térmica (ex: QZ Tray).
  *
- * Garante que cada order_item tenha `products.name` preenchido — caso o
- * relacionamento aninhado retorne null (produto deletado/desvinculado),
- * faz uma busca de fallback direto na tabela `products` por id.
+ * Garante PARIDADE com o conteúdo do PDF antigo (printOrder):
+ *  - tipo de pedido, canal, agendamento, taxa entrega, desconto
+ *  - telefone, endereço, pagamento, observações, cancelamento
+ *  - extras/complementos com preço e nome
+ *  - fallback de produto deletado
  */
 export async function fetchOrderForPrinting(
   orderId: string
 ): Promise<OrderForPrinting> {
-  // 1) Pedido + mesa + itens + produto (relacionamento aninhado)
   const { data: order, error } = await supabase
     .from("orders")
     .select(
@@ -44,6 +65,19 @@ export async function fetchOrderForPrinting(
       created_at,
       customer_name,
       customer_cpf,
+      order_type,
+      order_channel,
+      delivery_type,
+      delivery_address,
+      delivery_phone,
+      delivery_fee,
+      coupon_discount,
+      payment_type,
+      payment_brand,
+      notes,
+      cancellation_reason,
+      dd_scheduled_for,
+      restaurant_id,
       table_id,
       tables:table_id (
         table_name,
@@ -57,6 +91,13 @@ export async function fetchOrderForPrinting(
         product_id,
         products:product_id (
           name
+        ),
+        order_item_extras (
+          price_at_order,
+          extra_name,
+          product_extras:product_extra_id (
+            name
+          )
         )
       )
     `
@@ -71,16 +112,9 @@ export async function fetchOrderForPrinting(
     throw new Error(`Pedido ${orderId} não encontrado.`);
   }
 
-  const rawItems = (order.order_items ?? []) as Array<{
-    id: string;
-    quantity: number;
-    price_at_order: number;
-    notes: string | null;
-    product_id: string | null;
-    products: { name: string } | null;
-  }>;
+  const rawItems = (order.order_items ?? []) as Array<any>;
 
-  // 2) Fallback: itens sem produto resolvido via join
+  // Fallback: produtos deletados
   const missingProductIds = Array.from(
     new Set(
       rawItems
@@ -91,29 +125,39 @@ export async function fetchOrderForPrinting(
 
   const fallbackMap = new Map<string, string>();
   if (missingProductIds.length > 0) {
-    const { data: fallbackProducts, error: fbError } = await supabase
+    const { data: fallbackProducts } = await supabase
       .from("products")
       .select("id, name")
       .in("id", missingProductIds);
-
-    if (fbError) {
-      console.warn(
-        "[fetchOrderForPrinting] Falha no fallback de produtos:",
-        fbError.message
-      );
-    } else {
-      for (const p of fallbackProducts ?? []) {
-        fallbackMap.set(p.id, p.name);
-      }
+    for (const p of fallbackProducts ?? []) {
+      fallbackMap.set(p.id, p.name);
     }
   }
 
-  // 3) Normaliza itens: products.name SEMPRE preenchido (nunca null)
+  // Telefone do cliente (fallback via tabela customers)
+  let customerPhone: string | null = (order as any).delivery_phone ?? null;
+  if (!customerPhone && (order as any).customer_cpf) {
+    const { data: cust } = await supabase
+      .from("customers")
+      .select("phone")
+      .eq("cpf", (order as any).customer_cpf)
+      .eq("restaurant_id", (order as any).restaurant_id)
+      .maybeSingle();
+    if (cust?.phone) customerPhone = cust.phone;
+  }
+
   const order_items: OrderItemForPrinting[] = rawItems.map((it) => {
     const name =
       it.products?.name ??
       (it.product_id ? fallbackMap.get(it.product_id) : undefined) ??
       "Produto removido";
+
+    const order_item_extras: OrderItemExtraForPrinting[] = (
+      it.order_item_extras ?? []
+    ).map((ex: any) => ({
+      name: ex.extra_name ?? ex.product_extras?.name ?? "Extra",
+      price: Number(ex.price_at_order ?? 0),
+    }));
 
     return {
       id: it.id,
@@ -121,6 +165,7 @@ export async function fetchOrderForPrinting(
       price_at_order: Number(it.price_at_order),
       notes: it.notes,
       products: { name },
+      order_item_extras,
     };
   });
 
@@ -135,43 +180,23 @@ export async function fetchOrderForPrinting(
     id: order.id,
     status: order.status as string,
     created_at: order.created_at as string,
-    customer_name: order.customer_name,
-    customer_cpf: order.customer_cpf,
-    table_id: order.table_id ?? null,
+    customer_name: (order as any).customer_name,
+    customer_cpf: (order as any).customer_cpf,
+    customer_phone: customerPhone,
+    order_type: (order as any).order_type ?? null,
+    order_channel: (order as any).order_channel ?? null,
+    delivery_type: (order as any).delivery_type ?? null,
+    delivery_address: (order as any).delivery_address ?? null,
+    delivery_phone: (order as any).delivery_phone ?? null,
+    delivery_fee: Number((order as any).delivery_fee ?? 0),
+    coupon_discount: Number((order as any).coupon_discount ?? 0),
+    payment_type: (order as any).payment_type ?? null,
+    payment_brand: (order as any).payment_brand ?? null,
+    notes: (order as any).notes ?? null,
+    cancellation_reason: (order as any).cancellation_reason ?? null,
+    dd_scheduled_for: (order as any).dd_scheduled_for ?? null,
+    table_id: (order as any).table_id ?? null,
     tables,
     order_items,
   };
 }
-
-/* -------------------------------------------------------------------------
- * Exemplo de uso (para validar o JSON no console)
- * -------------------------------------------------------------------------
- *
- * import { fetchOrderForPrinting } from "@/lib/fetchOrderForPrinting";
- *
- * const order = await fetchOrderForPrinting("00000000-0000-0000-0000-000000000000");
- * console.log(JSON.stringify(order, null, 2));
- *
- * // Saída esperada:
- * // {
- * //   "id": "...",
- * //   "status": "delivered",
- * //   "created_at": "2025-04-23T12:34:56.000Z",
- * //   "customer_name": "João da Silva",
- * //   "customer_cpf": "12345678900",
- * //   "table_id": "...",
- * //   "tables": {
- * //     "table_name": "Mesa 1",
- * //     "table_number": 1
- * //   },
- * //   "order_items": [
- * //     {
- * //       "id": "...",
- * //       "quantity": 1,
- * //       "price_at_order": 37.9,
- * //       "notes": null,
- * //       "products": { "name": "Batatas Especiais" }
- * //     }
- * //   ]
- * // }
- * ----------------------------------------------------------------------- */
