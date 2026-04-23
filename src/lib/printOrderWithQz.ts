@@ -503,9 +503,26 @@ function looksLikeEscposPrinter(printerName: string): boolean {
 // =============================================================
 export async function printOrderWithQz(
   orderId: string,
-  printerName?: string
+  printerNameOrOptions?: string | PrintOrderQzOptions,
+  maybeOptions?: PrintOrderQzOptions
 ): Promise<PrintOrderQzResult> {
-  console.group(`🖨️ [QZ Tray] Impressão ESC/POS do pedido ${orderId}`);
+  // Compatibilidade retroativa: aceita (orderId), (orderId, "PrinterName"),
+  // (orderId, { mode }) ou (orderId, "PrinterName", { mode }).
+  let printerName: string | undefined;
+  let options: PrintOrderQzOptions = {};
+  if (typeof printerNameOrOptions === "string") {
+    printerName = printerNameOrOptions;
+    options = maybeOptions ?? {};
+  } else if (printerNameOrOptions && typeof printerNameOrOptions === "object") {
+    options = printerNameOrOptions;
+  }
+
+  // Fallback seguro: sempre que o modo não for informado, assume "pedido".
+  const mode: PrintReceiptMode = options.mode === "conta" ? "conta" : "pedido";
+
+  console.group(
+    `🖨️ [QZ Tray] Impressão ESC/POS do pedido ${orderId} — modo: ${mode}`
+  );
 
   let usedPrinter: string | null = null;
   let escposLikely = false;
