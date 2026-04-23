@@ -25,6 +25,7 @@ import { printOrder } from "@/lib/printOrder";
 import { printOrderWithQz } from "@/lib/printOrderWithQz";
 import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
 import { checkQzTrayConnection } from "@/lib/qzConnectionCheck";
+import { QzTrayStatusBadge } from "./QzTrayStatusBadge";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import type { DateRange } from "react-day-picker";
 
@@ -549,6 +550,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
           <p className="text-sm text-muted-foreground">{totalPendingCount} aguardando • {orders.length} no total</p>
         </div>
         <div className="flex items-center gap-2">
+          <QzTrayStatusBadge />
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-muted-foreground" />
             <Label htmlFor="auto-accept" className="text-xs">Aceitar automaticamente</Label>
