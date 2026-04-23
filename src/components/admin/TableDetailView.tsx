@@ -572,7 +572,7 @@ export const TableDetailView = () => {
                                         <span className="text-muted-foreground">
                                           R$ {(item.price_at_order * item.quantity).toFixed(2)}
                                         </span>
-                                        {!isPaid && (
+                                        {!isPaid && canManageOrders && (
                                           <Button
                                             size="icon"
                                             variant="ghost"
@@ -678,7 +678,7 @@ export const TableDetailView = () => {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {order.status === "pending" && !(order as any).pdv_source && (
+                      {order.status === "pending" && !(order as any).pdv_source && canManageOrders && (
                         <Button
                           size="sm"
                           onClick={() => updateOrderStatus(order.id, "accepted")}
@@ -686,7 +686,7 @@ export const TableDetailView = () => {
                           Aceitar
                         </Button>
                       )}
-                      {order.status === "accepted" && (
+                      {order.status === "accepted" && canManageOrders && (
                         <Button
                           size="sm"
                           onClick={() => updateOrderStatus(order.id, "preparing")}
@@ -694,7 +694,7 @@ export const TableDetailView = () => {
                           Preparando
                         </Button>
                       )}
-                      {order.status === "preparing" && (
+                      {order.status === "preparing" && canManageOrders && (
                         <Button
                           size="sm"
                           onClick={() => updateOrderStatus(order.id, "ready")}
@@ -709,13 +709,15 @@ export const TableDetailView = () => {
                       >
                         <Printer className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => deleteOrder(order.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {canManageOrders && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => deleteOrder(order.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
 
                     </div>
                   </div>
