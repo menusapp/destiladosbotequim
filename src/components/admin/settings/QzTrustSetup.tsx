@@ -186,7 +186,7 @@ export const QzTrustSetup = () => {
         <CardDescription>
           O sistema agora usa o <strong>certificado oficial do QZ Tray</strong>.
           Basta baixar o arquivo <code className="bg-muted px-1 rounded text-xs">override.crt</code>{" "}
-          abaixo e instalá-lo na pasta de autenticação do QZ Tray para que a
+          abaixo e copiá-lo para a pasta de instalação do QZ Tray para que a
           impressão fique 100% automática (sem popup de permissão).
         </CardDescription>
       </CardHeader>
