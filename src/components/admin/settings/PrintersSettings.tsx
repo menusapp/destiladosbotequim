@@ -4,10 +4,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Printer, CheckCircle2, Globe } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Printer, CheckCircle2, Globe, FileText, Zap } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { QzTraySection } from "./QzTraySection";
+import type { PrintMethod } from "@/lib/printDispatcher";
 
 interface WebPrinterConfig {
   paperSize: string;
@@ -18,6 +20,7 @@ interface WebPrinterConfig {
   fontBold: boolean;
   printCopies: number;
   supportsAutoCut: boolean;
+  printMethod: PrintMethod;
 }
 
 const FONT_OPTIONS = [
@@ -46,6 +49,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     fontBold: true,
     printCopies: 1,
     supportsAutoCut: false,
+    printMethod: 'pdf',
   });
 
   useEffect(() => {
@@ -60,6 +64,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
         .eq('restaurant_id', restaurantId)
         .maybeSingle();
       if (data) {
+        const rawMethod = (data as any).print_method;
         setWebConfig({
           paperSize: data.paper_size || '80mm',
           autoPrintOrders: Boolean(data.auto_print_orders),
@@ -69,6 +74,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           fontBold: (data as any).font_bold !== undefined ? Boolean((data as any).font_bold) : true,
           printCopies: (data as any).print_copies || 1,
           supportsAutoCut: Boolean((data as any).supports_auto_cut),
+          printMethod: rawMethod === 'qz_tray' ? 'qz_tray' : 'pdf',
         });
       }
     } catch (error) {
@@ -91,6 +97,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           font_bold: webConfig.fontBold,
           print_copies: webConfig.printCopies,
           supports_auto_cut: webConfig.supportsAutoCut,
+          print_method: webConfig.printMethod,
           updated_at: new Date().toISOString(),
         } as any, { onConflict: 'restaurant_id' });
       if (error) throw error;
@@ -167,6 +174,58 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
         <h2 className="text-2xl font-bold">Impressoras</h2>
         <p className="text-muted-foreground">Configure a impressão de pedidos e cupons via navegador</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Printer className="h-5 w-5" />
+            Método de impressão padrão
+          </CardTitle>
+          <CardDescription>
+            Define qual caminho será usado pelos botões de imprimir e pela impressão automática.
+            Você sempre pode escolher outro método na hora, pelo menu do botão de imprimir.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RadioGroup
+            value={webConfig.printMethod}
+            onValueChange={(v) => setWebConfig((prev) => ({ ...prev, printMethod: v as PrintMethod }))}
+            className="space-y-3"
+          >
+            <label
+              htmlFor="print-method-pdf"
+              className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition"
+            >
+              <RadioGroupItem value="pdf" id="print-method-pdf" className="mt-1" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <p className="font-medium">PDF / Impressora do sistema</p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Abre o diálogo de impressão do navegador. Funciona em qualquer impressora — térmica, jato de tinta ou laser.
+                </p>
+              </div>
+            </label>
+
+            <label
+              htmlFor="print-method-qz"
+              className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition"
+            >
+              <RadioGroupItem value="qz_tray" id="print-method-qz" className="mt-1" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-muted-foreground" />
+                  <p className="font-medium">QZ Tray</p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Impressão direta na térmica via ESC/POS. Requer o QZ Tray instalado e aberto no computador, e uma impressora selecionada na seção QZ Tray abaixo.
+                </p>
+              </div>
+            </label>
+          </RadioGroup>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

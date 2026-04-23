@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { formatPaymentMethod } from "@/lib/utils";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { printOrder as printOrderThermal } from "@/lib/printOrder";
+import { printDocument } from "@/lib/printDispatcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -351,7 +351,7 @@ export const TableDetailView = () => {
         })),
       })),
     };
-    await printOrderThermal(thermalOrder, restaurantId);
+    await printDocument(thermalOrder as any, restaurantId);
   };
 
   const printOrder = async (order: Order) => {
@@ -705,7 +705,8 @@ export const TableDetailView = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => printOrder(order)}
+                        onClick={() => printDocument(order as any, restaurantId)}
+                        title="Imprimir (usa método configurado em Impressoras)"
                       >
                         <Printer className="w-4 h-4" />
                       </Button>

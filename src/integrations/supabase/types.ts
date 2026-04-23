@@ -2945,6 +2945,7 @@ export type Database = {
           paper_size: string
           print_copies: number
           print_kitchen_copy: boolean
+          print_method: string
           restaurant_id: string
           supports_auto_cut: boolean
           updated_at: string | null
@@ -2962,6 +2963,7 @@ export type Database = {
           paper_size?: string
           print_copies?: number
           print_kitchen_copy?: boolean
+          print_method?: string
           restaurant_id: string
           supports_auto_cut?: boolean
           updated_at?: string | null
@@ -2979,6 +2981,7 @@ export type Database = {
           paper_size?: string
           print_copies?: number
           print_kitchen_copy?: boolean
+          print_method?: string
           restaurant_id?: string
           supports_auto_cut?: boolean
           updated_at?: string | null
