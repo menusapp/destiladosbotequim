@@ -41,9 +41,10 @@ import qz from "qz-tray";
 import { ensureQzConnected } from "@/lib/qzConnectionManager";
 import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
 
-const FUNCTIONS_BASE = import.meta.env.VITE_SUPABASE_PROJECT_ID
-  ? `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1`
-  : "";
+// Servimos o override.crt como arquivo estático em /qz-tray/override.crt.
+// Esse arquivo é EXATAMENTE o mesmo certificado público usado pelo backend
+// para assinar (QZ_CERTIFICATE), garantindo que o trust funcione.
+const OVERRIDE_CRT_URL = "/qz-tray/override.crt";
 
 const PATHS = {
   windows: String.raw`C:\Program Files\QZ Tray\auth\override.crt`,
@@ -79,20 +80,16 @@ export const QzTrustSetup = () => {
   const [testError, setTestError] = useState<string>("");
   const [testStartedAt, setTestStartedAt] = useState<number | null>(null);
 
-  /** Baixa o certificado público como override.crt. */
+  /** Baixa o override.crt oficial (servido estaticamente). */
   const handleDownloadCert = async () => {
-    if (!FUNCTIONS_BASE) {
-      toast.error("Configuração indisponível");
-      return;
-    }
     setDownloading(true);
     try {
-      console.log("🔐 [QZ Trust] Baixando certificado...");
-      const res = await fetch(`${FUNCTIONS_BASE}/qz-cert`);
+      console.log("🔐 [QZ Trust] Baixando override.crt oficial...");
+      const res = await fetch(OVERRIDE_CRT_URL, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const pem = await res.text();
       if (!pem.includes("BEGIN CERTIFICATE")) {
-        throw new Error("Certificado retornado em formato inválido");
+        throw new Error("Certificado em formato inválido");
       }
       const blob = new Blob([pem], { type: "application/x-x509-ca-cert" });
       const url = URL.createObjectURL(blob);
