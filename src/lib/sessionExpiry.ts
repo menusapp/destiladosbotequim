@@ -50,3 +50,22 @@ export function clearSessionTimestamp(): void {
     // ignore
   }
 }
+
+/**
+ * Retorna o caminho do painel se o usuário possui sessão válida (logado e não expirada).
+ * Caso contrário, retorna `null`. Usado para auto-redirect na landing/login.
+ */
+export function getActiveAdminRedirectPath(): string | null {
+  try {
+    if (isSessionExpired()) return null;
+    const restaurantId = localStorage.getItem("restaurant_id");
+    const staffId = localStorage.getItem("staff_id");
+    if (!restaurantId) return null;
+    const slug = localStorage.getItem("restaurant_slug");
+    if (!slug) return null;
+    if (!staffId) return `/login/staff`;
+    return `/${slug}/admin`;
+  } catch {
+    return null;
+  }
+}
