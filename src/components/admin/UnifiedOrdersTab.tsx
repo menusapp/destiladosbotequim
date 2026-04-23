@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { printOrder } from "@/lib/printOrder";
 import { printOrderWithQz } from "@/lib/printOrderWithQz";
 import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
+import { checkQzTrayConnection } from "@/lib/qzConnectionCheck";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import type { DateRange } from "react-day-picker";
 
@@ -354,25 +355,39 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
       });
       return;
     }
-    const toastId = toast.loading("Enviando para impressão...", {
+
+    const checkToastId = toast.loading("Verificando conexão com QZ Tray...");
+    const status = await checkQzTrayConnection();
+    if (!status.ok) {
+      toast.error("QZ Tray não está conectado", {
+        id: checkToastId,
+        description:
+          "Abra o aplicativo QZ Tray na sua máquina e tente novamente. Se ainda não tem instalado, baixe em qz.io.",
+        duration: 8000,
+      });
+      return;
+    }
+
+    toast.loading("Enviando para impressão...", {
+      id: checkToastId,
       description: `Impressora: ${saved}`,
     });
     try {
       const result = await printOrderWithQz(order.id);
       if (result.success) {
         toast.success("Pedido enviado para impressora", {
-          id: toastId,
+          id: checkToastId,
           description: result.printer ?? saved,
         });
       } else {
         toast.error("Erro ao imprimir via QZ Tray", {
-          id: toastId,
+          id: checkToastId,
           description: result.error ?? "Falha desconhecida",
         });
       }
     } catch (err: any) {
       toast.error("Erro ao imprimir via QZ Tray", {
-        id: toastId,
+        id: checkToastId,
         description: err?.message ?? String(err),
       });
     }
