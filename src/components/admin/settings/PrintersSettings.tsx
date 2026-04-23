@@ -182,8 +182,8 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
             Método de impressão padrão
           </CardTitle>
           <CardDescription>
-            Define qual caminho será usado pelos botões de imprimir e pela impressão automática.
-            Você sempre pode escolher outro método na hora, pelo menu do botão de imprimir.
+            Este será o método de impressão usado em <strong>todo o sistema</strong>. Todos os botões "Imprimir" do painel
+            (pedidos, mesas, contas, PDV) usarão automaticamente o método selecionado aqui.
           </CardDescription>
         </CardHeader>
         <CardContent>
