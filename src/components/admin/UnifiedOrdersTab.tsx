@@ -11,10 +11,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package, Store,
-  Printer, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock,
-  MoreVertical, Loader2, Eye, Zap, ScrollText
+  Printer, AlertTriangle, CreditCard, Banknote, Smartphone, Zap
 } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useOrderStatusAdvance, getNextStatus } from "@/hooks/useOrderStatusAdvance";
 import { toast } from "@/components/ui/sonner";
 import { formatPaymentForDisplay } from "@/lib/utils";
