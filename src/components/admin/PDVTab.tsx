@@ -1289,7 +1289,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
           {/* Tables Grid (scrollable) */}
           <div className="flex-1 overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 [&>div]:min-h-24">
               {tables?.map(table => {
                 const isOccupied = table.is_occupied;
                 const comandaCount = table.comandas?.length || 0;
@@ -1380,16 +1380,20 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           </div>
         </div>
 
-        {/* Right: Order Creation Panel — desktop inline, mobile slide-over */}
+        {/* Right: Order Creation Panel — desktop inline, mobile bottom sheet */}
         <div
           className={`
             ${isMobile
-              ? `fixed inset-0 z-50 bg-background flex flex-col p-4 transition-transform duration-300 ${mobileOrderPanelOpen ? "translate-x-0" : "translate-x-full"}`
+              ? `fixed inset-x-0 bottom-0 z-50 bg-background flex flex-col px-4 pt-4 pb-6 rounded-t-2xl shadow-2xl border-t transition-transform duration-300 h-[90vh] ${mobileOrderPanelOpen ? "translate-y-0" : "translate-y-full"}`
               : "w-[640px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0"
             }
           `}
         >
-          <div className="flex items-center justify-between mb-4 gap-2">
+          {/* Mobile drag handle */}
+          {isMobile && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 rounded-full bg-muted-foreground/30" />
+          )}
+          <div className={`flex items-center justify-between gap-2 ${isMobile ? "mb-3 mt-3" : "mb-4"}`}>
             <h3 className="font-bold text-lg">Novo Pedido</h3>
             <div className="flex items-center gap-1">
               {cart.length > 0 && (
@@ -1398,7 +1402,13 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                 </Button>
               )}
               {isMobile && (
-                <Button variant="ghost" size="icon" onClick={() => setMobileOrderPanelOpen(false)} className="h-8 w-8">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setMobileOrderPanelOpen(false)}
+                  className="h-11 w-11"
+                  aria-label="Fechar"
+                >
                   <X className="w-5 h-5" />
                 </Button>
               )}

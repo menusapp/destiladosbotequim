@@ -423,7 +423,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
             <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/30 mt-auto">
               <Button
                 size="sm"
-                className="flex-1 h-7 text-xs gap-1"
+                className="flex-1 h-11 md:h-7 text-sm md:text-xs gap-1"
                 disabled={isAdvancing}
                 onClick={(e) => handleQuickAdvance(e, order)}
               >
@@ -432,8 +432,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={(e) => e.stopPropagation()}>
-                    <MoreVertical className="w-3.5 h-3.5" />
+                  <Button variant="outline" size="sm" className="h-11 w-11 md:h-7 md:w-7 p-0" onClick={(e) => e.stopPropagation()}>
+                    <MoreVertical className="w-4 h-4 md:w-3.5 md:h-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-[140px]">
