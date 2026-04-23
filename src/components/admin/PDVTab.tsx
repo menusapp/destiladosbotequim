@@ -1182,6 +1182,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     await supabase.from("tables").update({ is_occupied: false, occupied_by: null, occupied_at: null }).eq("id", table.id);
     toast.success(`Mesa ${table.table_number} liberada`);
     refetchTables();
+    refetchActiveOrders();
   };
 
   const handleToggleHidden = async (table: TableData) => {
