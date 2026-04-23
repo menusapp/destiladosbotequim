@@ -24,6 +24,7 @@ import {
   fetchOrderForPrinting,
   type OrderForPrinting,
 } from "@/lib/fetchOrderForPrinting";
+import { resolveQzPrinter } from "@/lib/qzPrinterConfig";
 
 export interface PrintOrderQzResult {
   success: boolean;
@@ -277,9 +278,14 @@ export async function printOrderWithQz(
       console.log("ℹ️ Já estava conectado ao QZ Tray.");
     }
 
-    usedPrinter = printerName
-      ? printerName
-      : ((await qz.printers.getDefault()) as string);
+    if (printerName) {
+      usedPrinter = printerName;
+      console.log(`🎯 [QZ] Impressora informada via parâmetro: "${printerName}"`);
+    } else {
+      const resolved = await resolveQzPrinter();
+      usedPrinter = resolved.printer;
+      console.log(`📌 [QZ] Origem da impressora: ${resolved.source}`);
+    }
 
     if (!usedPrinter) {
       throw new Error(
