@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package, Store,
   Printer, XCircle, AlertTriangle, CreditCard, Banknote, Smartphone, CalendarClock,
-  MoreVertical, Loader2, Eye, Zap
+  MoreVertical, Loader2, Eye, Zap, ScrollText
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useOrderStatusAdvance, getNextStatus } from "@/hooks/useOrderStatusAdvance";
@@ -26,6 +26,7 @@ import { printOrderWithQz } from "@/lib/printOrderWithQz";
 import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
 import { checkQzTrayConnection } from "@/lib/qzConnectionCheck";
 import { QzTrayStatusBadge } from "./QzTrayStatusBadge";
+import { ReceiptPreviewDialog } from "./ReceiptPreviewDialog";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import type { DateRange } from "react-day-picker";
 
@@ -110,6 +111,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   }));
   const [pendingDateRange, setPendingDateRange] = useState<DateRange | undefined>();
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [previewOrderId, setPreviewOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -500,6 +502,9 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
                   <DropdownMenuItem onClick={(e) => handleQuickPrintQz(e, order)}>
                     <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir (QZ Tray)
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewOrderId(order.id); }}>
+                    <ScrollText className="w-3.5 h-3.5 mr-2" /> Visualizar cupom
+                  </DropdownMenuItem>
                   <DropdownMenuItem className="text-destructive" onClick={(e) => handleQuickCancel(e, order)}>
                     <XCircle className="w-3.5 h-3.5 mr-2" /> Cancelar pedido
                   </DropdownMenuItem>
@@ -636,6 +641,13 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
           onStatusUpdate={fetchOrders}
         />
       )}
+
+      {/* Preview do cupom térmico (sem impressora) */}
+      <ReceiptPreviewDialog
+        orderId={previewOrderId}
+        open={!!previewOrderId}
+        onOpenChange={(o) => { if (!o) setPreviewOrderId(null); }}
+      />
     </div>
   );
 };
