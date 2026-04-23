@@ -793,13 +793,6 @@ export const TableDetailDialog = ({
                 </div>
               </DialogTitle>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { onAddOrder(table.id); onOpenChange(false); }}
-                >
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar Pedido
-                </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="sm" disabled={!table.is_occupied}>
@@ -925,6 +918,24 @@ export const TableDetailDialog = ({
                             <span className="text-sm font-bold">R$ {comandaTotal.toFixed(2)}</span>
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Imprimir comanda" onClick={() => printFullComanda(comanda)}>
                               <Printer className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              title="Adicionar item à comanda"
+                              onClick={() => openAddItemsForComanda(comanda)}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Cancelar comanda"
+                              onClick={() => setCancellingComanda({ id: comanda.id, name: comanda.customer_name })}
+                            >
+                              <XCircle className="w-4 h-4" />
                             </Button>
                             {unpaidComandaTotal > 0.01 ? (
                               <Button size="sm" variant="outline" onClick={() => handlePayComanda(comanda)}>
