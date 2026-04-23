@@ -4,10 +4,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Printer, CheckCircle2, Globe } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Printer, CheckCircle2, Globe, FileText, Zap } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { QzTraySection } from "./QzTraySection";
+import type { PrintMethod } from "@/lib/printDispatcher";
 
 interface WebPrinterConfig {
   paperSize: string;
@@ -18,6 +20,7 @@ interface WebPrinterConfig {
   fontBold: boolean;
   printCopies: number;
   supportsAutoCut: boolean;
+  printMethod: PrintMethod;
 }
 
 const FONT_OPTIONS = [
@@ -46,6 +49,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
     fontBold: true,
     printCopies: 1,
     supportsAutoCut: false,
+    printMethod: 'pdf',
   });
 
   useEffect(() => {
@@ -60,6 +64,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
         .eq('restaurant_id', restaurantId)
         .maybeSingle();
       if (data) {
+        const rawMethod = (data as any).print_method;
         setWebConfig({
           paperSize: data.paper_size || '80mm',
           autoPrintOrders: Boolean(data.auto_print_orders),
@@ -69,6 +74,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           fontBold: (data as any).font_bold !== undefined ? Boolean((data as any).font_bold) : true,
           printCopies: (data as any).print_copies || 1,
           supportsAutoCut: Boolean((data as any).supports_auto_cut),
+          printMethod: rawMethod === 'qz_tray' ? 'qz_tray' : 'pdf',
         });
       }
     } catch (error) {
@@ -91,6 +97,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           font_bold: webConfig.fontBold,
           print_copies: webConfig.printCopies,
           supports_auto_cut: webConfig.supportsAutoCut,
+          print_method: webConfig.printMethod,
           updated_at: new Date().toISOString(),
         } as any, { onConflict: 'restaurant_id' });
       if (error) throw error;
