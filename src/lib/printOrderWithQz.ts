@@ -21,6 +21,7 @@ import {
   type OrderForPrinting,
 } from "@/lib/fetchOrderForPrinting";
 import { resolveQzPrinter } from "@/lib/qzPrinterConfig";
+import { ensureQzConnected } from "@/lib/qzConnectionManager";
 import {
   buildOriginLabel,
   formatDateTimeFull,
@@ -541,23 +542,18 @@ export async function printOrderWithQz(
     console.log("✅ Pedido carregado:", order);
     console.log("🏪 Loja:", storeName);
 
-    if (!qz.websocket.isActive()) {
-      console.log("⏳ Conectando ao QZ Tray (ws://localhost:8181)…");
-      try {
-        await withTimeout(qz.websocket.connect(), 5000, "conexão com QZ Tray");
-      } catch (e: any) {
-        console.error("❌ Falha ao conectar ao QZ Tray:", e?.message ?? e);
-        return fail({
-          success: false,
-          printer: null,
-          orderId,
-          escposLikely: false,
-          error: "Não foi possível conectar ao QZ Tray. Verifique se o aplicativo está aberto.",
-          errorCode: "qz_connect_failed",
-        });
-      }
-    } else {
-      console.log("ℹ️ Já estava conectado ao QZ Tray.");
+    try {
+      await ensureQzConnected({ timeoutMs: 5000, retries: 3 });
+    } catch (e: any) {
+      console.error("❌ Falha ao conectar ao QZ Tray:", e?.message ?? e);
+      return fail({
+        success: false,
+        printer: null,
+        orderId,
+        escposLikely: false,
+        error: "Não foi possível conectar ao QZ Tray. Verifique se o aplicativo está aberto.",
+        errorCode: "qz_connect_failed",
+      });
     }
 
     // ---------- Lista impressoras disponíveis ----------
@@ -714,16 +710,10 @@ export async function printOrderWithQz(
       error: message,
       errorCode: "unknown",
     });
-  } finally {
-    try {
-      if (qz.websocket.isActive()) {
-        await qz.websocket.disconnect();
-        console.log("🔌 [QZ Tray] Desconectado.");
-      }
-    } catch {
-      // ignore
-    }
   }
+  // NÃO desconectamos aqui: a conexão é mantida ativa pelo qzConnectionManager
+  // para que prints subsequentes sejam instantâneos. Se o socket cair, o
+  // próprio manager fará reconnect invisível na próxima chamada.
 }
 
 if (typeof window !== "undefined") {
