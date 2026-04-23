@@ -98,24 +98,16 @@ export const AdminHeader = ({
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 sm:gap-3 border-b border-border bg-card px-2 sm:px-4">
-      {/* Sidebar trigger — visible on all screens to allow collapsing the menu */}
-      <SidebarTrigger className="h-9 w-9 shrink-0" aria-label="Abrir/fechar menu">
+      {/* Sidebar trigger — desktop only (mobile uses bottom nav) */}
+      <SidebarTrigger className="hidden md:flex h-9 w-9 shrink-0" aria-label="Abrir/fechar menu">
         <Menu className="h-5 w-5" />
       </SidebarTrigger>
 
-      {/* Logo — also acts as menu trigger on mobile */}
-      <button
-        type="button"
-        onClick={() => {
-          // Trigger sidebar via SidebarTrigger click for consistency on mobile
-          const trigger = document.querySelector<HTMLButtonElement>('[data-sidebar="trigger"]');
-          if (window.matchMedia('(max-width: 767px)').matches) trigger?.click();
-        }}
-        className="flex items-center gap-2 shrink-0"
-      >
+      {/* Logo */}
+      <div className="flex items-center gap-2 shrink-0">
         <img src="/logo-menus.png" alt="Menus" className="h-7 w-7" />
         <span className="font-semibold text-sm text-foreground hidden sm:inline">Menus</span>
-      </button>
+      </div>
 
       {/* Divider */}
       <div className="h-5 w-px bg-border" />
