@@ -10,6 +10,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { MobileBottomNav } from "@/components/admin/MobileBottomNav";
 import { TourProvider } from "@/components/admin/tour/TourContext";
 import { TourOverlay } from "@/components/admin/tour/TourOverlay";
+import { ConfirmDialogProvider } from "@/hooks/useConfirmDialog";
 
 import { lazy, Suspense } from "react";
 
@@ -853,6 +854,7 @@ const RestaurantAdmin = () => {
   };
 
   return (
+    <ConfirmDialogProvider>
     <TourProvider>
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
@@ -1138,6 +1140,7 @@ const RestaurantAdmin = () => {
     </SidebarProvider>
     <TourOverlay />
     </TourProvider>
+    </ConfirmDialogProvider>
   );
 };
 
