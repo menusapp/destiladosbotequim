@@ -18,6 +18,7 @@ import { KioskPhoneCollection } from "@/components/kiosk/KioskPhoneCollection";
 import { KioskLayout } from "@/components/kiosk/KioskLayout";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
+import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 import { isFeaturedVisible } from "@/lib/featuredUtils";
 
 export type KioskStep = "idle" | "identification" | "menu" | "product" | "cart" | "consumption" | "phone_collection" | "delivery_address" | "payment" | "confirmation";
@@ -48,6 +49,7 @@ export default function Kiosk() {
   const [deliveryAddress, setDeliveryAddress] = useState<string>("");
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   useFacebookPixel(restaurant?.facebook_pixel_id);
+  useDynamicFavicon(restaurant?.logo_url, restaurant?.name);
   const disabledProductIds = inactiveData?.disabledProductIds || new Set<string>();
   const disabledExtraItemIds = inactiveData?.disabledExtraCategoryItemIds || new Set<string>();
   const disabledProductExtraIds = inactiveData?.disabledProductExtraIds || new Set<string>();
