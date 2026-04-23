@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
+import { MobileBottomNav } from "@/components/admin/MobileBottomNav";
 
 import { lazy, Suspense } from "react";
 
@@ -830,20 +831,23 @@ const RestaurantAdmin = () => {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar 
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          hasNewOrders={hasNewOrders}
-          hasNewBills={hasNewBills}
-          hasNewDeliveryOrders={hasNewDeliveryOrders}
-          hasNewLocalOrders={hasNewLocalOrders}
-          isSectionAllowed={isSectionAllowed}
-          hasActiveSubscription={hasActiveSubscription}
-          staffRole={staffRole}
-          staffAllowedSections={staffAllowedSections}
-          primaryColor={restaurant.primary_color}
-          onPrefetch={handlePrefetch}
-        />
+        {/* Sidebar — hidden on mobile (replaced by bottom nav) */}
+        <div className="hidden md:block">
+          <AppSidebar 
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            hasNewOrders={hasNewOrders}
+            hasNewBills={hasNewBills}
+            hasNewDeliveryOrders={hasNewDeliveryOrders}
+            hasNewLocalOrders={hasNewLocalOrders}
+            isSectionAllowed={isSectionAllowed}
+            hasActiveSubscription={hasActiveSubscription}
+            staffRole={staffRole}
+            staffAllowedSections={staffAllowedSections}
+            primaryColor={restaurant.primary_color}
+            onPrefetch={handlePrefetch}
+          />
+        </div>
         <SidebarInset className="flex-1 flex flex-col">
           <AdminHeader
             restaurantId={restaurant.id}
@@ -856,7 +860,7 @@ const RestaurantAdmin = () => {
             onPickupTimeUpdate={(time) => setRestaurant({ ...restaurant, pickup_time_minutes: time })}
             onIsOpenUpdate={(isOpen) => setRestaurant({ ...restaurant, is_open: isOpen })}
           />
-          <main className="flex-1 overflow-auto p-4">
+          <main className="flex-1 overflow-auto p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-4">
             {isDelinquent ? (
               <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
                 <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -1093,6 +1097,17 @@ const RestaurantAdmin = () => {
           />
         )}
         <SupportChatWidget />
+
+        {/* Mobile bottom nav — only on screens < md */}
+        <MobileBottomNav
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          hasNewDeliveryOrders={hasNewDeliveryOrders}
+          hasNewBills={hasNewBills}
+          hasNewLocalOrders={hasNewLocalOrders}
+          primaryColor={restaurant.primary_color}
+        />
+
       </div>
     </SidebarProvider>
   );

@@ -16,6 +16,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -27,6 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, Trash2 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { toast } from "@/components/ui/sonner";
@@ -73,6 +81,7 @@ export const TableDetailDialog = ({
   onTableCleared,
 }: TableDetailDialogProps) => {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [payingComanda, setPayingComanda] = useState<any>(null);
   const [splittingItem, setSplittingItem] = useState<any>(null);
   const [splittingOrderId, setSplittingOrderId] = useState<string>("");
@@ -775,57 +784,73 @@ export const TableDetailDialog = ({
     );
   };
 
+  // Reusable header content (used by both Dialog and Sheet)
+  const headerContent = (
+    <div className="flex items-start justify-between gap-2 flex-wrap">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shrink-0 ${
+          table?.is_occupied ? "bg-green-500" : "bg-muted-foreground/40"
+        }`}>
+          {table?.table_number}
+        </div>
+        <div className="min-w-0">
+          <span className="block truncate text-base font-semibold">{table?.table_name || `Mesa ${table?.table_number}`}</span>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <Badge variant={table?.is_occupied ? "default" : "secondary"}>
+              {table?.is_occupied ? "Ocupada" : "Livre"}
+            </Badge>
+            {table?.is_occupied && occupiedTime > 0 && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" /> {occupiedTime}min
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={!table?.is_occupied}
+            className="h-11 px-4 shrink-0"
+          >
+            <Eraser className="w-4 h-4 mr-1" /> Limpar Mesa
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limpar Mesa {table?.table_number}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso irá cancelar pedidos ativos, fechar comandas e liberar a mesa.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearTable}>Limpar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+
   if (!table) return null;
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent
+          className={
+            isMobile
+              ? "max-w-full w-screen h-[92vh] max-h-[92vh] rounded-t-2xl rounded-b-none p-4 overflow-hidden flex flex-col bottom-0 top-auto translate-y-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom"
+              : "max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col"
+          }
+        >
           <DialogHeader className="flex-shrink-0">
             <DialogDescription className="sr-only">Detalhes da mesa</DialogDescription>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
-                  table.is_occupied ? "bg-green-500" : "bg-muted-foreground/40"
-                }`}>
-                  {table.table_number}
-                </div>
-                <div>
-                  <span>{table.table_name || `Mesa ${table.table_number}`}</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <Badge variant={table.is_occupied ? "default" : "secondary"}>
-                      {table.is_occupied ? "Ocupada" : "Livre"}
-                    </Badge>
-                    {table.is_occupied && occupiedTime > 0 && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {occupiedTime}min
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </DialogTitle>
-              <div className="flex gap-2">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" disabled={!table.is_occupied}>
-                      <Eraser className="w-4 h-4 mr-1" /> Limpar Mesa
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Limpar Mesa {table.table_number}?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Isso irá cancelar pedidos ativos, fechar comandas e liberar a mesa.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClearTable}>Limpar</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
+            <DialogTitle asChild>
+              <div>{headerContent}</div>
+            </DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 min-h-0">
