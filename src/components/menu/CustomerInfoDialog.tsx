@@ -262,7 +262,7 @@ const CustomerInfoDialog = ({
     
     try {
       if (existingCustomer && restaurantId) {
-        const updateData: Record<string, string> = {};
+        const updateData: { phone?: string; birth_date?: string } = {};
         
         // Atualizar telefone se necessário
         if (!existingCustomer.phone && typedPhone) {
