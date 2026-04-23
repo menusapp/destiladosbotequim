@@ -313,6 +313,8 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
         </CardContent>
       </Card>
 
+      <QzTraySection />
+
       <div className="flex justify-end">
         <Button onClick={saveWebConfig} disabled={saving}>
           {saving ? 'Salvando...' : 'Salvar Configurações'}
