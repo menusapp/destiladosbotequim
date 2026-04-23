@@ -131,6 +131,8 @@ const Comanda = () => {
   const [restaurantColor, setRestaurantColor] = useState("#FF6B35");
   const [orderNotes, setOrderNotes] = useState("");
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const [restaurantLogo, setRestaurantLogo] = useState<string | null>(null);
+  const [restaurantName, setRestaurantName] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [billRequestEnabled, setBillRequestEnabled] = useState(true);
   const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
