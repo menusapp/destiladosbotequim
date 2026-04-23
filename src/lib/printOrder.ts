@@ -464,3 +464,130 @@ export const printOrder = async (
     printWindow.print();
   }, 300);
 };
+
+/**
+ * Generates a simplified kitchen receipt with only items, quantities, complements
+ * and notes. Excludes customer name, address, payment, totals.
+ */
+export const printKitchenReceipt = async (
+  order: {
+    id: string;
+    created_at: string;
+    order_type?: string;
+    delivery_type?: string;
+    table_id?: string;
+    notes?: string;
+    tables?: { table_number: number } | null;
+    order_channel?: string;
+    order_items: {
+      id: string;
+      quantity: number;
+      notes?: string;
+      products: { name: string } | null;
+      order_item_extras: { extra_name?: string | null; product_extras: { name: string } | null }[];
+    }[];
+  },
+  restaurantId: string
+) => {
+  // Fetch printer settings
+  let paperSize = "80mm";
+  let fontFamily = "Arial Black";
+  let fontSize = 13;
+  try {
+    const { data } = await supabase
+      .from("printer_settings")
+      .select("*")
+      .eq("restaurant_id", restaurantId)
+      .maybeSingle();
+    if (data?.paper_size) paperSize = data.paper_size;
+    if ((data as any)?.font_family) fontFamily = (data as any).font_family;
+    if ((data as any)?.font_size) fontSize = (data as any).font_size;
+  } catch {}
+
+  const isLocal = order.order_type === "local";
+  const isDelivery = order.delivery_type === "delivery";
+  const isPickup = order.delivery_type === "pickup";
+  const tableNumber = order.tables?.table_number;
+  const timeStr = new Date(order.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  let typeLabel = "";
+  if (isLocal) typeLabel = `Mesa ${tableNumber || "?"}`;
+  else if (order.order_type === "balcao" || order.order_channel === "totem") typeLabel = "Balcão";
+  else if (isPickup) typeLabel = "Retirada";
+  else if (isDelivery) typeLabel = "Delivery";
+  else typeLabel = "Pedido";
+
+  const itemsHtml = order.order_items
+    .map((item) => {
+      const extras = item.order_item_extras
+        .map((e) => `<div class="extra">+ ${e.extra_name || e.product_extras?.name || "Extra"}</div>`)
+        .join("");
+      const notes = item.notes ? `<div class="obs">Obs: ${item.notes}</div>` : "";
+      return `
+        <div class="item">
+          <div class="item-name">${item.quantity}x ${item.products?.name || "Produto"}</div>
+          ${extras}
+          ${notes}
+        </div>
+        <div class="item-sep"></div>
+      `;
+    })
+    .join("");
+
+  const html = `
+    <html>
+    <head>
+      <title>Cozinha #${order.id.slice(0, 8)}</title>
+      <style>
+        @page { margin: 0; size: ${paperSize} auto; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          font-family: '${fontFamily}', 'Courier New', monospace;
+          width: ${paperSize};
+          margin: 0 auto;
+          padding: 24px 12px 0 12px;
+          font-size: ${fontSize}px;
+          font-weight: bold;
+          line-height: 1.6;
+          color: #000;
+        }
+        .center { text-align: center; }
+        .header { text-align: center; font-size: 16px; padding: 8px 0; border: 2px solid #000; margin-bottom: 12px; }
+        .info { margin: 10px 0; font-size: 12px; }
+        .double-line { border-top: 2px solid #000; margin: 12px 0; }
+        .label { text-align: center; font-size: 13px; margin: 6px 0; }
+        .item { margin: 10px 0; }
+        .item-name { font-size: 14px; }
+        .extra { font-size: 12px; padding-left: 12px; }
+        .obs { font-size: 12px; padding-left: 12px; font-style: italic; }
+        .item-sep { border-top: 1px dashed #000; margin: 8px 0; }
+        .footer { text-align: center; font-size: 13px; padding: 8px 0; border: 2px solid #000; margin-top: 12px; }
+        .footer-margin { height: 80px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">VIA DA COZINHA</div>
+      <div class="info">
+        <div>Pedido #${order.id.slice(0, 8)} — ${timeStr}</div>
+        <div>Tipo: ${typeLabel}</div>
+      </div>
+      <div class="double-line"></div>
+      <div class="label">ITENS:</div>
+      ${itemsHtml}
+      <div class="footer">FIM DO PEDIDO</div>
+      <div class="footer-margin"></div>
+    </body>
+    </html>
+  `;
+
+  const printWindow = window.open("", "_blank", "width=400,height=600");
+  if (!printWindow) {
+    throw new Error("Popup bloqueado. Permita popups para imprimir.");
+  }
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+  }, 300);
+};
