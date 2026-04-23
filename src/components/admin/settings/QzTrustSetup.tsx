@@ -187,8 +187,10 @@ export const QzTrustSetup = () => {
           Configurar Impressão Automática (Sem Popup)
         </CardTitle>
         <CardDescription>
-          Instale o certificado de segurança no QZ Tray para imprimir sem aparecer
-          o popup de permissão a cada impressão.
+          O sistema agora usa o <strong>certificado oficial do QZ Tray</strong>.
+          Basta baixar o arquivo <code className="bg-muted px-1 rounded text-xs">override.crt</code>{" "}
+          abaixo e instalá-lo na pasta de autenticação do QZ Tray para que a
+          impressão fique 100% automática (sem popup de permissão).
         </CardDescription>
       </CardHeader>
 
