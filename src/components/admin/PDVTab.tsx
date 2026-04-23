@@ -35,6 +35,8 @@ import { TableDetailDialog } from "./TableDetailDialog";
 import { ManageTablesDrawer } from "./ManageTablesDrawer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { notifyOrderAcceptedFromPDV } from "@/lib/pdvNotifications";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { checkUnpaidBeforeTableClear } from "@/lib/dangerChecks";
 
 interface CartItem {
   productId: string;
@@ -164,6 +166,7 @@ const findMatchingDeliveryZone = ({
 const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, onTableOpened, showPrepTimer = true }: PDVTabProps) => {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const confirm = useConfirmDialog();
   const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
 
   // Order creation state
