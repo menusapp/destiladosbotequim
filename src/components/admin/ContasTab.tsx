@@ -22,6 +22,8 @@ interface StaffMember {
   allowed_sections: string[];
   is_active: boolean;
   created_at: string;
+  can_manage_orders?: boolean;
+  receives_order_notifications?: boolean;
 }
 
 interface ContasTabProps {
@@ -40,6 +42,8 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
   const [formDisplayName, setFormDisplayName] = useState("");
   const [formRole, setFormRole] = useState<StaffRole>("garcom");
   const [formSections, setFormSections] = useState<string[]>([]);
+  const [formCanManageOrders, setFormCanManageOrders] = useState(true);
+  const [formReceivesOrderNotifications, setFormReceivesOrderNotifications] = useState(true);
 
   const currentStaffId = localStorage.getItem("staff_id");
 
@@ -70,6 +74,8 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
       setFormDisplayName(member.display_name);
       setFormRole(member.role as StaffRole);
       setFormSections(member.allowed_sections || []);
+      setFormCanManageOrders(member.can_manage_orders !== false);
+      setFormReceivesOrderNotifications(member.receives_order_notifications !== false);
     } else {
       setEditingStaff(null);
       setFormUsername("");
@@ -77,6 +83,8 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
       setFormDisplayName("");
       setFormRole("garcom");
       setFormSections(ROLE_DEFAULT_SECTIONS["garcom"]);
+      setFormCanManageOrders(true);
+      setFormReceivesOrderNotifications(true);
     }
     setDialogOpen(true);
   };
