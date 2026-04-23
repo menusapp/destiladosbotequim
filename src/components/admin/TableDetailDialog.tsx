@@ -1152,6 +1152,37 @@ export const TableDetailDialog = ({
           onSelect={(customer) => handleSwapCustomer(editingComandaId, customer)}
         />
       )}
+
+      {/* Add Items to Order Drawer */}
+      <AddItemsToOrderDrawer
+        open={!!addItemsOrderId}
+        onClose={() => setAddItemsOrderId(null)}
+        orderId={addItemsOrderId || ""}
+        restaurantId={restaurantId}
+        onItemsAdded={() => {
+          refetchOrders();
+          refetchComandas();
+        }}
+      />
+
+      {/* Cancel Comanda Confirmation */}
+      <AlertDialog open={!!cancellingComanda} onOpenChange={(o) => { if (!o) setCancellingComanda(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar pedidos da comanda?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja cancelar todos os pedidos de <strong>{cancellingComanda?.name}</strong> nesta mesa?
+              Os itens voltarão ao estoque e os pedidos sairão das métricas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCancelComanda} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
