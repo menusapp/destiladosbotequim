@@ -118,17 +118,13 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
     fetchNotes();
   }, [fetchNotes]);
 
-  // Realtime subscription
-  useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout>;
-    const ch = supabase.channel(`fiscal-notes-rt-${restaurantId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_fiscal_notes' }, () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(fetchNotes, 400);
-      })
-      .subscribe();
-    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
-  }, [restaurantId, fetchNotes]);
+  // Realtime subscription (centralized hook with debounce + cleanup)
+  useRealtimeChannel({
+    channelName: `fiscal-notes-rt-${restaurantId}`,
+    bindings: [{ table: "order_fiscal_notes" }],
+    onChange: () => fetchNotes(),
+    debounceMs: 400,
+  });
 
   const handleRetry = async (note: FiscalNote) => {
     setRetrying(prev => new Set(prev).add(note.id));
