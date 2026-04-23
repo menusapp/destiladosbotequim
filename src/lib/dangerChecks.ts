@@ -77,16 +77,19 @@ export async function checkUnpaidBeforeTableClear(tableId: string): Promise<stri
     }
   }
 
-  // Subtrair o que já foi pago via splits (pagamentos parciais da comanda).
-  let splitsPaid = 0;
-  if ((orders ?? []).length > 0) {
-    const orderIds = (orders as any[]).map((o) => o.id);
-    const { data: splits } = await supabase
-      .from("payment_splits")
-      .select("value, order_id")
-      .in("order_id", orderIds);
-    splitsPaid = (splits ?? []).reduce((s: number, sp: any) => s + Number(sp.value || 0), 0);
-  }
+  // Subtrair o que já foi pago via bills (incluindo bills com splits parciais).
+  // Bills "paid" representam pagamentos confirmados; também consideramos o
+  // total_amount de bills com payment_splits para cobrir pagamentos divididos.
+  const { data: paidBills } = await supabase
+    .from("bills")
+    .select("total_amount, status, payment_splits")
+    .eq("table_id", tableId)
+    .eq("status", "paid");
+
+  const splitsPaid = (paidBills ?? []).reduce(
+    (s: number, b: any) => s + Number(b.total_amount || 0),
+    0,
+  );
 
   const totalUnpaid = Math.max(0, totalConsumed - splitsPaid);
   if (totalUnpaid > 0) {
