@@ -1,9 +1,17 @@
 /**
- * Impressão de pedido REAL via QZ Tray (modo texto puro).
+ * Impressão térmica profissional via QZ Tray (ESC/POS).
  *
  * - Usa fetchOrderForPrinting() para carregar o pedido completo.
- * - Imprime em "raw / plain", SEM ESC/POS e SEM corte (ainda).
+ * - Gera DUAS vias (CLIENTE e COZINHA) com comandos ESC/POS.
+ * - Aplica CORTE entre as vias e ao final.
  * - NÃO altera a impressão atual (window.print continua intacto).
+ *
+ * ⚠️ Compatibilidade:
+ * Comandos ESC/POS funcionam em impressoras térmicas profissionais
+ * (Epson TM-T20, Bematech MP-4200, Elgin i9, etc.).
+ * Em impressoras NÃO-ESC/POS (ex.: HP LaserJet P1005), os bytes de
+ * controle podem ser ignorados ou impressos como caracteres estranhos
+ * — a aplicação NÃO quebra, apenas o corte/negrito não terão efeito.
  *
  * Uso no DevTools:
  *   await window.printOrderWithQz("ID_DO_PEDIDO")
@@ -21,24 +29,49 @@ export interface PrintOrderQzResult {
   success: boolean;
   printer: string | null;
   orderId: string;
+  escposLikely: boolean;
   error?: string;
 }
 
-const LINE_WIDTH = 42; // largura típica de impressora térmica 80mm
+const LINE_WIDTH = 42; // 80mm térmica, fonte A
 
+// =============================================================
+// ESC/POS commands
+// =============================================================
+const ESC = "\x1B";
+const GS = "\x1D";
+
+const ESCPOS = {
+  INIT: ESC + "@", // reset
+  ALIGN_LEFT: ESC + "a" + "\x00",
+  ALIGN_CENTER: ESC + "a" + "\x01",
+  ALIGN_RIGHT: ESC + "a" + "\x02",
+  BOLD_ON: ESC + "E" + "\x01",
+  BOLD_OFF: ESC + "E" + "\x00",
+  DOUBLE_ON: GS + "!" + "\x11", // double width + height
+  DOUBLE_OFF: GS + "!" + "\x00",
+  // Corte total (full cut). Em impressoras sem suporte é ignorado.
+  CUT: GS + "V" + "\x00",
+  // Alimenta papel antes de cortar
+  FEED_3: "\n\n\n",
+};
+
+// =============================================================
+// Helpers de formatação
+// =============================================================
 function pad(text: string, width = LINE_WIDTH): string {
   if (text.length >= width) return text.slice(0, width);
   return text + " ".repeat(width - text.length);
 }
 
-function center(text: string, width = LINE_WIDTH): string {
-  if (text.length >= width) return text.slice(0, width);
-  const left = Math.floor((width - text.length) / 2);
-  return " ".repeat(left) + text;
+function divider(char = "-", width = LINE_WIDTH): string {
+  return char.repeat(width) + "\n";
 }
 
-function divider(char = "-", width = LINE_WIDTH): string {
-  return char.repeat(width);
+function lineLR(left: string, right: string, width = LINE_WIDTH): string {
+  const space = Math.max(1, width - right.length);
+  const l = left.length > space - 1 ? left.slice(0, space - 1) : left;
+  return l + " ".repeat(width - l.length - right.length) + right + "\n";
 }
 
 function formatPrice(value: number): string {
@@ -47,13 +80,19 @@ function formatPrice(value: number): string {
 
 function formatDateTime(iso: string): string {
   try {
-    const d = new Date(iso);
-    return d.toLocaleString("pt-BR");
+    return new Date(iso).toLocaleString("pt-BR");
   } catch {
     return iso;
   }
 }
 
+function shortOrderId(id: string): string {
+  return "#" + id.slice(0, 8).toUpperCase();
+}
+
+// =============================================================
+// Restaurante (nome da loja)
+// =============================================================
 async function fetchRestaurantName(orderId: string): Promise<string> {
   const { data, error } = await supabase
     .from("orders")
@@ -69,72 +108,160 @@ async function fetchRestaurantName(orderId: string): Promise<string> {
   return typeof name === "string" && name.length > 0 ? name : "Loja";
 }
 
-function buildReceiptText(
+// =============================================================
+// Construção das vias
+// =============================================================
+function buildCustomerReceipt(
   order: OrderForPrinting,
   storeName: string
 ): string {
-  const lines: string[] = [];
+  let out = "";
+  out += ESCPOS.INIT;
 
-  // Cabeçalho
-  lines.push(center(storeName.toUpperCase()));
-  lines.push(divider("="));
-  lines.push(`Pedido: #${order.id.slice(0, 8).toUpperCase()}`);
-  lines.push(`Status: ${order.status}`);
-  lines.push(`Data:   ${formatDateTime(order.created_at)}`);
-  lines.push(divider());
+  // Cabeçalho (loja)
+  out += ESCPOS.ALIGN_CENTER;
+  out += ESCPOS.BOLD_ON + ESCPOS.DOUBLE_ON;
+  out += storeName.toUpperCase() + "\n";
+  out += ESCPOS.DOUBLE_OFF + ESCPOS.BOLD_OFF;
+  out += "\n";
+  out += ESCPOS.BOLD_ON + "VIA DO CLIENTE" + ESCPOS.BOLD_OFF + "\n";
 
-  // Cliente
-  lines.push(`Cliente: ${order.customer_name || "-"}`);
-  if (order.customer_cpf) {
-    lines.push(`CPF:     ${order.customer_cpf}`);
-  }
+  // Corpo
+  out += ESCPOS.ALIGN_LEFT;
+  out += divider("=");
+  out += `Pedido: ${shortOrderId(order.id)}\n`;
+  out += `Status: ${order.status}\n`;
+  out += `Data:   ${formatDateTime(order.created_at)}\n`;
+  out += divider();
 
-  // Mesa
+  out += `Cliente: ${order.customer_name || "-"}\n`;
+  if (order.customer_cpf) out += `CPF:     ${order.customer_cpf}\n`;
   if (order.tables) {
     const tname = order.tables.table_name?.trim();
     const tnum = order.tables.table_number;
-    const mesaLabel = tname ? `${tname} (Nº ${tnum})` : `Mesa ${tnum}`;
-    lines.push(`Mesa:    ${mesaLabel}`);
+    out += `Mesa:    ${tname ? `${tname} (Nº ${tnum})` : `Mesa ${tnum}`}\n`;
   }
-
-  lines.push(divider());
+  out += divider();
 
   // Itens
-  lines.push(pad("ITENS"));
-  lines.push(divider());
+  out += ESCPOS.BOLD_ON + pad("ITENS") + "\n" + ESCPOS.BOLD_OFF;
+  out += divider();
 
+  let total = 0;
   for (const item of order.order_items) {
-    const qtyName = `${item.quantity}x ${item.products.name}`;
-    const price = formatPrice(item.price_at_order * item.quantity);
-    // Linha qty+nome alinhada à esquerda; preço à direita
-    const space = LINE_WIDTH - price.length;
-    const left =
-      qtyName.length > space - 1 ? qtyName.slice(0, space - 1) : qtyName;
-    lines.push(left + " ".repeat(LINE_WIDTH - left.length - price.length) + price);
-
-    if (item.notes && item.notes.trim().length > 0) {
-      lines.push(`   Obs: ${item.notes.trim()}`);
+    const subtotal = item.price_at_order * item.quantity;
+    total += subtotal;
+    out += lineLR(
+      `${item.quantity}x ${item.products.name}`,
+      formatPrice(subtotal)
+    );
+    if (item.notes && item.notes.trim()) {
+      out += `   Obs: ${item.notes.trim()}\n`;
     }
   }
 
-  lines.push(divider("="));
-  lines.push("");
-  lines.push("");
-  lines.push("");
+  out += divider();
+  out += ESCPOS.BOLD_ON + lineLR("TOTAL", formatPrice(total)) + ESCPOS.BOLD_OFF;
+  out += divider("=");
 
-  return lines.join("\n");
+  out += ESCPOS.ALIGN_CENTER;
+  out += "Obrigado pela preferencia!\n";
+
+  out += ESCPOS.FEED_3;
+  out += ESCPOS.CUT;
+  return out;
 }
 
+function buildKitchenReceipt(order: OrderForPrinting): string {
+  let out = "";
+  out += ESCPOS.INIT;
+
+  out += ESCPOS.ALIGN_CENTER;
+  out += ESCPOS.BOLD_ON + ESCPOS.DOUBLE_ON;
+  out += "VIA DA COZINHA\n";
+  out += ESCPOS.DOUBLE_OFF;
+  out += `Pedido ${shortOrderId(order.id)}\n`;
+  out += ESCPOS.BOLD_OFF;
+
+  out += ESCPOS.ALIGN_LEFT;
+  out += divider("=");
+
+  if (order.tables) {
+    const tname = order.tables.table_name?.trim();
+    const tnum = order.tables.table_number;
+    out +=
+      ESCPOS.BOLD_ON +
+      `MESA: ${tname ? `${tname} (Nº ${tnum})` : tnum}\n` +
+      ESCPOS.BOLD_OFF;
+  }
+  out += `Cliente: ${order.customer_name || "-"}\n`;
+  out += `Hora:    ${formatDateTime(order.created_at)}\n`;
+  out += divider();
+
+  out += ESCPOS.BOLD_ON + "ITENS A PREPARAR\n" + ESCPOS.BOLD_OFF;
+  out += divider();
+
+  for (const item of order.order_items) {
+    out +=
+      ESCPOS.BOLD_ON +
+      ESCPOS.DOUBLE_ON +
+      `${item.quantity}x ${item.products.name}\n` +
+      ESCPOS.DOUBLE_OFF +
+      ESCPOS.BOLD_OFF;
+
+    if (item.notes && item.notes.trim()) {
+      out += ESCPOS.BOLD_ON;
+      out += `>> OBS: ${item.notes.trim().toUpperCase()}\n`;
+      out += ESCPOS.BOLD_OFF;
+    }
+    out += "\n";
+  }
+
+  out += divider("=");
+  out += ESCPOS.FEED_3;
+  out += ESCPOS.CUT;
+  return out;
+}
+
+// =============================================================
+// Detecção heurística de impressora ESC/POS
+// =============================================================
+function looksLikeEscposPrinter(printerName: string): boolean {
+  const n = printerName.toLowerCase();
+  const escposHints = [
+    "epson",
+    "tm-",
+    "bematech",
+    "mp-4200",
+    "elgin",
+    "i9",
+    "daruma",
+    "thermal",
+    "termica",
+    "pos-",
+    "pos58",
+    "pos80",
+    "generic / text only",
+  ];
+  const nonEscposHints = ["laserjet", "deskjet", "officejet", "inkjet", "hp p"];
+  if (nonEscposHints.some((h) => n.includes(h))) return false;
+  if (escposHints.some((h) => n.includes(h))) return true;
+  return false;
+}
+
+// =============================================================
+// Função principal
+// =============================================================
 export async function printOrderWithQz(
   orderId: string,
   printerName?: string
 ): Promise<PrintOrderQzResult> {
-  console.group(`🖨️ [QZ Tray] Impressão de pedido ${orderId}`);
+  console.group(`🖨️ [QZ Tray] Impressão ESC/POS do pedido ${orderId}`);
 
   let usedPrinter: string | null = null;
+  let escposLikely = false;
 
   try {
-    // 1) Carrega pedido + nome da loja
     console.log("⏳ Carregando pedido…");
     const [order, storeName] = await Promise.all([
       fetchOrderForPrinting(orderId),
@@ -143,7 +270,6 @@ export async function printOrderWithQz(
     console.log("✅ Pedido carregado:", order);
     console.log("🏪 Loja:", storeName);
 
-    // 2) Conecta QZ Tray
     if (!qz.websocket.isActive()) {
       console.log("⏳ Conectando ao QZ Tray (ws://localhost:8181)…");
       await qz.websocket.connect();
@@ -151,12 +277,10 @@ export async function printOrderWithQz(
       console.log("ℹ️ Já estava conectado ao QZ Tray.");
     }
 
-    // 3) Resolve impressora
-    if (printerName) {
-      usedPrinter = printerName;
-    } else {
-      usedPrinter = (await qz.printers.getDefault()) as string;
-    }
+    usedPrinter = printerName
+      ? printerName
+      : ((await qz.printers.getDefault()) as string);
+
     if (!usedPrinter) {
       throw new Error(
         "Nenhuma impressora encontrada. Defina uma padrão no SO ou passe o nome."
@@ -164,24 +288,48 @@ export async function printOrderWithQz(
     }
     console.log("🖨️ Impressora utilizada:", usedPrinter);
 
-    // 4) Monta texto e envia (raw plain, sem ESC/POS, sem corte)
-    const receipt = buildReceiptText(order, storeName);
-    console.log("📄 Conteúdo:\n" + receipt);
+    escposLikely = looksLikeEscposPrinter(usedPrinter);
+    if (!escposLikely) {
+      console.warn(
+        "⚠️ A impressora selecionada NÃO parece ser ESC/POS térmica.\n" +
+          "Os comandos de corte e negrito podem ser ignorados ou impressos como caracteres estranhos.\n" +
+          "Use uma impressora térmica (Epson TM-, Bematech, Elgin i9, etc.) para o resultado final."
+      );
+    } else {
+      console.log("✅ Impressora compatível com ESC/POS detectada.");
+    }
+
+    const customer = buildCustomerReceipt(order, storeName);
+    const kitchen = buildKitchenReceipt(order);
+
+    console.log("📄 Via do CLIENTE preparada.");
+    console.log("📄 Via da COZINHA preparada.");
 
     const config = qz.configs.create(usedPrinter);
-    const data = [{ type: "raw", format: "plain", data: receipt }];
 
-    console.log("🚀 Iniciando impressão…");
+    // Duas vias — corte já incluso ao final de cada bloco
+    const data = [
+      { type: "raw", format: "plain", data: customer },
+      { type: "raw", format: "plain", data: kitchen },
+    ];
+
+    console.log("🚀 Iniciando impressão das duas vias…");
     await qz.print(config, data);
 
     console.log("✅ Impressão enviada com sucesso.");
     console.groupEnd();
-    return { success: true, printer: usedPrinter, orderId };
+    return { success: true, printer: usedPrinter, orderId, escposLikely };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("❌ Falha na impressão do pedido:", message);
     console.groupEnd();
-    return { success: false, printer: usedPrinter, orderId, error: message };
+    return {
+      success: false,
+      printer: usedPrinter,
+      orderId,
+      escposLikely,
+      error: message,
+    };
   } finally {
     try {
       if (qz.websocket.isActive()) {
