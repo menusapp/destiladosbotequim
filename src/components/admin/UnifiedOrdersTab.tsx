@@ -21,12 +21,11 @@ import { ptBR } from "date-fns/locale";
 import { OrderDetailModal } from "./OrderDetailModal";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { printOrder } from "@/lib/printOrder";
-import { printOrderWithQz } from "@/lib/printOrderWithQz";
+import { printDocument } from "@/lib/printDispatcher";
 import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
-import { checkQzTrayConnection } from "@/lib/qzConnectionCheck";
 import { QzTrayStatusBadge } from "./QzTrayStatusBadge";
 import { ReceiptPreviewDialog } from "./ReceiptPreviewDialog";
+import { PrintMethodMenu } from "./PrintMethodMenu";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import type { DateRange } from "react-day-picker";
 
@@ -345,7 +344,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
 
   const handleQuickPrint = async (e: React.MouseEvent, order: Order) => {
     e.stopPropagation();
-    try { await printOrder(order as any, restaurantId); } catch (err: any) { toast.error(err.message || "Erro ao imprimir"); }
+    // Respeita o método padrão configurado em Impressoras (PDF ou QZ Tray).
+    await printDocument(order as any, restaurantId);
   };
 
   const handleQuickPrintQz = async (e: React.MouseEvent, order: Order) => {

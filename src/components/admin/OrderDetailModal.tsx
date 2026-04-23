@@ -18,6 +18,8 @@ import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { printOrder, printKitchenReceipt } from "@/lib/printOrder";
+import { printDocument } from "@/lib/printDispatcher";
+import { PrintMethodMenu } from "./PrintMethodMenu";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 
@@ -191,7 +193,8 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const { canManageOrders } = useStaffOrderPermissions();
 
   const handlePrint = async () => {
-    try { await printOrder(order, restaurantId); } catch (error: any) { toast.error(error.message || "Erro ao imprimir"); }
+    // Mantém compatibilidade com chamadas internas — usa o método padrão configurado.
+    await printDocument(order as any, restaurantId);
   };
 
   const handlePrintKitchen = async () => {
