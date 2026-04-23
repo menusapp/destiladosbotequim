@@ -28,6 +28,34 @@ export interface PrintOrderQzResult {
   orderId: string;
   escposLikely: boolean;
   error?: string;
+  /** Código semântico para o frontend tratar diferentes cenários de erro. */
+  errorCode?:
+    | "no_printer_configured"
+    | "printer_not_available"
+    | "no_printers_found"
+    | "print_timeout"
+    | "qz_connect_failed"
+    | "unknown";
+}
+
+/** Tempo máximo (ms) que o envio para a impressora pode demorar antes de abortar. */
+const PRINT_TIMEOUT_MS = 15000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Timeout: ${label} demorou mais de ${ms}ms.`));
+    }, ms);
+    promise
+      .then((v) => {
+        clearTimeout(timer);
+        resolve(v);
+      })
+      .catch((e) => {
+        clearTimeout(timer);
+        reject(e);
+      });
+  });
 }
 
 const LINE_WIDTH = 42; // 80mm térmica, fonte A
