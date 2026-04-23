@@ -26,8 +26,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil } from "lucide-react";
+import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, XCircle } from "lucide-react";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
+import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -77,6 +78,8 @@ export const TableDetailDialog = ({
   const [splittingOrderId, setSplittingOrderId] = useState<string>("");
   const [payingSplit, setPayingSplit] = useState<Split | null>(null);
   const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
+  const [addItemsOrderId, setAddItemsOrderId] = useState<string | null>(null);
+  const [cancellingComanda, setCancellingComanda] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch active comandas for the table
   const { data: comandas, refetch: refetchComandas } = useQuery({
