@@ -104,20 +104,12 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Admin always has full order permissions (DB trigger also enforces it)
+    const effectiveCanManage = formRole === "admin" ? true : formCanManageOrders;
+    const effectiveReceives = formRole === "admin" ? true : formReceivesOrderNotifications;
+
     try {
       if (editingStaff) {
-        const updateData: any = {
-          display_name: formDisplayName,
-          role: formRole,
-          allowed_sections: formRole === "admin" ? ALL_SECTIONS.map(s => s.id) : formSections,
-        };
-        if (formPassword) {
-          updateData.password_hash = formPassword;
-        }
-        if (formUsername !== editingStaff.username) {
-          updateData.username = formUsername;
-        }
-
         const { error } = await supabase.rpc("admin_upsert_staff", {
           p_restaurant_id: restaurantId,
           p_id: editingStaff.id,
@@ -126,7 +118,9 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           p_password_hash: formPassword || null,
           p_role: formRole,
           p_allowed_sections: JSON.stringify(formRole === "admin" ? ALL_SECTIONS.map(s => s.id) : formSections),
-        });
+          p_can_manage_orders: effectiveCanManage,
+          p_receives_order_notifications: effectiveReceives,
+        } as any);
 
         if (error) throw error;
 
@@ -135,6 +129,8 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           localStorage.setItem("staff_name", formDisplayName);
           localStorage.setItem("staff_role", formRole);
           localStorage.setItem("staff_allowed_sections", JSON.stringify(formRole === "admin" ? ALL_SECTIONS.map(s => s.id) : formSections));
+          localStorage.setItem("staff_can_manage_orders", String(effectiveCanManage));
+          localStorage.setItem("staff_receives_order_notifications", String(effectiveReceives));
         }
 
         toast.success("Conta atualizada!");
@@ -156,7 +152,9 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           p_display_name: formDisplayName,
           p_role: formRole,
           p_allowed_sections: JSON.stringify(formSections),
-        });
+          p_can_manage_orders: effectiveCanManage,
+          p_receives_order_notifications: effectiveReceives,
+        } as any);
 
         if (error) {
           if (error.message?.includes("duplicate") || error.message?.includes("unique")) {
