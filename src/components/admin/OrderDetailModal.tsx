@@ -190,11 +190,6 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
 
   const { canManageOrders } = useStaffOrderPermissions();
 
-  const handlePrint = async () => {
-    // Mantém compatibilidade com chamadas internas — usa o método padrão configurado.
-    await printDocument(order as any, restaurantId);
-  };
-
   const handleWhatsApp = () => {
     if (order.delivery_phone) { const phone = order.delivery_phone.replace(/\D/g, ""); window.open(`https://wa.me/55${phone}`, "_blank"); }
     else { toast.error("Telefone não informado"); }
