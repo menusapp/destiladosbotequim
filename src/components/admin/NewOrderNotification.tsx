@@ -20,6 +20,7 @@ interface NewOrderNotificationProps {
   onDismiss: () => void;
   onStopSound?: () => void;
   onReject?: (reason: string) => void;
+  canManageOrders?: boolean;
 }
 
 export const NewOrderNotification = ({
@@ -34,6 +35,7 @@ export const NewOrderNotification = ({
   onDismiss,
   onStopSound,
   onReject,
+  canManageOrders = true,
 }: NewOrderNotificationProps) => {
   const [expanded, setExpanded] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
@@ -47,7 +49,7 @@ export const NewOrderNotification = ({
   };
 
   const title = `${getTypeLabel()} — ${customerName}`;
-  const canReject = onReject && (orderType === 'local' || orderType === 'balcao');
+  const canReject = canManageOrders && onReject && (orderType === 'local' || orderType === 'balcao');
 
   // Compact pill (collapsed)
   if (!expanded) {
