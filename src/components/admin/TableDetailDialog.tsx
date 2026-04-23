@@ -81,6 +81,7 @@ export const TableDetailDialog = ({
   onTableCleared,
 }: TableDetailDialogProps) => {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [payingComanda, setPayingComanda] = useState<any>(null);
   const [splittingItem, setSplittingItem] = useState<any>(null);
   const [splittingOrderId, setSplittingOrderId] = useState<string>("");
