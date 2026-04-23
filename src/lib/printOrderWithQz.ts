@@ -543,6 +543,7 @@ export async function printOrderWithQz(
     console.log("🏪 Loja:", storeName);
 
     try {
+      console.log("🖨️ [QZ Print] garantindo conexão persistente antes de imprimir...");
       await ensureQzConnected({ timeoutMs: 5000, retries: 3 });
     } catch (e: any) {
       console.error("❌ Falha ao conectar ao QZ Tray:", e?.message ?? e);
