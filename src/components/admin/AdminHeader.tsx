@@ -154,12 +154,7 @@ export const AdminHeader = ({
       {/* Realtime connection status */}
       <RealtimeStatusIndicator />
 
-      {/* Tour guiado da seção ativa — desktop only */}
-      {activeSection && (
-        <div className="hidden md:flex">
-          <TourButton sectionId={activeSection} />
-        </div>
-      )}
+      {/* TourButton removido daqui — agora é exibido contextualmente na seção QZ Tray (Configurações → Impressoras) */}
 
       {/* Toggle Abrir/Fechar */}
       <div className="flex items-center gap-2 px-2.5 py-1 rounded-button border border-border">
