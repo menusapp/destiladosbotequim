@@ -350,20 +350,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
 
   const handleQuickPrint = async (e: React.MouseEvent, order: Order) => {
     e.stopPropagation();
-    // Respeita o método padrão configurado em Impressoras (PDF ou QZ Tray).
+    // Respeita o método configurado em Configurações Gerais → Impressoras.
     await printDocument(order as any, restaurantId);
-  };
-
-  const handleQuickPrintForce = async (
-    e: React.MouseEvent,
-    order: Order,
-    method: "pdf" | "qz_tray"
-  ) => {
-    e.stopPropagation();
-    await printDocument(order as any, restaurantId, {
-      forcePdf: method === "pdf",
-      forceQz: method === "qz_tray",
-    });
   };
 
   const handleQuickCancel = (e: React.MouseEvent, order: Order) => {
@@ -467,13 +455,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
                     <Eye className="w-3.5 h-3.5 mr-2" /> Ver detalhes
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={(e) => handleQuickPrint(e, order)}>
-                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir (padrão)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => handleQuickPrintForce(e, order, "pdf")}>
-                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir como PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => handleQuickPrintForce(e, order, "qz_tray")}>
-                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir via QZ Tray
+                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewOrderId(order.id); }}>
                     <ScrollText className="w-3.5 h-3.5 mr-2" /> Visualizar cupom
