@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CalendarIcon, Plus, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
 import { startOfDay, endOfDay, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
@@ -95,17 +96,13 @@ export default function StockMovementsTab({ restaurantId }: StockMovementsTabPro
     fetchMovements();
   }, [fetchMovements]);
 
-  // Realtime subscription
-  useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout>;
-    const ch = supabase.channel(`stock-movements-rt-${restaurantId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements' }, () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(fetchMovements, 400);
-      })
-      .subscribe();
-    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
-  }, [restaurantId, fetchMovements]);
+  // Realtime subscription (centralized)
+  useRealtimeChannel({
+    channelName: `stock-movements-rt-${restaurantId}`,
+    bindings: [{ table: "stock_movements" }],
+    onChange: () => fetchMovements(),
+    debounceMs: 400,
+  });
 
   const fetchStockItems = async () => {
     const { data, error } = await supabase

@@ -1,5 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
+import { useDebounce } from "@/hooks/useDebounce";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -110,11 +112,22 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [previewOrderId, setPreviewOrderId] = useState<string | null>(null);
 
+  // Initial load + refetch when date range changes
   useEffect(() => {
     fetchOrders();
-    const cleanup = setupRealtime();
-    return cleanup;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantId, dateRange]);
+
+  // Centralized realtime: coalesces order/order_items bursts into a single refetch
+  useRealtimeChannel({
+    channelName: `unified-orders-${restaurantId}`,
+    bindings: [
+      { table: "orders", filter: `restaurant_id=eq.${restaurantId}` },
+      { table: "order_items" },
+    ],
+    onChange: () => fetchOrders(),
+    debounceMs: 400,
+  });
 
   useEffect(() => {
     if (pendingOrderToOpen && orders.length > 0) {
@@ -137,14 +150,17 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const autoAcceptRef = { current: autoAccept };
   autoAcceptRef.current = autoAccept;
 
+  // Auto-accept guard: avoid re-processing the same order id (prevents repeat advanceStatus calls)
+  const autoAcceptedIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!autoAccept) return;
-    const pendingOrders = orders.filter(o => o.status === "pending");
+    const pendingOrders = orders.filter(o => o.status === "pending" && !autoAcceptedIdsRef.current.has(o.id));
     if (pendingOrders.length === 0) return;
     pendingOrders.forEach(async (order) => {
+      autoAcceptedIdsRef.current.add(order.id);
       await advanceStatus(order, "accepted");
     });
-  }, [orders, autoAccept]);
+  }, [orders, autoAccept, advanceStatus]);
 
   // iFood polling every 30 seconds
   useEffect(() => {
@@ -225,20 +241,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     return () => { active = false; clearInterval(interval); };
   }, [restaurantId]);
 
-  const setupRealtime = () => {
-    let debounceTimer: ReturnType<typeof setTimeout>;
-    const ch = supabase.channel(`unified-orders-${restaurantId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(fetchOrders, 400);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(fetchOrders, 400);
-      })
-      .subscribe();
-    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
-  };
+  // Stable ref to fetchOrders so polling effects don't recreate intervals on every render
+  const fetchOrdersRef = useRef<() => void>(() => {});
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -253,6 +257,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     if (!error) setOrders(data || []);
     setLoading(false);
   };
+  fetchOrdersRef.current = fetchOrders;
 
   const calculateTotal = (order: Order) => {
     return (order.order_items || []).reduce((total, item) => {
@@ -264,6 +269,9 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const getElapsedMinutes = (createdAt: string) => Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
   const getElapsedColor = (m: number) => m < 5 ? "text-green-600 bg-green-50 border-green-200" : m < 15 ? "text-amber-600 bg-amber-50 border-amber-200" : "text-red-600 bg-red-50 border-red-200";
 
+  // Debounce search input — keeps typing snappy on large lists
+  const debouncedSearch = useDebounce(searchQuery, 200);
+
   const filteredOrders = useMemo(() => {
     let filtered = orders;
 
@@ -274,8 +282,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     }
     // "todos" shows everything
 
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
       filtered = filtered.filter(o =>
         o.customer_name.toLowerCase().includes(q) ||
         o.customer_cpf.includes(q) ||
@@ -285,7 +293,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     }
 
     return filtered;
-  }, [orders, activeTab, searchQuery]);
+  }, [orders, activeTab, debouncedSearch]);
 
   const groupedOrders = useMemo(() => {
     return {

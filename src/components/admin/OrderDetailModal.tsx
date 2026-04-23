@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
@@ -102,17 +103,16 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     }
   }, [order.id]);
 
-  useEffect(() => {
-    const ch = supabase.channel(`order-detail-${order.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `order_id=eq.${order.id}` }, () => {
-        refreshOrder();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` }, () => {
-        refreshOrder();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [order.id, refreshOrder]);
+  // Centralized realtime: order items + this specific order, debounced to avoid render storms
+  useRealtimeChannel({
+    channelName: `order-detail-${order.id}`,
+    bindings: [
+      { table: "order_items", filter: `order_id=eq.${order.id}` },
+      { table: "orders", event: "UPDATE", filter: `id=eq.${order.id}` },
+    ],
+    onChange: () => refreshOrder(),
+    debounceMs: 200,
+  });
 
   const getElapsedTime = () => {
     const elapsed = Date.now() - new Date(order.created_at).getTime();
