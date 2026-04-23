@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
+import { MobileBottomNav } from "@/components/admin/MobileBottomNav";
 
 import { lazy, Suspense } from "react";
 
@@ -830,20 +831,23 @@ const RestaurantAdmin = () => {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar 
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          hasNewOrders={hasNewOrders}
-          hasNewBills={hasNewBills}
-          hasNewDeliveryOrders={hasNewDeliveryOrders}
-          hasNewLocalOrders={hasNewLocalOrders}
-          isSectionAllowed={isSectionAllowed}
-          hasActiveSubscription={hasActiveSubscription}
-          staffRole={staffRole}
-          staffAllowedSections={staffAllowedSections}
-          primaryColor={restaurant.primary_color}
-          onPrefetch={handlePrefetch}
-        />
+        {/* Sidebar — hidden on mobile (replaced by bottom nav) */}
+        <div className="hidden md:block">
+          <AppSidebar 
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            hasNewOrders={hasNewOrders}
+            hasNewBills={hasNewBills}
+            hasNewDeliveryOrders={hasNewDeliveryOrders}
+            hasNewLocalOrders={hasNewLocalOrders}
+            isSectionAllowed={isSectionAllowed}
+            hasActiveSubscription={hasActiveSubscription}
+            staffRole={staffRole}
+            staffAllowedSections={staffAllowedSections}
+            primaryColor={restaurant.primary_color}
+            onPrefetch={handlePrefetch}
+          />
+        </div>
         <SidebarInset className="flex-1 flex flex-col">
           <AdminHeader
             restaurantId={restaurant.id}
