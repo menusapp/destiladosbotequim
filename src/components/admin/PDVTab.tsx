@@ -38,6 +38,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { notifyOrderAcceptedFromPDV } from "@/lib/pdvNotifications";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { checkUnpaidBeforeTableClear } from "@/lib/dangerChecks";
+import { getTableMenuLink } from "@/lib/shareableLinks";
 
 interface CartItem {
   productId: string;

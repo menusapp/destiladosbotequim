@@ -2,12 +2,15 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { printOrder } from "@/lib/printOrder";
+import { getShareableMenuLink } from "@/lib/shareableLinks";
 
 const PUBLIC_DOMAIN = 'https://menusapp.com.br';
 
 function buildPublicUrl(slug: string, path?: string): string {
-  const base = `${PUBLIC_DOMAIN}/${slug}`;
-  return path ? `${base}/${path}` : base;
+  // For shareable contexts (WhatsApp), prefer the link-preview URL so the
+  // restaurant's logo appears. The edge function redirects to the SPA.
+  if (path) return getShareableMenuLink(slug, path);
+  return `${PUBLIC_DOMAIN}/${slug}`;
 }
 
 interface Order {
