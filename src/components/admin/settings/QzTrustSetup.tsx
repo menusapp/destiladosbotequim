@@ -47,9 +47,9 @@ import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
 const OVERRIDE_CRT_URL = "/qz-tray/override.crt";
 
 const PATHS = {
-  windows: String.raw`C:\Program Files\QZ Tray\auth\override.crt`,
-  mac: "/Applications/QZ Tray.app/Contents/Resources/auth/override.crt",
-  linux: "/opt/qz-tray/auth/override.crt",
+  windows: String.raw`C:\Program Files\QZ Tray\override.crt`,
+  mac: "/Applications/QZ Tray.app/Contents/Resources/override.crt",
+  linux: "/opt/qz-tray/override.crt",
 };
 
 type TestStatus =
