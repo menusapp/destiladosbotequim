@@ -22,6 +22,8 @@ interface StaffMember {
   allowed_sections: string[];
   is_active: boolean;
   created_at: string;
+  can_manage_orders?: boolean;
+  receives_order_notifications?: boolean;
 }
 
 interface ContasTabProps {
@@ -40,6 +42,8 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
   const [formDisplayName, setFormDisplayName] = useState("");
   const [formRole, setFormRole] = useState<StaffRole>("garcom");
   const [formSections, setFormSections] = useState<string[]>([]);
+  const [formCanManageOrders, setFormCanManageOrders] = useState(true);
+  const [formReceivesOrderNotifications, setFormReceivesOrderNotifications] = useState(true);
 
   const currentStaffId = localStorage.getItem("staff_id");
 
@@ -70,6 +74,8 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
       setFormDisplayName(member.display_name);
       setFormRole(member.role as StaffRole);
       setFormSections(member.allowed_sections || []);
+      setFormCanManageOrders(member.can_manage_orders !== false);
+      setFormReceivesOrderNotifications(member.receives_order_notifications !== false);
     } else {
       setEditingStaff(null);
       setFormUsername("");
@@ -77,6 +83,8 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
       setFormDisplayName("");
       setFormRole("garcom");
       setFormSections(ROLE_DEFAULT_SECTIONS["garcom"]);
+      setFormCanManageOrders(true);
+      setFormReceivesOrderNotifications(true);
     }
     setDialogOpen(true);
   };
@@ -96,20 +104,12 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Admin always has full order permissions (DB trigger also enforces it)
+    const effectiveCanManage = formRole === "admin" ? true : formCanManageOrders;
+    const effectiveReceives = formRole === "admin" ? true : formReceivesOrderNotifications;
+
     try {
       if (editingStaff) {
-        const updateData: any = {
-          display_name: formDisplayName,
-          role: formRole,
-          allowed_sections: formRole === "admin" ? ALL_SECTIONS.map(s => s.id) : formSections,
-        };
-        if (formPassword) {
-          updateData.password_hash = formPassword;
-        }
-        if (formUsername !== editingStaff.username) {
-          updateData.username = formUsername;
-        }
-
         const { error } = await supabase.rpc("admin_upsert_staff", {
           p_restaurant_id: restaurantId,
           p_id: editingStaff.id,
@@ -118,7 +118,9 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           p_password_hash: formPassword || null,
           p_role: formRole,
           p_allowed_sections: JSON.stringify(formRole === "admin" ? ALL_SECTIONS.map(s => s.id) : formSections),
-        });
+          p_can_manage_orders: effectiveCanManage,
+          p_receives_order_notifications: effectiveReceives,
+        } as any);
 
         if (error) throw error;
 
@@ -127,6 +129,8 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           localStorage.setItem("staff_name", formDisplayName);
           localStorage.setItem("staff_role", formRole);
           localStorage.setItem("staff_allowed_sections", JSON.stringify(formRole === "admin" ? ALL_SECTIONS.map(s => s.id) : formSections));
+          localStorage.setItem("staff_can_manage_orders", String(effectiveCanManage));
+          localStorage.setItem("staff_receives_order_notifications", String(effectiveReceives));
         }
 
         toast.success("Conta atualizada!");
@@ -148,7 +152,9 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
           p_display_name: formDisplayName,
           p_role: formRole,
           p_allowed_sections: JSON.stringify(formSections),
-        });
+          p_can_manage_orders: effectiveCanManage,
+          p_receives_order_notifications: effectiveReceives,
+        } as any);
 
         if (error) {
           if (error.message?.includes("duplicate") || error.message?.includes("unique")) {
@@ -308,6 +314,45 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Order permissions */}
+              <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+                <p className="text-sm font-semibold">Permissões de pedidos</p>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Receber notificações de pedidos</p>
+                    <p className="text-xs text-muted-foreground">
+                      Novos pedidos de delivery e mesa aparecerão para esta conta
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formRole === "admin" ? true : formReceivesOrderNotifications}
+                    disabled={formRole === "admin"}
+                    onCheckedChange={setFormReceivesOrderNotifications}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Aceitar e recusar pedidos</p>
+                    <p className="text-xs text-muted-foreground">
+                      Esta conta pode confirmar ou cancelar pedidos recebidos
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formRole === "admin" ? true : formCanManageOrders}
+                    disabled={formRole === "admin"}
+                    onCheckedChange={setFormCanManageOrders}
+                  />
+                </div>
+
+                {formRole === "admin" && (
+                  <p className="text-xs text-muted-foreground italic">
+                    O administrador sempre tem acesso total.
+                  </p>
+                )}
               </div>
 
               {/* Permissions checkboxes */}

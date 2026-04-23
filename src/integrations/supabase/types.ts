@@ -2940,8 +2940,11 @@ export type Database = {
           font_family: string
           font_size: number
           id: string
+          kitchen_copy_auto_print: boolean
+          kitchen_printer_name: string | null
           paper_size: string
           print_copies: number
+          print_kitchen_copy: boolean
           restaurant_id: string
           supports_auto_cut: boolean
           updated_at: string | null
@@ -2954,8 +2957,11 @@ export type Database = {
           font_family?: string
           font_size?: number
           id?: string
+          kitchen_copy_auto_print?: boolean
+          kitchen_printer_name?: string | null
           paper_size?: string
           print_copies?: number
+          print_kitchen_copy?: boolean
           restaurant_id: string
           supports_auto_cut?: boolean
           updated_at?: string | null
@@ -2968,8 +2974,11 @@ export type Database = {
           font_family?: string
           font_size?: number
           id?: string
+          kitchen_copy_auto_print?: boolean
+          kitchen_printer_name?: string | null
           paper_size?: string
           print_copies?: number
+          print_kitchen_copy?: boolean
           restaurant_id?: string
           supports_auto_cut?: boolean
           updated_at?: string | null
@@ -3666,11 +3675,13 @@ export type Database = {
       restaurant_staff: {
         Row: {
           allowed_sections: Json
+          can_manage_orders: boolean
           created_at: string
           display_name: string
           id: string
           is_active: boolean
           password_hash: string
+          receives_order_notifications: boolean
           restaurant_id: string
           role: string
           updated_at: string
@@ -3678,11 +3689,13 @@ export type Database = {
         }
         Insert: {
           allowed_sections?: Json
+          can_manage_orders?: boolean
           created_at?: string
           display_name: string
           id?: string
           is_active?: boolean
           password_hash: string
+          receives_order_notifications?: boolean
           restaurant_id: string
           role?: string
           updated_at?: string
@@ -3690,11 +3703,13 @@ export type Database = {
         }
         Update: {
           allowed_sections?: Json
+          can_manage_orders?: boolean
           created_at?: string
           display_name?: string
           id?: string
           is_active?: boolean
           password_hash?: string
+          receives_order_notifications?: boolean
           restaurant_id?: string
           role?: string
           updated_at?: string
@@ -4781,10 +4796,12 @@ export type Database = {
         Args: { p_restaurant_id: string }
         Returns: {
           allowed_sections: Json
+          can_manage_orders: boolean
           created_at: string
           display_name: string
           id: string
           is_active: boolean
+          receives_order_notifications: boolean
           role: string
           username: string
         }[]
@@ -4867,18 +4884,33 @@ export type Database = {
         }
         Returns: string
       }
-      admin_upsert_staff: {
-        Args: {
-          p_allowed_sections?: string
-          p_display_name?: string
-          p_id?: string
-          p_password_hash?: string
-          p_restaurant_id: string
-          p_role?: string
-          p_username?: string
-        }
-        Returns: string
-      }
+      admin_upsert_staff:
+        | {
+            Args: {
+              p_allowed_sections?: string
+              p_display_name?: string
+              p_id?: string
+              p_password_hash?: string
+              p_restaurant_id: string
+              p_role?: string
+              p_username?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_allowed_sections?: string
+              p_can_manage_orders?: boolean
+              p_display_name?: string
+              p_id?: string
+              p_password_hash?: string
+              p_receives_order_notifications?: boolean
+              p_restaurant_id: string
+              p_role?: string
+              p_username?: string
+            }
+            Returns: string
+          }
       auto_release_idle_tables: { Args: never; Returns: undefined }
       auto_release_inactive_tables: { Args: never; Returns: undefined }
       check_mp_token_expiry: {
@@ -5025,7 +5057,9 @@ export type Database = {
         }
         Returns: {
           allowed_sections: Json
+          can_manage_orders: boolean
           display_name: string
+          receives_order_notifications: boolean
           role: string
           staff_id: string
         }[]

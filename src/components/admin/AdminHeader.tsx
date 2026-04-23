@@ -77,6 +77,8 @@ export const AdminHeader = ({
     localStorage.removeItem('staff_name');
     localStorage.removeItem('staff_role');
     localStorage.removeItem('staff_allowed_sections');
+    localStorage.removeItem('staff_can_manage_orders');
+    localStorage.removeItem('staff_receives_order_notifications');
     toast.success("Logout realizado com sucesso");
     navigate("/login/staff");
   };
@@ -89,6 +91,8 @@ export const AdminHeader = ({
     localStorage.removeItem('staff_role');
     localStorage.removeItem('restaurant_slug');
     localStorage.removeItem('staff_allowed_sections');
+    localStorage.removeItem('staff_can_manage_orders');
+    localStorage.removeItem('staff_receives_order_notifications');
     toast.success("Logout realizado com sucesso");
     navigate("/login");
   };

@@ -22,6 +22,7 @@ import { OrderDetailModal } from "./OrderDetailModal";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { printOrder } from "@/lib/printOrder";
+import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import type { DateRange } from "react-day-picker";
 
 interface OrderItemExtra {
@@ -98,6 +99,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const { advanceStatus, loadingOrderId } = useOrderStatusAdvance(restaurantId);
   const [autoPrint, setAutoPrint] = useState(false);
   const [autoAccept, setAutoAccept] = useState(false);
+  const { canManageOrders } = useStaffOrderPermissions();
   const [dateRange, setDateRange] = useState(() => ({
     from: startOfDay(new Date()),
     to: endOfDay(new Date()),
@@ -418,8 +420,8 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
             </span>
             <span className="font-bold text-sm">R$ {grandTotal.toFixed(2)}</span>
           </div>
-          {/* Quick action footer */}
-          {next && !['delivered', 'picked_up', 'cancelled'].includes(order.status) && (
+          {/* Quick action footer — hidden if no permission to manage orders */}
+          {next && !['delivered', 'picked_up', 'cancelled'].includes(order.status) && canManageOrders && (
             <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/30 mt-auto">
               <Button
                 size="sm"
