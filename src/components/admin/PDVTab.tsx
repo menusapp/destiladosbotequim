@@ -1991,7 +1991,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       {isMobile && !mobileOrderPanelOpen && (
         <Button
           onClick={() => setMobileOrderPanelOpen(true)}
-          className="fixed bottom-4 right-4 z-40 h-14 rounded-full shadow-lg flex items-center gap-2 px-5"
+          className="fixed bottom-24 right-4 z-50 h-14 rounded-full shadow-lg flex items-center gap-2 px-5 md:bottom-4"
           size="lg"
         >
           <ShoppingCart className="w-5 h-5" />
