@@ -42,7 +42,6 @@ import {
   clearSavedQzPrinter,
 } from "@/lib/qzPrinterConfig";
 import { ensureQzConnected } from "@/lib/qzConnectionManager";
-import { TourButton } from "@/components/admin/tour/TourButton";
 
 type ConnStatus = "idle" | "connecting" | "connected" | "error";
 
@@ -160,21 +159,14 @@ export const QzTraySection = () => {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="flex items-center gap-2">
-              <Plug className="h-5 w-5" />
-              Impressão Térmica (QZ Tray)
-            </CardTitle>
-            <CardDescription>
-              Conecte o QZ Tray para imprimir diretamente em impressoras térmicas
-              instaladas no computador, sem usar o diálogo do navegador.
-            </CardDescription>
-          </div>
-          <div className="shrink-0">
-            <TourButton sectionId="config-dados" />
-          </div>
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <Plug className="h-5 w-5" />
+          Impressão Térmica (QZ Tray)
+        </CardTitle>
+        <CardDescription>
+          Conecte o QZ Tray para imprimir diretamente em impressoras térmicas
+          instaladas no computador, sem usar o diálogo do navegador.
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-5">
