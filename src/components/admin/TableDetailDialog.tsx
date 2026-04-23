@@ -364,6 +364,8 @@ export const TableDetailDialog = ({
       toast.error(err.message || "Erro ao cancelar comanda");
     }
   };
+
+  const handleClearTable = async () => {
     if (!table) return;
     await supabase.from("orders").update({ status: "cancelled" })
       .eq("table_id", table.id).in("status", ["pending", "accepted", "preparing", "ready"]);
