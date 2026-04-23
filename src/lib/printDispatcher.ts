@@ -102,12 +102,11 @@ export async function printDocument(
     return;
   }
 
-  const checkToastId = showToasts ? toast.loading("Verificando conexão com QZ Tray...") : undefined;
+  // Verifica conexão silenciosamente — só avisa se falhar (no momento da impressão).
   const status = await checkQzTrayConnection();
   if (!status.ok) {
     if (showToasts) {
       toast.error("QZ Tray não está conectado", {
-        id: checkToastId,
         description:
           "Abra o aplicativo QZ Tray na sua máquina e tente novamente. Se ainda não tem instalado, baixe em qz.io.",
         duration: 8000,
@@ -116,12 +115,9 @@ export async function printDocument(
     return;
   }
 
-  if (showToasts) {
-    toast.loading("Enviando para impressão...", {
-      id: checkToastId,
-      description: `Impressora: ${saved}`,
-    });
-  }
+  const checkToastId = showToasts
+    ? toast.loading("Enviando para impressão...", { description: `Impressora: ${saved}` })
+    : undefined;
 
   try {
     const result = await printOrderWithQz(order.id, { mode });
