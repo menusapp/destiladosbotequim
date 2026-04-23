@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { clearSessionTimestamp } from "@/lib/sessionExpiry";
 
 import { RealtimeStatusIndicator } from "./RealtimeStatusIndicator";
+import { TourButton } from "./tour/TourButton";
 
 interface AdminHeaderProps {
   restaurantId: string;
@@ -24,6 +25,8 @@ interface AdminHeaderProps {
   pickupTime: number;
   isOpen: boolean;
   autoOpenClose?: boolean;
+  /** Seção ativa do painel — usada pelo botão Tour para iniciar o tour correto. */
+  activeSection?: string;
   onPrepTimeUpdate: (time: number) => void;
   onPickupTimeUpdate: (time: number) => void;
   onIsOpenUpdate: (isOpen: boolean) => void;
@@ -36,6 +39,7 @@ export const AdminHeader = ({
   pickupTime,
   isOpen,
   autoOpenClose = false,
+  activeSection,
   onPrepTimeUpdate,
   onPickupTimeUpdate,
   onIsOpenUpdate,
@@ -149,6 +153,9 @@ export const AdminHeader = ({
 
       {/* Realtime connection status */}
       <RealtimeStatusIndicator />
+
+      {/* Tour guiado da seção ativa */}
+      {activeSection && <TourButton sectionId={activeSection} />}
 
       {/* Toggle Abrir/Fechar */}
       <div className="flex items-center gap-2 px-2.5 py-1 rounded-button border border-border">
