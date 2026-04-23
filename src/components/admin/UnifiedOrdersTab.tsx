@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
 import { useDebounce } from "@/hooks/useDebounce";
