@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, XCircle } from "lucide-react";
+import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, Trash2 } from "lucide-react";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { toast } from "@/components/ui/sonner";
