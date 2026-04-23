@@ -63,24 +63,16 @@ function ProductPerformanceSkeleton() {
 const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
   const [dateRange, setDateRange] = useState<DateRange>("today");
   const { metrics: data, loading, refetch } = useOrderMetrics(restaurantId, dateRange);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Realtime refresh with debounce
-  useEffect(() => {
-    const debouncedRefetch = () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => refetch(), 2000);
-    };
-
-    const ch = supabase.channel(`overview-rt-${restaurantId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => debouncedRefetch())
-      .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements", filter: `restaurant_id=eq.${restaurantId}` }, () => debouncedRefetch())
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [restaurantId, refetch]);
+  // Centralized realtime: coalesces order/cash_movements bursts into a single refetch
+  useRealtimeChannel({
+    channelName: `overview-rt-${restaurantId}`,
+    bindings: [
+      { table: "orders", filter: `restaurant_id=eq.${restaurantId}` },
+      { table: "cash_movements", filter: `restaurant_id=eq.${restaurantId}` },
+    ],
+    onChange: () => refetch(),
+    debounceMs: 2000,
+  });
 
   if (loading) {
     return <OverviewSkeleton />;
