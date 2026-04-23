@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
 // Ícones por tipo de método
 const METHOD_ICONS: Record<string, any> = {
@@ -136,6 +137,8 @@ const Comanda = () => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [billRequestEnabled, setBillRequestEnabled] = useState(true);
   const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
+
+  useDynamicFavicon(restaurantLogo, restaurantName);
 
   useEffect(() => {
     fetchData();
