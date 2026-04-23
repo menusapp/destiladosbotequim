@@ -26,8 +26,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil } from "lucide-react";
+import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, XCircle } from "lucide-react";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
+import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -77,6 +78,8 @@ export const TableDetailDialog = ({
   const [splittingOrderId, setSplittingOrderId] = useState<string>("");
   const [payingSplit, setPayingSplit] = useState<Split | null>(null);
   const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
+  const [addItemsOrderId, setAddItemsOrderId] = useState<string | null>(null);
+  const [cancellingComanda, setCancellingComanda] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch active comandas for the table
   const { data: comandas, refetch: refetchComandas } = useQuery({
@@ -263,6 +266,103 @@ export const TableDetailDialog = ({
     toast.success("Pedido aceito!");
     refetchOrders();
     onTableCleared();
+  };
+
+  // Abre o drawer de adicionar itens. Usa o pedido ativo mais recente da comanda;
+  // se não houver, cria um novo pedido vazio (status 'accepted') para a comanda.
+  const openAddItemsForComanda = async (comanda: any) => {
+    if (!table) return;
+    try {
+      const comandaOrders = (orders || []).filter((o: any) => o.comanda_id === comanda.id);
+      const activeOrder = comandaOrders.find((o: any) =>
+        ["pending", "accepted", "preparing", "ready"].includes(o.status)
+      );
+
+      if (activeOrder) {
+        setAddItemsOrderId(activeOrder.id);
+        return;
+      }
+
+      const { data: newOrder, error: createError } = await supabase
+        .from("orders")
+        .insert({
+          restaurant_id: restaurantId,
+          table_id: table.id,
+          comanda_id: comanda.id,
+          customer_name: comanda.customer_name,
+          customer_cpf: comanda.customer_cpf,
+          status: "accepted",
+          order_type: "local",
+          pdv_source: true,
+        })
+        .select("id")
+        .single();
+
+      if (createError) throw createError;
+      setAddItemsOrderId(newOrder.id);
+    } catch (err: any) {
+      console.error("Erro ao abrir adicionar itens:", err);
+      toast.error(err.message || "Erro ao abrir adicionar itens");
+    }
+  };
+
+  // Cancela todos os pedidos ativos da comanda. Se a mesa ficar sem pedidos
+  // ativos e sem contas pendentes, libera a mesa automaticamente.
+  const confirmCancelComanda = async () => {
+    if (!cancellingComanda || !table) return;
+    try {
+      const comandaOrders = (orders || []).filter((o: any) => o.comanda_id === cancellingComanda.id);
+      const activeOrderIds = comandaOrders
+        .filter((o: any) => ["pending", "accepted", "preparing", "ready"].includes(o.status))
+        .map((o: any) => o.id);
+
+      if (activeOrderIds.length === 0) {
+        toast.info("Não há pedidos ativos para cancelar");
+        setCancellingComanda(null);
+        return;
+      }
+
+      const { error: cancelErr } = await supabase
+        .from("orders")
+        .update({ status: "cancelled", cancellation_reason: "Cancelado pelo PDV" })
+        .in("id", activeOrderIds);
+      if (cancelErr) throw cancelErr;
+
+      toast.success(`Pedidos de ${cancellingComanda.name} cancelados`);
+
+      // Verifica se restam pedidos ativos ou contas pendentes
+      const { data: remainingOrders } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("table_id", table.id)
+        .in("status", ["pending", "accepted", "preparing", "ready"])
+        .limit(1);
+
+      const { data: pendingBills } = await supabase
+        .from("bills")
+        .select("id")
+        .eq("table_id", table.id)
+        .neq("status", "paid")
+        .limit(1);
+
+      if ((!remainingOrders || remainingOrders.length === 0) && (!pendingBills || pendingBills.length === 0)) {
+        await supabase.from("tables").update({
+          is_occupied: false,
+          occupied_at: null,
+          occupied_by: null,
+        }).eq("id", table.id);
+        await supabase.from("comandas").update({ status: "closed", closed_at: new Date().toISOString() })
+          .eq("table_id", table.id).eq("status", "active");
+        onTableCleared();
+      }
+
+      setCancellingComanda(null);
+      refetchOrders();
+      refetchComandas();
+    } catch (err: any) {
+      console.error("Erro ao cancelar comanda:", err);
+      toast.error(err.message || "Erro ao cancelar comanda");
+    }
   };
 
   const handleClearTable = async () => {
@@ -693,13 +793,6 @@ export const TableDetailDialog = ({
                 </div>
               </DialogTitle>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { onAddOrder(table.id); onOpenChange(false); }}
-                >
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar Pedido
-                </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="sm" disabled={!table.is_occupied}>
@@ -825,6 +918,24 @@ export const TableDetailDialog = ({
                             <span className="text-sm font-bold">R$ {comandaTotal.toFixed(2)}</span>
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Imprimir comanda" onClick={() => printFullComanda(comanda)}>
                               <Printer className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              title="Adicionar item à comanda"
+                              onClick={() => openAddItemsForComanda(comanda)}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Cancelar comanda"
+                              onClick={() => setCancellingComanda({ id: comanda.id, name: comanda.customer_name })}
+                            >
+                              <XCircle className="w-4 h-4" />
                             </Button>
                             {unpaidComandaTotal > 0.01 ? (
                               <Button size="sm" variant="outline" onClick={() => handlePayComanda(comanda)}>
@@ -1041,6 +1152,37 @@ export const TableDetailDialog = ({
           onSelect={(customer) => handleSwapCustomer(editingComandaId, customer)}
         />
       )}
+
+      {/* Add Items to Order Drawer */}
+      <AddItemsToOrderDrawer
+        open={!!addItemsOrderId}
+        onClose={() => setAddItemsOrderId(null)}
+        orderId={addItemsOrderId || ""}
+        restaurantId={restaurantId}
+        onItemsAdded={() => {
+          refetchOrders();
+          refetchComandas();
+        }}
+      />
+
+      {/* Cancel Comanda Confirmation */}
+      <AlertDialog open={!!cancellingComanda} onOpenChange={(o) => { if (!o) setCancellingComanda(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar pedidos da comanda?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja cancelar todos os pedidos de <strong>{cancellingComanda?.name}</strong> nesta mesa?
+              Os itens voltarão ao estoque e os pedidos sairão das métricas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCancelComanda} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
