@@ -213,28 +213,26 @@ function buildCustomerReceipt(
   out += ESCPOS.ALIGN_CENTER;
   out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE;
   for (const l of wrap(storeName.toUpperCase(), 21)) out += l + "\n";
+  out += ESCPOS.SIZE_NORMAL;
+  out += divider("=");
+
+  // Título da via — mesmo tamanho do título da via da cozinha (SIZE_DOUBLE)
+  out += ESCPOS.SIZE_DOUBLE;
+  out += center("VIA DO CLIENTE", 21);
+  out += ESCPOS.SIZE_NORMAL;
+  out += divider("=");
+
+  // Número do pedido bem grande (3x) — espelha a via da cozinha
+  out += ESCPOS.SIZE_TRIPLE;
+  out += center(shortOrderId(order.id), 14);
   out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
-
-  out += divider("=");
-  out += ESCPOS.BOLD_ON + center("VIA DO CLIENTE") + ESCPOS.BOLD_OFF;
   out += divider("=");
 
-  // ---------- Número do pedido + data (igual PDF) ----------
-  out += ESCPOS.ALIGN_LEFT;
-  out += ESCPOS.BOLD_ON;
-  out += labeled(
-    "Pedido: ",
-    `${shortOrderId(order.id)} - ${formatDateTimeShort(order.created_at)}`
-  );
-  out += ESCPOS.BOLD_OFF;
-
-  // ---------- Tipo do pedido em destaque (igual PDF) ----------
+  // ---------- Tipo do pedido em destaque ----------
   const originLabel = buildOriginLabel(order);
-  out += "\n";
-  out += ESCPOS.ALIGN_CENTER + ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE_H;
+  out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE_H;
   out += center(originLabel, LINE_WIDTH);
   out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
-  out += "\n";
 
   // ---------- Agendamento ----------
   if (order.dd_scheduled_for) {
@@ -242,11 +240,19 @@ function buildCustomerReceipt(
     out += center("** AGENDADO PARA **");
     out += center(formatDateTimeShort(order.dd_scheduled_for));
     out += ESCPOS.BOLD_OFF;
-    out += "\n";
   }
+  out += divider("=");
 
-  // ---------- Bloco: cliente / contato / endereço ----------
+  // ---------- Identificação ----------
   out += ESCPOS.ALIGN_LEFT;
+  if (order.tables) {
+    const tname = order.tables.table_name?.trim();
+    const tnum = order.tables.table_number;
+    const mesaStr = tname ? `${tname} (No ${tnum})` : `Mesa ${tnum}`;
+    out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE_H;
+    out += "MESA: " + mesaStr + "\n";
+    out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
+  }
   out += labeled("Cliente: ", order.customer_name || "-");
   if (order.customer_cpf) out += labeled("CPF:     ", order.customer_cpf);
   if (order.customer_phone) {
@@ -255,14 +261,7 @@ function buildCustomerReceipt(
   if (order.delivery_type === "delivery" && order.delivery_address) {
     out += labeled("Endereco:", order.delivery_address);
   }
-  if (order.tables) {
-    const tname = order.tables.table_name?.trim();
-    const tnum = order.tables.table_number;
-    out += labeled(
-      "Mesa:    ",
-      tname ? `${tname} (No ${tnum})` : `Mesa ${tnum}`
-    );
-  }
+  out += labeled("Hora:    ", formatDateTimeShort(order.created_at));
   out += divider();
 
   // ---------- Bloco: itens ----------
@@ -278,11 +277,14 @@ function buildCustomerReceipt(
     const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
     subtotal += itemTotal;
 
-    const qty = `${item.quantity}x`.padEnd(3);
-    const left = `${qty} ${item.products.name}`;
-    out += ESCPOS.BOLD_ON;
-    out += lineLR(left, formatPrice(itemTotal));
-    out += ESCPOS.BOLD_OFF;
+    // Nome do item em destaque (SIZE_DOUBLE) — mesmo tamanho da via da cozinha
+    out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE;
+    for (const l of wrap(`${item.quantity}x ${item.products.name}`, 21))
+      out += l + "\n";
+    out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
+
+    // Linha de preço (tamanho normal, alinhada à direita)
+    out += lineLR("  Total do item", formatPrice(itemTotal));
 
     if (item.quantity > 1) {
       out +=
@@ -302,12 +304,10 @@ function buildCustomerReceipt(
       for (const l of obsLines) out += "    " + l + "\n";
       out += ESCPOS.BOLD_OFF;
     }
-    out += "\n";
+    out += divider("-");
   }
 
-  out += divider();
-
-  // ---------- Totais com breakdown completo (igual PDF) ----------
+  // ---------- Totais com breakdown completo ----------
   const discount = order.coupon_discount || 0;
   const deliveryFee = order.delivery_fee || 0;
   const finalTotal = subtotal - discount + deliveryFee;
@@ -336,18 +336,19 @@ function buildCustomerReceipt(
   }
 
   out += divider("=");
-  out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE_H;
-  out += lineLR("TOTAL", formatPrice(finalTotal));
+  out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE;
+  out += lineLR("TOTAL", formatPrice(finalTotal), 21);
   out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
   out += divider("=");
 
   // ---------- Pagamento ----------
   if (order.payment_type) {
-    out += "\n";
+    out += ESCPOS.BOLD_ON;
     out += labeled(
       "Pagamento:",
       formatPaymentType(order.payment_type, order.payment_brand)
     );
+    out += ESCPOS.BOLD_OFF;
   }
 
   // ---------- Observações gerais (sem o tag de desconto) ----------
@@ -369,9 +370,12 @@ function buildCustomerReceipt(
 
   // ---------- Rodapé ----------
   out += "\n";
+  out += divider("-");
   out += ESCPOS.ALIGN_CENTER;
-  out += ESCPOS.BOLD_ON + "Obrigado pela preferencia!\n" + ESCPOS.BOLD_OFF;
-  out += "Volte sempre :)\n";
+  out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE_H;
+  out += center("Obrigado pela preferencia!", LINE_WIDTH);
+  out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
+  out += center("Volte sempre :)");
   out += "\n";
   out += divider("-");
   out += center(`Impresso em ${formatDateTimeFull(new Date())}`);
