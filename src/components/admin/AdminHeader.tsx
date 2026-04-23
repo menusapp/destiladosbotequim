@@ -16,7 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { clearSessionTimestamp } from "@/lib/sessionExpiry";
 
 import { RealtimeStatusIndicator } from "./RealtimeStatusIndicator";
-import { TourButton } from "./tour/TourButton";
+
 
 interface AdminHeaderProps {
   restaurantId: string;
