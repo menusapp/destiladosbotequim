@@ -111,6 +111,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   }));
   const [pendingDateRange, setPendingDateRange] = useState<DateRange | undefined>();
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [previewOrderId, setPreviewOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
