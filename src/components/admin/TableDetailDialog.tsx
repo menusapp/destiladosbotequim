@@ -696,6 +696,21 @@ export const TableDetailDialog = ({
                 <Scissors className="h-3 w-3 text-muted-foreground" />
               </Button>
             )}
+            {!allSplitsPaid && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                title="Remover item"
+                onClick={() => setCancellingItem({
+                  id: item.id,
+                  name: `${item.quantity}x ${item.products?.name || "Produto"}`,
+                  total: itemTotal,
+                })}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </div>
 
