@@ -641,6 +641,13 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
           onStatusUpdate={fetchOrders}
         />
       )}
+
+      {/* Preview do cupom térmico (sem impressora) */}
+      <ReceiptPreviewDialog
+        orderId={previewOrderId}
+        open={!!previewOrderId}
+        onOpenChange={(o) => { if (!o) setPreviewOrderId(null); }}
+      />
     </div>
   );
 };
