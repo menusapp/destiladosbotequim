@@ -22,7 +22,6 @@ import { OrderDetailModal } from "./OrderDetailModal";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { printDocument } from "@/lib/printDispatcher";
-import { QzTrayStatusBadge } from "./QzTrayStatusBadge";
 import { ReceiptPreviewDialog } from "./ReceiptPreviewDialog";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import { OrderCard } from "./orders/OrderCard";
@@ -430,7 +429,6 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
           <p className="text-sm text-muted-foreground">{totalPendingCount} aguardando • {orders.length} no total</p>
         </div>
         <div className="flex items-center gap-2">
-          <QzTrayStatusBadge />
           <div className="flex items-center gap-2" data-tour="pedidos-auto-accept">
             <Zap className="w-4 h-4 text-muted-foreground" />
             <Label htmlFor="auto-accept" className="text-xs">Aceitar automaticamente</Label>
