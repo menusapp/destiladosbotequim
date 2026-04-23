@@ -77,16 +77,24 @@ export const CustomerSelectDialog = ({
     enabled: open,
   });
 
-  // Fetch all customer addresses for search
+  // Fetch addresses ONLY for customers of this restaurant + only the columns
+  // we actually use in the filter below. Restricting by CPF list avoids
+  // pulling addresses from other restaurants and reduces payload size.
   const { data: allAddresses } = useQuery({
-    queryKey: ["customer-addresses-all", restaurantId],
+    queryKey: ["customer-addresses-all", restaurantId, customers?.length ?? 0],
     queryFn: async () => {
+      const cpfs = (customers ?? []).map((c) => c.cpf).filter(Boolean);
+      if (cpfs.length === 0) return [] as Array<{
+        customer_cpf: string; street: string; number: string;
+        neighborhood: string; city: string; zip_code: string;
+      }>;
       const { data } = await supabase
         .from("customer_addresses")
-        .select("*");
+        .select("customer_cpf, street, number, neighborhood, city, zip_code")
+        .in("customer_cpf", cpfs);
       return data || [];
     },
-    enabled: open,
+    enabled: open && !!customers && customers.length > 0,
   });
 
   // Filter customers by name, CPF, phone, or address
