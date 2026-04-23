@@ -361,8 +361,57 @@ export const tourSteps: TourStepsBySection = {
   "config-dados": [
     {
       title: "Configurações Gerais",
-      content: "Dados da empresa, horários de funcionamento, zonas de delivery, métodos de pagamento, impressoras e backup.",
+      content:
+        "Dados da empresa, horários de funcionamento, zonas de delivery, métodos de pagamento, impressoras e backup. Abra a sub-aba Impressoras para seguir o passo a passo do QZ Tray.",
       placement: "center",
+    },
+    {
+      target: '[data-tour="printers-method"]',
+      title: "1. Escolha o método de impressão",
+      content:
+        "Na sub-aba Impressoras, marque a opção QZ Tray para imprimir direto na térmica, sem o popup do navegador. Esse será o método usado por todo o sistema.",
+      placement: "bottom",
+    },
+    {
+      target: '[data-tour="qz-trust-download"]',
+      title: "2. Baixe o certificado de segurança",
+      content:
+        "Role a página até a seção 'Configurar Impressão Automática' e clique em 'Baixar Certificado de Segurança'. Um arquivo chamado override.crt será salvo no seu computador.",
+      placement: "bottom",
+    },
+    {
+      target: '[data-tour="qz-trust-paths"]',
+      title: "3. Cole na pasta correta do QZ Tray",
+      content:
+        "Copie o override.crt baixado para a pasta exata do seu sistema (Windows, macOS ou Linux). Use o botão de copiar caminho ao lado e cole no Explorador de Arquivos. Se já existir um override.crt antigo, substitua pelo novo.",
+      placement: "top",
+    },
+    {
+      title: "4. Feche e abra o QZ Tray",
+      content:
+        "Vá ao ícone do QZ Tray ao lado do relógio, clique com o botão direito e escolha Exit. Depois abra o QZ Tray novamente pelo menu Iniciar. Sem reiniciar, o certificado novo não é aplicado.",
+      placement: "center",
+    },
+    {
+      target: '[data-tour="qz-connect"]',
+      title: "5. Conecte ao QZ Tray",
+      content:
+        "Volte aqui e clique em 'Conectar / Testar QZ Tray'. O sistema vai conversar com o QZ Tray instalado e listar as impressoras disponíveis logo abaixo.",
+      placement: "bottom",
+    },
+    {
+      target: '[data-tour="qz-printer-select"]',
+      title: "6. Selecione sua impressora térmica",
+      content:
+        "Escolha na lista a impressora térmica que vai imprimir os pedidos. A escolha é salva automaticamente para todas as impressões do sistema.",
+      placement: "top",
+    },
+    {
+      target: '[data-tour="qz-test-print"]',
+      title: "7. Teste a impressão",
+      content:
+        "Clique em 'Testar impressão' para enviar um cupom de teste. Se o papel sair sem aparecer popup de permissão, está tudo certo — a impressão automática está ativa em todo o sistema.",
+      placement: "top",
     },
   ],
 
