@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
 import { Loader2 } from "lucide-react";
+import { isSessionExpired, clearSessionTimestamp } from "@/lib/sessionExpiry";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -38,7 +39,22 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // Custom admin login flow: always require restaurant_id + staff_id
   const restaurantId = localStorage.getItem('restaurant_id');
   const staffId = localStorage.getItem('staff_id');
-  
+
+  // Sessão expira após 7 dias para reforçar segurança
+  if (isSessionExpired()) {
+    localStorage.removeItem('restaurant_id');
+    localStorage.removeItem('restaurant_name');
+    localStorage.removeItem('restaurant_slug');
+    localStorage.removeItem('staff_id');
+    localStorage.removeItem('staff_name');
+    localStorage.removeItem('staff_role');
+    localStorage.removeItem('staff_allowed_sections');
+    localStorage.removeItem('staff_can_manage_orders');
+    localStorage.removeItem('staff_receives_order_notifications');
+    clearSessionTimestamp();
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
   if (!restaurantId) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
