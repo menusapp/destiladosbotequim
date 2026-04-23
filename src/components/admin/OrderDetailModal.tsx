@@ -335,7 +335,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
               <Button variant="outline" onClick={handleGoToTable} className="gap-2"><Home className="w-4 h-4" />Mesa {order.tables?.table_number}</Button>
             )}
             
-            <Button variant="outline" onClick={handlePrint} className="gap-2"><Printer className="w-4 h-4" />Imprimir</Button>
+            <PrintMethodMenu order={order as any} restaurantId={restaurantId} variant="outline" />
             
             {order.delivery_phone && (
               <Button variant="outline" onClick={handleWhatsApp} className="gap-2"><MessageCircle className="w-4 h-4" />WhatsApp</Button>
