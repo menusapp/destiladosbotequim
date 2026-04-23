@@ -192,6 +192,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
             value={webConfig.printMethod}
             onValueChange={(v) => setWebConfig((prev) => ({ ...prev, printMethod: v as PrintMethod }))}
             className="space-y-3"
+            data-tour="printers-method"
           >
             <label
               htmlFor="print-method-pdf"
@@ -211,6 +212,7 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
 
             <label
               htmlFor="print-method-qz"
+              data-tour="printers-method-qz"
               className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition"
             >
               <RadioGroupItem value="qz_tray" id="print-method-qz" className="mt-1" />
@@ -373,9 +375,13 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
         </CardContent>
       </Card>
 
-      <QzTraySection />
+      <div data-tour="printers-qz-tray">
+        <QzTraySection />
+      </div>
 
-      <QzTrustSetup />
+      <div data-tour="printers-qz-trust">
+        <QzTrustSetup />
+      </div>
 
       <div className="flex justify-end">
         <Button onClick={saveWebConfig} disabled={saving}>

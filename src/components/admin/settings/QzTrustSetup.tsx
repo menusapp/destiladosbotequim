@@ -204,7 +204,12 @@ export const QzTrustSetup = () => {
             Clique no botão abaixo para baixar o arquivo{" "}
             <code className="bg-muted px-1 py-0.5 rounded text-xs">override.crt</code>.
           </p>
-          <Button onClick={handleDownloadCert} disabled={downloading} className="gap-2">
+          <Button
+            onClick={handleDownloadCert}
+            disabled={downloading}
+            className="gap-2"
+            data-tour="qz-trust-download"
+          >
             {downloading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -229,7 +234,7 @@ export const QzTrustSetup = () => {
             na pasta de instalação correspondente ao seu sistema:
           </p>
 
-          <div className="space-y-2 pl-1">
+          <div className="space-y-2 pl-1" data-tour="qz-trust-paths">
             {(["windows", "mac", "linux"] as const).map((os) => (
               <div
                 key={os}
@@ -309,7 +314,7 @@ export const QzTrustSetup = () => {
             <strong> sem popup</strong>.
           </p>
 
-          <div className="flex flex-wrap items-center gap-2 pl-1">
+          <div className="flex flex-wrap items-center gap-2 pl-1" data-tour="qz-trust-test">
             <Button
               onClick={handleTest}
               disabled={testStatus === "connecting" || testStatus === "printing"}
