@@ -378,6 +378,26 @@ export const QzTrustSetup = () => {
             </Alert>
           )}
         </div>
+
+        {/* Ajuda rápida — Invalid Certificate */}
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle className="text-sm">
+            Se ainda aparecer "Invalid Certificate"
+          </AlertTitle>
+          <AlertDescription className="text-xs">
+            <ol className="list-decimal pl-4 space-y-1 mt-1">
+              <li>Feche totalmente o QZ Tray (ícone → Exit).</li>
+              <li>
+                Verifique se existe um <code>override.crt</code> antigo na pasta
+                e substitua pelo novo baixado aqui.
+              </li>
+              <li>Confirme que o arquivo está no caminho correto do seu sistema.</li>
+              <li>Abra o QZ Tray novamente.</li>
+              <li>Clique em "Testar Impressão" outra vez.</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
       </CardContent>
     </Card>
   );
