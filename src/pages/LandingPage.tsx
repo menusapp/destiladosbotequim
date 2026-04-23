@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { getActiveAdminRedirectPath } from "@/lib/sessionExpiry";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -97,6 +99,12 @@ const allFeatures = [
 /* ── Component ── */
 const LandingPage = () => {
   const navigate = useNavigate();
+
+  // Auto-redirect: se já há sessão válida (até 7 dias), entrar direto no painel
+  useEffect(() => {
+    const path = getActiveAdminRedirectPath();
+    if (path) navigate(path, { replace: true });
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-card overflow-x-hidden font-sans">

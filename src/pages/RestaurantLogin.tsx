@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
-import { markSessionActive } from "@/lib/sessionExpiry";
+import { markSessionActive, getActiveAdminRedirectPath } from "@/lib/sessionExpiry";
 import menusLogo from "@/assets/menus-logo.png";
 
 const Landing = () => {
@@ -15,6 +15,12 @@ const Landing = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Auto-redirect: se já há sessão válida (até 7 dias), entrar direto no painel
+  useEffect(() => {
+    const path = getActiveAdminRedirectPath();
+    if (path) navigate(path, { replace: true });
+  }, [navigate]);
 
   const clearStaffSession = () => {
     localStorage.removeItem('staff_id');
