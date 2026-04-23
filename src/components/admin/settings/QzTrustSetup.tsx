@@ -289,9 +289,10 @@ export const QzTrustSetup = () => {
             <h3 className="font-semibold text-sm">Reinicie o QZ Tray</h3>
           </div>
           <p className="text-sm text-muted-foreground pl-1">
-            Clique com o botão direito no ícone do QZ Tray (próximo ao relógio) →{" "}
-            <strong>Exit</strong>. Depois abra novamente pelo menu Iniciar /
-            Aplicativos.
+            <strong>Feche totalmente o QZ Tray</strong> (clique com o botão
+            direito no ícone próximo ao relógio → <strong>Exit</strong>) e
+            abra novamente pelo menu Iniciar / Aplicativos somente após copiar
+            o certificado para a pasta correta.
           </p>
         </div>
 
