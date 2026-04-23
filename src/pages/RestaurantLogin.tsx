@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
+import { markSessionActive } from "@/lib/sessionExpiry";
 import menusLogo from "@/assets/menus-logo.png";
 
 const Landing = () => {
@@ -57,6 +58,7 @@ const Landing = () => {
         localStorage.removeItem('restaurant_slug');
         localStorage.setItem('restaurant_id', restaurant_id);
         localStorage.setItem('restaurant_name', restaurant_name);
+        markSessionActive();
         void cacheRestaurantSlug(restaurant_id);
         toast.success(`Bem-vindo ao ${restaurant_name}!`);
         navigate('/login/staff');

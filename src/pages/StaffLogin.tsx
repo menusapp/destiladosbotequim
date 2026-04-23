@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { Loader2, ShieldCheck } from "lucide-react";
+import { markSessionActive } from "@/lib/sessionExpiry";
 import menusLogo from "@/assets/menus-logo.png";
 
 const StaffLogin = () => {
@@ -162,6 +163,7 @@ const StaffLogin = () => {
         const isAdmin = staff.role === "admin";
         localStorage.setItem("staff_can_manage_orders", String(isAdmin || staff.can_manage_orders !== false));
         localStorage.setItem("staff_receives_order_notifications", String(isAdmin || staff.receives_order_notifications !== false));
+        markSessionActive();
         const slug = localStorage.getItem("restaurant_slug") || restaurantId;
         toast.success(`Bem-vindo, ${staff.display_name}!`);
         navigate(`/${slug}/admin`);
