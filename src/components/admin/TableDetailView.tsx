@@ -351,7 +351,7 @@ export const TableDetailView = () => {
         })),
       })),
     };
-    await printOrderThermal(thermalOrder, restaurantId);
+    await printDocument(thermalOrder as any, restaurantId);
   };
 
   const printOrder = async (order: Order) => {
