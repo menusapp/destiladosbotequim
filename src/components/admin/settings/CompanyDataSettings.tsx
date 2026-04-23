@@ -308,6 +308,10 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             </Card>
           </div>
 
+          <Suspense fallback={<SubTabLoading />}>
+            <ShareableLinksSection restaurantId={restaurantId} />
+          </Suspense>
+
           <Button onClick={handleSaveSettings} className="w-full sm:w-auto gap-2">
             <Save className="h-4 w-4" />
             Salvar Identidade Visual
