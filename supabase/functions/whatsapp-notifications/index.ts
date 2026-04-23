@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
 
     const orderId = (context && typeof context === 'object') ? (context as any).order_id : null;
     const needsSummary = orderId && (template.includes('{{resumo_pedido}}') || template.includes('{{total_pedido}}'));
+    console.log(`[NOTIF] orderId=${orderId} needsSummary=${needsSummary} templateHasResumo=${template.includes('{{resumo_pedido}}')}`);
 
     if (needsSummary) {
       try {
