@@ -11,6 +11,43 @@
 import qz from "qz-tray";
 
 const STORAGE_KEY = "qz:selectedPrinter";
+const ONBOARDING_KEY = "qz:configured";
+const ONBOARDING_DISMISSED_KEY = "qz:onboardingDismissed";
+
+/** Marca o onboarding como concluído (impressora configurada e testada). */
+export function markQzConfigured(): void {
+  try {
+    localStorage.setItem(ONBOARDING_KEY, "true");
+  } catch {
+    // ignore
+  }
+}
+
+/** Indica se o usuário já completou o onboarding do QZ. */
+export function isQzConfigured(): boolean {
+  try {
+    return localStorage.getItem(ONBOARDING_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** Marca o onboarding como "dispensado por agora" (não mostra mais nesta sessão). */
+export function dismissQzOnboarding(): void {
+  try {
+    sessionStorage.setItem(ONBOARDING_DISMISSED_KEY, "true");
+  } catch {
+    // ignore
+  }
+}
+
+export function isQzOnboardingDismissed(): boolean {
+  try {
+    return sessionStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 export function getSavedQzPrinter(): string | null {
   try {

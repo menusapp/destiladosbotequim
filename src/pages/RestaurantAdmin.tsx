@@ -48,6 +48,7 @@ import { NewOrderNotification } from "@/components/admin/NewOrderNotification";
 import { NewBillNotification } from "@/components/admin/NewBillNotification";
 import { NewReservationNotification } from "@/components/admin/NewReservationNotification";
 import { SupportChatWidget } from "@/components/admin/SupportChatWidget";
+import { QzOnboardingGate } from "@/components/admin/QzOnboardingGate";
 
 interface Restaurant {
   id: string;
@@ -1125,6 +1126,7 @@ const RestaurantAdmin = () => {
           />
         )}
         <SupportChatWidget />
+        {restaurant?.id && <QzOnboardingGate restaurantId={restaurant.id} />}
 
         {/* Mobile bottom nav — only on screens < md */}
         <MobileBottomNav
