@@ -426,14 +426,25 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     return map;
   }, [todayReservations]);
 
-  // Realtime for tables and orders — filtered by restaurant_id
+  // Realtime for tables and orders — filtered + debounced para evitar refetch em rajada
   useEffect(() => {
+    let tablesTimer: ReturnType<typeof setTimeout>;
+    let ordersTimer: ReturnType<typeof setTimeout>;
+    const debouncedTables = () => { clearTimeout(tablesTimer); tablesTimer = setTimeout(() => refetchTables(), 250); };
+    const debouncedOrders = () => {
+      clearTimeout(ordersTimer);
+      ordersTimer = setTimeout(() => {
+        refetchPendingOrders();
+        refetchActiveOrders();
+        queryClient.invalidateQueries({ queryKey: ["pdv-searchable-orders"] });
+      }, 300);
+    };
     const ch = supabase.channel(`pdv-tables-rt-${restaurantId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "tables", filter: `restaurant_id=eq.${restaurantId}` }, () => refetchTables())
-      .on("postgres_changes", { event: "*", schema: "public", table: "comandas", filter: `restaurant_id=eq.${restaurantId}` }, () => refetchTables())
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, () => { refetchPendingOrders(); refetchActiveOrders(); queryClient.invalidateQueries({ queryKey: ["pdv-searchable-orders"] }); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tables", filter: `restaurant_id=eq.${restaurantId}` }, debouncedTables)
+      .on("postgres_changes", { event: "*", schema: "public", table: "comandas", filter: `restaurant_id=eq.${restaurantId}` }, debouncedTables)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, debouncedOrders)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { clearTimeout(tablesTimer); clearTimeout(ordersTimer); supabase.removeChannel(ch); };
   }, [restaurantId, refetchTables, refetchPendingOrders, refetchActiveOrders, queryClient]);
 
   const filteredProducts = useMemo(() => {

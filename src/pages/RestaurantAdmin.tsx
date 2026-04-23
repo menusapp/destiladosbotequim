@@ -529,9 +529,9 @@ const RestaurantAdmin = () => {
       )
       .subscribe();
 
-    // Realtime para status is_open do restaurante (sincronizar entre contas)
+    // Realtime para status is_open do restaurante (canal único por restaurante para evitar colisão entre abas)
     const restaurantChannel = supabase
-      .channel('restaurant-status-sync')
+      .channel(`restaurant-status-sync-${restaurantId}`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
