@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 const SUPABASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -50,6 +51,7 @@ interface IntegrationsTabProps {
 }
 
 const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
+  const confirm = useConfirmDialog();
   // iFood state
   const [ifoodSheetOpen, setIfoodSheetOpen] = useState(false);
   const [ifoodConfig, setIfoodConfig] = useState<IfoodConfig | null>(null);
@@ -331,7 +333,13 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleMpDisconnect = async () => {
-    if (!confirm("Tem certeza que deseja desconectar o Mercado Pago? Você precisará reconectar para voltar a receber pagamentos online.")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Desconectar Mercado Pago?",
+      description: "Você precisará reconectar para voltar a receber pagamentos online.",
+      consequence: "Pedidos online em pagamentos pendentes podem ser afetados.",
+    });
+    if (!ok) return;
     setDisconnectingMp(true);
     try {
       const { error } = await supabase.rpc("admin_delete_payment_config", {

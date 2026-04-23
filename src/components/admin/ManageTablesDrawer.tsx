@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { Plus, Pencil, Trash2, Users, ImageIcon, X, Check } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface TableRow {
   id: string;
@@ -42,6 +43,7 @@ interface FormData {
 const emptyForm: FormData = { table_number: "", table_name: "", min_capacity: "1", max_capacity: "4", description: "", is_hidden: false };
 
 export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesChanged }: ManageTablesDrawerProps) => {
+  const confirm = useConfirmDialog();
   const [tables, setTables] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -254,7 +256,7 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
                       size="icon"
                       variant="ghost"
                       className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => { if (confirm("Excluir esta mesa?")) handleDelete(table.id); }}
+                      onClick={() => askDelete(table.id)}
                       disabled={!!table.is_occupied}
                     >
                       <Trash2 className="w-3.5 h-3.5" />

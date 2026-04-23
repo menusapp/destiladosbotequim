@@ -13,6 +13,7 @@ import { Plus, Edit, UserCheck, UserX, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_SECTIONS, STAFF_ROLES, ROLE_DEFAULT_SECTIONS, type StaffRole } from "@/lib/staffPermissions";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface StaffMember {
   id: string;
@@ -31,6 +32,7 @@ interface ContasTabProps {
 }
 
 const ContasTab = ({ restaurantId }: ContasTabProps) => {
+  const confirm = useConfirmDialog();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -207,9 +209,13 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
       return;
     }
 
-    if (!window.confirm(`Tem certeza que deseja excluir a conta de "${member.display_name}"? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
+    const ok = await confirm({
+      variant: "destructive",
+      title: `Excluir conta de "${member.display_name}"?`,
+      description: "Este funcionário perderá o acesso ao sistema imediatamente.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     const { data, error } = await supabase.rpc("admin_delete_staff", {
       p_staff_id: member.id,

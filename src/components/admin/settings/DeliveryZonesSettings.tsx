@@ -11,6 +11,7 @@ import { MapPin, Plus, Trash2, Edit, CircleDot } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import RadiusMapPicker from "./RadiusMapPicker";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface DeliveryZone {
   id: string;
@@ -28,6 +29,7 @@ interface DeliveryZone {
 }
 
 const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
+  const confirm = useConfirmDialog();
   const [zones, setZones] = useState<DeliveryZone[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -169,7 +171,13 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleDelete = async (zoneId: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta região?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir região de entrega?",
+      description: "Pedidos para esta região não terão taxa configurada.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     try {
       const { error } = await supabase

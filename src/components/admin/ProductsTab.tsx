@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { checkProductInActiveOrders } from "@/lib/dangerChecks";
 
 interface Product {
   id: string;
@@ -98,6 +100,7 @@ interface ExtraCategoryItem {
 }
 
 const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string; isRestaurantOpen: boolean }) => {
+  const confirm = useConfirmDialog();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -562,7 +565,13 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
   const handleDeleteExtraCategory = async (categoryId: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir categoria de complementos?",
+      description: "Os complementos desta categoria serão removidos dos produtos.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     const { error } = await supabase
       .from("extra_categories")
@@ -768,12 +777,27 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
   };
 
 const handleDelete = async (id: string) => {
-  if (!confirm("Tem certeza que deseja excluir este produto permanentemente?")) return;
-
   if (isRestaurantOpen) {
     toast.error("Feche o restaurante para excluir produtos");
     return;
   }
+
+  // Bloqueia exclusão se o produto está em pedidos ainda em andamento.
+  // Diferente das outras confirmações, esta é uma trava dura: não dá pra
+  // permitir mesmo que o usuário insista, pois apagar quebraria os pedidos.
+  const check = await checkProductInActiveOrders(id);
+  if (check.blocked) {
+    toast.error(check.reason || "Produto está em pedidos ativos.");
+    return;
+  }
+
+  const ok = await confirm({
+    variant: "destructive",
+    title: "Excluir produto permanentemente?",
+    description: "O produto será removido do cardápio e do PDV.",
+    consequence: "Esta ação não pode ser desfeita.",
+  });
+  if (!ok) return;
 
   try {
     const { error } = await supabase.rpc('admin_delete_product', {

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CreditCard, Plus, Trash2, Banknote, Smartphone, Receipt, Pencil } from "lucide-react";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface PaymentMethod {
   id: string;
@@ -48,6 +49,7 @@ const MEAL_VOUCHER_BRANDS = [
 ];
 
 const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
+  const confirm = useConfirmDialog();
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -135,7 +137,13 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleDelete = async (methodId: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta forma de pagamento?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir forma de pagamento?",
+      description: "Esta forma de pagamento ficará indisponível para novos pedidos.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     try {
       const { error } = await supabase

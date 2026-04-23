@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, FolderOpen } from "lucide-react";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface StockCategory {
   id: string;
@@ -18,6 +19,7 @@ interface StockCategoriesTabProps {
 }
 
 const StockCategoriesTab = ({ restaurantId }: StockCategoriesTabProps) => {
+  const confirm = useConfirmDialog();
   const [categories, setCategories] = useState<StockCategory[]>([]);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<StockCategory | null>(null);
@@ -74,7 +76,13 @@ const StockCategoriesTab = ({ restaurantId }: StockCategoriesTabProps) => {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir categoria de estoque?",
+      description: "Os insumos vinculados ficarão sem categoria.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     const { error } = await supabase
       .from("stock_categories")

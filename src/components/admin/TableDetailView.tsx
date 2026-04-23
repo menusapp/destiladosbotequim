@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/collapsible";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { checkOrderInPreparation } from "@/lib/dangerChecks";
 
 interface ComandaWithDetails {
   id: string;
@@ -74,6 +76,7 @@ interface Order {
 export const TableDetailView = () => {
   const { tableId } = useParams();
   const navigate = useNavigate();
+  const confirm = useConfirmDialog();
   const [tableNumber, setTableNumber] = useState<number>(0);
   const [comandas, setComandas] = useState<ComandaWithDetails[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
@@ -256,7 +259,13 @@ export const TableDetailView = () => {
   };
 
   const deleteOrder = async (orderId: string) => {
-    if (!confirm("Tem certeza que deseja excluir este pedido?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir pedido?",
+      description: "Todos os itens deste pedido serão removidos.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     try {
       const { error } = await supabase.rpc("admin_delete_order", {
@@ -273,8 +282,16 @@ export const TableDetailView = () => {
     }
   };
 
-  const cancelOrderItem = async (orderItemId: string, productName: string) => {
-    if (!confirm(`Cancelar "${productName}"? O item será removido do pedido e devolvido ao estoque.`)) return;
+  const cancelOrderItem = async (orderItemId: string, productName: string, orderStatus?: string) => {
+    const warnings = checkOrderInPreparation(orderStatus);
+    const ok = await confirm({
+      variant: "destructive",
+      title: `Cancelar "${productName}"?`,
+      description: "O item será removido do pedido e os insumos serão devolvidos ao estoque.",
+      consequence: "Esta ação não pode ser desfeita.",
+      warnings,
+    });
+    if (!ok) return;
     setCancellingItemId(orderItemId);
     try {
       const { error } = await supabase.rpc("admin_cancel_order_item", {
