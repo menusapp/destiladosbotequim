@@ -70,31 +70,40 @@ export default function LoyaltyManagement({ restaurantId }: LoyaltyManagementPro
     try {
       const { data, error } = await supabase
         .from("loyalty_points")
-        .select("*")
+        .select("customer_cpf, points_balance, total_earned, total_redeemed")
         .eq("restaurant_id", restaurantId)
         .order("total_earned", { ascending: false })
         .limit(10);
 
       if (error) throw error;
 
-      // Buscar nomes dos clientes (se disponível nos pedidos)
-      const customersWithNames = await Promise.all(
-        (data || []).map(async (customer) => {
-          const { data: orderData } = await supabase
-            .from("orders")
-            .select("customer_name")
-            .eq("customer_cpf", customer.customer_cpf)
-            .limit(1)
-            .single();
+      const baseList = data || [];
+      const cpfs = baseList.map((c) => c.customer_cpf).filter(Boolean);
 
-          return {
-            ...customer,
-            customer_name: orderData?.customer_name,
-          };
-        })
+      // Resolve customer names in a SINGLE query (was N+1: 10 customers → 10 queries).
+      // We pick the most-recent customer_name for each CPF in this restaurant.
+      const namesByCpf = new Map<string, string>();
+      if (cpfs.length > 0) {
+        const { data: ordersData } = await supabase
+          .from("orders")
+          .select("customer_cpf, customer_name, created_at")
+          .eq("restaurant_id", restaurantId)
+          .in("customer_cpf", cpfs)
+          .order("created_at", { ascending: false });
+
+        for (const row of ordersData || []) {
+          if (row.customer_cpf && row.customer_name && !namesByCpf.has(row.customer_cpf)) {
+            namesByCpf.set(row.customer_cpf, row.customer_name);
+          }
+        }
+      }
+
+      setTopCustomers(
+        baseList.map((customer) => ({
+          ...customer,
+          customer_name: namesByCpf.get(customer.customer_cpf),
+        })),
       );
-
-      setTopCustomers(customersWithNames);
     } catch (error) {
       console.error("Error fetching top customers:", error);
     }
