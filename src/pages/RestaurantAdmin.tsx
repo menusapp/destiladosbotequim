@@ -239,8 +239,14 @@ const RestaurantAdmin = () => {
           const orderId = order.id;
           const status = order.status;
           const shouldNotify = status === 'pending' || (order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status));
-          
-          if (orderRestaurantId === restaurantId && shouldNotify) {
+
+          // Filter by staff permission: only show notifications to users that opted in.
+          // Owner sessions (no staff_role set) keep receiving everything.
+          const staffRoleLS = localStorage.getItem('staff_role') || '';
+          const receivesRaw = localStorage.getItem('staff_receives_order_notifications');
+          const receivesNotifications = staffRoleLS === 'admin' || receivesRaw === null || receivesRaw === 'true';
+
+          if (orderRestaurantId === restaurantId && shouldNotify && receivesNotifications) {
             // Verificar se já foi notificado (usar ref para evitar stale closure)
             if (notifiedOrdersRef.current.has(orderId)) return;
 
