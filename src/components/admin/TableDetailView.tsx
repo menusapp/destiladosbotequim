@@ -82,6 +82,7 @@ export const TableDetailView = () => {
   const [expandedComandas, setExpandedComandas] = useState<Set<string>>(new Set());
   const [addItemsOrderId, setAddItemsOrderId] = useState<string | null>(null);
   const [cancellingItemId, setCancellingItemId] = useState<string | null>(null);
+  const { canManageOrders } = useStaffOrderPermissions();
 
   useEffect(() => {
     if (tableId) {

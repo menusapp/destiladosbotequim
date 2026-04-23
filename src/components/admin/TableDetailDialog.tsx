@@ -83,6 +83,7 @@ export const TableDetailDialog = ({
   const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
   const [addItemsOrderId, setAddItemsOrderId] = useState<string | null>(null);
   const [cancellingItem, setCancellingItem] = useState<{ id: string; name: string; total: number } | null>(null);
+  const { canManageOrders } = useStaffOrderPermissions();
 
   // Fetch active comandas for the table
   const { data: comandas, refetch: refetchComandas } = useQuery({
