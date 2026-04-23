@@ -12,10 +12,6 @@
  * Em impressoras NÃO-ESC/POS (ex.: HP LaserJet P1005), os bytes de
  * controle podem ser ignorados ou impressos como caracteres estranhos
  * — a aplicação NÃO quebra, apenas o corte/negrito não terão efeito.
- *
- * Uso no DevTools:
- *   await window.printOrderWithQz("ID_DO_PEDIDO")
- *   await window.printOrderWithQz("ID_DO_PEDIDO", "Nome Impressora")
  */
 
 import qz from "qz-tray";
@@ -43,36 +39,89 @@ const ESC = "\x1B";
 const GS = "\x1D";
 
 const ESCPOS = {
-  INIT: ESC + "@", // reset
+  INIT: ESC + "@",
   ALIGN_LEFT: ESC + "a" + "\x00",
   ALIGN_CENTER: ESC + "a" + "\x01",
   ALIGN_RIGHT: ESC + "a" + "\x02",
   BOLD_ON: ESC + "E" + "\x01",
   BOLD_OFF: ESC + "E" + "\x00",
-  DOUBLE_ON: GS + "!" + "\x11", // double width + height
-  DOUBLE_OFF: GS + "!" + "\x00",
-  // Corte total (full cut). Em impressoras sem suporte é ignorado.
+  UNDERLINE_ON: ESC + "-" + "\x01",
+  UNDERLINE_OFF: ESC + "-" + "\x00",
+  // GS ! n  (nibble alto = altura, nibble baixo = largura)
+  SIZE_NORMAL: GS + "!" + "\x00",
+  SIZE_DOUBLE_W: GS + "!" + "\x10",
+  SIZE_DOUBLE_H: GS + "!" + "\x01",
+  SIZE_DOUBLE: GS + "!" + "\x11",
+  SIZE_TRIPLE: GS + "!" + "\x22",
   CUT: GS + "V" + "\x00",
-  // Alimenta papel antes de cortar
+  FEED_2: "\n\n",
   FEED_3: "\n\n\n",
 };
 
 // =============================================================
 // Helpers de formatação
 // =============================================================
-function pad(text: string, width = LINE_WIDTH): string {
-  if (text.length >= width) return text.slice(0, width);
-  return text + " ".repeat(width - text.length);
+function center(text: string, width = LINE_WIDTH): string {
+  const t = text.length > width ? text.slice(0, width) : text;
+  const left = Math.max(0, Math.floor((width - t.length) / 2));
+  return " ".repeat(left) + t + "\n";
 }
 
 function divider(char = "-", width = LINE_WIDTH): string {
   return char.repeat(width) + "\n";
 }
 
+/** Word-wrap respeitando palavras; quebra à força palavras maiores que a largura. */
+function wrap(text: string, width = LINE_WIDTH, indent = ""): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  const max = Math.max(1, width - indent.length);
+  const pushWord = (w: string) => {
+    if (!current.length) {
+      if (w.length > max) {
+        for (let i = 0; i < w.length; i += max) lines.push(indent + w.slice(i, i + max));
+      } else current = w;
+    } else if (current.length + 1 + w.length <= max) {
+      current += " " + w;
+    } else {
+      lines.push(indent + current);
+      current = "";
+      if (w.length > max) {
+        for (let i = 0; i < w.length; i += max) lines.push(indent + w.slice(i, i + max));
+      } else current = w;
+    }
+  };
+  for (const w of words) pushWord(w);
+  if (current.length) lines.push(indent + current);
+  return lines;
+}
+
+/** Linha esquerda + direita; preço encostado na borda direita (1ª linha). */
 function lineLR(left: string, right: string, width = LINE_WIDTH): string {
-  const space = Math.max(1, width - right.length);
-  const l = left.length > space - 1 ? left.slice(0, space - 1) : left;
-  return l + " ".repeat(width - l.length - right.length) + right + "\n";
+  const space = Math.max(1, width - right.length - 1);
+  if (left.length <= space) {
+    return left + " ".repeat(width - left.length - right.length) + right + "\n";
+  }
+  const wrapped = wrap(left, space);
+  let out =
+    wrapped[0] +
+    " ".repeat(width - wrapped[0].length - right.length) +
+    right +
+    "\n";
+  for (let i = 1; i < wrapped.length; i++) out += wrapped[i] + "\n";
+  return out;
+}
+
+/** "Rótulo: valor" com wrap alinhado ao rótulo. */
+function labeled(label: string, value: string, width = LINE_WIDTH): string {
+  const prefix = `${label} `;
+  const indent = " ".repeat(prefix.length);
+  const lines = wrap(value, width - prefix.length);
+  if (!lines.length) return prefix + "\n";
+  let out = prefix + lines[0] + "\n";
+  for (let i = 1; i < lines.length; i++) out += indent + lines[i] + "\n";
+  return out;
 }
 
 function formatPrice(value: number): string {
@@ -81,7 +130,13 @@ function formatPrice(value: number): string {
 
 function formatDateTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("pt-BR");
+    return new Date(iso).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return iso;
   }
@@ -119,54 +174,85 @@ function buildCustomerReceipt(
   let out = "";
   out += ESCPOS.INIT;
 
-  // Cabeçalho (loja)
+  // ---------- Cabeçalho: nome da loja ----------
   out += ESCPOS.ALIGN_CENTER;
-  out += ESCPOS.BOLD_ON + ESCPOS.DOUBLE_ON;
-  out += storeName.toUpperCase() + "\n";
-  out += ESCPOS.DOUBLE_OFF + ESCPOS.BOLD_OFF;
-  out += "\n";
-  out += ESCPOS.BOLD_ON + "VIA DO CLIENTE" + ESCPOS.BOLD_OFF + "\n";
+  out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE;
+  for (const l of wrap(storeName.toUpperCase(), 21)) out += l + "\n";
+  out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
 
-  // Corpo
-  out += ESCPOS.ALIGN_LEFT;
   out += divider("=");
-  out += `Pedido: ${shortOrderId(order.id)}\n`;
-  out += `Status: ${order.status}\n`;
-  out += `Data:   ${formatDateTime(order.created_at)}\n`;
+  out += ESCPOS.BOLD_ON + center("VIA DO CLIENTE") + ESCPOS.BOLD_OFF;
+  out += divider("=");
+
+  // ---------- Número do pedido em destaque ----------
+  out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE;
+  out += center(`PEDIDO ${shortOrderId(order.id)}`, 21);
+  out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
+  out += "\n";
+
+  // ---------- Bloco: dados do pedido ----------
+  out += ESCPOS.ALIGN_LEFT;
+  out += labeled("Status: ", String(order.status).toUpperCase());
+  out += labeled("Data:   ", formatDateTime(order.created_at));
   out += divider();
 
-  out += `Cliente: ${order.customer_name || "-"}\n`;
-  if (order.customer_cpf) out += `CPF:     ${order.customer_cpf}\n`;
+  // ---------- Bloco: cliente ----------
+  out += labeled("Cliente:", order.customer_name || "-");
+  if (order.customer_cpf) out += labeled("CPF:    ", order.customer_cpf);
   if (order.tables) {
     const tname = order.tables.table_name?.trim();
     const tnum = order.tables.table_number;
-    out += `Mesa:    ${tname ? `${tname} (Nº ${tnum})` : `Mesa ${tnum}`}\n`;
+    out += labeled(
+      "Mesa:   ",
+      tname ? `${tname} (Nº ${tnum})` : `Mesa ${tnum}`
+    );
   }
   out += divider();
 
-  // Itens
-  out += ESCPOS.BOLD_ON + pad("ITENS") + "\n" + ESCPOS.BOLD_OFF;
+  // ---------- Bloco: itens ----------
+  out += ESCPOS.BOLD_ON + center("ITENS DO PEDIDO") + ESCPOS.BOLD_OFF;
   out += divider();
 
   let total = 0;
   for (const item of order.order_items) {
     const subtotal = item.price_at_order * item.quantity;
     total += subtotal;
-    out += lineLR(
-      `${item.quantity}x ${item.products.name}`,
-      formatPrice(subtotal)
-    );
-    if (item.notes && item.notes.trim()) {
-      out += `   Obs: ${item.notes.trim()}\n`;
+
+    const qty = `${item.quantity}x`.padEnd(3);
+    const left = `${qty} ${item.products.name}`;
+    out += lineLR(left, formatPrice(subtotal));
+
+    if (item.quantity > 1) {
+      out +=
+        "    " +
+        `(${item.quantity} x ${formatPrice(item.price_at_order)})` +
+        "\n";
     }
+
+    if (item.notes && item.notes.trim()) {
+      const obsLines = wrap(`>> Obs: ${item.notes.trim()}`, LINE_WIDTH - 4);
+      out += ESCPOS.BOLD_ON;
+      for (const l of obsLines) out += "    " + l + "\n";
+      out += ESCPOS.BOLD_OFF;
+    }
+    out += "\n";
   }
 
   out += divider();
-  out += ESCPOS.BOLD_ON + lineLR("TOTAL", formatPrice(total)) + ESCPOS.BOLD_OFF;
+
+  // ---------- Totais ----------
+  out += lineLR("Subtotal", formatPrice(total));
+  out += divider("=");
+  out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE_H;
+  out += lineLR("TOTAL", formatPrice(total));
+  out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
   out += divider("=");
 
+  // ---------- Rodapé ----------
+  out += "\n";
   out += ESCPOS.ALIGN_CENTER;
-  out += "Obrigado pela preferencia!\n";
+  out += ESCPOS.BOLD_ON + "Obrigado pela preferencia!\n" + ESCPOS.BOLD_OFF;
+  out += "Volte sempre :)\n";
 
   out += ESCPOS.FEED_3;
   out += ESCPOS.CUT;
@@ -177,48 +263,56 @@ function buildKitchenReceipt(order: OrderForPrinting): string {
   let out = "";
   out += ESCPOS.INIT;
 
+  // ---------- Cabeçalho ----------
   out += ESCPOS.ALIGN_CENTER;
-  out += ESCPOS.BOLD_ON + ESCPOS.DOUBLE_ON;
-  out += "VIA DA COZINHA\n";
-  out += ESCPOS.DOUBLE_OFF;
-  out += `Pedido ${shortOrderId(order.id)}\n`;
-  out += ESCPOS.BOLD_OFF;
-
-  out += ESCPOS.ALIGN_LEFT;
+  out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE;
+  out += center("VIA DA COZINHA", 21);
+  out += ESCPOS.SIZE_NORMAL;
   out += divider("=");
 
+  // Número do pedido bem grande (3x)
+  out += ESCPOS.SIZE_TRIPLE;
+  out += center(shortOrderId(order.id), 14);
+  out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
+  out += divider("=");
+
+  // ---------- Identificação ----------
+  out += ESCPOS.ALIGN_LEFT;
   if (order.tables) {
     const tname = order.tables.table_name?.trim();
     const tnum = order.tables.table_number;
-    out +=
-      ESCPOS.BOLD_ON +
-      `MESA: ${tname ? `${tname} (Nº ${tnum})` : tnum}\n` +
-      ESCPOS.BOLD_OFF;
+    const mesaStr = tname ? `${tname} (Nº ${tnum})` : `Mesa ${tnum}`;
+    out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE_H;
+    out += "MESA: " + mesaStr + "\n";
+    out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
   }
-  out += `Cliente: ${order.customer_name || "-"}\n`;
-  out += `Hora:    ${formatDateTime(order.created_at)}\n`;
+  out += labeled("Cliente:", order.customer_name || "-");
+  out += labeled("Hora:   ", formatDateTime(order.created_at));
   out += divider();
 
-  out += ESCPOS.BOLD_ON + "ITENS A PREPARAR\n" + ESCPOS.BOLD_OFF;
+  // ---------- Itens ----------
+  out += ESCPOS.BOLD_ON + center("ITENS A PREPARAR") + ESCPOS.BOLD_OFF;
   out += divider();
 
   for (const item of order.order_items) {
-    out +=
-      ESCPOS.BOLD_ON +
-      ESCPOS.DOUBLE_ON +
-      `${item.quantity}x ${item.products.name}\n` +
-      ESCPOS.DOUBLE_OFF +
-      ESCPOS.BOLD_OFF;
+    out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE;
+    for (const l of wrap(`${item.quantity}x ${item.products.name}`, 21))
+      out += l + "\n";
+    out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
 
     if (item.notes && item.notes.trim()) {
+      const obsLines = wrap(
+        `>> OBS: ${item.notes.trim().toUpperCase()}`,
+        LINE_WIDTH
+      );
       out += ESCPOS.BOLD_ON;
-      out += `>> OBS: ${item.notes.trim().toUpperCase()}\n`;
+      for (const l of obsLines) out += l + "\n";
       out += ESCPOS.BOLD_OFF;
     }
-    out += "\n";
+    out += divider("-");
   }
 
-  out += divider("=");
+  out += "\n";
   out += ESCPOS.FEED_3;
   out += ESCPOS.CUT;
   return out;
@@ -313,7 +407,6 @@ export async function printOrderWithQz(
 
     const config = qz.configs.create(usedPrinter);
 
-    // Duas vias — corte já incluso ao final de cada bloco
     const data = [
       { type: "raw", format: "plain", data: customer },
       { type: "raw", format: "plain", data: kitchen },
