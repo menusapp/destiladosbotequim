@@ -16,6 +16,7 @@ const PaymentMethodsSettings = lazy(() => import("./PaymentMethodsSettings"));
 const OnlinePaymentsSettings = lazy(() => import("./OnlinePaymentsSettings"));
 const PrintersSettings = lazy(() => import("./PrintersSettings"));
 const BackupSettings = lazy(() => import("./BackupSettings"));
+const ShareableLinksSection = lazy(() => import("./ShareableLinksSection"));
 
 interface Settings {
   logo_url: string | null;
