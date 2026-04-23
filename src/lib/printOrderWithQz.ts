@@ -713,7 +713,7 @@ export async function printOrderWithQz(
       escposLikely,
       error: message,
       errorCode: "unknown",
-    };
+    });
   } finally {
     try {
       if (qz.websocket.isActive()) {
