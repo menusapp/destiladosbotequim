@@ -67,6 +67,7 @@ import QRCode from "qrcode";
 import { format, formatDistanceToNow, isToday, parseISO, addMinutes, isBefore, isAfter } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface Comanda {
   id: string;
@@ -113,6 +114,7 @@ type TableStatus = "available" | "occupied" | "reserved";
 
 const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   const navigate = useNavigate();
+  const confirm = useConfirmDialog();
   const [tables, setTables] = useState<Table[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [reservationsEnabled, setReservationsEnabled] = useState(false);

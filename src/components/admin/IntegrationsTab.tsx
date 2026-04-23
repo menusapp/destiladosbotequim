@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 const SUPABASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -50,6 +51,7 @@ interface IntegrationsTabProps {
 }
 
 const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
+  const confirm = useConfirmDialog();
   // iFood state
   const [ifoodSheetOpen, setIfoodSheetOpen] = useState(false);
   const [ifoodConfig, setIfoodConfig] = useState<IfoodConfig | null>(null);

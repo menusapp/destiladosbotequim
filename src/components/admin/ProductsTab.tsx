@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { checkProductInActiveOrders } from "@/lib/dangerChecks";
 
 interface Product {
   id: string;
@@ -98,6 +100,7 @@ interface ExtraCategoryItem {
 }
 
 const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string; isRestaurantOpen: boolean }) => {
+  const confirm = useConfirmDialog();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);

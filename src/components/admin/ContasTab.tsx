@@ -13,6 +13,7 @@ import { Plus, Edit, UserCheck, UserX, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_SECTIONS, STAFF_ROLES, ROLE_DEFAULT_SECTIONS, type StaffRole } from "@/lib/staffPermissions";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface StaffMember {
   id: string;
@@ -31,6 +32,7 @@ interface ContasTabProps {
 }
 
 const ContasTab = ({ restaurantId }: ContasTabProps) => {
+  const confirm = useConfirmDialog();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);

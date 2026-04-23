@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { Plus, Pencil, Trash2, Users, ImageIcon, X, Check } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface TableRow {
   id: string;
@@ -42,6 +43,7 @@ interface FormData {
 const emptyForm: FormData = { table_number: "", table_name: "", min_capacity: "1", max_capacity: "4", description: "", is_hidden: false };
 
 export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesChanged }: ManageTablesDrawerProps) => {
+  const confirm = useConfirmDialog();
   const [tables, setTables] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

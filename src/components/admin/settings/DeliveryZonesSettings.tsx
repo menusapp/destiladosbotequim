@@ -11,6 +11,7 @@ import { MapPin, Plus, Trash2, Edit, CircleDot } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import RadiusMapPicker from "./RadiusMapPicker";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface DeliveryZone {
   id: string;
@@ -28,6 +29,7 @@ interface DeliveryZone {
 }
 
 const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
+  const confirm = useConfirmDialog();
   const [zones, setZones] = useState<DeliveryZone[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);

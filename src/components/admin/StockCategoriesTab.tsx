@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, FolderOpen } from "lucide-react";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 
 interface StockCategory {
   id: string;
@@ -18,6 +19,7 @@ interface StockCategoriesTabProps {
 }
 
 const StockCategoriesTab = ({ restaurantId }: StockCategoriesTabProps) => {
+  const confirm = useConfirmDialog();
   const [categories, setCategories] = useState<StockCategory[]>([]);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<StockCategory | null>(null);

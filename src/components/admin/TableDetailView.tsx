@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/collapsible";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { checkOrderInPreparation } from "@/lib/dangerChecks";
 
 interface ComandaWithDetails {
   id: string;
@@ -74,6 +76,7 @@ interface Order {
 export const TableDetailView = () => {
   const { tableId } = useParams();
   const navigate = useNavigate();
+  const confirm = useConfirmDialog();
   const [tableNumber, setTableNumber] = useState<number>(0);
   const [comandas, setComandas] = useState<ComandaWithDetails[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
