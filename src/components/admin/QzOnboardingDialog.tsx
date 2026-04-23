@@ -37,6 +37,7 @@ import {
   setSavedQzPrinter,
   dismissQzOnboarding,
 } from "@/lib/qzPrinterConfig";
+import { ensureQzConnected } from "@/lib/qzConnectionManager";
 
 type Step = "intro" | "connecting" | "select" | "testing" | "done" | "error";
 
@@ -71,9 +72,7 @@ export const QzOnboardingDialog = ({ open, onClose }: Props) => {
     setStep("connecting");
     setErrorMsg("");
     try {
-      if (!qz.websocket.isActive()) {
-        await qz.websocket.connect();
-      }
+      await ensureQzConnected();
       const list = (await qz.printers.find()) as string[];
       setPrinters(list);
       if (list.length === 0) {
@@ -107,7 +106,7 @@ export const QzOnboardingDialog = ({ open, onClose }: Props) => {
     setStep("testing");
     setErrorMsg("");
     try {
-      if (!qz.websocket.isActive()) await qz.websocket.connect();
+      await ensureQzConnected();
       const config = qz.configs.create(selected);
       await qz.print(config, [{ type: "raw", format: "plain", data: SAMPLE_TEXT }]);
       setSavedQzPrinter(selected);

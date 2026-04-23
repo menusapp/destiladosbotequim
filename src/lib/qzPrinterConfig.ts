@@ -75,23 +75,13 @@ export function clearSavedQzPrinter(): void {
   }
 }
 
-/** Lista impressoras conectando ao QZ Tray (e desconecta ao final). */
+/** Lista impressoras conectando ao QZ Tray (mantém conexão viva via manager). */
 export async function listQzPrinters(): Promise<string[]> {
-  const wasActive = qz.websocket.isActive();
-  try {
-    if (!wasActive) await qz.websocket.connect();
-    const printers = (await qz.printers.find()) as string[];
-    console.log(`🖨️ [QZ Config] ${printers.length} impressora(s):`, printers);
-    return printers;
-  } finally {
-    if (!wasActive && qz.websocket.isActive()) {
-      try {
-        await qz.websocket.disconnect();
-      } catch {
-        // ignore
-      }
-    }
-  }
+  const { ensureQzConnected } = await import("@/lib/qzConnectionManager");
+  await ensureQzConnected();
+  const printers = (await qz.printers.find()) as string[];
+  console.log(`🖨️ [QZ Config] ${printers.length} impressora(s):`, printers);
+  return printers;
 }
 
 /**
