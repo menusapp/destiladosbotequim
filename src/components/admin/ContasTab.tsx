@@ -316,6 +316,45 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
                 </Select>
               </div>
 
+              {/* Order permissions */}
+              <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+                <p className="text-sm font-semibold">Permissões de pedidos</p>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Receber notificações de pedidos</p>
+                    <p className="text-xs text-muted-foreground">
+                      Novos pedidos de delivery e mesa aparecerão para esta conta
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formRole === "admin" ? true : formReceivesOrderNotifications}
+                    disabled={formRole === "admin"}
+                    onCheckedChange={setFormReceivesOrderNotifications}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Aceitar e recusar pedidos</p>
+                    <p className="text-xs text-muted-foreground">
+                      Esta conta pode confirmar ou cancelar pedidos recebidos
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formRole === "admin" ? true : formCanManageOrders}
+                    disabled={formRole === "admin"}
+                    onCheckedChange={setFormCanManageOrders}
+                  />
+                </div>
+
+                {formRole === "admin" && (
+                  <p className="text-xs text-muted-foreground italic">
+                    O administrador sempre tem acesso total.
+                  </p>
+                )}
+              </div>
+
               {/* Permissions checkboxes */}
               {formRole !== "admin" && (
                 <div className="space-y-2">
