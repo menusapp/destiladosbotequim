@@ -71,12 +71,87 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Build enriched context: if order_id is provided, fetch items + totals
+    // and expose them as {{resumo_pedido}} and {{total_pedido}}.
+    const enrichedContext: Record<string, unknown> = { ...(context || {}) };
+
+    const orderId = (context && typeof context === 'object') ? (context as any).order_id : null;
+    const needsSummary = orderId && (template.includes('{{resumo_pedido}}') || template.includes('{{total_pedido}}'));
+
+    if (needsSummary) {
+      try {
+        const { data: order } = await supabase
+          .from('orders')
+          .select('id, delivery_fee, coupon_discount, delivery_address, delivery_type, order_type, notes')
+          .eq('id', orderId)
+          .maybeSingle();
+
+        const { data: items } = await supabase
+          .from('order_items')
+          .select('quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name))')
+          .eq('order_id', orderId);
+
+        const fmt = (n: number) => `R$ ${Number(n || 0).toFixed(2).replace('.', ',')}`;
+
+        const lines: string[] = ['📋 *Resumo do Pedido*', ''];
+        let subtotal = 0;
+
+        (items || []).forEach((it: any, idx: number) => {
+          const qty = Number(it.quantity || 1);
+          const unit = Number(it.price_at_order || 0);
+          const extrasArr = Array.isArray(it.order_item_extras) ? it.order_item_extras : [];
+          const extrasUnit = extrasArr.reduce((s: number, e: any) => s + Number(e.price_at_order || 0), 0);
+          const lineTotal = (unit + extrasUnit) * qty;
+          subtotal += lineTotal;
+
+          const productName = it.products?.name || 'Item';
+          lines.push(`${idx + 1}. *${productName}* x${qty} — ${fmt(lineTotal)}`);
+
+          extrasArr.forEach((e: any) => {
+            const extraName = e.extra_name || e.product_extras?.name || 'Adicional';
+            const extraPrice = Number(e.price_at_order || 0);
+            if (extraPrice > 0) {
+              lines.push(`   + ${extraName} (${fmt(extraPrice)})`);
+            } else {
+              lines.push(`   + ${extraName}`);
+            }
+          });
+
+          if (it.notes) lines.push(`   📝 ${it.notes}`);
+        });
+
+        const deliveryFee = Number(order?.delivery_fee || 0);
+        const discount = Number(order?.coupon_discount || 0);
+        const total = subtotal + deliveryFee - discount;
+
+        if (deliveryFee > 0 || discount > 0) {
+          lines.push('');
+          lines.push(`Subtotal: ${fmt(subtotal)}`);
+          if (deliveryFee > 0) lines.push(`🚚 Taxa de entrega: ${fmt(deliveryFee)}`);
+          if (discount > 0) lines.push(`🎟️ Desconto: -${fmt(discount)}`);
+        }
+
+        if (order?.delivery_address) {
+          lines.push('');
+          lines.push(`📍 ${order.delivery_address}`);
+        }
+
+        lines.push('');
+        lines.push(`💰 *Total: ${fmt(total)}*`);
+
+        enrichedContext.resumo_pedido = lines.join('\n');
+        enrichedContext.total_pedido = fmt(total);
+      } catch (summaryErr) {
+        console.warn('[NOTIF] Failed to build order summary:', summaryErr);
+        enrichedContext.resumo_pedido = '';
+        enrichedContext.total_pedido = '';
+      }
+    }
+
     // Replace variables in template
     let message = template;
-    if (context && typeof context === 'object') {
-      for (const [key, value] of Object.entries(context)) {
-        message = message.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value || ''));
-      }
+    for (const [key, value] of Object.entries(enrichedContext)) {
+      message = message.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value ?? ''));
     }
 
     // Determine recipient phone
