@@ -13,6 +13,21 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/** Normaliza o secret: aceita PEM, PEM com \n escapados, ou base64 puro. */
+function normalizePem(raw: string): string {
+  const cleaned = raw.replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim();
+  if (cleaned.includes("BEGIN")) return cleaned;
+  // Base64 puro → assume PKCS#8 PRIVATE KEY (mais comum p/ secrets simples)
+  const b64 = cleaned.replace(/\s+/g, "");
+  const lines = b64.match(/.{1,64}/g) ?? [b64];
+  return [
+    "-----BEGIN PRIVATE KEY-----",
+    ...lines,
+    "-----END PRIVATE KEY-----",
+    "",
+  ].join("\n");
+}
+
 /** Converte PEM (PKCS#1 ou PKCS#8) → ArrayBuffer pronto pro WebCrypto. */
 function pemToArrayBuffer(pem: string): ArrayBuffer {
   const cleaned = pem
