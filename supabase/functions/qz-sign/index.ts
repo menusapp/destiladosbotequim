@@ -86,9 +86,12 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
 let cachedKey: CryptoKey | null = null;
 async function getKey(): Promise<CryptoKey> {
   if (cachedKey) return cachedKey;
-  const pem = Deno.env.get("QZ_PRIVATE_KEY");
-  if (!pem) throw new Error("QZ_PRIVATE_KEY not configured");
+  const raw = Deno.env.get("QZ_PRIVATE_KEY");
+  if (!raw) throw new Error("QZ_PRIVATE_KEY not configured");
+  const pem = normalizePem(raw);
+  console.log("[qz-sign] Importing private key (PKCS#1?", pem.includes("RSA PRIVATE KEY"), ")");
   cachedKey = await importPrivateKey(pem);
+  console.log("[qz-sign] Private key imported successfully");
   return cachedKey;
 }
 
