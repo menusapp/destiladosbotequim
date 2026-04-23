@@ -63,7 +63,10 @@ export function setupQzSigning(): void {
   qz.security.setCertificatePromise((resolve: (cert: string) => void, reject: (e: any) => void) => {
     if (!certPromise) certPromise = fetchCertificate();
     certPromise
-      .then(resolve)
+      .then((cert) => {
+        console.log("🔐 [QZ] Certificado carregado (", cert.length, "chars)");
+        resolve(cert);
+      })
       .catch((err) => {
         console.warn("[qz-signing] certificado indisponível, fallback:", err?.message ?? err);
         certPromise = null;
@@ -73,8 +76,12 @@ export function setupQzSigning(): void {
 
   qz.security.setSignaturePromise((toSign: string) => {
     return (resolve: (sig: string) => void, reject: (e: any) => void) => {
+      console.log("🔐 [QZ] Assinatura solicitada (", toSign.length, "bytes)");
       signRequest(toSign)
-        .then(resolve)
+        .then((sig) => {
+          console.log("🔐 [QZ] Assinatura recebida (", sig.length, "chars base64)");
+          resolve(sig);
+        })
         .catch((err) => {
           console.warn("[qz-signing] assinatura falhou, fallback:", err?.message ?? err);
           reject(err);
