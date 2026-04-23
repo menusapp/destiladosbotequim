@@ -20,16 +20,13 @@ export interface QzTestResult {
 }
 
 /**
- * Conecta ao QZ Tray, lista impressoras e desconecta.
+ * Conecta ao QZ Tray, lista impressoras e mantém a conexão ativa.
  * Loga tudo no console para validação manual.
  */
 export async function testQzTrayConnection(): Promise<QzTestResult> {
   console.group("🖨️ [QZ Tray] Teste de conexão");
 
   try {
-    // Para o teste em modo "trusted-less" (sem certificado assinado),
-    // o QZ Tray pedirá confirmação manual ao usuário no primeiro acesso.
-    // Em produção, configure assinatura digital — por enquanto isso é só teste.
     if (!qz.websocket.isActive()) {
       console.log("⏳ Conectando ao QZ Tray (ws://localhost:8181)…");
       await qz.websocket.connect();
@@ -60,6 +57,7 @@ export async function testQzTrayConnection(): Promise<QzTestResult> {
     };
 
     console.log("📦 Resultado completo:", result);
+    console.log("🔒 [QZ Tray] conexão mantida ativa para reutilização.");
     console.groupEnd();
     return result;
   } catch (error) {
@@ -76,16 +74,6 @@ export async function testQzTrayConnection(): Promise<QzTestResult> {
       version: null,
       error: message,
     };
-  } finally {
-    // Desconecta para não manter o WebSocket aberto após o teste
-    try {
-      if (qz.websocket.isActive()) {
-        await qz.websocket.disconnect();
-        console.log("🔌 [QZ Tray] Desconectado.");
-      }
-    } catch {
-      // ignore
-    }
   }
 }
 

@@ -140,14 +140,28 @@ export function ensureQzConnected(options: ConnectOptions = {}): Promise<void> {
     retries: options.retries ?? 3,
   };
 
-  // Se já está conectado E o socket está mesmo ativo → resolve imediato.
-  if (status === "connected" && qz.websocket.isActive()) {
+  setupQzSigning();
+  attachWsListenersOnce();
+
+  // Se o socket já está ativo, reaproveita a conexão existente mesmo que o
+  // status interno esteja desatualizado.
+  if (qz.websocket.isActive()) {
+    if (status !== "connected") {
+      console.log("ℹ️ [QZ Manager] socket já ativo; sincronizando status sem reconectar.");
+    } else {
+      console.log("ℹ️ [QZ Manager] já conectado; reutilizando conexão ativa.");
+    }
+    setStatus("connected");
     return Promise.resolve();
   }
 
   // Se há uma tentativa em andamento, retorna a MESMA promise (dedup).
-  if (inFlight) return inFlight;
+  if (inFlight) {
+    console.log("⏳ [QZ Manager] conexão já em andamento; reutilizando promise existente.");
+    return inFlight;
+  }
 
+  console.log("🔄 [QZ Manager] conexão necessária; iniciando ensureQzConnected().");
   inFlight = doConnect(opts).finally(() => {
     inFlight = null;
   });

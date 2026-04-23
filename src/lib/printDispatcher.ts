@@ -102,8 +102,9 @@ export async function printDocument(
     return;
   }
 
-  // Verifica conexão silenciosamente — só avisa se falhar (no momento da impressão).
-  const status = await checkQzTrayConnection();
+  // Verifica conexão silenciosamente — se precisar conectar, usa o manager central
+  // e mantém o socket aberto para as próximas impressões.
+  const status = await checkQzTrayConnection({ connectIfNeeded: true });
   if (!status.ok) {
     if (showToasts) {
       toast.error("QZ Tray não está conectado", {

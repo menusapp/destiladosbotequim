@@ -1,62 +1,58 @@
 /**
  * Pré-validação de conexão com o QZ Tray.
  *
- * Tenta abrir uma conexão WebSocket curta com o QZ Tray (ws://localhost:8181)
- * para verificar se o aplicativo está instalado e em execução na máquina
- * do usuário ANTES de tentar imprimir.
+ * Suporta dois modos:
+ * - passivo: apenas verifica se já existe conexão ativa, SEM abrir popup
+ * - ativo: usa o gerenciador central para conectar quando necessário
  *
- * - NÃO altera a impressão antiga (window.print).
- * - NÃO interfere no fluxo de printOrderWithQz — apenas adiciona uma checagem
- *   prévia para evitar tentativas de impressão sem QZ ativo.
+ * Importante: nunca fecha a conexão depois da checagem.
  */
 
 import qz from "qz-tray";
+import { ensureQzConnected } from "@/lib/qzConnectionManager";
 
 export type QzConnectionStatus =
   | { ok: true; alreadyConnected: boolean }
   | { ok: false; reason: string };
 
-/**
- * Verifica se o QZ Tray está disponível.
- * Se não estava conectado e a checagem abrir conexão para testar,
- * a conexão é fechada ao final para não interferir no estado global.
- */
+interface CheckQzTrayConnectionOptions {
+  timeoutMs?: number;
+  connectIfNeeded?: boolean;
+}
+
 export async function checkQzTrayConnection(
-  timeoutMs = 3000
+  options: number | CheckQzTrayConnectionOptions = {}
 ): Promise<QzConnectionStatus> {
+  const normalized =
+    typeof options === "number"
+      ? { timeoutMs: options, connectIfNeeded: true }
+      : {
+          timeoutMs: options.timeoutMs ?? 3000,
+          connectIfNeeded: options.connectIfNeeded ?? true,
+        };
+
   console.group("🔎 [QZ Check] Verificando conexão com QZ Tray…");
   try {
     if (qz.websocket.isActive()) {
-      console.log("✅ QZ Tray já está conectado.");
+      console.log("✅ [QZ Check] conexão já ativa.");
       console.groupEnd();
       return { ok: true, alreadyConnected: true };
     }
 
-    console.log("⏳ Tentando conectar a ws://localhost:8181…");
-    const connectPromise = qz.websocket.connect();
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error("Tempo esgotado ao conectar ao QZ Tray")),
-        timeoutMs
-      )
-    );
-
-    await Promise.race([connectPromise, timeoutPromise]);
-    console.log("✅ Conexão com QZ Tray estabelecida.");
-
-    // Fecha a conexão de teste — printOrderWithQz reabre quando necessário.
-    try {
-      await qz.websocket.disconnect();
-      console.log("🔌 Conexão de teste fechada.");
-    } catch {
-      // ignore
+    if (!normalized.connectIfNeeded) {
+      console.log("ℹ️ [QZ Check] modo passivo: não vai conectar automaticamente.");
+      console.groupEnd();
+      return { ok: false, reason: "QZ Tray desconectado" };
     }
 
+    console.log("🔄 [QZ Check] sem conexão ativa; solicitando conexão ao manager.");
+    await ensureQzConnected({ timeoutMs: normalized.timeoutMs, retries: 1 });
+    console.log("✅ [QZ Check] conexão estabelecida e mantida ativa.");
     console.groupEnd();
     return { ok: true, alreadyConnected: false };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn("❌ QZ Tray indisponível:", message);
+    console.warn("❌ [QZ Check] QZ Tray indisponível:", message);
     console.groupEnd();
     return { ok: false, reason: message };
   }

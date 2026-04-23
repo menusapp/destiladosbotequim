@@ -59,10 +59,8 @@ export async function testPrintQz(
       );
     }
 
-    // Configuração simples (sem ESC/POS, sem corte)
     const config = qz.configs.create(usedPrinter);
 
-    // Dados em formato "raw" texto puro
     const data = [
       {
         type: "raw",
@@ -77,6 +75,7 @@ export async function testPrintQz(
     await qz.print(config, data);
 
     console.log("✅ Impressão enviada com sucesso.");
+    console.log("🔒 [QZ Tray] conexão mantida ativa para reutilização.");
     console.groupEnd();
     return { success: true, printer: usedPrinter };
   } catch (error) {
@@ -87,15 +86,6 @@ export async function testPrintQz(
     );
     console.groupEnd();
     return { success: false, printer: usedPrinter, error: message };
-  } finally {
-    try {
-      if (qz.websocket.isActive()) {
-        await qz.websocket.disconnect();
-        console.log("🔌 [QZ Tray] Desconectado.");
-      }
-    } catch {
-      // ignore
-    }
   }
 }
 
