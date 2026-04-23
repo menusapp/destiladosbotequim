@@ -20,6 +20,8 @@ export const useInactivityLogout = () => {
       localStorage.removeItem('staff_name');
       localStorage.removeItem('staff_role');
       localStorage.removeItem('staff_allowed_sections');
+      localStorage.removeItem('staff_can_manage_orders');
+      localStorage.removeItem('staff_receives_order_notifications');
       toast.info("Sessão expirada por inatividade");
       navigate("/login/staff");
     }, INACTIVITY_TIMEOUT);
