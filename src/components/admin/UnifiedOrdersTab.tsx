@@ -348,92 +348,16 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     await printDocument(order as any, restaurantId);
   };
 
-  const handleQuickPrintQz = async (e: React.MouseEvent, order: Order) => {
+  const handleQuickPrintForce = async (
+    e: React.MouseEvent,
+    order: Order,
+    method: "pdf" | "qz_tray"
+  ) => {
     e.stopPropagation();
-    const saved = getSavedQzPrinter();
-    if (!saved) {
-      toast.warning("Nenhuma impressora térmica configurada", {
-        description: "Vá em Configurações Gerais → Impressoras para selecionar uma impressora QZ Tray.",
-        duration: 6000,
-      });
-      return;
-    }
-
-    const checkToastId = toast.loading("Verificando conexão com QZ Tray...");
-    const status = await checkQzTrayConnection();
-    if (!status.ok) {
-      toast.error("QZ Tray não está conectado", {
-        id: checkToastId,
-        description:
-          "Abra o aplicativo QZ Tray na sua máquina e tente novamente. Se ainda não tem instalado, baixe em qz.io.",
-        duration: 8000,
-      });
-      return;
-    }
-
-    toast.loading("Enviando para impressão...", {
-      id: checkToastId,
-      description: `Impressora: ${saved}`,
+    await printDocument(order as any, restaurantId, {
+      forcePdf: method === "pdf",
+      forceQz: method === "qz_tray",
     });
-    try {
-      const result = await printOrderWithQz(order.id);
-      if (result.success) {
-        toast.success("Pedido enviado para impressora", {
-          id: checkToastId,
-          description: result.printer ?? saved,
-        });
-      } else {
-        // Mensagens específicas por código de erro
-        const code = result.errorCode;
-        if (code === "printer_not_available") {
-          toast.error("Impressora indisponível", {
-            id: checkToastId,
-            description: `"${saved}" não está conectada. Vá em Configurações Gerais → Impressoras e escolha outra.`,
-            duration: 9000,
-          });
-        } else if (code === "no_printers_found") {
-          toast.error("Nenhuma impressora detectada", {
-            id: checkToastId,
-            description: "Conecte uma impressora ao computador e tente novamente.",
-            duration: 8000,
-          });
-        } else if (code === "print_timeout") {
-          toast.error("Tempo esgotado na impressão", {
-            id: checkToastId,
-            description: `A impressora "${saved}" não respondeu. Verifique se está ligada e online.`,
-            duration: 9000,
-          });
-        } else if (code === "no_printer_configured") {
-          toast.warning("Nenhuma impressora configurada", {
-            id: checkToastId,
-            description: "Vá em Configurações Gerais → Impressoras.",
-            duration: 8000,
-          });
-        } else if (code === "qz_connect_failed") {
-          toast.error("QZ Tray não respondeu", {
-            id: checkToastId,
-            description: "Verifique se o aplicativo QZ Tray está aberto.",
-            duration: 8000,
-          });
-        } else {
-          toast.error("Erro ao imprimir via QZ Tray", {
-            id: checkToastId,
-            description: result.error ?? "Falha desconhecida",
-            duration: 8000,
-          });
-        }
-      }
-    } catch (err: any) {
-      // Garantia extra: encerra o loading mesmo em erro inesperado
-      toast.error("Erro inesperado na impressão", {
-        id: checkToastId,
-        description: err?.message ?? String(err),
-        duration: 8000,
-      });
-    } finally {
-      // Failsafe: dismiss caso o toast ainda esteja em loading
-      toast.dismiss(checkToastId);
-    }
   };
 
   const handleQuickCancel = (e: React.MouseEvent, order: Order) => {
