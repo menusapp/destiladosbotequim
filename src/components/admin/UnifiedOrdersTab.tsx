@@ -112,11 +112,22 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [previewOrderId, setPreviewOrderId] = useState<string | null>(null);
 
+  // Initial load + refetch when date range changes
   useEffect(() => {
     fetchOrders();
-    const cleanup = setupRealtime();
-    return cleanup;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantId, dateRange]);
+
+  // Centralized realtime: coalesces order/order_items bursts into a single refetch
+  useRealtimeChannel({
+    channelName: `unified-orders-${restaurantId}`,
+    bindings: [
+      { table: "orders", filter: `restaurant_id=eq.${restaurantId}` },
+      { table: "order_items" },
+    ],
+    onChange: () => fetchOrders(),
+    debounceMs: 400,
+  });
 
   useEffect(() => {
     if (pendingOrderToOpen && orders.length > 0) {
@@ -227,20 +238,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     return () => { active = false; clearInterval(interval); };
   }, [restaurantId]);
 
-  const setupRealtime = () => {
-    let debounceTimer: ReturnType<typeof setTimeout>;
-    const ch = supabase.channel(`unified-orders-${restaurantId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(fetchOrders, 400);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(fetchOrders, 400);
-      })
-      .subscribe();
-    return () => { clearTimeout(debounceTimer); supabase.removeChannel(ch); };
-  };
+  const setupRealtime = () => () => undefined; // legacy no-op (replaced by useRealtimeChannel above)
 
   const fetchOrders = async () => {
     setLoading(true);
