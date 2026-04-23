@@ -31,11 +31,27 @@ import {
   shortOrderId,
 } from "@/lib/receiptFormatters";
 
+export type PrintReceiptMode = "pedido" | "conta";
+
+export interface PrintOrderQzOptions {
+  /**
+   * Contexto da impressão:
+   * - "pedido" (padrão): imprime DUAS vias (Cliente + Cozinha) com corte entre elas.
+   * - "conta": imprime APENAS UMA via (Cliente) — usado em fechamento/pagamento
+   *   para evitar duplicação do cupom e via desnecessária da cozinha.
+   */
+  mode?: PrintReceiptMode;
+}
+
 export interface PrintOrderQzResult {
   success: boolean;
   printer: string | null;
   orderId: string;
   escposLikely: boolean;
+  /** Modo realmente usado nesta impressão. */
+  mode: PrintReceiptMode;
+  /** Quantidade de vias enviadas para a impressora. */
+  copies: number;
   error?: string;
   /** Código semântico para o frontend tratar diferentes cenários de erro. */
   errorCode?:
