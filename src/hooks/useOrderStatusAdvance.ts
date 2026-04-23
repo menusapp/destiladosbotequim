@@ -122,6 +122,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
           context: {
             nome: order.customer_name || "Cliente",
             numero_pedido: order.id.slice(0, 8),
+            order_id: order.id,
             tempo_estimado: restaurant?.prep_time_minutes?.toString() || "30",
             phone,
             motivo: reason || "Não informado",
