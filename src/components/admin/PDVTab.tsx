@@ -1183,7 +1183,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             {tables?.length || 0} mesas • {occupiedTables} ocup. • {availableTables} livres
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0" data-tour="pdv-auto-print">
           <Printer className="h-4 w-4 text-muted-foreground" />
           <label htmlFor="auto-print-toggle" className="text-xs text-muted-foreground cursor-pointer hidden sm:inline">Auto-print</label>
           <Switch
@@ -1203,7 +1203,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         {/* Left: Tables Grid */}
         <div className="flex-1 flex flex-col min-h-0">
           {/* Order Search Bar */}
-          <div className="flex gap-2 mb-2 flex-shrink-0">
+          <div className="flex gap-2 mb-2 flex-shrink-0" data-tour="pdv-search">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -1418,7 +1418,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           <ScrollArea className="flex-1">
             <div className="space-y-5 pr-3">
               {/* Order type tabs */}
-              <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)}>
+              <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)} data-tour="pdv-order-type">
                 <TabsList className="w-full grid grid-cols-3">
                   <TabsTrigger value="mesa" className="text-xs">Mesa</TabsTrigger>
                   <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
@@ -1427,7 +1427,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               </Tabs>
 
               {/* Customer Section — Inline Fields */}
-              <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="border rounded-lg p-4 bg-muted/30" data-tour="pdv-customer">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-medium text-muted-foreground">Cliente</p>
                   {(customerName || customerCpf || customerPhone) && (
@@ -1770,7 +1770,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               )}
 
 
-              <div className="space-y-3">
+              <div className="space-y-3" data-tour="pdv-products">
                 <Label className="text-xs font-semibold mb-1.5 block">Produtos</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -1979,7 +1979,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                 </Button>
               )}
             </div>
-            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()}>
+            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()} data-tour="pdv-confirm">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               Criar Pedido
             </Button>

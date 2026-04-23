@@ -8,6 +8,8 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { MobileBottomNav } from "@/components/admin/MobileBottomNav";
+import { TourProvider } from "@/components/admin/tour/TourContext";
+import { TourOverlay } from "@/components/admin/tour/TourOverlay";
 
 import { lazy, Suspense } from "react";
 
@@ -851,6 +853,7 @@ const RestaurantAdmin = () => {
   };
 
   return (
+    <TourProvider>
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         {/* Sidebar — hidden on mobile (replaced by bottom nav) */}
@@ -878,6 +881,7 @@ const RestaurantAdmin = () => {
             pickupTime={restaurant.pickup_time_minutes}
             isOpen={restaurant.is_open}
             autoOpenClose={restaurant.auto_open_close}
+            activeSection={activeSection}
             onPrepTimeUpdate={(time) => setRestaurant({ ...restaurant, prep_time_minutes: time })}
             onPickupTimeUpdate={(time) => setRestaurant({ ...restaurant, pickup_time_minutes: time })}
             onIsOpenUpdate={(isOpen) => setRestaurant({ ...restaurant, is_open: isOpen })}
@@ -1132,6 +1136,8 @@ const RestaurantAdmin = () => {
 
       </div>
     </SidebarProvider>
+    <TourOverlay />
+    </TourProvider>
   );
 };
 
