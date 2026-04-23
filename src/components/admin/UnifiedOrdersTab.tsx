@@ -26,6 +26,7 @@ import { printOrderWithQz } from "@/lib/printOrderWithQz";
 import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
 import { checkQzTrayConnection } from "@/lib/qzConnectionCheck";
 import { QzTrayStatusBadge } from "./QzTrayStatusBadge";
+import { ReceiptPreviewDialog } from "./ReceiptPreviewDialog";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import type { DateRange } from "react-day-picker";
 
