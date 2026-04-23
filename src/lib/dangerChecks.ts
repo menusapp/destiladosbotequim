@@ -48,29 +48,54 @@ export async function checkOpenOrdersBeforeCashClose(restaurantId: string): Prom
 export async function checkUnpaidBeforeTableClear(tableId: string): Promise<string[]> {
   const warnings: string[] = [];
 
-  const { data: bills, error } = await supabase
-    .from("bills")
-    .select("total_amount, status")
+  // Calcular o consumo REAL a partir dos itens dos pedidos não cancelados da mesa,
+  // do mesmo jeito que o TableDetailDialog faz. Usar bills.total_amount direto pode
+  // mostrar valores incorretos (bills antigos, contas duplicadas ou ainda não geradas).
+  const { data: orders } = await supabase
+    .from("orders")
+    .select(
+      `id, status,
+       order_items(quantity, price_at_order,
+         order_item_extras(price_at_order)
+       )`,
+    )
     .eq("table_id", tableId)
-    .neq("status", "paid");
+    .neq("status", "cancelled");
 
-  if (error || !bills) return warnings;
+  let totalConsumed = 0;
+  const activeOrderIds: string[] = [];
+  for (const o of (orders ?? []) as any[]) {
+    for (const item of o.order_items ?? []) {
+      const extrasTotal = (item.order_item_extras ?? []).reduce(
+        (s: number, e: any) => s + Number(e.price_at_order || 0),
+        0,
+      );
+      totalConsumed += (Number(item.price_at_order || 0) + extrasTotal) * Number(item.quantity || 0);
+    }
+    if ((ACTIVE_ORDER_STATUSES as readonly string[]).includes(o.status)) {
+      activeOrderIds.push(o.id);
+    }
+  }
 
-  const totalUnpaid = bills.reduce((sum, b: any) => sum + Number(b.total_amount || 0), 0);
+  // Subtrair o que já foi pago via splits (pagamentos parciais da comanda).
+  let splitsPaid = 0;
+  if ((orders ?? []).length > 0) {
+    const orderIds = (orders as any[]).map((o) => o.id);
+    const { data: splits } = await supabase
+      .from("payment_splits")
+      .select("value, order_id")
+      .in("order_id", orderIds);
+    splitsPaid = (splits ?? []).reduce((s: number, sp: any) => s + Number(sp.value || 0), 0);
+  }
+
+  const totalUnpaid = Math.max(0, totalConsumed - splitsPaid);
   if (totalUnpaid > 0) {
     warnings.push(
       `Esta mesa tem R$ ${totalUnpaid.toFixed(2).replace(".", ",")} em consumo não pago.`,
     );
   }
 
-  // Também avisar sobre pedidos ativos na mesa
-  const { data: activeOrders } = await supabase
-    .from("orders")
-    .select("id, status")
-    .eq("table_id", tableId)
-    .in("status", ACTIVE_ORDER_STATUSES as unknown as string[]);
-
-  const activeCount = activeOrders?.length ?? 0;
+  const activeCount = activeOrderIds.length;
   if (activeCount > 0) {
     warnings.push(
       `${activeCount} pedido${activeCount > 1 ? "s" : ""} ainda em andamento serão cancelados.`,
