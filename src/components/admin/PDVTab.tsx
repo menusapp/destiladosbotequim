@@ -30,7 +30,7 @@ import { validateCPF, validatePhone } from "@/lib/cpfValidator";
 import { Switch } from "@/components/ui/switch";
 import { Printer } from "lucide-react";
 import { PDVProductDrawer } from "./PDVProductDrawer";
-import { printOrder } from "@/lib/printOrder";
+import { printDocument } from "@/lib/printDispatcher";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { TableDetailDialog } from "./TableDetailDialog";
 import { ManageTablesDrawer } from "./ManageTablesDrawer";
@@ -1109,7 +1109,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           })),
         };
         try {
-          await printOrder(printOrderObj, restaurantId);
+          await printDocument(printOrderObj as any, restaurantId);
         } catch { /* ignore print errors */ }
       }
 

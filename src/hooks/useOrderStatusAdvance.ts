@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
-import { printOrder } from "@/lib/printOrder";
+import { printDocument } from "@/lib/printDispatcher";
 import { getShareableMenuLink } from "@/lib/shareableLinks";
 
 const PUBLIC_DOMAIN = 'https://menusapp.com.br';
@@ -217,7 +217,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
         }
         try {
           const { data: printerConfig } = await supabase.from("printer_settings").select("auto_print_orders").eq("restaurant_id", restaurantId).maybeSingle();
-          if (printerConfig?.auto_print_orders) await printOrder(order as any, restaurantId);
+          if (printerConfig?.auto_print_orders) await printDocument(order as any, restaurantId, { showToasts: false });
         } catch (printErr) { console.error("Auto-print error:", printErr); }
       }
 
