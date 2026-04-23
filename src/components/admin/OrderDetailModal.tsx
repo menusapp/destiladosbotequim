@@ -17,8 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
-import { printOrder } from "@/lib/printOrder";
+import { printOrder, printKitchenReceipt } from "@/lib/printOrder";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
+import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -187,8 +188,14 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     }
   };
 
+  const { canManageOrders } = useStaffOrderPermissions();
+
   const handlePrint = async () => {
     try { await printOrder(order, restaurantId); } catch (error: any) { toast.error(error.message || "Erro ao imprimir"); }
+  };
+
+  const handlePrintKitchen = async () => {
+    try { await printKitchenReceipt(order, restaurantId); } catch (error: any) { toast.error(error.message || "Erro ao imprimir via da cozinha"); }
   };
 
   const handleWhatsApp = () => {
@@ -266,7 +273,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
 
           {/* Ações do Pedido — sempre visível */}
           <div className="flex flex-wrap gap-2">
-            {order.status === "pending" && (
+            {order.status === "pending" && canManageOrders && (
               <Button onClick={() => updateStatus("accepted")} className="gap-2"><Play className="w-4 h-4" />Iniciar Preparo</Button>
             )}
             {(order.status === "accepted" || order.status === "preparing") && order.order_type === "delivery" && order.delivery_type === "delivery" && (
@@ -313,7 +320,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
               <Button onClick={() => updateStatus("picked_up")} className="gap-2"><Play className="w-4 h-4" />Confirmar Retirada</Button>
             )}
             
-            {!isFinalized && order.status !== "cancelled" && (
+            {!isFinalized && order.status !== "cancelled" && canManageOrders && (
               <Button variant="destructive" onClick={() => setShowCancelDialog(true)} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
             )}
             
