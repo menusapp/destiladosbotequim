@@ -24,6 +24,7 @@ import {
   fetchOrderForPrinting,
   type OrderForPrinting,
 } from "@/lib/fetchOrderForPrinting";
+import { resolveQzPrinter } from "@/lib/qzPrinterConfig";
 
 export interface PrintOrderQzResult {
   success: boolean;
