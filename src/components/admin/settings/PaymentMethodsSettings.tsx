@@ -135,7 +135,13 @@ const PaymentMethodsSettings = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleDelete = async (methodId: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta forma de pagamento?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir forma de pagamento?",
+      description: "Esta forma de pagamento ficará indisponível para novos pedidos.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     try {
       const { error } = await supabase

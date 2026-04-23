@@ -399,7 +399,13 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta mesa?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir mesa?",
+      description: "A mesa será removida permanentemente da lista.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     const { error } = await supabase.from("tables").delete().eq("id", id);
 

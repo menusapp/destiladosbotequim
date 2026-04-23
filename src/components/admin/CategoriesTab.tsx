@@ -194,7 +194,13 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir categoria?",
+      description: "Os produtos vinculados a esta categoria ficarão sem categoria.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     if (isRestaurantOpen) {
       toast.error("Feche o restaurante para excluir categorias");

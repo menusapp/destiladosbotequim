@@ -207,9 +207,13 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
       return;
     }
 
-    if (!window.confirm(`Tem certeza que deseja excluir a conta de "${member.display_name}"? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
+    const ok = await confirm({
+      variant: "destructive",
+      title: `Excluir conta de "${member.display_name}"?`,
+      description: "Este funcionário perderá o acesso ao sistema imediatamente.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     const { data, error } = await supabase.rpc("admin_delete_staff", {
       p_staff_id: member.id,

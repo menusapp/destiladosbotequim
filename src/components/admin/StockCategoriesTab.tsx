@@ -74,7 +74,13 @@ const StockCategoriesTab = ({ restaurantId }: StockCategoriesTabProps) => {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir categoria de estoque?",
+      description: "Os insumos vinculados ficarão sem categoria.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     const { error } = await supabase
       .from("stock_categories")

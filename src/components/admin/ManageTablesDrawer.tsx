@@ -254,7 +254,7 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
                       size="icon"
                       variant="ghost"
                       className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => { if (confirm("Excluir esta mesa?")) handleDelete(table.id); }}
+                      onClick={() => askDelete(table.id)}
                       disabled={!!table.is_occupied}
                     >
                       <Trash2 className="w-3.5 h-3.5" />

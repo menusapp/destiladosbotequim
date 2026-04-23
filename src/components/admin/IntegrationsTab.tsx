@@ -331,7 +331,13 @@ const IntegrationsTab = ({ restaurantId }: IntegrationsTabProps) => {
   };
 
   const handleMpDisconnect = async () => {
-    if (!confirm("Tem certeza que deseja desconectar o Mercado Pago? Você precisará reconectar para voltar a receber pagamentos online.")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Desconectar Mercado Pago?",
+      description: "Você precisará reconectar para voltar a receber pagamentos online.",
+      consequence: "Pedidos online em pagamentos pendentes podem ser afetados.",
+    });
+    if (!ok) return;
     setDisconnectingMp(true);
     try {
       const { error } = await supabase.rpc("admin_delete_payment_config", {

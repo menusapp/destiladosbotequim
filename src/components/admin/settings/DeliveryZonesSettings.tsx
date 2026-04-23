@@ -169,7 +169,13 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
   };
 
   const handleDelete = async (zoneId: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta região?")) return;
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir região de entrega?",
+      description: "Pedidos para esta região não terão taxa configurada.",
+      consequence: "Esta ação não pode ser desfeita.",
+    });
+    if (!ok) return;
 
     try {
       const { error } = await supabase
