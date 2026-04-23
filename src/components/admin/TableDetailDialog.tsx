@@ -16,13 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -842,11 +835,11 @@ export const TableDetailDialog = ({
         <DialogContent
           className={
             isMobile
-              ? "max-w-full w-screen h-[92vh] max-h-[92vh] rounded-t-2xl rounded-b-none p-4 overflow-hidden flex flex-col bottom-0 top-auto translate-y-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom"
+              ? "max-w-full w-screen h-[92vh] max-h-[92vh] rounded-t-2xl rounded-b-none p-4 overflow-hidden flex flex-col bottom-0 top-auto left-0 right-0 translate-x-0 translate-y-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom border-x-0 border-b-0 [&>button[aria-label='Close'],&>button:has(>svg.lucide-x)]:h-11 [&>button[aria-label='Close'],&>button:has(>svg.lucide-x)]:w-11 [&>button[aria-label='Close'],&>button:has(>svg.lucide-x)]:flex [&>button[aria-label='Close'],&>button:has(>svg.lucide-x)]:items-center [&>button[aria-label='Close'],&>button:has(>svg.lucide-x)]:justify-center [&>button>svg.lucide-x]:h-5 [&>button>svg.lucide-x]:w-5"
               : "max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col"
           }
         >
-          <DialogHeader className="flex-shrink-0">
+          <DialogHeader className={`flex-shrink-0 ${isMobile ? "pr-12 text-left" : ""}`}>
             <DialogDescription className="sr-only">Detalhes da mesa</DialogDescription>
             <DialogTitle asChild>
               <div>{headerContent}</div>
@@ -854,7 +847,7 @@ export const TableDetailDialog = ({
           </DialogHeader>
 
           <div className="flex-1 min-h-0">
-            <ScrollArea className="relative h-full overflow-hidden -mx-6 px-[24px] py-0 my-0">
+            <ScrollArea className={`relative h-full overflow-hidden ${isMobile ? "-mx-4 px-4" : "-mx-6 px-[24px]"} py-0 my-0`}>
               <div className="space-y-6 pb-4">
               {/* Clients Section */}
               {comandas && comandas.length > 0 && (
