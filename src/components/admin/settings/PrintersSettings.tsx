@@ -9,6 +9,7 @@ import { Printer, CheckCircle2, Globe, FileText, Zap } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { QzTraySection } from "./QzTraySection";
+import { QzTrustSetup } from "./QzTrustSetup";
 import type { PrintMethod } from "@/lib/printDispatcher";
 
 interface WebPrinterConfig {
@@ -373,6 +374,8 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
       </Card>
 
       <QzTraySection />
+
+      <QzTrustSetup />
 
       <div className="flex justify-end">
         <Button onClick={saveWebConfig} disabled={saving}>
