@@ -163,25 +163,28 @@ export const TableDetailDialog = ({
     }
   }, [open, table?.id]);
 
-  // Realtime subscription for table data
+  // Realtime subscription for table data — filtrado por table_id e debounced
   useEffect(() => {
     if (!open || !table) return;
+    let ordersTimer: ReturnType<typeof setTimeout>;
+    let billsTimer: ReturnType<typeof setTimeout>;
+    let splitsTimer: ReturnType<typeof setTimeout>;
+    const debouncedOrders = () => {
+      clearTimeout(ordersTimer);
+      ordersTimer = setTimeout(() => { refetchOrders(); refetchComandas(); }, 200);
+    };
+    const debouncedBills = () => { clearTimeout(billsTimer); billsTimer = setTimeout(() => refetchBills(), 200); };
+    const debouncedSplits = () => { clearTimeout(splitsTimer); splitsTimer = setTimeout(() => refetchSplits(), 200); };
     const ch = supabase.channel(`table-detail-${table.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        refetchOrders();
-        refetchComandas();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "bills" }, () => {
-        refetchBills();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, () => {
-        refetchComandas();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_item_splits" }, () => {
-        refetchSplits();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `table_id=eq.${table.id}` }, debouncedOrders)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bills", filter: `table_id=eq.${table.id}` }, debouncedBills)
+      .on("postgres_changes", { event: "*", schema: "public", table: "comandas", filter: `table_id=eq.${table.id}` }, debouncedOrders)
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_item_splits" }, debouncedSplits)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      clearTimeout(ordersTimer); clearTimeout(billsTimer); clearTimeout(splitsTimer);
+      supabase.removeChannel(ch);
+    };
   }, [open, table?.id]);
 
   // Fetch requested/on_the_way bills for this table
