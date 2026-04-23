@@ -10,6 +10,7 @@ import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { QzTraySection } from "./QzTraySection";
 import { QzTrustSetup } from "./QzTrustSetup";
+import { QzTrayHowToDialog } from "./QzTrayHowToDialog";
 import type { PrintMethod } from "@/lib/printDispatcher";
 
 interface WebPrinterConfig {
@@ -171,9 +172,12 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Impressoras</h2>
-        <p className="text-muted-foreground">Configure a impressão de pedidos e cupons via navegador</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-bold">Impressoras</h2>
+          <p className="text-muted-foreground">Configure a impressão de pedidos e cupons via navegador</p>
+        </div>
+        <QzTrayHowToDialog />
       </div>
 
       <Card>
