@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,17 +107,24 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
   useEffect(() => {
     fetchCurrentSession();
     fetchClosedSessions();
-    const ch = supabase.channel(`cash-rt-${restaurantId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements", filter: `restaurant_id=eq.${restaurantId}` }, () => {
-        if (currentSession) fetchMovements();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "cash_register_sessions", filter: `restaurant_id=eq.${restaurantId}` }, () => {
-        fetchCurrentSession();
-        fetchClosedSessions();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantId]);
+
+  // Centralized realtime: cash_movements + sessions, debounced (300ms)
+  useRealtimeChannel({
+    channelName: `cash-rt-${restaurantId}`,
+    bindings: [
+      { table: "cash_movements", filter: `restaurant_id=eq.${restaurantId}` },
+      { table: "cash_register_sessions", filter: `restaurant_id=eq.${restaurantId}` },
+    ],
+    onChange: () => {
+      // Always refresh sessions; refresh movements only if there is an open session
+      fetchCurrentSession();
+      fetchClosedSessions();
+      if (currentSession) fetchMovements();
+    },
+    debounceMs: 300,
+  });
 
   useEffect(() => {
     if (currentSession) {
