@@ -16,7 +16,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { printOrder } from "@/lib/printOrder";
-import { printOrderWithQz } from "@/lib/printOrderWithQz";
+import { printOrderWithQz, type PrintReceiptMode } from "@/lib/printOrderWithQz";
 import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
 import { checkQzTrayConnection } from "@/lib/qzConnectionCheck";
 
@@ -29,6 +29,15 @@ export interface PrintDocumentOptions {
   forceQz?: boolean;
   /** Mostrar toasts informativos (default: true). */
   showToasts?: boolean;
+  /**
+   * Contexto da impressão (afeta apenas QZ Tray):
+   * - "pedido" (padrão): 2 vias (Cliente + Cozinha) com corte entre elas.
+   * - "conta": 1 via apenas (Cliente) — usado em fechamento/pagamento.
+   *
+   * No motor PDF (window.print) o sistema operacional gera 1 cópia por padrão,
+   * portanto este parâmetro só altera o comportamento quando method === "qz_tray".
+   */
+  mode?: PrintReceiptMode;
 }
 
 /**
@@ -63,14 +72,17 @@ export async function printDocument(
   restaurantId: string,
   options: PrintDocumentOptions = {}
 ): Promise<void> {
-  const { forcePdf, forceQz, showToasts = true } = options;
+  const { forcePdf, forceQz, showToasts = true, mode = "pedido" } = options;
 
   let method: PrintMethod;
   if (forcePdf) method = "pdf";
   else if (forceQz) method = "qz_tray";
   else method = await getPrintMethod(restaurantId);
 
-  console.log(`🖨️ [printDispatcher] Método: ${method} (forced=${forcePdf || forceQz ? "yes" : "no"})`);
+  console.log(
+    `🖨️ [printDispatcher] Método: ${method} | Modo: ${mode} ` +
+      `(forced=${forcePdf || forceQz ? "yes" : "no"})`
+  );
 
   if (method === "pdf") {
     await printOrder(order as any, restaurantId);
@@ -112,7 +124,7 @@ export async function printDocument(
   }
 
   try {
-    const result = await printOrderWithQz(order.id);
+    const result = await printOrderWithQz(order.id, { mode });
     if (!showToasts) return;
 
     if (result.success) {

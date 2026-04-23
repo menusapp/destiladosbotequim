@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Printer, ChevronDown, FileText, Zap } from "lucide-react";
 import { getPrintMethod, printDocument, type PrintMethod } from "@/lib/printDispatcher";
+import type { PrintReceiptMode } from "@/lib/printOrderWithQz";
 
 interface PrintMethodMenuProps {
   order: { id: string } & Record<string, any>;
@@ -33,6 +34,12 @@ interface PrintMethodMenuProps {
   stopPropagation?: boolean;
   /** Callback após disparo (independe de sucesso). */
   onPrintTriggered?: () => void;
+  /**
+   * Contexto da impressão (afeta apenas o motor QZ Tray):
+   * - "pedido" (padrão): imprime 2 vias (Cliente + Cozinha).
+   * - "conta": imprime apenas 1 via (Cliente) — para fechamento/pagamento.
+   */
+  mode?: PrintReceiptMode;
 }
 
 export function PrintMethodMenu({
@@ -44,6 +51,7 @@ export function PrintMethodMenu({
   className,
   stopPropagation = false,
   onPrintTriggered,
+  mode = "pedido",
 }: PrintMethodMenuProps) {
   const [defaultMethod, setDefaultMethod] = useState<PrintMethod>("pdf");
 
@@ -63,7 +71,7 @@ export function PrintMethodMenu({
 
   const handle = async (opts?: { forcePdf?: boolean; forceQz?: boolean }) => {
     onPrintTriggered?.();
-    await printDocument(order, restaurantId, opts);
+    await printDocument(order, restaurantId, { ...opts, mode });
   };
 
   const defaultLabel = defaultMethod === "qz_tray" ? "QZ Tray" : "PDF";

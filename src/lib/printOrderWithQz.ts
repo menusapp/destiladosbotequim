@@ -31,11 +31,27 @@ import {
   shortOrderId,
 } from "@/lib/receiptFormatters";
 
+export type PrintReceiptMode = "pedido" | "conta";
+
+export interface PrintOrderQzOptions {
+  /**
+   * Contexto da impressão:
+   * - "pedido" (padrão): imprime DUAS vias (Cliente + Cozinha) com corte entre elas.
+   * - "conta": imprime APENAS UMA via (Cliente) — usado em fechamento/pagamento
+   *   para evitar duplicação do cupom e via desnecessária da cozinha.
+   */
+  mode?: PrintReceiptMode;
+}
+
 export interface PrintOrderQzResult {
   success: boolean;
   printer: string | null;
   orderId: string;
   escposLikely: boolean;
+  /** Modo realmente usado nesta impressão. */
+  mode: PrintReceiptMode;
+  /** Quantidade de vias enviadas para a impressora. */
+  copies: number;
   error?: string;
   /** Código semântico para o frontend tratar diferentes cenários de erro. */
   errorCode?:
@@ -487,12 +503,34 @@ function looksLikeEscposPrinter(printerName: string): boolean {
 // =============================================================
 export async function printOrderWithQz(
   orderId: string,
-  printerName?: string
+  printerNameOrOptions?: string | PrintOrderQzOptions,
+  maybeOptions?: PrintOrderQzOptions
 ): Promise<PrintOrderQzResult> {
-  console.group(`🖨️ [QZ Tray] Impressão ESC/POS do pedido ${orderId}`);
+  // Compatibilidade retroativa: aceita (orderId), (orderId, "PrinterName"),
+  // (orderId, { mode }) ou (orderId, "PrinterName", { mode }).
+  let printerName: string | undefined;
+  let options: PrintOrderQzOptions = {};
+  if (typeof printerNameOrOptions === "string") {
+    printerName = printerNameOrOptions;
+    options = maybeOptions ?? {};
+  } else if (printerNameOrOptions && typeof printerNameOrOptions === "object") {
+    options = printerNameOrOptions;
+  }
+
+  // Fallback seguro: sempre que o modo não for informado, assume "pedido".
+  const mode: PrintReceiptMode = options.mode === "conta" ? "conta" : "pedido";
+
+  console.group(
+    `🖨️ [QZ Tray] Impressão ESC/POS do pedido ${orderId} — modo: ${mode}`
+  );
 
   let usedPrinter: string | null = null;
   let escposLikely = false;
+
+  // Helper para anexar mode/copies em qualquer retorno (mantém compat).
+  const fail = (
+    partial: Omit<PrintOrderQzResult, "mode" | "copies">
+  ): PrintOrderQzResult => ({ ...partial, mode, copies: 0 });
 
   try {
     console.log("⏳ Carregando pedido…");
@@ -509,14 +547,14 @@ export async function printOrderWithQz(
         await withTimeout(qz.websocket.connect(), 5000, "conexão com QZ Tray");
       } catch (e: any) {
         console.error("❌ Falha ao conectar ao QZ Tray:", e?.message ?? e);
-        return {
+        return fail({
           success: false,
           printer: null,
           orderId,
           escposLikely: false,
           error: "Não foi possível conectar ao QZ Tray. Verifique se o aplicativo está aberto.",
           errorCode: "qz_connect_failed",
-        };
+        });
       }
     } else {
       console.log("ℹ️ Já estava conectado ao QZ Tray.");
@@ -550,7 +588,7 @@ export async function printOrderWithQz(
     // ---------- Validação: nenhuma impressora no sistema ----------
     if (availablePrinters.length === 0) {
       console.error("❌ Nenhuma impressora disponível no sistema.");
-      return {
+      return fail({
         success: false,
         printer: usedPrinter,
         orderId,
@@ -558,11 +596,11 @@ export async function printOrderWithQz(
         error:
           "Nenhuma impressora encontrada no sistema. Conecte uma impressora e tente novamente.",
         errorCode: "no_printers_found",
-      };
+      });
     }
 
     if (!usedPrinter) {
-      return {
+      return fail({
         success: false,
         printer: null,
         orderId,
@@ -570,7 +608,7 @@ export async function printOrderWithQz(
         error:
           "Nenhuma impressora configurada. Vá em Configurações Gerais → Impressoras.",
         errorCode: "no_printer_configured",
-      };
+      });
     }
 
     // ---------- Validação: impressora salva ainda existe ----------
@@ -579,14 +617,14 @@ export async function printOrderWithQz(
         `❌ Impressora "${usedPrinter}" não está mais disponível. Disponíveis:`,
         availablePrinters
       );
-      return {
+      return fail({
         success: false,
         printer: usedPrinter,
         orderId,
         escposLikely: false,
         error: `A impressora configurada "${usedPrinter}" não está disponível. Vá em Configurações Gerais → Impressoras e escolha outra.`,
         errorCode: "printer_not_available",
-      };
+      });
     }
 
     console.log("🖨️ Impressora utilizada:", usedPrinter);
@@ -601,18 +639,33 @@ export async function printOrderWithQz(
       console.log("✅ Impressora compatível com ESC/POS detectada.");
     }
 
+    // ---------- Montagem das vias conforme o MODO ----------
+    // - "pedido": 2 vias (Cliente + Cozinha) com corte entre elas (corte já vai
+    //   embutido no final de cada buildXReceipt via ESCPOS.CUT).
+    // - "conta":  1 via (Cliente apenas) — sem via da cozinha, sem duplicação.
     const customer = buildCustomerReceipt(order, storeName);
-    const kitchen = buildKitchenReceipt(order);
-
     console.log("📄 Via do CLIENTE preparada.");
-    console.log("📄 Via da COZINHA preparada.");
+
+    const data: { type: string; format: string; data: string }[] = [
+      { type: "raw", format: "plain", data: customer },
+    ];
+
+    if (mode === "pedido") {
+      const kitchen = buildKitchenReceipt(order);
+      console.log("📄 Via da COZINHA preparada.");
+      data.push({ type: "raw", format: "plain", data: kitchen });
+    } else {
+      console.log("ℹ️ Modo 'conta': via da cozinha NÃO será impressa.");
+    }
+
+    const copies = data.length;
+    console.log(
+      `🧾 [QZ] Modo de impressão: "${mode}" → ${copies} via(s) ${
+        copies === 1 ? "(apenas Cliente)" : "(Cliente + Cozinha)"
+      }`
+    );
 
     const config = qz.configs.create(usedPrinter);
-
-    const data = [
-      { type: "raw", format: "plain", data: customer },
-      { type: "raw", format: "plain", data: kitchen },
-    ];
 
     console.log(`🚀 Iniciando impressão (timeout: ${PRINT_TIMEOUT_MS}ms)…`);
     try {
@@ -630,6 +683,8 @@ export async function printOrderWithQz(
         printer: usedPrinter,
         orderId,
         escposLikely,
+        mode,
+        copies,
         error: isTimeout
           ? `Tempo esgotado ao enviar para "${usedPrinter}". A impressora pode estar offline ou desconectada.`
           : msg,
@@ -637,21 +692,28 @@ export async function printOrderWithQz(
       };
     }
 
-    console.log("✅ Impressão enviada com sucesso.");
+    console.log(`✅ Impressão enviada com sucesso (${copies} via(s)).`);
     console.groupEnd();
-    return { success: true, printer: usedPrinter, orderId, escposLikely };
+    return {
+      success: true,
+      printer: usedPrinter,
+      orderId,
+      escposLikely,
+      mode,
+      copies,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("❌ Falha na impressão do pedido:", message);
     console.groupEnd();
-    return {
+    return fail({
       success: false,
       printer: usedPrinter,
       orderId,
       escposLikely,
       error: message,
       errorCode: "unknown",
-    };
+    });
   } finally {
     try {
       if (qz.websocket.isActive()) {
