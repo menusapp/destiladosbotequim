@@ -489,7 +489,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         await insertOrderItems(order.id);
 
         // Trigger WhatsApp "order accepted" notification (PDV delivery)
-        notifyOrderAcceptedFromPDV({
+        // Awaited to prevent the request from being aborted when the drawer unmounts.
+        await notifyOrderAcceptedFromPDV({
           restaurantId,
           orderId: order.id,
           customerName: customerName.trim(),
@@ -510,7 +511,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
         await insertOrderItems(order.id);
 
         // Trigger WhatsApp "order accepted" notification (PDV pickup)
-        notifyOrderAcceptedFromPDV({
+        // Awaited to prevent the request from being aborted when the drawer unmounts.
+        await notifyOrderAcceptedFromPDV({
           restaurantId,
           orderId: order.id,
           customerName: customerName.trim(),
@@ -598,7 +600,8 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
             phoneForNotify = cust?.phone || null;
           }
           if (phoneForNotify) {
-            notifyOrderAcceptedFromPDV({
+            // Awaited to prevent the request from being aborted when the drawer unmounts.
+            await notifyOrderAcceptedFromPDV({
               restaurantId,
               orderId: order.id,
               customerName: currentCustomerName,
