@@ -521,7 +521,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
         </div>
         <div className="flex items-center gap-2">
           <QzTrayStatusBadge />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-tour="pedidos-auto-accept">
             <Zap className="w-4 h-4 text-muted-foreground" />
             <Label htmlFor="auto-accept" className="text-xs">Aceitar automaticamente</Label>
             <Switch id="auto-accept" checked={autoAccept} onCheckedChange={async (v) => {
@@ -530,7 +530,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
               toast.success(v ? "Pedidos serão aceitos automaticamente" : "Aceite automático desativado");
             }} />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-tour="pedidos-auto-print">
             <Printer className="w-4 h-4 text-muted-foreground" />
             <Label htmlFor="auto-print" className="text-xs">Impressão automática</Label>
             <Switch id="auto-print" checked={autoPrint} onCheckedChange={async (v) => {
@@ -546,7 +546,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
             }}
           >
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" data-tour="pedidos-date">
                 <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
                 {format(dateRange.from, "dd/MM")} - {format(dateRange.to, "dd/MM")}
               </Button>
@@ -574,7 +574,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
       </div>
 
       {/* Search */}
-      <div className="relative max-w-md">
+      <div className="relative max-w-md" data-tour="pedidos-search">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Buscar por nome, telefone, CPF ou código..."
@@ -586,7 +586,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList data-tour="pedidos-tabs">
           <TabsTrigger value="todos">Todos</TabsTrigger>
           <TabsTrigger value="delivery">Delivery</TabsTrigger>
           <TabsTrigger value="retirada">Retirada</TabsTrigger>

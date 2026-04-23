@@ -104,7 +104,7 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
           <p className="text-sm text-muted-foreground font-light">Resumo e métricas do restaurante</p>
         </div>
         <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[200px]" data-tour="overview-period">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -116,7 +116,7 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
       </div>
 
       {/* TOP CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3" data-tour="overview-cards">
         <MetricCard title="Vendas Totais" value={`R$ ${data.totalSales.toFixed(2)}`} sub={`${data.ordersCount} pedidos`} badge={dateRangeLabels[dateRange]} badgeColor="bg-emerald-500" icon={<DollarSign className="h-4 w-4" />} />
         <MetricCard title="Pedidos" value={data.ordersCount.toString()} sub={dateRangeLabels[dateRange]} badge="Total" badgeColor="bg-blue-500" icon={<ShoppingBag className="h-4 w-4" />} />
         <MetricCard title="Ticket Médio" value={`R$ ${data.averageTicket.toFixed(2)}`} sub="Por pedido" badge="Média" badgeColor="bg-blue-500" icon={<TrendingUp className="h-4 w-4" />} />
@@ -127,7 +127,7 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
       {/* CHART + REVENUE BY METHOD */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {chartData.length > 0 && (
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2" data-tour="overview-chart">
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -153,7 +153,7 @@ const OverviewTab = ({ restaurantId }: OverviewTabProps) => {
           </Card>
         )}
 
-        <Card className={chartData.length === 0 ? "lg:col-span-3" : ""}>
+        <Card className={chartData.length === 0 ? "lg:col-span-3" : ""} data-tour="overview-by-method">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-sm">Receita por Método</h3>
