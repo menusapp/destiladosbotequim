@@ -502,6 +502,9 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
                   <DropdownMenuItem onClick={(e) => handleQuickPrintQz(e, order)}>
                     <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir (QZ Tray)
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewOrderId(order.id); }}>
+                    <ScrollText className="w-3.5 h-3.5 mr-2" /> Visualizar cupom
+                  </DropdownMenuItem>
                   <DropdownMenuItem className="text-destructive" onClick={(e) => handleQuickCancel(e, order)}>
                     <XCircle className="w-3.5 h-3.5 mr-2" /> Cancelar pedido
                   </DropdownMenuItem>
