@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
