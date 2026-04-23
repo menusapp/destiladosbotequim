@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
 
     const orderId = (context && typeof context === 'object') ? (context as any).order_id : null;
     const needsSummary = orderId && (template.includes('{{resumo_pedido}}') || template.includes('{{total_pedido}}'));
+    console.log(`[NOTIF] orderId=${orderId} needsSummary=${needsSummary} templateHasResumo=${template.includes('{{resumo_pedido}}')}`);
 
     if (needsSummary) {
       try {
@@ -86,10 +87,22 @@ Deno.serve(async (req) => {
           .eq('id', orderId)
           .maybeSingle();
 
-        const { data: items } = await supabase
+        // Fetch items — retry once if empty (handles race with cardápio inserting items sequentially)
+        let { data: items } = await supabase
           .from('order_items')
           .select('quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name))')
           .eq('order_id', orderId);
+
+        if (!items || items.length === 0) {
+          console.log('[NOTIF] Items empty on first try, waiting 1.5s and retrying...');
+          await new Promise((r) => setTimeout(r, 1500));
+          const retry = await supabase
+            .from('order_items')
+            .select('quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name))')
+            .eq('order_id', orderId);
+          items = retry.data;
+          console.log(`[NOTIF] Retry returned ${items?.length || 0} items`);
+        }
 
         const fmt = (n: number) => `R$ ${Number(n || 0).toFixed(2).replace('.', ',')}`;
 
@@ -141,6 +154,7 @@ Deno.serve(async (req) => {
 
         enrichedContext.resumo_pedido = lines.join('\n');
         enrichedContext.total_pedido = fmt(total);
+        console.log(`[NOTIF] Built summary: ${lines.length} lines, total=${fmt(total)}, items=${(items||[]).length}`);
       } catch (summaryErr) {
         console.warn('[NOTIF] Failed to build order summary:', summaryErr);
         enrichedContext.resumo_pedido = '';
