@@ -836,16 +836,38 @@ export const TableDetailDialog = ({
 
   if (!table) return null;
 
+  // Mobile: render as bottom Sheet for better UX (full-width, no centering glitches, larger close target)
+  if (isMobile) {
+    return (
+      <>
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          <SheetContent
+            side="bottom"
+            className="w-full h-[92vh] max-h-[92vh] rounded-t-2xl p-4 overflow-hidden flex flex-col [&>button]:h-11 [&>button]:w-11 [&>button]:right-3 [&>button]:top-3 [&>button>svg]:h-5 [&>button>svg]:w-5"
+          >
+            <SheetHeader className="flex-shrink-0 pr-12 text-left">
+              <SheetDescription className="sr-only">Detalhes da mesa</SheetDescription>
+              <SheetTitle asChild>
+                <div>{headerContent}</div>
+              </SheetTitle>
+            </SheetHeader>
+
+            <div className="flex-1 min-h-0 mt-3">
+              <ScrollArea className="relative h-full overflow-hidden -mx-4 px-4 py-0 my-0">
+                {tableContent}
+              </ScrollArea>
+            </div>
+          </SheetContent>
+        </Sheet>
+        {modals}
+      </>
+    );
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className={
-            isMobile
-              ? "max-w-full w-screen h-[92vh] max-h-[92vh] rounded-t-2xl rounded-b-none p-4 overflow-hidden flex flex-col bottom-0 top-auto translate-y-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom"
-              : "max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col"
-          }
-        >
+        <DialogContent className="max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogDescription className="sr-only">Detalhes da mesa</DialogDescription>
             <DialogTitle asChild>
