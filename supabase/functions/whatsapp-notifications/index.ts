@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
 
         enrichedContext.resumo_pedido = lines.join('\n');
         enrichedContext.total_pedido = fmt(total);
+        console.log(`[NOTIF] Built summary: ${lines.length} lines, total=${fmt(total)}, items=${(items||[]).length}`);
       } catch (summaryErr) {
         console.warn('[NOTIF] Failed to build order summary:', summaryErr);
         enrichedContext.resumo_pedido = '';
