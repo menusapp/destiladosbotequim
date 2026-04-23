@@ -2,15 +2,12 @@
  * Gera o texto puro do cupom térmico (mesmas regras do printOrderWithQz),
  * mas SEM bytes ESC/POS — para preview em tela usando fonte monoespaçada.
  *
- * Suporta DUAS larguras:
- *  - 80mm → 42 colunas (padrão da impressão real em printOrderWithQz)
- *  - 58mm → 32 colunas (impressoras compactas)
+ * Conteúdo equivalente ao PDF antigo (telefone, endereço, taxa de entrega,
+ * desconto, pagamento, observações, agendamento, cancelamento, extras).
  *
- * Mantém:
- *  - Centralização, dividers, word-wrap, lineLR, labeled
- *  - Marcadores visuais [NEGRITO]/[GRANDE]/[GIGANTE] — apenas indicativo,
- *    NÃO saem no papel real (são interpretados como bytes ESC/POS).
- *  - Marcador de corte entre as duas vias.
+ * Suporta DUAS larguras:
+ *  - 80mm → 42 colunas
+ *  - 58mm → 32 colunas
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +15,15 @@ import {
   fetchOrderForPrinting,
   type OrderForPrinting,
 } from "@/lib/fetchOrderForPrinting";
+import {
+  buildOriginLabel,
+  formatDateTimeFull,
+  formatDateTimeShort,
+  formatPaymentType,
+  formatPhoneDisplay,
+  formatPrice,
+  shortOrderId,
+} from "@/lib/receiptFormatters";
 
 export type ReceiptWidth = "58mm" | "80mm";
 
@@ -106,28 +112,6 @@ function labeled(label: string, value: string, width: number): string {
   return out;
 }
 
-function formatPrice(value: number): string {
-  return `R$ ${value.toFixed(2).replace(".", ",")}`;
-}
-
-function formatDateTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function shortOrderId(id: string): string {
-  return "#" + id.slice(0, 8).toUpperCase();
-}
-
 async function fetchRestaurantName(orderId: string): Promise<string> {
   const { data } = await supabase
     .from("orders")
@@ -138,11 +122,7 @@ async function fetchRestaurantName(orderId: string): Promise<string> {
   return typeof name === "string" && name.length > 0 ? name : "Loja";
 }
 
-// Largura "dupla" (textos GRANDES) — em ESC/POS isso ocupa 2x cada char.
-// Para simular, reduzimos a largura efetiva pela metade.
 const dblWidth = (width: number) => Math.max(10, Math.floor(width / 2));
-// Triple (GIGANTE) ~ 1/3
-const tplWidth = (width: number) => Math.max(8, Math.floor(width / 3));
 
 // =============================================================
 // VIA DO CLIENTE
@@ -154,7 +134,7 @@ function buildCustomerPreview(
 ): string {
   let out = "";
 
-  // Cabeçalho — nome da loja "GRANDE" (duplo)
+  // Nome da loja
   for (const l of wrap(storeName.toUpperCase(), dblWidth(width)))
     out += center(l, width).replace("\n", "  [GRANDE]\n");
 
@@ -162,21 +142,40 @@ function buildCustomerPreview(
   out += center("VIA DO CLIENTE  [NEGRITO]", width);
   out += divider("=", width);
 
-  out += center(`PEDIDO ${shortOrderId(order.id)}  [GRANDE]`, width);
+  // Pedido + data
+  out += labeled(
+    "Pedido: ",
+    `${shortOrderId(order.id)} - ${formatDateTimeShort(order.created_at)}  [NEGRITO]`,
+    width
+  );
+
+  // Tipo do pedido em destaque
+  const originLabel = buildOriginLabel(order);
+  out += "\n";
+  out += center(originLabel + "  [GRANDE+NEGRITO]", width);
   out += "\n";
 
-  out += labeled("Status: ", String(order.status).toUpperCase(), width);
-  out += labeled("Data:   ", formatDateTime(order.created_at), width);
-  out += divider("-", width);
+  if (order.dd_scheduled_for) {
+    out += center("** AGENDADO PARA **  [NEGRITO]", width);
+    out += center(formatDateTimeShort(order.dd_scheduled_for), width);
+    out += "\n";
+  }
 
-  out += labeled("Cliente:", order.customer_name || "-", width);
-  if (order.customer_cpf) out += labeled("CPF:    ", order.customer_cpf, width);
+  // Cliente / contato
+  out += labeled("Cliente: ", order.customer_name || "-", width);
+  if (order.customer_cpf) out += labeled("CPF:     ", order.customer_cpf, width);
+  if (order.customer_phone) {
+    out += labeled("Telefone:", formatPhoneDisplay(order.customer_phone), width);
+  }
+  if (order.delivery_type === "delivery" && order.delivery_address) {
+    out += labeled("Endereco:", order.delivery_address, width);
+  }
   if (order.tables) {
     const tname = order.tables.table_name?.trim();
     const tnum = order.tables.table_number;
     out += labeled(
-      "Mesa:   ",
-      tname ? `${tname} (Nº ${tnum})` : `Mesa ${tnum}`,
+      "Mesa:    ",
+      tname ? `${tname} (No ${tnum})` : `Mesa ${tnum}`,
       width
     );
   }
@@ -185,20 +184,28 @@ function buildCustomerPreview(
   out += center("ITENS DO PEDIDO  [NEGRITO]", width);
   out += divider("-", width);
 
-  let total = 0;
+  let subtotal = 0;
   for (const item of order.order_items) {
-    const subtotal = item.price_at_order * item.quantity;
-    total += subtotal;
+    const extrasTotal = item.order_item_extras.reduce(
+      (s, e) => s + e.price,
+      0
+    );
+    const itemTotal = (item.price_at_order + extrasTotal) * item.quantity;
+    subtotal += itemTotal;
 
     const qty = `${item.quantity}x`.padEnd(3);
     const left = `${qty} ${item.products.name}`;
-    out += lineLR(left, formatPrice(subtotal), width);
+    out += lineLR(left, formatPrice(itemTotal), width) + "  [NEGRITO]";
 
     if (item.quantity > 1) {
       out +=
         "    " +
         `(${item.quantity} x ${formatPrice(item.price_at_order)})` +
         "\n";
+    }
+
+    for (const ex of item.order_item_extras) {
+      out += lineLR(`  + ${ex.name}`, formatPrice(ex.price), width);
     }
 
     if (item.notes && item.notes.trim()) {
@@ -209,15 +216,67 @@ function buildCustomerPreview(
   }
 
   out += divider("-", width);
-  out += lineLR("Subtotal", formatPrice(total), width);
+
+  // Totais (mesmo breakdown do PDF)
+  const discount = order.coupon_discount || 0;
+  const deliveryFee = order.delivery_fee || 0;
+  const finalTotal = subtotal - discount + deliveryFee;
+  const isDelivery = order.delivery_type === "delivery";
+  const showBreakdown = discount > 0 || deliveryFee > 0 || isDelivery;
+
+  if (showBreakdown) {
+    out += lineLR("Subtotal", formatPrice(subtotal), width);
+    if (discount > 0) {
+      out += lineLR("Desconto", `- ${formatPrice(discount)}`, width);
+    }
+    if (isDelivery) {
+      out += lineLR(
+        "Taxa de entrega",
+        deliveryFee > 0 ? formatPrice(deliveryFee) : "Gratis",
+        width
+      );
+    } else if (deliveryFee > 0) {
+      out += lineLR("Taxa de entrega", formatPrice(deliveryFee), width);
+    }
+  }
+
   out += divider("=", width);
-  out += lineLR("TOTAL", formatPrice(total), width) + "  [GRANDE+NEGRITO]\n";
+  out += lineLR("TOTAL", formatPrice(finalTotal), width) + "  [GRANDE+NEGRITO]\n";
   out += divider("=", width);
+
+  if (order.payment_type) {
+    out += "\n";
+    out += labeled(
+      "Pagamento:",
+      formatPaymentType(order.payment_type, order.payment_brand),
+      width
+    );
+  }
+
+  const cleanNotes = order.notes
+    ? order.notes.replace(/\[Desconto:.+?\]/g, "").trim()
+    : "";
+  if (cleanNotes) {
+    out += divider("-", width);
+    out += labeled("Obs:     ", cleanNotes, width);
+  }
+
+  if (order.cancellation_reason) {
+    out += divider("-", width);
+    out += labeled(
+      "MOTIVO CANCELAMENTO:",
+      order.cancellation_reason + "  [NEGRITO]",
+      width
+    );
+  }
 
   out += "\n";
   out += center("Obrigado pela preferencia!  [NEGRITO]", width);
   out += center("Volte sempre :)", width);
-  out += "\n\n";
+  out += "\n";
+  out += divider("-", width);
+  out += center(`Impresso em ${formatDateTimeFull(new Date())}`, width);
+  out += "\n";
 
   return out;
 }
@@ -233,14 +292,23 @@ function buildKitchenPreview(order: OrderForPrinting, width: number): string {
   out += center(shortOrderId(order.id) + "  [GIGANTE]", width);
   out += divider("=", width);
 
+  const originLabel = buildOriginLabel(order);
+  out += center(originLabel + "  [GRANDE+NEGRITO]", width);
+
+  if (order.dd_scheduled_for) {
+    out += center("** AGENDADO **  [NEGRITO]", width);
+    out += center(formatDateTimeShort(order.dd_scheduled_for), width);
+  }
+  out += divider("=", width);
+
   if (order.tables) {
     const tname = order.tables.table_name?.trim();
     const tnum = order.tables.table_number;
-    const mesaStr = tname ? `${tname} (Nº ${tnum})` : `Mesa ${tnum}`;
+    const mesaStr = tname ? `${tname} (No ${tnum})` : `Mesa ${tnum}`;
     out += "MESA: " + mesaStr + "  [GRANDE+NEGRITO]\n";
   }
   out += labeled("Cliente:", order.customer_name || "-", width);
-  out += labeled("Hora:   ", formatDateTime(order.created_at), width);
+  out += labeled("Hora:   ", formatDateTimeShort(order.created_at), width);
   out += divider("-", width);
 
   out += center("ITENS A PREPARAR  [NEGRITO]", width);
@@ -249,6 +317,10 @@ function buildKitchenPreview(order: OrderForPrinting, width: number): string {
   for (const item of order.order_items) {
     for (const l of wrap(`${item.quantity}x ${item.products.name}`, dblWidth(width)))
       out += l + "  [GRANDE+NEGRITO]\n";
+
+    for (const ex of item.order_item_extras) {
+      out += "  + " + ex.name + "\n";
+    }
 
     if (item.notes && item.notes.trim()) {
       const obsLines = wrap(
@@ -260,7 +332,17 @@ function buildKitchenPreview(order: OrderForPrinting, width: number): string {
     out += divider("-", width);
   }
 
-  out += "\n\n";
+  const cleanNotes = order.notes
+    ? order.notes.replace(/\[Desconto:.+?\]/g, "").trim()
+    : "";
+  if (cleanNotes) {
+    out += labeled("OBS GERAL:", cleanNotes.toUpperCase() + "  [NEGRITO]", width);
+  }
+
+  out += "\n";
+  out += divider("-", width);
+  out += center(`Impresso em ${formatDateTimeFull(new Date())}`, width);
+  out += "\n";
   return out;
 }
 
