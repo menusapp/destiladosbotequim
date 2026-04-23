@@ -855,6 +855,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     }
 
     setSubmitting(true);
+    let createdOrderId: string | null = null;
     try {
       // Auto-create/update customer in CRM
       await upsertCustomerCRM();
@@ -889,6 +890,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           pdv_source: true,
         }).select().single();
         if (error) throw error;
+        createdOrderId = order.id;
         await insertOrderItems(order.id);
 
         // Employee credit for delivery
@@ -924,6 +926,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           pdv_source: true,
         }).select().single();
         if (error) throw error;
+        createdOrderId = order.id;
         await insertOrderItems(order.id);
 
         // Trigger WhatsApp "order accepted" notification (PDV pickup)
@@ -1012,6 +1015,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           pdv_source: true,
         }).select().single();
         if (error) throw error;
+        createdOrderId = order.id;
 
         // Insert items first so trigger calculates total correctly
         await insertOrderItems(order.id);
@@ -1084,7 +1088,10 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             ].filter(Boolean).join(" - ") || undefined
           : undefined;
         const printOrderObj = {
-          id: "PDV-" + Date.now(),
+          // IMPORTANTE: usar o UUID real do pedido criado no banco.
+          // O motor QZ Tray faz fetch por id (UUID), então um código sintético
+          // como "PDV-<timestamp>" quebra a query (invalid input syntax for type uuid).
+          id: createdOrderId ?? ("PDV-" + Date.now()),
           created_at: new Date().toISOString(),
           customer_name: customerName.trim(),
           order_type: orderType === "mesa" ? "local" : "delivery",
