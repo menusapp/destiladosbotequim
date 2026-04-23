@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Printer, CheckCircle2, Globe } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { QzTraySection } from "./QzTraySection";
 
 interface WebPrinterConfig {
   paperSize: string;
@@ -311,6 +312,8 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
           </div>
         </CardContent>
       </Card>
+
+      <QzTraySection />
 
       <div className="flex justify-end">
         <Button onClick={saveWebConfig} disabled={saving}>
