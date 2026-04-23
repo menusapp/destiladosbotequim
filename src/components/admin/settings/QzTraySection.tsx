@@ -176,6 +176,7 @@ export const QzTraySection = () => {
             variant="outline"
             onClick={handleConnect}
             disabled={status === "connecting"}
+            data-tour="qz-connect"
           >
             <Plug className="h-4 w-4 mr-2" />
             {status === "connecting"
@@ -243,7 +244,7 @@ export const QzTraySection = () => {
             onValueChange={handleSelect}
             disabled={printers.length === 0}
           >
-            <SelectTrigger>
+            <SelectTrigger data-tour="qz-printer-select">
               <SelectValue
                 placeholder={
                   printers.length === 0
@@ -274,6 +275,7 @@ export const QzTraySection = () => {
           <Button
             onClick={handleTestPrint}
             disabled={!selected || printing}
+            data-tour="qz-test-print"
           >
             <Printer className="h-4 w-4 mr-2" />
             {printing ? "Imprimindo..." : "Testar impressão"}
