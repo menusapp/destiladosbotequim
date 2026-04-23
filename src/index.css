@@ -160,3 +160,67 @@
   background-color: hsl(var(--border));
   border-radius: 9999px;
 }
+
+/* =========================================================================
+   Mobile safety rules — ADMIN PANEL ONLY (.admin-panel scope)
+   Não afeta cardápios de clientes (Menu, DeliveryMenu, Kiosk, Comanda).
+   Objetivo: eliminar sobreposição de textos/botões e garantir alvos
+   tocáveis adequados em telas pequenas (<768px).
+   ========================================================================= */
+@media (max-width: 767px) {
+  /* Alvo tocável mínimo 44px (WCAG/Apple HIG) — exceções: ícones inline em
+     menus densos, switches, checkboxes/radios, e itens de seleção. */
+  .admin-panel button,
+  .admin-panel [role="button"],
+  .admin-panel a[href],
+  .admin-panel input:not([type="checkbox"]):not([type="radio"]),
+  .admin-panel select,
+  .admin-panel textarea {
+    min-height: 44px;
+  }
+  /* Não forçar min-height em controles dentro de tabelas/dropdowns/comandos
+     onde quebraria o layout denso. */
+  .admin-panel table button,
+  .admin-panel table a,
+  .admin-panel [role="menu"] button,
+  .admin-panel [role="listbox"] button,
+  .admin-panel [cmdk-item] button,
+  .admin-panel .no-min-tap,
+  .admin-panel .no-min-tap * {
+    min-height: 0;
+  }
+
+  /* Texto nunca transborda nem sobrepõe */
+  .admin-panel p,
+  .admin-panel span,
+  .admin-panel h1,
+  .admin-panel h2,
+  .admin-panel h3,
+  .admin-panel h4,
+  .admin-panel label {
+    max-width: 100%;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Itens flex não encolhem a zero (corrige textos cortados em headers de cards) */
+  .admin-panel .flex > * {
+    min-width: 0;
+  }
+
+  /* Tabelas: rolagem horizontal segura quando largura excede a tela */
+  .admin-panel table {
+    max-width: 100%;
+  }
+  .admin-panel .table-wrapper,
+  .admin-panel [data-table-scroll] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modais e drawers: nunca ultrapassar a viewport */
+  [role="dialog"],
+  [data-vaul-drawer] {
+    max-width: 100vw;
+  }
+}
