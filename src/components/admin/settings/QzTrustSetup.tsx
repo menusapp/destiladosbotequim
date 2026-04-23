@@ -47,9 +47,9 @@ import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
 const OVERRIDE_CRT_URL = "/qz-tray/override.crt";
 
 const PATHS = {
-  windows: String.raw`C:\Program Files\QZ Tray\auth\override.crt`,
-  mac: "/Applications/QZ Tray.app/Contents/Resources/auth/override.crt",
-  linux: "/opt/qz-tray/auth/override.crt",
+  windows: String.raw`C:\Program Files\QZ Tray\override.crt`,
+  mac: "/Applications/QZ Tray.app/Contents/Resources/override.crt",
+  linux: "/opt/qz-tray/override.crt",
 };
 
 type TestStatus =
@@ -186,7 +186,7 @@ export const QzTrustSetup = () => {
         <CardDescription>
           O sistema agora usa o <strong>certificado oficial do QZ Tray</strong>.
           Basta baixar o arquivo <code className="bg-muted px-1 rounded text-xs">override.crt</code>{" "}
-          abaixo e instalá-lo na pasta de autenticação do QZ Tray para que a
+          abaixo e copiá-lo para a pasta de instalação do QZ Tray para que a
           impressão fique 100% automática (sem popup de permissão).
         </CardDescription>
       </CardHeader>
@@ -226,7 +226,7 @@ export const QzTrustSetup = () => {
           </div>
           <p className="text-sm text-muted-foreground pl-1">
             Cole o arquivo <code className="bg-muted px-1 py-0.5 rounded text-xs">override.crt</code>{" "}
-            na pasta correspondente ao seu sistema:
+            na pasta de instalação correspondente ao seu sistema:
           </p>
 
           <div className="space-y-2 pl-1">
@@ -261,10 +261,21 @@ export const QzTrustSetup = () => {
 
           <Alert className="mt-2">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle className="text-sm">Permissão de administrador</AlertTitle>
+            <AlertTitle className="text-sm">Substitua qualquer arquivo antigo</AlertTitle>
             <AlertDescription className="text-xs">
-              No Windows pode ser necessário "Executar como administrador" o
-              Explorador de Arquivos para colar nessa pasta.
+              Se já existir um <code>override.crt</code> antigo nessa pasta,
+              substitua pelo novo. Manter o arquivo antigo causa erro de
+              <strong> Invalid Certificate</strong>.
+            </AlertDescription>
+          </Alert>
+
+          <Alert className="mt-2">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle className="text-sm">Permissão no Windows</AlertTitle>
+            <AlertDescription className="text-xs">
+              No Windows, pode ser necessário abrir o Explorador de Arquivos como
+              administrador (clique direito → "Executar como administrador") ou
+              confirmar a permissão ao colar o arquivo nessa pasta.
             </AlertDescription>
           </Alert>
         </div>
@@ -278,9 +289,10 @@ export const QzTrustSetup = () => {
             <h3 className="font-semibold text-sm">Reinicie o QZ Tray</h3>
           </div>
           <p className="text-sm text-muted-foreground pl-1">
-            Clique com o botão direito no ícone do QZ Tray (próximo ao relógio) →{" "}
-            <strong>Exit</strong>. Depois abra novamente pelo menu Iniciar /
-            Aplicativos.
+            <strong>Feche totalmente o QZ Tray</strong> (clique com o botão
+            direito no ícone próximo ao relógio → <strong>Exit</strong>) e
+            abra novamente pelo menu Iniciar / Aplicativos somente após copiar
+            o certificado para a pasta correta.
           </p>
         </div>
 
@@ -366,6 +378,26 @@ export const QzTrustSetup = () => {
             </Alert>
           )}
         </div>
+
+        {/* Ajuda rápida — Invalid Certificate */}
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle className="text-sm">
+            Se ainda aparecer "Invalid Certificate"
+          </AlertTitle>
+          <AlertDescription className="text-xs">
+            <ol className="list-decimal pl-4 space-y-1 mt-1">
+              <li>Feche totalmente o QZ Tray (ícone → Exit).</li>
+              <li>
+                Verifique se existe um <code>override.crt</code> antigo na pasta
+                e substitua pelo novo baixado aqui.
+              </li>
+              <li>Confirme que o arquivo está no caminho correto do seu sistema.</li>
+              <li>Abra o QZ Tray novamente.</li>
+              <li>Clique em "Testar Impressão" outra vez.</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
       </CardContent>
     </Card>
   );
