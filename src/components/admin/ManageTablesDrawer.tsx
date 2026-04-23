@@ -143,7 +143,14 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
     setSaving(false);
   };
 
-  const handleDelete = async (id: string) => {
+  const askDelete = async (id: string) => {
+    const ok = await confirm({
+      variant: "destructive",
+      title: "Excluir esta mesa?",
+      description: "A mesa será removida permanentemente.",
+      consequence: "Pedidos e comandas vinculados podem impedir a exclusão.",
+    });
+    if (!ok) return;
     const { error } = await supabase.from("tables").delete().eq("id", id);
     if (error) {
       toast.error("Erro ao excluir mesa. Pode ter pedidos vinculados.");
