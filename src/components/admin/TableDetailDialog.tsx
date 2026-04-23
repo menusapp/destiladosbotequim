@@ -37,6 +37,7 @@ import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { SplitPaymentDialog } from "./SplitPaymentDialog";
 import { SplitPaymentSelect } from "./SplitPaymentSelect";
 import { printOrder as printOrderThermal } from "@/lib/printOrder";
+import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 
 interface TableDetailDialogProps {
   restaurantId: string;
@@ -82,6 +83,7 @@ export const TableDetailDialog = ({
   const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
   const [addItemsOrderId, setAddItemsOrderId] = useState<string | null>(null);
   const [cancellingItem, setCancellingItem] = useState<{ id: string; name: string; total: number } | null>(null);
+  const { canManageOrders } = useStaffOrderPermissions();
 
   // Fetch active comandas for the table
   const { data: comandas, refetch: refetchComandas } = useQuery({
@@ -698,7 +700,7 @@ export const TableDetailDialog = ({
                 <Scissors className="h-3 w-3 text-muted-foreground" />
               </Button>
             )}
-            {!allSplitsPaid && (
+            {!allSplitsPaid && canManageOrders && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -800,30 +802,32 @@ export const TableDetailDialog = ({
           </div>
         </div>
       </div>
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={!table?.is_occupied}
-            className="h-11 px-4 shrink-0"
-          >
-            <Eraser className="w-4 h-4 mr-1" /> Limpar Mesa
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Limpar Mesa {table?.table_number}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Isso irá cancelar pedidos ativos, fechar comandas e liberar a mesa.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleClearTable}>Limpar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {canManageOrders && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={!table?.is_occupied}
+              className="h-11 px-4 shrink-0"
+            >
+              <Eraser className="w-4 h-4 mr-1" /> Limpar Mesa
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Limpar Mesa {table?.table_number}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Isso irá cancelar pedidos ativos, fechar comandas e liberar a mesa.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleClearTable}>Limpar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 
@@ -1005,7 +1009,7 @@ export const TableDetailDialog = ({
                                       -{((order.coupon_discount || 0)).toFixed(2)}
                                     </Badge>
                                   )}
-                                  {order.status === "pending" && !(order as any).pdv_source && (
+                                  {order.status === "pending" && !(order as any).pdv_source && canManageOrders && (
                                     <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleAcceptOrder(order.id)}>
                                       Aceitar
                                     </Button>
