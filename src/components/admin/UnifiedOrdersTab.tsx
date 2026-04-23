@@ -22,10 +22,8 @@ import { OrderDetailModal } from "./OrderDetailModal";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { printDocument } from "@/lib/printDispatcher";
-import { getSavedQzPrinter } from "@/lib/qzPrinterConfig";
 import { QzTrayStatusBadge } from "./QzTrayStatusBadge";
 import { ReceiptPreviewDialog } from "./ReceiptPreviewDialog";
-import { PrintMethodMenu } from "./PrintMethodMenu";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import type { DateRange } from "react-day-picker";
 
@@ -461,10 +459,13 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
                     <Eye className="w-3.5 h-3.5 mr-2" /> Ver detalhes
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={(e) => handleQuickPrint(e, order)}>
-                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir
+                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir (padrão)
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => handleQuickPrintQz(e, order)}>
-                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir (QZ Tray)
+                  <DropdownMenuItem onClick={(e) => handleQuickPrintForce(e, order, "pdf")}>
+                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir como PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => handleQuickPrintForce(e, order, "qz_tray")}>
+                    <Printer className="w-3.5 h-3.5 mr-2" /> Imprimir via QZ Tray
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewOrderId(order.id); }}>
                     <ScrollText className="w-3.5 h-3.5 mr-2" /> Visualizar cupom
