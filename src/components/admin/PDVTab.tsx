@@ -1125,7 +1125,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
   // Table actions
   const getTableMenuUrl = (tableNumber: number) => {
-    return restaurantSlug ? `https://menusapp.com.br/${restaurantSlug}/mesa/${tableNumber}` : null;
+    if (!restaurantSlug) return null;
+    // Use the shareable link helper so WhatsApp previews show the restaurant's logo
+    return getTableMenuLink(restaurantSlug, tableNumber);
   };
 
   const handleCopyLink = (table: TableData) => {
