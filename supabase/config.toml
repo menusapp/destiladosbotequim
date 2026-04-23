@@ -86,3 +86,9 @@ verify_jwt = false
 
 [functions.menu-link-preview]
 verify_jwt = false
+
+[functions.qz-cert]
+verify_jwt = false
+
+[functions.qz-sign]
+verify_jwt = false

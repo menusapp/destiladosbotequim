@@ -14,4 +14,9 @@ import "./lib/qzTrayPrintTest";
 import "./lib/qzPrinterConfig";
 import "./lib/printOrderWithQz";
 
+// Configura assinatura digital do QZ Tray (elimina o popup "Untrusted website"
+// quando o certificado correspondente está instalado no QZ Tray do cliente).
+import { setupQzSigning } from "./lib/qzSigning";
+setupQzSigning();
+
 createRoot(document.getElementById("root")!).render(<App />);
