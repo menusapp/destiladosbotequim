@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef, lazy, Suspense } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, lazy, Suspense } from "react";
+import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DollarSign, ShoppingBag, TrendingUp, Store, Truck } from "lucide-react";
