@@ -752,7 +752,11 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Confirmada</Badge>;
       case "cancelled":
         return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">Cancelada</Badge>;
+      case "no_show":
+        return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">Não compareceu</Badge>;
       case "completed":
+      case "arrived":
+      case "seated":
         return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">Concluída</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
