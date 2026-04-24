@@ -414,7 +414,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   });
 
   // Fetch active reservations in batch for table badges; stale/finalized statuses never block tables
-  const { data: todayReservations } = useQuery({
+  const { data: todayReservations, refetch: refetchTodayReservations } = useQuery({
     queryKey: ["pdv-today-reservations", restaurantId],
     queryFn: async () => {
       const today = format(new Date(), "yyyy-MM-dd");
@@ -450,6 +450,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     let tablesTimer: ReturnType<typeof setTimeout>;
     let ordersTimer: ReturnType<typeof setTimeout>;
     const debouncedTables = () => { clearTimeout(tablesTimer); tablesTimer = setTimeout(() => refetchTables(), 250); };
+    const debouncedReservations = () => { clearTimeout(tablesTimer); tablesTimer = setTimeout(() => refetchTodayReservations(), 250); };
     const debouncedOrders = () => {
       clearTimeout(ordersTimer);
       ordersTimer = setTimeout(() => {
@@ -462,9 +463,10 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       .on("postgres_changes", { event: "*", schema: "public", table: "tables", filter: `restaurant_id=eq.${restaurantId}` }, debouncedTables)
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas", filter: `restaurant_id=eq.${restaurantId}` }, debouncedTables)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, debouncedOrders)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations", filter: `restaurant_id=eq.${restaurantId}` }, debouncedReservations)
       .subscribe();
     return () => { clearTimeout(tablesTimer); clearTimeout(ordersTimer); supabase.removeChannel(ch); };
-  }, [restaurantId, refetchTables, refetchPendingOrders, refetchActiveOrders, queryClient]);
+  }, [restaurantId, refetchTables, refetchTodayReservations, refetchPendingOrders, refetchActiveOrders, queryClient]);
 
   // Debounced search keeps typing snappy on large product lists
   const debouncedSearchTerm = useDebounce(searchTerm, 180);
@@ -1405,7 +1407,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       )}
                       {!isOccupied && reservationByTable.has(table.id) && (
                         <Badge className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100">
-                          🕐 Reservado {reservationByTable.get(table.id)!.time}
+                          🕐 Reservado {reservationByTable.get(table.id)!.reservation_time?.slice(0, 5)}
                         </Badge>
                       )}
                       <Badge variant={table.is_hidden ? "outline" : isOccupied ? "default" : "secondary"} className="text-[10px]">
