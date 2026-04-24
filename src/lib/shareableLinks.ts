@@ -1,52 +1,76 @@
 /**
- * Helpers for generating shareable links for the digital menu.
+ * Helpers centralizados para gerar links públicos do restaurante.
  *
- * - `getShareableMenuLink(slug)` — URL pointing to the `menu-link-preview` edge function.
- *   Used when sharing on WhatsApp / Facebook / Twitter so the preview shows the
- *   restaurant's logo and name (Open Graph meta tags). Browsers are auto-redirected
- *   to the actual SPA menu.
+ * Formato preferido: subdomínio (`slug.menusapp.com.br/...`)
+ * Fallback aceito:    path antigo (`menusapp.com.br/slug/...`)
  *
- * - `getDirectMenuLink(slug)` — Plain URL of the digital menu (no preview metadata).
- *   Use when the link doesn't need a rich preview (e.g. internal admin nav).
- *
- * - `getSubdomainMenuLink(slug)` — Pretty subdomain version: `slug.menusapp.com.br/menus`.
- *   Available because the VPS has a wildcard DNS (*.menusapp.com.br).
- *
- * - `getTableMenuLink(slug, tableNumber)` — Link to a specific table's menu (QR codes).
+ * - `getPublicMenuLink(slug, extraPath?)` → URL pública limpa (subdomínio).
+ * - `getDirectMenuLink(slug, extraPath?)` → mesmo que acima (mantido por
+ *   retrocompatibilidade).
+ * - `getSubdomainMenuLink(slug)`         → subdomínio explícito (ex.: para
+ *   exibir como "link mais bonito" na UI).
+ * - `getLegacyMenuLink(slug, extraPath?)` → formato antigo path-based (fallback
+ *   exibido para o usuário caso o subdomínio não funcione).
+ * - `getShareableMenuLink(slug, extraPath?)` → URL com prévia rica para
+ *   WhatsApp/redes sociais (passa pela edge function `menu-link-preview`).
+ * - `getTableMenuLink(slug, tableNumber)`  → link de QR Code para mesa.
  */
 
 const PUBLIC_DOMAIN = "menusapp.com.br";
 const SUPABASE_PROJECT_REF = "nrddbsudiphrvgfneqle";
 const PREVIEW_FN_BASE = `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/menu-link-preview`;
 
-/**
- * Returns the link that should be shared with customers (WhatsApp, social media).
- * Routes through the `menu-link-preview` edge function so previews show the
- * restaurant's branding.
- */
-export function getShareableMenuLink(slug: string, extraPath?: string): string {
-  const base = `${PREVIEW_FN_BASE}/${slug}`;
-  return extraPath ? `${base}/${extraPath}` : base;
+function joinPath(base: string, extraPath?: string): string {
+  if (!extraPath) return base;
+  const cleaned = extraPath.replace(/^\/+/, "");
+  return `${base}/${cleaned}`;
 }
 
 /**
- * Direct path-based link to the digital menu (no preview metadata).
+ * URL pública canônica do cardápio — formato subdomínio.
+ * Ex.: getPublicMenuLink("rods") → "https://rods.menusapp.com.br"
+ *      getPublicMenuLink("rods", "mesa/3") → "https://rods.menusapp.com.br/mesa/3"
  */
-export function getDirectMenuLink(slug: string): string {
-  return `https://${PUBLIC_DOMAIN}/${slug}`;
+export function getPublicMenuLink(slug: string, extraPath?: string): string {
+  return joinPath(`https://${slug}.${PUBLIC_DOMAIN}`, extraPath);
 }
 
 /**
- * Pretty subdomain link: `slug.menusapp.com.br/menus`.
- * Works because the VPS has wildcard DNS configured.
+ * Mantido como alias do formato preferido (subdomínio) para que código
+ * existente que chamava `getDirectMenuLink` continue funcionando.
+ */
+export function getDirectMenuLink(slug: string, extraPath?: string): string {
+  return getPublicMenuLink(slug, extraPath);
+}
+
+/**
+ * Subdomínio explícito (mesmo que getPublicMenuLink, mantido para clareza
+ * em telas que mostram "Subdomínio (recomendado)").
  */
 export function getSubdomainMenuLink(slug: string): string {
-  return `https://${slug}.${PUBLIC_DOMAIN}/menus`;
+  return getPublicMenuLink(slug);
 }
 
 /**
- * Link to a specific table's menu (used by QR codes).
- * Always shareable via the preview function.
+ * Formato antigo (path-based) — continua funcionando via fallback de roteamento
+ * e é exibido como alternativa caso o subdomínio falhe.
+ */
+export function getLegacyMenuLink(slug: string, extraPath?: string): string {
+  return joinPath(`https://${PUBLIC_DOMAIN}/${slug}`, extraPath);
+}
+
+/**
+ * URL com prévia rica (Open Graph) para WhatsApp / redes sociais.
+ * Roteia pela edge function `menu-link-preview`, que devolve HTML com og:image
+ * e redireciona o navegador para a URL canônica (subdomínio).
+ */
+export function getShareableMenuLink(slug: string, extraPath?: string): string {
+  return joinPath(`${PREVIEW_FN_BASE}/${slug}`, extraPath);
+}
+
+/**
+ * Link para a mesa (QR code).
+ * Sempre via prévia para que ao compartilhar pelo WhatsApp apareça a logo.
  */
 export function getTableMenuLink(slug: string, tableNumber: number): string {
   return getShareableMenuLink(slug, `mesa/${tableNumber}`);
