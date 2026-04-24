@@ -1131,6 +1131,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                           <SelectItem value="confirmed">Confirmadas</SelectItem>
                           <SelectItem value="completed">Concluídas</SelectItem>
                           <SelectItem value="cancelled">Canceladas</SelectItem>
+                          <SelectItem value="no_show">Não compareceu</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
