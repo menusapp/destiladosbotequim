@@ -66,7 +66,8 @@ interface BusinessHour {
 }
 
 const Reservations = () => {
-  const { slug: restaurantSlug } = useParams<{ slug: string }>();
+  const { slug: pathSlug } = useParams<{ slug: string }>();
+  const restaurantSlug = resolveSlug(pathSlug);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [tables, setTables] = useState<TableData[]>([]);
   const [reservedTableIds, setReservedTableIds] = useState<string[]>([]);

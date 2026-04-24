@@ -101,7 +101,8 @@ const getStatusConfig = (status: string, deliveryType?: string) => {
 };
 
 export default function OrderConfirmation() {
-  const { slug: restaurantSlug, orderId } = useParams();
+  const { slug: pathSlug, orderId } = useParams();
+  const restaurantSlug = resolveSlug(pathSlug);
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
