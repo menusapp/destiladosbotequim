@@ -241,56 +241,34 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     setReservations(data || []);
   };
 
-  const getTableStatus = (table: Table): TableStatus => {
-    if (table.is_occupied) {
-      return "occupied";
-    }
-    
-    const now = new Date();
+  // Considera reserva "ativa" apenas se status estiver entre os ativos
+  // (NUNCA cancelled, no_show, completed) e dentro da janela de tempo
+  const ACTIVE_RESERVATION_STATUSES = new Set(["confirmed", "pending"]);
+
+  const isReservationActiveForTable = (r: Reservation, table: Table, now: Date): boolean => {
+    if (!ACTIVE_RESERVATION_STATUSES.has(r.status)) return false;
     const today = format(now, "yyyy-MM-dd");
-    const currentTime = format(now, "HH:mm");
-    
-    // Check for active reservations (confirmed, for today, within time window)
-    const activeReservation = reservations.find(r => {
-      if (r.status !== "confirmed") return false;
-      if (r.reservation_date !== today) return false;
-      
-      // Check if table matches (either table_id or legacy reservation_table_id)
-      const tableMatches = r.table_id === table.id;
-      if (!tableMatches) return false;
-      
-      // Check time window: 30 min before to 2 hours after
-      const reservationTime = r.reservation_time.slice(0, 5);
-      const reservationDate = parseISO(`${r.reservation_date}T${reservationTime}`);
-      const windowStart = addMinutes(reservationDate, -30);
-      const windowEnd = addMinutes(reservationDate, 120);
-      
-      return isAfter(now, windowStart) && isBefore(now, windowEnd);
-    });
-    
-    if (activeReservation) {
-      return "reserved";
-    }
-    
+    if (r.reservation_date !== today) return false;
+    if (r.table_id !== table.id) return false;
+
+    const reservationTime = r.reservation_time.slice(0, 5);
+    const reservationDate = parseISO(`${r.reservation_date}T${reservationTime}`);
+    const windowStart = addMinutes(reservationDate, -30);
+    const windowEnd = addMinutes(reservationDate, 120);
+    return isAfter(now, windowStart) && isBefore(now, windowEnd);
+  };
+
+  const getTableStatus = (table: Table): TableStatus => {
+    if (table.is_occupied) return "occupied";
+    const now = new Date();
+    const activeReservation = reservations.find(r => r.status === "confirmed" && isReservationActiveForTable(r, table, now));
+    if (activeReservation) return "reserved";
     return "available";
   };
 
   const getActiveReservation = (table: Table): Reservation | null => {
     const now = new Date();
-    const today = format(now, "yyyy-MM-dd");
-    
-    return reservations.find(r => {
-      if (r.status !== "confirmed") return false;
-      if (r.reservation_date !== today) return false;
-      if (r.table_id !== table.id) return false;
-      
-      const reservationTime = r.reservation_time.slice(0, 5);
-      const reservationDate = parseISO(`${r.reservation_date}T${reservationTime}`);
-      const windowStart = addMinutes(reservationDate, -30);
-      const windowEnd = addMinutes(reservationDate, 120);
-      
-      return isAfter(now, windowStart) && isBefore(now, windowEnd);
-    }) || null;
+    return reservations.find(r => r.status === "confirmed" && isReservationActiveForTable(r, table, now)) || null;
   };
 
   const openTableDialog = (table?: Table) => {
