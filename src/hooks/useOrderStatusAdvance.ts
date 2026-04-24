@@ -4,9 +4,9 @@ import { toast } from "@/components/ui/sonner";
 import { printDocument } from "@/lib/printDispatcher";
 import { getPublicMenuLink } from "@/lib/shareableLinks";
 
-// Gera links públicos no formato preferido (subdomínio):
-// https://<slug>.menusapp.com.br/<path>
-// O formato antigo (/<slug>) continua aceito pelo app como fallback.
+// Gera links públicos no formato path-based:
+// https://menusapp.com.br/<slug>/<path>
+// (Subdomínios desativados — domínio hospedado no Lovable não suporta wildcard.)
 function buildPublicUrl(slug: string, path?: string): string {
   return getPublicMenuLink(slug, path);
 }
