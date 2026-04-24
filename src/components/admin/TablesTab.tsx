@@ -981,17 +981,28 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                                     </div>
                                     <div className="flex gap-2">
                                       {reservation.status === "confirmed" && (
-                                        <Button
-                                          size="sm"
-                                          className="bg-orange-600 hover:bg-orange-700"
-                                          onClick={() => {
-                                            setSelectedReservation(reservation);
-                                            setArrivalDialogOpen(true);
-                                          }}
-                                        >
-                                          <Check className="h-4 w-4 mr-1" />
-                                          Cliente Chegou
-                                        </Button>
+                                        <>
+                                          <Button
+                                            size="sm"
+                                            className="bg-orange-600 hover:bg-orange-700"
+                                            onClick={() => {
+                                              setSelectedReservation(reservation);
+                                              setArrivalDialogOpen(true);
+                                            }}
+                                          >
+                                            <Check className="h-4 w-4 mr-1" />
+                                            Cliente Chegou
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-destructive border-destructive/40"
+                                            onClick={() => handleNoShow(reservation)}
+                                          >
+                                            <X className="h-4 w-4 mr-1" />
+                                            Não veio
+                                          </Button>
+                                        </>
                                       )}
                                       {reservation.status === "pending" && (
                                         <>
