@@ -17,6 +17,7 @@ const OnlinePaymentsSettings = lazy(() => import("./OnlinePaymentsSettings"));
 const PrintersSettings = lazy(() => import("./PrintersSettings"));
 const BackupSettings = lazy(() => import("./BackupSettings"));
 const ShareableLinksSection = lazy(() => import("./ShareableLinksSection"));
+import { QzTrayDownloadCard } from "./QzTrayDownloadCard";
 
 interface Settings {
   logo_url: string | null;
@@ -316,6 +317,8 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
             <Save className="h-4 w-4" />
             Salvar Identidade Visual
           </Button>
+
+          <QzTrayDownloadCard variant="compact" />
         </TabsContent>
 
         {/* Tab 2: Operacional (merged: Operacional + Cadastro de Clientes + Cardápio) */}
