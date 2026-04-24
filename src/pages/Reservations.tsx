@@ -35,6 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import CustomerInfoDialog from "@/components/menu/CustomerInfoDialog";
 import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
+import { ACTIVE_RESERVATION_STATUSES } from "@/lib/reservations";
 
 interface Restaurant {
   id: string;
@@ -167,7 +168,7 @@ const Reservations = () => {
       .select("table_id")
       .eq("restaurant_id", restaurant.id)
       .eq("reservation_date", dateStr)
-      .eq("status", "confirmed");
+      .in("status", Array.from(ACTIVE_RESERVATION_STATUSES));
     
     setReservedTableIds((data || []).map(r => r.table_id).filter(Boolean) as string[]);
   };
@@ -222,7 +223,7 @@ const Reservations = () => {
       .eq("restaurant_id", restaurant.id)
       .eq("table_id", selectedTable.id)
       .eq("reservation_date", format(reservationDate, "yyyy-MM-dd"))
-      .eq("status", "confirmed")
+      .in("status", Array.from(ACTIVE_RESERVATION_STATUSES))
       .maybeSingle();
 
     if (existingReservation) {

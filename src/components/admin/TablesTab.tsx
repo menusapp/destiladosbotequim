@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ReservationHoursSettings from "./settings/ReservationHoursSettings";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,10 +64,15 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import QRCode from "qrcode";
-import { format, formatDistanceToNow, isToday, parseISO, addMinutes, isBefore, isAfter } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import {
+  ACTIVE_RESERVATION_STATUSES,
+  buildActiveReservationByTable,
+  isReservationExpired,
+} from "@/lib/reservations";
 
 interface Comanda {
   id: string;
@@ -152,6 +157,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     fetchRestaurantData();
     fetchTables();
     fetchReservations();
+    cleanupExpiredReservations();
 
     // Consolidated realtime: 1 channel with multiple listeners + debounce
     let tablesDebounce: ReturnType<typeof setTimeout>;
@@ -241,34 +247,43 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     setReservations(data || []);
   };
 
-  // Considera reserva "ativa" apenas se status estiver entre os ativos
-  // (NUNCA cancelled, no_show, completed) e dentro da janela de tempo
-  const ACTIVE_RESERVATION_STATUSES = new Set(["confirmed", "pending"]);
+  const cleanupExpiredReservations = async () => {
+    const { data } = await supabase
+      .from("reservations")
+      .select("id, table_id, reservation_date, reservation_time, status")
+      .eq("restaurant_id", restaurantId)
+      .in("status", Array.from(ACTIVE_RESERVATION_STATUSES));
 
-  const isReservationActiveForTable = (r: Reservation, table: Table, now: Date): boolean => {
-    if (!ACTIVE_RESERVATION_STATUSES.has(r.status)) return false;
-    const today = format(now, "yyyy-MM-dd");
-    if (r.reservation_date !== today) return false;
-    if (r.table_id !== table.id) return false;
+    const expiredIds = (data || [])
+      .filter((reservation) => isReservationExpired(reservation))
+      .map((reservation) => reservation.id);
 
-    const reservationTime = r.reservation_time.slice(0, 5);
-    const reservationDate = parseISO(`${r.reservation_date}T${reservationTime}`);
-    const windowStart = addMinutes(reservationDate, -30);
-    const windowEnd = addMinutes(reservationDate, 120);
-    return isAfter(now, windowStart) && isBefore(now, windowEnd);
+    if (expiredIds.length === 0) return;
+
+    await supabase
+      .from("reservations")
+      .update({ status: "expired" })
+      .in("id", expiredIds);
+
+    setReservations((prev) => prev.map((reservation) =>
+      expiredIds.includes(reservation.id) ? { ...reservation, status: "expired" } : reservation
+    ));
   };
+
+  const activeReservationByTable = useMemo(
+    () => buildActiveReservationByTable(reservations),
+    [reservations]
+  );
 
   const getTableStatus = (table: Table): TableStatus => {
     if (table.is_occupied) return "occupied";
-    const now = new Date();
-    const activeReservation = reservations.find(r => r.status === "confirmed" && isReservationActiveForTable(r, table, now));
+    const activeReservation = activeReservationByTable.get(table.id);
     if (activeReservation) return "reserved";
     return "available";
   };
 
   const getActiveReservation = (table: Table): Reservation | null => {
-    const now = new Date();
-    return reservations.find(r => r.status === "confirmed" && isReservationActiveForTable(r, table, now)) || null;
+    return activeReservationByTable.get(table.id) || null;
   };
 
   const openTableDialog = (table?: Table) => {

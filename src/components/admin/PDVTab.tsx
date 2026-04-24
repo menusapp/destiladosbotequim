@@ -39,6 +39,11 @@ import { notifyOrderAcceptedFromPDV } from "@/lib/pdvNotifications";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { checkUnpaidBeforeTableClear } from "@/lib/dangerChecks";
 import { getTableMenuLink } from "@/lib/shareableLinks";
+import {
+  ACTIVE_RESERVATION_STATUSES,
+  buildActiveReservationByTable,
+  isReservationExpired,
+} from "@/lib/reservations";
 
 interface CartItem {
   productId: string;
@@ -60,6 +65,15 @@ interface TableData {
   max_capacity: number;
   is_hidden: boolean;
   comandas?: { id: string; customer_name: string; customer_cpf: string }[];
+}
+
+interface TableReservation {
+  id: string;
+  table_id: string | null;
+  reservation_date: string;
+  reservation_time: string | null;
+  customer_name: string;
+  status: string | null;
 }
 
 interface SelectedCustomer {
@@ -399,33 +413,36 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     },
   });
 
-  // Fetch today's confirmed reservations for table badges
-  const { data: todayReservations } = useQuery({
+  // Fetch active reservations in batch for table badges; stale/finalized statuses never block tables
+  const { data: todayReservations, refetch: refetchTodayReservations } = useQuery({
     queryKey: ["pdv-today-reservations", restaurantId],
     queryFn: async () => {
       const today = format(new Date(), "yyyy-MM-dd");
       const { data } = await supabase
         .from("reservations")
-        .select("id, table_id, reservation_time, customer_name, status")
+        .select("id, table_id, reservation_date, reservation_time, customer_name, status")
         .eq("restaurant_id", restaurantId)
-        .eq("reservation_date", today)
-        .eq("status", "confirmed");
-      return data || [];
+        .lte("reservation_date", today)
+        .in("status", Array.from(ACTIVE_RESERVATION_STATUSES));
+
+      const reservations = (data || []) as TableReservation[];
+      const expiredIds = reservations
+        .filter((reservation) => isReservationExpired(reservation))
+        .map((reservation) => reservation.id);
+
+      if (expiredIds.length > 0) {
+        await supabase.from("reservations").update({ status: "expired" }).in("id", expiredIds);
+      }
+
+      return reservations.filter((reservation) =>
+        reservation.reservation_date === today && !expiredIds.includes(reservation.id)
+      );
     },
   });
 
-  // Map table_id → reservation info for today
+  // Map table_id → active reservation info for the current time window
   const reservationByTable = useMemo(() => {
-    const map = new Map<string, { time: string; customerName: string }>();
-    todayReservations?.forEach(r => {
-      if (r.table_id) {
-        map.set(r.table_id, {
-          time: r.reservation_time?.slice(0, 5) || "",
-          customerName: r.customer_name
-        });
-      }
-    });
-    return map;
+    return buildActiveReservationByTable(todayReservations || []);
   }, [todayReservations]);
 
   // Realtime for tables and orders — filtered + debounced para evitar refetch em rajada
@@ -433,6 +450,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     let tablesTimer: ReturnType<typeof setTimeout>;
     let ordersTimer: ReturnType<typeof setTimeout>;
     const debouncedTables = () => { clearTimeout(tablesTimer); tablesTimer = setTimeout(() => refetchTables(), 250); };
+    const debouncedReservations = () => { clearTimeout(tablesTimer); tablesTimer = setTimeout(() => refetchTodayReservations(), 250); };
     const debouncedOrders = () => {
       clearTimeout(ordersTimer);
       ordersTimer = setTimeout(() => {
@@ -445,9 +463,10 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       .on("postgres_changes", { event: "*", schema: "public", table: "tables", filter: `restaurant_id=eq.${restaurantId}` }, debouncedTables)
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas", filter: `restaurant_id=eq.${restaurantId}` }, debouncedTables)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, debouncedOrders)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations", filter: `restaurant_id=eq.${restaurantId}` }, debouncedReservations)
       .subscribe();
     return () => { clearTimeout(tablesTimer); clearTimeout(ordersTimer); supabase.removeChannel(ch); };
-  }, [restaurantId, refetchTables, refetchPendingOrders, refetchActiveOrders, queryClient]);
+  }, [restaurantId, refetchTables, refetchTodayReservations, refetchPendingOrders, refetchActiveOrders, queryClient]);
 
   // Debounced search keeps typing snappy on large product lists
   const debouncedSearchTerm = useDebounce(searchTerm, 180);
@@ -1388,7 +1407,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       )}
                       {!isOccupied && reservationByTable.has(table.id) && (
                         <Badge className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100">
-                          🕐 Reservado {reservationByTable.get(table.id)!.time}
+                          🕐 Reservado {reservationByTable.get(table.id)!.reservation_time?.slice(0, 5)}
                         </Badge>
                       )}
                       <Badge variant={table.is_hidden ? "outline" : isOccupied ? "default" : "secondary"} className="text-[10px]">
