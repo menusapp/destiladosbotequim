@@ -7,7 +7,14 @@
 // Optional path passthrough: /functions/v1/menu-link-preview/<slug>/qualquer/coisa
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const PUBLIC_DOMAIN = "https://menusapp.com.br";
+const PUBLIC_DOMAIN = "menusapp.com.br";
+
+// Build the canonical public URL using the subdomain format (preferred).
+// Ex.: buildPublicUrl("rods") → "https://rods.menusapp.com.br"
+function buildPublicUrl(slug: string, extraPath?: string): string {
+  const base = `https://${slug}.${PUBLIC_DOMAIN}`;
+  return extraPath ? `${base}/${extraPath.replace(/^\/+/, "")}` : base;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,12 +57,10 @@ Deno.serve(async (req) => {
       .eq("slug", slug)
       .maybeSingle();
 
-    const finalUrl = extraPath
-      ? `${PUBLIC_DOMAIN}/${slug}/${extraPath}`
-      : `${PUBLIC_DOMAIN}/${slug}`;
+    const finalUrl = buildPublicUrl(slug, extraPath);
 
     const name = restaurant?.name || "Cardápio Digital";
-    const logo = restaurant?.logo_url || `${PUBLIC_DOMAIN}/placeholder.svg`;
+    const logo = restaurant?.logo_url || `https://${PUBLIC_DOMAIN}/placeholder.svg`;
     const description = `Acesse o cardápio digital de ${name} e faça seu pedido online.`;
 
     const html = `<!DOCTYPE html>

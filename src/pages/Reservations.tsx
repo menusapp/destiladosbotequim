@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import { resolveSlug } from "@/lib/slugResolver";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
@@ -65,7 +66,8 @@ interface BusinessHour {
 }
 
 const Reservations = () => {
-  const { slug: restaurantSlug } = useParams<{ slug: string }>();
+  const { slug: pathSlug } = useParams<{ slug: string }>();
+  const restaurantSlug = resolveSlug(pathSlug);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [tables, setTables] = useState<TableData[]>([]);
   const [reservedTableIds, setReservedTableIds] = useState<string[]>([]);

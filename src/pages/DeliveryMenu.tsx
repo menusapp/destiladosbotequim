@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
+import { resolveSlug } from "@/lib/slugResolver";
 import { supabase } from "@/integrations/supabase/client";
 import { MenuHeader } from "@/components/menu/MenuHeader";
 import { RestaurantInfoCard } from "@/components/menu/RestaurantInfoCard";
@@ -24,8 +25,8 @@ import { useFacebookPixel } from "@/hooks/useFacebookPixel";
 import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
 export default function DeliveryMenu() {
-  const { slug: restaurantSlug } = useParams<{ slug: string }>();
-  
+  const { slug: pathSlug } = useParams<{ slug: string }>();
+  const restaurantSlug = resolveSlug(pathSlug);
   const [restaurant, setRestaurant] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);

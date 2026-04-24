@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { resolveSlug } from "@/lib/slugResolver";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -100,7 +101,8 @@ const getStatusConfig = (status: string, deliveryType?: string) => {
 };
 
 export default function OrderConfirmation() {
-  const { slug: restaurantSlug, orderId } = useParams();
+  const { slug: pathSlug, orderId } = useParams();
+  const restaurantSlug = resolveSlug(pathSlug);
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);

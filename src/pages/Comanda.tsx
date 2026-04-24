@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { resolveSlug } from "@/lib/slugResolver";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -111,7 +112,8 @@ interface CartItem {
 }
 
 const Comanda = () => {
-  const { slug: restaurantSlug, tableNumber } = useParams();
+  const { slug: pathSlug, tableNumber } = useParams();
+  const restaurantSlug = resolveSlug(pathSlug);
   const navigate = useNavigate();
   
   const [orders, setOrders] = useState<Order[]>([]);

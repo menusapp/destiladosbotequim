@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { resolveSlug } from "@/lib/slugResolver";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useMenuInactivityLogout } from "@/hooks/useMenuInactivityLogout";
@@ -22,7 +23,8 @@ import { useSessionTracking } from "@/hooks/useSessionTracking";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
 import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 const Menu = () => {
-  const { slug: restaurantSlug, tableNumber } = useParams();
+  const { slug: pathSlug, tableNumber } = useParams();
+  const restaurantSlug = resolveSlug(pathSlug);
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
