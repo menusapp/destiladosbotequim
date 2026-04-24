@@ -22,6 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { ACTIVE_RESERVATION_STATUSES } from "@/lib/reservations";
 
 interface TableData {
   id: string;
@@ -191,7 +192,7 @@ export const ReservationsView = ({
       .select("table_id")
       .eq("restaurant_id", restaurant.id)
       .eq("reservation_date", dateStr)
-      .eq("status", "confirmed")
+      .in("status", Array.from(ACTIVE_RESERVATION_STATUSES))
       .then(({ data }) => {
         setReservedTableIds((data || []).map(r => r.table_id).filter(Boolean) as string[]);
       });
@@ -277,7 +278,7 @@ export const ReservationsView = ({
       .eq("restaurant_id", restaurant.id)
       .eq("table_id", selectedTable.id)
       .eq("reservation_date", format(reservationDate, "yyyy-MM-dd"))
-      .eq("status", "confirmed")
+      .in("status", Array.from(ACTIVE_RESERVATION_STATUSES))
       .maybeSingle();
 
     if (existingReservation) {
