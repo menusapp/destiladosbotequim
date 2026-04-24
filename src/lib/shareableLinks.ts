@@ -70,8 +70,9 @@ export function getShareableMenuLink(slug: string, extraPath?: string): string {
 
 /**
  * Link para a mesa (QR code).
- * Sempre via prévia para que ao compartilhar pelo WhatsApp apareça a logo.
+ * Usa a URL pública direta (subdomínio) do cardápio local da mesa,
+ * para que o cliente abra diretamente o cardápio com a comanda da mesa.
  */
 export function getTableMenuLink(slug: string, tableNumber: number): string {
-  return getShareableMenuLink(slug, `mesa/${tableNumber}`);
+  return getPublicMenuLink(slug, `mesa/${tableNumber}`);
 }
