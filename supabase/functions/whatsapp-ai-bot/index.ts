@@ -6,15 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const PUBLIC_DOMAIN = 'https://menusapp.com.br';
+const PUBLIC_DOMAIN = 'menusapp.com.br';
 const SUPABASE_URL_ENV = Deno.env.get('SUPABASE_URL') || '';
 
-// Build the public menu URL using the production domain so customers
-// see the actual restaurant link (e.g. https://menusapp.com.br/<slug>)
-// instead of an internal Supabase functions URL.
+// Build the public menu URL using the subdomain format (preferred):
+// https://<slug>.menusapp.com.br/<path>
+// The legacy path-based format (/<slug>) still works as fallback in the app.
 function buildPublicUrl(slug: string, path?: string): string {
-  const base = `${PUBLIC_DOMAIN}/${slug}`;
-  return path ? `${base}/${path}` : base;
+  const base = `https://${slug}.${PUBLIC_DOMAIN}`;
+  return path ? `${base}/${path.replace(/^\/+/, '')}` : base;
 }
 
 Deno.serve(async (req) => {
