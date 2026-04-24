@@ -9,10 +9,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const PUBLIC_DOMAIN = "menusapp.com.br";
 
-// Build the canonical public URL using the subdomain format (preferred).
-// Ex.: buildPublicUrl("rods") → "https://rods.menusapp.com.br"
+// Build the canonical public URL using the path-based format.
+// Ex.: buildPublicUrl("rods") → "https://menusapp.com.br/rods"
+// (Subdomínios desativados — Lovable não suporta wildcard em domínios customizados.)
 function buildPublicUrl(slug: string, extraPath?: string): string {
-  const base = `https://${slug}.${PUBLIC_DOMAIN}`;
+  const base = `https://${PUBLIC_DOMAIN}/${slug}`;
   return extraPath ? `${base}/${extraPath.replace(/^\/+/, "")}` : base;
 }
 

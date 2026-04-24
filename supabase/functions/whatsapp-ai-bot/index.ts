@@ -9,11 +9,11 @@ const corsHeaders = {
 const PUBLIC_DOMAIN = 'menusapp.com.br';
 const SUPABASE_URL_ENV = Deno.env.get('SUPABASE_URL') || '';
 
-// Build the public menu URL using the subdomain format (preferred):
-// https://<slug>.menusapp.com.br/<path>
-// The legacy path-based format (/<slug>) still works as fallback in the app.
+// Build the public menu URL using the path-based format:
+// https://menusapp.com.br/<slug>/<path>
+// (Subdomínios desativados — Lovable não suporta wildcard em domínios customizados.)
 function buildPublicUrl(slug: string, path?: string): string {
-  const base = `https://${slug}.${PUBLIC_DOMAIN}`;
+  const base = `https://${PUBLIC_DOMAIN}/${slug}`;
   return path ? `${base}/${path.replace(/^\/+/, '')}` : base;
 }
 

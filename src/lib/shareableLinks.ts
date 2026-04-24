@@ -1,16 +1,16 @@
 /**
  * Helpers centralizados para gerar links públicos do restaurante.
  *
- * Formato preferido: subdomínio (`slug.menusapp.com.br/...`)
- * Fallback aceito:    path antigo (`menusapp.com.br/slug/...`)
+ * Formato atual: path-based (`menusapp.com.br/{slug}/...`)
  *
- * - `getPublicMenuLink(slug, extraPath?)` → URL pública limpa (subdomínio).
- * - `getDirectMenuLink(slug, extraPath?)` → mesmo que acima (mantido por
- *   retrocompatibilidade).
- * - `getSubdomainMenuLink(slug)`         → subdomínio explícito (ex.: para
- *   exibir como "link mais bonito" na UI).
- * - `getLegacyMenuLink(slug, extraPath?)` → formato antigo path-based (fallback
- *   exibido para o usuário caso o subdomínio não funcione).
+ * Os subdomínios (`{slug}.menusapp.com.br`) foram desativados temporariamente
+ * pois o domínio é hospedado no Lovable, que não suporta wildcards em domínios
+ * customizados. Todas as funções abaixo retornam URLs no formato path-based.
+ *
+ * - `getPublicMenuLink(slug, extraPath?)` → URL pública do cardápio.
+ * - `getDirectMenuLink(slug, extraPath?)` → alias de retrocompatibilidade.
+ * - `getSubdomainMenuLink(slug)`          → alias de retrocompatibilidade.
+ * - `getLegacyMenuLink(slug, extraPath?)` → mesmo formato (mantido por compat).
  * - `getShareableMenuLink(slug, extraPath?)` → URL com prévia rica para
  *   WhatsApp/redes sociais (passa pela edge function `menu-link-preview`).
  * - `getTableMenuLink(slug, tableNumber)`  → link de QR Code para mesa.
@@ -27,42 +27,40 @@ function joinPath(base: string, extraPath?: string): string {
 }
 
 /**
- * URL pública canônica do cardápio — formato subdomínio.
- * Ex.: getPublicMenuLink("rods") → "https://rods.menusapp.com.br"
- *      getPublicMenuLink("rods", "mesa/3") → "https://rods.menusapp.com.br/mesa/3"
+ * URL pública canônica do cardápio — formato path-based.
+ * Ex.: getPublicMenuLink("rods") → "https://menusapp.com.br/rods"
+ *      getPublicMenuLink("rods", "mesa/3") → "https://menusapp.com.br/rods/mesa/3"
  */
 export function getPublicMenuLink(slug: string, extraPath?: string): string {
-  return joinPath(`https://${slug}.${PUBLIC_DOMAIN}`, extraPath);
+  return joinPath(`https://${PUBLIC_DOMAIN}/${slug}`, extraPath);
 }
 
 /**
- * Mantido como alias do formato preferido (subdomínio) para que código
- * existente que chamava `getDirectMenuLink` continue funcionando.
+ * Alias mantido para retrocompatibilidade.
  */
 export function getDirectMenuLink(slug: string, extraPath?: string): string {
   return getPublicMenuLink(slug, extraPath);
 }
 
 /**
- * Subdomínio explícito (mesmo que getPublicMenuLink, mantido para clareza
- * em telas que mostram "Subdomínio (recomendado)").
+ * Alias mantido para retrocompatibilidade — agora retorna o mesmo formato
+ * path-based (subdomínios desativados).
  */
 export function getSubdomainMenuLink(slug: string): string {
   return getPublicMenuLink(slug);
 }
 
 /**
- * Formato antigo (path-based) — continua funcionando via fallback de roteamento
- * e é exibido como alternativa caso o subdomínio falhe.
+ * Formato legado (mantido como alias do formato atual).
  */
 export function getLegacyMenuLink(slug: string, extraPath?: string): string {
-  return joinPath(`https://${PUBLIC_DOMAIN}/${slug}`, extraPath);
+  return getPublicMenuLink(slug, extraPath);
 }
 
 /**
  * URL com prévia rica (Open Graph) para WhatsApp / redes sociais.
  * Roteia pela edge function `menu-link-preview`, que devolve HTML com og:image
- * e redireciona o navegador para a URL canônica (subdomínio).
+ * e redireciona o navegador para a URL canônica.
  */
 export function getShareableMenuLink(slug: string, extraPath?: string): string {
   return joinPath(`${PREVIEW_FN_BASE}/${slug}`, extraPath);
@@ -70,7 +68,7 @@ export function getShareableMenuLink(slug: string, extraPath?: string): string {
 
 /**
  * Link para a mesa (QR code).
- * Usa a URL pública direta (subdomínio) do cardápio local da mesa,
+ * Usa a URL pública path-based do cardápio local da mesa,
  * para que o cliente abra diretamente o cardápio com a comanda da mesa.
  */
 export function getTableMenuLink(slug: string, tableNumber: number): string {
