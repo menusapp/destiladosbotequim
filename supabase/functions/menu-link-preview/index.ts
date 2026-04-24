@@ -62,7 +62,6 @@ Deno.serve(async (req) => {
     const name = restaurant?.name || "Cardápio Digital";
     const logo = restaurant?.logo_url || `https://${PUBLIC_DOMAIN}/placeholder.svg`;
     const description = `Acesse o cardápio digital de ${name} e faça seu pedido online.`;
-    const description = `Acesse o cardápio digital de ${name} e faça seu pedido online.`;
 
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
