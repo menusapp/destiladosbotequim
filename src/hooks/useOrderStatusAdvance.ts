@@ -2,14 +2,13 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { printDocument } from "@/lib/printDispatcher";
-const PUBLIC_DOMAIN = 'https://menusapp.com.br';
+import { getPublicMenuLink } from "@/lib/shareableLinks";
 
+// Gera links públicos no formato preferido (subdomínio):
+// https://<slug>.menusapp.com.br/<path>
+// O formato antigo (/<slug>) continua aceito pelo app como fallback.
 function buildPublicUrl(slug: string, path?: string): string {
-  // Always use the public domain directly so customers see a clean URL
-  // (e.g. https://menusapp.com.br/<slug>/pedido/<id>) instead of the
-  // internal Supabase functions URL.
-  const base = `${PUBLIC_DOMAIN}/${slug}`;
-  return path ? `${base}/${path}` : base;
+  return getPublicMenuLink(slug, path);
 }
 
 interface Order {
