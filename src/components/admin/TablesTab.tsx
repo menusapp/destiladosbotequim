@@ -639,8 +639,8 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     const ok = await confirm({
       title: "Cliente não veio?",
       description: `Marcar a reserva de ${reservation.customer_name} como "não compareceu" e liberar a mesa?`,
-      confirmText: "Confirmar",
-      cancelText: "Voltar",
+      confirmLabel: "Confirmar",
+      cancelLabel: "Voltar",
     });
     if (!ok) return;
 
