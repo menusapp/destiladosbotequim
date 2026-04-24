@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { isOnRestaurantSubdomain } from "@/lib/slugResolver";
 
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const RestaurantLogin = lazy(() => import("./pages/RestaurantLogin"));
@@ -56,8 +57,14 @@ const App = () => (
 
           <Suspense fallback={<RouteFallback />}>
             <Routes>
-              {/* Landing page comercial */}
-              <Route path="/" element={<LandingPage />} />
+              {/*
+                Quando acessado via subdomínio do restaurante (ex.: rods.menusapp.com.br/),
+                a raiz "/" carrega o cardápio delivery; caso contrário mostra a landing.
+              */}
+              <Route
+                path="/"
+                element={isOnRestaurantSubdomain() ? <DeliveryMenu /> : <LandingPage />}
+              />
 
               {/* Auth routes */}
               <Route path="/login" element={<RestaurantLogin />} />
