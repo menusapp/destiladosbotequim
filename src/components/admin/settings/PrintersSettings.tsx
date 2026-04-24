@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { QzTraySection } from "./QzTraySection";
 import { QzTrustSetup } from "./QzTrustSetup";
 import { QzTrayHowToDialog } from "./QzTrayHowToDialog";
+import { QzTrayDownloadCard } from "./QzTrayDownloadCard";
 import type { PrintMethod } from "@/lib/printDispatcher";
 
 interface WebPrinterConfig {
@@ -179,6 +180,8 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
         </div>
         <QzTrayHowToDialog />
       </div>
+
+      <QzTrayDownloadCard />
 
       <Card>
         <CardHeader>
@@ -386,6 +389,8 @@ const PrintersSettings = ({ restaurantId }: { restaurantId: string }) => {
       <div data-tour="printers-qz-trust">
         <QzTrustSetup />
       </div>
+
+      <QzTrayDownloadCard />
 
       <div className="flex justify-end">
         <Button onClick={saveWebConfig} disabled={saving}>
