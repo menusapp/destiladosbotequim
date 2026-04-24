@@ -569,6 +569,10 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
   const handleConfirmReservation = async () => {
     if (!selectedReservation) return;
+    const id = selectedReservation.id;
+
+    // Atualização otimista
+    setReservations(prev => prev.map(r => r.id === id ? { ...r, status: "confirmed" } : r));
 
     const { error } = await supabase
       .from("reservations")
@@ -577,24 +581,36 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         confirmed_by: "Admin",
         confirmed_at: new Date().toISOString(),
       })
-      .eq("id", selectedReservation.id);
+      .eq("id", id);
 
     if (error) {
+      // Reverte
+      setReservations(prev => prev.map(r => r.id === id ? selectedReservation : r));
       toast.error("Erro ao confirmar reserva");
       return;
     }
 
-    // Enviar WhatsApp
     sendReservationWhatsApp(selectedReservation, 'confirmed');
-
     toast.success("Reserva confirmada!");
     setConfirmDialogOpen(false);
     setSelectedReservation(null);
-    fetchReservations();
   };
 
   const handleCancelReservation = async () => {
     if (!selectedReservation) return;
+    const id = selectedReservation.id;
+    const tableId = selectedReservation.table_id;
+    const previous = selectedReservation;
+
+    // Atualização otimista: marca reserva como cancelada e libera mesa visualmente
+    setReservations(prev => prev.map(r => r.id === id ? { ...r, status: "cancelled" } : r));
+    if (tableId) {
+      setTables(prev => prev.map(t =>
+        t.id === tableId && t.is_occupied && t.occupied_by === previous.customer_name
+          ? { ...t, is_occupied: false, occupied_by: null, occupied_at: null }
+          : t
+      ));
+    }
 
     const { error } = await supabase
       .from("reservations")
@@ -604,67 +620,120 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         cancelled_at: new Date().toISOString(),
         cancellation_reason: cancellationReason || null,
       })
-      .eq("id", selectedReservation.id);
+      .eq("id", id);
 
     if (error) {
+      setReservations(prev => prev.map(r => r.id === id ? previous : r));
       toast.error("Erro ao cancelar reserva");
       return;
     }
 
-    // Enviar WhatsApp
-    sendReservationWhatsApp(selectedReservation, 'cancelled');
-
-    toast.success("Reserva cancelada!");
+    sendReservationWhatsApp(previous, 'cancelled');
+    toast.success("Reserva cancelada e mesa liberada.");
     setCancelDialogOpen(false);
     setSelectedReservation(null);
     setCancellationReason("");
-    fetchReservations();
+  };
+
+  const handleNoShow = async (reservation: Reservation) => {
+    const ok = await confirm({
+      title: "Cliente não veio?",
+      description: `Marcar a reserva de ${reservation.customer_name} como "não compareceu" e liberar a mesa?`,
+      confirmText: "Confirmar",
+      cancelText: "Voltar",
+    });
+    if (!ok) return;
+
+    const id = reservation.id;
+    const tableId = reservation.table_id;
+
+    // Otimista
+    setReservations(prev => prev.map(r => r.id === id ? { ...r, status: "no_show" } : r));
+    if (tableId) {
+      setTables(prev => prev.map(t =>
+        t.id === tableId && t.is_occupied && t.occupied_by === reservation.customer_name
+          ? { ...t, is_occupied: false, occupied_by: null, occupied_at: null }
+          : t
+      ));
+    }
+
+    const { error } = await supabase
+      .from("reservations")
+      .update({
+        status: "no_show",
+        cancelled_by: "Admin",
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: "Cliente não compareceu",
+      })
+      .eq("id", id);
+
+    if (error) {
+      setReservations(prev => prev.map(r => r.id === id ? reservation : r));
+      toast.error("Erro ao registrar não comparecimento");
+      return;
+    }
+
+    toast.success("Reserva marcada como não comparecimento. Mesa liberada.");
   };
 
   const handleClientArrival = async () => {
     if (!selectedReservation) return;
+    const reservation = selectedReservation;
 
     try {
-      // Find the table
-      const table = tables.find(t => t.id === selectedReservation.table_id);
+      const table = tables.find(t => t.id === reservation.table_id);
       if (!table) {
         toast.error("Mesa não encontrada");
         return;
       }
 
-      // Create comanda for the customer
-      await supabase.from("comandas").insert({
-        restaurant_id: restaurantId,
-        table_id: table.id,
-        customer_name: selectedReservation.customer_name,
-        customer_cpf: selectedReservation.customer_cpf,
-        status: "active",
-      });
-
-      // Mark table as occupied
-      await supabase
-        .from("tables")
-        .update({
-          is_occupied: true,
-          occupied_by: selectedReservation.customer_name,
-          occupied_at: new Date().toISOString(),
-        })
-        .eq("id", table.id);
-
-      // Mark reservation as completed
-      await supabase
-        .from("reservations")
-        .update({ status: "completed" })
-        .eq("id", selectedReservation.id);
-
-      toast.success("Cliente chegou! Comanda criada.");
+      // Atualização otimista IMEDIATA na UI
+      setTables(prev => prev.map(t =>
+        t.id === table.id
+          ? { ...t, is_occupied: true, occupied_by: reservation.customer_name, occupied_at: new Date().toISOString() }
+          : t
+      ));
+      setReservations(prev => prev.map(r =>
+        r.id === reservation.id ? { ...r, status: "completed" } : r
+      ));
       setArrivalDialogOpen(false);
       setSelectedReservation(null);
-      fetchTables();
-      fetchReservations();
+      toast.success("Cliente chegou. Mesa ocupada com sucesso.");
+
+      // Operações em paralelo no backend
+      const [comandaRes, tableRes, reservationRes] = await Promise.all([
+        supabase.from("comandas").insert({
+          restaurant_id: restaurantId,
+          table_id: table.id,
+          customer_name: reservation.customer_name,
+          customer_cpf: reservation.customer_cpf,
+          status: "active",
+        }),
+        supabase
+          .from("tables")
+          .update({
+            is_occupied: true,
+            occupied_by: reservation.customer_name,
+            occupied_at: new Date().toISOString(),
+          })
+          .eq("id", table.id),
+        supabase
+          .from("reservations")
+          .update({ status: "completed" })
+          .eq("id", reservation.id),
+      ]);
+
+      if (comandaRes.error || tableRes.error || reservationRes.error) {
+        console.error("Erro chegada:", comandaRes.error, tableRes.error, reservationRes.error);
+        toast.error("Algumas operações falharam. Atualizando...");
+        fetchTables();
+        fetchReservations();
+      }
     } catch (error) {
       console.error("Erro:", error);
       toast.error("Erro ao registrar chegada");
+      fetchTables();
+      fetchReservations();
     }
   };
 
