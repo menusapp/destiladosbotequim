@@ -241,56 +241,34 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     setReservations(data || []);
   };
 
-  const getTableStatus = (table: Table): TableStatus => {
-    if (table.is_occupied) {
-      return "occupied";
-    }
-    
-    const now = new Date();
+  // Considera reserva "ativa" apenas se status estiver entre os ativos
+  // (NUNCA cancelled, no_show, completed) e dentro da janela de tempo
+  const ACTIVE_RESERVATION_STATUSES = new Set(["confirmed", "pending"]);
+
+  const isReservationActiveForTable = (r: Reservation, table: Table, now: Date): boolean => {
+    if (!ACTIVE_RESERVATION_STATUSES.has(r.status)) return false;
     const today = format(now, "yyyy-MM-dd");
-    const currentTime = format(now, "HH:mm");
-    
-    // Check for active reservations (confirmed, for today, within time window)
-    const activeReservation = reservations.find(r => {
-      if (r.status !== "confirmed") return false;
-      if (r.reservation_date !== today) return false;
-      
-      // Check if table matches (either table_id or legacy reservation_table_id)
-      const tableMatches = r.table_id === table.id;
-      if (!tableMatches) return false;
-      
-      // Check time window: 30 min before to 2 hours after
-      const reservationTime = r.reservation_time.slice(0, 5);
-      const reservationDate = parseISO(`${r.reservation_date}T${reservationTime}`);
-      const windowStart = addMinutes(reservationDate, -30);
-      const windowEnd = addMinutes(reservationDate, 120);
-      
-      return isAfter(now, windowStart) && isBefore(now, windowEnd);
-    });
-    
-    if (activeReservation) {
-      return "reserved";
-    }
-    
+    if (r.reservation_date !== today) return false;
+    if (r.table_id !== table.id) return false;
+
+    const reservationTime = r.reservation_time.slice(0, 5);
+    const reservationDate = parseISO(`${r.reservation_date}T${reservationTime}`);
+    const windowStart = addMinutes(reservationDate, -30);
+    const windowEnd = addMinutes(reservationDate, 120);
+    return isAfter(now, windowStart) && isBefore(now, windowEnd);
+  };
+
+  const getTableStatus = (table: Table): TableStatus => {
+    if (table.is_occupied) return "occupied";
+    const now = new Date();
+    const activeReservation = reservations.find(r => r.status === "confirmed" && isReservationActiveForTable(r, table, now));
+    if (activeReservation) return "reserved";
     return "available";
   };
 
   const getActiveReservation = (table: Table): Reservation | null => {
     const now = new Date();
-    const today = format(now, "yyyy-MM-dd");
-    
-    return reservations.find(r => {
-      if (r.status !== "confirmed") return false;
-      if (r.reservation_date !== today) return false;
-      if (r.table_id !== table.id) return false;
-      
-      const reservationTime = r.reservation_time.slice(0, 5);
-      const reservationDate = parseISO(`${r.reservation_date}T${reservationTime}`);
-      const windowStart = addMinutes(reservationDate, -30);
-      const windowEnd = addMinutes(reservationDate, 120);
-      
-      return isAfter(now, windowStart) && isBefore(now, windowEnd);
-    }) || null;
+    return reservations.find(r => r.status === "confirmed" && isReservationActiveForTable(r, table, now)) || null;
   };
 
   const openTableDialog = (table?: Table) => {
@@ -591,6 +569,10 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
 
   const handleConfirmReservation = async () => {
     if (!selectedReservation) return;
+    const id = selectedReservation.id;
+
+    // Atualização otimista
+    setReservations(prev => prev.map(r => r.id === id ? { ...r, status: "confirmed" } : r));
 
     const { error } = await supabase
       .from("reservations")
@@ -599,24 +581,36 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         confirmed_by: "Admin",
         confirmed_at: new Date().toISOString(),
       })
-      .eq("id", selectedReservation.id);
+      .eq("id", id);
 
     if (error) {
+      // Reverte
+      setReservations(prev => prev.map(r => r.id === id ? selectedReservation : r));
       toast.error("Erro ao confirmar reserva");
       return;
     }
 
-    // Enviar WhatsApp
     sendReservationWhatsApp(selectedReservation, 'confirmed');
-
     toast.success("Reserva confirmada!");
     setConfirmDialogOpen(false);
     setSelectedReservation(null);
-    fetchReservations();
   };
 
   const handleCancelReservation = async () => {
     if (!selectedReservation) return;
+    const id = selectedReservation.id;
+    const tableId = selectedReservation.table_id;
+    const previous = selectedReservation;
+
+    // Atualização otimista: marca reserva como cancelada e libera mesa visualmente
+    setReservations(prev => prev.map(r => r.id === id ? { ...r, status: "cancelled" } : r));
+    if (tableId) {
+      setTables(prev => prev.map(t =>
+        t.id === tableId && t.is_occupied && t.occupied_by === previous.customer_name
+          ? { ...t, is_occupied: false, occupied_by: null, occupied_at: null }
+          : t
+      ));
+    }
 
     const { error } = await supabase
       .from("reservations")
@@ -626,67 +620,120 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         cancelled_at: new Date().toISOString(),
         cancellation_reason: cancellationReason || null,
       })
-      .eq("id", selectedReservation.id);
+      .eq("id", id);
 
     if (error) {
+      setReservations(prev => prev.map(r => r.id === id ? previous : r));
       toast.error("Erro ao cancelar reserva");
       return;
     }
 
-    // Enviar WhatsApp
-    sendReservationWhatsApp(selectedReservation, 'cancelled');
-
-    toast.success("Reserva cancelada!");
+    sendReservationWhatsApp(previous, 'cancelled');
+    toast.success("Reserva cancelada e mesa liberada.");
     setCancelDialogOpen(false);
     setSelectedReservation(null);
     setCancellationReason("");
-    fetchReservations();
+  };
+
+  const handleNoShow = async (reservation: Reservation) => {
+    const ok = await confirm({
+      title: "Cliente não veio?",
+      description: `Marcar a reserva de ${reservation.customer_name} como "não compareceu" e liberar a mesa?`,
+      confirmLabel: "Confirmar",
+      cancelLabel: "Voltar",
+    });
+    if (!ok) return;
+
+    const id = reservation.id;
+    const tableId = reservation.table_id;
+
+    // Otimista
+    setReservations(prev => prev.map(r => r.id === id ? { ...r, status: "no_show" } : r));
+    if (tableId) {
+      setTables(prev => prev.map(t =>
+        t.id === tableId && t.is_occupied && t.occupied_by === reservation.customer_name
+          ? { ...t, is_occupied: false, occupied_by: null, occupied_at: null }
+          : t
+      ));
+    }
+
+    const { error } = await supabase
+      .from("reservations")
+      .update({
+        status: "no_show",
+        cancelled_by: "Admin",
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: "Cliente não compareceu",
+      })
+      .eq("id", id);
+
+    if (error) {
+      setReservations(prev => prev.map(r => r.id === id ? reservation : r));
+      toast.error("Erro ao registrar não comparecimento");
+      return;
+    }
+
+    toast.success("Reserva marcada como não comparecimento. Mesa liberada.");
   };
 
   const handleClientArrival = async () => {
     if (!selectedReservation) return;
+    const reservation = selectedReservation;
 
     try {
-      // Find the table
-      const table = tables.find(t => t.id === selectedReservation.table_id);
+      const table = tables.find(t => t.id === reservation.table_id);
       if (!table) {
         toast.error("Mesa não encontrada");
         return;
       }
 
-      // Create comanda for the customer
-      await supabase.from("comandas").insert({
-        restaurant_id: restaurantId,
-        table_id: table.id,
-        customer_name: selectedReservation.customer_name,
-        customer_cpf: selectedReservation.customer_cpf,
-        status: "active",
-      });
-
-      // Mark table as occupied
-      await supabase
-        .from("tables")
-        .update({
-          is_occupied: true,
-          occupied_by: selectedReservation.customer_name,
-          occupied_at: new Date().toISOString(),
-        })
-        .eq("id", table.id);
-
-      // Mark reservation as completed
-      await supabase
-        .from("reservations")
-        .update({ status: "completed" })
-        .eq("id", selectedReservation.id);
-
-      toast.success("Cliente chegou! Comanda criada.");
+      // Atualização otimista IMEDIATA na UI
+      setTables(prev => prev.map(t =>
+        t.id === table.id
+          ? { ...t, is_occupied: true, occupied_by: reservation.customer_name, occupied_at: new Date().toISOString() }
+          : t
+      ));
+      setReservations(prev => prev.map(r =>
+        r.id === reservation.id ? { ...r, status: "completed" } : r
+      ));
       setArrivalDialogOpen(false);
       setSelectedReservation(null);
-      fetchTables();
-      fetchReservations();
+      toast.success("Cliente chegou. Mesa ocupada com sucesso.");
+
+      // Operações em paralelo no backend
+      const [comandaRes, tableRes, reservationRes] = await Promise.all([
+        supabase.from("comandas").insert({
+          restaurant_id: restaurantId,
+          table_id: table.id,
+          customer_name: reservation.customer_name,
+          customer_cpf: reservation.customer_cpf,
+          status: "active",
+        }),
+        supabase
+          .from("tables")
+          .update({
+            is_occupied: true,
+            occupied_by: reservation.customer_name,
+            occupied_at: new Date().toISOString(),
+          })
+          .eq("id", table.id),
+        supabase
+          .from("reservations")
+          .update({ status: "completed" })
+          .eq("id", reservation.id),
+      ]);
+
+      if (comandaRes.error || tableRes.error || reservationRes.error) {
+        console.error("Erro chegada:", comandaRes.error, tableRes.error, reservationRes.error);
+        toast.error("Algumas operações falharam. Atualizando...");
+        fetchTables();
+        fetchReservations();
+      }
     } catch (error) {
       console.error("Erro:", error);
       toast.error("Erro ao registrar chegada");
+      fetchTables();
+      fetchReservations();
     }
   };
 
@@ -705,7 +752,11 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
         return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Confirmada</Badge>;
       case "cancelled":
         return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">Cancelada</Badge>;
+      case "no_show":
+        return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">Não compareceu</Badge>;
       case "completed":
+      case "arrived":
+      case "seated":
         return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">Concluída</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
@@ -934,17 +985,28 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                                     </div>
                                     <div className="flex gap-2">
                                       {reservation.status === "confirmed" && (
-                                        <Button
-                                          size="sm"
-                                          className="bg-orange-600 hover:bg-orange-700"
-                                          onClick={() => {
-                                            setSelectedReservation(reservation);
-                                            setArrivalDialogOpen(true);
-                                          }}
-                                        >
-                                          <Check className="h-4 w-4 mr-1" />
-                                          Cliente Chegou
-                                        </Button>
+                                        <>
+                                          <Button
+                                            size="sm"
+                                            className="bg-orange-600 hover:bg-orange-700"
+                                            onClick={() => {
+                                              setSelectedReservation(reservation);
+                                              setArrivalDialogOpen(true);
+                                            }}
+                                          >
+                                            <Check className="h-4 w-4 mr-1" />
+                                            Cliente Chegou
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-destructive border-destructive/40"
+                                            onClick={() => handleNoShow(reservation)}
+                                          >
+                                            <X className="h-4 w-4 mr-1" />
+                                            Não veio
+                                          </Button>
+                                        </>
                                       )}
                                       {reservation.status === "pending" && (
                                         <>
@@ -1069,6 +1131,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                           <SelectItem value="confirmed">Confirmadas</SelectItem>
                           <SelectItem value="completed">Concluídas</SelectItem>
                           <SelectItem value="cancelled">Canceladas</SelectItem>
+                          <SelectItem value="no_show">Não compareceu</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1117,9 +1180,14 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
                                       </>
                                     )}
                                     {reservation.status === "confirmed" && (
-                                      <Button size="sm" className="bg-orange-600 hover:bg-orange-700" onClick={() => { setSelectedReservation(reservation); setArrivalDialogOpen(true); }}>
-                                        <Check className="h-4 w-4 mr-1" />Cliente Chegou
-                                      </Button>
+                                      <>
+                                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700" onClick={() => { setSelectedReservation(reservation); setArrivalDialogOpen(true); }}>
+                                          <Check className="h-4 w-4 mr-1" />Cliente Chegou
+                                        </Button>
+                                        <Button variant="outline" size="sm" className="text-destructive border-destructive/40" onClick={() => handleNoShow(reservation)}>
+                                          <X className="h-4 w-4 mr-1" />Não veio
+                                        </Button>
+                                      </>
                                     )}
                                   </div>
                                 </div>
