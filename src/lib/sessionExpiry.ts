@@ -52,6 +52,28 @@ export function clearSessionTimestamp(): void {
 }
 
 /**
+ * Limpa toda a sessão do painel admin (restaurante + funcionário + timestamp).
+ * Centraliza a limpeza para evitar inconsistências quando a sessão expira ou
+ * quando o usuário precisa ser deslogado por falha/segurança.
+ */
+export function clearAdminSession(): void {
+  try {
+    localStorage.removeItem("restaurant_id");
+    localStorage.removeItem("restaurant_name");
+    localStorage.removeItem("restaurant_slug");
+    localStorage.removeItem("staff_id");
+    localStorage.removeItem("staff_name");
+    localStorage.removeItem("staff_role");
+    localStorage.removeItem("staff_allowed_sections");
+    localStorage.removeItem("staff_can_manage_orders");
+    localStorage.removeItem("staff_receives_order_notifications");
+  } catch {
+    // ignore
+  }
+  clearSessionTimestamp();
+}
+
+/**
  * Retorna o caminho do painel se o usuário possui sessão válida (logado e não expirada).
  * Caso contrário, retorna `null`. Usado para auto-redirect na landing/login.
  */

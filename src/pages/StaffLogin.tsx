@@ -30,6 +30,13 @@ const StaffLogin = () => {
   const restaurantId = localStorage.getItem("restaurant_id");
   const restaurantName = localStorage.getItem("restaurant_name");
 
+  // Redireciona para /login se não houver sessão de restaurante (em useEffect, não durante render)
+  useEffect(() => {
+    if (!restaurantId || !restaurantName) {
+      navigate("/login", { replace: true });
+    }
+  }, [restaurantId, restaurantName, navigate]);
+
   useEffect(() => {
     if (!restaurantId) return;
 
@@ -37,39 +44,54 @@ const StaffLogin = () => {
 
     const loadData = async () => {
       setCheckingStaff(true);
+      try {
+        const [logoRes, hasStaffRes] = await Promise.allSettled([
+          supabase.from("restaurants").select("logo_url").eq("id", restaurantId).maybeSingle(),
+          supabase.rpc("admin_check_has_staff", { p_restaurant_id: restaurantId }),
+        ]);
 
-      const [logoRes, hasStaffRes] = await Promise.allSettled([
-        supabase.from("restaurants").select("logo_url").eq("id", restaurantId).maybeSingle(),
-        supabase.rpc("admin_check_has_staff", { p_restaurant_id: restaurantId }),
-      ]);
+        if (!isActive) return;
 
-      if (!isActive) return;
+        if (logoRes.status === "fulfilled" && logoRes.value.data?.logo_url) {
+          setRestaurantLogo(logoRes.value.data.logo_url);
+        }
 
-      if (logoRes.status === "fulfilled" && logoRes.value.data?.logo_url) {
-        setRestaurantLogo(logoRes.value.data.logo_url);
+        if (hasStaffRes.status === "fulfilled") {
+          setIsFirstTime(hasStaffRes.value.data !== true);
+        } else {
+          // Em caso de falha na verificação, assumir que não é primeiro acesso
+          // para mostrar o formulário de login normal em vez de travar.
+          console.error("Erro ao verificar equipe do restaurante:", hasStaffRes.reason);
+          setIsFirstTime(false);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar dados de login:", err);
+        if (isActive) setIsFirstTime(false);
+      } finally {
+        if (isActive) setCheckingStaff(false);
       }
-
-      if (hasStaffRes.status === "fulfilled") {
-        setIsFirstTime(hasStaffRes.value.data !== true);
-      } else {
-        console.error("Erro ao verificar equipe do restaurante:", hasStaffRes.reason);
-        setIsFirstTime(false);
-      }
-
-      setCheckingStaff(false);
     };
 
     void loadData();
 
+    // Failsafe: se algo travar, libera a tela depois de 8s
+    const failsafe = setTimeout(() => {
+      if (isActive) setCheckingStaff(false);
+    }, 8000);
+
     return () => {
       isActive = false;
+      clearTimeout(failsafe);
     };
   }, [restaurantId]);
 
-  // If no restaurant session, redirect to login
+  // Enquanto o redirect não acontece, evita renderizar o formulário sem dados
   if (!restaurantId || !restaurantName) {
-    navigate("/login");
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   const handleCreateOwnerAccount = async (e: React.FormEvent) => {
