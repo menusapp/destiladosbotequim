@@ -65,7 +65,8 @@ const Landing = () => {
         localStorage.setItem('restaurant_id', restaurant_id);
         localStorage.setItem('restaurant_name', restaurant_name);
         markSessionActive();
-        void cacheRestaurantSlug(restaurant_id);
+        // Aguardar slug antes de avançar — evita inconsistência no /login/staff e no /{slug}/admin
+        await cacheRestaurantSlug(restaurant_id);
         toast.success(`Bem-vindo ao ${restaurant_name}!`);
         navigate('/login/staff');
       } else if (username.trim().toUpperCase() === "CEO" && password === "CEO123") {
