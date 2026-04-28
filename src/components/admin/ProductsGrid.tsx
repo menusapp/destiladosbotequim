@@ -242,8 +242,8 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
 
     let debounceTimer: ReturnType<typeof setTimeout>;
     const channel = supabase
-      .channel('products-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+      .channel(`products-grid-${restaurantId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `restaurant_id=eq.${restaurantId}` }, () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(fetchProducts, 500);
       })

@@ -205,8 +205,8 @@ const ProductsTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: string;
     // Debounced realtime for products
     let debounceTimer: ReturnType<typeof setTimeout>;
     const channel = supabase
-      .channel('products-tab-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+      .channel(`products-tab-${restaurantId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `restaurant_id=eq.${restaurantId}` }, () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(fetchProducts, 500);
       })

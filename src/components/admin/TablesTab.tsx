@@ -166,18 +166,18 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
     const debouncedFetchReservations = () => { clearTimeout(reservationsDebounce); reservationsDebounce = setTimeout(fetchReservations, 400); };
 
     const channel = supabase
-      .channel("tables-all-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tables" }, debouncedFetchTables)
-      .on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, debouncedFetchTables)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
+      .channel(`tables-tab-${restaurantId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "tables", filter: `restaurant_id=eq.${restaurantId}` }, debouncedFetchTables)
+      .on("postgres_changes", { event: "*", schema: "public", table: "comandas", filter: `restaurant_id=eq.${restaurantId}` }, debouncedFetchTables)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, (payload) => {
         const order = payload.new as any;
         if (order.order_type === "local" && order.restaurant_id === restaurantId) debouncedFetchTables();
       })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `restaurant_id=eq.${restaurantId}` }, (payload) => {
         const order = payload.new as any;
         if (order.order_type === "local" && order.restaurant_id === restaurantId) debouncedFetchTables();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, debouncedFetchReservations)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations", filter: `restaurant_id=eq.${restaurantId}` }, debouncedFetchReservations)
       .subscribe();
 
     return () => {
