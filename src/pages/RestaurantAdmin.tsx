@@ -244,13 +244,14 @@ const RestaurantAdmin = () => {
 
     // Canal para novos pedidos
     const ordersChannel = supabase
-      .channel('new-orders-notification')
+      .channel(`new-orders-${restaurantId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'orders',
+          filter: `restaurant_id=eq.${restaurantId}`,
         },
         async (payload) => {
           const order = payload.new as any;
