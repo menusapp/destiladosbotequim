@@ -666,22 +666,23 @@ const RestaurantAdmin = () => {
     }
   };
 
-  // Verificar horário a cada minuto quando automação está ativa
+  // Verificar horário a cada minuto quando automação está ativa.
+  // Usa restaurantRef para evitar stale closure: o intervalo lê sempre o
+  // valor mais recente de restaurant sem precisar ser recriado a cada update.
   useEffect(() => {
     if (!restaurant?.auto_open_close) return;
 
     const interval = setInterval(() => {
-      checkAndUpdateOpenStatus(restaurant);
+      if (restaurantRef.current) checkAndUpdateOpenStatus(restaurantRef.current);
     }, 60000); // A cada 1 minuto
 
     return () => clearInterval(interval);
   }, [restaurant?.id, restaurant?.auto_open_close]);
 
   const handleLogout = () => {
-    localStorage.removeItem('staff_id');
-    localStorage.removeItem('staff_name');
-    localStorage.removeItem('staff_role');
-    localStorage.removeItem('staff_allowed_sections');
+    // Limpa toda a sessão admin (restaurante + funcionário + timestamp).
+    // clearAdminSession cobre todas as chaves; o handler antigo esquecia várias.
+    clearAdminSession();
     toast.success("Logout realizado com sucesso");
     navigate("/login/staff");
   };
