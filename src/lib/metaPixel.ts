@@ -64,6 +64,30 @@ export function trackPageView() {
   window.fbq?.("track", "PageView");
 }
 
+/**
+ * Dispara um evento garantindo que o fbq esteja disponível.
+ * Caso ainda não esteja carregado, tenta novamente por até ~2s.
+ * Útil quando o evento é seguido de um window.location.href (redirect).
+ */
+function safeFbq(method: "track" | "trackCustom", eventName: string, params?: Record<string, any>) {
+  if (typeof window === "undefined") return;
+  const send = () => window.fbq?.(method, eventName, params || {});
+  if (window.fbq) {
+    send();
+    return;
+  }
+  let tries = 0;
+  const interval = setInterval(() => {
+    tries++;
+    if (window.fbq) {
+      send();
+      clearInterval(interval);
+    } else if (tries > 20) {
+      clearInterval(interval);
+    }
+  }, 100);
+}
+
 /** Evento padrão do Pixel. */
 export function trackEvent(
   eventName:
@@ -76,10 +100,10 @@ export function trackEvent(
     | "Subscribe",
   params?: Record<string, any>
 ) {
-  window.fbq?.("track", eventName, params || {});
+  safeFbq("track", eventName, params);
 }
 
 /** Evento customizado. */
 export function trackCustom(eventName: string, params?: Record<string, any>) {
-  window.fbq?.("trackCustom", eventName, params || {});
+  safeFbq("trackCustom", eventName, params);
 }
