@@ -700,7 +700,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
             ) : (
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="destructive" size="lg" className="gap-2">
+                  <Button data-tour="caixa-open" variant="destructive" size="lg" className="gap-2">
                     <Wallet className="h-5 w-5" />
                     Fechar Caixa
                   </Button>
