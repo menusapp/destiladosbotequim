@@ -100,6 +100,7 @@ export const TableDetailDialog = ({
       return data || [];
     },
     enabled: open && !!table,
+    staleTime: 0,
   });
 
   // Fetch orders for this table grouped by comanda
@@ -125,6 +126,7 @@ export const TableDetailDialog = ({
       return data || [];
     },
     enabled: open && !!table,
+    staleTime: 0,
   });
 
   // Fetch splits for all orders in this table

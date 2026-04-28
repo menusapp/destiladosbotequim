@@ -312,6 +312,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         .eq("status", "pending");
       return data || [];
     },
+    staleTime: 0,
   });
 
   // Fetch ALL active local orders per table (for permanent preview)
@@ -326,6 +327,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         .in("status", ["pending", "accepted", "preparing", "ready"]);
       return data || [];
     },
+    staleTime: 0,
   });
 
   // Fetch searchable orders with items and table info
@@ -411,6 +413,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         comandas: comandasData.filter(c => c.table_id === t.id),
       })) as TableData[];
     },
+    staleTime: 0,
   });
 
   // Fetch active reservations in batch for table badges; stale/finalized statuses never block tables
