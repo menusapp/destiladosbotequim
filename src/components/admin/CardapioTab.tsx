@@ -70,7 +70,7 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen: _isRestaurantOpen }: Card
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-transparent border-b border-border rounded-none h-auto p-0 w-full justify-start">
+        <TabsList data-tour="cardapio-tabs" className="bg-transparent border-b border-border rounded-none h-auto p-0 w-full justify-start">
           <TabsTrigger 
             value="produtos"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
