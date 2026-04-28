@@ -1,4 +1,26 @@
 import { lazy, Suspense } from "react";
+
+// Auto-recover from stale chunk errors after a redeploy.
+// When index.html references a JS hash that no longer exists, force one reload.
+const lazyWithRetry = <T,>(factory: () => Promise<{ default: T }>) =>
+  lazy(() =>
+    factory().catch((err) => {
+      const msg = String(err?.message || err);
+      if (
+        /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError/i.test(
+          msg
+        )
+      ) {
+        const key = "__chunk_reloaded__";
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, "1");
+          window.location.reload();
+          return new Promise(() => {}) as any;
+        }
+      }
+      throw err;
+    })
+  );
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
