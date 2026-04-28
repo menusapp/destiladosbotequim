@@ -76,6 +76,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <MetaPixelRouteTracker />
 
           <Suspense fallback={<RouteFallback />}>
             <Routes>
