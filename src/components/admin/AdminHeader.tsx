@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Copy, Store, Settings, Menu } from "lucide-react";
 import { AccountSettingsDialog } from "./AccountSettingsDialog";
 import { Button } from "@/components/ui/button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +45,8 @@ export const AdminHeader = ({
   onIsOpenUpdate,
 }: AdminHeaderProps) => {
   const navigate = useNavigate();
+  const { state: sidebarState, toggleSidebar } = useSidebar();
+  const sidebarOpen = sidebarState === "expanded";
   
   const [updatingOpen, setUpdatingOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
@@ -108,10 +110,38 @@ export const AdminHeader = ({
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 sm:gap-3 border-b border-border bg-card px-2 sm:px-4">
-      {/* Sidebar trigger — desktop only (mobile uses bottom nav) */}
-      <SidebarTrigger className="hidden md:flex h-9 w-9 shrink-0" aria-label="Abrir/fechar menu">
-        <Menu className="h-5 w-5" />
-      </SidebarTrigger>
+      {/* Sidebar trigger — desktop only (mobile uses bottom nav) — animated burger */}
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        aria-label={sidebarOpen ? "Fechar menu" : "Abrir menu"}
+        aria-expanded={sidebarOpen}
+        className="hidden md:flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-muted transition-colors group"
+      >
+        <span className="relative block w-5 h-5">
+          <span
+            className="absolute left-0 block h-[2px] w-5 bg-foreground rounded-full transition-all duration-300 ease-out"
+            style={{
+              top: sidebarOpen ? "9px" : "4px",
+              transform: sidebarOpen ? "rotate(45deg)" : "rotate(0deg)",
+            }}
+          />
+          <span
+            className="absolute left-0 top-[9px] block h-[2px] w-5 bg-foreground rounded-full transition-all duration-200 ease-out"
+            style={{
+              opacity: sidebarOpen ? 0 : 1,
+              transform: sidebarOpen ? "scaleX(0)" : "scaleX(1)",
+            }}
+          />
+          <span
+            className="absolute left-0 block h-[2px] w-5 bg-foreground rounded-full transition-all duration-300 ease-out"
+            style={{
+              top: sidebarOpen ? "9px" : "14px",
+              transform: sidebarOpen ? "rotate(-45deg)" : "rotate(0deg)",
+            }}
+          />
+        </span>
+      </button>
 
       {/* Logo */}
       <div className="flex items-center gap-2 shrink-0">
