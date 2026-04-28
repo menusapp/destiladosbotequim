@@ -179,7 +179,7 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
+        <TabsList data-tour="marketing-tabs">
           <TabsTrigger value="campaigns" className="gap-2">
             <Megaphone className="h-4 w-4" />
             Campanhas
