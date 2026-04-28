@@ -886,6 +886,7 @@ const RestaurantAdmin = () => {
   return (
     <ConfirmDialogProvider>
     <TourProvider>
+    <TourSectionBridge onChangeSection={setActiveSection} />
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         {/* Sidebar — hidden on mobile (replaced by bottom nav) */}
