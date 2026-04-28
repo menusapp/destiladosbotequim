@@ -381,7 +381,7 @@ const RestaurantAdmin = () => {
 
     // Canal para novas contas
     const billsChannel = supabase
-      .channel('new-bills-notification')
+      .channel(`new-bills-${restaurantId}`)
       .on(
         'postgres_changes',
         {
