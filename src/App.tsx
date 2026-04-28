@@ -1,4 +1,26 @@
 import { lazy, Suspense } from "react";
+
+// Auto-recover from stale chunk errors after a redeploy.
+// When index.html references a JS hash that no longer exists, force one reload.
+const lazyWithRetry = <T,>(factory: () => Promise<{ default: T }>) =>
+  lazy(() =>
+    factory().catch((err) => {
+      const msg = String(err?.message || err);
+      if (
+        /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError/i.test(
+          msg
+        )
+      ) {
+        const key = "__chunk_reloaded__";
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, "1");
+          window.location.reload();
+          return new Promise(() => {}) as any;
+        }
+      }
+      throw err;
+    })
+  );
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,25 +30,25 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { isOnRestaurantSubdomain } from "@/lib/slugResolver";
 
-const LandingPage = lazy(() => import("./pages/LandingPage"));
-const RestaurantLogin = lazy(() => import("./pages/RestaurantLogin"));
-const CEOLogin = lazy(() => import("./pages/CEOLogin"));
-const CEODashboard = lazy(() => import("./pages/CEODashboard"));
-const RestaurantAdmin = lazy(() => import("./pages/RestaurantAdmin"));
-const Menu = lazy(() => import("./pages/Menu"));
-const Comanda = lazy(() => import("./pages/Comanda"));
-const DeliveryMenu = lazy(() => import("./pages/DeliveryMenu"));
-const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
-const Reservations = lazy(() => import("./pages/Reservations"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const StaffLogin = lazy(() => import("./pages/StaffLogin"));
-const TableDetailView = lazy(() =>
+const LandingPage = lazyWithRetry(() => import("./pages/LandingPage"));
+const RestaurantLogin = lazyWithRetry(() => import("./pages/RestaurantLogin"));
+const CEOLogin = lazyWithRetry(() => import("./pages/CEOLogin"));
+const CEODashboard = lazyWithRetry(() => import("./pages/CEODashboard"));
+const RestaurantAdmin = lazyWithRetry(() => import("./pages/RestaurantAdmin"));
+const Menu = lazyWithRetry(() => import("./pages/Menu"));
+const Comanda = lazyWithRetry(() => import("./pages/Comanda"));
+const DeliveryMenu = lazyWithRetry(() => import("./pages/DeliveryMenu"));
+const OrderConfirmation = lazyWithRetry(() => import("./pages/OrderConfirmation"));
+const Reservations = lazyWithRetry(() => import("./pages/Reservations"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+const StaffLogin = lazyWithRetry(() => import("./pages/StaffLogin"));
+const TableDetailView = lazyWithRetry(() =>
   import("./components/admin/TableDetailView").then((m) => ({ default: m.TableDetailView }))
 );
-const MercadoPagoCallback = lazy(() => import("./pages/MercadoPagoCallback"));
-const RestaurantRegistration = lazy(() => import("./pages/RestaurantRegistration"));
-const PaymentPending = lazy(() => import("./pages/PaymentPending"));
-const Kiosk = lazy(() => import("./pages/Kiosk"));
+const MercadoPagoCallback = lazyWithRetry(() => import("./pages/MercadoPagoCallback"));
+const RestaurantRegistration = lazyWithRetry(() => import("./pages/RestaurantRegistration"));
+const PaymentPending = lazyWithRetry(() => import("./pages/PaymentPending"));
+const Kiosk = lazyWithRetry(() => import("./pages/Kiosk"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
