@@ -706,13 +706,13 @@ export const ReportsTab = ({ restaurantId }: ReportsTabProps) => {
           <h2 className="text-2xl font-semibold tracking-[-0.025em]">Relatório DRE</h2>
           <p className="text-sm text-muted-foreground font-light">Visualize métricas e análises do seu negócio</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2">
+        <Button data-tour="relatorios-export" variant="outline" size="sm" onClick={handleExportPDF} className="gap-2">
           <Download className="h-4 w-4" />
           Exportar PDF
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div data-tour="relatorios-period" className="flex flex-wrap items-center gap-2">
         {[
           { key: "today", label: "Hoje" },
           { key: "yesterday", label: "Ontem" },

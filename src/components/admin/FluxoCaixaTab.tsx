@@ -554,7 +554,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
           </div>
           
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
-            <TabsList className="grid grid-cols-2 w-full sm:w-auto h-9">
+            <TabsList data-tour="caixa-tabs" className="grid grid-cols-2 w-full sm:w-auto h-9">
               <TabsTrigger value="fluxo" className="text-xs sm:text-sm px-2">Fluxo de Caixa</TabsTrigger>
               <TabsTrigger value="historico" className="text-xs sm:text-sm px-2">Histórico</TabsTrigger>
             </TabsList>
@@ -562,7 +562,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
             {!currentSession ? (
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button size="lg" className="gap-2">
+                  <Button data-tour="caixa-open" size="lg" className="gap-2">
                     <Wallet className="h-5 w-5" />
                     Abrir Caixa
                   </Button>
@@ -700,7 +700,7 @@ export default function FluxoCaixaTab({ restaurantId }: FluxoCaixaTabProps) {
             ) : (
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="destructive" size="lg" className="gap-2">
+                  <Button data-tour="caixa-open" variant="destructive" size="lg" className="gap-2">
                     <Wallet className="h-5 w-5" />
                     Fechar Caixa
                   </Button>

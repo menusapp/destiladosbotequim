@@ -235,7 +235,7 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
           <h1 className="text-2xl font-bold">Clientes</h1>
           <p className="text-muted-foreground">Gerencie sua base de clientes</p>
         </div>
-        <Button onClick={() => setIsNewCustomerOpen(true)}>
+        <Button data-tour="clientes-new" onClick={() => setIsNewCustomerOpen(true)}>
           <UserPlus className="w-4 h-4 mr-2" />
           Novo Cliente
         </Button>

@@ -875,7 +875,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       ) : (
         <div className="space-y-6">
           {/* Link Público de Reservas */}
-          <Card>
+          <Card data-tour="reservas-link">
             <CardContent className="py-4">
               <Label className="font-medium mb-2 block">Link Público de Reservas</Label>
               <p className="text-sm text-muted-foreground mb-3">Envie este link aos clientes para que façam reservas online.</p>
@@ -935,7 +935,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
           </Card>
 
           <Tabs defaultValue="today" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 max-w-lg">
+            <TabsList data-tour="reservas-tabs" className="grid w-full grid-cols-3 max-w-lg">
               <TabsTrigger value="today">
                 Hoje ({todayReservations.length})
               </TabsTrigger>

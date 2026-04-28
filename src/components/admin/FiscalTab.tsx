@@ -14,7 +14,7 @@ export default function FiscalTab({ restaurantId }: FiscalTabProps) {
   return (
     <div className="space-y-4">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList data-tour="fiscal-tabs">
           <TabsTrigger value="settings" className="gap-1.5">
             <Settings className="h-3.5 w-3.5" />
             Configurações Fiscais

@@ -834,7 +834,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
           >
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para adicionar produtos"); return; } resetForm(); setDialogOpen(true); }}>
+          <Button data-tour="cardapio-new-product" onClick={() => { if (isRestaurantOpen) { toast.error("Feche o restaurante para adicionar produtos"); return; } resetForm(); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Novo Produto
           </Button>
         </div>

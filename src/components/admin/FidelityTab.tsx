@@ -77,7 +77,7 @@ export default function FidelityTab({ restaurantId }: FidelityTabProps) {
       </div>
 
       <Tabs defaultValue="programas" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+        <TabsList data-tour="fidelidade-tabs" className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
           <TabsTrigger value="programas" className="flex items-center gap-2">
             <Gift className="w-4 h-4" />
             <span className="hidden sm:inline">Programas</span>

@@ -448,7 +448,7 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
 
         {/* Right column - Simulator */}
         <div className="lg:sticky lg:top-4 h-fit">
-          <Card className="flex flex-col" style={{ height: '600px' }}>
+          <Card data-tour="robo-simulator" className="flex flex-col" style={{ height: '600px' }}>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center justify-between">
                 <span className="flex items-center gap-2">
