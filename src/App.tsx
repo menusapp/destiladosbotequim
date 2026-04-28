@@ -42,7 +42,7 @@ const OrderConfirmation = lazyWithRetry(() => import("./pages/OrderConfirmation"
 const Reservations = lazyWithRetry(() => import("./pages/Reservations"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const StaffLogin = lazyWithRetry(() => import("./pages/StaffLogin"));
-const TableDetailView = lazy(() =>
+const TableDetailView = lazyWithRetry(() =>
   import("./components/admin/TableDetailView").then((m) => ({ default: m.TableDetailView }))
 );
 const MercadoPagoCallback = lazyWithRetry(() => import("./pages/MercadoPagoCallback"));
