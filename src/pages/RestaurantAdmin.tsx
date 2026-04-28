@@ -88,6 +88,9 @@ interface Restaurant {
 const RestaurantAdmin = () => {
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  // Ref para evitar stale closure no setInterval do auto open/close
+  const restaurantRef = useRef<Restaurant | null>(null);
+  useEffect(() => { restaurantRef.current = restaurant; }, [restaurant]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("dashboard");
   const activeSectionRef = useRef(activeSection);
