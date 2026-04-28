@@ -86,7 +86,23 @@ interface Restaurant {
   show_prep_timer?: boolean;
 }
 
-const RestaurantAdmin = () => {
+/**
+ * Registra a função de troca de aba no TourContext, permitindo que o tour
+ * contínuo navegue entre as abas do painel automaticamente.
+ */
+const TourSectionBridge = ({
+  onChangeSection,
+}: {
+  onChangeSection: (section: string) => void;
+}) => {
+  const { setSectionChanger } = useTour();
+  useEffect(() => {
+    setSectionChanger((sectionId: TourSectionId) => onChangeSection(sectionId));
+    return () => setSectionChanger(null);
+  }, [setSectionChanger, onChangeSection]);
+  return null;
+};
+
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   // Ref para evitar stale closure no setInterval do auto open/close
