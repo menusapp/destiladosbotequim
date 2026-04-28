@@ -779,27 +779,7 @@ const RestaurantAdmin = () => {
     setReservationNotification(null);
   };
 
-  // Prefetch map: section → dynamic import
-  const prefetchMap: Record<string, () => void> = {
-    cardapio: () => import("@/components/admin/CardapioTab"),
-    estoque: () => import("@/components/admin/StockTab"),
-    custos: () => import("@/components/admin/CostosTab"),
-    margens: () => import("@/components/admin/MargensTab"),
-    caixa: () => import("@/components/admin/FluxoCaixaTab"),
-    clientes: () => import("@/components/admin/ClientesTab"),
-    fidelidade: () => import("@/components/admin/FidelityTab"),
-    marketing: () => import("@/components/admin/MarketingTab"),
-    fiscal: () => import("@/components/admin/FiscalTab"),
-    integracoes: () => import("@/components/admin/IntegrationsTab"),
-    modulos: () => import("@/components/admin/ModulosTab"),
-    contas: () => import("@/components/admin/ContasTab"),
-    relatorios: () => import("@/components/admin/ReportsTab"),
-    "mesas-reservas": () => import("@/components/admin/TablesTab"),
-    "config-dados": () => import("@/components/admin/settings/CompanyDataSettings"),
-    "config-whatsapp": () => import("@/components/admin/settings/WhatsAppSettings"),
-    "config-totem": () => import("@/components/admin/settings/KioskSettings"),
-  };
-
+  // prefetchMap movido para o escopo do módulo (acima do componente).
   const handlePrefetch = (sectionId: string) => {
     prefetchMap[sectionId]?.();
   };
