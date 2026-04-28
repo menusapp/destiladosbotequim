@@ -179,7 +179,7 @@ export const TableDetailDialog = ({
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `table_id=eq.${table.id}` }, debouncedOrders)
       .on("postgres_changes", { event: "*", schema: "public", table: "bills", filter: `table_id=eq.${table.id}` }, debouncedBills)
       .on("postgres_changes", { event: "*", schema: "public", table: "comandas", filter: `table_id=eq.${table.id}` }, debouncedOrders)
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_item_splits", filter: `restaurant_id=eq.${table.restaurant_id}` }, debouncedSplits)
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_item_splits", filter: `restaurant_id=eq.${restaurantId}` }, debouncedSplits)
       .subscribe();
     return () => {
       clearTimeout(ordersTimer); clearTimeout(billsTimer); clearTimeout(splitsTimer);
