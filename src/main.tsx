@@ -19,4 +19,8 @@ import "./lib/printOrderWithQz";
 import { setupQzSigning } from "./lib/qzSigning";
 setupQzSigning();
 
+// Meta Pixel — inicializa o mais cedo possível (PageView inicial automático)
+import { initMetaPixel } from "./lib/metaPixel";
+initMetaPixel();
+
 createRoot(document.getElementById("root")!).render(<App />);

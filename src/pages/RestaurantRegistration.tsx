@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { trackEvent } from "@/lib/metaPixel";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,14 @@ const RestaurantRegistration = () => {
   const [redirectingToPayment, setRedirectingToPayment] = useState(false);
 
   const planInfo = planDisplayMap[planSlug || ""] || { name: "Desconhecido", color: "text-muted-foreground" };
+
+  // Meta Pixel — Lead ao iniciar o cadastro de uma loja
+  useEffect(() => {
+    trackEvent("Lead", {
+      content_name: `Cadastro - Plano ${planInfo.name}`,
+      content_category: planSlug || "unknown",
+    });
+  }, [planSlug, planInfo.name]);
 
   const handleSlugChange = (value: string) => {
     const sanitized = value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 50);
@@ -143,10 +152,24 @@ const RestaurantRegistration = () => {
         }
       }
 
+      // Meta Pixel — restaurante criado com sucesso
+      trackEvent("CompleteRegistration", {
+        content_name: `Restaurante cadastrado - ${planInfo.name}`,
+        content_category: planSlug || "unknown",
+        status: true,
+      });
+
       // Check if there's a payment redirect (paid plans)
       if (res.data?.redirectUrl) {
         setRedirectingToPayment(true);
         toast.success("Restaurante criado! Redirecionando para pagamento...");
+        // Meta Pixel — InitiateCheckout antes de redirecionar para o MP
+        trackEvent("InitiateCheckout", {
+          content_name: `Checkout - Plano ${planInfo.name}`,
+          content_ids: [planSlug],
+          content_type: "subscription_plan",
+          currency: "BRL",
+        });
         setTimeout(() => {
           window.location.href = res.data.redirectUrl;
         }, 2000);
