@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getActiveAdminRedirectPath } from "@/lib/sessionExpiry";
+import { trackEvent } from "@/lib/metaPixel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -164,6 +165,14 @@ const LandingPage = () => {
     const path = getActiveAdminRedirectPath();
     if (path) navigate(path, { replace: true });
   }, [navigate]);
+
+  // Meta Pixel — ViewContent da landing (uma vez por sessão de página)
+  useEffect(() => {
+    trackEvent("ViewContent", {
+      content_name: "Landing Page MenusApp",
+      content_category: "landing",
+    });
+  }, []);
 
   const currentTab = adminTabs.find((t) => t.id === activeTab) ?? adminTabs[0];
 
@@ -603,7 +612,17 @@ const LandingPage = () => {
                     <Button
                       className={`w-full mt-8 h-12 font-bold text-base hover:scale-[1.02] transition-all rounded-full ${plan.highlighted ? "shadow-lg shadow-primary/25" : ""}`}
                       variant={plan.highlighted ? "default" : "outline"}
-                      onClick={() => navigate(`/registro/${plan.planSlug}`)}
+                      onClick={() => {
+                        const value = parseFloat(plan.price.replace(",", "."));
+                        trackEvent("AddToCart", {
+                          content_name: `Plano ${plan.name}`,
+                          content_ids: [plan.planSlug],
+                          content_type: "subscription_plan",
+                          value,
+                          currency: "BRL",
+                        });
+                        navigate(`/registro/${plan.planSlug}`);
+                      }}
                     >
                       {plan.cta}
                       <ChevronRight className="ml-1 h-5 w-5" />
