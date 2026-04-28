@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getActiveAdminRedirectPath } from "@/lib/sessionExpiry";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import {
   AlertTriangle, DollarSign,
   Receipt, CalendarCheck,
   Pizza, Coffee, Beer, Sandwich, ChefHat,
-  CheckCircle2,
+  CheckCircle2, Store, Users,
 } from "lucide-react";
 
 /* ── Plans ── */
@@ -96,15 +96,76 @@ const allFeatures = [
   { icon: CalendarCheck, title: "Reservas de mesas", desc: "Reservas online e visual." },
 ];
 
+/* ── Modos de venda (estilo Menurio) ── */
+const sellingModes = [
+  {
+    icon: Truck,
+    title: "Delivery",
+    desc: "Pedidos no seu próprio link, sem comissão e com Robô IA atendendo no WhatsApp.",
+    cta: "Criar cardápio grátis",
+  },
+  {
+    icon: QrCode,
+    title: "QR Code na Mesa",
+    desc: "Cardápio interativo: o cliente abre no celular, escolhe e pede sem chamar o garçom.",
+    cta: "Começar agora",
+  },
+  {
+    icon: Store,
+    title: "Retirada no Balcão",
+    desc: "Pedido rápido para quem prefere buscar. Tempo de retirada e fila integrados.",
+    cta: "Ver demonstração",
+  },
+  {
+    icon: Utensils,
+    title: "Comanda na Mesa",
+    desc: "Comanda digital para restaurantes e bares. Fechamento de conta por mesa em segundos.",
+    cta: "Experimentar",
+  },
+];
+
+/* ── Tabs do Painel Admin ── */
+const adminTabs = [
+  {
+    id: "pedidos",
+    label: "Pedidos",
+    image: landingPdv,
+    title: "Gestor de pedidos completo",
+    desc: "PDV integrado, comandas digitais, gestão visual de mesas e confirmação automática de pedidos. Do balcão ao delivery num só lugar.",
+    bullets: ["PDV completo com atalhos", "Comandas digitais por mesa", "Gestão visual de mesas", "Confirmação automática", "Totem de autoatendimento"],
+  },
+  {
+    id: "financeiro",
+    label: "Financeiro",
+    image: landingDre,
+    title: "Visão completa do seu negócio",
+    desc: "DRE automático, fluxo de caixa diário, CMV por produto, custos fixos e variáveis — tudo calculado a partir das vendas reais. Pare de usar planilha.",
+    bullets: ["DRE automático mensal", "Fluxo de caixa em tempo real", "CMV por produto", "Margens e lucratividade"],
+  },
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    image: landingWhatsapp,
+    title: "Marketing automático no WhatsApp",
+    desc: "Campanhas de remarketing que disparam sozinhas. Cliente inativo recebe cupom, pedido confirmado vira notificação — sem você levantar um dedo.",
+    bullets: ["Remarketing automático", "Cupons personalizados", "Notificações de pedido", "Segmentação inteligente"],
+  },
+];
+
+const adminTabChips = ["Cardápio", "Pedidos", "Clientes", "Pagamentos", "Entregas", "Relatórios", "WhatsApp", "QR Codes"];
+
 /* ── Component ── */
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(adminTabs[0].id);
 
   // Auto-redirect: se já há sessão válida (até 7 dias), entrar direto no painel
   useEffect(() => {
     const path = getActiveAdminRedirectPath();
     if (path) navigate(path, { replace: true });
   }, [navigate]);
+
+  const currentTab = adminTabs.find((t) => t.id === activeTab) ?? adminTabs[0];
 
   return (
     <div className="min-h-screen bg-card overflow-x-hidden font-sans">
@@ -117,10 +178,10 @@ const LandingPage = () => {
           </div>
           <nav className="hidden md:flex items-center gap-8">
             {[
-              { href: "#funcoes", label: "Funções" },
+              { href: "#solucoes", label: "Soluções" },
               { href: "#vantagens", label: "Vantagens" },
-              { href: "#pricing", label: "Planos" },
-              { href: "#faq", label: "FAQ" },
+              { href: "#funcoes", label: "Recursos" },
+              { href: "#pricing", label: "Preços" },
             ].map((l) => (
               <a key={l.href} href={l.href} className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors">{l.label}</a>
             ))}
@@ -129,17 +190,17 @@ const LandingPage = () => {
             <Button variant="ghost" size="sm" className="text-sm sm:text-base font-medium px-2 sm:px-3" onClick={() => navigate("/login")}>
               Entrar
             </Button>
-            <Button size="sm" className="font-semibold text-sm sm:text-base shadow-md shadow-primary/20 px-3 sm:px-4" onClick={() => navigate("/registro/trial")}>
-              Começar agora
+            <Button size="sm" className="font-semibold text-sm sm:text-base shadow-md shadow-primary/20 px-3 sm:px-4 rounded-full" onClick={() => navigate("/registro/trial")}>
+              Começar grátis
             </Button>
           </div>
         </div>
       </header>
 
-      {/* ═══ HERO ═══ */}
+      {/* ═══ HERO (estilo Menurio: título centralizado + 3 métricas inline + CTA pílula) ═══ */}
       <section className="relative overflow-hidden bg-card">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.04] via-transparent to-transparent" />
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-primary/[0.05] blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.06] via-primary/[0.02] to-transparent" />
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-primary/[0.07] blur-[120px] pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
           <ScrollReveal>
@@ -150,50 +211,50 @@ const LandingPage = () => {
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground tracking-[-0.03em] leading-[1.1]">
-              O sistema completo para
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground tracking-[-0.03em] leading-[1.05]">
+              A solução completa para
               <br />
-              <span className="inline-block min-h-[1.2em]">
+              <span className="inline-block min-h-[1.2em] text-primary">
                 <TypingEffect />
               </span>
             </h1>
           </ScrollReveal>
 
+          {/* 3 métricas inline (estilo Menurio) */}
           <ScrollReveal delay={200}>
-            <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Pare de perder pedidos. Aumente suas vendas sem pagar comissão.{" "}
-              <strong className="text-foreground">Automatize seu restaurante em minutos.</strong>
-            </p>
-          </ScrollReveal>
-
-          {/* Diferenciadores */}
-          <ScrollReveal delay={250}>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-medium text-muted-foreground">
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> Zero comissão por pedido</span>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> Robô IA que vende 24h</span>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> DRE automático</span>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-primary" /> Parceiro de integração iFood</span>
+            <div className="mt-10 flex flex-wrap items-start justify-center gap-x-12 gap-y-4">
+              {[
+                { value: "Até 20%", label: "mais rapidez no atendimento" },
+                { value: "Redução de 30%", label: "nos custos operacionais" },
+                { value: "Aumento de 40%", label: "no faturamento" },
+              ].map((m) => (
+                <div key={m.label} className="text-center">
+                  <p className="text-lg sm:text-xl font-extrabold text-foreground">{m.value}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{m.label}</p>
+                </div>
+              ))}
             </div>
           </ScrollReveal>
 
+          {/* CTA pílula (estilo Menurio) */}
           <ScrollReveal delay={300}>
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" className="text-lg px-10 h-14 font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] transition-all" onClick={() => navigate("/registro/trial")}>
-                Começar agora
+            <div className="mt-10 flex flex-col items-center gap-3">
+              <Button
+                size="lg"
+                className="text-base sm:text-lg px-10 h-14 font-bold rounded-full shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 hover:scale-[1.02] transition-all"
+                onClick={() => navigate("/registro/trial")}
+              >
+                Escolher cardápio ideal
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 h-14 font-semibold" onClick={() => document.getElementById("vantagens")?.scrollIntoView({ behavior: "smooth" })}>
-                Ver vantagens
-              </Button>
+              <p className="text-sm text-muted-foreground">7 dias grátis • Sem cartão • Setup em 2 minutos</p>
             </div>
-            <p className="text-sm text-muted-foreground mt-3">
-              7 dias grátis • Sem cartão • Setup em 2 minutos
-            </p>
           </ScrollReveal>
 
+          {/* Mockup do dashboard */}
           <ScrollReveal delay={400}>
-            <div className="mt-12 mx-auto max-w-4xl">
-              <div className="rounded-2xl border border-border shadow-2xl shadow-primary/10 overflow-hidden">
+            <div className="mt-14 mx-auto max-w-4xl">
+              <div className="rounded-2xl border border-border shadow-2xl shadow-primary/15 overflow-hidden">
                 <img src={heroDashboard} alt="Dashboard do Menus App — sistema de gestão para restaurantes" className="w-full h-auto" />
               </div>
             </div>
@@ -201,10 +262,74 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 1. SEÇÃO DE DOR → SOLUÇÃO ═══ */}
+      {/* ═══ POR QUE ESCOLHER (4 stats grandes — estilo Menurio) ═══ */}
       <section className="py-16 sm:py-20 bg-background">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">
+              Por que escolher o <span className="text-primary">Menu's</span>?
+            </h2>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            {[
+              { value: "+500", label: "restaurantes atendidos" },
+              { value: "+50k", label: "pedidos por mês" },
+              { value: "4.9/5", label: "avaliação dos clientes" },
+              { value: "0%", label: "taxa sobre vendas" },
+            ].map((s, i) => (
+              <ScrollReveal key={s.label} delay={i * 100}>
+                <div className="text-center">
+                  <div className="text-4xl sm:text-5xl font-extrabold text-primary tracking-tight">{s.value}</div>
+                  <p className="text-sm text-muted-foreground mt-2 font-medium">{s.label}</p>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ SOLUÇÕES (Delivery / QR Mesa / Balcão / Comanda — estilo Menurio) ═══ */}
+      <section id="solucoes" className="py-16 sm:py-20 bg-card">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-12">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Soluções</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">
+              Autoatendimento para delivery, mesa e balcão
+            </h2>
+            <p className="mt-3 text-lg text-muted-foreground max-w-2xl mx-auto">
+              Em um só lugar, tudo que você precisa para resolver os desafios de atendimento do seu restaurante.
+            </p>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {sellingModes.map((m, i) => (
+              <ScrollReveal key={m.title} delay={i * 100}>
+                <div className="group p-6 rounded-2xl border border-border bg-background hover:shadow-xl hover:border-primary/30 hover:-translate-y-1 transition-all h-full flex flex-col">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
+                    <m.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-bold text-foreground mb-2">{m.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">{m.desc}</p>
+                  <button
+                    onClick={() => navigate("/registro/trial")}
+                    className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:gap-2 transition-all"
+                  >
+                    {m.cta}
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ DORES → SOLUÇÃO ═══ */}
+      <section id="vantagens" className="py-16 sm:py-20 bg-background">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-10">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Vantagens</span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">
               Você pode estar <span className="text-destructive">perdendo dinheiro</span> todos os dias
             </h2>
@@ -236,8 +361,81 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 2. COMO FUNCIONA (3 PASSOS) ═══ */}
+      {/* ═══ PAINEL ADMINISTRATIVO COMPLETO (com tabs — estilo Menurio) ═══ */}
       <section className="py-16 sm:py-20 bg-card">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-10">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Painel</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">
+              Painel Administrativo Completo
+            </h2>
+            <p className="mt-3 text-lg text-muted-foreground max-w-2xl mx-auto">
+              Gerencie cardápio, pedidos, clientes e muito mais em um só lugar.
+            </p>
+          </ScrollReveal>
+
+          {/* Chips das áreas cobertas */}
+          <ScrollReveal delay={100}>
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
+              {adminTabChips.map((c) => (
+                <span
+                  key={c}
+                  className="px-3.5 py-1.5 rounded-full border border-border bg-background text-xs font-semibold text-muted-foreground"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          </ScrollReveal>
+
+          {/* Tabs */}
+          <ScrollReveal delay={150}>
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
+              {adminTabs.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
+                    activeTab === t.id
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                      : "bg-background text-muted-foreground hover:text-foreground border border-border"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </ScrollReveal>
+
+          {/* Conteúdo da tab ativa */}
+          <ScrollReveal delay={200}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+              <div className="rounded-2xl border border-border shadow-xl overflow-hidden bg-background">
+                <img src={currentTab.image} alt={currentTab.title} className="w-full h-auto" />
+              </div>
+              <div>
+                <h3 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
+                  {currentTab.title}
+                </h3>
+                <p className="mt-4 text-lg text-muted-foreground leading-relaxed">{currentTab.desc}</p>
+                <ul className="mt-6 space-y-3">
+                  {currentTab.bullets.map((b) => (
+                    <li key={b} className="flex items-center gap-3">
+                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Check className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <span className="text-base text-foreground font-medium">{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ═══ COMO COMEÇAR (3 PASSOS) ═══ */}
+      <section className="py-16 sm:py-20 bg-background">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Passo a passo</span>
@@ -251,7 +449,7 @@ const LandingPage = () => {
               { num: "03", icon: ShoppingCart, title: "Comece a vender", desc: "Compartilhe o QR Code e receba pedidos na hora." },
             ].map((s, i) => (
               <ScrollReveal key={s.num} delay={i * 120}>
-                <div className="text-center space-y-4 p-6 rounded-2xl border border-border bg-background hover:shadow-lg hover:border-primary/20 transition-all">
+                <div className="text-center space-y-4 p-6 rounded-2xl border border-border bg-card hover:shadow-lg hover:border-primary/20 transition-all">
                   <div className="text-4xl font-extrabold text-primary/20">{s.num}</div>
                   <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
                     <s.icon className="h-7 w-7 text-primary" />
@@ -262,117 +460,15 @@ const LandingPage = () => {
               </ScrollReveal>
             ))}
           </div>
-
-          <ScrollReveal delay={400}>
-            <p className="text-center mt-8 text-base font-semibold text-muted-foreground">
-              Sem instalação. Sem complicação. Funciona em qualquer dispositivo.
-            </p>
-          </ScrollReveal>
         </div>
       </section>
 
-      {/* ═══ 3. OPERAÇÃO — GESTOR DE PEDIDOS (screenshot real) ═══ */}
-      <section className="py-16 sm:py-20 bg-background">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <ScrollReveal>
-              <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-4">Operação</span>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
-                Gestor de pedidos <span className="text-primary">completo</span>
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
-                PDV integrado, comandas digitais, gestão visual de mesas e confirmação automática de pedidos. Do balcão ao delivery num só lugar.
-              </p>
-              <ul className="mt-6 space-y-3">
-                {["PDV completo com atalhos", "Comandas digitais por mesa", "Gestão visual de mesas", "Confirmação automática de pedidos", "Totem de autoatendimento"].map((item) => (
-                  <li key={item} className="flex items-center gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <Check className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                    <span className="text-base text-foreground font-medium">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </ScrollReveal>
-            <ScrollReveal delay={200}>
-              <div className="rounded-2xl border border-border shadow-xl overflow-hidden">
-                <img src={landingPdv} alt="Gestor de pedidos do Menus App" className="w-full h-auto" />
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ 4. FINANCEIRO (screenshot real) ═══ */}
-      <section className="py-16 sm:py-20 bg-card">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <ScrollReveal delay={200} className="order-2 lg:order-1">
-              <div className="rounded-2xl border border-border shadow-xl overflow-hidden">
-                <img src={landingDre} alt="Relatório DRE automático do Menus App" className="w-full h-auto" />
-              </div>
-            </ScrollReveal>
-            <ScrollReveal className="order-1 lg:order-2">
-              <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-4">Financeiro</span>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
-                Visão completa do <span className="text-primary">seu negócio</span>
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
-                DRE automático, fluxo de caixa diário, CMV por produto, custos fixos e variáveis — tudo calculado a partir das suas vendas reais. Pare de usar planilha.
-              </p>
-              <ul className="mt-6 space-y-3">
-                {["DRE automático mensal", "Fluxo de caixa em tempo real", "CMV por produto", "Margens e lucratividade"].map((item) => (
-                  <li key={item} className="flex items-center gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <Check className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                    <span className="text-base text-foreground font-medium">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ 5. WHATSAPP ═══ */}
-      <section className="py-16 sm:py-20 bg-background">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <ScrollReveal>
-              <span className="inline-block px-3 py-1 rounded-full bg-[hsl(142_70%_45%)]/10 text-[hsl(142_70%_35%)] text-sm font-semibold uppercase tracking-wider mb-4">WhatsApp</span>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
-                Marketing automático e central de alertas no <span className="text-[hsl(142_70%_35%)]">WhatsApp</span>
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
-                Crie campanhas de remarketing que disparam automaticamente. Cliente inativo? Ele recebe um cupom. Pedido confirmado? Notificação instantânea. Tudo sem você levantar um dedo.
-              </p>
-              <ul className="mt-6 space-y-3">
-                {["Remarketing automático", "Cupons personalizados", "Notificações de pedido", "Segmentação inteligente"].map((item) => (
-                  <li key={item} className="flex items-center gap-3">
-                    <div className="h-6 w-6 rounded-full bg-[hsl(142_70%_45%)]/10 flex items-center justify-center shrink-0">
-                      <Check className="h-3.5 w-3.5 text-[hsl(142_70%_35%)]" />
-                    </div>
-                    <span className="text-base text-foreground font-medium">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </ScrollReveal>
-            <ScrollReveal delay={200}>
-              <div className="rounded-2xl border border-border shadow-xl overflow-hidden">
-                <img src={landingWhatsapp} alt="Marketing por WhatsApp do Menus App" className="w-full h-auto" />
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ 6. TUDO QUE SEU RESTAURANTE PRECISA — GRID ═══ */}
+      {/* ═══ FUNÇÕES COMPLETAS — GRID ═══ */}
       <section id="funcoes" className="py-16 sm:py-20 bg-card">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-10">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Funções</span>
-            <h2 id="vantagens" className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Tudo que seu restaurante precisa</h2>
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Recursos</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">Tudo que seu restaurante precisa</h2>
             <p className="mt-3 text-lg text-muted-foreground max-w-xl mx-auto">
               Um sistema completo que substitui dezenas de ferramentas.
             </p>
@@ -394,7 +490,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 7. PROVA SOCIAL ═══ */}
+      {/* ═══ DEPOIMENTOS ═══ */}
       <section className="py-16 sm:py-20 bg-background">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
@@ -426,26 +522,10 @@ const LandingPage = () => {
               </ScrollReveal>
             ))}
           </div>
-
-          <ScrollReveal delay={300}>
-            <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center max-w-3xl mx-auto">
-              {[
-                { value: "500+", label: "Restaurantes ativos" },
-                { value: "50k+", label: "Pedidos por mês" },
-                { value: "4.9/5", label: "Avaliação dos clientes" },
-                { value: "0%", label: "Taxa sobre vendas" },
-              ].map((s) => (
-                <div key={s.label}>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-primary">{s.value}</div>
-                  <p className="text-sm text-muted-foreground mt-1">{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </ScrollReveal>
         </div>
       </section>
 
-      {/* ═══ 8. SEGMENTOS ═══ */}
+      {/* ═══ SEGMENTOS ═══ */}
       <section className="py-16 sm:py-20 bg-card">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <ScrollReveal>
@@ -476,43 +556,18 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ═══ 9. OFERTA / TESTE GRÁTIS ═══ */}
-      <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <ScrollReveal>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-[-0.025em]">
-              Teste grátis por 7 dias
-            </h2>
-            <p className="mt-4 text-lg text-white/80 max-w-xl mx-auto leading-relaxed">
-              Use sem compromisso. Se não gostar, não precisa pagar nada.
-            </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm font-semibold text-white/90">
-              <span className="flex items-center gap-1.5"><Shield className="h-4 w-4" /> Sem cartão</span>
-              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" /> Sem risco</span>
-              <span className="flex items-center gap-1.5"><Zap className="h-4 w-4" /> Setup em 2 min</span>
-            </div>
-            <div className="mt-8">
-              <Button
-                size="lg"
-                className="text-lg px-10 h-14 font-bold bg-white text-primary hover:bg-white/90 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all"
-                onClick={() => navigate("/registro/trial")}
-              >
-                Começar grátis agora
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </div>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* ═══ 10. PRICING ═══ */}
+      {/* ═══ PRICING ═══ */}
       <section id="pricing" className="py-16 sm:py-20 bg-background relative overflow-hidden">
         <div className="absolute top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/[0.04] blur-[120px] pointer-events-none" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <ScrollReveal className="text-center mb-14">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Planos & Preços</span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">Escolha o plano ideal</h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-xl mx-auto">Sem fidelidade, sem multa. Comece agora e mude quando quiser.</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">
+              Planos para cada momento do seu restaurante
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground max-w-xl mx-auto">
+              Sem fidelidade, sem multa. Comece agora e mude quando quiser.
+            </p>
           </ScrollReveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-start">
@@ -546,7 +601,7 @@ const LandingPage = () => {
                       ))}
                     </ul>
                     <Button
-                      className={`w-full mt-8 h-12 font-bold text-base hover:scale-[1.02] transition-all ${plan.highlighted ? "shadow-lg shadow-primary/25" : ""}`}
+                      className={`w-full mt-8 h-12 font-bold text-base hover:scale-[1.02] transition-all rounded-full ${plan.highlighted ? "shadow-lg shadow-primary/25" : ""}`}
                       variant={plan.highlighted ? "default" : "outline"}
                       onClick={() => navigate(`/registro/${plan.planSlug}`)}
                     >
@@ -559,10 +614,16 @@ const LandingPage = () => {
               </ScrollReveal>
             ))}
           </div>
+
+          <ScrollReveal delay={400}>
+            <p className="text-center mt-8 text-sm text-muted-foreground">
+              Cancele a qualquer momento • Sem taxas por pedido • Pagamento seguro
+            </p>
+          </ScrollReveal>
         </div>
       </section>
 
-      {/* ═══ 11. FAQ ═══ */}
+      {/* ═══ FAQ ═══ */}
       <section id="faq" className="py-16 sm:py-20 bg-card">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-10">
@@ -583,6 +644,35 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* ═══ CTA FINAL (laranja) ═══ */}
+      <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <ScrollReveal>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-[-0.025em]">
+              Pronto para revolucionar seu atendimento?
+            </h2>
+            <p className="mt-4 text-lg text-white/85 max-w-xl mx-auto leading-relaxed">
+              Comece agora mesmo, é grátis. Sem cartão de crédito.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm font-semibold text-white/90">
+              <span className="flex items-center gap-1.5"><Shield className="h-4 w-4" /> Sem cartão</span>
+              <span className="flex items-center gap-1.5"><Check className="h-4 w-4" /> Sem risco</span>
+              <span className="flex items-center gap-1.5"><Zap className="h-4 w-4" /> Setup em 2 min</span>
+            </div>
+            <div className="mt-8">
+              <Button
+                size="lg"
+                className="text-lg px-10 h-14 font-bold rounded-full bg-white text-primary hover:bg-white/90 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all"
+                onClick={() => navigate("/registro/trial")}
+              >
+                Começar grátis agora
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
       {/* ═══ FOOTER ═══ */}
       <footer className="border-t border-border bg-card py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -592,10 +682,10 @@ const LandingPage = () => {
               <span className="text-lg font-bold text-foreground tracking-tight">Menu's</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <a href="#funcoes" className="hover:text-foreground transition-colors">Funções</a>
+              <a href="#solucoes" className="hover:text-foreground transition-colors">Soluções</a>
               <a href="#vantagens" className="hover:text-foreground transition-colors">Vantagens</a>
-              <a href="#pricing" className="hover:text-foreground transition-colors">Planos</a>
-              <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
+              <a href="#funcoes" className="hover:text-foreground transition-colors">Recursos</a>
+              <a href="#pricing" className="hover:text-foreground transition-colors">Preços</a>
             </div>
             <div className="flex flex-col items-center md:items-end gap-1">
               <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Menu's. Todos os direitos reservados.</p>
