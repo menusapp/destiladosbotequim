@@ -8,8 +8,9 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { MobileBottomNav } from "@/components/admin/MobileBottomNav";
-import { TourProvider } from "@/components/admin/tour/TourContext";
+import { TourProvider, useTour } from "@/components/admin/tour/TourContext";
 import { TourOverlay } from "@/components/admin/tour/TourOverlay";
+import type { TourSectionId } from "@/components/admin/tour/types";
 import { ConfirmDialogProvider } from "@/hooks/useConfirmDialog";
 
 import { lazy, Suspense } from "react";
