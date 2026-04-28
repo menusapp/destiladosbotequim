@@ -29,6 +29,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { isOnRestaurantSubdomain } from "@/lib/slugResolver";
+import { MetaPixelRouteTracker } from "@/components/MetaPixelRouteTracker";
 
 const LandingPage = lazyWithRetry(() => import("./pages/LandingPage"));
 const RestaurantLogin = lazyWithRetry(() => import("./pages/RestaurantLogin"));
