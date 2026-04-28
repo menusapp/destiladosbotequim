@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
-import { Check, Crown, ArrowUp, ArrowDown, Package } from "lucide-react";
+import { Check, Crown, ArrowUp, ArrowDown, Package, ExternalLink } from "lucide-react";
+import { trackEvent } from "@/lib/metaPixel";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +15,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// Links de assinatura do Mercado Pago por slug do plano
+const MP_PLAN_LINKS: Record<string, string> = {
+  basico: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=ce558ba8031d48e78c875adbe8af561a",
+  intermediario: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=fe9ff4a87e634b86a493887ab8737b17",
+  avancado: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=e0f8cd5628974aa180490d2b6e9d78ea",
+};
+
+// Normaliza nome do plano para slug (remove acentos, lowercase)
+function planNameToSlug(name: string): string | null {
+  const normalized = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+  if (normalized.includes("basic")) return "basico";
+  if (normalized.includes("interm")) return "intermediario";
+  if (normalized.includes("avanc")) return "avancado";
+  return null;
+}
 
 const ALL_MODULES: Record<string, string> = {
   cardapio: "Cardápio Digital",
@@ -132,6 +153,11 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
 
   const handleSelectPlan = (plan: Plan) => {
     if (activeSub?.plan_id === plan.id) return;
+    const slug = planNameToSlug(plan.name);
+    if (!slug || !MP_PLAN_LINKS[slug]) {
+      toast.error("Link de pagamento indisponível para este plano. Contate o suporte.");
+      return;
+    }
     let action = "Assinar";
     if (activeSub) {
       action = plan.price > activeSub.plan_price ? "Fazer Upgrade" : "Fazer Downgrade";
@@ -144,30 +170,39 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
     setSubmitting(true);
 
     try {
-      if (activeSub) {
-        const { error: deactivateErr } = await supabase
-          .from("restaurant_subscriptions")
-          .update({ status: "cancelled" })
-          .eq("id", activeSub.id);
-        if (deactivateErr) throw deactivateErr;
+      const slug = planNameToSlug(confirmDialog.plan.name);
+      if (!slug || !MP_PLAN_LINKS[slug]) {
+        throw new Error("Link de pagamento indisponível.");
       }
 
-      const { error: insertErr } = await supabase
-        .from("restaurant_subscriptions")
-        .insert({
-          restaurant_id: restaurantId,
-          plan_id: confirmDialog.plan.id,
-          status: "active",
-        });
-      if (insertErr) throw insertErr;
+      // Meta Pixel — clique para ir até o checkout do MP conta como AddToCart
+      trackEvent("AddToCart", {
+        content_name: `Plano ${confirmDialog.plan.name}`,
+        content_ids: [slug],
+        content_type: "subscription_plan",
+        value: confirmDialog.plan.price,
+        currency: "BRL",
+      });
+      // E também InitiateCheckout, já que estamos saindo para a página de pagamento
+      trackEvent("InitiateCheckout", {
+        content_name: `Checkout - Plano ${confirmDialog.plan.name}`,
+        content_ids: [slug],
+        content_type: "subscription_plan",
+        value: confirmDialog.plan.price,
+        currency: "BRL",
+      });
 
-      toast.success(`Plano "${confirmDialog.plan.name}" ativado com sucesso!`);
-      setConfirmDialog(null);
-      fetchData();
-      setTimeout(() => window.location.reload(), 500);
+      // Monta URL com external_reference = restaurant_id (necessário para o webhook reconhecer)
+      const mpUrl = new URL(MP_PLAN_LINKS[slug]);
+      mpUrl.searchParams.set("external_reference", restaurantId);
+
+      toast.success("Redirecionando para o pagamento...");
+      // Pequeno delay para o pixel disparar antes do redirect
+      setTimeout(() => {
+        window.location.href = mpUrl.toString();
+      }, 600);
     } catch (err: any) {
-      toast.error(err.message || "Erro ao alterar plano");
-    } finally {
+      toast.error(err.message || "Erro ao iniciar pagamento");
       setSubmitting(false);
     }
   };
@@ -310,29 +345,38 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
       </div>
 
       {/* Confirm Dialog */}
-      <AlertDialog open={!!confirmDialog} onOpenChange={() => setConfirmDialog(null)}>
+      <AlertDialog open={!!confirmDialog} onOpenChange={() => !submitting && setConfirmDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{confirmDialog?.action}</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="space-y-2">
               {activeSub ? (
-                <>
+                <span className="block">
                   Trocar de <strong>{activeSub.plan_name}</strong> para{" "}
                   <strong>{confirmDialog?.plan.name}</strong> (R${" "}
-                  {confirmDialog?.plan.price.toFixed(2)}/mês)?
-                </>
+                  {confirmDialog?.plan.price.toFixed(2)}/mês).
+                </span>
               ) : (
-                <>
+                <span className="block">
                   Assinar o plano <strong>{confirmDialog?.plan.name}</strong> por R${" "}
-                  {confirmDialog?.plan.price.toFixed(2)}/mês?
-                </>
+                  {confirmDialog?.plan.price.toFixed(2)}/mês.
+                </span>
               )}
+              <span className="block text-xs text-muted-foreground pt-2">
+                Você será redirecionado para o Mercado Pago para concluir o pagamento com segurança.
+                O novo plano será ativado automaticamente após a confirmação do pagamento.
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmSubscription} disabled={submitting}>
-              {submitting ? "Processando..." : "Confirmar"}
+              {submitting ? "Redirecionando..." : (
+                <>
+                  Ir para pagamento
+                  <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                </>
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
