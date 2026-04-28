@@ -345,29 +345,38 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
       </div>
 
       {/* Confirm Dialog */}
-      <AlertDialog open={!!confirmDialog} onOpenChange={() => setConfirmDialog(null)}>
+      <AlertDialog open={!!confirmDialog} onOpenChange={() => !submitting && setConfirmDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{confirmDialog?.action}</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="space-y-2">
               {activeSub ? (
-                <>
+                <span className="block">
                   Trocar de <strong>{activeSub.plan_name}</strong> para{" "}
                   <strong>{confirmDialog?.plan.name}</strong> (R${" "}
-                  {confirmDialog?.plan.price.toFixed(2)}/mês)?
-                </>
+                  {confirmDialog?.plan.price.toFixed(2)}/mês).
+                </span>
               ) : (
-                <>
+                <span className="block">
                   Assinar o plano <strong>{confirmDialog?.plan.name}</strong> por R${" "}
-                  {confirmDialog?.plan.price.toFixed(2)}/mês?
-                </>
+                  {confirmDialog?.plan.price.toFixed(2)}/mês.
+                </span>
               )}
+              <span className="block text-xs text-muted-foreground pt-2">
+                Você será redirecionado para o Mercado Pago para concluir o pagamento com segurança.
+                O novo plano será ativado automaticamente após a confirmação do pagamento.
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmSubscription} disabled={submitting}>
-              {submitting ? "Processando..." : "Confirmar"}
+              {submitting ? "Redirecionando..." : (
+                <>
+                  Ir para pagamento
+                  <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                </>
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
