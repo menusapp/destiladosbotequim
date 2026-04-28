@@ -277,7 +277,7 @@ export default function MargensTab({ restaurantId }: MargensTabProps) {
           <p className="text-sm text-muted-foreground font-light">Análise de custos e margens por produto</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
+          <div data-tour="margens-target-cmv" className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
             <Target className="h-4 w-4 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">Meta CMV:</span>
             <Input
