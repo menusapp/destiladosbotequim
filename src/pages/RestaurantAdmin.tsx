@@ -49,6 +49,29 @@ import { NewBillNotification } from "@/components/admin/NewBillNotification";
 import { NewReservationNotification } from "@/components/admin/NewReservationNotification";
 import { SupportChatWidget } from "@/components/admin/SupportChatWidget";
 import { QzOnboardingGate } from "@/components/admin/QzOnboardingGate";
+import { clearAdminSession } from "@/lib/sessionExpiry";
+
+// Prefetch map: section → dynamic import. Definido fora do componente para
+// evitar recriação a cada render.
+const prefetchMap: Record<string, () => Promise<unknown>> = {
+  cardapio: () => import("@/components/admin/CardapioTab"),
+  estoque: () => import("@/components/admin/StockTab"),
+  custos: () => import("@/components/admin/CostosTab"),
+  margens: () => import("@/components/admin/MargensTab"),
+  caixa: () => import("@/components/admin/FluxoCaixaTab"),
+  clientes: () => import("@/components/admin/ClientesTab"),
+  fidelidade: () => import("@/components/admin/FidelityTab"),
+  marketing: () => import("@/components/admin/MarketingTab"),
+  fiscal: () => import("@/components/admin/FiscalTab"),
+  integracoes: () => import("@/components/admin/IntegrationsTab"),
+  modulos: () => import("@/components/admin/ModulosTab"),
+  contas: () => import("@/components/admin/ContasTab"),
+  relatorios: () => import("@/components/admin/ReportsTab"),
+  "mesas-reservas": () => import("@/components/admin/TablesTab"),
+  "config-dados": () => import("@/components/admin/settings/CompanyDataSettings"),
+  "config-whatsapp": () => import("@/components/admin/settings/WhatsAppSettings"),
+  "config-totem": () => import("@/components/admin/settings/KioskSettings"),
+};
 
 interface Restaurant {
   id: string;
