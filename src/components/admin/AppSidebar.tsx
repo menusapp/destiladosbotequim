@@ -111,7 +111,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
   const allConfig = menuStructure.configSubItems;
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background w-[260px]">
+    <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border bg-sidebar-background w-[260px]">
       <SidebarContent className="bg-sidebar-background">
         <SidebarGroup>
           <SidebarGroupContent>
