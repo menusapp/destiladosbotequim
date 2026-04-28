@@ -364,6 +364,7 @@ const RestaurantAdmin = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'orders',
+          filter: `restaurant_id=eq.${restaurantId}`,
         },
         (payload) => {
           const order = payload.new as any;
