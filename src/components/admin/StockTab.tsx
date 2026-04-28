@@ -25,7 +25,7 @@ export default function StockTab({ restaurantId }: StockTabProps) {
           <h1 className="text-[32px] font-bold text-foreground leading-tight">Estoque</h1>
           <p className="text-sm text-muted-foreground mt-1">Gerencie insumos, categorias e movimentações</p>
         </div>
-        <Button onClick={() => setImportDialogOpen(true)} className="gap-2">
+        <Button data-tour="estoque-import-nfe" onClick={() => setImportDialogOpen(true)} className="gap-2">
           <FileText className="h-4 w-4" />
           Importar Nota Fiscal
         </Button>
@@ -33,7 +33,7 @@ export default function StockTab({ restaurantId }: StockTabProps) {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-transparent border-b border-border rounded-none h-auto p-0 w-full justify-start">
+        <TabsList data-tour="estoque-tabs" className="bg-transparent border-b border-border rounded-none h-auto p-0 w-full justify-start">
           <TabsTrigger 
             value="insumos"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
