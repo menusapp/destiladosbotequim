@@ -45,6 +45,8 @@ export const AdminHeader = ({
   onIsOpenUpdate,
 }: AdminHeaderProps) => {
   const navigate = useNavigate();
+  const { state: sidebarState, toggleSidebar } = useSidebar();
+  const sidebarOpen = sidebarState === "expanded";
   
   const [updatingOpen, setUpdatingOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
