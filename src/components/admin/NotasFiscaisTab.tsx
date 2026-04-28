@@ -122,7 +122,7 @@ const NotasFiscaisTab = ({ restaurantId }: { restaurantId: string }) => {
   // Realtime subscription (centralized hook with debounce + cleanup)
   useRealtimeChannel({
     channelName: `fiscal-notes-rt-${restaurantId}`,
-    bindings: [{ table: "order_fiscal_notes" }],
+    bindings: [{ table: "order_fiscal_notes", filter: `restaurant_id=eq.${restaurantId}` }],
     onChange: () => fetchNotes(),
     debounceMs: 400,
   });
