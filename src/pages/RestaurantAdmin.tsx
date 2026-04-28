@@ -103,6 +103,7 @@ const TourSectionBridge = ({
   return null;
 };
 
+const RestaurantAdmin = () => {
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   // Ref para evitar stale closure no setInterval do auto open/close
