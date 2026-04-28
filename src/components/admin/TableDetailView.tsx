@@ -96,8 +96,13 @@ export const TableDetailView = () => {
   }, [tableId]);
 
   const setupRealtime = () => {
-    const comandasChannel = supabase
-      .channel(`comandas-${tableId}`)
+    const channel = supabase
+      .channel(`table-view-${tableId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `table_id=eq.${tableId}` },
+        () => fetchTableData()
+      )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'comandas', filter: `table_id=eq.${tableId}` },
@@ -105,18 +110,8 @@ export const TableDetailView = () => {
       )
       .subscribe();
 
-    const ordersChannel = supabase
-      .channel(`orders-${tableId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders', filter: `table_id=eq.${tableId}` },
-        () => fetchTableData()
-      )
-      .subscribe();
-
     return () => {
-      supabase.removeChannel(comandasChannel);
-      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(channel);
     };
   };
 
