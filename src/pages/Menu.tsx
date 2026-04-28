@@ -435,14 +435,19 @@ const Menu = () => {
     }
     
     // Configurar realtime (sempre, independente de logout)
+    // ⚠️ Aguarda restaurant.id para aplicar filtros server-side (isolamento entre tenants)
+    const restaurantId = restaurant?.id;
+    if (!restaurantId) return;
+
     const savedCustomerInfo = sessionStorage.getItem("customerInfo");
     const currentCustomer = savedCustomerInfo ? JSON.parse(savedCustomerInfo) : null;
     
-    const channel = supabase.channel(`menu-changes-${restaurantSlug}`)
+    const channel = supabase.channel(`menu-changes-${restaurantId}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'products'
+        table: 'products',
+        filter: `restaurant_id=eq.${restaurantId}`
       }, () => {
         if (restaurantRef.current?.id) {
           fetchData();
@@ -451,7 +456,8 @@ const Menu = () => {
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'categories'
+        table: 'categories',
+        filter: `restaurant_id=eq.${restaurantId}`
       }, () => {
         if (restaurantRef.current?.id) {
           fetchData();
@@ -461,7 +467,7 @@ const Menu = () => {
         event: 'UPDATE', 
         schema: 'public', 
         table: 'restaurants',
-        filter: `slug=eq.${restaurantSlug}`
+        filter: `id=eq.${restaurantId}`
       }, (payload) => {
         const updatedRestaurant = payload.new as any;
         
@@ -473,7 +479,8 @@ const Menu = () => {
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
-        table: 'orders'
+        table: 'orders',
+        filter: `restaurant_id=eq.${restaurantId}`
       }, (payload) => {
         const order = payload.new as any;
         const oldOrder = payload.old as any;
@@ -500,12 +507,14 @@ const Menu = () => {
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table: 'orders'
+        table: 'orders',
+        filter: `restaurant_id=eq.${restaurantId}`
       }, () => {
         const currentTableId = tableIdRef.current;
         if (currentTableId) checkOpenComanda(currentTableId, cart);
       })
       // 💳 Listener de contas (bills) UPDATE para detectar pagamento (usando ref)
+      // Nota: bills não tem restaurant_id; filtragem por mesa do cliente é feita no callback
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
@@ -556,7 +565,8 @@ const Menu = () => {
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
-        table: 'tables'
+        table: 'tables',
+        filter: `restaurant_id=eq.${restaurantId}`
       }, (payload) => {
         const table = payload.new as any;
         const oldTable = payload.old as any;
@@ -593,7 +603,7 @@ const Menu = () => {
     return () => { 
       supabase.removeChannel(channel); 
     };
-  }, [fetchData, restaurantSlug, tableNumber]);
+  }, [fetchData, restaurantSlug, tableNumber, restaurant?.id]);
 
   // 🔒 Revalidar sessão ao voltar do background (visibilitychange + focus)
   useEffect(() => {
