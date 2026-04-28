@@ -260,7 +260,7 @@ const ContasTab = ({ restaurantId }: ContasTabProps) => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()}>
+            <Button data-tour="contas-new" onClick={() => handleOpenDialog()}>
               <Plus className="h-4 w-4 mr-2" /> Nova Conta
             </Button>
           </DialogTrigger>
