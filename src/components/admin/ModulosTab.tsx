@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
-import { Check, Crown, ArrowUp, ArrowDown, Package } from "lucide-react";
+import { Check, Crown, ArrowUp, ArrowDown, Package, ExternalLink } from "lucide-react";
+import { trackEvent } from "@/lib/metaPixel";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +15,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// Links de assinatura do Mercado Pago por slug do plano
+const MP_PLAN_LINKS: Record<string, string> = {
+  basico: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=ce558ba8031d48e78c875adbe8af561a",
+  intermediario: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=fe9ff4a87e634b86a493887ab8737b17",
+  avancado: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=e0f8cd5628974aa180490d2b6e9d78ea",
+};
+
+// Normaliza nome do plano para slug (remove acentos, lowercase)
+function planNameToSlug(name: string): string | null {
+  const normalized = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+  if (normalized.includes("basic")) return "basico";
+  if (normalized.includes("interm")) return "intermediario";
+  if (normalized.includes("avanc")) return "avancado";
+  return null;
+}
 
 const ALL_MODULES: Record<string, string> = {
   cardapio: "Cardápio Digital",
