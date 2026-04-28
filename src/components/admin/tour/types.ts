@@ -45,3 +45,32 @@ export type TourSectionId =
   | "config-whatsapp";
 
 export type TourStepsBySection = Partial<Record<TourSectionId, TourStep[]>>;
+
+/**
+ * Ordem oficial das seções no tour contínuo. O tour começa na aba em que o
+ * usuário clicou e segue daqui em diante até a última. Abas sem passos
+ * cadastrados são puladas silenciosamente.
+ */
+export const TOUR_SECTION_ORDER: TourSectionId[] = [
+  "visao-geral",
+  "pedidos",
+  "pdv",
+  "mesas-reservas",
+  "cardapio",
+  "estoque",
+  "caixa",
+  "custos",
+  "margens",
+  "relatorios",
+  "clientes",
+  "fidelidade",
+  "marketing",
+  "robo-menus",
+  "integracoes",
+  "fiscal",
+  "contas",
+  "modulos",
+  "config-dados",
+  "config-totem",
+  "config-whatsapp",
+];
