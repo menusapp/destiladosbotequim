@@ -1,14 +1,14 @@
 /**
- * Overlay visual do tour guiado.
+ * Overlay visual do tour guiado contínuo.
  *
- * - Escurece a tela e abre um "buraco" sobre o elemento alvo (spotlight)
- *   usando uma máscara CSS com box-shadow gigante.
- * - Renderiza um card flutuante com título, descrição, indicador de progresso
- *   e botões de navegação.
- * - Recalcula posição quando: passo muda, janela redimensiona, layout
- *   muda (scroll, resize observer no body).
- * - Tecla ESC encerra o tour.
- * - Quando o target não existe, o card é centralizado.
+ * - Destaca o elemento alvo com um anel laranja fino + glow suave (sem
+ *   escurecer a tela).
+ * - Card flutuante posiciona-se de forma adaptativa (top/bottom/left/right
+ *   ou centralizado quando não há target).
+ * - Recalcula posição em mudanças de passo, resize, scroll e mutações de
+ *   layout. Usa retries (60ms / 200ms / 400ms) para cobrir trocas de aba.
+ * - ESC encerra; setas ←/→ navegam.
+ * - Botão muda para "Concluir" apenas no último passo da última aba do tour.
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -26,9 +26,10 @@ interface Rect {
   height: number;
 }
 
-const PADDING = 8; // padding ao redor do elemento destacado
+const PADDING = 6;
 const CARD_WIDTH = 340;
-const CARD_GAP = 14; // distância entre o card e o elemento
+const CARD_GAP = 16;
+const RING_COLOR = "#F97316"; // orange-500
 
 function getRectFromTarget(target?: string): Rect | null {
   if (!target) return null;
@@ -44,7 +45,6 @@ function getRectFromTarget(target?: string): Rect | null {
 }
 
 function computeCardPosition(rect: Rect | null, placement: TourPlacement) {
-  // viewport sizes
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
@@ -52,50 +52,50 @@ function computeCardPosition(rect: Rect | null, placement: TourPlacement) {
     return {
       top: Math.max(20, vh / 2 - 120),
       left: Math.max(20, vw / 2 - CARD_WIDTH / 2),
-      arrow: null as null | "top" | "bottom" | "left" | "right",
     };
   }
 
   let top = 0;
   let left = 0;
-  let arrow: "top" | "bottom" | "left" | "right" | null = null;
-
-  const cardEstHeight = 200; // estimativa para clamp; ajustamos abaixo
+  const cardEstHeight = 200;
 
   switch (placement) {
     case "top":
       top = rect.top - cardEstHeight - CARD_GAP;
       left = rect.left + rect.width / 2 - CARD_WIDTH / 2;
-      arrow = "bottom";
       break;
     case "bottom":
       top = rect.top + rect.height + CARD_GAP;
       left = rect.left + rect.width / 2 - CARD_WIDTH / 2;
-      arrow = "top";
       break;
     case "left":
       top = rect.top + rect.height / 2 - cardEstHeight / 2;
       left = rect.left - CARD_WIDTH - CARD_GAP;
-      arrow = "right";
       break;
     case "right":
       top = rect.top + rect.height / 2 - cardEstHeight / 2;
       left = rect.left + rect.width + CARD_GAP;
-      arrow = "left";
       break;
   }
 
-  // Se card sair da viewport, fallback para o lado oposto / centraliza
   if (top < 16) top = Math.min(rect.top + rect.height + CARD_GAP, vh - cardEstHeight - 16);
   if (top + cardEstHeight > vh - 16) top = Math.max(16, rect.top - cardEstHeight - CARD_GAP);
   if (left < 16) left = 16;
   if (left + CARD_WIDTH > vw - 16) left = vw - CARD_WIDTH - 16;
 
-  return { top, left, arrow };
+  return { top, left };
 }
 
 export function TourOverlay() {
-  const { activeSectionId, stepIndex, nextStep, prevStep, endTour } = useTour();
+  const {
+    activeSectionId,
+    stepIndex,
+    nextStep,
+    prevStep,
+    endTour,
+    isFinalStep,
+    isFirstStep,
+  } = useTour();
   const [rect, setRect] = useState<Rect | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -105,7 +105,7 @@ export function TourOverlay() {
   );
   const step = steps[stepIndex];
 
-  // Recalcula posição do alvo a cada mudança de passo / resize / scroll
+  // Recalcula posição do alvo (com retries para cobrir trocas de aba)
   useLayoutEffect(() => {
     if (!step) {
       setRect(null);
@@ -114,9 +114,10 @@ export function TourOverlay() {
     const update = () => setRect(getRectFromTarget(step.target));
 
     update();
-    // tenta novamente em ~50ms para casos onde o DOM ainda está renderizando
     const t1 = window.setTimeout(update, 60);
     const t2 = window.setTimeout(update, 200);
+    const t3 = window.setTimeout(update, 400);
+    const t4 = window.setTimeout(update, 700);
 
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
@@ -126,24 +127,30 @@ export function TourOverlay() {
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      window.clearTimeout(t4);
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
       ro.disconnect();
     };
-  }, [step]);
+  }, [step, activeSectionId]);
 
-  // Bring target into view se estiver fora da viewport
+  // Bring target into view
   useEffect(() => {
     if (!step?.target) return;
-    const el = document.querySelector(step.target) as HTMLElement | null;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    if (r.top < 0 || r.bottom > window.innerHeight) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    const tryScroll = () => {
+      const el = document.querySelector(step.target!) as HTMLElement | null;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    };
+    const t = window.setTimeout(tryScroll, 250);
+    return () => window.clearTimeout(t);
   }, [step]);
 
-  // ESC encerra
+  // Atalhos de teclado
   useEffect(() => {
     if (!activeSectionId) return;
     const handler = (e: KeyboardEvent) => {
@@ -160,13 +167,8 @@ export function TourOverlay() {
   const placement: TourPlacement = step.placement ?? (rect ? "bottom" : "center");
   const cardPos = computeCardPosition(rect, placement);
 
-  const isLast = stepIndex === steps.length - 1;
-  const isFirst = stepIndex === 0;
-
-  // Spotlight: usamos um div absoluto sobre o target com box-shadow imenso
-  // (escurece tudo ao redor sem cobrir o elemento). É cliques-passantes
-  // dentro do recorte porque o spotlight tem `pointer-events: none`.
-  const spotlightStyle: React.CSSProperties | null = rect
+  // Anel laranja sobre o target
+  const ringStyle: React.CSSProperties | null = rect
     ? {
         position: "fixed",
         top: rect.top - PADDING,
@@ -174,21 +176,14 @@ export function TourOverlay() {
         width: rect.width + PADDING * 2,
         height: rect.height + PADDING * 2,
         borderRadius: 10,
-        boxShadow: "0 0 0 9999px hsl(var(--background) / 0.78)",
+        border: `2px solid ${RING_COLOR}`,
+        boxShadow: `0 0 0 4px ${RING_COLOR}2E, 0 0 16px ${RING_COLOR}4D`,
         pointerEvents: "none",
         zIndex: 9998,
-        transition: "all 180ms ease-out",
+        transition: "top 220ms ease-out, left 220ms ease-out, width 220ms ease-out, height 220ms ease-out",
+        animation: "tourRingPulse 1.8s ease-in-out infinite",
       }
     : null;
-
-  // Quando não há rect, usamos um overlay escuro de tela cheia
-  const fullOverlayStyle: React.CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    background: "hsl(var(--background) / 0.78)",
-    zIndex: 9997,
-    pointerEvents: "auto",
-  };
 
   const cardStyle: React.CSSProperties = {
     position: "fixed",
@@ -196,30 +191,38 @@ export function TourOverlay() {
     left: cardPos.left,
     width: CARD_WIDTH,
     zIndex: 9999,
-    transition: "top 200ms ease-out, left 200ms ease-out",
+    transition: "top 220ms ease-out, left 220ms ease-out",
   };
 
   return createPortal(
     <>
-      {/* Background escuro (apenas quando não há spotlight) */}
-      {!rect && <div style={fullOverlayStyle} onClick={endTour} aria-hidden />}
+      {/* Keyframes inline (evita poluir o CSS global por uma feature pontual) */}
+      <style>{`
+        @keyframes tourRingPulse {
+          0%, 100% { box-shadow: 0 0 0 4px ${RING_COLOR}2E, 0 0 16px ${RING_COLOR}4D; }
+          50%      { box-shadow: 0 0 0 7px ${RING_COLOR}1F, 0 0 22px ${RING_COLOR}66; }
+        }
+      `}</style>
 
-      {/* Spotlight */}
-      {spotlightStyle && <div style={spotlightStyle} aria-hidden />}
+      {/* Anel laranja */}
+      {ringStyle && <div style={ringStyle} aria-hidden />}
 
       {/* Card flutuante */}
       <div
         ref={cardRef}
         style={cardStyle}
-        className="rounded-xl border border-border bg-card text-card-foreground shadow-2xl"
+        className="rounded-xl border border-border bg-card text-card-foreground shadow-2xl ring-1"
         role="dialog"
         aria-modal="true"
         aria-labelledby="tour-step-title"
       >
+        {/* Faixa laranja superior — conecta visualmente com o anel */}
+        <div className="h-1 w-full rounded-t-xl" style={{ backgroundColor: RING_COLOR }} />
+
         {/* Header */}
-        <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-2">
+        <div className="flex items-start justify-between gap-2 px-4 pt-3 pb-2">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: RING_COLOR }}>
               Tour · Passo {stepIndex + 1} de {steps.length}
             </p>
             <h3 id="tour-step-title" className="mt-1 text-base font-semibold leading-tight">
@@ -245,8 +248,11 @@ export function TourOverlay() {
         <div className="px-4 pb-3">
           <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
             <div
-              className="h-full bg-primary transition-all duration-300"
-              style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}
+              className="h-full transition-all duration-300"
+              style={{
+                width: `${((stepIndex + 1) / steps.length) * 100}%`,
+                backgroundColor: RING_COLOR,
+              }}
             />
           </div>
         </div>
@@ -266,15 +272,20 @@ export function TourOverlay() {
               variant="outline"
               size="sm"
               onClick={prevStep}
-              disabled={isFirst}
+              disabled={isFirstStep}
               className="h-8 px-2.5"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               Anterior
             </Button>
-            <Button size="sm" onClick={nextStep} className="h-8 px-3">
-              {isLast ? "Concluir" : "Próximo"}
-              {!isLast && <ChevronRight className="h-3.5 w-3.5 ml-0.5" />}
+            <Button
+              size="sm"
+              onClick={nextStep}
+              className="h-8 px-3 text-white"
+              style={{ backgroundColor: RING_COLOR }}
+            >
+              {isFinalStep ? "Concluir" : "Próximo"}
+              {!isFinalStep && <ChevronRight className="h-3.5 w-3.5 ml-0.5" />}
             </Button>
           </div>
         </div>
