@@ -153,6 +153,11 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
 
   const handleSelectPlan = (plan: Plan) => {
     if (activeSub?.plan_id === plan.id) return;
+    const slug = planNameToSlug(plan.name);
+    if (!slug || !MP_PLAN_LINKS[slug]) {
+      toast.error("Link de pagamento indisponível para este plano. Contate o suporte.");
+      return;
+    }
     let action = "Assinar";
     if (activeSub) {
       action = plan.price > activeSub.plan_price ? "Fazer Upgrade" : "Fazer Downgrade";
@@ -165,30 +170,39 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
     setSubmitting(true);
 
     try {
-      if (activeSub) {
-        const { error: deactivateErr } = await supabase
-          .from("restaurant_subscriptions")
-          .update({ status: "cancelled" })
-          .eq("id", activeSub.id);
-        if (deactivateErr) throw deactivateErr;
+      const slug = planNameToSlug(confirmDialog.plan.name);
+      if (!slug || !MP_PLAN_LINKS[slug]) {
+        throw new Error("Link de pagamento indisponível.");
       }
 
-      const { error: insertErr } = await supabase
-        .from("restaurant_subscriptions")
-        .insert({
-          restaurant_id: restaurantId,
-          plan_id: confirmDialog.plan.id,
-          status: "active",
-        });
-      if (insertErr) throw insertErr;
+      // Meta Pixel — clique para ir até o checkout do MP conta como AddToCart
+      trackEvent("AddToCart", {
+        content_name: `Plano ${confirmDialog.plan.name}`,
+        content_ids: [slug],
+        content_type: "subscription_plan",
+        value: confirmDialog.plan.price,
+        currency: "BRL",
+      });
+      // E também InitiateCheckout, já que estamos saindo para a página de pagamento
+      trackEvent("InitiateCheckout", {
+        content_name: `Checkout - Plano ${confirmDialog.plan.name}`,
+        content_ids: [slug],
+        content_type: "subscription_plan",
+        value: confirmDialog.plan.price,
+        currency: "BRL",
+      });
 
-      toast.success(`Plano "${confirmDialog.plan.name}" ativado com sucesso!`);
-      setConfirmDialog(null);
-      fetchData();
-      setTimeout(() => window.location.reload(), 500);
+      // Monta URL com external_reference = restaurant_id (necessário para o webhook reconhecer)
+      const mpUrl = new URL(MP_PLAN_LINKS[slug]);
+      mpUrl.searchParams.set("external_reference", restaurantId);
+
+      toast.success("Redirecionando para o pagamento...");
+      // Pequeno delay para o pixel disparar antes do redirect
+      setTimeout(() => {
+        window.location.href = mpUrl.toString();
+      }, 600);
     } catch (err: any) {
-      toast.error(err.message || "Erro ao alterar plano");
-    } finally {
+      toast.error(err.message || "Erro ao iniciar pagamento");
       setSubmitting(false);
     }
   };
