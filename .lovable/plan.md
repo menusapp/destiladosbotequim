@@ -1,56 +1,122 @@
-## Análise: o que aplicar e o que descartar
+## Objetivo
 
-Auditei cada item do plano sugerido contra o código atual. Resultado:
+Transformar o tour atual (que termina em cada aba) em um **tour contínuo encadeado** entre todas as abas do painel, e melhorar a aparência visual do destaque (borda laranja fina ao redor do elemento referenciado).
 
-| # | Item proposto | Aplicar? | Motivo |
-|---|---|---|---|
-| 1 | Extrair notificações para `useAdminNotifications.ts` | **Não** | Refatoração puramente cosmética (~400 linhas movidas), zero ganho funcional, alto risco de regressão em fluxo crítico (pedidos/contas/reservas em tempo real). Não vale o risco. |
-| 2 | Filtro `restaurant_id` no canal de reservations | **Sim** | Bug real confirmado: `new-reservations-notification` não tem `filter` no binding — recebe eventos de todos os restaurantes e filtra só no JS. Mesma classe de bug das Correções 1 anteriores. |
-| 3 | `handleLogout` usar `clearAdminSession()` | **Sim** | Bug real: o handler atual remove só 4 chaves de staff, esquece `restaurant_id`, `restaurant_name`, `restaurant_slug`, `staff_can_manage_orders`, `staff_receives_order_notifications` e o timestamp de expiração. `clearAdminSession()` já existe em `sessionExpiry.ts` e cobre tudo. |
-| 4 | Stale closure no `setInterval` de auto open/close | **Sim** | Bug real: o `setInterval` captura `restaurant` no momento da criação. Embora as deps reincluam `restaurant?.id`, mudanças em outros campos (`opening_hours`, `auto_open_close` toggles intermediários) não recriam o intervalo, e a função `checkAndUpdateOpenStatus` é chamada com snapshot antigo. Ref resolve. |
-| 5 | Mover `prefetchMap` e `TabSkeleton` para fora do componente | **Sim (parcial)** | `prefetchMap` é um objeto recriado a cada render — fácil mover. `TabSkeleton` vou conferir se existe; se sim, mover junto. Ganho pequeno mas grátis. |
-| 6 | Corrigir `useAuth.signOut` → `/login` | **Não** | `useAuth.tsx` **não é importado em nenhum lugar do projeto** (rg confirmou: zero usos fora do próprio arquivo). É código morto. Mexer só adiciona ruído. |
+---
 
-## O que vai ser feito
+## Comportamento novo do tour
 
-### 1. `src/pages/RestaurantAdmin.tsx` — 3 correções pontuais
+1. **Sequência fixa de abas** — definida explicitamente em ordem (visão geral → pedidos → pdv → mesas-reservas → cardápio → estoque → caixa → custos → margens → relatórios → clientes → fidelidade → marketing → robo-menus → integrações → fiscal → contas → módulos → config-dados → config-totem → config-whatsapp).
 
-**1a.** Adicionar `filter: restaurant_id=eq.${restaurantId}` ao canal `new-reservations-notification` (renomear para `new-reservations-${restaurantId}` por consistência com Correção 1 anterior). Manter a verificação JS como segunda camada.
+2. **Início em qualquer aba** — clicar em "Tour" começa pelos passos da aba **atual**, mas continua dali em diante. Ex.: começou em "Cardápio" → ao terminar os passos de cardápio, avança automaticamente para "Estoque" e segue até a última aba.
 
-**1b.** Substituir o corpo do `handleLogout` por:
+3. **Não volta para abas anteriores** — quem começa em "Cardápio" não verá tour de "Visão Geral" / "Pedidos" / "PDV". O botão "Anterior" só volta dentro do range já percorrido (da aba inicial em diante).
+
+4. **Botão "Próximo" em vez de "Concluir"** — só aparece "Concluir" no último passo da última aba da sequência. Em qualquer outro último-passo-de-aba, o botão é "Próximo" e ele:
+   - Troca a aba ativa do painel (`setActiveSection`)
+   - Aguarda o DOM da próxima aba renderizar
+   - Avança para o primeiro passo dessa nova aba
+
+5. **"Pular tour"** continua encerrando tudo imediatamente.
+
+---
+
+## Visual do destaque (borda laranja)
+
+- Substituir o spotlight atual (escurecimento por box-shadow) por um **anel laranja fino ao redor do elemento alvo**:
+  - Borda 2px sólida na cor `#F97316` (orange-500, alinha com identidade do app).
+  - `border-radius: 8px`, `padding` interno de 6px ao redor do elemento.
+  - `box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.18)` para um glow suave.
+  - Animação sutil de pulso (opcional, leve — 1.5s ease-in-out).
+  - **Sem** escurecimento de tela (fundo continua visível e clicável fora do card), para ficar mais leve.
+- Card flutuante mantém-se posicionado de forma adaptativa (já existe lógica em `computeCardPosition`), mas com leve atualização de estilo (sombra mais marcada, borda laranja de 1px no topo do card para conectar visualmente).
+- Quando não há `target` (passo introdutório de aba, com `placement: "center"`), apenas o card centralizado aparece — sem anel.
+
+---
+
+## Arquivos afetados
+
+| Arquivo | Mudança |
+|---|---|
+| `src/components/admin/tour/types.ts` | Adicionar constante `TOUR_SECTION_ORDER: TourSectionId[]` com a sequência completa de abas. |
+| `src/components/admin/tour/TourContext.tsx` | Refatorar para suportar tour multi-aba: estado `startSectionId` + `currentSectionIndex` + `stepIndex`. `startTour(sectionId)` define o início e marca o índice atual. `nextStep` avança dentro da aba e, quando chega ao fim, pula para a próxima aba na ordem (chama callback de troca de aba). `prevStep` recua dentro da aba (e cruza para a aba anterior **somente se** já tiver sido visitada nesta sessão de tour). Expor função `setSectionChanger(fn)` para permitir que o `RestaurantAdmin` registre seu `setActiveSection`. |
+| `src/pages/RestaurantAdmin.tsx` | No mount, registrar `setActiveSection` no contexto do tour via `useEffect`. |
+| `src/components/admin/tour/TourOverlay.tsx` | Trocar spotlight por anel laranja; remover overlay escuro de fundo (manter só quando não há target, mas transparente / clique passa); ajustar lógica de "isLast" para considerar última aba da ordem (não apenas último passo da aba atual); ao trocar de aba, aguardar ~250ms antes de tentar localizar o próximo target (já há retries em 60ms/200ms — aumentar para cobrir troca de aba). |
+| `src/components/admin/tour/tourSteps.ts` | Sem alteração funcional — apenas garantir que `getStepsForSection` continue retornando vazio gracioso para abas sem passos (essas abas serão **puladas** automaticamente pelo novo `nextStep`, em vez de exibir o fallback "Tour ainda não disponível"). |
+
+---
+
+## Detalhes técnicos
+
+### Ordem das abas
+
 ```ts
-import { clearAdminSession } from "@/lib/sessionExpiry";
+export const TOUR_SECTION_ORDER: TourSectionId[] = [
+  "visao-geral", "pedidos", "pdv", "mesas-reservas", "cardapio",
+  "estoque", "caixa", "custos", "margens", "relatorios",
+  "clientes", "fidelidade", "marketing", "robo-menus",
+  "integracoes", "fiscal", "contas", "modulos",
+  "config-dados", "config-totem", "config-whatsapp",
+];
+```
 
-const handleLogout = () => {
-  clearAdminSession();
-  toast.success("Logout realizado com sucesso");
-  navigate("/login/staff");
+### Lógica do `nextStep` (resumida)
+
+```text
+if (stepIndex < steps.length - 1) → stepIndex++
+else:
+  procurar próxima seção na ordem (a partir da atual + 1) que tenha steps
+  se encontrou:
+    chamar sectionChanger(novaSecao)
+    setActiveSectionId(novaSecao); setStepIndex(0)
+  senão:
+    endTour()  // chegou ao fim
+```
+
+Abas sem passos cadastrados são **puladas** silenciosamente.
+
+### Lógica do `prevStep`
+
+- Recua dentro da aba; ao chegar em `stepIndex 0`, só recua para a aba anterior **se** essa aba estiver dentro do range já percorrido nesta sessão (entre `startSectionIndex` e `currentSectionIndex - 1`). Caso contrário, fica no passo 0.
+
+### Estilo do anel (TourOverlay)
+
+```tsx
+const ringStyle = {
+  position: "fixed",
+  top: rect.top - 6,
+  left: rect.left - 6,
+  width: rect.width + 12,
+  height: rect.height + 12,
+  borderRadius: 8,
+  border: "2px solid #F97316",
+  boxShadow: "0 0 0 4px rgba(249, 115, 22, 0.18)",
+  pointerEvents: "none",
+  zIndex: 9998,
+  transition: "all 200ms ease-out",
+  animation: "tourRingPulse 1.6s ease-in-out infinite",
 };
 ```
 
-**1c.** Corrigir stale closure do auto open/close:
-```ts
-const restaurantRef = useRef(restaurant);
-useEffect(() => { restaurantRef.current = restaurant; }, [restaurant]);
+Keyframe `tourRingPulse` adicionado inline via `<style>` no portal (alterando `box-shadow` spread sutilmente).
 
+### Registro do trocador de aba
+
+Em `RestaurantAdmin.tsx`, dentro do `TourProvider`:
+
+```tsx
+const { setSectionChanger } = useTour();
 useEffect(() => {
-  if (!restaurant?.auto_open_close) return;
-  const interval = setInterval(() => {
-    if (restaurantRef.current) checkAndUpdateOpenStatus(restaurantRef.current);
-  }, 60_000);
-  return () => clearInterval(interval);
-}, [restaurant?.id, restaurant?.auto_open_close, checkAndUpdateOpenStatus]);
+  setSectionChanger((sectionId) => setActiveSection(sectionId));
+}, [setSectionChanger]);
 ```
 
-**1d.** Mover `prefetchMap` (e `TabSkeleton` se existir) para o escopo do módulo, antes da definição do componente.
+Como `RestaurantAdmin` já está envolto pelo `TourProvider`, basta um sub-componente "TourBridge" para chamar o hook (ou expor `setSectionChanger` no contexto e chamá-lo).
 
-### 2. Arquivos NÃO alterados
+---
 
-- `src/hooks/useAuth.tsx` — código morto, não tocar.
-- Nenhum hook novo (`useAdminNotifications.ts`) será criado — refatoração descartada por risco/benefício ruim.
-- Banco de dados: zero mudanças.
+## Fora do escopo
 
-## Notas
-
-- Tudo é frontend, sem migração.
-- Mantém 100% do comportamento atual de notificações, sons, fila e cascata — apenas conserta vazamento cross-tenant em reservas, logout incompleto, stale closure no relógio de abertura/fechamento, e um micro-ganho de performance.
+- Não altera os textos / estrutura dos passos em `tourSteps.ts` (só o comportamento de navegação).
+- Não adiciona novos `data-tour="..."` em componentes.
+- Não modifica a lógica de "tour completed" no localStorage (continuará marcando a seção inicial; opcionalmente, podemos marcar todas as percorridas — pendente decisão; por padrão, marca todas).

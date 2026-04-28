@@ -8,8 +8,9 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/AppSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { MobileBottomNav } from "@/components/admin/MobileBottomNav";
-import { TourProvider } from "@/components/admin/tour/TourContext";
+import { TourProvider, useTour } from "@/components/admin/tour/TourContext";
 import { TourOverlay } from "@/components/admin/tour/TourOverlay";
+import type { TourSectionId } from "@/components/admin/tour/types";
 import { ConfirmDialogProvider } from "@/hooks/useConfirmDialog";
 
 import { lazy, Suspense } from "react";
@@ -84,6 +85,23 @@ interface Restaurant {
   primary_color?: string;
   show_prep_timer?: boolean;
 }
+
+/**
+ * Registra a função de troca de aba no TourContext, permitindo que o tour
+ * contínuo navegue entre as abas do painel automaticamente.
+ */
+const TourSectionBridge = ({
+  onChangeSection,
+}: {
+  onChangeSection: (section: string) => void;
+}) => {
+  const { setSectionChanger } = useTour();
+  useEffect(() => {
+    setSectionChanger((sectionId: TourSectionId) => onChangeSection(sectionId));
+    return () => setSectionChanger(null);
+  }, [setSectionChanger, onChangeSection]);
+  return null;
+};
 
 const RestaurantAdmin = () => {
   const navigate = useNavigate();
@@ -868,6 +886,7 @@ const RestaurantAdmin = () => {
   return (
     <ConfirmDialogProvider>
     <TourProvider>
+    <TourSectionBridge onChangeSection={setActiveSection} />
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         {/* Sidebar — hidden on mobile (replaced by bottom nav) */}
