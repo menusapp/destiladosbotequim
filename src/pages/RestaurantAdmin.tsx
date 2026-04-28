@@ -490,15 +490,16 @@ const RestaurantAdmin = () => {
       )
       .subscribe();
 
-    // Canal para novas reservas
+    // Canal para novas reservas (filtrado por restaurant_id no servidor)
     const reservationsChannel = supabase
-      .channel('new-reservations-notification')
+      .channel(`new-reservations-${restaurantId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'reservations',
+          filter: `restaurant_id=eq.${restaurantId}`,
         },
         async (payload) => {
           const reservation = payload.new as any;
