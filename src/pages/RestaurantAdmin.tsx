@@ -49,6 +49,29 @@ import { NewBillNotification } from "@/components/admin/NewBillNotification";
 import { NewReservationNotification } from "@/components/admin/NewReservationNotification";
 import { SupportChatWidget } from "@/components/admin/SupportChatWidget";
 import { QzOnboardingGate } from "@/components/admin/QzOnboardingGate";
+import { clearAdminSession } from "@/lib/sessionExpiry";
+
+// Prefetch map: section → dynamic import. Definido fora do componente para
+// evitar recriação a cada render.
+const prefetchMap: Record<string, () => Promise<unknown>> = {
+  cardapio: () => import("@/components/admin/CardapioTab"),
+  estoque: () => import("@/components/admin/StockTab"),
+  custos: () => import("@/components/admin/CostosTab"),
+  margens: () => import("@/components/admin/MargensTab"),
+  caixa: () => import("@/components/admin/FluxoCaixaTab"),
+  clientes: () => import("@/components/admin/ClientesTab"),
+  fidelidade: () => import("@/components/admin/FidelityTab"),
+  marketing: () => import("@/components/admin/MarketingTab"),
+  fiscal: () => import("@/components/admin/FiscalTab"),
+  integracoes: () => import("@/components/admin/IntegrationsTab"),
+  modulos: () => import("@/components/admin/ModulosTab"),
+  contas: () => import("@/components/admin/ContasTab"),
+  relatorios: () => import("@/components/admin/ReportsTab"),
+  "mesas-reservas": () => import("@/components/admin/TablesTab"),
+  "config-dados": () => import("@/components/admin/settings/CompanyDataSettings"),
+  "config-whatsapp": () => import("@/components/admin/settings/WhatsAppSettings"),
+  "config-totem": () => import("@/components/admin/settings/KioskSettings"),
+};
 
 interface Restaurant {
   id: string;
@@ -65,6 +88,9 @@ interface Restaurant {
 const RestaurantAdmin = () => {
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  // Ref para evitar stale closure no setInterval do auto open/close
+  const restaurantRef = useRef<Restaurant | null>(null);
+  useEffect(() => { restaurantRef.current = restaurant; }, [restaurant]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("dashboard");
   const activeSectionRef = useRef(activeSection);
@@ -467,15 +493,16 @@ const RestaurantAdmin = () => {
       )
       .subscribe();
 
-    // Canal para novas reservas
+    // Canal para novas reservas (filtrado por restaurant_id no servidor)
     const reservationsChannel = supabase
-      .channel('new-reservations-notification')
+      .channel(`new-reservations-${restaurantId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'reservations',
+          filter: `restaurant_id=eq.${restaurantId}`,
         },
         async (payload) => {
           const reservation = payload.new as any;
@@ -516,6 +543,7 @@ const RestaurantAdmin = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'reservations',
+          filter: `restaurant_id=eq.${restaurantId}`,
         },
         (payload) => {
           const reservation = payload.new as any;
@@ -638,22 +666,23 @@ const RestaurantAdmin = () => {
     }
   };
 
-  // Verificar horário a cada minuto quando automação está ativa
+  // Verificar horário a cada minuto quando automação está ativa.
+  // Usa restaurantRef para evitar stale closure: o intervalo lê sempre o
+  // valor mais recente de restaurant sem precisar ser recriado a cada update.
   useEffect(() => {
     if (!restaurant?.auto_open_close) return;
 
     const interval = setInterval(() => {
-      checkAndUpdateOpenStatus(restaurant);
+      if (restaurantRef.current) checkAndUpdateOpenStatus(restaurantRef.current);
     }, 60000); // A cada 1 minuto
 
     return () => clearInterval(interval);
   }, [restaurant?.id, restaurant?.auto_open_close]);
 
   const handleLogout = () => {
-    localStorage.removeItem('staff_id');
-    localStorage.removeItem('staff_name');
-    localStorage.removeItem('staff_role');
-    localStorage.removeItem('staff_allowed_sections');
+    // Limpa toda a sessão admin (restaurante + funcionário + timestamp).
+    // clearAdminSession cobre todas as chaves; o handler antigo esquecia várias.
+    clearAdminSession();
     toast.success("Logout realizado com sucesso");
     navigate("/login/staff");
   };
@@ -750,27 +779,7 @@ const RestaurantAdmin = () => {
     setReservationNotification(null);
   };
 
-  // Prefetch map: section → dynamic import
-  const prefetchMap: Record<string, () => void> = {
-    cardapio: () => import("@/components/admin/CardapioTab"),
-    estoque: () => import("@/components/admin/StockTab"),
-    custos: () => import("@/components/admin/CostosTab"),
-    margens: () => import("@/components/admin/MargensTab"),
-    caixa: () => import("@/components/admin/FluxoCaixaTab"),
-    clientes: () => import("@/components/admin/ClientesTab"),
-    fidelidade: () => import("@/components/admin/FidelityTab"),
-    marketing: () => import("@/components/admin/MarketingTab"),
-    fiscal: () => import("@/components/admin/FiscalTab"),
-    integracoes: () => import("@/components/admin/IntegrationsTab"),
-    modulos: () => import("@/components/admin/ModulosTab"),
-    contas: () => import("@/components/admin/ContasTab"),
-    relatorios: () => import("@/components/admin/ReportsTab"),
-    "mesas-reservas": () => import("@/components/admin/TablesTab"),
-    "config-dados": () => import("@/components/admin/settings/CompanyDataSettings"),
-    "config-whatsapp": () => import("@/components/admin/settings/WhatsAppSettings"),
-    "config-totem": () => import("@/components/admin/settings/KioskSettings"),
-  };
-
+  // prefetchMap movido para o escopo do módulo (acima do componente).
   const handlePrefetch = (sectionId: string) => {
     prefetchMap[sectionId]?.();
   };

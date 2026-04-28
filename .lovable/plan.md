@@ -1,54 +1,56 @@
-Diagnóstico
+## Análise: o que aplicar e o que descartar
 
-A causa mais provável não é cookie em si. O painel usa uma sessão customizada salva no `localStorage` por 7 dias (`restaurant_id`, `staff_id`, `restaurant_slug`, etc.). Quem já tinha esses dados salvos consegue entrar direto. Quem nunca logou precisa passar pelo fluxo completo, e esse fluxo tem alguns pontos frágeis que podem deixar a tela presa em carregamento ou em branco.
+Auditei cada item do plano sugerido contra o código atual. Resultado:
 
-Pontos encontrados:
+| # | Item proposto | Aplicar? | Motivo |
+|---|---|---|---|
+| 1 | Extrair notificações para `useAdminNotifications.ts` | **Não** | Refatoração puramente cosmética (~400 linhas movidas), zero ganho funcional, alto risco de regressão em fluxo crítico (pedidos/contas/reservas em tempo real). Não vale o risco. |
+| 2 | Filtro `restaurant_id` no canal de reservations | **Sim** | Bug real confirmado: `new-reservations-notification` não tem `filter` no binding — recebe eventos de todos os restaurantes e filtra só no JS. Mesma classe de bug das Correções 1 anteriores. |
+| 3 | `handleLogout` usar `clearAdminSession()` | **Sim** | Bug real: o handler atual remove só 4 chaves de staff, esquece `restaurant_id`, `restaurant_name`, `restaurant_slug`, `staff_can_manage_orders`, `staff_receives_order_notifications` e o timestamp de expiração. `clearAdminSession()` já existe em `sessionExpiry.ts` e cobre tudo. |
+| 4 | Stale closure no `setInterval` de auto open/close | **Sim** | Bug real: o `setInterval` captura `restaurant` no momento da criação. Embora as deps reincluam `restaurant?.id`, mudanças em outros campos (`opening_hours`, `auto_open_close` toggles intermediários) não recriam o intervalo, e a função `checkAndUpdateOpenStatus` é chamada com snapshot antigo. Ref resolve. |
+| 5 | Mover `prefetchMap` e `TabSkeleton` para fora do componente | **Sim (parcial)** | `prefetchMap` é um objeto recriado a cada render — fácil mover. `TabSkeleton` vou conferir se existe; se sim, mover junto. Ganho pequeno mas grátis. |
+| 6 | Corrigir `useAuth.signOut` → `/login` | **Não** | `useAuth.tsx` **não é importado em nenhum lugar do projeto** (rg confirmou: zero usos fora do próprio arquivo). É código morto. Mexer só adiciona ruído. |
 
-1. `ProtectedRoute` espera `supabase.auth.getSession()` antes de liberar/redirectar, mas o painel admin não usa essa autenticação nativa; ele usa `localStorage` + RPCs customizadas. Se essa inicialização demorar/travar em algum navegador, o admin fica no spinner infinito.
+## O que vai ser feito
 
-2. `RestaurantLogin` salva `restaurant_id` e `restaurant_name`, mas busca o `restaurant_slug` em paralelo sem esperar (`void cacheRestaurantSlug(...)`) e navega imediatamente para `/login/staff`. Em conexão lenta/dispositivo novo, o staff login pode prosseguir antes do slug estar salvo.
+### 1. `src/pages/RestaurantAdmin.tsx` — 3 correções pontuais
 
-3. `StaffLogin` fica em `checkingStaff` enquanto faz duas consultas em paralelo. Se alguma consulta ficar pendente ou falhar de forma não tratada no carregamento inicial, ele pode nunca sair do loader.
+**1a.** Adicionar `filter: restaurant_id=eq.${restaurantId}` ao canal `new-reservations-notification` (renomear para `new-reservations-${restaurantId}` por consistência com Correção 1 anterior). Manter a verificação JS como segunda camada.
 
-4. `StaffLogin` redireciona usando `navigate()` durante o render quando não há restaurante salvo. Isso pode causar comportamento instável/tela branca em rotas como `/login/staff` acessadas diretamente por navegador novo.
+**1b.** Substituir o corpo do `handleLogout` por:
+```ts
+import { clearAdminSession } from "@/lib/sessionExpiry";
 
-O que vamos fazer sem quebrar o sistema
+const handleLogout = () => {
+  clearAdminSession();
+  toast.success("Logout realizado com sucesso");
+  navigate("/login/staff");
+};
+```
 
-1. Ajustar `ProtectedRoute` para o admin customizado
-   - Remover a dependência de `supabase.auth.getSession()` para liberar a rota admin.
-   - Validar somente a sessão customizada existente: `restaurant_id`, `staff_id` e expiração de 7 dias.
-   - Manter o comportamento atual: sem restaurante vai para `/login`; sem funcionário vai para `/login/staff`; sessão vencida limpa dados e volta para `/login`.
+**1c.** Corrigir stale closure do auto open/close:
+```ts
+const restaurantRef = useRef(restaurant);
+useEffect(() => { restaurantRef.current = restaurant; }, [restaurant]);
 
-2. Corrigir a corrida do slug no login do restaurante
-   - No login do restaurante, buscar e salvar `restaurant_slug` antes de navegar para `/login/staff`.
-   - Se a busca do slug falhar, manter fallback seguro, mas sem navegar para uma URL quebrada.
+useEffect(() => {
+  if (!restaurant?.auto_open_close) return;
+  const interval = setInterval(() => {
+    if (restaurantRef.current) checkAndUpdateOpenStatus(restaurantRef.current);
+  }, 60_000);
+  return () => clearInterval(interval);
+}, [restaurant?.id, restaurant?.auto_open_close, checkAndUpdateOpenStatus]);
+```
 
-3. Tornar `StaffLogin` tolerante a falhas
-   - Trocar o `navigate('/login')` feito durante render por um `useEffect`, evitando tela branca.
-   - Colocar `try/catch/finally` ao redor do carregamento inicial para garantir que `checkingStaff` sempre termine.
-   - Se a consulta de logo falhar, continuar usando o logo padrão.
-   - Se a checagem de funcionários falhar, mostrar o formulário normal em vez de travar.
+**1d.** Mover `prefetchMap` (e `TabSkeleton` se existir) para o escopo do módulo, antes da definição do componente.
 
-4. Melhorar logout/limpeza de sessão
-   - Garantir que logout limpe também `staff_can_manage_orders`, `staff_receives_order_notifications` e timestamp de sessão quando apropriado.
-   - Preservar o fluxo de 7 dias para quem logou corretamente.
+### 2. Arquivos NÃO alterados
 
-5. Adicionar um fallback visual de erro no carregamento crítico
-   - Se alguma etapa essencial do login/admin demorar demais, mostrar uma mensagem clara com botão para voltar ao login/limpar sessão, em vez de spinner infinito.
+- `src/hooks/useAuth.tsx` — código morto, não tocar.
+- Nenhum hook novo (`useAdminNotifications.ts`) será criado — refatoração descartada por risco/benefício ruim.
+- Banco de dados: zero mudanças.
 
-Resultado esperado
+## Notas
 
-- Dispositivo novo abre `/login` normalmente.
-- Após login do restaurante, `/login/staff` carrega sempre, mesmo em conexão lenta.
-- Após login do funcionário, entra em `/{slug}/admin` de forma consistente.
-- Quem já está logado continua entrando direto por até 7 dias.
-- O painel deixa de depender de uma sessão nativa que ele não usa, eliminando a principal fonte do carregamento infinito.
-
-Arquivos que serão alterados
-
-- `src/components/ProtectedRoute.tsx`
-- `src/pages/RestaurantLogin.tsx`
-- `src/pages/StaffLogin.tsx`
-- possivelmente `src/lib/sessionExpiry.ts` apenas para centralizar limpeza de sessão e reduzir repetição
-
-Não pretendo alterar banco de dados nem mexer nas regras de acesso agora. A correção é no fluxo frontend de sessão/login.
+- Tudo é frontend, sem migração.
+- Mantém 100% do comportamento atual de notificações, sons, fila e cascata — apenas conserta vazamento cross-tenant em reservas, logout incompleto, stale closure no relógio de abertura/fechamento, e um micro-ganho de performance.
