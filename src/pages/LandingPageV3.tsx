@@ -16,6 +16,7 @@ import landingQrcodes from "@/assets/landing-qrcodes.png";
 import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
 import landingTotem from "@/assets/landing-totem.png";
+import landingGarcom from "@/assets/landing-garcom.png";
 import {
   ArrowRight, Check, Star,
   QrCode, ShoppingCart, Utensils, Package,
