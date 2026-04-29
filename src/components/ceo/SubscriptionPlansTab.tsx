@@ -36,6 +36,7 @@ interface Plan {
   features: string[];
   is_active: boolean | null;
   created_at: string | null;
+  mp_subscription_link?: string | null;
 }
 
 export function SubscriptionPlansTab() {
@@ -49,6 +50,7 @@ export function SubscriptionPlansTab() {
   const [formPrice, setFormPrice] = useState("");
   const [formActive, setFormActive] = useState(true);
   const [formFeatures, setFormFeatures] = useState<string[]>([]);
+  const [formMpLink, setFormMpLink] = useState("");
 
   useEffect(() => { fetchPlans(); }, []);
 
