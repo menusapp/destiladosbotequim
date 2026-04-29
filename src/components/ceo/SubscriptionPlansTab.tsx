@@ -215,6 +215,18 @@ export function SubscriptionPlansTab() {
                   ))}
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Link de assinatura Mercado Pago</Label>
+                <Input
+                  type="url"
+                  placeholder="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=..."
+                  value={formMpLink}
+                  onChange={(e) => setFormMpLink(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Link gerado no Mercado Pago para este plano. Clientes serão redirecionados para cá ao fazer upgrade ou downgrade.
+                </p>
+              </div>
               <Button type="submit" className="w-full">{editing ? "Atualizar" : "Criar"}</Button>
             </form>
           </DialogContent>
