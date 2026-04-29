@@ -378,11 +378,13 @@ const LandingPageV3 = () => {
             </div>
           </ScrollReveal>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-            <div className={`mx-auto w-full rounded-xl border border-border shadow-lg overflow-hidden bg-card ${currentTab.id === "cardapio" ? "max-w-[294px]" : "max-w-7xl"}`}>
-              <img key={currentTab.id} src={currentTab.image} alt={currentTab.title} className="w-full h-auto block" />
+          <div className={`grid grid-cols-1 gap-10 items-center ${currentTab.id === "cardapio" ? "lg:grid-cols-2" : "lg:grid-cols-5"}`}>
+            <div className={currentTab.id === "cardapio" ? "" : "lg:col-span-3"}>
+              <div className={`mx-auto w-full rounded-xl border border-border shadow-lg overflow-hidden bg-card ${currentTab.id === "cardapio" ? "max-w-[294px]" : ""}`}>
+                <img key={currentTab.id} src={currentTab.image} alt={currentTab.title} className="w-full h-auto block" />
+              </div>
             </div>
-              <div>
+              <div className={currentTab.id === "cardapio" ? "" : "lg:col-span-2"}>
                 <h3 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
                   {currentTab.title}
                 </h3>
