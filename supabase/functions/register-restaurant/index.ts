@@ -63,16 +63,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Este slug já está em uso. Escolha outro." }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Check username uniqueness
-    const { data: existingUser } = await supabase
-      .from("restaurant_credentials")
-      .select("id")
-      .eq("username", username.trim())
-      .maybeSingle();
-
-    if (existingUser) {
-      return new Response(JSON.stringify({ error: "Este nome de usuário já está em uso." }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    // Username uniqueness is enforced per-restaurant by the DB constraint
+    // (restaurant_id, username). Same username across different restaurants is allowed.
 
     // Determine the actual plan
     const isTrial = planSlug === "trial";
