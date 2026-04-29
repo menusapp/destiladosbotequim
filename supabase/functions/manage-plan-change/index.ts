@@ -40,21 +40,26 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const jsonOk = (body: Record<string, unknown>) =>
+    new Response(JSON.stringify({ ok: true, ...body }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  const jsonErr = (error: string) =>
+    new Response(JSON.stringify({ ok: false, error }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   try {
     const { restaurant_id, action, target_plan_id } = await req.json();
 
     if (!restaurant_id || !action || !target_plan_id) {
-      return new Response(
-        JSON.stringify({ error: "Parâmetros obrigatórios: restaurant_id, action, target_plan_id" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonErr("Parâmetros obrigatórios: restaurant_id, action, target_plan_id");
     }
 
     if (!["upgrade", "downgrade"].includes(action)) {
-      return new Response(
-        JSON.stringify({ error: "action deve ser 'upgrade' ou 'downgrade'" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonErr("action deve ser 'upgrade' ou 'downgrade'");
     }
 
     const supabase = createClient(
@@ -70,22 +75,19 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (tpErr || !targetPlan) {
-      return new Response(
-        JSON.stringify({ error: "Plano alvo não encontrado" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonErr("Plano alvo não encontrado");
     }
 
-    // 2. Buscar assinatura ativa atual
-    const { data: currentSub } = await supabase
+    // 2. Buscar assinatura ativa atual (robusto contra duplicatas)
+    const { data: currentSubs } = await supabase
       .from("restaurant_subscriptions")
       .select("id, plan_id, status, subscription_plans(name, price)")
       .eq("restaurant_id", restaurant_id)
       .in("status", ["active", "past_due"])
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
+    const currentSub = currentSubs?.[0] ?? null;
     const currentPrice = (currentSub?.subscription_plans as any)?.price || 0;
 
     // 3. Buscar link MP do plano alvo
@@ -97,10 +99,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!planLink?.mp_subscription_link) {
-      return new Response(
-        JSON.stringify({ error: "Link de pagamento não configurado para este plano. Contate o suporte." }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonErr("Link de pagamento não configurado para este plano. Contate o suporte.");
     }
 
     const mpUrl = new URL(planLink.mp_subscription_link);
@@ -120,26 +119,20 @@ Deno.serve(async (req) => {
           .eq("id", currentSub.id);
       }
 
-      return new Response(
-        JSON.stringify({
-          type: "upgrade",
-          redirect_url: mpUrl.toString(),
-          plan_name: targetPlan.name,
-          plan_price: targetPlan.price,
-          prorate_amount: prorate,
-          days_until_renewal: daysLeft,
-          renewal_date: renewalDate.toISOString().split("T")[0],
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonOk({
+        type: "upgrade",
+        redirect_url: mpUrl.toString(),
+        plan_name: targetPlan.name,
+        plan_price: targetPlan.price,
+        prorate_amount: prorate,
+        days_until_renewal: daysLeft,
+        renewal_date: renewalDate.toISOString().split("T")[0],
+      });
     }
 
     // DOWNGRADE
     if (!currentSub) {
-      return new Response(
-        JSON.stringify({ error: "Não há assinatura ativa para fazer downgrade" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonErr("Não há assinatura ativa para fazer downgrade");
     }
 
     // Agendar downgrade — plano atual continua ativo até o dia 5
@@ -151,23 +144,17 @@ Deno.serve(async (req) => {
       })
       .eq("id", currentSub.id);
 
-    return new Response(
-      JSON.stringify({
-        type: "downgrade",
-        redirect_url: mpUrl.toString(),
-        plan_name: targetPlan.name,
-        plan_price: targetPlan.price,
-        days_until_renewal: daysLeft,
-        renewal_date: renewalDate.toISOString().split("T")[0],
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonOk({
+      type: "downgrade",
+      redirect_url: mpUrl.toString(),
+      plan_name: targetPlan.name,
+      plan_price: targetPlan.price,
+      days_until_renewal: daysLeft,
+      renewal_date: renewalDate.toISOString().split("T")[0],
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erro desconhecido";
     console.error("[manage-plan-change] Error:", msg);
-    return new Response(
-      JSON.stringify({ error: msg }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonErr(msg);
   }
 });

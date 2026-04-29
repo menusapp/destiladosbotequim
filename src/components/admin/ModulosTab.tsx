@@ -128,25 +128,25 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         .eq("restaurant_id", restaurantId)
         .in("status", ["active", "past_due"])
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .limit(1),
     ]);
 
     if (plansRes.data) {
       setPlans(plansRes.data.map((d: any) => ({ ...d, features: d.features || [] })));
     }
 
-    if (subRes.data && subRes.data.subscription_plans) {
-      const sp = subRes.data.subscription_plans as any;
+    const subRow = subRes.data?.[0];
+    if (subRow && subRow.subscription_plans) {
+      const sp = subRow.subscription_plans as any;
       setActiveSub({
-        id: subRes.data.id,
-        plan_id: subRes.data.plan_id,
-        status: subRes.data.status,
+        id: subRow.id,
+        plan_id: subRow.plan_id,
+        status: subRow.status,
         plan_name: sp.name,
         plan_price: sp.price,
         plan_features: sp.features || [],
-        pending_downgrade_plan_id: (subRes.data as any).pending_downgrade_plan_id,
-        pending_downgrade_at: (subRes.data as any).pending_downgrade_at,
+        pending_downgrade_plan_id: (subRow as any).pending_downgrade_plan_id,
+        pending_downgrade_at: (subRow as any).pending_downgrade_at,
       });
     } else {
       setActiveSub(null);
@@ -178,8 +178,19 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         },
       });
 
-      if (error || !data?.redirect_url) {
-        throw new Error((data as any)?.error || error?.message || "Erro ao iniciar upgrade");
+      if (error) {
+        let msg = error.message || "Erro ao iniciar upgrade";
+        try {
+          const parsed = JSON.parse(error.message);
+          msg = parsed.error || parsed.message || msg;
+        } catch {}
+        throw new Error(msg);
+      }
+      if (data?.ok === false) {
+        throw new Error(data.error || "Erro ao iniciar upgrade");
+      }
+      if (!data?.redirect_url) {
+        throw new Error("Link de pagamento não encontrado. Verifique se o plano tem link configurado.");
       }
 
       // Pixel
@@ -218,8 +229,19 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         },
       });
 
-      if (error || !data?.redirect_url) {
-        throw new Error((data as any)?.error || error?.message || "Erro ao agendar downgrade");
+      if (error) {
+        let msg = error.message || "Erro ao agendar downgrade";
+        try {
+          const parsed = JSON.parse(error.message);
+          msg = parsed.error || parsed.message || msg;
+        } catch {}
+        throw new Error(msg);
+      }
+      if (data?.ok === false) {
+        throw new Error(data.error || "Erro ao agendar downgrade");
+      }
+      if (!data?.redirect_url) {
+        throw new Error("Link de pagamento não encontrado. Verifique se o plano tem link configurado.");
       }
 
       toast.success(
