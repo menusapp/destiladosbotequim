@@ -31,7 +31,7 @@ import {
   Tablet, Hand, Zap, Users,
 } from "lucide-react";
 
-const WHATSAPP_URL = "https://wa.me/5514999999999";
+const WHATSAPP_URL = "https://w.app/menusapp";
 const REGISTER_URL = "https://menusapp.com.br/registro/avancado";
 
 /* ── Plans (V2) ── */
