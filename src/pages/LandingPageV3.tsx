@@ -12,6 +12,7 @@ import landingPdv from "@/assets/landing-pdv.jpg";
 import landingPedidos from "@/assets/landing-pedidos.png";
 import landingClientes from "@/assets/landing-clientes.png";
 import landingPagamentos from "@/assets/landing-pagamentos.png";
+import landingQrcodes from "@/assets/landing-qrcodes.png";
 import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
 import {
@@ -130,7 +131,7 @@ const adminTabs = [
     bullets: ["Remarketing automático", "Cupons personalizados", "Notificações de pedido", "Segmentação inteligente"],
   },
   {
-    id: "qrcodes", label: "QR Codes", image: landingPdv,
+    id: "qrcodes", label: "QR Codes", image: landingQrcodes,
     title: "QR Codes para mesas e divulgação",
     desc: "Gere QR Codes ilimitados para mesas, balcão, totem e materiais impressos. Cada código rastreia origem dos pedidos para você medir o que funciona.",
     bullets: ["QR Codes ilimitados", "Rastreamento por origem", "Personalização visual", "Impressão fácil em qualquer formato"],
