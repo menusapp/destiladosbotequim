@@ -502,6 +502,7 @@ export default function LandingPageV2() {
         <Pain />
         <Steps />
         <Testimonials />
+        <Simulator />
         <Pricing />
         <FAQ />
         <FinalCTA />
