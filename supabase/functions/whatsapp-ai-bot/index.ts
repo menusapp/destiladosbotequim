@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
         newStep = 'menu';
       } else {
         const result = await processMenuChoice(
-          message_text, menuOptions || [], restaurant, aiConfig, supabase, restaurant_id, menuLink, customer_phone
+          message_text, menuOptions || [], restaurant, effectiveConfig, supabase, restaurant_id, menuLink, customer_phone
         );
         responseText = result.response;
         newStep = result.newStep;
