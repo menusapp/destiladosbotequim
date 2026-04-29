@@ -379,7 +379,7 @@ const LandingPageV3 = () => {
             </div>
           </ScrollReveal>
 
-          <div className={`grid grid-cols-1 items-center ${["cardapio","whatsapp"].includes(currentTab.id) ? "gap-10 lg:grid-cols-2" : "gap-8 lg:grid-cols-[minmax(0,1fr)_24rem]"}`}>
+          <div className={`grid grid-cols-1 items-center ${["cardapio","whatsapp"].includes(currentTab.id) ? "gap-10 lg:grid-cols-2" : "gap-10 lg:grid-cols-[minmax(0,1fr)_30rem]"}`}>
             <div>
               <div className={`mx-auto w-full rounded-xl border border-border shadow-lg overflow-hidden bg-card ${["cardapio","whatsapp"].includes(currentTab.id) ? "max-w-[294px]" : ""}`}>
                 <img key={currentTab.id} src={currentTab.image} alt={currentTab.title} className="w-full h-auto block" />
