@@ -115,12 +115,6 @@ const adminTabs = [
     bullets: ["Pix e cartão integrados", "Split de pagamento", "Conciliação automática", "Controle de taxas"],
   },
   {
-    id: "entregas", label: "Entregas", image: landingPdv,
-    title: "Delivery próprio sem comissão",
-    desc: "Configure zonas, taxas e tempo de entrega. Acompanhe motoboys em tempo real e ofereça rastreamento ao cliente.",
-    bullets: ["Zonas e taxas configuráveis", "Rastreamento em tempo real", "Gestão de motoboys", "0% de comissão por pedido"],
-  },
-  {
     id: "financeiro", label: "Financeiro", image: landingDre,
     title: "Visão completa do seu negócio",
     desc: "DRE automático, fluxo de caixa diário, CMV por produto, custos fixos e variáveis — tudo calculado a partir das vendas reais. Pare de usar planilha.",
