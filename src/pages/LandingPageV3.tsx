@@ -11,6 +11,7 @@ import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
 import landingPedidos from "@/assets/landing-pedidos.png";
 import landingClientes from "@/assets/landing-clientes.png";
+import landingPagamentos from "@/assets/landing-pagamentos.png";
 import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
 import {
@@ -111,7 +112,7 @@ const adminTabs = [
     bullets: ["Histórico completo de compras", "Segmentação automática", "Programa de fidelidade", "Aniversariantes do mês"],
   },
   {
-    id: "pagamentos", label: "Pagamentos", image: landingDre,
+    id: "pagamentos", label: "Pagamentos", image: landingPagamentos,
     title: "Pagamentos integrados e seguros",
     desc: "Aceite Pix, cartão e dinheiro com conciliação automática. Split de pagamento, troco e taxas controladas no painel.",
     bullets: ["Pix e cartão integrados", "Split de pagamento", "Conciliação automática", "Controle de taxas"],
