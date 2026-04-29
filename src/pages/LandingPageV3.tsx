@@ -121,7 +121,7 @@ const adminTabs = [
     bullets: ["Zonas e taxas configuráveis", "Rastreamento em tempo real", "Gestão de motoboys", "0% de comissão por pedido"],
   },
   {
-    id: "relatorios", label: "Relatórios", image: landingDre,
+    id: "financeiro", label: "Financeiro", image: landingDre,
     title: "Visão completa do seu negócio",
     desc: "DRE automático, fluxo de caixa diário, CMV por produto, custos fixos e variáveis — tudo calculado a partir das vendas reais. Pare de usar planilha.",
     bullets: ["DRE automático mensal", "Fluxo de caixa em tempo real", "CMV por produto", "Margens e lucratividade"],
