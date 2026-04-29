@@ -62,6 +62,38 @@ export function useRestaurantModules(restaurantId: string | null) {
     setLoading(true);
     setLoaded(false);
     fetchModules(restaurantId);
+
+    // Realtime: re-fetch when CEO edits plans OR when this restaurant's
+    // subscription changes (plan switch, status update, etc.).
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const refetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchModules(restaurantId), 200);
+    };
+
+    const channel = supabase
+      .channel(`modules-${restaurantId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "subscription_plans" },
+        refetch
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "restaurant_subscriptions",
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        refetch
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
   }, [restaurantId]);
 
   const fetchModules = async (restId: string) => {
