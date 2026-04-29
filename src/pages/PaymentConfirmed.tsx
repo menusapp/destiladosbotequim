@@ -109,15 +109,16 @@ export default function PaymentConfirmed() {
           {status === "timeout" && (
             <>
               <CheckCircle2 className="h-12 w-12 mx-auto text-green-600" />
-              <h1 className="text-xl font-semibold">Pagamento recebido</h1>
+              <h1 className="text-xl font-semibold">Pagamento recebido!</h1>
               <p className="text-muted-foreground">
-                Seu plano será ativado em instantes. Acesse o painel para continuar.
+                Seu plano será ativado em instantes. Se não aparecer em 5 minutos,
+                entre em contato com o suporte.
               </p>
               <Button
                 className="w-full"
                 onClick={() => navigate(resolvedSlug ? `/${resolvedSlug}/admin` : "/login")}
               >
-                Ir para o painel
+                Ir para o login
               </Button>
             </>
           )}
