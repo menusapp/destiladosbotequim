@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        expired: expiredSubs.length,
+        expired: hasExpired ? expiredSubs.length : 0,
         restaurant_ids: restaurantIds,
         grace_downgraded: graceDowngraded,
         scheduled_downgrades_applied: downgradesApplied,
