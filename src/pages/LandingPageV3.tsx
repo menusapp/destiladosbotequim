@@ -15,6 +15,7 @@ import landingPagamentos from "@/assets/landing-pagamentos.png";
 import landingQrcodes from "@/assets/landing-qrcodes.png";
 import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
+import landingRoboMenus from "@/assets/landing-robo-menus.png";
 import landingTotem from "@/assets/landing-totem.png";
 import landingGarcom from "@/assets/landing-garcom.png";
 import {
