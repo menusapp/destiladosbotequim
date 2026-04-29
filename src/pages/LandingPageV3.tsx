@@ -363,6 +363,7 @@ const LandingPageV3 = () => {
               {adminTabs.map((t) => (
                 <button
                   key={t.id}
+                  type="button"
                   onClick={() => setActiveTab(t.id)}
                   className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
                     activeTab === t.id
@@ -376,11 +377,10 @@ const LandingPageV3 = () => {
             </div>
           </ScrollReveal>
 
-          <ScrollReveal delay={200}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-              <div className="mx-auto w-full max-w-md rounded-xl border border-border shadow-lg overflow-hidden bg-card">
-                <img src={currentTab.image} alt={currentTab.title} className="w-full h-auto block" />
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            <div className="mx-auto w-full max-w-md rounded-xl border border-border shadow-lg overflow-hidden bg-card">
+              <img key={currentTab.id} src={currentTab.image} alt={currentTab.title} className="w-full h-auto block" />
+            </div>
               <div>
                 <h3 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
                   {currentTab.title}
@@ -414,8 +414,7 @@ const LandingPageV3 = () => {
                 </div>
               </div>
             </div>
-          </ScrollReveal>
-        </div>
+          </div>
       </section>
 
       {/* ═══ COMO COMEÇAR (original — passo 02 com IA) ═══ */}
