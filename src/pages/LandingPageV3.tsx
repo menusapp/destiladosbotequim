@@ -9,6 +9,7 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import menusLogo from "@/assets/menus-logo.png";
 import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
+import landingPedidos from "@/assets/landing-pedidos.png";
 import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
 import {
@@ -97,7 +98,7 @@ const adminTabs = [
     bullets: ["Fotos e descrições ilimitadas", "Categorias e complementos", "Atualização em tempo real", "Publicação multicanal"],
   },
   {
-    id: "pedidos", label: "Pedidos", image: landingPdv,
+    id: "pedidos", label: "Pedidos", image: landingPedidos,
     title: "Gestor de pedidos completo",
     desc: "PDV integrado, comandas digitais, gestão visual de mesas e confirmação automática de pedidos. Do balcão ao delivery num só lugar.",
     bullets: ["PDV completo com atalhos", "Comandas digitais por mesa", "Gestão visual de mesas", "Confirmação automática", "Totem de autoatendimento"],
