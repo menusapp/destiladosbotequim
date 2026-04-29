@@ -82,6 +82,9 @@ const App = () => (
 
           <Suspense fallback={<RouteFallback />}>
             <Routes>
+              {/* Rotas estáticas globais — devem vir ANTES de qualquer rota dinâmica e da raiz "/" */}
+              <Route path="/pagamento-confirmado" element={<PaymentConfirmed />} />
+
               {/*
                 Quando acessado via subdomínio do restaurante (ex.: rods.menusapp.com.br/),
                 a raiz "/" carrega o cardápio delivery; caso contrário mostra a landing.
@@ -105,7 +108,6 @@ const App = () => (
               {/* Registration routes (post-payment redirect) */}
               <Route path="/registro/:planSlug" element={<RestaurantRegistration />} />
               <Route path="/pagamento-pendente/:slug" element={<PaymentPending />} />
-              <Route path="/pagamento-confirmado" element={<PaymentConfirmed />} />
 
               {/* Restaurant-scoped routes (slug-based) */}
               <Route path="/:slug/kiosk" element={<Kiosk />} />
