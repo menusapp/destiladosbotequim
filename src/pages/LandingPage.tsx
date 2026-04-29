@@ -565,6 +565,24 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* ═══ SIMULADOR ═══ */}
+      <section className="py-16 sm:py-20 bg-muted/30">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-10">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Calculadora</span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">
+              Quanto seu restaurante pode faturar a mais?
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+              Mexa nos sliders e veja sua projeção de receita com Menu's.
+            </p>
+          </ScrollReveal>
+          <ScrollReveal delay={150}>
+            <SavingsSimulator registerUrl="/registro/trial" />
+          </ScrollReveal>
+        </div>
+      </section>
+
       {/* ═══ PRICING ═══ */}
       <section id="pricing" className="py-16 sm:py-20 bg-background relative overflow-hidden">
         <div className="absolute top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/[0.04] blur-[120px] pointer-events-none" />
