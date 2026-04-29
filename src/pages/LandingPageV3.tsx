@@ -88,8 +88,14 @@ const allFeatures = [
   { icon: CalendarCheck, title: "Reservas de mesas", desc: "Reservas online e visual." },
 ];
 
-/* ── Tabs do Painel (original) ── */
+/* ── Tabs do Painel ── */
 const adminTabs = [
+  {
+    id: "cardapio", label: "Cardápio", image: landingPdv,
+    title: "Cardápio digital completo",
+    desc: "Monte seu cardápio com fotos, categorias, complementos e variações. Atualize preços em tempo real e publique para todos os canais com um clique.",
+    bullets: ["Fotos e descrições ilimitadas", "Categorias e complementos", "Atualização em tempo real", "Publicação multicanal"],
+  },
   {
     id: "pedidos", label: "Pedidos", image: landingPdv,
     title: "Gestor de pedidos completo",
@@ -97,7 +103,25 @@ const adminTabs = [
     bullets: ["PDV completo com atalhos", "Comandas digitais por mesa", "Gestão visual de mesas", "Confirmação automática", "Totem de autoatendimento"],
   },
   {
-    id: "financeiro", label: "Financeiro", image: landingDre,
+    id: "clientes", label: "Clientes", image: landingPdv,
+    title: "Base de clientes inteligente",
+    desc: "Conheça quem compra de você. Histórico de pedidos, ticket médio, frequência e segmentação automática para campanhas certeiras.",
+    bullets: ["Histórico completo de compras", "Segmentação automática", "Programa de fidelidade", "Aniversariantes do mês"],
+  },
+  {
+    id: "pagamentos", label: "Pagamentos", image: landingDre,
+    title: "Pagamentos integrados e seguros",
+    desc: "Aceite Pix, cartão e dinheiro com conciliação automática. Split de pagamento, troco e taxas controladas no painel.",
+    bullets: ["Pix e cartão integrados", "Split de pagamento", "Conciliação automática", "Controle de taxas"],
+  },
+  {
+    id: "entregas", label: "Entregas", image: landingPdv,
+    title: "Delivery próprio sem comissão",
+    desc: "Configure zonas, taxas e tempo de entrega. Acompanhe motoboys em tempo real e ofereça rastreamento ao cliente.",
+    bullets: ["Zonas e taxas configuráveis", "Rastreamento em tempo real", "Gestão de motoboys", "0% de comissão por pedido"],
+  },
+  {
+    id: "relatorios", label: "Relatórios", image: landingDre,
     title: "Visão completa do seu negócio",
     desc: "DRE automático, fluxo de caixa diário, CMV por produto, custos fixos e variáveis — tudo calculado a partir das vendas reais. Pare de usar planilha.",
     bullets: ["DRE automático mensal", "Fluxo de caixa em tempo real", "CMV por produto", "Margens e lucratividade"],
@@ -108,9 +132,13 @@ const adminTabs = [
     desc: "Campanhas de remarketing que disparam sozinhas. Cliente inativo recebe cupom, pedido confirmado vira notificação — sem você levantar um dedo.",
     bullets: ["Remarketing automático", "Cupons personalizados", "Notificações de pedido", "Segmentação inteligente"],
   },
+  {
+    id: "qrcodes", label: "QR Codes", image: landingPdv,
+    title: "QR Codes para mesas e divulgação",
+    desc: "Gere QR Codes ilimitados para mesas, balcão, totem e materiais impressos. Cada código rastreia origem dos pedidos para você medir o que funciona.",
+    bullets: ["QR Codes ilimitados", "Rastreamento por origem", "Personalização visual", "Impressão fácil em qualquer formato"],
+  },
 ];
-
-const adminTabChips = ["Cardápio", "Pedidos", "Clientes", "Pagamentos", "Entregas", "Relatórios", "WhatsApp", "QR Codes"];
 
 const goRegister = () => { window.location.href = REGISTER_URL; };
 const openWhatsApp = () => { window.open(WHATSAPP_URL, "_blank", "noopener"); };
