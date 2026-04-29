@@ -7,6 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { TypingEffect } from "@/components/landing/TypingEffect";
+import PhoneMockup from "@/components/landing/PhoneMockup";
+import SavingsSimulator from "@/components/landing/SavingsSimulator";
 import menusLogo from "@/assets/menus-logo.png";
 import heroDashboard from "@/assets/landing-hero-dashboard.jpg";
 import landingPdv from "@/assets/landing-pdv.jpg";
@@ -260,12 +262,10 @@ const LandingPage = () => {
             </div>
           </ScrollReveal>
 
-          {/* Mockup do dashboard */}
+          {/* Mockup do celular animado */}
           <ScrollReveal delay={400}>
-            <div className="mt-14 mx-auto max-w-4xl">
-              <div className="rounded-2xl border border-border shadow-2xl shadow-primary/15 overflow-hidden">
-                <img src={heroDashboard} alt="Dashboard do Menus App — sistema de gestão para restaurantes" className="w-full h-auto" />
-              </div>
+            <div className="mt-14 mx-auto max-w-md">
+              <PhoneMockup />
             </div>
           </ScrollReveal>
         </div>
