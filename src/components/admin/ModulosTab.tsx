@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
-import { Check, Crown, ArrowUp, ArrowDown, Package, ExternalLink } from "lucide-react";
+import { Check, CheckCircle, ArrowUp, ArrowDown, Package, ExternalLink } from "lucide-react";
 import { trackEvent } from "@/lib/metaPixel";
 import {
   Dialog,
@@ -333,8 +333,8 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
             >
               {isCurrent && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-3 py-0.5 shadow-sm">
-                    <Crown className="h-3 w-3" /> Atual
+                  <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-3 py-0.5 shadow-sm whitespace-nowrap">
+                    <CheckCircle className="h-3 w-3" /> Seu plano atual
                   </Badge>
                 </div>
               )}
@@ -360,8 +360,12 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                 </div>
 
                 {isCurrent ? (
-                  <Button disabled variant="outline" className="w-full text-xs h-9 opacity-60">
-                    Plano Ativo
+                  <Button
+                    disabled
+                    className="w-full text-xs h-9 bg-green-600 hover:bg-green-600 text-white cursor-default opacity-100 disabled:opacity-100"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                    Plano atual
                   </Button>
                 ) : (
                   <Button
@@ -372,11 +376,17 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                   >
                     {isLoadingThis ? (
                       "Processando..."
+                    ) : !activeSub ? (
+                      "Assinar"
+                    ) : isUpgrade ? (
+                      <>
+                        <ArrowUp className="h-3.5 w-3.5 mr-1" />
+                        Upgrade para este plano
+                      </>
                     ) : (
                       <>
-                        {isUpgrade && <ArrowUp className="h-3.5 w-3.5 mr-1" />}
-                        {isDowngrade && <ArrowDown className="h-3.5 w-3.5 mr-1" />}
-                        {!activeSub ? "Assinar" : isUpgrade ? "Upgrade" : "Downgrade"}
+                        <ArrowDown className="h-3.5 w-3.5 mr-1" />
+                        Downgrade para este plano
                       </>
                     )}
                   </Button>
