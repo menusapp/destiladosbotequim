@@ -642,8 +642,11 @@ const LandingHamburgueria = () => {
       </section>
 
       {/* ═══ CTA FINAL ═══ */}
-      <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-16 sm:py-20 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #D97706 0%, #92400E 100%)' }}>
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-10 select-none text-[8rem] flex items-center justify-around">
+          <span>🍔</span><span className="hidden sm:inline">🍟</span><span>🥤</span>
+        </div>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
           <ScrollReveal>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-[-0.025em]">
               {CTA_FINAL_TITLE}
