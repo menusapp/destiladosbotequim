@@ -37,7 +37,7 @@ export function PlatformMetricsTab() {
       // Active subscriptions for MRR
       const { data: subs } = await supabase
         .from("restaurant_subscriptions" as any)
-        .select("*, subscription_plans(price)")
+        .select("*, subscription_plans!restaurant_subscriptions_plan_id_fkey(price)")
         .eq("status", "active") as any;
 
       const activeMRR = ((subs as any[]) || []).reduce((sum: number, s: any) => {

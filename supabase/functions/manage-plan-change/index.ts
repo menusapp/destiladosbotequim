@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     // 2. Buscar assinatura ativa atual (robusto contra duplicatas)
     const { data: currentSubs } = await supabase
       .from("restaurant_subscriptions")
-      .select("id, plan_id, status, subscription_plans(name, price)")
+      .select("id, plan_id, status, subscription_plans!restaurant_subscriptions_plan_id_fkey(name, price)")
       .eq("restaurant_id", restaurant_id)
       .in("status", ["active", "past_due"])
       .order("created_at", { ascending: false })
