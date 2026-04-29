@@ -361,7 +361,7 @@ const LandingPageV3 = () => {
                 <button
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
-                  className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
                     activeTab === t.id
                       ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
                       : "bg-card text-muted-foreground hover:text-foreground border border-border"
