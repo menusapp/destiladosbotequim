@@ -312,7 +312,7 @@ const LandingPageV3 = () => {
 
       {/* ═══ SOLUÇÕES (original) ═══ */}
       <section id="solucoes" className="py-16 sm:py-20 bg-card">
-        <div className={`mx-auto px-4 sm:px-6 lg:px-8 ${currentTab.id === "cardapio" ? "max-w-6xl" : "max-w-[92rem]"}`}>
+        <div className={`mx-auto px-4 sm:px-6 lg:px-8 ${["cardapio","whatsapp"].includes(currentTab.id) ? "max-w-6xl" : "max-w-[92rem]"}`}>
           <ScrollReveal className="text-center mb-12">
             <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Soluções</span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">
@@ -378,9 +378,9 @@ const LandingPageV3 = () => {
             </div>
           </ScrollReveal>
 
-          <div className={`grid grid-cols-1 items-center ${currentTab.id === "cardapio" ? "gap-10 lg:grid-cols-2" : "gap-8 lg:grid-cols-[minmax(0,1fr)_24rem]"}`}>
+          <div className={`grid grid-cols-1 items-center ${["cardapio","whatsapp"].includes(currentTab.id) ? "gap-10 lg:grid-cols-2" : "gap-8 lg:grid-cols-[minmax(0,1fr)_24rem]"}`}>
             <div>
-              <div className={`mx-auto w-full rounded-xl border border-border shadow-lg overflow-hidden bg-card ${currentTab.id === "cardapio" ? "max-w-[294px]" : ""}`}>
+              <div className={`mx-auto w-full rounded-xl border border-border shadow-lg overflow-hidden bg-card ${["cardapio","whatsapp"].includes(currentTab.id) ? "max-w-[294px]" : ""}`}>
                 <img key={currentTab.id} src={currentTab.image} alt={currentTab.title} className="w-full h-auto block" />
               </div>
             </div>
