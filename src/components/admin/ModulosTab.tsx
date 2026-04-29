@@ -128,25 +128,25 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         .eq("restaurant_id", restaurantId)
         .in("status", ["active", "past_due"])
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .limit(1),
     ]);
 
     if (plansRes.data) {
       setPlans(plansRes.data.map((d: any) => ({ ...d, features: d.features || [] })));
     }
 
-    if (subRes.data && subRes.data.subscription_plans) {
-      const sp = subRes.data.subscription_plans as any;
+    const subRow = subRes.data?.[0];
+    if (subRow && subRow.subscription_plans) {
+      const sp = subRow.subscription_plans as any;
       setActiveSub({
-        id: subRes.data.id,
-        plan_id: subRes.data.plan_id,
-        status: subRes.data.status,
+        id: subRow.id,
+        plan_id: subRow.plan_id,
+        status: subRow.status,
         plan_name: sp.name,
         plan_price: sp.price,
         plan_features: sp.features || [],
-        pending_downgrade_plan_id: (subRes.data as any).pending_downgrade_plan_id,
-        pending_downgrade_at: (subRes.data as any).pending_downgrade_at,
+        pending_downgrade_plan_id: (subRow as any).pending_downgrade_plan_id,
+        pending_downgrade_at: (subRow as any).pending_downgrade_at,
       });
     } else {
       setActiveSub(null);
