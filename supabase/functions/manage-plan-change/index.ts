@@ -76,16 +76,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2. Buscar assinatura ativa atual
-    const { data: currentSub } = await supabase
+    // 2. Buscar assinatura ativa atual (robusto contra duplicatas)
+    const { data: currentSubs } = await supabase
       .from("restaurant_subscriptions")
       .select("id, plan_id, status, subscription_plans(name, price)")
       .eq("restaurant_id", restaurant_id)
       .in("status", ["active", "past_due"])
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
+    const currentSub = currentSubs?.[0] ?? null;
     const currentPrice = (currentSub?.subscription_plans as any)?.price || 0;
 
     // 3. Buscar link MP do plano alvo
