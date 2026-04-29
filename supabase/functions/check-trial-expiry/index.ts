@@ -33,37 +33,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!expiredSubs || expiredSubs.length === 0) {
-      console.log("[check-trial-expiry] No expired trials found");
-      return new Response(JSON.stringify({ expired: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const hasExpired = expiredSubs && expiredSubs.length > 0;
+    const restaurantIds = hasExpired ? expiredSubs.map((s) => s.restaurant_id) : [];
+    const subIds = hasExpired ? expiredSubs.map((s) => s.id) : [];
+
+    if (hasExpired) {
+      const { error: updateSubError } = await supabase
+        .from("restaurant_subscriptions")
+        .update({ status: "expired" })
+        .in("id", subIds);
+
+      if (updateSubError) {
+        console.error("[check-trial-expiry] Error updating subscriptions:", updateSubError);
+      }
+
+      const { error: updateRestError } = await supabase
+        .from("restaurants")
+        .update({ trial_expired: true })
+        .in("id", restaurantIds);
+
+      if (updateRestError) {
+        console.error("[check-trial-expiry] Error updating restaurants:", updateRestError);
+      }
     }
 
-    const restaurantIds = expiredSubs.map((s) => s.restaurant_id);
-    const subIds = expiredSubs.map((s) => s.id);
-
-    // Update subscriptions to expired
-    const { error: updateSubError } = await supabase
-      .from("restaurant_subscriptions")
-      .update({ status: "expired" })
-      .in("id", subIds);
-
-    if (updateSubError) {
-      console.error("[check-trial-expiry] Error updating subscriptions:", updateSubError);
-    }
-
-    // Update restaurants to trial_expired
-    const { error: updateRestError } = await supabase
-      .from("restaurants")
-      .update({ trial_expired: true })
-      .in("id", restaurantIds);
-
-    if (updateRestError) {
-      console.error("[check-trial-expiry] Error updating restaurants:", updateRestError);
-    }
-
-    console.log(`[check-trial-expiry] Expired ${expiredSubs.length} trials`);
+    console.log(`[check-trial-expiry] Expired ${hasExpired ? expiredSubs.length : 0} trials`);
 
     // ============================================================
     // 2. Período de graça expirado → downgrade para plano free
