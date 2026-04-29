@@ -9,6 +9,8 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { TypingEffect } from "@/components/landing/TypingEffect";
 import PhoneMockup from "@/components/landing/PhoneMockup";
 import SavingsSimulator from "@/components/landing/SavingsSimulator";
+import { NicheHeroDecor, NicheBadge } from "@/components/landing/NicheHeroDecor";
+import { NicheExtraSection } from "@/components/landing/NicheExtraSection";
 import menusLogo from "@/assets/menus-logo.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
 import landingDre from "@/assets/landing-dre.png";
@@ -180,15 +182,28 @@ const LandingSorveteria = () => {
 
       {/* ═══ HERO ═══ */}
       <section className="relative overflow-hidden bg-card">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.06] via-primary/[0.02] to-transparent" />
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-primary/[0.07] blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-pink-500/[0.08] via-purple-500/[0.04] to-transparent" />
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-purple-500/[0.10] blur-[120px] pointer-events-none" />
+
+        <NicheHeroDecor
+          bgPatternEmoji="🍦"
+          keyframes={`
+            @keyframes drip { 0%,100%{transform:translateY(0) rotate(-5deg)} 50%{transform:translateY(-18px) rotate(5deg)} } @keyframes scoop-bounce { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-15px) scale(1.1)} }
+          `}
+          emojis={[
+            { emoji: "🍦", className: "top-[8%] left-[6%] text-6xl sm:text-7xl [animation:drip_5s_ease-in-out_infinite]" },
+            { emoji: "🍨", className: "top-[16%] right-[7%] text-5xl sm:text-6xl [animation:scoop-bounce_6s_ease-in-out_infinite]" },
+            { emoji: "🍧", className: "bottom-[26%] left-[5%] hidden md:block text-5xl sm:text-6xl [animation:drip_7s_ease-in-out_infinite]" },
+            { emoji: "🎂", className: "bottom-[14%] right-[6%] text-5xl sm:text-6xl [animation:scoop-bounce_5.5s_ease-in-out_infinite]" },
+            { emoji: "⭐", className: "top-[40%] left-[3%] hidden lg:block text-4xl sm:text-5xl [animation:drip_8s_ease-in-out_infinite]" },
+          ]}
+        />
 
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
           <ScrollReveal>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-8 border border-primary/20">
-              <Star className="h-4 w-4 fill-primary" />
-              {HERO_BADGE}
-            </div>
+            <NicheBadge bgClass="bg-pink-500/15 text-pink-700 border-pink-500/30">
+              🍦 {HERO_BADGE}
+            </NicheBadge>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
@@ -497,6 +512,22 @@ const LandingSorveteria = () => {
         </div>
       </section>
 
+      {/* ═══ NICHE EXCLUSIVE ═══ */}
+      <NicheExtraSection
+        eyebrow="Sorveteria"
+        title={<>Sabores que conquistam o <span className="text-pink-200">ano todo</span></>}
+        subtitle="Cardápio visual cheio de cor, fidelidade automática e sabor para cada estação do ano."
+        bgStyle="linear-gradient(135deg, #DB2777 0%, #9333EA 100%)"
+        cardClass="bg-white/15 border-white/30 backdrop-blur-sm"
+        titleClass="text-white"
+        textClass="text-white/90"
+        cards={[
+          { emoji: "☀️", title: "Verão de sorvete", desc: "Vitrine digital com fotos lindas de cada sabor. Ticket médio sobe quando o cliente vê." },
+          { emoji: "☕", title: "Inverno do chocolate quente", desc: "Cardápio sazonal em 1 clique. Mude a vitrine entre estações sem refazer nada." },
+          { emoji: "🎉", title: "Festas e fidelidade", desc: "Programa de pontos automático: 10 sorvetes = 1 grátis. Cliente volta toda semana." },
+        ]}
+      />
+
       {/* ═══ SIMULADOR ═══ */}
       <section className="py-16 sm:py-20 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -611,8 +642,11 @@ const LandingSorveteria = () => {
       </section>
 
       {/* ═══ CTA FINAL ═══ */}
-      <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-16 sm:py-20 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #DB2777 0%, #9333EA 100%)' }}>
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-10 select-none text-[8rem] flex items-center justify-around">
+          <span>🍦</span><span className="hidden sm:inline">🍨</span><span>🎂</span>
+        </div>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
           <ScrollReveal>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-[-0.025em]">
               {CTA_FINAL_TITLE}

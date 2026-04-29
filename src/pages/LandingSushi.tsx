@@ -9,6 +9,8 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { TypingEffect } from "@/components/landing/TypingEffect";
 import PhoneMockup from "@/components/landing/PhoneMockup";
 import SavingsSimulator from "@/components/landing/SavingsSimulator";
+import { NicheHeroDecor, NicheBadge } from "@/components/landing/NicheHeroDecor";
+import { NicheExtraSection } from "@/components/landing/NicheExtraSection";
 import menusLogo from "@/assets/menus-logo.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
 import landingDre from "@/assets/landing-dre.png";
@@ -180,15 +182,27 @@ const LandingSushi = () => {
 
       {/* ═══ HERO ═══ */}
       <section className="relative overflow-hidden bg-card">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.06] via-primary/[0.02] to-transparent" />
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-primary/[0.07] blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-red-600/[0.06] via-neutral-900/[0.02] to-transparent" />
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-red-600/[0.08] blur-[120px] pointer-events-none" />
+
+        <NicheHeroDecor
+          bgPatternEmoji="🍣"
+          keyframes={`
+            @keyframes zen-float { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-20px) scale(1.05)} } @keyframes zen-drift { 0%,100%{transform:translateY(0) rotate(0)} 50%{transform:translateY(-15px) rotate(4deg)} }
+          `}
+          emojis={[
+            { emoji: "🍣", className: "top-[8%] left-[7%] text-6xl sm:text-7xl [animation:zen-float_8s_ease-in-out_infinite]" },
+            { emoji: "🍱", className: "top-[18%] right-[8%] text-5xl sm:text-6xl [animation:zen-drift_9s_ease-in-out_infinite]" },
+            { emoji: "🥢", className: "bottom-[26%] left-[5%] hidden md:block text-5xl sm:text-6xl [animation:zen-float_10s_ease-in-out_infinite]" },
+            { emoji: "🌸", className: "bottom-[14%] right-[7%] text-5xl sm:text-6xl [animation:zen-drift_7s_ease-in-out_infinite]" },
+          ]}
+        />
 
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
           <ScrollReveal>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-8 border border-primary/20">
-              <Star className="h-4 w-4 fill-primary" />
-              {HERO_BADGE}
-            </div>
+            <NicheBadge bgClass="bg-red-600/15 text-red-700 border-red-600/30">
+              🍣 {HERO_BADGE}
+            </NicheBadge>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
@@ -497,6 +511,22 @@ const LandingSushi = () => {
         </div>
       </section>
 
+      {/* ═══ NICHE EXCLUSIVE ═══ */}
+      <NicheExtraSection
+        eyebrow="Sushi"
+        title={<>Experiência japonesa <span className="text-red-600">completa</span></>}
+        subtitle="Combinados, rodízio e temaki num cardápio digital com a elegância que sua marca merece."
+        bgStyle="linear-gradient(180deg, #FAFAFA 0%, #F5F5F4 100%)"
+        cardClass="bg-white border-neutral-200"
+        titleClass="text-neutral-900"
+        textClass="text-neutral-600"
+        cards={[
+          { emoji: "🍱", title: "Combinados visuais", desc: "Fotos profissionais em cada combinado. Cliente entende o que está pedindo e pede mais." },
+          { emoji: "🍣", title: "Rodízio digital", desc: "Pedidos rodada por rodada direto da mesa. Cozinha controla o ritmo sem caos." },
+          { emoji: "🌸", title: "Atendimento omotenashi", desc: "Notas, observações e preferências do cliente salvas para a próxima visita." },
+        ]}
+      />
+
       {/* ═══ SIMULADOR ═══ */}
       <section className="py-16 sm:py-20 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -611,8 +641,11 @@ const LandingSushi = () => {
       </section>
 
       {/* ═══ CTA FINAL ═══ */}
-      <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-16 sm:py-20 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #DC2626 0%, #7F1D1D 100%)' }}>
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-10 select-none text-[8rem] flex items-center justify-around">
+          <span>🍣</span><span className="hidden sm:inline">🌸</span><span>🥢</span>
+        </div>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
           <ScrollReveal>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-[-0.025em]">
               {CTA_FINAL_TITLE}

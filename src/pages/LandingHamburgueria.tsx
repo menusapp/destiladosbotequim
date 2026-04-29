@@ -9,6 +9,8 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { TypingEffect } from "@/components/landing/TypingEffect";
 import PhoneMockup from "@/components/landing/PhoneMockup";
 import SavingsSimulator from "@/components/landing/SavingsSimulator";
+import { NicheHeroDecor, NicheBadge } from "@/components/landing/NicheHeroDecor";
+import { NicheExtraSection } from "@/components/landing/NicheExtraSection";
 import menusLogo from "@/assets/menus-logo.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
 import landingDre from "@/assets/landing-dre.png";
@@ -180,15 +182,28 @@ const LandingHamburgueria = () => {
 
       {/* ═══ HERO ═══ */}
       <section className="relative overflow-hidden bg-card">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.06] via-primary/[0.02] to-transparent" />
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-primary/[0.07] blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.08] via-amber-500/[0.03] to-transparent" />
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-amber-500/[0.10] blur-[120px] pointer-events-none" />
+
+        <NicheHeroDecor
+          bgPatternEmoji="🍔"
+          keyframes={`
+            @keyframes burger-float { 0%,100%{transform:translateY(0) rotate(-6deg)} 50%{transform:translateY(-22px) rotate(6deg)} }
+            @keyframes burger-float-slow { 0%,100%{transform:translateY(0) rotate(0)} 50%{transform:translateY(-14px) rotate(-8deg)} }
+          `}
+          emojis={[
+            { emoji: "🍔", className: "top-[8%] left-[6%] hidden sm:block", size: "text-6xl sm:text-7xl", rotate: "" },
+            { emoji: "🍟", className: "top-[18%] right-[8%] hidden sm:block", size: "text-5xl sm:text-6xl" },
+            { emoji: "🥤", className: "bottom-[22%] left-[4%] hidden md:block", size: "text-5xl sm:text-6xl" },
+            { emoji: "🍔", className: "bottom-[10%] right-[6%] hidden sm:block", size: "text-6xl sm:text-7xl" },
+          ].map((e, i) => ({ ...e, className: `${e.className} ${i % 2 === 0 ? "[animation:burger-float_6s_ease-in-out_infinite]" : "[animation:burger-float-slow_7s_ease-in-out_infinite]"}` }))}
+        />
 
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
           <ScrollReveal>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-8 border border-primary/20">
-              <Star className="h-4 w-4 fill-primary" />
-              {HERO_BADGE}
-            </div>
+            <NicheBadge bgClass="bg-amber-500/15 text-amber-700 border-amber-500/30">
+              🍔 {HERO_BADGE}
+            </NicheBadge>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
@@ -497,6 +512,22 @@ const LandingHamburgueria = () => {
         </div>
       </section>
 
+      {/* ═══ NICHE EXCLUSIVE ═══ */}
+      <NicheExtraSection
+        eyebrow="Hamburgueria"
+        title={<>Por que <span className="text-amber-600">hamburguerias</span> nos amam?</>}
+        subtitle="Feito para quem vive o rush do almoço, do happy hour e da madrugada."
+        bgStyle="linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)"
+        cardClass="bg-white border-amber-200 text-amber-900"
+        titleClass="text-amber-900"
+        textClass="text-amber-800/80"
+        cards={[
+          { emoji: "🍔", title: "Pedido sem erro", desc: "Cliente monta o burger no celular: ponto da carne, sem cebola, queijo extra. Cozinha imprime exato." },
+          { emoji: "🍟", title: "Combo que vende sozinho", desc: "Sugestão automática de batata e bebida no carrinho aumenta o ticket médio em até 30%." },
+          { emoji: "🥤", title: "Delivery sem comissão", desc: "Cardápio próprio no WhatsApp e link direto. Adeus iFood comendo sua margem." },
+        ]}
+      />
+
       {/* ═══ SIMULADOR ═══ */}
       <section className="py-16 sm:py-20 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -611,8 +642,11 @@ const LandingHamburgueria = () => {
       </section>
 
       {/* ═══ CTA FINAL ═══ */}
-      <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-16 sm:py-20 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #D97706 0%, #92400E 100%)' }}>
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-10 select-none text-[8rem] flex items-center justify-around">
+          <span>🍔</span><span className="hidden sm:inline">🍟</span><span>🥤</span>
+        </div>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
           <ScrollReveal>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-[-0.025em]">
               {CTA_FINAL_TITLE}

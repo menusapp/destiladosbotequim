@@ -9,6 +9,8 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { TypingEffect } from "@/components/landing/TypingEffect";
 import PhoneMockup from "@/components/landing/PhoneMockup";
 import SavingsSimulator from "@/components/landing/SavingsSimulator";
+import { NicheHeroDecor, NicheBadge } from "@/components/landing/NicheHeroDecor";
+import { NicheExtraSection } from "@/components/landing/NicheExtraSection";
 import menusLogo from "@/assets/menus-logo.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
 import landingDre from "@/assets/landing-dre.png";
@@ -180,15 +182,27 @@ const LandingBar = () => {
 
       {/* ═══ HERO ═══ */}
       <section className="relative overflow-hidden bg-card">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.06] via-primary/[0.02] to-transparent" />
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-primary/[0.07] blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-700/[0.08] via-amber-700/[0.03] to-transparent" />
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-amber-700/[0.10] blur-[120px] pointer-events-none" />
+
+        <NicheHeroDecor
+          bgPatternEmoji="🍺"
+          keyframes={`
+            @keyframes bar-sway { 0%,100%{transform:rotate(-5deg) translateY(0)} 50%{transform:rotate(5deg) translateY(-10px)} } @keyframes bar-bounce { 0%,100%{transform:translateY(0) rotate(0)} 50%{transform:translateY(-15px) rotate(-6deg)} }
+          `}
+          emojis={[
+            { emoji: "🍺", className: "top-[8%] left-[6%] text-6xl sm:text-7xl [animation:bar-sway_5s_ease-in-out_infinite]" },
+            { emoji: "🍻", className: "top-[16%] right-[7%] text-5xl sm:text-6xl [animation:bar-bounce_6s_ease-in-out_infinite]" },
+            { emoji: "🥃", className: "bottom-[24%] left-[5%] hidden md:block text-5xl sm:text-6xl [animation:bar-sway_7s_ease-in-out_infinite]" },
+            { emoji: "🎸", className: "bottom-[12%] right-[6%] text-5xl sm:text-6xl [animation:bar-bounce_5.5s_ease-in-out_infinite]" },
+          ]}
+        />
 
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
           <ScrollReveal>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-8 border border-primary/20">
-              <Star className="h-4 w-4 fill-primary" />
-              {HERO_BADGE}
-            </div>
+            <NicheBadge bgClass="bg-amber-700/15 text-amber-800 border-amber-700/30">
+              🍺 {HERO_BADGE}
+            </NicheBadge>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
@@ -497,6 +511,22 @@ const LandingBar = () => {
         </div>
       </section>
 
+      {/* ═══ NICHE EXCLUSIVE ═══ */}
+      <NicheExtraSection
+        eyebrow="Bar"
+        title={<>Noite de bar <span className="text-amber-400">sem estresse</span></>}
+        subtitle="QR Code na mesa, bar lotado, atendentes felizes e seu caixa fechando redondo."
+        bgStyle="linear-gradient(135deg, #1C1917 0%, #292524 100%)"
+        cardClass="bg-stone-800/60 border-amber-700/40 backdrop-blur-sm"
+        titleClass="text-amber-100"
+        textClass="text-stone-300"
+        cards={[
+          { emoji: "📱", title: "Pede sem chamar garçom", desc: "Cliente abre o QR Code, escolhe e envia. Garçom só leva — sem ficar correndo na mesa." },
+          { emoji: "🍻", title: "Segunda rodada sozinho", desc: "Mesa abre comanda digital e adiciona quantas rodadas quiser sem chamar ninguém." },
+          { emoji: "💸", title: "Divide a conta sem briga", desc: "Comanda digital divide por pessoa, item ou igualmente. Cada um paga o seu pelo Pix." },
+        ]}
+      />
+
       {/* ═══ SIMULADOR ═══ */}
       <section className="py-16 sm:py-20 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -611,8 +641,11 @@ const LandingBar = () => {
       </section>
 
       {/* ═══ CTA FINAL ═══ */}
-      <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, hsl(25 100% 50%) 0%, hsl(25 100% 42%) 100%)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-16 sm:py-20 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #B45309 0%, #78350F 100%)' }}>
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-10 select-none text-[8rem] flex items-center justify-around">
+          <span>🍺</span><span className="hidden sm:inline">🥃</span><span>🎸</span>
+        </div>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
           <ScrollReveal>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-[-0.025em]">
               {CTA_FINAL_TITLE}
