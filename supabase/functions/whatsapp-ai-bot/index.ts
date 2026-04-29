@@ -131,10 +131,10 @@ Deno.serve(async (req) => {
       .order('position');
 
     const menuLink = buildPublicUrl(restaurant.slug);
-    const welcomeType = aiConfig.welcome_message_type || 'numeric_menu';
+    const welcomeType = effectiveConfig.welcome_message_type || 'numeric_menu';
 
     // ── Link-only cooldown: only send the menu link once every 2 hours ──
-    if (welcomeType === 'link_only') {
+    if (welcomeType === 'link_only' && !simulate) {
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
       const lastSentAt = conversation?.last_message_at ? new Date(conversation.last_message_at) : null;
       const alreadyGreeted = conversation?.current_step === 'menu';
