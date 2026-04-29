@@ -272,14 +272,14 @@ const Pricing = () => {
       name: "INTERMEDIÁRIO",
       price: "149,90",
       perDay: "≈ R$ 5,00/dia",
-      featured: true,
+      featured: false,
       features: ["Tudo do Básico", "Delivery completo (0% taxa)", "Gestão de estoque e CMV", "Relatórios e DRE", "Programa de fidelidade", "Até 5 usuários", "Suporte prioritário"],
     },
     {
       name: "AVANÇADO",
       price: "249,90",
       perDay: "≈ R$ 8,33/dia",
-      featured: false,
+      featured: true,
       features: ["Tudo do Intermediário", "Robô IA Vendedor", "Marketing WhatsApp", "Remarketing automático", "Nota fiscal eletrônica", "Usuários ilimitados", "Suporte VIP"],
     },
   ];

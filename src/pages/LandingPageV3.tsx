@@ -45,12 +45,12 @@ const plans = [
     features: ["Cardápio digital ilimitado", "QR Code para mesas", "Pedidos em tempo real", "1 usuário administrador", "Suporte por email"],
   },
   {
-    name: "INTERMEDIÁRIO", price: "149,90", perDay: "≈ R$ 5,00/dia", featured: true,
+    name: "INTERMEDIÁRIO", price: "149,90", perDay: "≈ R$ 5,00/dia", featured: false,
     planSlug: "intermediario",
     features: ["Tudo do Básico", "Delivery completo (0% taxa)", "Gestão de estoque e CMV", "Relatórios e DRE", "Programa de fidelidade", "Até 5 usuários", "Suporte prioritário"],
   },
   {
-    name: "AVANÇADO", price: "249,90", perDay: "≈ R$ 8,33/dia", featured: false,
+    name: "AVANÇADO", price: "249,90", perDay: "≈ R$ 8,33/dia", featured: true,
     planSlug: "avancado",
     features: ["Tudo do Intermediário", "Robô IA Vendedor", "Marketing WhatsApp", "Remarketing automático", "Nota fiscal eletrônica", "Usuários ilimitados", "Suporte VIP"],
   },
