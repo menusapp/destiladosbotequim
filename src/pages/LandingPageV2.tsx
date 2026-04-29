@@ -250,7 +250,24 @@ const Testimonials = () => {
       </div>
     </section>
   );
-};
+
+/* ───────── Simulador de Economia ───────── */
+const Simulator = () => (
+  <section className="py-20 px-5 lg:px-8 bg-white">
+    <div className="max-w-5xl mx-auto">
+      <div className="text-center mb-10">
+        <span className="text-xs font-bold tracking-[0.2em] text-[#F97316]">CALCULADORA</span>
+        <h2 className="mt-3 text-3xl md:text-5xl font-extrabold text-[#0F172A] tracking-tight">
+          Quanto seu restaurante pode faturar a mais?
+        </h2>
+        <p className="mt-4 text-[#475569] max-w-2xl mx-auto">
+          Mexa nos sliders e veja sua projeção de receita com Menu's.
+        </p>
+      </div>
+      <SavingsSimulator primaryColor="#F97316" primaryColorEnd="#FB923C" registerUrl={REGISTER_URL} />
+    </div>
+  </section>
+);
 
 /* ───────── Planos ───────── */
 const Pricing = () => {
