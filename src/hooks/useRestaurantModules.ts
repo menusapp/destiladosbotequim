@@ -70,7 +70,7 @@ export function useRestaurantModules(restaurantId: string | null) {
       const [subResult, restResult] = await Promise.all([
         supabase
           .from("restaurant_subscriptions")
-          .select("plan_id, status, is_trial, trial_ends_at, next_payment_at, subscription_plans(name, features)")
+          .select("plan_id, status, is_trial, trial_ends_at, next_payment_at, subscription_plans!restaurant_subscriptions_plan_id_fkey(name, features)")
           .eq("restaurant_id", restId)
           .eq("status", "active")
           .order("created_at", { ascending: false })
