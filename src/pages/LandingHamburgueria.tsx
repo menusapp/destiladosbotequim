@@ -9,6 +9,8 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { TypingEffect } from "@/components/landing/TypingEffect";
 import PhoneMockup from "@/components/landing/PhoneMockup";
 import SavingsSimulator from "@/components/landing/SavingsSimulator";
+import { NicheHeroDecor, NicheBadge } from "@/components/landing/NicheHeroDecor";
+import { NicheExtraSection } from "@/components/landing/NicheExtraSection";
 import menusLogo from "@/assets/menus-logo.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
 import landingDre from "@/assets/landing-dre.png";
