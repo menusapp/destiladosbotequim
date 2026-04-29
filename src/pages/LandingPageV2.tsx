@@ -250,6 +250,7 @@ const Testimonials = () => {
       </div>
     </section>
   );
+};
 
 /* ───────── Simulador de Economia ───────── */
 const Simulator = () => (
