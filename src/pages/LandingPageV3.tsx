@@ -378,7 +378,7 @@ const LandingPageV3 = () => {
           </ScrollReveal>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-            <div className="mx-auto w-full max-w-2xl rounded-xl border border-border shadow-lg overflow-hidden bg-card">
+            <div className={`mx-auto w-full rounded-xl border border-border shadow-lg overflow-hidden bg-card ${currentTab.id === "cardapio" ? "max-w-[294px]" : "max-w-2xl"}`}>
               <img key={currentTab.id} src={currentTab.image} alt={currentTab.title} className="w-full h-auto block" />
             </div>
               <div>
