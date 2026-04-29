@@ -100,15 +100,8 @@ const Hero = () => (
         ✓ Sem cartão de crédito  ·  ✓ Setup em 2 minutos  ·  ✓ Cancele quando quiser
       </p>
 
-      <div className="mt-14 relative">
-        <div className="absolute inset-x-10 -bottom-6 h-12 bg-[#F97316]/20 blur-3xl rounded-full" />
-        <img
-          src={dashboardMockup}
-          alt="Dashboard do MenusApp mostrando pedidos, faturamento e cardápio digital"
-          width={1536}
-          height={1024}
-          className="relative rounded-2xl shadow-2xl border border-[#E2E8F0] mx-auto w-full max-w-5xl"
-        />
+      <div className="mt-16 flex justify-center">
+        <PhoneMockup primaryColor="#F97316" primaryColorEnd="#FB923C" />
       </div>
     </div>
   </section>
