@@ -1,53 +1,51 @@
 ## Problema
 
-Atualmente o cadastro falha com "Este nome de usuário já está em uso" mesmo quando o username existe apenas em **outro** restaurante. Isso acontece porque:
+O restaurante `8713e59b...` tem assinatura `active` do plano **Básico** (features `["cardapio","delivery","whatsapp"]`) mas todas as abas aparecem liberadas.
 
-1. A tabela `restaurant_credentials` tem constraint **UNIQUE (username)** — global, não por restaurante.
-2. A edge function `register-restaurant` faz check de username sem filtrar por `restaurant_id`.
+Diagnóstico (DB confirma que os dados estão corretos):
+- `subscription_plans` tem os 3 planos com `features` corretos.
+- `restaurant_subscriptions` tem 1 linha `active` por restaurante (Básico para esse caso).
+- RLS é aberta (`anon` lê normalmente).
 
-A regra correta: username deve ser único **dentro do mesmo restaurante**, mas pode se repetir entre restaurantes diferentes.
+A causa raiz está em `src/hooks/useRestaurantModules.ts`:
 
-Bônus: a tabela `restaurant_staff` já está correta (`UNIQUE (restaurant_id, username)`), então a correção é apenas em `restaurant_credentials` e na função RPC de login.
+1. **Fail-open por padrão.** `allowedModules` é inicializado como `null`. A função `isSectionAllowed` faz `if (allowedModules === null) return true;` — então durante o loading, em qualquer erro de fetch, ou se o join `subscription_plans(features)` voltar vazio, **todas as seções liberam**. É isso que está acontecendo na prática.
+2. **Query frágil.** Usa `.maybeSingle()` em cima de uma tabela com histórico (cancelled/suspended) e join aninhado. Se voltar mais de uma `active` por race condition do webhook (pode acontecer), retorna erro 406 → cai no `catch` → seta `null` → libera tudo.
+3. **`SectionWrapper`** em `RestaurantAdmin.tsx` (linha 809) reforça o fail-open: `const checkAllowed = (id) => !isSectionAllowed || isSectionAllowed(id);` — a função sempre existe, mas como `isSectionAllowed(id)` devolve `true` quando `allowedModules` é `null`, nada é bloqueado.
 
-## Mudanças
+## Correções
 
-### 1. Migration no banco
+### 1. `src/hooks/useRestaurantModules.ts`
 
-- Remover constraint `restaurant_credentials_username_key` (UNIQUE global em `username`).
-- Criar nova constraint `UNIQUE (restaurant_id, username)`.
-- Atualizar a função `validate_restaurant_credentials(p_username, p_password)` para iterar por **todos** os registros com aquele username e validar a senha (bcrypt) em cada um, retornando o primeiro match. Isso é necessário porque o login do restaurante (`/login`) só pede username + senha, sem slug. Como a senha é hashed com bcrypt (salt único), é impossível dois restaurantes terem o mesmo username + mesmo hash, então o match por senha é seguro.
+- Trocar `.maybeSingle()` por `.limit(1)` e pegar `data?.[0] ?? null` (segue a regra do projeto sobre `single-query-errors` e evita 406 com múltiplas linhas).
+- Buscar explicitamente `plan_id, status, is_trial, trial_ends_at, next_payment_at, subscription_plans(name, features)` em vez de `*`.
+- Adicionar estado `loaded: boolean` separado de `loading`. Enquanto `loaded === false`, **`isSectionAllowed` retorna `false`** para seções não-`ALWAYS_AVAILABLE` (fail-closed). Isso evita o flash de "liberado" enquanto a query roda.
+- Após carregar:
+  - Se houver assinatura ativa válida: `allowedModules = plan.features ?? []`.
+  - Se NÃO houver assinatura ativa e o trial não estiver válido: `allowedModules = []` (tudo bloqueado, exceto `ALWAYS_AVAILABLE` e `modulos`).
+  - Se trial ativo (não expirado, sem assinatura): `allowedModules = []` mas `isTrial=true` (mantém comportamento atual de trial).
+- Manter `ALWAYS_AVAILABLE` (inclui `modulos`, `visao-geral`, configs básicas) sempre liberado para o usuário poder navegar até a aba de planos.
+- Logar via `console.warn` quando o fetch falhar, para debug futuro — mas **não** liberar acesso.
 
-```sql
--- Trocar unique
-ALTER TABLE public.restaurant_credentials
-  DROP CONSTRAINT restaurant_credentials_username_key;
+### 2. `src/pages/RestaurantAdmin.tsx` — `SectionWrapper`
 
-ALTER TABLE public.restaurant_credentials
-  ADD CONSTRAINT restaurant_credentials_restaurant_username_key
-  UNIQUE (restaurant_id, username);
+- Substituir `const checkAllowed = (id) => !isSectionAllowed || isSectionAllowed(id);` por chamada direta `isSectionAllowed(id)` (a função sempre existe vinda do hook).
+- Ler também `loaded` do hook e, enquanto não carregou, renderizar um skeleton/placeholder simples ao invés do conteúdo da aba — evita o flash.
 
--- Atualizar RPC para iterar
-CREATE OR REPLACE FUNCTION public.validate_restaurant_credentials(...)
--- FOR rec IN SELECT ... WHERE username = p_username LOOP
---   IF crypt(p_password, rec.password_hash) = rec.password_hash THEN RETURN; END IF;
--- END LOOP;
-```
+### 3. Sem alteração de mapa de planos
 
-### 2. Edge function `register-restaurant`
+Os `features` já vêm do banco corretamente para os 3 planos (Básico/Intermediário/Avançado). **Não é necessário** criar um `PLAN_MODULES` hardcoded — a fonte da verdade já é `subscription_plans.features`. O mapa `SECTION_TO_MODULE` no hook já cobre as seções da sidebar.
 
-Trocar o check de unicidade do username para considerar `(restaurant_id, username)`. Como o restaurante ainda não foi criado nesse momento, a validação deixa de fazer sentido como pré-check global e passa a confiar na constraint composta do banco — basta remover o pré-check de username e deixar o erro de constraint aparecer (improvável, pois o restaurante é novo). Mantém-se o pré-check de slug, que continua sendo global.
+### 4. `BlockedOverlay` — sem alteração
 
-### 3. Sem mudanças no frontend
+Já existe e é renderizado pelo `SectionWrapper` com `reason='plan'`. Após as correções acima, abas como PDV, Estoque, Financeiro, Fidelidade, Marketing, Fiscal, Reservas, Mesas etc. passarão a aparecer com o overlay de blur + botão "Ver planos e fazer upgrade" para o restaurante Básico.
 
-`RestaurantLogin.tsx` continua chamando o mesmo RPC, agora com lógica corrigida. Nenhuma outra tela precisa mudar.
+### Fora de escopo (preservar)
 
-## Arquivos afetados
+Nenhuma alteração em fluxo de pedidos, pagamentos, iFood, Delivery Direto, fiscal ou checkout. Apenas o hook de módulos e o wrapper de seções no admin.
 
-- `supabase/functions/register-restaurant/index.ts` — remover pré-check de username
-- Migration SQL — trocar constraint + atualizar RPC `validate_restaurant_credentials`
+## Resultado esperado
 
-## O que NÃO muda
-
-- Não altero fluxos de pedidos, cardápio, iFood, Delivery Direto, fiscal.
-- Staff login continua igual (já estava correto).
-- Slug continua sendo único globalmente.
+Para o restaurante Básico (`8713e59b...`):
+- Liberado: Visão Geral, Cardápio, Pedidos Online (delivery), WhatsApp, Módulos, Contas, configs básicas.
+- Bloqueado com overlay: PDV, Mesas/Reservas, Caixa, Estoque, Custos, Margens, Relatórios, Clientes, Fidelidade, Marketing, Fiscal, Pagamentos Online, Totem.
