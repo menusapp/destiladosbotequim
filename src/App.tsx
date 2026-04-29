@@ -49,6 +49,7 @@ const TableDetailView = lazyWithRetry(() =>
 const MercadoPagoCallback = lazyWithRetry(() => import("./pages/MercadoPagoCallback"));
 const RestaurantRegistration = lazyWithRetry(() => import("./pages/RestaurantRegistration"));
 const PaymentPending = lazyWithRetry(() => import("./pages/PaymentPending"));
+const PaymentConfirmed = lazyWithRetry(() => import("./pages/PaymentConfirmed"));
 const Kiosk = lazyWithRetry(() => import("./pages/Kiosk"));
 
 const queryClient = new QueryClient({
@@ -104,6 +105,7 @@ const App = () => (
               {/* Registration routes (post-payment redirect) */}
               <Route path="/registro/:planSlug" element={<RestaurantRegistration />} />
               <Route path="/pagamento-pendente/:slug" element={<PaymentPending />} />
+              <Route path="/pagamento-confirmado" element={<PaymentConfirmed />} />
 
               {/* Restaurant-scoped routes (slug-based) */}
               <Route path="/:slug/kiosk" element={<Kiosk />} />

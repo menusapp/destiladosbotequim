@@ -176,6 +176,11 @@ export function SubscriptionPlansTab() {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-100">
+        <strong>Atenção:</strong> Atualize a URL de redirect de cada plano no painel do
+        Mercado Pago (Seu negócio → Assinaturas → editar plano) para:{" "}
+        <code className="font-mono">https://menusapp.com.br/pagamento-confirmado?plan=&lt;basico|intermediario|avancado&gt;</code>
+      </div>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Planos de Assinatura</h2>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
