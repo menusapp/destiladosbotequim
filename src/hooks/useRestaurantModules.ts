@@ -35,11 +35,13 @@ const ALWAYS_AVAILABLE = [
   "config-totem",
   "modulos",
   "robo-menus",
+  "equipe",
 ];
 
 export function useRestaurantModules(restaurantId: string | null) {
   // null = not loaded yet; [] = loaded but nothing allowed; [..] = loaded with features
   const [allowedModules, setAllowedModules] = useState<string[] | null>(null);
+  const [planName, setPlanName] = useState<string | null>(null);
   const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean | null>(null);
   const [isDelinquent, setIsDelinquent] = useState(false);
   const [isTrial, setIsTrial] = useState(false);
@@ -107,6 +109,7 @@ export function useRestaurantModules(restaurantId: string | null) {
         const plan = (sub as any).subscription_plans as { name?: string; features?: string[] };
         const features = Array.isArray(plan.features) ? plan.features : [];
         setAllowedModules(features);
+        setPlanName(plan.name ?? null);
         setHasActiveSubscription(true);
         setIsTrial((sub as any).is_trial === true);
 
@@ -124,6 +127,7 @@ export function useRestaurantModules(restaurantId: string | null) {
         // remain accessible via isSectionAllowed below so the user can reach
         // the plans screen and pay.
         setAllowedModules([]);
+        setPlanName(null);
         setHasActiveSubscription(false);
         setIsDelinquent(false);
         setIsTrial(false);
@@ -132,6 +136,7 @@ export function useRestaurantModules(restaurantId: string | null) {
       console.warn("[useRestaurantModules] unexpected error:", err);
       // Fail-closed on error
       setAllowedModules([]);
+      setPlanName(null);
       setHasActiveSubscription(false);
     } finally {
       setLoading(false);
@@ -152,6 +157,7 @@ export function useRestaurantModules(restaurantId: string | null) {
 
   return {
     allowedModules,
+    planName,
     loading,
     loaded,
     isSectionAllowed,

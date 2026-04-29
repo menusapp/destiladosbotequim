@@ -33,6 +33,7 @@ const ClientesTab = lazy(() => import("@/components/admin/ClientesTab"));
 const FidelityTab = lazy(() => import("@/components/admin/FidelityTab"));
 const FiscalTab = lazy(() => import("@/components/admin/FiscalTab"));
 const ContasTab = lazy(() => import("@/components/admin/ContasTab"));
+const EquipeTab = lazy(() => import("@/components/admin/EquipeTab"));
 const IntegrationsTab = lazy(() => import("@/components/admin/IntegrationsTab"));
 const ModulosTab = lazy(() => import("@/components/admin/ModulosTab"));
 const CompanyDataSettings = lazy(() => import("@/components/admin/settings/CompanyDataSettings"));
@@ -243,7 +244,7 @@ const RestaurantAdmin = () => {
   }, [reservationNotification]);
   
   useInactivityLogout();
-  const { isSectionAllowed, hasActiveSubscription, allowedModules, isDelinquent, loaded: modulesLoaded } = useRestaurantModules(restaurant?.id || null);
+  const { isSectionAllowed, hasActiveSubscription, allowedModules, planName, isDelinquent, loaded: modulesLoaded } = useRestaurantModules(restaurant?.id || null);
   const isTotemUnlocked = Array.isArray(allowedModules) && allowedModules.includes("totem");
 
   // No longer force modulos — overlays handle blocked access now
@@ -877,6 +878,8 @@ const RestaurantAdmin = () => {
           return <ModulosTab restaurantId={restaurant.id} />;
         case "contas":
           return <ContasTab restaurantId={restaurant.id} />;
+        case "equipe":
+          return <EquipeTab restaurantId={restaurant.id} planName={planName} onNavigateToPlans={() => setActiveSection("modulos")} />;
         case "config-dados":
           return <CompanyDataSettings restaurantId={restaurant.id} />;
         case "config-whatsapp":

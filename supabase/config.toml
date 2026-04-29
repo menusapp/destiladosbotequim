@@ -98,3 +98,6 @@ verify_jwt = false
 
 [functions.qz-sign]
 verify_jwt = false
+
+[functions.staff-create]
+verify_jwt = false

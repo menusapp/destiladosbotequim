@@ -84,6 +84,7 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
       { id: "integracoes", label: "Integrações", icon: Plug },
       { id: "fiscal", label: "Fiscal", icon: FileText },
       { id: "contas", label: "Contas", icon: Users },
+      { id: "equipe", label: "Equipe", icon: Users2 },
       { id: "modulos", label: "Planos", icon: Construction },
     ],
   ];
