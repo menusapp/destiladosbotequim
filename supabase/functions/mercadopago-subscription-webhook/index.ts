@@ -44,9 +44,14 @@ Deno.serve(async (req) => {
 
     // Handle subscription_preapproval (subscription status changes)
     if (action === "subscription_preapproval.updated" || action === "subscription_preapproval.created") {
-      const mpAccessToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+      if (!Deno.env.get("MERCADOPAGO_SUBSCRIPTIONS_ACCESS_TOKEN")) {
+        console.warn("[MP Sub Webhook] MERCADOPAGO_SUBSCRIPTIONS_ACCESS_TOKEN não configurado, usando fallback MERCADOPAGO_ACCESS_TOKEN");
+      }
+      const mpAccessToken =
+        Deno.env.get("MERCADOPAGO_SUBSCRIPTIONS_ACCESS_TOKEN") ||
+        Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
       if (!mpAccessToken) {
-        console.error("[MP Sub Webhook] No MERCADOPAGO_ACCESS_TOKEN configured");
+        console.error("[MP Sub Webhook] Nenhum access token de MP disponível");
         return new Response("OK", { status: 200, headers: corsHeaders });
       }
 
