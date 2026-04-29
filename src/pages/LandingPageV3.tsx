@@ -414,7 +414,7 @@ const LandingPageV3 = () => {
                 </div>
               </div>
             </div>
-          </ScrollReveal>
+          </div>
         </div>
       </section>
 
