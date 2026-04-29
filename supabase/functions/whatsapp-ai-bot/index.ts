@@ -43,11 +43,14 @@ Deno.serve(async (req) => {
       .eq('restaurant_id', restaurant_id)
       .maybeSingle();
 
-    if (!aiConfig?.is_active) {
+    if (!aiConfig?.is_active && !simulate) {
       return new Response(JSON.stringify({ skipped: true, reason: 'AI not active' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // For simulator, fall back to defaults if no config exists
+    const effectiveConfig = aiConfig || { welcome_message_type: 'numeric_menu', is_active: true };
 
     // Get restaurant info
     const { data: restaurant } = await supabase
