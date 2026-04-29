@@ -8,7 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import menusLogo from "@/assets/menus-logo.png";
 import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
-import landingPdv from "@/assets/landing-pdv.png";
+import landingPdv from "@/assets/landing-pdv.jpg";
 import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
 import {
@@ -375,8 +375,8 @@ const LandingPageV3 = () => {
 
           <ScrollReveal delay={200}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-              <div className="rounded-2xl border border-border shadow-xl overflow-hidden bg-card">
-                <img src={currentTab.image} alt={currentTab.title} className="w-full h-auto" />
+              <div className="rounded-2xl border border-border shadow-xl overflow-hidden bg-card p-4 sm:p-8">
+                <img src={currentTab.image} alt={currentTab.title} className="w-full h-auto rounded-lg shadow-sm" />
               </div>
               <div>
                 <h3 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-[-0.025em] leading-tight">
