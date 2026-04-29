@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, Check, Star, MessageCircle, Rocket, TrendingDown, Smartphone, DollarSign, Package, ArrowRight } from "lucide-react";
-import dashboardMockup from "@/assets/landing-dashboard-mockup.jpg";
+import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
 
 const WHATSAPP_URL = "https://wa.me/5514999999999";
 const REGISTER_URL = "https://menusapp.com.br/registro/avancado";

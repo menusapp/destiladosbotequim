@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import menusLogo from "@/assets/menus-logo.png";
-import dashboardMockup from "@/assets/landing-dashboard-mockup.jpg";
+import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
 import landingPdv from "@/assets/landing-pdv.png";
 import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
