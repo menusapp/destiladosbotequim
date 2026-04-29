@@ -182,15 +182,28 @@ const LandingHamburgueria = () => {
 
       {/* ═══ HERO ═══ */}
       <section className="relative overflow-hidden bg-card">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.06] via-primary/[0.02] to-transparent" />
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-primary/[0.07] blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/[0.08] via-amber-500/[0.03] to-transparent" />
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-amber-500/[0.10] blur-[120px] pointer-events-none" />
+
+        <NicheHeroDecor
+          bgPatternEmoji="🍔"
+          keyframes={`
+            @keyframes burger-float { 0%,100%{transform:translateY(0) rotate(-6deg)} 50%{transform:translateY(-22px) rotate(6deg)} }
+            @keyframes burger-float-slow { 0%,100%{transform:translateY(0) rotate(0)} 50%{transform:translateY(-14px) rotate(-8deg)} }
+          `}
+          emojis={[
+            { emoji: "🍔", className: "top-[8%] left-[6%] hidden sm:block", size: "text-6xl sm:text-7xl", rotate: "" },
+            { emoji: "🍟", className: "top-[18%] right-[8%] hidden sm:block", size: "text-5xl sm:text-6xl" },
+            { emoji: "🥤", className: "bottom-[22%] left-[4%] hidden md:block", size: "text-5xl sm:text-6xl" },
+            { emoji: "🍔", className: "bottom-[10%] right-[6%] hidden sm:block", size: "text-6xl sm:text-7xl" },
+          ].map((e, i) => ({ ...e, className: `${e.className} ${i % 2 === 0 ? "[animation:burger-float_6s_ease-in-out_infinite]" : "[animation:burger-float-slow_7s_ease-in-out_infinite]"}` }))}
+        />
 
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
           <ScrollReveal>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-8 border border-primary/20">
-              <Star className="h-4 w-4 fill-primary" />
-              {HERO_BADGE}
-            </div>
+            <NicheBadge bgClass="bg-amber-500/15 text-amber-700 border-amber-500/30">
+              🍔 {HERO_BADGE}
+            </NicheBadge>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
