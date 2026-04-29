@@ -677,6 +677,24 @@ const LandingPageV3 = () => {
         </div>
       </section>
 
+      {/* ═══ SIMULADOR ═══ */}
+      <section className="py-20 px-5 lg:px-8 bg-background">
+        <div className="max-w-5xl mx-auto">
+          <ScrollReveal className="text-center mb-10">
+            <span className="text-xs font-bold tracking-[0.2em] text-primary">CALCULADORA</span>
+            <h2 className="mt-3 text-3xl md:text-5xl font-extrabold text-foreground tracking-tight">
+              Quanto seu restaurante pode faturar a mais?
+            </h2>
+            <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
+              Mexa nos sliders e veja sua projeção de receita com Menu's.
+            </p>
+          </ScrollReveal>
+          <ScrollReveal delay={150}>
+            <SavingsSimulator registerUrl={REGISTER_URL} />
+          </ScrollReveal>
+        </div>
+      </section>
+
       {/* ═══ PLANOS (V2) ═══ */}
       <section id="pricing" className="py-20 px-5 lg:px-8 bg-[#F5F5F0]">
         <div className="max-w-6xl mx-auto text-center">
