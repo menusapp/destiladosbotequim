@@ -517,7 +517,7 @@ const LandingPageV3 = () => {
               <div className="rounded-2xl border border-border bg-background overflow-hidden shadow-md hover:shadow-xl transition-shadow h-full flex flex-col">
                 <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
                   <img
-                    src="/placeholder.svg"
+                    src={landingTotem}
                     alt="Totem de autoatendimento Menus"
                     className="w-full h-full object-cover"
                     loading="lazy"
