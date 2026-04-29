@@ -26,6 +26,7 @@ import {
   Receipt, CalendarCheck,
   Pizza, Coffee, Beer, Sandwich, ChefHat,
   Store, Rocket, MessageCircle, Sparkles,
+  Tablet, Hand, Zap, Users,
 } from "lucide-react";
 
 const WHATSAPP_URL = "https://wa.me/5514999999999";
