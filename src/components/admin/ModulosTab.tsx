@@ -229,8 +229,19 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         },
       });
 
-      if (error || !data?.redirect_url) {
-        throw new Error((data as any)?.error || error?.message || "Erro ao agendar downgrade");
+      if (error) {
+        let msg = error.message || "Erro ao agendar downgrade";
+        try {
+          const parsed = JSON.parse(error.message);
+          msg = parsed.error || parsed.message || msg;
+        } catch {}
+        throw new Error(msg);
+      }
+      if (data?.ok === false) {
+        throw new Error(data.error || "Erro ao agendar downgrade");
+      }
+      if (!data?.redirect_url) {
+        throw new Error("Link de pagamento não encontrado. Verifique se o plano tem link configurado.");
       }
 
       toast.success(
