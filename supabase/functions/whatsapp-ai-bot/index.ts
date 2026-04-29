@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     // ── Bot pause check ──
-    if (conversation?.bot_paused && conversation?.bot_paused_until) {
+    if (!simulate && conversation?.bot_paused && conversation?.bot_paused_until) {
       const pausedUntil = new Date(conversation.bot_paused_until);
       if (pausedUntil > new Date()) {
         console.log(`[AI-BOT] Bot paused for ${customer_phone} until ${pausedUntil.toISOString()}`);
