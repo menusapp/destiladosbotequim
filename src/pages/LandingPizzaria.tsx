@@ -514,7 +514,7 @@ const LandingPizzaria = () => {
       {/* ═══ NICHE EXCLUSIVE ═══ */}
       <NicheExtraSection
         eyebrow="Pizzaria"
-        title={<>O rush da <span class="text-red-600">sexta-feira</span> nunca mais será um problema</>}
+        title={<>O rush da <span className="text-red-600">sexta-feira</span> nunca mais será um problema</>}
         subtitle="Receba 50 pedidos simultâneos sem travar a cozinha nem perder um cliente."
         bgStyle="linear-gradient(135deg, #7F1D1D 0%, #450A0A 100%)"
         cardClass="bg-red-950/40 border-red-700/40 backdrop-blur-sm"

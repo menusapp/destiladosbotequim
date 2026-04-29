@@ -515,7 +515,7 @@ const LandingSorveteria = () => {
       {/* ═══ NICHE EXCLUSIVE ═══ */}
       <NicheExtraSection
         eyebrow="Sorveteria"
-        title={<>Sabores que conquistam o <span class="text-pink-200">ano todo</span></>}
+        title={<>Sabores que conquistam o <span className="text-pink-200">ano todo</span></>}
         subtitle="Cardápio visual cheio de cor, fidelidade automática e sabor para cada estação do ano."
         bgStyle="linear-gradient(135deg, #DB2777 0%, #9333EA 100%)"
         cardClass="bg-white/15 border-white/30 backdrop-blur-sm"

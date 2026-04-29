@@ -514,7 +514,7 @@ const LandingBar = () => {
       {/* ═══ NICHE EXCLUSIVE ═══ */}
       <NicheExtraSection
         eyebrow="Bar"
-        title={<>Noite de bar <span class="text-amber-400">sem estresse</span></>}
+        title={<>Noite de bar <span className="text-amber-400">sem estresse</span></>}
         subtitle="QR Code na mesa, bar lotado, atendentes felizes e seu caixa fechando redondo."
         bgStyle="linear-gradient(135deg, #1C1917 0%, #292524 100%)"
         cardClass="bg-stone-800/60 border-amber-700/40 backdrop-blur-sm"

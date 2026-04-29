@@ -514,7 +514,7 @@ const LandingSushi = () => {
       {/* ═══ NICHE EXCLUSIVE ═══ */}
       <NicheExtraSection
         eyebrow="Sushi"
-        title={<>Experiência japonesa <span class="text-red-600">completa</span></>}
+        title={<>Experiência japonesa <span className="text-red-600">completa</span></>}
         subtitle="Combinados, rodízio e temaki num cardápio digital com a elegância que sua marca merece."
         bgStyle="linear-gradient(180deg, #FAFAFA 0%, #F5F5F4 100%)"
         cardClass="bg-white border-neutral-200"

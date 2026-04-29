@@ -514,7 +514,7 @@ const LandingMarmitaria = () => {
       {/* ═══ NICHE EXCLUSIVE ═══ */}
       <NicheExtraSection
         eyebrow="Marmitaria"
-        title={<>Clientes fixos <span class="text-green-400">todo mês</span> no piloto automático</>}
+        title={<>Clientes fixos <span className="text-green-400">todo mês</span> no piloto automático</>}
         subtitle="Plano mensal, cobrança automática, marmita entregue. Fidelidade que se constrói sozinha."
         bgStyle="linear-gradient(135deg, #14532D 0%, #052E16 100%)"
         cardClass="bg-green-950/40 border-green-700/40 backdrop-blur-sm"
