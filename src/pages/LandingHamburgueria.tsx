@@ -512,6 +512,22 @@ const LandingHamburgueria = () => {
         </div>
       </section>
 
+      {/* ═══ NICHE EXCLUSIVE ═══ */}
+      <NicheExtraSection
+        eyebrow="Hamburgueria"
+        title={<>Por que <span className="text-amber-600">hamburguerias</span> nos amam?</>}
+        subtitle="Feito para quem vive o rush do almoço, do happy hour e da madrugada."
+        bgStyle="linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)"
+        cardClass="bg-white border-amber-200 text-amber-900"
+        titleClass="text-amber-900"
+        textClass="text-amber-800/80"
+        cards={[
+          { emoji: "🍔", title: "Pedido sem erro", desc: "Cliente monta o burger no celular: ponto da carne, sem cebola, queijo extra. Cozinha imprime exato." },
+          { emoji: "🍟", title: "Combo que vende sozinho", desc: "Sugestão automática de batata e bebida no carrinho aumenta o ticket médio em até 30%." },
+          { emoji: "🥤", title: "Delivery sem comissão", desc: "Cardápio próprio no WhatsApp e link direto. Adeus iFood comendo sua margem." },
+        ]}
+      />
+
       {/* ═══ SIMULADOR ═══ */}
       <section className="py-16 sm:py-20 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
