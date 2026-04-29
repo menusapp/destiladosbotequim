@@ -31,7 +31,7 @@ import {
   Tablet, Hand, Zap, Users,
 } from "lucide-react";
 
-const WHATSAPP_URL = "https://w.app/menusapp";
+const WHATSAPP_URL = `https://wa.me/5514999001166?text=${encodeURIComponent("Olá! Vim pelo site e tenho interesse no sistema. Tenho um restaurante e quero aumentar meus pedidos e automatizar meu atendimento. Pode me explicar como funciona?")}`;
 const REGISTER_URL = "https://menusapp.com.br/registro/avancado";
 
 /* ── Plans (V2) ── */
