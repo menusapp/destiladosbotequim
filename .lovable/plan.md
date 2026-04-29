@@ -1,51 +1,86 @@
-## Problema
+## Diagnóstico
 
-O restaurante `8713e59b...` tem assinatura `active` do plano **Básico** (features `["cardapio","delivery","whatsapp"]`) mas todas as abas aparecem liberadas.
+Verifiquei o estado real:
 
-Diagnóstico (DB confirma que os dados estão corretos):
-- `subscription_plans` tem os 3 planos com `features` corretos.
-- `restaurant_subscriptions` tem 1 linha `active` por restaurante (Básico para esse caso).
-- RLS é aberta (`anon` lê normalmente).
+- A assinatura do `testemuitotop` está `active` mas com **`mp_preapproval_id = NULL`** — confirma que ela foi criada manualmente no SQL Editor, **não pelo webhook**.
+- Em `function_edge_logs` **não existe nenhuma chamada** para `mercadopago-subscription-webhook` em todo o histórico recente. Ou seja, o Mercado Pago nunca conseguiu (ou nunca tentou) entregar a notificação.
 
-A causa raiz está em `src/hooks/useRestaurantModules.ts`:
+## Causas raiz (duas)
 
-1. **Fail-open por padrão.** `allowedModules` é inicializado como `null`. A função `isSectionAllowed` faz `if (allowedModules === null) return true;` — então durante o loading, em qualquer erro de fetch, ou se o join `subscription_plans(features)` voltar vazio, **todas as seções liberam**. É isso que está acontecendo na prática.
-2. **Query frágil.** Usa `.maybeSingle()` em cima de uma tabela com histórico (cancelled/suspended) e join aninhado. Se voltar mais de uma `active` por race condition do webhook (pode acontecer), retorna erro 406 → cai no `catch` → seta `null` → libera tudo.
-3. **`SectionWrapper`** em `RestaurantAdmin.tsx` (linha 809) reforça o fail-open: `const checkAllowed = (id) => !isSectionAllowed || isSectionAllowed(id);` — a função sempre existe, mas como `isSectionAllowed(id)` devolve `true` quando `allowedModules` é `null`, nada é bloqueado.
+### 1. Edge function exigindo JWT (problema de código — corrijo agora)
 
-## Correções
+Em `supabase/config.toml` todas as funções públicas chamadas por terceiros (iFood, Delivery Direto, MP charge, MP webhook clássico, WhatsApp etc.) têm `verify_jwt = false`. **Mas `mercadopago-subscription-webhook` está faltando nessa lista.** Isso faz o MP receber `401 Unauthorized` ao tentar entregar a notificação e o webhook **nunca executa** — exatamente o que vimos nos logs (vazio).
 
-### 1. `src/hooks/useRestaurantModules.ts`
+Por isso, mesmo o pagamento sendo aprovado e a tela `pagamento-confirmado` aparecer, o painel CEO continuou mostrando `pending_payment` — o webhook nunca rodou para virar `active`.
 
-- Trocar `.maybeSingle()` por `.limit(1)` e pegar `data?.[0] ?? null` (segue a regra do projeto sobre `single-query-errors` e evita 406 com múltiplas linhas).
-- Buscar explicitamente `plan_id, status, is_trial, trial_ends_at, next_payment_at, subscription_plans(name, features)` em vez de `*`.
-- Adicionar estado `loaded: boolean` separado de `loading`. Enquanto `loaded === false`, **`isSectionAllowed` retorna `false`** para seções não-`ALWAYS_AVAILABLE` (fail-closed). Isso evita o flash de "liberado" enquanto a query roda.
-- Após carregar:
-  - Se houver assinatura ativa válida: `allowedModules = plan.features ?? []`.
-  - Se NÃO houver assinatura ativa e o trial não estiver válido: `allowedModules = []` (tudo bloqueado, exceto `ALWAYS_AVAILABLE` e `modulos`).
-  - Se trial ativo (não expirado, sem assinatura): `allowedModules = []` mas `isTrial=true` (mantém comportamento atual de trial).
-- Manter `ALWAYS_AVAILABLE` (inclui `modulos`, `visao-geral`, configs básicas) sempre liberado para o usuário poder navegar até a aba de planos.
-- Logar via `console.warn` quando o fetch falhar, para debug futuro — mas **não** liberar acesso.
+### 2. URL do webhook não configurada no painel do MP (problema de configuração — você precisa fazer)
 
-### 2. `src/pages/RestaurantAdmin.tsx` — `SectionWrapper`
+Mesmo destravando o JWT, o MP só dispara `subscription_preapproval.updated` / `subscription_authorized_payment.created` para a URL configurada no painel. Como os planos foram criados manualmente, a URL provavelmente está vazia ou apontando para outro lugar.
 
-- Substituir `const checkAllowed = (id) => !isSectionAllowed || isSectionAllowed(id);` por chamada direta `isSectionAllowed(id)` (a função sempre existe vinda do hook).
-- Ler também `loaded` do hook e, enquanto não carregou, renderizar um skeleton/placeholder simples ao invés do conteúdo da aba — evita o flash.
+## Correção 1 — Código (eu faço ao aprovar)
 
-### 3. Sem alteração de mapa de planos
+Adicionar em `supabase/config.toml`, junto com os outros webhooks públicos:
 
-Os `features` já vêm do banco corretamente para os 3 planos (Básico/Intermediário/Avançado). **Não é necessário** criar um `PLAN_MODULES` hardcoded — a fonte da verdade já é `subscription_plans.features`. O mapa `SECTION_TO_MODULE` no hook já cobre as seções da sidebar.
+```toml
+[functions.mercadopago-subscription-webhook]
+verify_jwt = false
 
-### 4. `BlockedOverlay` — sem alteração
+[functions.mercadopago-oauth]
+verify_jwt = false
+```
 
-Já existe e é renderizado pelo `SectionWrapper` com `reason='plan'`. Após as correções acima, abas como PDV, Estoque, Financeiro, Fidelidade, Marketing, Fiscal, Reservas, Mesas etc. passarão a aparecer com o overlay de blur + botão "Ver planos e fazer upgrade" para o restaurante Básico.
+(Aproveitando para expor `mercadopago-oauth` também, que é callback público do MP e pelo mesmo motivo precisa aceitar requests sem JWT.)
 
-### Fora de escopo (preservar)
+Nenhuma alteração na lógica do webhook é necessária — ele já está correto:
 
-Nenhuma alteração em fluxo de pedidos, pagamentos, iFood, Delivery Direto, fiscal ou checkout. Apenas o hook de módulos e o wrapper de seções no admin.
+- Identifica o restaurante via `external_reference` (que o `register-restaurant` já injeta na URL do MP, linha 211 do `register-restaurant/index.ts`) com fallback para `mp_payer_email`.
+- Atualiza a sub `pending_payment` existente para `active` (preservando o índice único `idx_restaurant_subscriptions_one_active` e qualquer upgrade/downgrade pendente) em vez de cancelar+inserir.
+- Limpa `pending_plan_slug` e flags de trial.
+- Trata renovação mensal via `subscription_authorized_payment.created`.
+- Trata `paused`/`cancelled` com período de graça de 5 dias e suspensão automática após 2 falhas.
 
-## Resultado esperado
+A coluna `mp_payer_email` já existe em `restaurants` e o `register-restaurant` já grava (vimos `legitgutin@gmail.com` salvo para o `testemuitotop`).
 
-Para o restaurante Básico (`8713e59b...`):
-- Liberado: Visão Geral, Cardápio, Pedidos Online (delivery), WhatsApp, Módulos, Contas, configs básicas.
-- Bloqueado com overlay: PDV, Mesas/Reservas, Caixa, Estoque, Custos, Margens, Relatórios, Clientes, Fidelidade, Marketing, Fiscal, Pagamentos Online, Totem.
+## Correção 2 — Configuração no painel do MP (você precisa fazer)
+
+Esta parte **não é código**, é configuração nos planos do MP. Para cada um dos 3 planos de assinatura (Básico, Intermediário, Avançado):
+
+1. Acesse https://www.mercadopago.com.br/subscriptions → "Seu negócio" → "Assinaturas" → editar plano
+2. Em "URL de notificação" (Webhooks/IPN), colar:
+
+   ```
+   https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/mercadopago-subscription-webhook
+   ```
+
+3. Em "URL de retorno após pagamento" (já feito anteriormente, confirmar):
+
+   ```
+   https://menusapp.com.br/pagamento-confirmado?plan=basico
+   https://menusapp.com.br/pagamento-confirmado?plan=intermediario
+   https://menusapp.com.br/pagamento-confirmado?plan=avancado
+   ```
+
+4. Salvar e usar o botão **"Simular notificação" → "Planos e assinaturas" → `subscription_preapproval`** para testar.
+
+## Validação após aprovar e configurar
+
+1. Após o deploy, o Lovable Cloud reaplica `verify_jwt=false`.
+2. No painel do MP, simular notificação `subscription_preapproval.updated` para um restaurante de teste.
+3. Verificar nos logs do edge function que aparece:
+   - `[MP Sub Webhook] Received: ...`
+   - `[MP Sub Webhook] Preapproval status: authorized payer: ...`
+   - `[MP Sub Webhook] Subscription activated for restaurant: <uuid>`
+4. Conferir no banco:
+
+   ```sql
+   SELECT status, mp_preapproval_id, last_payment_at
+   FROM restaurant_subscriptions
+   WHERE restaurant_id = '<uuid>'
+   ORDER BY created_at DESC LIMIT 1;
+   ```
+
+   Esperado: `status='active'`, `mp_preapproval_id` preenchido, `last_payment_at` recente.
+
+## Fora de escopo (não tocar)
+
+Pedidos, cardápio, iFood, Delivery Direto, fiscal, QZ Tray, lógica de cobrança, RLS de outras tabelas. A única alteração de código é o `supabase/config.toml`.
