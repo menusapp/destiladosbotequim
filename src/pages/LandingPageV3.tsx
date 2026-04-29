@@ -415,7 +415,6 @@ const LandingPageV3 = () => {
               </div>
             </div>
           </div>
-        </div>
       </section>
 
       {/* ═══ COMO COMEÇAR (original — passo 02 com IA) ═══ */}
