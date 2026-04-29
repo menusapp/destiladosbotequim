@@ -155,7 +155,7 @@ const adminTabs = [
     bullets: ["Campanhas em massa no WhatsApp", "Remarketing de inativos", "Cupons segmentados", "Disparos programados"],
   },
   {
-    id: "fiscal", label: "Nota Fiscal", image: landingDre,
+    id: "fiscal", label: "Nota Fiscal", image: landingFiscal,
     title: "Emissão de NFC-e integrada",
     desc: "Emita nota fiscal eletrônica direto no SEFAZ a cada venda, sem sistema externo. Tudo conciliado com o financeiro e pronto para o contador.",
     bullets: ["NFC-e direto ao SEFAZ", "Emissão automática por venda", "Cancelamento e contingência", "Relatórios prontos para o contador"],
