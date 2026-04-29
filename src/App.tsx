@@ -86,6 +86,7 @@ const App = () => (
             <Routes>
               {/* Rotas estáticas globais — devem vir ANTES de qualquer rota dinâmica e da raiz "/" */}
               <Route path="/pagamento-confirmado" element={<PaymentConfirmed />} />
+              <Route path="/v1" element={<LandingPage />} />
               <Route path="/v2" element={<LandingPageV2 />} />
               <Route path="/v3" element={<LandingPageV3 />} />
 
@@ -95,7 +96,7 @@ const App = () => (
               */}
               <Route
                 path="/"
-                element={isOnRestaurantSubdomain() ? <DeliveryMenu /> : <LandingPage />}
+                element={isOnRestaurantSubdomain() ? <DeliveryMenu /> : <LandingPageV3 />}
               />
 
               {/* Auth routes */}
