@@ -43,11 +43,14 @@ Deno.serve(async (req) => {
       .eq('restaurant_id', restaurant_id)
       .maybeSingle();
 
-    if (!aiConfig?.is_active) {
+    if (!aiConfig?.is_active && !simulate) {
       return new Response(JSON.stringify({ skipped: true, reason: 'AI not active' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // For simulator, fall back to defaults if no config exists
+    const effectiveConfig = aiConfig || { welcome_message_type: 'numeric_menu', is_active: true };
 
     // Get restaurant info
     const { data: restaurant } = await supabase
@@ -72,7 +75,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     // ── Bot pause check ──
-    if (conversation?.bot_paused && conversation?.bot_paused_until) {
+    if (!simulate && conversation?.bot_paused && conversation?.bot_paused_until) {
       const pausedUntil = new Date(conversation.bot_paused_until);
       if (pausedUntil > new Date()) {
         console.log(`[AI-BOT] Bot paused for ${customer_phone} until ${pausedUntil.toISOString()}`);
@@ -128,10 +131,10 @@ Deno.serve(async (req) => {
       .order('position');
 
     const menuLink = buildPublicUrl(restaurant.slug);
-    const welcomeType = aiConfig.welcome_message_type || 'numeric_menu';
+    const welcomeType = effectiveConfig.welcome_message_type || 'numeric_menu';
 
     // ── Link-only cooldown: only send the menu link once every 2 hours ──
-    if (welcomeType === 'link_only') {
+    if (welcomeType === 'link_only' && !simulate) {
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
       const lastSentAt = conversation?.last_message_at ? new Date(conversation.last_message_at) : null;
       const alreadyGreeted = conversation?.current_step === 'menu';
@@ -156,7 +159,7 @@ Deno.serve(async (req) => {
         newStep = 'menu';
       } else {
         const result = await processMenuChoice(
-          message_text, menuOptions || [], restaurant, aiConfig, supabase, restaurant_id, menuLink, customer_phone
+          message_text, menuOptions || [], restaurant, effectiveConfig, supabase, restaurant_id, menuLink, customer_phone
         );
         responseText = result.response;
         newStep = result.newStep;
