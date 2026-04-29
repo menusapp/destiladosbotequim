@@ -32,6 +32,7 @@ import { isOnRestaurantSubdomain } from "@/lib/slugResolver";
 import { MetaPixelRouteTracker } from "@/components/MetaPixelRouteTracker";
 
 const LandingPage = lazyWithRetry(() => import("./pages/LandingPage"));
+const LandingPageV2 = lazyWithRetry(() => import("./pages/LandingPageV2"));
 const RestaurantLogin = lazyWithRetry(() => import("./pages/RestaurantLogin"));
 const CEOLogin = lazyWithRetry(() => import("./pages/CEOLogin"));
 const CEODashboard = lazyWithRetry(() => import("./pages/CEODashboard"));
@@ -84,6 +85,7 @@ const App = () => (
             <Routes>
               {/* Rotas estáticas globais — devem vir ANTES de qualquer rota dinâmica e da raiz "/" */}
               <Route path="/pagamento-confirmado" element={<PaymentConfirmed />} />
+              <Route path="/v2" element={<LandingPageV2 />} />
 
               {/*
                 Quando acessado via subdomínio do restaurante (ex.: rods.menusapp.com.br/),
