@@ -34,6 +34,12 @@ import { MetaPixelRouteTracker } from "@/components/MetaPixelRouteTracker";
 const LandingPage = lazyWithRetry(() => import("./pages/LandingPage"));
 const LandingPageV2 = lazyWithRetry(() => import("./pages/LandingPageV2"));
 const LandingPageV3 = lazyWithRetry(() => import("./pages/LandingPageV3"));
+const LandingHamburgueria = lazyWithRetry(() => import("./pages/LandingHamburgueria"));
+const LandingPizzaria = lazyWithRetry(() => import("./pages/LandingPizzaria"));
+const LandingBar = lazyWithRetry(() => import("./pages/LandingBar"));
+const LandingSushi = lazyWithRetry(() => import("./pages/LandingSushi"));
+const LandingMarmitaria = lazyWithRetry(() => import("./pages/LandingMarmitaria"));
+const LandingSorveteria = lazyWithRetry(() => import("./pages/LandingSorveteria"));
 const RestaurantLogin = lazyWithRetry(() => import("./pages/RestaurantLogin"));
 const CEOLogin = lazyWithRetry(() => import("./pages/CEOLogin"));
 const CEODashboard = lazyWithRetry(() => import("./pages/CEODashboard"));
@@ -89,6 +95,12 @@ const App = () => (
               <Route path="/v1" element={<LandingPage />} />
               <Route path="/v2" element={<LandingPageV2 />} />
               <Route path="/v3" element={<LandingPageV3 />} />
+              <Route path="/hamburgueria" element={<LandingHamburgueria />} />
+              <Route path="/pizzaria" element={<LandingPizzaria />} />
+              <Route path="/bar" element={<LandingBar />} />
+              <Route path="/sushi" element={<LandingSushi />} />
+              <Route path="/marmitaria" element={<LandingMarmitaria />} />
+              <Route path="/sorveteria" element={<LandingSorveteria />} />
 
               {/*
                 Quando acessado via subdomínio do restaurante (ex.: rods.menusapp.com.br/),

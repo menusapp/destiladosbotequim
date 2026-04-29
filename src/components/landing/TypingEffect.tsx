@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 
-const words = ["restaurantes", "hamburguerias", "pizzarias", "bares", "cafeterias", "lanchonetes"];
+const defaultWords = ["restaurantes", "hamburguerias", "pizzarias", "bares", "cafeterias", "lanchonetes"];
 
-export function TypingEffect() {
+interface TypingEffectProps {
+  words?: string[];
+}
+
+export function TypingEffect({ words = defaultWords }: TypingEffectProps = {}) {
   const [wordIndex, setWordIndex] = useState(0);
   const [text, setText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
