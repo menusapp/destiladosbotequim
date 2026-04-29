@@ -17,6 +17,7 @@ import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
 import landingRoboMenus from "@/assets/landing-robo-menus.png";
 import landingMarketing from "@/assets/landing-marketing.png";
+import landingFiscal from "@/assets/landing-fiscal.png";
 import landingTotem from "@/assets/landing-totem.png";
 import landingGarcom from "@/assets/landing-garcom.png";
 import {
