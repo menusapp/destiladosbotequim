@@ -189,7 +189,7 @@ export default function EquipeTab({ restaurantId, planName, onNavigateToPlans }:
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => window.open("https://wa.me/5514999999999", "_blank")}
+                  onClick={() => window.open("https://w.app/menusapp", "_blank")}
                 >
                   Falar no WhatsApp
                 </Button>
