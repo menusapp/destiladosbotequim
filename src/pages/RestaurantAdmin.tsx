@@ -636,8 +636,10 @@ const RestaurantAdmin = () => {
         checkAndUpdateOpenStatus(data);
       }
     } catch (error) {
+      console.error("Erro ao carregar dados do restaurante:", error);
+      clearAdminSession();
       toast.error("Erro ao carregar dados do restaurante");
-      navigate("/login");
+      navigate("/login", { replace: true });
     } finally {
       setLoading(false);
     }
