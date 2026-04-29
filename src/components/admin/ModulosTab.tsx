@@ -124,7 +124,7 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         .order("price", { ascending: true }),
       supabase
         .from("restaurant_subscriptions")
-        .select("*, subscription_plans(name, price, features)")
+        .select("*, subscription_plans!restaurant_subscriptions_plan_id_fkey(name, price, features)")
         .eq("restaurant_id", restaurantId)
         .in("status", ["active", "past_due"])
         .order("created_at", { ascending: false })
