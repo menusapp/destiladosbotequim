@@ -141,7 +141,7 @@ const adminTabs = [
     bullets: ["QR Codes ilimitados", "Rastreamento por origem", "Personalização visual", "Impressão fácil em qualquer formato"],
   },
   {
-    id: "robo-menus", label: "Robô Menu's", image: landingWhatsapp,
+    id: "robo-menus", label: "Robô Menu's", image: landingRoboMenus,
     title: "Robô IA que vende por você",
     desc: "Atendente virtual no WhatsApp 24h por dia. Tira dúvidas, sugere produtos, monta o pedido e fecha a venda automaticamente — treinado com o seu cardápio.",
     bullets: ["Atendimento 24h no WhatsApp", "Sugestão inteligente de produtos", "Fechamento automático de pedidos", "Treinado com o seu cardápio"],
