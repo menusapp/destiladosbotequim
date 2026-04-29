@@ -29,6 +29,7 @@ const RestaurantRegistration = () => {
     cnpj: "",
     phone: "",
     address: "",
+    email: "",
     username: "",
     password: "",
     confirmPassword: "",
@@ -96,6 +97,10 @@ const RestaurantRegistration = () => {
       toast.error("O slug deve ter pelo menos 3 caracteres");
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast.error("Informe um email válido do responsável");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -106,6 +111,7 @@ const RestaurantRegistration = () => {
           cnpj: form.cnpj,
           phone: form.phone,
           address: form.address,
+          email: form.email.trim().toLowerCase(),
           username: form.username,
           password: form.password,
           adminUsername: form.adminUsername,
@@ -318,6 +324,21 @@ const RestaurantRegistration = () => {
                 placeholder="Rua, número, bairro, cidade - UF"
                 maxLength={300}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Email do responsável *</Label>
+              <Input
+                required
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="seu@email.com"
+                maxLength={200}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use o mesmo email da sua conta do Mercado Pago para ativar seu plano automaticamente após o pagamento.
+              </p>
             </div>
 
             <div className="border-t pt-4 mt-2">
