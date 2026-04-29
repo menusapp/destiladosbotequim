@@ -1,72 +1,84 @@
-## Objetivo
+## Reformular cadastro em wizard de 4 passos
 
-Criar 6 landing pages de nicho (Hamburgueria, Pizzaria, Bar, Sushi, Marmitaria, Sorveteria) baseadas na `LandingPage.tsx` existente, com a mesma estrutura/qualidade visual, mas com cópia (textos, dores, métricas, depoimentos, CTA, TypingEffect) 100% adaptada a cada segmento. A `LandingPage.tsx` original NÃO será alterada.
+Transformar `src/pages/RestaurantRegistration.tsx` num fluxo guiado de 4 etapas, mais leve e persuasivo, sem alterar nenhuma rota, edge function, integração de pagamento ou redirecionamento existentes.
 
-## Arquivos a criar
+### O que muda na experiência
 
-- `src/pages/LandingHamburgueria.tsx`
-- `src/pages/LandingPizzaria.tsx`
-- `src/pages/LandingBar.tsx`
-- `src/pages/LandingSushi.tsx`
-- `src/pages/LandingMarmitaria.tsx`
-- `src/pages/LandingSorveteria.tsx`
+```text
+①  Negócio   ─── ②  Localização   ─── ③  Acesso   ─── ④  Plano
+nome+tipo+fone   CEP+endereço+CNPJ    nome+email+slug+senha   3 cards + criar conta
+```
 
-Cada uma será praticamente uma cópia da `LandingPage.tsx` com as constantes locais (`painPoints`, `sellingModes`, `testimonials`, `heroBadge`, `heroMetrics`, `typingWords`, `ctaFinalTitle`, `content_name` do Pixel) substituídas pelos textos do nicho conforme a especificação fornecida.
+- Topo fixo com logo do Menu's centralizada e barra de progresso (4 círculos com nome embaixo + barra fina de 0–100%).
+- Um único “card” por step ocupa a viewport (`max-w-lg mx-auto`), com título motivacional e subtítulo de valor.
+- Transição suave: o step atual desliza para a esquerda e o próximo entra da direita ao avançar; inverso ao voltar (`translateX` + `opacity`, 300ms).
+- Mobile-first, totalmente responsivo, sem mostrar todos os campos de uma vez.
 
-## Arquivos a modificar
+### Step 1 — “Vamos começar!”
+- **Nome do restaurante** (input grande, autoFocus).
+- **Tipo de estabelecimento**: grid de cards clicáveis com ícones (Restaurante, Hamburgueria, Pizzaria, Bar, Marmitaria, Sorveteria, Cafeteria, Outro) — usando ícones de `lucide-react` já instalados (Utensils, Sandwich, Pizza, Beer, Salad, IceCream, Coffee, Store). O tipo selecionado destaca com borda/preenchimento primário e troca o ícone exibido no topo do card.
+- **Telefone/WhatsApp** com máscara `(00) 00000-0000`.
+- Validação para avançar: nome ≥ 2 chars, tipo selecionado, telefone ≥ 10 dígitos.
 
-### `src/components/landing/TypingEffect.tsx`
-Aceitar uma prop opcional `words?: string[]` (mantendo o array padrão atual como fallback) para que cada landing de nicho passe seu próprio array (ex.: `["sua hamburgueria", "seu delivery de burgers", "sua smash burger"]`) sem afetar a landing original.
+### Step 2 — “Onde você está?”
+- **CEP** (8 dígitos): ao completar, faz `fetch` para `https://viacep.com.br/ws/{cep}/json/` e auto-preenche rua, bairro e cidade. Mostra spinner enquanto consulta e erro inline se CEP inválido.
+- **Rua e número** (rua preenchida pelo ViaCEP; número editável manual).
+- **Bairro e Cidade/UF** (preenchidos automaticamente, editáveis).
+- **CNPJ** com label “Opcional — para emissão de nota fiscal”.
+- Validação para avançar: CEP válido (8 dígitos) + rua + número + cidade preenchidos. CNPJ opcional.
+- O endereço final é montado em `address = "{rua}, {numero} - {bairro}, {cidade}/{uf}"` para enviar à edge function (mesmo campo `address` atual).
 
-### `src/App.tsx`
-- Adicionar 6 imports lazy:
-  ```tsx
-  const LandingHamburgueria = lazyWithRetry(() => import("./pages/LandingHamburgueria"));
-  // ... e os outros 5
-  ```
-- Adicionar 6 rotas **antes** das rotas dinâmicas `/:slug`:
-  ```tsx
-  <Route path="/hamburgueria" element={<LandingHamburgueria />} />
-  <Route path="/pizzaria" element={<LandingPizzaria />} />
-  <Route path="/bar" element={<LandingBar />} />
-  <Route path="/sushi" element={<LandingSushi />} />
-  <Route path="/marmitaria" element={<LandingMarmitaria />} />
-  <Route path="/sorveteria" element={<LandingSorveteria />} />
-  ```
-  Posição: junto com `/v1`, `/v2`, `/v3` (já estão antes de `/` e `/:slug`).
+### Step 3 — “Crie seu acesso”
+- **Nome do responsável** (novo campo apenas exibido; será usado como `adminUsername` por padrão, podendo ser editado abaixo se quiser).
+- **Email** com instrução: “Use o mesmo email do Mercado Pago para ativar seu plano automaticamente”.
+- **Nome de usuário** (slug): live-preview `menusapp.com.br/{slug}` atualizado em tempo real, com debounce de 500ms para checar disponibilidade via `supabase.from('restaurants').select('id').eq('slug', x).maybeSingle()`. Indicador visual: spinner / check verde / “Indisponível”.
+- **Senha** (PasswordInput) e **Confirmar senha** (PasswordInput).
+- Validação para avançar: email válido, slug ≥ 3 chars + disponível + sem caracteres especiais (já sanitizado), senhas iguais e ≥ 6 chars.
+- Internamente o wizard reutiliza o mesmo valor de senha para `password` e `adminPassword`, e o slug para `username`, mantendo a edge function recebendo todos os campos atuais sem mudanças.
 
-## O que se mantém igual em todas
+### Step 4 — “Escolha seu plano”
+- Três cards (Básico R$69,90 / Intermediário R$149,90 / Avançado R$249,90) lado a lado em desktop, empilhados em mobile. Avançado vem com selo “Mais escolhido” e já vem **pré-selecionado** quando vier de `/registro/avancado`, idem para os outros (`/registro/basico`, `/registro/intermediario`, `/registro/trial`). A tela permite trocar o plano mesmo se vier pré-selecionado.
+- Card selecionado ganha borda primária + checkmark.
+- Resumo do cadastro abaixo (card cinza claro): nome do restaurante, usuário (`menusapp.com.br/{slug}`) e plano escolhido.
+- Botão principal: “Criar minha conta grátis 🚀” + linha “7 dias grátis · Sem cartão · Cancele quando quiser”.
+- Botão secundário “← Voltar”.
 
-- Estrutura de seções: Header → Hero → Stats (4 cards) → Soluções → Dores → Painel Admin (com tabs) → Como Começar → Recursos → Depoimentos → Segmentos → Simulador → Pricing → FAQ → CTA Final → Footer.
-- Componentes compartilhados: `ScrollReveal`, `TypingEffect`, `PhoneMockup`, `SavingsSimulator`.
-- Planos e preços: Básico R$ 69,90 / Intermediário R$ 149,90 / Avançado R$ 249,90 — Avançado destacado como "Mais Escolhido".
-- Navegação: `/registro/:planSlug` nos CTAs dos planos, `/registro/trial` no Hero/Simulador/CTA final.
-- Logo, paleta (primary laranja), tokens do design system.
-- `useEffect` de auto-redirect para painel logado (`getActiveAdminRedirectPath`).
-- `SavingsSimulator` com `registerUrl="/registro/trial"`.
-- Sem novos assets — reutiliza os imports já existentes (`menusLogo`, `landingPdv`, `landingDre`, `landingWhatsapp`, etc.).
+### Validação e UX
 
-## O que muda em cada landing (por nicho)
+- Erros inline por campo (texto vermelho abaixo do input) — não bloqueiam digitação, mas impedem `goNext()` se houver falha.
+- `Enter` no input avança para o próximo campo / próximo step quando válido.
+- A barra de progresso é clicável apenas em steps já completados (permite voltar rápido).
 
-Para cada uma, são substituídos:
-1. **Hero badge** (texto "Usado por mais de X...").
-2. **TypingEffect words** (passados via prop).
-3. **3 métricas inline** do hero.
-4. **`painPoints`** (4 pares dor → solução, conforme a spec).
-5. **`sellingModes`** quando o nicho exige adaptação (Hamburgueria troca os 4 modos; demais mantêm os genéricos ajustando descrições leves quando relevante).
-6. **`testimonials`** (3 depoimentos do nicho).
-7. **CTA final title** (ex.: "Pronto para vender mais burgers sem pagar comissão?").
-8. **`trackEvent("ViewContent", { content_name: "Landing Hamburgueria", ... })`** — `content_name` específico por nicho.
+### Manter 100% da funcionalidade
 
-Os textos exatos por nicho (badge, palavras do TypingEffect, métricas, 4 pares de dor/solução, 3 depoimentos, CTA final) seguem fielmente a especificação fornecida na mensagem.
+Ao submeter o Step 4, chamar exatamente a mesma edge function `register-restaurant` com o mesmo payload de hoje:
 
-## Detalhes técnicos
+```ts
+{ name, slug, cnpj, phone, address, email, username, password,
+  adminUsername, adminPassword, planSlug }
+```
 
-- Cada arquivo de landing é autocontido: importa os mesmos assets/ícones da original, declara as constantes locais com o conteúdo do nicho e renderiza a mesma árvore JSX.
-- `TypingEffect` será atualizado para `({ words = defaultWords }: { words?: string[] })` — comportamento atual preservado quando chamado sem props (a `LandingPage.tsx` original continua funcionando sem mudança).
-- Rotas adicionadas no bloco "Rotas estáticas globais" do `App.tsx`, garantindo que estejam **antes** de `/:slug` (que captura qualquer slug de restaurante).
-- Sem novas dependências, sem mudanças em `tailwind.config.ts` ou `index.css`.
+- `planSlug` agora vem do plano selecionado no Step 4 (sobrescreve o da URL se o usuário trocou).
+- Telas de sucesso (`success`) e redirecionamento para o Mercado Pago (`redirectingToPayment`) permanecem idênticas.
+- Eventos do Meta Pixel (`Lead`, `CompleteRegistration`, `InitiateCheckout`) continuam disparando nos mesmos pontos.
+- Persistência em `localStorage` (restaurant_id/name/slug, staff_*) inalterada.
+- Validações server-side e RLS continuam intocadas; o wizard apenas adiciona validação client-side (zod) por step.
 
-## Resultado
+### Detalhes técnicos
 
-6 novas URLs públicas (`/hamburgueria`, `/pizzaria`, `/bar`, `/sushi`, `/marmitaria`, `/sorveteria`), cada uma com a mesma experiência visual da landing principal, mas com mensagem de marketing direcionada ao segmento — prontas para usar em campanhas pagas segmentadas por nicho.
+- Arquivo único: reescrevo `src/pages/RestaurantRegistration.tsx`. Nenhum outro arquivo é tocado.
+- Estado: um único `form` (mantém os mesmos campos de hoje) + `step (1-4)`, `direction ('forward'|'back')`, `selectedType`, `cepLoading`, `slugChecking/slugAvailable`, `errors` (registro de erros por step).
+- Animação: container com `overflow-hidden`, conteúdo do step com classe condicional `translate-x-*` e `opacity-*` baseada em `direction`, usando utilitários Tailwind + `transition-[transform,opacity] duration-300 ease-out`.
+- ViaCEP: `fetch` direto, sem dependência nova; tratamento de erro com toast.
+- Schema de validação por step com `zod` (já usado no projeto) — uma função `validateStep(step)` decide se pode avançar.
+- Debounce do slug com um `useEffect` + `setTimeout` simples (sem nova dependência).
+- Telefone e CEP recebem máscara via função utilitária local (sem libs novas).
+- Acessibilidade: `aria-current="step"` no círculo ativo, `aria-invalid` em campos com erro, foco automático no primeiro campo de cada step.
+
+### Fora de escopo (intocado)
+
+- Edge function `register-restaurant`.
+- Rotas (`/registro/:planSlug` continua igual).
+- Lógica de pagamento e redirect para Mercado Pago.
+- Telas de “sucesso” e “redirecionando para pagamento”.
+- Qualquer outra página do app.
