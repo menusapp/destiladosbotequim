@@ -8,7 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import menusLogo from "@/assets/menus-logo.png";
 import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
-import landingPdv from "@/assets/landing-pdv.png";
+import landingPdv from "@/assets/landing-pdv.jpg";
 import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
 import {
