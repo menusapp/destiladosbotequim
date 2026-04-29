@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     console.log("[register-restaurant] Received body keys:", Object.keys(body));
 
-    const { name, slug, cnpj, phone, address, username, password, adminUsername, adminPassword, planSlug } = body;
+    const { name, slug, cnpj, phone, address, username, password, adminUsername, adminPassword, planSlug, email } = body;
 
     // Validation
     if (!name || typeof name !== "string" || name.trim().length < 2 || name.length > 200) {
@@ -112,11 +112,17 @@ Deno.serve(async (req) => {
     const trialEndsAt = isTrial ? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
 
     // 1. Create restaurant
+    const trimmedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return new Response(JSON.stringify({ error: "Email do responsável inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const restaurantInsert: any = {
       name: name.trim(),
       slug: slug.trim(),
       cnpj: cnpj?.trim() || null,
       endereco_fiscal: address?.trim() || null,
+      mp_payer_email: trimmedEmail,
     };
     if (isTrial) {
       restaurantInsert.trial_started_at = now.toISOString();
