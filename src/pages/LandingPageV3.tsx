@@ -139,6 +139,24 @@ const adminTabs = [
     desc: "Gere QR Codes ilimitados para mesas, balcão, totem e materiais impressos. Cada código rastreia origem dos pedidos para você medir o que funciona.",
     bullets: ["QR Codes ilimitados", "Rastreamento por origem", "Personalização visual", "Impressão fácil em qualquer formato"],
   },
+  {
+    id: "robo-menus", label: "Robô Menu's", image: landingWhatsapp,
+    title: "Robô IA que vende por você",
+    desc: "Atendente virtual no WhatsApp 24h por dia. Tira dúvidas, sugere produtos, monta o pedido e fecha a venda automaticamente — treinado com o seu cardápio.",
+    bullets: ["Atendimento 24h no WhatsApp", "Sugestão inteligente de produtos", "Fechamento automático de pedidos", "Treinado com o seu cardápio"],
+  },
+  {
+    id: "marketing", label: "Marketing", image: landingClientes,
+    title: "Marketing automatizado de verdade",
+    desc: "Campanhas em massa, remarketing para clientes inativos, cupons segmentados e disparos programados. Traga clientes de volta sem esforço manual.",
+    bullets: ["Campanhas em massa no WhatsApp", "Remarketing de inativos", "Cupons segmentados", "Disparos programados"],
+  },
+  {
+    id: "fiscal", label: "Nota Fiscal", image: landingDre,
+    title: "Emissão de NFC-e integrada",
+    desc: "Emita nota fiscal eletrônica direto no SEFAZ a cada venda, sem sistema externo. Tudo conciliado com o financeiro e pronto para o contador.",
+    bullets: ["NFC-e direto ao SEFAZ", "Emissão automática por venda", "Cancelamento e contingência", "Relatórios prontos para o contador"],
+  },
 ];
 
 const goRegister = () => { window.location.href = REGISTER_URL; };
