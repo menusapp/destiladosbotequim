@@ -11,8 +11,23 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method === "GET") {
+    return new Response("OK", { status: 200, headers: corsHeaders });
+  }
+
+  let body: any;
   try {
-    const body = await req.json();
+    const text = await req.text();
+    if (!text || text.trim() === "") {
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+    body = JSON.parse(text);
+  } catch (e: any) {
+    console.error("[MP Sub Webhook] Invalid JSON body:", e?.message);
+    return new Response("OK", { status: 200, headers: corsHeaders });
+  }
+
+  try {
     console.log("[MP Sub Webhook] Received:", JSON.stringify(body));
 
     const action = body.action || body.type;
