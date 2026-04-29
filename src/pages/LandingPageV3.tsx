@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
+import PhoneMockup from "@/components/landing/PhoneMockup";
+import SavingsSimulator from "@/components/landing/SavingsSimulator";
 import menusLogo from "@/assets/menus-logo.png";
 import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
@@ -286,13 +288,8 @@ const LandingPageV3 = () => {
           </ScrollReveal>
 
           <ScrollReveal delay={400}>
-            <div className="mt-14 relative">
-              <div className="absolute inset-x-10 -bottom-6 h-12 bg-primary/20 blur-3xl rounded-full" />
-              <img
-                src={dashboardMockup}
-                alt="Dashboard do MenusApp mostrando pedidos, faturamento e cardápio digital"
-                className="relative rounded-2xl shadow-2xl border border-border mx-auto w-full max-w-5xl"
-              />
+            <div className="mt-14 mx-auto max-w-md">
+              <PhoneMockup />
             </div>
           </ScrollReveal>
         </div>
