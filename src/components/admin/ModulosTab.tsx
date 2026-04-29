@@ -6,6 +6,14 @@ import { toast } from "@/components/ui/sonner";
 import { Check, Crown, ArrowUp, ArrowDown, Package, ExternalLink } from "lucide-react";
 import { trackEvent } from "@/lib/metaPixel";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -15,26 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-// Links de assinatura do Mercado Pago por slug do plano
-const MP_PLAN_LINKS: Record<string, string> = {
-  basico: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=ce558ba8031d48e78c875adbe8af561a",
-  intermediario: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=fe9ff4a87e634b86a493887ab8737b17",
-  avancado: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=e0f8cd5628974aa180490d2b6e9d78ea",
-};
-
-// Normaliza nome do plano para slug (remove acentos, lowercase)
-function planNameToSlug(name: string): string | null {
-  const normalized = name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-  if (normalized.includes("basic")) return "basico";
-  if (normalized.includes("interm")) return "intermediario";
-  if (normalized.includes("avanc")) return "avancado";
-  return null;
-}
+import { Separator } from "@/components/ui/separator";
 
 const ALL_MODULES: Record<string, string> = {
   cardapio: "Cardápio Digital",
@@ -50,6 +39,7 @@ const ALL_MODULES: Record<string, string> = {
   pagamentos_online: "Pagamentos Online",
   reservas: "Reservas",
 };
+
 const PLAN_TEXT_FEATURES: Record<string, string[]> = {
   "básico": [
     "Cardápio digital ilimitado",
@@ -95,17 +85,29 @@ interface ActiveSubscription {
   plan_name: string;
   plan_price: number;
   plan_features: string[];
+  pending_downgrade_plan_id?: string | null;
+  pending_downgrade_at?: string | null;
 }
 
 interface ModulosTabProps {
   restaurantId: string;
 }
 
+interface UpgradePreview {
+  url: string;
+  planName: string;
+  planPrice: number;
+  prorateAmount: number;
+  daysUntilRenewal: number;
+}
+
 export default function ModulosTab({ restaurantId }: ModulosTabProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [activeSub, setActiveSub] = useState<ActiveSubscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const [confirmDialog, setConfirmDialog] = useState<{ plan: Plan; action: string } | null>(null);
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
+  const [upgradePreview, setUpgradePreview] = useState<UpgradePreview | null>(null);
+  const [downgradeConfirm, setDowngradeConfirm] = useState<{ plan: Plan } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -124,7 +126,7 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         .from("restaurant_subscriptions")
         .select("*, subscription_plans(name, price, features)")
         .eq("restaurant_id", restaurantId)
-        .eq("status", "active")
+        .in("status", ["active", "past_due"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
@@ -143,6 +145,8 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         plan_name: sp.name,
         plan_price: sp.price,
         plan_features: sp.features || [],
+        pending_downgrade_plan_id: (subRes.data as any).pending_downgrade_plan_id,
+        pending_downgrade_at: (subRes.data as any).pending_downgrade_at,
       });
     } else {
       setActiveSub(null);
@@ -151,60 +155,101 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
     setLoading(false);
   };
 
-  const handleSelectPlan = (plan: Plan) => {
+  const handleSelectPlan = async (plan: Plan) => {
     if (activeSub?.plan_id === plan.id) return;
-    const slug = planNameToSlug(plan.name);
-    if (!slug || !MP_PLAN_LINKS[slug]) {
-      toast.error("Link de pagamento indisponível para este plano. Contate o suporte.");
+
+    // Sem assinatura ainda — tratar como upgrade direto (assinar)
+    const action: "upgrade" | "downgrade" =
+      !activeSub || plan.price >= activeSub.plan_price ? "upgrade" : "downgrade";
+
+    if (action === "downgrade") {
+      setDowngradeConfirm({ plan });
       return;
     }
-    let action = "Assinar";
-    if (activeSub) {
-      action = plan.price > activeSub.plan_price ? "Fazer Upgrade" : "Fazer Downgrade";
+
+    setLoadingPlanId(plan.id);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("manage-plan-change", {
+        body: {
+          restaurant_id: restaurantId,
+          action: "upgrade",
+          target_plan_id: plan.id,
+        },
+      });
+
+      if (error || !data?.redirect_url) {
+        throw new Error((data as any)?.error || error?.message || "Erro ao iniciar upgrade");
+      }
+
+      // Pixel
+      trackEvent("AddToCart", {
+        content_name: `Plano ${plan.name}`,
+        content_ids: [plan.id],
+        content_type: "subscription_plan",
+        value: plan.price,
+        currency: "BRL",
+      });
+
+      setUpgradePreview({
+        url: data.redirect_url,
+        planName: data.plan_name,
+        planPrice: data.plan_price,
+        prorateAmount: data.prorate_amount || 0,
+        daysUntilRenewal: data.days_until_renewal || 0,
+      });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao processar upgrade");
+    } finally {
+      setLoadingPlanId(null);
     }
-    setConfirmDialog({ plan, action });
   };
 
-  const confirmSubscription = async () => {
-    if (!confirmDialog) return;
+  const confirmDowngrade = async () => {
+    if (!downgradeConfirm) return;
     setSubmitting(true);
 
     try {
-      const slug = planNameToSlug(confirmDialog.plan.name);
-      if (!slug || !MP_PLAN_LINKS[slug]) {
-        throw new Error("Link de pagamento indisponível.");
+      const { data, error } = await supabase.functions.invoke("manage-plan-change", {
+        body: {
+          restaurant_id: restaurantId,
+          action: "downgrade",
+          target_plan_id: downgradeConfirm.plan.id,
+        },
+      });
+
+      if (error || !data?.redirect_url) {
+        throw new Error((data as any)?.error || error?.message || "Erro ao agendar downgrade");
       }
 
-      // Meta Pixel — clique para ir até o checkout do MP conta como AddToCart
-      trackEvent("AddToCart", {
-        content_name: `Plano ${confirmDialog.plan.name}`,
-        content_ids: [slug],
-        content_type: "subscription_plan",
-        value: confirmDialog.plan.price,
-        currency: "BRL",
-      });
-      // E também InitiateCheckout, já que estamos saindo para a página de pagamento
-      trackEvent("InitiateCheckout", {
-        content_name: `Checkout - Plano ${confirmDialog.plan.name}`,
-        content_ids: [slug],
-        content_type: "subscription_plan",
-        value: confirmDialog.plan.price,
-        currency: "BRL",
-      });
+      toast.success(
+        `Downgrade agendado! Seu plano atual continua ativo até ${new Date(
+          data.renewal_date
+        ).toLocaleDateString("pt-BR")}.`
+      );
 
-      // Monta URL com external_reference = restaurant_id (necessário para o webhook reconhecer)
-      const mpUrl = new URL(MP_PLAN_LINKS[slug]);
-      mpUrl.searchParams.set("external_reference", restaurantId);
+      // Abrir link MP em nova aba para o usuário aprovar a nova assinatura
+      window.open(data.redirect_url, "_blank");
 
-      toast.success("Redirecionando para o pagamento...");
-      // Pequeno delay para o pixel disparar antes do redirect
-      setTimeout(() => {
-        window.location.href = mpUrl.toString();
-      }, 600);
+      setDowngradeConfirm(null);
+      await fetchData();
     } catch (err: any) {
-      toast.error(err.message || "Erro ao iniciar pagamento");
+      toast.error(err.message || "Erro ao processar downgrade");
+    } finally {
       setSubmitting(false);
     }
+  };
+
+  const goToPayment = () => {
+    if (!upgradePreview) return;
+    trackEvent("InitiateCheckout", {
+      content_name: `Checkout - ${upgradePreview.planName}`,
+      value: upgradePreview.planPrice,
+      currency: "BRL",
+    });
+    setTimeout(() => {
+      window.location.href = upgradePreview.url;
+    }, 400);
   };
 
   if (loading) {
@@ -226,38 +271,44 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
     );
   }
 
-  // Find the "recommended" plan (middle one, or most expensive if only 2)
   return (
     <div className="w-full space-y-6">
-      {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold tracking-tight text-foreground">Escolha seu plano</h2>
         <p className="text-muted-foreground text-sm max-w-md mx-auto">
-          {activeSub
-            ? <>Plano atual: <span className="font-semibold text-primary">{activeSub.plan_name}</span> — R$ {activeSub.plan_price.toFixed(2)}/mês</>
-            : "Selecione o plano ideal para desbloquear os módulos do seu restaurante"}
+          {activeSub ? (
+            <>
+              Plano atual: <span className="font-semibold text-primary">{activeSub.plan_name}</span> — R${" "}
+              {activeSub.plan_price.toFixed(2)}/mês
+            </>
+          ) : (
+            "Selecione o plano ideal para desbloquear os módulos do seu restaurante"
+          )}
         </p>
+        {activeSub?.pending_downgrade_plan_id && activeSub?.pending_downgrade_at && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            Downgrade agendado para{" "}
+            {new Date(activeSub.pending_downgrade_at).toLocaleDateString("pt-BR")}
+          </p>
+        )}
       </div>
 
-      {/* Plans Grid */}
       <div className="grid gap-5 md:grid-cols-3 items-start">
         {plans.map((plan) => {
           const isCurrent = activeSub?.plan_id === plan.id;
           const isUpgrade = activeSub ? plan.price > activeSub.plan_price : false;
           const isDowngrade = activeSub ? plan.price < activeSub.plan_price : false;
+          const isLoadingThis = loadingPlanId === plan.id;
 
           return (
             <div
               key={plan.id}
-              className={`
-                relative rounded-2xl border bg-card p-6 transition-all duration-200
-                ${isCurrent
+              className={`relative rounded-2xl border bg-card p-6 transition-all duration-200 ${
+                isCurrent
                   ? "border-primary/60 ring-2 ring-primary/15 shadow-md"
                   : "border-border hover:border-primary/20 hover:shadow-sm"
-                }
-              `}
+              }`}
             >
-              {/* Badges */}
               {isCurrent && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-3 py-0.5 shadow-sm">
@@ -266,7 +317,6 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                 </div>
               )}
 
-              {/* Plan Info */}
               <div className="pt-2 space-y-4">
                 <div>
                   <h3 className="font-semibold text-lg text-foreground">{plan.name}</h3>
@@ -275,7 +325,6 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                   )}
                 </div>
 
-                {/* Price */}
                 <div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-bold text-foreground">
@@ -288,7 +337,6 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                   </p>
                 </div>
 
-                {/* CTA Button */}
                 {isCurrent ? (
                   <Button disabled variant="outline" className="w-full text-xs h-9 opacity-60">
                     Plano Ativo
@@ -298,17 +346,22 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                     className="w-full text-xs h-9"
                     variant={isUpgrade || !activeSub ? "default" : "outline"}
                     onClick={() => handleSelectPlan(plan)}
+                    disabled={isLoadingThis}
                   >
-                    {isUpgrade && <ArrowUp className="h-3.5 w-3.5 mr-1" />}
-                    {isDowngrade && <ArrowDown className="h-3.5 w-3.5 mr-1" />}
-                    {!activeSub ? "Assinar" : isUpgrade ? "Upgrade" : "Downgrade"}
+                    {isLoadingThis ? (
+                      "Processando..."
+                    ) : (
+                      <>
+                        {isUpgrade && <ArrowUp className="h-3.5 w-3.5 mr-1" />}
+                        {isDowngrade && <ArrowDown className="h-3.5 w-3.5 mr-1" />}
+                        {!activeSub ? "Assinar" : isUpgrade ? "Upgrade" : "Downgrade"}
+                      </>
+                    )}
                   </Button>
                 )}
 
-                {/* Divider */}
                 <div className="border-t border-border" />
 
-                {/* Textual Features from LP */}
                 {PLAN_TEXT_FEATURES[plan.name.toLowerCase()] && (
                   <ul className="space-y-2">
                     {PLAN_TEXT_FEATURES[plan.name.toLowerCase()].map((feat) => (
@@ -322,12 +375,13 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
                   </ul>
                 )}
 
-                {/* Module badges */}
                 {plan.features.length > 0 && (
                   <>
                     <div className="border-t border-border" />
                     <div>
-                      <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider font-medium">Módulos incluídos</p>
+                      <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider font-medium">
+                        Módulos incluídos
+                      </p>
                       <div className="flex flex-wrap gap-1">
                         {plan.features.map((f) => (
                           <Badge key={f} variant="outline" className="text-[10px]">
@@ -344,39 +398,75 @@ export default function ModulosTab({ restaurantId }: ModulosTabProps) {
         })}
       </div>
 
-      {/* Confirm Dialog */}
-      <AlertDialog open={!!confirmDialog} onOpenChange={() => !submitting && setConfirmDialog(null)}>
+      {/* Modal de pré-visualização do UPGRADE com pró-rata */}
+      <Dialog open={!!upgradePreview} onOpenChange={(o) => !o && setUpgradePreview(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upgrade para {upgradePreview?.planName}</DialogTitle>
+            <DialogDescription>
+              Revise o valor proporcional antes de continuar para o pagamento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Dias até a renovação (dia 5)</span>
+                <span className="font-medium">{upgradePreview?.daysUntilRenewal} dias</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Valor proporcional hoje</span>
+                <span className="font-semibold text-primary text-base">
+                  R$ {upgradePreview?.prorateAmount.toFixed(2).replace(".", ",")}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">A partir do dia 5</span>
+                <span className="font-medium">
+                  R$ {upgradePreview?.planPrice.toFixed(2).replace(".", ",")}/mês
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Você será redirecionado para o Mercado Pago para concluir o pagamento com segurança.
+              O upgrade é ativado automaticamente após a confirmação.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpgradePreview(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={goToPayment}>
+              Continuar para pagamento
+              <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação de DOWNGRADE */}
+      <AlertDialog open={!!downgradeConfirm} onOpenChange={(o) => !submitting && !o && setDowngradeConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirmDialog?.action}</AlertDialogTitle>
+            <AlertDialogTitle>Fazer downgrade para {downgradeConfirm?.plan.name}</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              {activeSub ? (
-                <span className="block">
-                  Trocar de <strong>{activeSub.plan_name}</strong> para{" "}
-                  <strong>{confirmDialog?.plan.name}</strong> (R${" "}
-                  {confirmDialog?.plan.price.toFixed(2)}/mês).
-                </span>
-              ) : (
-                <span className="block">
-                  Assinar o plano <strong>{confirmDialog?.plan.name}</strong> por R${" "}
-                  {confirmDialog?.plan.price.toFixed(2)}/mês.
-                </span>
-              )}
+              <span className="block">
+                Seu plano atual <strong>{activeSub?.plan_name}</strong> continuará ativo até o dia 5
+                do próximo ciclo.
+              </span>
+              <span className="block">
+                A partir daí, você passará para <strong>{downgradeConfirm?.plan.name}</strong> (R${" "}
+                {downgradeConfirm?.plan.price.toFixed(2)}/mês).
+              </span>
               <span className="block text-xs text-muted-foreground pt-2">
-                Você será redirecionado para o Mercado Pago para concluir o pagamento com segurança.
-                O novo plano será ativado automaticamente após a confirmação do pagamento.
+                Você precisará aprovar a nova assinatura no Mercado Pago. Abriremos o link para você.
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSubscription} disabled={submitting}>
-              {submitting ? "Redirecionando..." : (
-                <>
-                  Ir para pagamento
-                  <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
-                </>
-              )}
+            <AlertDialogAction onClick={confirmDowngrade} disabled={submitting}>
+              {submitting ? "Processando..." : "Sim, fazer downgrade"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

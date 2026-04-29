@@ -78,11 +78,13 @@ Deno.serve(async (req) => {
       }
 
       if (preapproval.status === "authorized" || preapproval.status === "active") {
-        // Try to update existing pending_payment subscription first
+        // Buscar QUALQUER assinatura existente (active, past_due, suspended, pending)
         const { data: existingSub } = await (supabase.from("restaurant_subscriptions" as any) as any)
-          .select("id")
+          .select("id, plan_id, pending_upgrade_plan_id, pending_downgrade_plan_id, pending_downgrade_at")
           .eq("restaurant_id", restaurantId)
-          .in("status", ["pending_payment", "suspended"])
+          .in("status", ["pending_payment", "suspended", "active", "past_due"])
+          .order("created_at", { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         if (existingSub) {
@@ -90,14 +92,38 @@ Deno.serve(async (req) => {
           const nextPayment = new Date();
           nextPayment.setMonth(nextPayment.getMonth() + 1);
 
+          const updateData: any = {
+            status: "active",
+            last_payment_at: new Date().toISOString(),
+            next_payment_at: nextPayment.toISOString(),
+            mp_preapproval_id: String(dataId),
+            failed_payments: 0,
+            in_grace_period: false,
+            grace_period_start: null,
+            grace_period_ends_at: null,
+          };
+
+          // Se tem upgrade pendente, aplicar agora (pagamento confirmou o upgrade)
+          if (existingSub.pending_upgrade_plan_id) {
+            updateData.plan_id = existingSub.pending_upgrade_plan_id;
+            updateData.pending_upgrade_plan_id = null;
+            console.log("[MP Sub Webhook] Applying pending upgrade for restaurant:", restaurantId);
+          }
+
+          // Se tem downgrade agendado e a data já chegou, aplicar
+          if (existingSub.pending_downgrade_plan_id && existingSub.pending_downgrade_at) {
+            const today = new Date();
+            const downgradeDate = new Date(existingSub.pending_downgrade_at);
+            if (today >= downgradeDate) {
+              updateData.plan_id = existingSub.pending_downgrade_plan_id;
+              updateData.pending_downgrade_plan_id = null;
+              updateData.pending_downgrade_at = null;
+              console.log("[MP Sub Webhook] Applying scheduled downgrade for restaurant:", restaurantId);
+            }
+          }
+
           await (supabase.from("restaurant_subscriptions" as any) as any)
-            .update({
-              status: "active",
-              last_payment_at: new Date().toISOString(),
-              next_payment_at: nextPayment.toISOString(),
-              mp_preapproval_id: String(dataId),
-              failed_payments: 0,
-            })
+            .update(updateData)
             .eq("id", existingSub.id);
 
           console.log("[MP Sub Webhook] Existing subscription activated for restaurant:", restaurantId);
@@ -160,13 +186,22 @@ Deno.serve(async (req) => {
 
         console.log("[MP Sub Webhook] Subscription activated for restaurant:", restaurantId);
       } else if (preapproval.status === "paused" || preapproval.status === "cancelled") {
-        // Suspend subscription
+        // Iniciar período de graça de 5 dias antes de derrubar para free
+        const graceStart = new Date();
+        const graceEnd = new Date();
+        graceEnd.setDate(graceEnd.getDate() + 5);
+
         await (supabase.from("restaurant_subscriptions" as any) as any)
-          .update({ status: "suspended" })
+          .update({
+            status: "past_due",
+            in_grace_period: true,
+            grace_period_start: graceStart.toISOString(),
+            grace_period_ends_at: graceEnd.toISOString(),
+          })
           .eq("restaurant_id", restaurantId)
           .eq("mp_preapproval_id", String(dataId));
 
-        console.log("[MP Sub Webhook] Subscription suspended for restaurant:", restaurantId);
+        console.log("[MP Sub Webhook] Grace period started for restaurant:", restaurantId);
       }
     }
 
@@ -191,27 +226,49 @@ Deno.serve(async (req) => {
         nextPayment.setMonth(nextPayment.getMonth() + 1);
 
         // Try matching by preapproval_id first, then external_reference
+        const renewUpdate: any = {
+          status: "active",
+          last_payment_at: new Date().toISOString(),
+          next_payment_at: nextPayment.toISOString(),
+          failed_payments: 0,
+          in_grace_period: false,
+          grace_period_start: null,
+          grace_period_ends_at: null,
+        };
+
         if (preapprovalId) {
-          await (supabase.from("restaurant_subscriptions" as any) as any)
-            .update({
-              status: "active",
-              last_payment_at: new Date().toISOString(),
-              next_payment_at: nextPayment.toISOString(),
-              failed_payments: 0,
-            })
-            .eq("mp_preapproval_id", String(preapprovalId));
+          // Buscar a sub para verificar downgrade pendente
+          const { data: subForRenewal } = await (supabase.from("restaurant_subscriptions" as any) as any)
+            .select("id, pending_downgrade_plan_id, pending_downgrade_at, pending_upgrade_plan_id")
+            .eq("mp_preapproval_id", String(preapprovalId))
+            .maybeSingle();
+
+          if (subForRenewal) {
+            const updates = { ...renewUpdate };
+            if (subForRenewal.pending_upgrade_plan_id) {
+              updates.plan_id = subForRenewal.pending_upgrade_plan_id;
+              updates.pending_upgrade_plan_id = null;
+            }
+            if (subForRenewal.pending_downgrade_plan_id && subForRenewal.pending_downgrade_at) {
+              const today = new Date();
+              const dg = new Date(subForRenewal.pending_downgrade_at);
+              if (today >= dg) {
+                updates.plan_id = subForRenewal.pending_downgrade_plan_id;
+                updates.pending_downgrade_plan_id = null;
+                updates.pending_downgrade_at = null;
+              }
+            }
+            await (supabase.from("restaurant_subscriptions" as any) as any)
+              .update(updates)
+              .eq("id", subForRenewal.id);
+          }
 
           console.log("[MP Sub Webhook] Payment renewed for preapproval:", preapprovalId);
         } else if (externalRef) {
           await (supabase.from("restaurant_subscriptions" as any) as any)
-            .update({
-              status: "active",
-              last_payment_at: new Date().toISOString(),
-              next_payment_at: nextPayment.toISOString(),
-              failed_payments: 0,
-            })
+            .update(renewUpdate)
             .eq("restaurant_id", externalRef)
-            .in("status", ["pending_payment", "active", "suspended"]);
+            .in("status", ["pending_payment", "active", "suspended", "past_due"]);
 
           console.log("[MP Sub Webhook] Payment activated for restaurant:", externalRef);
         }

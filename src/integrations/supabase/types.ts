@@ -2797,6 +2797,41 @@ export type Database = {
           },
         ]
       }
+      plan_payment_links: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          mp_subscription_link: string
+          plan_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          mp_subscription_link: string
+          plan_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          mp_subscription_link?: string
+          plan_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_payment_links_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: true
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       point_order_payments: {
         Row: {
           amount: number
@@ -3731,13 +3766,21 @@ export type Database = {
       restaurant_subscriptions: {
         Row: {
           created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
           expires_at: string | null
           failed_payments: number
+          grace_period_ends_at: string | null
+          grace_period_start: string | null
           id: string
+          in_grace_period: boolean
           is_trial: boolean | null
           last_payment_at: string | null
           mp_preapproval_id: string | null
           next_payment_at: string | null
+          pending_downgrade_at: string | null
+          pending_downgrade_plan_id: string | null
+          pending_upgrade_plan_id: string | null
           plan_id: string
           restaurant_id: string
           started_at: string | null
@@ -3746,13 +3789,21 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
           expires_at?: string | null
           failed_payments?: number
+          grace_period_ends_at?: string | null
+          grace_period_start?: string | null
           id?: string
+          in_grace_period?: boolean
           is_trial?: boolean | null
           last_payment_at?: string | null
           mp_preapproval_id?: string | null
           next_payment_at?: string | null
+          pending_downgrade_at?: string | null
+          pending_downgrade_plan_id?: string | null
+          pending_upgrade_plan_id?: string | null
           plan_id: string
           restaurant_id: string
           started_at?: string | null
@@ -3761,13 +3812,21 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
           expires_at?: string | null
           failed_payments?: number
+          grace_period_ends_at?: string | null
+          grace_period_start?: string | null
           id?: string
+          in_grace_period?: boolean
           is_trial?: boolean | null
           last_payment_at?: string | null
           mp_preapproval_id?: string | null
           next_payment_at?: string | null
+          pending_downgrade_at?: string | null
+          pending_downgrade_plan_id?: string | null
+          pending_upgrade_plan_id?: string | null
           plan_id?: string
           restaurant_id?: string
           started_at?: string | null
@@ -3775,6 +3834,20 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "restaurant_subscriptions_pending_downgrade_plan_id_fkey"
+            columns: ["pending_downgrade_plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_subscriptions_pending_upgrade_plan_id_fkey"
+            columns: ["pending_upgrade_plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "restaurant_subscriptions_plan_id_fkey"
             columns: ["plan_id"]

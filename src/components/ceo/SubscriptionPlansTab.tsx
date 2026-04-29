@@ -36,6 +36,7 @@ interface Plan {
   features: string[];
   is_active: boolean | null;
   created_at: string | null;
+  mp_subscription_link?: string | null;
 }
 
 export function SubscriptionPlansTab() {
@@ -49,6 +50,7 @@ export function SubscriptionPlansTab() {
   const [formPrice, setFormPrice] = useState("");
   const [formActive, setFormActive] = useState(true);
   const [formFeatures, setFormFeatures] = useState<string[]>([]);
+  const [formMpLink, setFormMpLink] = useState("");
 
   useEffect(() => { fetchPlans(); }, []);
 
@@ -57,12 +59,28 @@ export function SubscriptionPlansTab() {
       .from("subscription_plans")
       .select("*")
       .order("price", { ascending: true });
-    if (!error) setPlans((data || []).map(d => ({ ...d, features: (d.features as any) || [] })));
+    if (error) {
+      setLoading(false);
+      return;
+    }
+    const plansData = (data || []).map((d) => ({ ...d, features: (d.features as any) || [] }));
+
+    // Buscar links MP de cada plano
+    const planIds = plansData.map((p) => p.id);
+    const { data: links } = await supabase
+      .from("plan_payment_links" as any)
+      .select("plan_id, mp_subscription_link")
+      .in("plan_id", planIds);
+
+    const linkMap = new Map<string, string>();
+    (links as any[] | null)?.forEach((l) => linkMap.set(l.plan_id, l.mp_subscription_link));
+
+    setPlans(plansData.map((p) => ({ ...p, mp_subscription_link: linkMap.get(p.id) || null })));
     setLoading(false);
   };
 
   const resetForm = () => {
-    setFormName(""); setFormDesc(""); setFormPrice(""); setFormActive(true); setFormFeatures([]); setEditing(null);
+    setFormName(""); setFormDesc(""); setFormPrice(""); setFormActive(true); setFormFeatures([]); setFormMpLink(""); setEditing(null);
   };
 
   const openDialog = (plan?: Plan) => {
@@ -73,6 +91,7 @@ export function SubscriptionPlansTab() {
       setFormPrice(String(plan.price));
       setFormActive(plan.is_active ?? true);
       setFormFeatures(plan.features);
+      setFormMpLink(plan.mp_subscription_link || "");
     } else {
       resetForm();
     }
@@ -83,6 +102,31 @@ export function SubscriptionPlansTab() {
     setFormFeatures(prev =>
       prev.includes(moduleId) ? prev.filter(f => f !== moduleId) : [...prev, moduleId]
     );
+  };
+
+  const upsertPlanLink = async (planId: string) => {
+    const trimmed = formMpLink.trim();
+    if (!trimmed) {
+      // Se vazio, remover link existente
+      await supabase.from("plan_payment_links" as any).delete().eq("plan_id", planId);
+      return;
+    }
+    // Upsert manual: tenta update; se 0 linhas, insert
+    const { data: existing } = await supabase
+      .from("plan_payment_links" as any)
+      .select("id")
+      .eq("plan_id", planId)
+      .maybeSingle();
+    if (existing) {
+      await supabase
+        .from("plan_payment_links" as any)
+        .update({ mp_subscription_link: trimmed, is_active: true, updated_at: new Date().toISOString() })
+        .eq("plan_id", planId);
+    } else {
+      await supabase
+        .from("plan_payment_links" as any)
+        .insert({ plan_id: planId, mp_subscription_link: trimmed, is_active: true });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,15 +140,23 @@ export function SubscriptionPlansTab() {
     };
 
     try {
+      let planId: string;
       if (editing) {
         const { error } = await supabase.from("subscription_plans").update(payload).eq("id", editing.id);
         if (error) throw error;
+        planId = editing.id;
         toast.success("Plano atualizado");
       } else {
-        const { error } = await supabase.from("subscription_plans").insert(payload);
+        const { data: created, error } = await supabase
+          .from("subscription_plans")
+          .insert(payload)
+          .select("id")
+          .single();
         if (error) throw error;
+        planId = created!.id;
         toast.success("Plano criado");
       }
+      await upsertPlanLink(planId);
       setDialogOpen(false);
       resetForm();
       fetchPlans();
@@ -162,6 +214,18 @@ export function SubscriptionPlansTab() {
                     </div>
                   ))}
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Link de assinatura Mercado Pago</Label>
+                <Input
+                  type="url"
+                  placeholder="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=..."
+                  value={formMpLink}
+                  onChange={(e) => setFormMpLink(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Link gerado no Mercado Pago para este plano. Clientes serão redirecionados para cá ao fazer upgrade ou downgrade.
+                </p>
               </div>
               <Button type="submit" className="w-full">{editing ? "Atualizar" : "Criar"}</Button>
             </form>

@@ -50,6 +50,7 @@ import { NewBillNotification } from "@/components/admin/NewBillNotification";
 import { NewReservationNotification } from "@/components/admin/NewReservationNotification";
 import { SupportChatWidget } from "@/components/admin/SupportChatWidget";
 import { QzOnboardingGate } from "@/components/admin/QzOnboardingGate";
+import { GracePeriodBanner } from "@/components/admin/GracePeriodBanner";
 import { clearAdminSession } from "@/lib/sessionExpiry";
 
 // Prefetch map: section → dynamic import. Definido fora do componente para
@@ -907,6 +908,10 @@ const RestaurantAdmin = () => {
           />
         </div>
         <SidebarInset className="flex-1 flex flex-col">
+          <GracePeriodBanner
+            restaurantId={restaurant.id}
+            onRegularize={() => setActiveSection("modulos")}
+          />
           <AdminHeader
             restaurantId={restaurant.id}
             restaurantSlug={restaurant.slug}
