@@ -10,6 +10,7 @@ import menusLogo from "@/assets/menus-logo.png";
 import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
 import landingPedidos from "@/assets/landing-pedidos.png";
+import landingClientes from "@/assets/landing-clientes.png";
 import landingDre from "@/assets/landing-dre.png";
 import landingWhatsapp from "@/assets/landing-whatsapp.png";
 import {
@@ -104,7 +105,7 @@ const adminTabs = [
     bullets: ["PDV completo com atalhos", "Comandas digitais por mesa", "Gestão visual de mesas", "Confirmação automática", "Totem de autoatendimento"],
   },
   {
-    id: "clientes", label: "Clientes", image: landingPdv,
+    id: "clientes", label: "Clientes", image: landingClientes,
     title: "Base de clientes inteligente",
     desc: "Conheça quem compra de você. Histórico de pedidos, ticket médio, frequência e segmentação automática para campanhas certeiras.",
     bullets: ["Histórico completo de compras", "Segmentação automática", "Programa de fidelidade", "Aniversariantes do mês"],
