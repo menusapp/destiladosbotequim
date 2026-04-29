@@ -361,16 +361,6 @@ const LandingPageV3 = () => {
             </p>
           </ScrollReveal>
 
-          <ScrollReveal delay={100}>
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
-              {adminTabChips.map((c) => (
-                <span key={c} className="px-3.5 py-1.5 rounded-full border border-border bg-card text-xs font-semibold text-muted-foreground">
-                  {c}
-                </span>
-              ))}
-            </div>
-          </ScrollReveal>
-
           <ScrollReveal delay={150}>
             <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
               {adminTabs.map((t) => (
