@@ -148,7 +148,7 @@ const adminTabs = [
     bullets: ["Atendimento 24h no WhatsApp", "Sugestão inteligente de produtos", "Fechamento automático de pedidos", "Treinado com o seu cardápio"],
   },
   {
-    id: "marketing", label: "Marketing", image: landingClientes,
+    id: "marketing", label: "Marketing", image: landingMarketing,
     title: "Marketing automatizado de verdade",
     desc: "Campanhas em massa, remarketing para clientes inativos, cupons segmentados e disparos programados. Traga clientes de volta sem esforço manual.",
     bullets: ["Campanhas em massa no WhatsApp", "Remarketing de inativos", "Cupons segmentados", "Disparos programados"],
