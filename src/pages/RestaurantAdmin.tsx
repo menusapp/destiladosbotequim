@@ -243,8 +243,8 @@ const RestaurantAdmin = () => {
   }, [reservationNotification]);
   
   useInactivityLogout();
-  const { isSectionAllowed, hasActiveSubscription, allowedModules, isDelinquent } = useRestaurantModules(restaurant?.id || null);
-  const isTotemUnlocked = allowedModules === null || (Array.isArray(allowedModules) && allowedModules.includes("totem"));
+  const { isSectionAllowed, hasActiveSubscription, allowedModules, isDelinquent, loaded: modulesLoaded } = useRestaurantModules(restaurant?.id || null);
+  const isTotemUnlocked = Array.isArray(allowedModules) && allowedModules.includes("totem");
 
   // No longer force modulos — overlays handle blocked access now
 
@@ -805,13 +805,22 @@ const RestaurantAdmin = () => {
 
   // Section wrapper that adds blur overlay for blocked sections
   const SectionWrapper = ({ sectionId, children, onNavigateToPlans: navToPlans }: { sectionId: string; restaurantId: string; staffRole: string; staffAllowedSections: string[]; children: React.ReactNode; onNavigateToPlans: () => void }) => {
+    // While subscription/modules are still loading, render a neutral placeholder
+    // for plan-gated sections to avoid a flash of unrestricted UI.
+    if (!modulesLoaded) {
+      return (
+        <div className="min-h-[400px] flex items-center justify-center">
+          <div className="h-8 w-8 rounded-full border-2 border-muted border-t-primary animate-spin" aria-label="Carregando" />
+        </div>
+      );
+    }
+
     const access = (() => {
-      const checkAllowed = (id: string) => !isSectionAllowed || isSectionAllowed(id);
       const isStaffOk = (id: string) => {
         if (!staffRole || staffRole === "admin") return true;
         return staffAllowedSections?.includes(id) ?? false;
       };
-      if (!checkAllowed(sectionId)) return { blocked: true, reason: 'plan' as const };
+      if (!isSectionAllowed(sectionId)) return { blocked: true, reason: 'plan' as const };
       if (!isStaffOk(sectionId)) return { blocked: true, reason: 'permission' as const };
       return { blocked: false, reason: null };
     })();
