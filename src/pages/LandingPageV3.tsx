@@ -400,20 +400,20 @@ const LandingPageV3 = () => {
                     </li>
                   ))}
                 </ul>
-                <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                <div className="mt-8 flex flex-col sm:flex-row gap-4">
                   <a
                     href={REGISTER_URL}
-                    className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover active:scale-[0.97] text-primary-foreground font-bold px-6 py-3 rounded-xl shadow-md shadow-primary/20 transition-all"
+                    className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover active:scale-[0.97] text-primary-foreground font-bold text-base px-7 py-4 rounded-2xl shadow-md shadow-primary/20 transition-all"
                   >
-                    <Rocket className="h-4 w-4" /> Testar grátis
+                    <Rocket className="h-5 w-5" /> Testar grátis
                   </a>
                   <a
                     href={WHATSAPP_URL}
                     target="_blank"
                     rel="noopener"
-                    className="inline-flex items-center justify-center gap-2 bg-card border-2 border-[#25D366] text-[#15803D] hover:bg-[#F0FDF4] active:scale-[0.97] font-bold px-6 py-3 rounded-xl transition-all"
+                    className="inline-flex items-center justify-center gap-2 bg-card border-2 border-[#25D366] text-[#15803D] hover:bg-[#F0FDF4] active:scale-[0.97] font-bold text-base px-7 py-4 rounded-2xl transition-all"
                   >
-                    <MessageCircle className="h-4 w-4" /> Falar com especialista
+                    <MessageCircle className="h-5 w-5" /> Falar com especialista
                   </a>
                 </div>
               </div>
