@@ -7,6 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { TypingEffect } from "@/components/landing/TypingEffect";
+import PhoneMockup from "@/components/landing/PhoneMockup";
+import SavingsSimulator from "@/components/landing/SavingsSimulator";
 import menusLogo from "@/assets/menus-logo.png";
 import heroDashboard from "@/assets/landing-hero-dashboard.jpg";
 import landingPdv from "@/assets/landing-pdv.jpg";
@@ -260,12 +262,10 @@ const LandingPage = () => {
             </div>
           </ScrollReveal>
 
-          {/* Mockup do dashboard */}
+          {/* Mockup do celular animado */}
           <ScrollReveal delay={400}>
-            <div className="mt-14 mx-auto max-w-4xl">
-              <div className="rounded-2xl border border-border shadow-2xl shadow-primary/15 overflow-hidden">
-                <img src={heroDashboard} alt="Dashboard do Menus App — sistema de gestão para restaurantes" className="w-full h-auto" />
-              </div>
+            <div className="mt-14 mx-auto max-w-md">
+              <PhoneMockup />
             </div>
           </ScrollReveal>
         </div>
@@ -561,6 +561,24 @@ const LandingPage = () => {
                 </div>
               ))}
             </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ═══ SIMULADOR ═══ */}
+      <section className="py-16 sm:py-20 bg-muted/30">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-10">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Calculadora</span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground tracking-[-0.025em]">
+              Quanto seu restaurante pode faturar a mais?
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+              Mexa nos sliders e veja sua projeção de receita com Menu's.
+            </p>
+          </ScrollReveal>
+          <ScrollReveal delay={150}>
+            <SavingsSimulator registerUrl="/registro/trial" />
           </ScrollReveal>
         </div>
       </section>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, Check, Star, MessageCircle, Rocket, TrendingDown, Smartphone, DollarSign, Package, ArrowRight } from "lucide-react";
-import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
+import PhoneMockup from "@/components/landing/PhoneMockup";
+import SavingsSimulator from "@/components/landing/SavingsSimulator";
 
 const WHATSAPP_URL = "https://w.app/menusapp";
 const REGISTER_URL = "https://menusapp.com.br/registro/avancado";
@@ -99,15 +100,8 @@ const Hero = () => (
         ✓ Sem cartão de crédito  ·  ✓ Setup em 2 minutos  ·  ✓ Cancele quando quiser
       </p>
 
-      <div className="mt-14 relative">
-        <div className="absolute inset-x-10 -bottom-6 h-12 bg-[#F97316]/20 blur-3xl rounded-full" />
-        <img
-          src={dashboardMockup}
-          alt="Dashboard do MenusApp mostrando pedidos, faturamento e cardápio digital"
-          width={1536}
-          height={1024}
-          className="relative rounded-2xl shadow-2xl border border-[#E2E8F0] mx-auto w-full max-w-5xl"
-        />
+      <div className="mt-16 flex justify-center">
+        <PhoneMockup primaryColor="#F97316" primaryColorEnd="#FB923C" />
       </div>
     </div>
   </section>
@@ -257,6 +251,24 @@ const Testimonials = () => {
     </section>
   );
 };
+
+/* ───────── Simulador de Economia ───────── */
+const Simulator = () => (
+  <section className="py-20 px-5 lg:px-8 bg-white">
+    <div className="max-w-5xl mx-auto">
+      <div className="text-center mb-10">
+        <span className="text-xs font-bold tracking-[0.2em] text-[#F97316]">CALCULADORA</span>
+        <h2 className="mt-3 text-3xl md:text-5xl font-extrabold text-[#0F172A] tracking-tight">
+          Quanto seu restaurante pode faturar a mais?
+        </h2>
+        <p className="mt-4 text-[#475569] max-w-2xl mx-auto">
+          Mexa nos sliders e veja sua projeção de receita com Menu's.
+        </p>
+      </div>
+      <SavingsSimulator primaryColor="#F97316" primaryColorEnd="#FB923C" registerUrl={REGISTER_URL} />
+    </div>
+  </section>
+);
 
 /* ───────── Planos ───────── */
 const Pricing = () => {
@@ -490,6 +502,7 @@ export default function LandingPageV2() {
         <Pain />
         <Steps />
         <Testimonials />
+        <Simulator />
         <Pricing />
         <FAQ />
         <FinalCTA />

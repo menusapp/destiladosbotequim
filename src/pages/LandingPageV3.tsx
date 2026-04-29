@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollReveal } from "@/components/landing/ScrollReveal";
+import PhoneMockup from "@/components/landing/PhoneMockup";
+import SavingsSimulator from "@/components/landing/SavingsSimulator";
 import menusLogo from "@/assets/menus-logo.png";
 import dashboardMockup from "@/assets/landing-dashboard-mockup.png";
 import landingPdv from "@/assets/landing-pdv.jpg";
@@ -286,13 +288,8 @@ const LandingPageV3 = () => {
           </ScrollReveal>
 
           <ScrollReveal delay={400}>
-            <div className="mt-14 relative">
-              <div className="absolute inset-x-10 -bottom-6 h-12 bg-primary/20 blur-3xl rounded-full" />
-              <img
-                src={dashboardMockup}
-                alt="Dashboard do MenusApp mostrando pedidos, faturamento e cardápio digital"
-                className="relative rounded-2xl shadow-2xl border border-border mx-auto w-full max-w-5xl"
-              />
+            <div className="mt-14 mx-auto max-w-md">
+              <PhoneMockup />
             </div>
           </ScrollReveal>
         </div>
@@ -676,6 +673,24 @@ const LandingPageV3 = () => {
                 </div>
               ))}
             </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ═══ SIMULADOR ═══ */}
+      <section className="py-20 px-5 lg:px-8 bg-background">
+        <div className="max-w-5xl mx-auto">
+          <ScrollReveal className="text-center mb-10">
+            <span className="text-xs font-bold tracking-[0.2em] text-primary">CALCULADORA</span>
+            <h2 className="mt-3 text-3xl md:text-5xl font-extrabold text-foreground tracking-tight">
+              Quanto seu restaurante pode faturar a mais?
+            </h2>
+            <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
+              Mexa nos sliders e veja sua projeção de receita com Menu's.
+            </p>
+          </ScrollReveal>
+          <ScrollReveal delay={150}>
+            <SavingsSimulator registerUrl={REGISTER_URL} />
           </ScrollReveal>
         </div>
       </section>
