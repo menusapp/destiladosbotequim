@@ -26,6 +26,7 @@ import {
   Receipt, CalendarCheck,
   Pizza, Coffee, Beer, Sandwich, ChefHat,
   Store, Rocket, MessageCircle, Sparkles,
+  Tablet, Hand, Zap, Users,
 } from "lucide-react";
 
 const WHATSAPP_URL = "https://wa.me/5514999999999";
@@ -492,6 +493,89 @@ const LandingPageV3 = () => {
                 </div>
               </ScrollReveal>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ TOTEM + GARÇOM MOBILE ═══ */}
+      <section id="atendimento" className="py-16 sm:py-20 bg-card">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-12">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold uppercase tracking-wider mb-3">Atendimento sem fricção</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-[-0.025em]">
+              Mais pedidos, menos espera
+            </h2>
+            <p className="mt-3 text-lg text-muted-foreground max-w-2xl mx-auto">
+              Liberte seu time da papelada. Totem de autoatendimento e PDV no bolso do garçom — pedidos voam direto para a cozinha, sem retrabalho.
+            </p>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* TOTEM */}
+            <ScrollReveal>
+              <div className="rounded-2xl border border-border bg-background overflow-hidden shadow-md hover:shadow-xl transition-shadow h-full flex flex-col">
+                <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+                  <img
+                    src="/placeholder.svg"
+                    alt="Totem de autoatendimento Menus"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="p-6 flex flex-col gap-4 flex-1">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Tablet className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-bold text-foreground">Totem de autoatendimento</h3>
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Diminua filas e aumente o ticket médio. O cliente monta o pedido no totem, paga na hora e a cozinha já começa a produzir — sem intermediários, sem erro de digitação.
+                  </p>
+                  <ul className="space-y-2 mt-auto">
+                    {["Pagamento integrado no terminal", "Sugestões inteligentes de combo", "Reduz erros e tempo de espera"].map((b) => (
+                      <li key={b} className="flex items-start gap-2 text-sm text-foreground">
+                        <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            {/* PDV MOBILE GARÇOM */}
+            <ScrollReveal delay={100}>
+              <div className="rounded-2xl border border-border bg-background overflow-hidden shadow-md hover:shadow-xl transition-shadow h-full flex flex-col">
+                <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+                  <img
+                    src="/placeholder.svg"
+                    alt="PDV no celular do garçom"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="p-6 flex flex-col gap-4 flex-1">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Smartphone className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-bold text-foreground">PDV no celular do garçom</h3>
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed">
+                    Seu garçom vira um caixa móvel. Abre comanda na mesa, lança pedidos na hora, envia para cozinha e bar em segundos e fecha a conta sem sair do salão.
+                  </p>
+                  <ul className="space-y-2 mt-auto">
+                    {["Abre e fecha comanda na mesa", "Envio instantâneo para cozinha", "Funciona em qualquer Android ou iPhone"].map((b) => (
+                      <li key={b} className="flex items-start gap-2 text-sm text-foreground">
+                        <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </ScrollReveal>
           </div>
         </div>
       </section>
