@@ -234,16 +234,9 @@ export const TableDetailView = () => {
           occupied_by: allOrders.find(o => o.id === orderId)?.customer_name || "Cliente",
         }).eq("id", tableId);
 
-        // Auto-print on accept if enabled
-        const autoPrintEnabled = localStorage.getItem("pdv_auto_print") === "true";
-        if (autoPrintEnabled) {
-          const order = allOrders.find(o => o.id === orderId);
-          if (order) {
-            try {
-              await printOrderForThermal(order);
-            } catch { /* ignore print errors */ }
-          }
-        }
+        // Auto-print é disparado globalmente pelo RestaurantAdmin nas
+        // contas com notificações ativadas (PC primário) — não aqui no
+        // dispositivo do garçom que aceitou o pedido.
       }
 
       fetchTableData();

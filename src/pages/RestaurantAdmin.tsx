@@ -53,6 +53,7 @@ import { SupportChatWidget } from "@/components/admin/SupportChatWidget";
 import { QzOnboardingGate } from "@/components/admin/QzOnboardingGate";
 import { GracePeriodBanner } from "@/components/admin/GracePeriodBanner";
 import { clearAdminSession } from "@/lib/sessionExpiry";
+import { printDocument } from "@/lib/printDispatcher";
 
 // Prefetch map: section → dynamic import. Definido fora do componente para
 // evitar recriação a cada render.
@@ -396,6 +397,23 @@ const RestaurantAdmin = () => {
                 items,
               };
               setNotificationQueue(prev => [...prev, newNotification]);
+
+              // Auto-print on PC accounts (those with notifications enabled).
+              // Trigger só dispara aqui — o dispositivo do garçom (com notificações
+              // desativadas) não chega a executar este bloco.
+              try {
+                const { data: printerCfg } = await supabase
+                  .from('printer_settings')
+                  .select('auto_print_orders')
+                  .eq('restaurant_id', restaurantId)
+                  .maybeSingle();
+                if (printerCfg?.auto_print_orders) {
+                  printDocument(orderData as any, restaurantId, { showToasts: false })
+                    .catch(err => console.error('[auto-print] erro:', err));
+                }
+              } catch (err) {
+                console.error('[auto-print] falha ao ler printer_settings:', err);
+              }
 
               // Marcar como notificado (atualizar ref e state)
               const updated = new Set(notifiedOrdersRef.current);

@@ -1092,55 +1092,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
       toast.success("Pedido criado com sucesso!");
 
-      // Auto-print if enabled
-      if (autoPrint) {
-        const table = orderType === "mesa" ? tables?.find(t => t.id === selectedTableId) : undefined;
-        const cityParts = (deliveryCity || "").split(" - ");
-        const resolvedCityName = (selectedAddress?.city || cityParts[0] || matchedZone?.zone_name || "").trim();
-        const resolvedState = (selectedAddress?.state || cityParts[1] || "").trim();
-        const resolvedCityLabel = resolvedCityName
-          ? `${resolvedCityName}${resolvedState ? ` - ${resolvedState}` : ""}`
-          : "";
-        const printableDeliveryAddress = orderType === "delivery"
-          ? [
-              resolvedCityLabel,
-              deliveryAddress || "",
-              deliveryNeighborhood || selectedAddress?.neighborhood || "",
-              deliveryCep ? `CEP ${deliveryCep}` : "",
-            ].filter(Boolean).join(" - ") || undefined
-          : undefined;
-        const printOrderObj = {
-          // IMPORTANTE: usar o UUID real do pedido criado no banco.
-          // O motor QZ Tray faz fetch por id (UUID), então um código sintético
-          // como "PDV-<timestamp>" quebra a query (invalid input syntax for type uuid).
-          id: createdOrderId ?? ("PDV-" + Date.now()),
-          created_at: new Date().toISOString(),
-          customer_name: customerName.trim(),
-          order_type: orderType === "mesa" ? "local" : "delivery",
-          delivery_type: orderType === "delivery" ? "delivery" : orderType === "retirada" ? "pickup" : undefined,
-          tables: table ? { table_number: table.table_number } : null,
-          delivery_address: printableDeliveryAddress,
-          delivery_phone: customerPhone || undefined,
-          payment_type: paymentType || undefined,
-          notes: (notes || "") + (discountNotes ? ` [Desconto: ${discountNotes}]` : ""),
-          coupon_discount: calculatedDiscount > 0 ? calculatedDiscount : undefined,
-          delivery_fee: orderType === "delivery" ? resolvedDeliveryFee : undefined,
-          order_items: cart.map((item, i) => ({
-            id: `item-${i}`,
-            quantity: item.quantity,
-            price_at_order: item.price,
-            notes: item.notes || undefined,
-            products: { name: item.productName },
-            order_item_extras: item.extras.map(e => ({
-              price_at_order: e.price,
-              product_extras: { name: e.name },
-            })),
-          })),
-        };
-        try {
-          await printDocument(printOrderObj as any, restaurantId);
-        } catch { /* ignore print errors */ }
-      }
+      // Auto-print é disparado pelo painel global (RestaurantAdmin) nas
+      // contas com notificações ativadas (tipicamente o PC primário). Assim
+      // o pedido NÃO imprime no celular do garçom que criou o pedido.
 
       clearForm();
       refetchTables();
