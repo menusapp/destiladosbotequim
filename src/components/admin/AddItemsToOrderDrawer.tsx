@@ -159,6 +159,8 @@ export const AddItemsToOrderDrawer = ({
       // Stock deduction is handled by DB trigger on status change to delivered/picked_up
 
       toast.success(`${item.productName} adicionado ao pedido!`);
+      // Notify other admin sessions that this order was modified
+      broadcastOrderModified({ restaurantId, orderId, action: "item_added" });
       setShowProductDrawer(false);
       setSelectedProduct(null);
       onItemsAdded();
