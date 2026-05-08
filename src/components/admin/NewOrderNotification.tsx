@@ -131,7 +131,7 @@ export const NewOrderNotification = ({
       <div className="flex items-center justify-between px-4 py-3 border-b border-orange-200">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <Bell className="w-4 h-4 text-white" />
+            <HeaderIcon className="w-4 h-4 text-white" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-orange-900 truncate">{title}</p>
