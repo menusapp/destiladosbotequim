@@ -10,8 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { 
-  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Home, Trash2, RefreshCw, Loader2, CalendarClock, ChevronDown
+  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Minus, Home, Trash2, RefreshCw, Loader2, CalendarClock, ChevronDown
 } from "lucide-react";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
@@ -78,6 +79,8 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const [showChangePaymentModal, setShowChangePaymentModal] = useState(false);
   const [showAddItems, setShowAddItems] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
+  const [updatingQtyItemId, setUpdatingQtyItemId] = useState<string | null>(null);
+  const confirm = useConfirmDialog();
   const [order, setOrder] = useState<Order>(initialOrder);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -187,6 +190,41 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       toast.error("Erro ao remover item do pedido");
     } finally {
       setRemovingItemId(null);
+    }
+  };
+
+  const handleChangeQuantity = async (item: OrderItem, delta: number) => {
+    const currentQty = item.quantity;
+    const newQty = currentQty + delta;
+    if (newQty < 1) {
+      toast.error("Quantidade mínima é 1. Para remover o item, use a lixeira.");
+      return;
+    }
+    const productName = item.products?.name || "Item";
+    const ok = await confirm({
+      title: "Confirmar alteração?",
+      description: `Alterar quantidade de "${productName}" de ${currentQty} para ${newQty}?`,
+      confirmLabel: "Sim, alterar",
+      cancelLabel: "Cancelar",
+    });
+    if (!ok) return;
+
+    setUpdatingQtyItemId(item.id);
+    try {
+      const { error } = await supabase
+        .from("order_items")
+        .update({ quantity: newQty })
+        .eq("id", item.id);
+      if (error) throw error;
+      toast.success("Quantidade atualizada!");
+      broadcastOrderModified({ restaurantId, orderId: order.id, action: delta > 0 ? "item_added" : "item_removed" });
+      await refreshOrder();
+      onStatusUpdate();
+    } catch (error: any) {
+      console.error("Erro ao atualizar quantidade:", error);
+      toast.error("Erro ao atualizar quantidade");
+    } finally {
+      setUpdatingQtyItemId(null);
     }
   };
 
@@ -364,7 +402,39 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                             {item.products?.name || "Produto"}
                             {item.notes && <p className="text-xs text-muted-foreground mt-1">Obs: {item.notes}</p>}
                           </TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
+                          <TableCell className="text-center">
+                            {canRemoveItems ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleChangeQuantity(item, -1)}
+                                  disabled={updatingQtyItemId === item.id || item.quantity <= 1}
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <span className="min-w-[1.5rem] text-center font-medium">
+                                  {updatingQtyItemId === item.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin inline" />
+                                  ) : (
+                                    item.quantity
+                                  )}
+                                </span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleChangeQuantity(item, 1)}
+                                  disabled={updatingQtyItemId === item.id}
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              item.quantity
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">R$ {item.price_at_order.toFixed(2)}</TableCell>
                           <TableCell>
                             {item.order_item_extras.length > 0 ? (
