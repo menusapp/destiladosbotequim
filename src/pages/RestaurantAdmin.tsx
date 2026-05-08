@@ -53,6 +53,7 @@ import { SupportChatWidget } from "@/components/admin/SupportChatWidget";
 import { QzOnboardingGate } from "@/components/admin/QzOnboardingGate";
 import { GracePeriodBanner } from "@/components/admin/GracePeriodBanner";
 import { clearAdminSession } from "@/lib/sessionExpiry";
+import { printDocument } from "@/lib/printDispatcher";
 
 // Prefetch map: section → dynamic import. Definido fora do componente para
 // evitar recriação a cada render.
