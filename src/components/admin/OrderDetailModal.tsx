@@ -10,8 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { 
-  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Home, Trash2, RefreshCw, Loader2, CalendarClock, ChevronDown
+  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Minus, Home, Trash2, RefreshCw, Loader2, CalendarClock, ChevronDown
 } from "lucide-react";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
