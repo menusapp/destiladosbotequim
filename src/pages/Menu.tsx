@@ -22,6 +22,7 @@ import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
 import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
+import { normalizeSearch } from "@/lib/searchNormalize";
 const Menu = () => {
   const { slug: pathSlug, tableNumber } = useParams();
   const restaurantSlug = resolveSlug(pathSlug);
@@ -1084,13 +1085,13 @@ const Menu = () => {
     ? activeCategories.map(cat => ({
         ...cat,
         products: cat.products.filter(p => 
-          p.name.toLowerCase().includes(searchQuery.toLowerCase())
+          normalizeSearch(p.name).includes(normalizeSearch(searchQuery))
         )
       })).filter(cat => cat.products.length > 0)
     : activeCategories;
 
   const filteredProducts = searchQuery.trim()
-    ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? allProducts.filter(p => normalizeSearch(p.name).includes(normalizeSearch(searchQuery)))
     : allProducts;
 
   const cartItemCount = getTotalItemCount();

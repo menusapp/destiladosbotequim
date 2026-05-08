@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface Category {
   id: string;
@@ -262,7 +263,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
   }, [allProducts]);
 
   const filteredProducts = productSearch
-    ? allProducts.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()))
+    ? allProducts.filter(p => normalizeSearch(p.name).includes(normalizeSearch(productSearch)))
     : allProducts;
 
   const toggleProduct = (productId: string) => {

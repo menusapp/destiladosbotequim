@@ -27,6 +27,7 @@ import { toast } from "@/components/ui/sonner";
 import { CustomerDetailDrawer } from "./CustomerDetailDrawer";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface ClientesTabProps {
   restaurantId: string;
@@ -149,9 +150,9 @@ export const ClientesTab = ({ restaurantId }: ClientesTabProps) => {
     if (!customers) return [];
     let result = [...customers];
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
+      const term = normalizeSearch(searchTerm);
       result = result.filter(c => 
-        c.name.toLowerCase().includes(term) || c.cpf.includes(term) || c.phone?.includes(term)
+        normalizeSearch(c.name).includes(term) || c.cpf.includes(term) || c.phone?.includes(term)
       );
     }
     switch (sortBy) {

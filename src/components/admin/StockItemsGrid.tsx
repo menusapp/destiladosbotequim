@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, AlertTriangle, Package, Pencil } from "lucide-react";
 import StockCard from "./StockCard";
 import BulkDeleteStockDialog from "./BulkDeleteStockDialog";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface StockCategory {
   id: string;
@@ -238,7 +239,7 @@ const StockItemsGrid = ({ restaurantId }: StockItemsGridProps) => {
 
   const lowStockItems = stockItems.filter(item => item.current_quantity <= item.minimum_quantity);
   const filteredItems = stockItems.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    normalizeSearch(item.name).includes(normalizeSearch(searchQuery))
   );
 
   return (

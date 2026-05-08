@@ -28,6 +28,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { checkProductInActiveOrders } from "@/lib/dangerChecks";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface Product {
   id: string;
@@ -1671,7 +1672,7 @@ const handleDelete = async (id: string) => {
             <div className="max-h-[500px] overflow-y-auto space-y-2 pr-2">
           {products
               .filter((product) =>
-                product.name.toLowerCase().includes(searchQuery.toLowerCase())
+                normalizeSearch(product.name).includes(normalizeSearch(searchQuery))
               )
               .map((product) => (
                 <div

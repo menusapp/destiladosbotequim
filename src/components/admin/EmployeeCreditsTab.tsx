@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DollarSign, Users, AlertTriangle, Check, X, Calendar as CalendarIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface EmployeeCreditsTabProps {
   restaurantId: string;
@@ -88,7 +89,7 @@ export const EmployeeCreditsTab = ({ restaurantId }: EmployeeCreditsTabProps) =>
 
   const filtered = useMemo(() => {
     if (!nameFilter) return credits;
-    return credits.filter(c => c.employee_name.toLowerCase().includes(nameFilter.toLowerCase()));
+    return credits.filter(c => normalizeSearch(c.employee_name).includes(normalizeSearch(nameFilter)));
   }, [credits, nameFilter]);
 
   const totalPending = useMemo(() =>

@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Trash2, Loader2, Pencil, ToggleLeft, ToggleRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface BulkDeleteStockDialogProps {
   restaurantId: string;
@@ -61,8 +62,8 @@ const BulkDeleteStockDialog = ({ restaurantId, open, onOpenChange, onDeleted }: 
 
   const filtered = useMemo(() => {
     if (!search.trim()) return items;
-    const t = search.toLowerCase();
-    return items.filter(i => i.name.toLowerCase().includes(t));
+    const t = normalizeSearch(search);
+    return items.filter(i => normalizeSearch(i.name).includes(t));
   }, [items, search]);
 
   const grouped = useMemo(() => {

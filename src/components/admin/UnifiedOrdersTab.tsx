@@ -26,6 +26,7 @@ import { ReceiptPreviewDialog } from "./ReceiptPreviewDialog";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import { OrderCard } from "./orders/OrderCard";
 import type { DateRange } from "react-day-picker";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface OrderItemExtra {
   price_at_order: number;
@@ -281,9 +282,9 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     // "todos" shows everything
 
     if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase();
+      const q = normalizeSearch(debouncedSearch);
       filtered = filtered.filter(o =>
-        o.customer_name.toLowerCase().includes(q) ||
+        normalizeSearch(o.customer_name).includes(q) ||
         o.customer_cpf.includes(q) ||
         o.delivery_phone?.includes(q) ||
         o.id.slice(0, 8).includes(q)

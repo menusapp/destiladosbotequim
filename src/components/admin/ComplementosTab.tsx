@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface StockItem { id: string; name: string; unit: string; price_per_unit: number; }
 interface CategoryItemIngredient { id: string; stock_item_id: string; quantity: number; stock_item_name?: string; stock_item_unit?: string; stock_item_price?: number; }
@@ -384,8 +385,8 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
   };
 
   const filteredCategories = categories.filter(cat =>
-    cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    cat.items.some(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    normalizeSearch(cat.name).includes(normalizeSearch(searchQuery)) ||
+    cat.items.some(item => normalizeSearch(item.name).includes(normalizeSearch(searchQuery)))
   );
 
   const calculateItemCost = (ingredients: CategoryItemIngredient[]) => ingredients.reduce((sum, ing) => sum + (ing.quantity * (ing.stock_item_price || 0)), 0);
@@ -568,7 +569,7 @@ const ComplementosTab = ({ restaurantId, isRestaurantOpen, onOpenDigitizer }: Co
                   <ScrollArea className="h-48 border rounded-lg">
                     <div className="p-2 space-y-1">
                       {allProducts
-                        .filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
+                        .filter(p => normalizeSearch(p.name).includes(normalizeSearch(productSearchQuery)))
                         .map(product => (
                           <label key={product.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer text-sm">
                             <Checkbox

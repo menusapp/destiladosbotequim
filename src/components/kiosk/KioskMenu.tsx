@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Product } from "@/types/menu";
 import { Search, ShoppingCart, X, LogOut, Star, UtensilsCrossed } from "lucide-react";
 import { isFeaturedVisible } from "@/lib/featuredUtils";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface Props {
   categories: Category[];
@@ -44,7 +45,7 @@ export function KioskMenu({ categories, featuredProducts: featuredProductsProp, 
 
   const allProducts = categories.flatMap(c => c.products);
   const filteredProducts = searchQuery
-    ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? allProducts.filter(p => normalizeSearch(p.name).includes(normalizeSearch(searchQuery)))
     : null;
 
   return (
