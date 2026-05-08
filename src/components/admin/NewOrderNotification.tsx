@@ -54,7 +54,8 @@ export const NewOrderNotification = ({
   const title = isModified
     ? `Pedido alterado — ${getTypeLabel()}`
     : `${getTypeLabel()} — ${customerName}`;
-  const canReject = canManageOrders && onReject && (orderType === 'local' || orderType === 'balcao');
+  const canReject = !isModified && canManageOrders && onReject && (orderType === 'local' || orderType === 'balcao');
+  const HeaderIcon = isModified ? Pencil : Bell;
 
   // Compact pill (collapsed)
   if (!expanded) {
