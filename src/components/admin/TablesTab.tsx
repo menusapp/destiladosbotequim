@@ -69,11 +69,11 @@ import { ptBR } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import {
-import { normalizeSearch } from "@/lib/searchNormalize";
   ACTIVE_RESERVATION_STATUSES,
   buildActiveReservationByTable,
   isReservationExpired,
 } from "@/lib/reservations";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface Comanda {
   id: string;
