@@ -116,19 +116,15 @@ export async function printDocument(
     return;
   }
 
-  const checkToastId = showToasts
-    ? toast.loading("Enviando para impressão...", { description: `Impressora: ${saved}` })
-    : undefined;
+  // Não mostramos mais toasts de "loading" nem de "sucesso" — apenas erros.
+  const checkToastId = undefined;
 
   try {
     const result = await printOrderWithQz(order.id, { mode });
     if (!showToasts) return;
 
     if (result.success) {
-      toast.success("Pedido enviado para impressora", {
-        id: checkToastId,
-        description: result.printer ?? saved,
-      });
+      // Sucesso silencioso: nenhuma notificação.
       return;
     }
 
