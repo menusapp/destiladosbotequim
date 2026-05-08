@@ -21,6 +21,7 @@ interface NewOrderNotificationProps {
   onStopSound?: () => void;
   onReject?: (reason: string) => void;
   canManageOrders?: boolean;
+  kind?: "new" | "modified";
 }
 
 export const NewOrderNotification = ({
