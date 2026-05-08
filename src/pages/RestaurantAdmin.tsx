@@ -426,8 +426,9 @@ const RestaurantAdmin = () => {
           const orderId = order.id;
           const status = order.status;
           const keepTotemNotification = order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status);
-          
-          if (!keepTotemNotification && status !== 'pending') {
+          const keepLocalNotification = order.order_type === 'local' && ['pending', 'accepted', 'preparing'].includes(status);
+
+          if (!keepTotemNotification && !keepLocalNotification && status !== 'pending') {
             setNotificationQueue(prev => prev.filter(n => n.orderId !== orderId));
           }
         }
