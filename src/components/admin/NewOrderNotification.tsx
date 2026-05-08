@@ -65,7 +65,7 @@ export const NewOrderNotification = ({
         className="flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-50 border border-orange-200 shadow-lg cursor-pointer hover:shadow-xl transition-all w-80"
       >
         <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
-          <Bell className="w-4 h-4 text-white" />
+          <HeaderIcon className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-orange-900 truncate">{title}</p>
