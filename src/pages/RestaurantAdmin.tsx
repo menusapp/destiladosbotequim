@@ -607,11 +607,95 @@ const RestaurantAdmin = () => {
       })
       .subscribe();
 
+    // Canal de broadcast para alterações em pedidos existentes
+    // (itens adicionados/removidos via PDV / OrderDetailModal / Mesa).
+    const orderModificationsChannel = supabase
+      .channel(`order-modifications-${restaurantId}`)
+      .on('broadcast', { event: 'order-modified' }, async (payload) => {
+        try {
+          const data = (payload as any).payload || {};
+          const orderId: string | undefined = data.orderId;
+          const actorId: string | undefined = data.actorId;
+          if (!orderId) return;
+
+          // Respeita preferência de notificações do staff
+          const staffRoleLS = localStorage.getItem('staff_role') || '';
+          const receivesRaw = localStorage.getItem('staff_receives_order_notifications');
+          const receivesNotifications = staffRoleLS === 'admin' || receivesRaw === null || receivesRaw === 'true';
+          if (!receivesNotifications) return;
+
+          // Não notifica quem fez a alteração
+          const myStaffId = localStorage.getItem('staff_id') || localStorage.getItem('restaurant_id');
+          if (actorId && myStaffId && actorId === myStaffId) return;
+
+          // Buscar dados do pedido
+          const { data: orderData } = await supabase
+            .from('orders')
+            .select(`
+              id, customer_name, order_type, delivery_type, table_id, delivery_fee, restaurant_id,
+              order_items(price_at_order, quantity, products(name), order_item_extras(price_at_order))
+            `)
+            .eq('id', orderId)
+            .maybeSingle();
+
+          if (!orderData || orderData.restaurant_id !== restaurantId) return;
+
+          const itemsTotal = (orderData.order_items || []).reduce((sum: number, item: any) => {
+            const extrasTotal = (item.order_item_extras || []).reduce((s: number, e: any) => s + Number(e.price_at_order || 0), 0);
+            return sum + (Number(item.price_at_order || 0) + extrasTotal) * Number(item.quantity || 0);
+          }, 0);
+          const total = itemsTotal + Number((orderData as any).delivery_fee || 0);
+
+          let tableNumber: number | undefined;
+          if (orderData.table_id) {
+            const { data: tableData } = await supabase
+              .from('tables')
+              .select('table_number')
+              .eq('id', orderData.table_id)
+              .maybeSingle();
+            tableNumber = tableData?.table_number;
+          }
+
+          const items = (orderData.order_items || []).slice(0, 5).map((oi: any) => ({
+            name: oi.products?.name || 'Item',
+            quantity: oi.quantity,
+          }));
+
+          const orderType = (orderData.order_type === 'balcao'
+            ? 'balcao'
+            : orderData.order_type === 'delivery'
+              ? 'delivery'
+              : 'local') as 'local' | 'delivery' | 'balcao';
+
+          setNotificationQueue(prev => {
+            // Substitui notificação "modified" anterior do mesmo pedido (evita empilhar)
+            const filtered = prev.filter(n => !(n.orderId === orderId && n.kind === 'modified'));
+            return [
+              ...filtered,
+              {
+                orderId,
+                customerName: orderData.customer_name,
+                total,
+                orderType,
+                tableNumber,
+                deliveryType: (orderData as any).delivery_type as 'delivery' | 'pickup' | undefined,
+                items,
+                kind: 'modified',
+              },
+            ];
+          });
+        } catch (e) {
+          console.warn('order-modified handler error:', e);
+        }
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(billsChannel);
       supabase.removeChannel(reservationsChannel);
       supabase.removeChannel(restaurantChannel);
+      supabase.removeChannel(orderModificationsChannel);
     };
   };
 
