@@ -21,6 +21,7 @@ import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { PrintMethodMenu } from "./PrintMethodMenu";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
+import { broadcastOrderModified } from "@/lib/broadcastOrderModified";
 
 interface OrderItemExtra {
   price_at_order: number;
