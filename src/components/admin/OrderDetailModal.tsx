@@ -204,8 +204,8 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     const ok = await confirm({
       title: "Confirmar alteração?",
       description: `Alterar quantidade de "${productName}" de ${currentQty} para ${newQty}?`,
-      confirmText: "Sim, alterar",
-      cancelText: "Cancelar",
+      confirmLabel: "Sim, alterar",
+      cancelLabel: "Cancelar",
     });
     if (!ok) return;
 
