@@ -1097,6 +1097,7 @@ const RestaurantAdmin = () => {
                       tableNumber={notification.tableNumber}
                       deliveryType={notification.deliveryType}
                       items={notification.items}
+                      kind={notification.kind}
                       onView={() => {
                         const current = notification;
                         (async () => {
