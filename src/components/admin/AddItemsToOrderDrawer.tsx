@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { broadcastOrderModified } from "@/lib/broadcastOrderModified";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface Product {
   id: string;
@@ -102,7 +103,7 @@ export const AddItemsToOrderDrawer = ({
     if (searchQuery.trim()) {
       return categories
         .flatMap((c) => c.products)
-        .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        .filter((p) => normalizeSearch(p.name).includes(normalizeSearch(searchQuery)));
     }
     if (selectedCategory) {
       return categories.find((c) => c.id === selectedCategory)?.products || [];

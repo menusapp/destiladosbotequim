@@ -17,6 +17,7 @@ import { validateCPF } from "@/lib/cpfValidator";
 import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { notifyOrderAcceptedFromPDV } from "@/lib/pdvNotifications";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 const CARD_BRANDS_PDV = [
   { code: "visa", name: "Visa" },
@@ -221,7 +222,7 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     if (!searchTerm) return products;
-    return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    return products.filter(p => normalizeSearch(p.name).includes(normalizeSearch(searchTerm)));
   }, [products, searchTerm]);
 
   const cartSubtotal = useMemo(() => {

@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Users, Gift, AlertCircle } from "lucide-react";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface LoyaltyProgram {
   id: string;
@@ -217,7 +218,7 @@ export default function CustomerProgressTab({ restaurantId }: CustomerProgressTa
 
   const filteredCustomers = customers.filter(c => 
     c.cpf.includes(searchTerm.replace(/\D/g, "")) ||
-    c.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    normalizeSearch(c.name).includes(normalizeSearch(searchTerm))
   );
 
   if (loading) {

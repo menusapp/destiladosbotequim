@@ -8,6 +8,7 @@ import { TrendingDown, TrendingUp, Package, Target, Search, ArrowUpDown, Chevron
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface MargensTabProps {
   restaurantId: string;
@@ -237,7 +238,7 @@ export default function MargensTab({ restaurantId }: MargensTabProps) {
   };
 
   const filteredAndSortedProducts = products
-    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter(p => normalizeSearch(p.name).includes(normalizeSearch(searchQuery)))
     .sort((a, b) => {
       return sortOrder === 'desc' ? b.margin - a.margin : a.margin - b.margin;
     });

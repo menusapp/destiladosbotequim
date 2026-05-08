@@ -30,6 +30,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import ProductCard from "./ProductCard";
 import BulkDeleteProductsDialog from "./BulkDeleteProductsDialog";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface Product {
   id: string;
@@ -756,11 +757,11 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
   const cmvPercentage = effectivePriceForCMV > 0 ? (fixedCost / effectivePriceForCMV) * 100 : 0;
 
   const filteredProducts = products.filter(product => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = normalizeSearch(searchQuery).trim();
     if (!q) return true;
-    if (product.name.toLowerCase().includes(q)) return true;
-    if ((product as any).pdv_code && (product as any).pdv_code.toLowerCase().includes(q)) return true;
-    if (product.extraPdvCodes?.some(code => code.toLowerCase().includes(q))) return true;
+    if (normalizeSearch(product.name).includes(q)) return true;
+    if ((product as any).pdv_code && normalizeSearch((product as any).pdv_code).includes(q)) return true;
+    if (product.extraPdvCodes?.some(code => normalizeSearch(code).includes(q))) return true;
     return false;
   });
 

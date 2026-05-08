@@ -23,6 +23,7 @@ import { isFeaturedVisible } from "@/lib/featuredUtils";
 import { useInactiveStockItems } from "@/hooks/useInactiveStockItems";
 import { useFacebookPixel } from "@/hooks/useFacebookPixel";
 import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 export default function DeliveryMenu() {
   const { slug: pathSlug } = useParams<{ slug: string }>();
@@ -410,13 +411,13 @@ export default function DeliveryMenu() {
     ? activeCategories.map(cat => ({
         ...cat,
         products: cat.products.filter(p => 
-          p.name.toLowerCase().includes(searchQuery.toLowerCase())
+          normalizeSearch(p.name).includes(normalizeSearch(searchQuery))
         )
       })).filter(cat => cat.products.length > 0)
     : activeCategories;
 
   const filteredProducts = searchQuery.trim()
-    ? allProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? allProducts.filter(p => normalizeSearch(p.name).includes(normalizeSearch(searchQuery)))
     : allProducts;
 
   return (

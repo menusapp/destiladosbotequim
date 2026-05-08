@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { FileText, Loader2, MapPin, UtensilsCrossed, Truck, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/sonner";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface PendingOrder {
   id: string;
@@ -195,11 +196,11 @@ const PendingOrdersPanel = ({ restaurantId, dateRange, onEmitted, searchTerm = "
 
   const filteredOrders = useMemo(() => {
     if (!searchTerm.trim()) return orders;
-    const term = searchTerm.toLowerCase().trim();
+    const term = normalizeSearch(searchTerm).trim();
     return orders.filter(o =>
-      o.customer_name?.toLowerCase().includes(term) ||
+      normalizeSearch(o.customer_name).includes(term) ||
       o.customer_cpf?.includes(term) ||
-      o.id.toLowerCase().includes(term)
+      normalizeSearch(o.id).includes(term)
     );
   }, [orders, searchTerm]);
 

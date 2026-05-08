@@ -69,6 +69,7 @@ import { ptBR } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import {
+import { normalizeSearch } from "@/lib/searchNormalize";
   ACTIVE_RESERVATION_STATUSES,
   buildActiveReservationByTable,
   isReservationExpired,
@@ -781,7 +782,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   // Filter tables
   const filteredTables = tables.filter((table) => {
     const displayName = table.table_name || `Mesa ${table.table_number}`;
-    const matchesSearch = displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = normalizeSearch(displayName).includes(normalizeSearch(searchQuery)) ||
       table.table_number.toString().includes(searchQuery);
     if (!matchesSearch) return false;
 
@@ -795,7 +796,7 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
   // Filter reservations
   const filteredReservations = reservations.filter((r) => {
     const matchesSearch =
-      r.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      normalizeSearch(r.customer_name).includes(normalizeSearch(searchTerm)) ||
       r.customer_cpf.includes(searchTerm) ||
       r.customer_phone.includes(searchTerm);
 

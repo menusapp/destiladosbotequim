@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { Plus, ChevronUp, ChevronDown, X, Clock, Calendar } from "lucide-react";
 import { FeaturedScheduleEntry } from "@/lib/featuredUtils";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface Product {
   id: string;
@@ -272,7 +273,7 @@ const DestaquesTab = ({ restaurantId }: DestaquesTabProps) => {
 
   const filteredAvailableProducts = availableProducts
     .filter(p => !p.is_featured)
-    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    .filter(p => normalizeSearch(p.name).includes(normalizeSearch(searchQuery)));
 
   if (loading) {
     return (

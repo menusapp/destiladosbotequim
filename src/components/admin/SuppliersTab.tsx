@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Pencil, Trash2, Building2, Phone, Mail, User } from "lucide-react";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface Supplier {
   id: string;
@@ -91,7 +92,7 @@ export default function SuppliersTab({ restaurantId }: SuppliersTabProps) {
     fetchSuppliers();
   };
 
-  const filtered = suppliers.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filtered = suppliers.filter(s => normalizeSearch(s.name).includes(normalizeSearch(searchQuery)));
 
   return (
     <div className="space-y-6">

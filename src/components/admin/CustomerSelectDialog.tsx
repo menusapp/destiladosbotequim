@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Search, User, Check, MapPin, Plus, ChevronLeft } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface Address {
   id: string;
@@ -102,12 +103,12 @@ export const CustomerSelectDialog = ({
     if (!customers) return [];
     if (!searchTerm) return customers;
 
-    const term = searchTerm.toLowerCase();
+    const term = normalizeSearch(searchTerm);
     
     // Find CPFs that match by address
     const cpfsWithMatchingAddress = new Set<string>();
     allAddresses?.forEach((addr: any) => {
-      const addrStr = `${addr.street} ${addr.number} ${addr.neighborhood} ${addr.city} ${addr.zip_code}`.toLowerCase();
+      const addrStr = normalizeSearch(`${addr.street} ${addr.number} ${addr.neighborhood} ${addr.city} ${addr.zip_code}`);
       if (addrStr.includes(term)) {
         cpfsWithMatchingAddress.add(addr.customer_cpf);
       }
@@ -115,7 +116,7 @@ export const CustomerSelectDialog = ({
 
     return customers.filter(
       (c) =>
-        c.name.toLowerCase().includes(term) ||
+        normalizeSearch(c.name).includes(term) ||
         c.cpf.includes(term) ||
         c.phone?.includes(term) ||
         cpfsWithMatchingAddress.has(c.cpf)

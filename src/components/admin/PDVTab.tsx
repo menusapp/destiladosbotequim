@@ -40,6 +40,7 @@ import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { checkUnpaidBeforeTableClear } from "@/lib/dangerChecks";
 import { getTableMenuLink } from "@/lib/shareableLinks";
 import {
+import { normalizeSearch } from "@/lib/searchNormalize";
   ACTIVE_RESERVATION_STATUSES,
   buildActiveReservationByTable,
   isReservationExpired,
@@ -383,11 +384,11 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     if (!searchableOrders) return [];
     if (orderSearchDate && orderSearchTerm.length < 2) return searchableOrders;
     if (orderSearchTerm.length < 2) return [];
-    const term = orderSearchTerm.toLowerCase();
+    const term = normalizeSearch(orderSearchTerm);
     return searchableOrders.filter((order: any) => {
-      if (order.customer_name?.toLowerCase().includes(term)) return true;
+      if (normalizeSearch(order.customer_name).includes(term)) return true;
       if (order.customer_cpf?.includes(term)) return true;
-      if (order.order_items?.some((item: any) => item.products?.name?.toLowerCase().includes(term))) return true;
+      if (order.order_items?.some((item: any) => normalizeSearch(item.products?.name).includes(term))) return true;
       return false;
     });
   }, [searchableOrders, orderSearchTerm, orderSearchDate]);
@@ -475,9 +476,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const debouncedSearchTerm = useDebounce(searchTerm, 180);
   const filteredProducts = useMemo(() => {
     if (!products) return [];
-    const q = debouncedSearchTerm.trim().toLowerCase();
+    const q = normalizeSearch(debouncedSearchTerm).trim();
     if (!q) return products;
-    return products.filter(p => p.name.toLowerCase().includes(q));
+    return products.filter(p => normalizeSearch(p.name).includes(q));
   }, [products, debouncedSearchTerm]);
 
   const cartSubtotal = useMemo(() => {
