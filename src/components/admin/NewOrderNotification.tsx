@@ -37,10 +37,12 @@ export const NewOrderNotification = ({
   onStopSound,
   onReject,
   canManageOrders = true,
+  kind = "new",
 }: NewOrderNotificationProps) => {
   const [expanded, setExpanded] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const isModified = kind === "modified";
 
   const getTypeLabel = () => {
     if (orderType === 'balcao') return 'Balcão';
@@ -49,7 +51,9 @@ export const NewOrderNotification = ({
     return 'Delivery';
   };
 
-  const title = `${getTypeLabel()} — ${customerName}`;
+  const title = isModified
+    ? `Pedido alterado — ${getTypeLabel()}`
+    : `${getTypeLabel()} — ${customerName}`;
   const canReject = canManageOrders && onReject && (orderType === 'local' || orderType === 'balcao');
 
   // Compact pill (collapsed)
