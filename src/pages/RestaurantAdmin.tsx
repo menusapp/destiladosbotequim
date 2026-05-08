@@ -127,6 +127,7 @@ const RestaurantAdmin = () => {
     tableNumber?: number;
     deliveryType?: 'delivery' | 'pickup';
     items?: Array<{name: string; quantity: number}>;
+    kind?: 'new' | 'modified';
   }>>([]);
   const [cascadeExpanded, setCascadeExpanded] = useState(false);
   const notificationQueueRef = useRef<typeof notificationQueue>([]);
