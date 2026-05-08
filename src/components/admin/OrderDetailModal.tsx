@@ -402,7 +402,39 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                             {item.products?.name || "Produto"}
                             {item.notes && <p className="text-xs text-muted-foreground mt-1">Obs: {item.notes}</p>}
                           </TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
+                          <TableCell className="text-center">
+                            {canRemoveItems ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleChangeQuantity(item, -1)}
+                                  disabled={updatingQtyItemId === item.id || item.quantity <= 1}
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <span className="min-w-[1.5rem] text-center font-medium">
+                                  {updatingQtyItemId === item.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin inline" />
+                                  ) : (
+                                    item.quantity
+                                  )}
+                                </span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleChangeQuantity(item, 1)}
+                                  disabled={updatingQtyItemId === item.id}
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              item.quantity
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">R$ {item.price_at_order.toFixed(2)}</TableCell>
                           <TableCell>
                             {item.order_item_extras.length > 0 ? (
