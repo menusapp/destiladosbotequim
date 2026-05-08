@@ -305,7 +305,16 @@ const RestaurantAdmin = () => {
           const orderType = order.order_type;
           const orderId = order.id;
           const status = order.status;
-          const shouldNotify = status === 'pending' || (order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status));
+          // Notify on:
+          // - Any new pending order (delivery / balcão / cardápio mesa)
+          // - Totem orders that come in already accepted/preparing
+          // - Any local (mesa) order regardless of initial status, so PDV/garçom-created
+          //   orders also ping the other staff sessions on the network.
+          const activeLocalStatuses = ['pending', 'accepted', 'preparing'];
+          const shouldNotify =
+            status === 'pending' ||
+            (order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status)) ||
+            (order.order_type === 'local' && activeLocalStatuses.includes(status));
 
           // Filter by staff permission: only show notifications to users that opted in.
           // Owner sessions (no staff_role set) keep receiving everything.
@@ -417,8 +426,9 @@ const RestaurantAdmin = () => {
           const orderId = order.id;
           const status = order.status;
           const keepTotemNotification = order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status);
-          
-          if (!keepTotemNotification && status !== 'pending') {
+          const keepLocalNotification = order.order_type === 'local' && ['pending', 'accepted', 'preparing'].includes(status);
+
+          if (!keepTotemNotification && !keepLocalNotification && status !== 'pending') {
             setNotificationQueue(prev => prev.filter(n => n.orderId !== orderId));
           }
         }
