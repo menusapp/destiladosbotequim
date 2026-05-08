@@ -193,7 +193,40 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     }
   };
 
-  const { canManageOrders } = useStaffOrderPermissions();
+  const handleChangeQuantity = async (item: OrderItem, delta: number) => {
+    const currentQty = item.quantity;
+    const newQty = currentQty + delta;
+    if (newQty < 1) {
+      toast.error("Quantidade mínima é 1. Para remover o item, use a lixeira.");
+      return;
+    }
+    const productName = item.products?.name || "Item";
+    const ok = await confirm({
+      title: "Confirmar alteração?",
+      description: `Alterar quantidade de "${productName}" de ${currentQty} para ${newQty}?`,
+      confirmText: "Sim, alterar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+
+    setUpdatingQtyItemId(item.id);
+    try {
+      const { error } = await supabase
+        .from("order_items")
+        .update({ quantity: newQty })
+        .eq("id", item.id);
+      if (error) throw error;
+      toast.success("Quantidade atualizada!");
+      broadcastOrderModified({ restaurantId, orderId: order.id, action: delta > 0 ? "item_added" : "item_removed" });
+      await refreshOrder();
+      onStatusUpdate();
+    } catch (error: any) {
+      console.error("Erro ao atualizar quantidade:", error);
+      toast.error("Erro ao atualizar quantidade");
+    } finally {
+      setUpdatingQtyItemId(null);
+    }
+  };
 
   const handleWhatsApp = () => {
     if (order.delivery_phone) { const phone = order.delivery_phone.replace(/\D/g, ""); window.open(`https://wa.me/55${phone}`, "_blank"); }
