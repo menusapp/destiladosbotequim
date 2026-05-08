@@ -7,6 +7,7 @@ import { Search, Plus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { PDVProductDrawer } from "./PDVProductDrawer";
+import { broadcastOrderModified } from "@/lib/broadcastOrderModified";
 
 interface Product {
   id: string;
