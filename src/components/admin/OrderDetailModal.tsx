@@ -179,6 +179,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       const { error } = await supabase.rpc("restore_stock_for_order_item", { p_order_item_id: itemId, p_restaurant_id: restaurantId });
       if (error) throw error;
       toast.success("Item removido e estoque restaurado!");
+      broadcastOrderModified({ restaurantId, orderId: order.id, action: "item_removed" });
       await refreshOrder();
       onStatusUpdate();
     } catch (error: any) {
