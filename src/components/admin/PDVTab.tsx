@@ -40,11 +40,11 @@ import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { checkUnpaidBeforeTableClear } from "@/lib/dangerChecks";
 import { getTableMenuLink } from "@/lib/shareableLinks";
 import {
-import { normalizeSearch } from "@/lib/searchNormalize";
   ACTIVE_RESERVATION_STATUSES,
   buildActiveReservationByTable,
   isReservationExpired,
 } from "@/lib/reservations";
+import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface CartItem {
   productId: string;
