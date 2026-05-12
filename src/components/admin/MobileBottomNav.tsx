@@ -15,6 +15,8 @@ interface MobileBottomNavProps {
   hasNewBills?: boolean;
   hasNewLocalOrders?: boolean;
   primaryColor?: string;
+  staffRole?: string;
+  staffAllowedSections?: string[];
 }
 
 const PRIMARY_TABS = [
