@@ -1401,7 +1401,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           className={`
             ${isMobile
               ? `fixed inset-x-0 bottom-0 z-50 bg-background flex flex-col px-4 pt-4 pb-6 rounded-t-2xl shadow-2xl border-t transition-transform duration-300 h-[90vh] ${mobileOrderPanelOpen ? "translate-y-0" : "translate-y-full"}`
-              : "w-[640px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0"
+              : "w-[520px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0"
             }
           `}
         >
