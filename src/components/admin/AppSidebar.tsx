@@ -107,9 +107,11 @@ export function AppSidebar({ activeSection, onSectionChange, hasNewOrders, hasNe
 
   const isBlocked = (id: string) => !checkAllowed(id) || !isStaffAllowed(id);
 
-  // Show all groups — never filter
-  const allGroups = menuGroups;
-  const allConfig = menuStructure.configSubItems;
+  // Hide items the staff has no permission for; plan-blocked items still show with lock
+  const allGroups = menuGroups
+    .map((group) => group.filter((item) => isStaffAllowed(item.id)))
+    .filter((group) => group.length > 0);
+  const allConfig = menuStructure.configSubItems.filter((item) => isStaffAllowed(item.id));
 
   return (
     <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border bg-sidebar-background w-[260px]">
