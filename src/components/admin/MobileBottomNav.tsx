@@ -53,10 +53,20 @@ export function MobileBottomNav({
   hasNewBills,
   hasNewLocalOrders,
   primaryColor = "#FF6B35",
+  staffRole,
+  staffAllowedSections,
 }: MobileBottomNavProps) {
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const isPrimaryActive = PRIMARY_TABS.some((t) => t.id === activeSection);
+  const isStaffAllowed = (id: string) => {
+    if (!staffRole || staffRole === "admin") return true;
+    return staffAllowedSections?.includes(id) ?? false;
+  };
+
+  const primaryTabs = PRIMARY_TABS.filter((t) => isStaffAllowed(t.id));
+  const moreTabs = MORE_TABS.filter((t) => isStaffAllowed(t.id));
+
+  const isPrimaryActive = primaryTabs.some((t) => t.id === activeSection);
 
   const handleSelect = (id: string) => {
     onSectionChange(id);
