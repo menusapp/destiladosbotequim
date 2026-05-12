@@ -191,8 +191,8 @@ export const AdminHeader = ({
         </div>
       )}
 
-      {/* Toggle Abrir/Fechar */}
-      <div className="flex items-center gap-2 px-2.5 py-1 rounded-button border border-border">
+      {/* Toggle Abrir/Fechar — desktop only */}
+      <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-button border border-border">
         <Store className={`h-3.5 w-3.5 ${isOpen ? 'text-green-500' : 'text-destructive'}`} />
         <span className={`text-label font-medium ${isOpen ? 'text-green-500' : 'text-destructive'}`}>
           {isOpen ? 'Aberto' : 'Fechado'}
