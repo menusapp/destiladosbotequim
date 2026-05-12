@@ -79,7 +79,7 @@ export function MobileBottomNav({
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Navegação principal"
     >
-      <div className="grid grid-cols-4 h-16">
+      <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${primaryTabs.length + 1}, minmax(0, 1fr))` }}>
         {primaryTabs.map((tab) => {
           const isActive = activeSection === tab.id;
           let hasDot = false;
