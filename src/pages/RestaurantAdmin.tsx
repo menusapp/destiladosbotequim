@@ -1300,6 +1300,8 @@ const RestaurantAdmin = () => {
           hasNewBills={hasNewBills}
           hasNewLocalOrders={hasNewLocalOrders}
           primaryColor={restaurant.primary_color}
+          staffRole={staffRole ?? undefined}
+          staffAllowedSections={staffAllowedSections}
         />
 
       </div>

@@ -15,6 +15,8 @@ interface MobileBottomNavProps {
   hasNewBills?: boolean;
   hasNewLocalOrders?: boolean;
   primaryColor?: string;
+  staffRole?: string;
+  staffAllowedSections?: string[];
 }
 
 const PRIMARY_TABS = [
@@ -51,10 +53,20 @@ export function MobileBottomNav({
   hasNewBills,
   hasNewLocalOrders,
   primaryColor = "#FF6B35",
+  staffRole,
+  staffAllowedSections,
 }: MobileBottomNavProps) {
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const isPrimaryActive = PRIMARY_TABS.some((t) => t.id === activeSection);
+  const isStaffAllowed = (id: string) => {
+    if (!staffRole || staffRole === "admin") return true;
+    return staffAllowedSections?.includes(id) ?? false;
+  };
+
+  const primaryTabs = PRIMARY_TABS.filter((t) => isStaffAllowed(t.id));
+  const moreTabs = MORE_TABS.filter((t) => isStaffAllowed(t.id));
+
+  const isPrimaryActive = primaryTabs.some((t) => t.id === activeSection);
 
   const handleSelect = (id: string) => {
     onSectionChange(id);
@@ -67,8 +79,8 @@ export function MobileBottomNav({
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Navegação principal"
     >
-      <div className="grid grid-cols-4 h-16">
-        {PRIMARY_TABS.map((tab) => {
+      <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${primaryTabs.length + 1}, minmax(0, 1fr))` }}>
+        {primaryTabs.map((tab) => {
           const isActive = activeSection === tab.id;
           let hasDot = false;
           if (tab.id === "pedidos") hasDot = !!(hasNewDeliveryOrders || hasNewBills);
@@ -129,7 +141,7 @@ export function MobileBottomNav({
             </SheetHeader>
             <div className="flex-1 overflow-y-auto p-3">
               <div className="grid grid-cols-3 gap-2">
-                {MORE_TABS.map((tab) => {
+                {moreTabs.map((tab) => {
                   const isActive = activeSection === tab.id;
                   return (
                     <button
