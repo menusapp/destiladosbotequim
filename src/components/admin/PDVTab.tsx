@@ -1198,7 +1198,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             {tables?.length || 0} mesas • {occupiedTables} ocup. • {availableTables} livres
           </p>
         </div>
-        <div className="no-min-tap flex items-center gap-1.5 flex-shrink-0 h-8 px-2 rounded-button border border-border" data-tour="pdv-auto-print">
+        <div className="no-min-tap hidden sm:flex items-center gap-1.5 flex-shrink-0 h-8 px-2 rounded-button border border-border" data-tour="pdv-auto-print">
           <Printer className="h-3.5 w-3.5 text-muted-foreground" />
           <label htmlFor="auto-print-toggle" className="text-[11px] sm:text-xs text-muted-foreground cursor-pointer">Auto-print</label>
           <Switch
