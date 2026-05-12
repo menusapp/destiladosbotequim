@@ -80,7 +80,7 @@ export function MobileBottomNav({
       aria-label="Navegação principal"
     >
       <div className="grid grid-cols-4 h-16">
-        {PRIMARY_TABS.map((tab) => {
+        {primaryTabs.map((tab) => {
           const isActive = activeSection === tab.id;
           let hasDot = false;
           if (tab.id === "pedidos") hasDot = !!(hasNewDeliveryOrders || hasNewBills);
@@ -141,7 +141,7 @@ export function MobileBottomNav({
             </SheetHeader>
             <div className="flex-1 overflow-y-auto p-3">
               <div className="grid grid-cols-3 gap-2">
-                {MORE_TABS.map((tab) => {
+                {moreTabs.map((tab) => {
                   const isActive = activeSection === tab.id;
                   return (
                     <button
