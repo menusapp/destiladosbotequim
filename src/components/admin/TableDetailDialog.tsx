@@ -749,19 +749,13 @@ export const TableDetailDialog = ({
 
     return (
       <div key={item.id} className={allSplitsPaid ? "opacity-60" : ""}>
-        <div className="flex justify-between text-xs items-start">
-          <span className="flex-1">
-            {item.quantity}x {item.products?.name || "Produto"}
-          </span>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
-              R$ {itemTotal.toFixed(2)}
-            </span>
+        <div className="flex justify-between text-xs items-start gap-2">
+          <span className="flex-1 flex items-center gap-1.5">
             {!hasSplits && !allSplitsPaid && canManageOrders && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="h-5 w-5 p-0"
+                className="h-5 w-5 p-0 shrink-0 border-primary/40"
                 title="Adicionar mais deste item"
                 onClick={() => {
                   setAddingQtyItem({
@@ -776,6 +770,12 @@ export const TableDetailDialog = ({
                 <Plus className="h-3 w-3 text-primary" />
               </Button>
             )}
+            <span>{item.quantity}x {item.products?.name || "Produto"}</span>
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
+              R$ {itemTotal.toFixed(2)}
+            </span>
             {!hasSplits && !allSplitsPaid && (
               <Button
                 variant="ghost"
