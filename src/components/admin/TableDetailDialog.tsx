@@ -1275,6 +1275,60 @@ export const TableDetailDialog = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Quantity Confirmation */}
+      <AlertDialog open={!!addingQtyItem} onOpenChange={(o) => { if (!o) { setAddingQtyItem(null); setExtraQty(1); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Adicionar mais deste item</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div>Confirme a quantidade adicional. O valor será somado ao item.</div>
+                {addingQtyItem && (
+                  <div className="rounded-md border bg-muted/50 px-3 py-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium text-foreground">{addingQtyItem.name}</div>
+                      <div className="text-xs text-muted-foreground">Atual: {addingQtyItem.currentQty}x</div>
+                    </div>
+                    <div className="flex items-center justify-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => setExtraQty((q) => Math.max(1, q - 1))}
+                        disabled={extraQty <= 1}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <div className="text-2xl font-bold w-12 text-center text-foreground">+{extraQty}</div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => setExtraQty((q) => q + 1)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex justify-between text-sm text-foreground pt-1 border-t">
+                      <span>Adicional:</span>
+                      <span className="font-bold">R$ {(addingQtyItem.unitPrice * extraQty).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingQty}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmAddQty(); }} disabled={savingQty}>
+              {savingQty ? "Salvando…" : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
