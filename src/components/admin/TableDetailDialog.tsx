@@ -750,27 +750,60 @@ export const TableDetailDialog = ({
     return (
       <div key={item.id} className={allSplitsPaid ? "opacity-60" : ""}>
         <div className="flex justify-between text-xs items-start gap-2">
-          <span className="flex-1 flex items-center gap-1.5">
-            {!hasSplits && !allSplitsPaid && canManageOrders && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-5 w-5 p-0 shrink-0 border-primary/40"
-                title="Adicionar mais deste item"
-                onClick={() => {
-                  setAddingQtyItem({
-                    id: item.id,
-                    name: item.products?.name || "Produto",
-                    unitPrice: item.price_at_order,
-                    currentQty: item.quantity,
-                  });
-                  setExtraQty(1);
-                }}
-              >
-                <Plus className="h-3 w-3 text-primary" />
-              </Button>
-            )}
+          <span className="flex-1 flex items-center gap-1.5 flex-wrap">
             <span>{item.quantity}x {item.products?.name || "Produto"}</span>
+            {!hasSplits && !allSplitsPaid && canManageOrders && (
+              <span className="inline-flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-5 w-5 p-0 shrink-0 border-destructive/40"
+                  title="Remover uma unidade"
+                  onClick={async () => {
+                    if (item.quantity <= 1) {
+                      setCancellingItem({
+                        id: item.id,
+                        name: `${item.quantity}x ${item.products?.name || "Produto"}`,
+                        total: itemTotal,
+                      });
+                      return;
+                    }
+                    const newQty = item.quantity - 1;
+                    const { error } = await supabase
+                      .from("order_items")
+                      .update({ quantity: newQty })
+                      .eq("id", item.id);
+                    if (error) {
+                      toast.error("Erro ao remover unidade");
+                      return;
+                    }
+                    toast.success(`-1 ${item.products?.name || "item"}`);
+                    broadcastOrderModified({ restaurantId, orderId, action: "item_removed" });
+                    refetchOrders();
+                    refetchComandas();
+                  }}
+                >
+                  <Minus className="h-3 w-3 text-destructive" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-5 w-5 p-0 shrink-0 border-primary/40"
+                  title="Adicionar mais deste item"
+                  onClick={() => {
+                    setAddingQtyItem({
+                      id: item.id,
+                      name: item.products?.name || "Produto",
+                      unitPrice: item.price_at_order,
+                      currentQty: item.quantity,
+                    });
+                    setExtraQty(1);
+                  }}
+                >
+                  <Plus className="h-3 w-3 text-primary" />
+                </Button>
+              </span>
+            )}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
             <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
