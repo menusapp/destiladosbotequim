@@ -84,6 +84,9 @@ export const TableDetailDialog = ({
   const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
   const [addItemsOrderId, setAddItemsOrderId] = useState<string | null>(null);
   const [cancellingItem, setCancellingItem] = useState<{ id: string; name: string; total: number } | null>(null);
+  const [addingQtyItem, setAddingQtyItem] = useState<{ id: string; name: string; unitPrice: number; currentQty: number } | null>(null);
+  const [extraQty, setExtraQty] = useState(1);
+  const [savingQty, setSavingQty] = useState(false);
   const { canManageOrders } = useStaffOrderPermissions();
 
   // Fetch active comandas for the table
