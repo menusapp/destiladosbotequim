@@ -726,6 +726,25 @@ export const TableDetailDialog = ({
             <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
               R$ {itemTotal.toFixed(2)}
             </span>
+            {!hasSplits && !allSplitsPaid && canManageOrders && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                title="Adicionar mais deste item"
+                onClick={() => {
+                  setAddingQtyItem({
+                    id: item.id,
+                    name: item.products?.name || "Produto",
+                    unitPrice: item.price_at_order,
+                    currentQty: item.quantity,
+                  });
+                  setExtraQty(1);
+                }}
+              >
+                <Plus className="h-3 w-3 text-primary" />
+              </Button>
+            )}
             {!hasSplits && !allSplitsPaid && (
               <Button
                 variant="ghost"
