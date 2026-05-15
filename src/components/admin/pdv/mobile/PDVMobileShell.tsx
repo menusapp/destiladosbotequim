@@ -305,7 +305,7 @@ export const PDVMobileShell = (props: PDVMobileShellProps) => {
       </div>
 
       {/* Grid compacto de produtos */}
-      <div className="flex-1 overflow-y-auto px-3 pt-3 pb-32">
+      <div className="flex-1 overflow-y-auto px-3 pt-3 pb-40">
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16 text-sm text-muted-foreground">
             Nenhum produto encontrado
