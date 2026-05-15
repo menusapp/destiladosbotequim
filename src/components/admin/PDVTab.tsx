@@ -45,7 +45,6 @@ import {
   isReservationExpired,
 } from "@/lib/reservations";
 import { normalizeSearch } from "@/lib/searchNormalize";
-import { PDVMobileShell } from "./pdv/mobile/PDVMobileShell";
 
 interface CartItem {
   productId: string;
@@ -1188,115 +1187,6 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
   const occupiedTables = tables?.filter(t => t.is_occupied).length || 0;
   const availableTables = tables?.filter(t => !t.is_occupied).length || 0;
-
-  // Helper: abre o drawer de produto enriquecido (usado por desktop e mobile shell)
-  const openProductWithExtras = async (product: any) => {
-    setSelectedProduct(product);
-    setIsProductDrawerOpen(true);
-    try {
-      const { data: complementGroups } = await supabase
-        .from("product_complement_groups")
-        .select("extra_category_id, display_order, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
-        .eq("product_id", product.id)
-        .order("display_order");
-
-      const complementExtras = (complementGroups || []).flatMap((g: any) => {
-        const cat = g.extra_categories;
-        if (!cat?.extra_category_items) return [];
-        return cat.extra_category_items.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          is_required: g.is_required,
-          min_selection: g.min_selection,
-          max_selection: g.max_selection,
-          extra_category_id: g.extra_category_id,
-          extra_category_name: cat.name,
-          group_order: g.display_order ?? 9999,
-          is_complement: true,
-        }));
-      });
-
-      const combinedExtras = [
-        ...(product.product_extras || []),
-        ...complementExtras,
-      ];
-
-      setSelectedProduct({ ...product, product_extras: combinedExtras });
-    } catch (_) { /* keep base extras on error */ }
-  };
-
-  // ============ MOBILE HANDHELD MODE ============
-  if (isMobile) {
-    return (
-      <>
-        <PDVMobileShell
-          products={products || []}
-          orderType={orderType}
-          setOrderType={setOrderType}
-          cart={cart}
-          setCart={setCart}
-          onOpenProduct={openProductWithExtras}
-          tables={tables}
-          selectedTableId={selectedTableId}
-          setSelectedTableId={setSelectedTableId}
-          pendingByTable={pendingByTable}
-          reservationByTable={reservationByTable}
-          customerName={customerName}
-          setCustomerName={setCustomerName}
-          customerPhone={customerPhone}
-          setCustomerPhone={setCustomerPhone}
-          customerCpf={customerCpf}
-          onCpfChange={handleCpfAutoSearch}
-          cpfSearching={cpfSearching}
-          notes={notes}
-          setNotes={setNotes}
-          paymentType={paymentType}
-          setPaymentType={setPaymentType}
-          deliveryAddress={deliveryAddress}
-          setDeliveryAddress={setDeliveryAddress}
-          deliveryNeighborhood={deliveryNeighborhood}
-          setDeliveryNeighborhood={setDeliveryNeighborhood}
-          deliveryCep={deliveryCep}
-          setDeliveryCep={setDeliveryCep}
-          deliveryCity={deliveryCity}
-          setDeliveryCity={setDeliveryCity}
-          cartSubtotal={cartSubtotal}
-          cartTotal={cartTotal}
-          resolvedDeliveryFee={resolvedDeliveryFee}
-          onSubmit={handleSubmit}
-          submitting={submitting}
-          onClearForm={clearForm}
-        />
-
-        {/* Drawers compartilhados */}
-        <PDVProductDrawer
-          product={selectedProduct}
-          open={isProductDrawerOpen}
-          onClose={() => setIsProductDrawerOpen(false)}
-          onAddToCart={handleAddToCart}
-        />
-        <CustomerSelectDialog
-          restaurantId={restaurantId}
-          open={isCustomerSelectOpen}
-          onOpenChange={setIsCustomerSelectOpen}
-          onSelect={handleCustomerSelect}
-        />
-        <TableDetailDialog
-          restaurantId={restaurantId}
-          table={selectedTableForDrawer}
-          open={!!selectedTableForDrawer}
-          onOpenChange={(open) => { if (!open) setSelectedTableForDrawer(null); }}
-          onAddOrder={(tableId) => {
-            setSelectedTableForDrawer(null);
-            setOrderType("mesa");
-            setSelectedTableId(tableId);
-          }}
-          onTableCleared={() => refetchTables()}
-        />
-      </>
-    );
-  }
 
   return (
     <div className="h-[calc(100vh-7rem)] flex flex-col overflow-hidden">

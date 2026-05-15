@@ -1,86 +1,84 @@
-# Refatoração do PDV Mobile — handheld operacional
+## Reformular cadastro em wizard de 4 passos
 
-## Contexto
+Transformar `src/pages/RestaurantRegistration.tsx` num fluxo guiado de 4 etapas, mais leve e persuasivo, sem alterar nenhuma rota, edge function, integração de pagamento ou redirecionamento existentes.
 
-`src/components/admin/PDVTab.tsx` tem **2150 linhas** com estado profundamente acoplado (carrinho, mesas, comandas, clientes, endereços, pagamento, fiscal, impressão, reservas, zonas de entrega). É o coração operacional do sistema — qualquer regressão quebra restaurantes em produção.
+### O que muda na experiência
 
-Por isso a refatoração será **faseada e isolada por componente**, mantendo `PDVTab.tsx` como orquestrador e extraindo a UI mobile para componentes novos. **Nenhuma regra de negócio, integração, RPC ou cálculo será alterado** — apenas camada de apresentação mobile.
+```text
+①  Negócio   ─── ②  Localização   ─── ③  Acesso   ─── ④  Plano
+nome+tipo+fone   CEP+endereço+CNPJ    nome+email+slug+senha   3 cards + criar conta
+```
 
-## Estratégia geral
+- Topo fixo com logo do Menu's centralizada e barra de progresso (4 círculos com nome embaixo + barra fina de 0–100%).
+- Um único “card” por step ocupa a viewport (`max-w-lg mx-auto`), com título motivacional e subtítulo de valor.
+- Transição suave: o step atual desliza para a esquerda e o próximo entra da direita ao avançar; inverso ao voltar (`translateX` + `opacity`, 300ms).
+- Mobile-first, totalmente responsivo, sem mostrar todos os campos de uma vez.
 
-- Criar um **novo modo "handheld"** acionado quando `useIsMobile()` é true, sem tocar no layout desktop.
-- Componentes novos vivem em `src/components/admin/pdv/mobile/` e consomem o estado/handlers já existentes do `PDVTab` via props.
-- Cada fase entrega valor isolado e pode ser testada antes da próxima.
-- Reutilizar tokens semânticos do design system (laranja primário, sem cores hardcoded).
+### Step 1 — “Vamos começar!”
+- **Nome do restaurante** (input grande, autoFocus).
+- **Tipo de estabelecimento**: grid de cards clicáveis com ícones (Restaurante, Hamburgueria, Pizzaria, Bar, Marmitaria, Sorveteria, Cafeteria, Outro) — usando ícones de `lucide-react` já instalados (Utensils, Sandwich, Pizza, Beer, Salad, IceCream, Coffee, Store). O tipo selecionado destaca com borda/preenchimento primário e troca o ícone exibido no topo do card.
+- **Telefone/WhatsApp** com máscara `(00) 00000-0000`.
+- Validação para avançar: nome ≥ 2 chars, tipo selecionado, telefone ≥ 10 dígitos.
 
-## Fases (na ordem de prioridade que você pediu)
+### Step 2 — “Onde você está?”
+- **CEP** (8 dígitos): ao completar, faz `fetch` para `https://viacep.com.br/ws/{cep}/json/` e auto-preenche rua, bairro e cidade. Mostra spinner enquanto consulta e erro inline se CEP inválido.
+- **Rua e número** (rua preenchida pelo ViaCEP; número editável manual).
+- **Bairro e Cidade/UF** (preenchidos automaticamente, editáveis).
+- **CNPJ** com label “Opcional — para emissão de nota fiscal”.
+- Validação para avançar: CEP válido (8 dígitos) + rua + número + cidade preenchidos. CNPJ opcional.
+- O endereço final é montado em `address = "{rua}, {numero} - {bairro}, {cidade}/{uf}"` para enviar à edge function (mesmo campo `address` atual).
 
-### Fase 1 — Estrutura mobile + Categorias horizontais fixas
-- Novo `PDVMobileShell` que envolve apenas a renderização mobile.
-- `PDVCategoryStrip`: tira horizontal sticky com chips de categoria, scroll-snap, indicador da categoria ativa, "Todos" + "⚡ Mais pedidos".
-- Filtro de produtos passa a respeitar a categoria selecionada + busca (já normalizada via `normalizeSearch`).
+### Step 3 — “Crie seu acesso”
+- **Nome do responsável** (novo campo apenas exibido; será usado como `adminUsername` por padrão, podendo ser editado abaixo se quiser).
+- **Email** com instrução: “Use o mesmo email do Mercado Pago para ativar seu plano automaticamente”.
+- **Nome de usuário** (slug): live-preview `menusapp.com.br/{slug}` atualizado em tempo real, com debounce de 500ms para checar disponibilidade via `supabase.from('restaurants').select('id').eq('slug', x).maybeSingle()`. Indicador visual: spinner / check verde / “Indisponível”.
+- **Senha** (PasswordInput) e **Confirmar senha** (PasswordInput).
+- Validação para avançar: email válido, slug ≥ 3 chars + disponível + sem caracteres especiais (já sanitizado), senhas iguais e ≥ 6 chars.
+- Internamente o wizard reutiliza o mesmo valor de senha para `password` e `adminPassword`, e o slug para `username`, mantendo a edge function recebendo todos os campos atuais sem mudanças.
 
-### Fase 2 — Grid compacto de produtos
-- `PDVProductGrid` mobile: 2 colunas, card compacto (imagem 64px, nome 2 linhas, preço, botão `+` 44×44 destacado em primary).
-- Área de toque ≥44px, ripple/active state, sem cliques acidentais (botão `+` com `stopPropagation`).
+### Step 4 — “Escolha seu plano”
+- Três cards (Básico R$69,90 / Intermediário R$149,90 / Avançado R$249,90) lado a lado em desktop, empilhados em mobile. Avançado vem com selo “Mais escolhido” e já vem **pré-selecionado** quando vier de `/registro/avancado`, idem para os outros (`/registro/basico`, `/registro/intermediario`, `/registro/trial`). A tela permite trocar o plano mesmo se vier pré-selecionado.
+- Card selecionado ganha borda primária + checkmark.
+- Resumo do cadastro abaixo (card cinza claro): nome do restaurante, usuário (`menusapp.com.br/{slug}`) e plano escolhido.
+- Botão principal: “Criar minha conta grátis 🚀” + linha “7 dias grátis · Sem cartão · Cancele quando quiser”.
+- Botão secundário “← Voltar”.
 
-### Fase 3 — Carrinho fixo inferior + bottom-sheet
-- `PDVCartBar` fixo na base: "N itens • R$ XX,XX" + botão "Ver pedido", respeita safe-area.
-- `PDVCartSheet` (bottom sheet via `Sheet side="bottom"`): lista itens, qtd ±, editar, remover, observações por item, total.
-- Reaproveita os handlers atuais (`addToCart`, `removeFromCart`, `updateQuantity`).
+### Validação e UX
 
-### Fase 4 — Fluxo por etapas (tipo → produtos → carrinho → finalizar)
-- `PDVOrderTypeStep`: tela inicial com 3 cartões grandes — Mesa / Delivery / Retirada.
-- Após escolher tipo, vai direto pra grade de produtos.
-- Campos de cliente / CPF / endereço / pagamento ficam em **seções colapsáveis** dentro do `PDVCartSheet` ("+ Cliente", "+ Dados fiscais", "+ Pagamento", "+ Endereço" quando delivery).
-- CPF e observações iniciam recolhidos.
+- Erros inline por campo (texto vermelho abaixo do input) — não bloqueiam digitação, mas impedem `goNext()` se houver falha.
+- `Enter` no input avança para o próximo campo / próximo step quando válido.
+- A barra de progresso é clicável apenas em steps já completados (permite voltar rápido).
 
-### Fase 5 — Busca turbinada
-- Autofocus no input ao abrir a busca, `inputMode="search"`.
-- Debounce já existe (`useDebounce`).
-- Normalização de acentos já existe (`normalizeSearch`); adiciona tolerância a abreviação (substring por palavra).
-- Ranking: produtos mais pedidos primeiro (usar `order_count` se disponível na query, senão fallback alfabético).
-- Seção "⚡ Mais pedidos" no topo quando não há busca/categoria.
+### Manter 100% da funcionalidade
 
-### Fase 6 — Touch & micro-UX
-- Padronizar altura mínima 44px em todos os controles do PDV mobile.
-- Aumentar `gap` entre botões críticos (confirmar/cancelar) pra evitar mistap.
-- Feedback tátil via `active:scale-[0.97]` e transições rápidas (150ms).
+Ao submeter o Step 4, chamar exatamente a mesma edge function `register-restaurant` com o mesmo payload de hoje:
 
-### Fase 7 — Grid visual de mesas
-- Substituir o `Select` de mesa (no fluxo Mesa) por um `PDVTableGrid`: chips/tiles de mesa coloridos por status (livre / ocupada / reservada), tap único pra selecionar.
-- Reaproveita `tablesQuery` e `buildActiveReservationByTable` já existentes.
+```ts
+{ name, slug, cnpj, phone, address, email, username, password,
+  adminUsername, adminPassword, planSlug }
+```
 
-### Itens 11 e 12 (dark mode + identidade visual)
-- Já usamos tokens semânticos via `index.css`; vou garantir que todos os componentes novos usem `bg-background`, `text-foreground`, `bg-primary`, etc., para que o dark mode "ligue" automaticamente quando o tema for ativado. **Não vou ativar dark mode agora.**
+- `planSlug` agora vem do plano selecionado no Step 4 (sobrescreve o da URL se o usuário trocou).
+- Telas de sucesso (`success`) e redirecionamento para o Mercado Pago (`redirectingToPayment`) permanecem idênticas.
+- Eventos do Meta Pixel (`Lead`, `CompleteRegistration`, `InitiateCheckout`) continuam disparando nos mesmos pontos.
+- Persistência em `localStorage` (restaurant_id/name/slug, staff_*) inalterada.
+- Validações server-side e RLS continuam intocadas; o wizard apenas adiciona validação client-side (zod) por step.
 
-## Garantias de não-regressão
+### Detalhes técnicos
 
-- Desktop intocado: gating por `useIsMobile()`.
-- Nenhuma alteração em: queries Supabase, mutations, cálculo de total, fluxo de pagamento, impressão, NFCe, integrações iFood/DD, comandas, RPCs.
-- Todos os componentes novos consomem props/handlers que já existem em `PDVTab`.
-- `PDVProductDrawer` continua sendo o sheet de extras/adicionais (já é mobile-friendly).
+- Arquivo único: reescrevo `src/pages/RestaurantRegistration.tsx`. Nenhum outro arquivo é tocado.
+- Estado: um único `form` (mantém os mesmos campos de hoje) + `step (1-4)`, `direction ('forward'|'back')`, `selectedType`, `cepLoading`, `slugChecking/slugAvailable`, `errors` (registro de erros por step).
+- Animação: container com `overflow-hidden`, conteúdo do step com classe condicional `translate-x-*` e `opacity-*` baseada em `direction`, usando utilitários Tailwind + `transition-[transform,opacity] duration-300 ease-out`.
+- ViaCEP: `fetch` direto, sem dependência nova; tratamento de erro com toast.
+- Schema de validação por step com `zod` (já usado no projeto) — uma função `validateStep(step)` decide se pode avançar.
+- Debounce do slug com um `useEffect` + `setTimeout` simples (sem nova dependência).
+- Telefone e CEP recebem máscara via função utilitária local (sem libs novas).
+- Acessibilidade: `aria-current="step"` no círculo ativo, `aria-invalid` em campos com erro, foco automático no primeiro campo de cada step.
 
-## Detalhes técnicos
+### Fora de escopo (intocado)
 
-- Novos arquivos:
-  - `src/components/admin/pdv/mobile/PDVMobileShell.tsx`
-  - `src/components/admin/pdv/mobile/PDVOrderTypeStep.tsx`
-  - `src/components/admin/pdv/mobile/PDVCategoryStrip.tsx`
-  - `src/components/admin/pdv/mobile/PDVProductGrid.tsx`
-  - `src/components/admin/pdv/mobile/PDVCartBar.tsx`
-  - `src/components/admin/pdv/mobile/PDVCartSheet.tsx`
-  - `src/components/admin/pdv/mobile/PDVTableGrid.tsx`
-- `PDVTab.tsx` ganha um bloco `if (isMobile) return <PDVMobileShell {...props} />` no topo do return, mantendo o JSX desktop atual intacto abaixo.
-- Tipos `CartItem`, `TableData`, `SelectedCustomer`, etc. movidos para `src/components/admin/pdv/types.ts` e re-exportados para evitar duplicação.
-
-## Tamanho estimado
-
-~7 componentes novos (+~1500 linhas) e ~50 linhas tocadas em `PDVTab.tsx`. Nenhum arquivo existente deletado.
-
-## Confirmação
-
-Antes de começar, confirma 2 pontos:
-
-1. Posso entregar tudo numa única passada (todas as 7 fases) ou prefere que eu pare após a Fase 3 (categorias + grid compacto + carrinho fixo) pra você testar antes do resto?
-2. O fluxo "Mesa → escolher mesa → produtos" deve abrir a comanda imediatamente ao tocar na mesa, ou só ao confirmar o pedido (como é hoje)?
+- Edge function `register-restaurant`.
+- Rotas (`/registro/:planSlug` continua igual).
+- Lógica de pagamento e redirect para Mercado Pago.
+- Telas de “sucesso” e “redirecionando para pagamento”.
+- Qualquer outra página do app.
