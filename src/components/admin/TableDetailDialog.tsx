@@ -375,7 +375,33 @@ export const TableDetailDialog = ({
     }
   };
 
-  const handleClearTable = async () => {
+  const confirmAddQty = async () => {
+    if (!addingQtyItem || extraQty < 1) return;
+    setSavingQty(true);
+    try {
+      const newQty = addingQtyItem.currentQty + extraQty;
+      const { error } = await supabase
+        .from("order_items")
+        .update({ quantity: newQty })
+        .eq("id", addingQtyItem.id);
+      if (error) throw error;
+      toast.success(`+${extraQty} ${addingQtyItem.name} adicionado(s)`);
+      // Find the order id for broadcast
+      const order = (orders || []).find((o: any) =>
+        (o.order_items || []).some((it: any) => it.id === addingQtyItem.id)
+      );
+      if (order) broadcastOrderModified({ restaurantId, orderId: order.id, action: "item_added" });
+      setAddingQtyItem(null);
+      setExtraQty(1);
+      refetchOrders();
+      refetchComandas();
+    } catch (err: any) {
+      console.error("Erro ao aumentar quantidade:", err);
+      toast.error(err.message || "Erro ao aumentar quantidade");
+    } finally {
+      setSavingQty(false);
+    }
+  };
     if (!table) return;
     await supabase.from("orders").update({ status: "cancelled" })
       .eq("table_id", table.id).in("status", ["pending", "accepted", "preparing", "ready"]);
