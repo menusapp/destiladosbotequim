@@ -223,6 +223,37 @@ export const TableDetailDialog = ({
     return (item.price_at_order + extrasTotal) * item.quantity;
   };
 
+  // Agrupa itens iguais (mesmo produto, extras, observação e preço) para exibir
+  // como uma única linha somando a quantidade. Itens com splits ficam isolados.
+  const groupItems = (items: any[]): any[] => {
+    if (!items || items.length === 0) return [];
+    const groups: any[] = [];
+    const indexByKey = new Map<string, number>();
+    items.forEach((item: any) => {
+      const hasSplits = (splitsByItem.get(item.id)?.length || 0) > 0;
+      const extrasKey = (item.order_item_extras || [])
+        .map((e: any) => `${e.product_extras?.name || e.extra_name || ""}:${e.price_at_order}`)
+        .sort()
+        .join("|");
+      const key = hasSplits
+        ? `solo:${item.id}`
+        : `${item.products?.name || ""}|${item.price_at_order}|${item.notes || ""}|${extrasKey}`;
+      const existingIdx = indexByKey.get(key);
+      if (existingIdx === undefined || hasSplits) {
+        indexByKey.set(key, groups.length);
+        groups.push({ ...item, _ids: [item.id], _aggregatedQty: item.quantity });
+      } else {
+        const g = groups[existingIdx];
+        g._ids.push(item.id);
+        g._aggregatedQty += item.quantity;
+      }
+    });
+    return groups.map((g) => ({
+      ...g,
+      quantity: g._aggregatedQty,
+    }));
+  };
+
   const ordersByComanda = useMemo(() => {
     if (!orders || !comandas) return new Map<string, any[]>();
     const map = new Map<string, any[]>();
@@ -718,19 +749,13 @@ export const TableDetailDialog = ({
 
     return (
       <div key={item.id} className={allSplitsPaid ? "opacity-60" : ""}>
-        <div className="flex justify-between text-xs items-start">
-          <span className="flex-1">
-            {item.quantity}x {item.products?.name || "Produto"}
-          </span>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
-              R$ {itemTotal.toFixed(2)}
-            </span>
+        <div className="flex justify-between text-xs items-start gap-2">
+          <span className="flex-1 flex items-center gap-1.5">
             {!hasSplits && !allSplitsPaid && canManageOrders && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="h-5 w-5 p-0"
+                className="h-5 w-5 p-0 shrink-0 border-primary/40"
                 title="Adicionar mais deste item"
                 onClick={() => {
                   setAddingQtyItem({
@@ -745,6 +770,12 @@ export const TableDetailDialog = ({
                 <Plus className="h-3 w-3 text-primary" />
               </Button>
             )}
+            <span>{item.quantity}x {item.products?.name || "Produto"}</span>
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
+              R$ {itemTotal.toFixed(2)}
+            </span>
             {!hasSplits && !allSplitsPaid && (
               <Button
                 variant="ghost"
@@ -1077,7 +1108,7 @@ export const TableDetailDialog = ({
                                 </div>
                               </div>
                               <div className="text-sm space-y-0.5">
-                                {order.order_items?.map((item: any) => renderItem(item, order.id))}
+                                {groupItems(order.order_items || []).map((item: any) => renderItem(item, order.id))}
                               </div>
                             </Card>
                           ))}
@@ -1156,7 +1187,7 @@ export const TableDetailDialog = ({
                           <span className="text-sm font-bold">R$ {getOrderTotal(order).toFixed(2)}</span>
                         </div>
                         <div className="text-xs space-y-0.5">
-                          {order.order_items?.map((item: any) => renderItem(item, order.id))}
+                          {groupItems(order.order_items || []).map((item: any) => renderItem(item, order.id))}
                         </div>
                       </Card>
                     ))}
