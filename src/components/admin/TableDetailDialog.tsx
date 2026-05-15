@@ -223,6 +223,37 @@ export const TableDetailDialog = ({
     return (item.price_at_order + extrasTotal) * item.quantity;
   };
 
+  // Agrupa itens iguais (mesmo produto, extras, observação e preço) para exibir
+  // como uma única linha somando a quantidade. Itens com splits ficam isolados.
+  const groupItems = (items: any[]): any[] => {
+    if (!items || items.length === 0) return [];
+    const groups: any[] = [];
+    const indexByKey = new Map<string, number>();
+    items.forEach((item: any) => {
+      const hasSplits = (splitsByItem.get(item.id)?.length || 0) > 0;
+      const extrasKey = (item.order_item_extras || [])
+        .map((e: any) => `${e.product_extras?.name || e.extra_name || ""}:${e.price_at_order}`)
+        .sort()
+        .join("|");
+      const key = hasSplits
+        ? `solo:${item.id}`
+        : `${item.products?.name || ""}|${item.price_at_order}|${item.notes || ""}|${extrasKey}`;
+      const existingIdx = indexByKey.get(key);
+      if (existingIdx === undefined || hasSplits) {
+        indexByKey.set(key, groups.length);
+        groups.push({ ...item, _ids: [item.id], _aggregatedQty: item.quantity });
+      } else {
+        const g = groups[existingIdx];
+        g._ids.push(item.id);
+        g._aggregatedQty += item.quantity;
+      }
+    });
+    return groups.map((g) => ({
+      ...g,
+      quantity: g._aggregatedQty,
+    }));
+  };
+
   const ordersByComanda = useMemo(() => {
     if (!orders || !comandas) return new Map<string, any[]>();
     const map = new Map<string, any[]>();
