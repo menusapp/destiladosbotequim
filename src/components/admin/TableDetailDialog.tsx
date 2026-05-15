@@ -26,7 +26,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, Trash2 } from "lucide-react";
+import { Users, ShoppingBag, Clock, Eraser, Plus, Minus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, Trash2 } from "lucide-react";
+import { broadcastOrderModified } from "@/lib/broadcastOrderModified";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
