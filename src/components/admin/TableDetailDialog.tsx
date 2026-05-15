@@ -1108,7 +1108,7 @@ export const TableDetailDialog = ({
                                 </div>
                               </div>
                               <div className="text-sm space-y-0.5">
-                                {order.order_items?.map((item: any) => renderItem(item, order.id))}
+                                {groupItems(order.order_items || []).map((item: any) => renderItem(item, order.id))}
                               </div>
                             </Card>
                           ))}
