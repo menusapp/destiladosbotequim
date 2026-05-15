@@ -45,6 +45,7 @@ import {
   isReservationExpired,
 } from "@/lib/reservations";
 import { normalizeSearch } from "@/lib/searchNormalize";
+import { PDVMobileShell } from "./pdv/mobile/PDVMobileShell";
 
 interface CartItem {
   productId: string;
