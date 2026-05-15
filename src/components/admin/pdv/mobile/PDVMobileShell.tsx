@@ -323,27 +323,55 @@ export const PDVMobileShell = (props: PDVMobileShellProps) => {
         )}
       </div>
 
-      {/* Cart bar fixa */}
-      {cart.length > 0 && (
+      {/* Cart bar fixa — sempre visível durante a montagem do pedido */}
+      <div
+        className="fixed left-0 right-0 z-40 px-3 pointer-events-none"
+        style={{ bottom: 0, paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))", paddingTop: "0.75rem" }}
+      >
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[140%] bg-gradient-to-t from-background via-background/95 to-transparent -z-10" />
         <button
-          onClick={() => setCartOpen(true)}
-          className="fixed left-3 right-3 z-40 bg-primary text-primary-foreground rounded-2xl shadow-2xl active:scale-[0.98] transition-all touch-manipulation"
-          style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          onClick={() => cart.length > 0 && setCartOpen(true)}
+          disabled={cart.length === 0}
+          aria-label={cart.length === 0 ? "Adicione produtos para criar o pedido" : "Criar pedido"}
+          className={cn(
+            "pointer-events-auto w-full rounded-2xl shadow-2xl backdrop-blur-md transition-all duration-200 touch-manipulation",
+            "flex items-center justify-between px-4 py-3",
+            cart.length === 0
+              ? "bg-muted/90 text-muted-foreground cursor-not-allowed"
+              : "bg-primary text-primary-foreground active:scale-[0.98]"
+          )}
+          style={{ minHeight: "60px" }}
         >
-          <div className="flex items-center justify-between px-4 py-3.5">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <ShoppingBag className="w-6 h-6" />
-                <Badge className="absolute -top-2 -right-2 h-5 min-w-5 px-1 bg-primary-foreground text-primary text-[11px] font-bold flex items-center justify-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative shrink-0">
+              <ShoppingBag className="w-6 h-6" />
+              {cartCount > 0 && (
+                <Badge className="absolute -top-2 -right-2 h-5 min-w-5 px-1 bg-primary-foreground text-primary text-[11px] font-bold flex items-center justify-center pointer-events-none">
                   {cartCount}
                 </Badge>
-              </div>
-              <span className="text-sm font-semibold">Ver pedido</span>
+              )}
             </div>
-            <span className="text-base font-bold">R$ {cartTotal.toFixed(2)}</span>
+            <div className="flex flex-col items-start leading-tight min-w-0">
+              <span className="text-[11px] font-medium opacity-80">
+                {cart.length === 0
+                  ? "Nenhum item ainda"
+                  : `${cartCount} ${cartCount === 1 ? "item" : "itens"}`}
+              </span>
+              <span className="text-base font-bold">
+                {cart.length === 0 ? "Adicione produtos" : `R$ ${cartTotal.toFixed(2)}`}
+              </span>
+            </div>
           </div>
+          <span className={cn(
+            "text-sm font-bold px-4 py-2 rounded-xl transition-all whitespace-nowrap",
+            cart.length === 0
+              ? "bg-muted-foreground/10"
+              : "bg-primary-foreground/15"
+          )}>
+            Criar Pedido
+          </span>
         </button>
-      )}
+      </div>
 
       {/* Bottom sheet do carrinho / checkout */}
       <CartSheet
