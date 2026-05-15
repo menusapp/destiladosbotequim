@@ -1187,7 +1187,7 @@ export const TableDetailDialog = ({
                           <span className="text-sm font-bold">R$ {getOrderTotal(order).toFixed(2)}</span>
                         </div>
                         <div className="text-xs space-y-0.5">
-                          {order.order_items?.map((item: any) => renderItem(item, order.id))}
+                          {groupItems(order.order_items || []).map((item: any) => renderItem(item, order.id))}
                         </div>
                       </Card>
                     ))}
