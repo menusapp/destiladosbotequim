@@ -26,7 +26,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Users, ShoppingBag, Clock, Eraser, Plus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, Trash2 } from "lucide-react";
+import { Users, ShoppingBag, Clock, Eraser, Plus, Minus, CreditCard, User, Receipt, Truck, Scissors, ChevronDown, CheckCircle2, Printer, Pencil, Trash2 } from "lucide-react";
+import { broadcastOrderModified } from "@/lib/broadcastOrderModified";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
@@ -83,6 +84,9 @@ export const TableDetailDialog = ({
   const [editingComandaId, setEditingComandaId] = useState<string | null>(null);
   const [addItemsOrderId, setAddItemsOrderId] = useState<string | null>(null);
   const [cancellingItem, setCancellingItem] = useState<{ id: string; name: string; total: number } | null>(null);
+  const [addingQtyItem, setAddingQtyItem] = useState<{ id: string; name: string; unitPrice: number; currentQty: number } | null>(null);
+  const [extraQty, setExtraQty] = useState(1);
+  const [savingQty, setSavingQty] = useState(false);
   const { canManageOrders } = useStaffOrderPermissions();
 
   // Fetch active comandas for the table
@@ -368,6 +372,34 @@ export const TableDetailDialog = ({
     } catch (err: any) {
       console.error("Erro ao cancelar item:", err);
       toast.error(err.message || "Erro ao cancelar item");
+    }
+  };
+
+  const confirmAddQty = async () => {
+    if (!addingQtyItem || extraQty < 1) return;
+    setSavingQty(true);
+    try {
+      const newQty = addingQtyItem.currentQty + extraQty;
+      const { error } = await supabase
+        .from("order_items")
+        .update({ quantity: newQty })
+        .eq("id", addingQtyItem.id);
+      if (error) throw error;
+      toast.success(`+${extraQty} ${addingQtyItem.name} adicionado(s)`);
+      // Find the order id for broadcast
+      const order = (orders || []).find((o: any) =>
+        (o.order_items || []).some((it: any) => it.id === addingQtyItem.id)
+      );
+      if (order) broadcastOrderModified({ restaurantId, orderId: order.id, action: "item_added" });
+      setAddingQtyItem(null);
+      setExtraQty(1);
+      refetchOrders();
+      refetchComandas();
+    } catch (err: any) {
+      console.error("Erro ao aumentar quantidade:", err);
+      toast.error(err.message || "Erro ao aumentar quantidade");
+    } finally {
+      setSavingQty(false);
     }
   };
 
@@ -694,6 +726,25 @@ export const TableDetailDialog = ({
             <span className={`text-muted-foreground ${allSplitsPaid ? "line-through" : ""}`}>
               R$ {itemTotal.toFixed(2)}
             </span>
+            {!hasSplits && !allSplitsPaid && canManageOrders && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                title="Adicionar mais deste item"
+                onClick={() => {
+                  setAddingQtyItem({
+                    id: item.id,
+                    name: item.products?.name || "Produto",
+                    unitPrice: item.price_at_order,
+                    currentQty: item.quantity,
+                  });
+                  setExtraQty(1);
+                }}
+              >
+                <Plus className="h-3 w-3 text-primary" />
+              </Button>
+            )}
             {!hasSplits && !allSplitsPaid && (
               <Button
                 variant="ghost"
@@ -1220,6 +1271,60 @@ export const TableDetailDialog = ({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmCancelItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add Quantity Confirmation */}
+      <AlertDialog open={!!addingQtyItem} onOpenChange={(o) => { if (!o) { setAddingQtyItem(null); setExtraQty(1); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Adicionar mais deste item</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div>Confirme a quantidade adicional. O valor será somado ao item.</div>
+                {addingQtyItem && (
+                  <div className="rounded-md border bg-muted/50 px-3 py-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium text-foreground">{addingQtyItem.name}</div>
+                      <div className="text-xs text-muted-foreground">Atual: {addingQtyItem.currentQty}x</div>
+                    </div>
+                    <div className="flex items-center justify-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => setExtraQty((q) => Math.max(1, q - 1))}
+                        disabled={extraQty <= 1}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <div className="text-2xl font-bold w-12 text-center text-foreground">+{extraQty}</div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => setExtraQty((q) => q + 1)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex justify-between text-sm text-foreground pt-1 border-t">
+                      <span>Adicional:</span>
+                      <span className="font-bold">R$ {(addingQtyItem.unitPrice * extraQty).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingQty}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmAddQty(); }} disabled={savingQty}>
+              {savingQty ? "Salvando…" : "Confirmar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
