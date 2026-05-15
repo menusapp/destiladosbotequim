@@ -752,12 +752,12 @@ export const TableDetailDialog = ({
         <div className="flex justify-between text-xs items-start gap-2">
           <span className="flex-1 flex items-center gap-1.5 flex-wrap">
             <span>{item.quantity}x {item.products?.name || "Produto"}</span>
-            {!hasSplits && !allSplitsPaid && canManageOrders && (
-              <span className="inline-flex items-center gap-1">
+            {!hasSplits && !allSplitsPaid && (
+              <span className="inline-flex items-center gap-1 ml-1 shrink-0 align-middle">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-5 w-5 p-0 shrink-0 border-destructive/40"
+                  className="h-6 w-6 p-0 shrink-0 border-destructive/60 bg-background"
                   title="Remover uma unidade"
                   onClick={async () => {
                     if (item.quantity <= 1) {
@@ -788,7 +788,7 @@ export const TableDetailDialog = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-5 w-5 p-0 shrink-0 border-primary/40"
+                  className="h-6 w-6 p-0 shrink-0 border-primary/60 bg-background"
                   title="Adicionar mais deste item"
                   onClick={() => {
                     setAddingQtyItem({
