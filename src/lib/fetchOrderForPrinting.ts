@@ -18,6 +18,7 @@ export interface OrderItemForPrinting {
 
 export interface OrderForPrinting {
   id: string;
+  daily_order_number: number | null;
   status: string;
   created_at: string;
   customer_name: string;
