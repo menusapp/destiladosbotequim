@@ -62,6 +62,7 @@ export async function fetchOrderForPrinting(
     .select(
       `
       id,
+      daily_order_number,
       status,
       created_at,
       customer_name,
@@ -179,6 +180,7 @@ export async function fetchOrderForPrinting(
 
   return {
     id: order.id,
+    daily_order_number: (order as any).daily_order_number ?? null,
     status: order.status as string,
     created_at: order.created_at as string,
     customer_name: (order as any).customer_name,
