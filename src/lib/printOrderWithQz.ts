@@ -224,7 +224,7 @@ function buildCustomerReceipt(
 
   // Número do pedido bem grande (3x) — espelha a via da cozinha
   out += ESCPOS.SIZE_TRIPLE;
-  out += center(shortOrderId(order.id), 14);
+  out += center(formatOrderLabel(order), 14);
   out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
   out += divider("=");
 
@@ -398,7 +398,7 @@ function buildKitchenReceipt(order: OrderForPrinting): string {
 
   // Número do pedido bem grande (3x)
   out += ESCPOS.SIZE_TRIPLE;
-  out += center(shortOrderId(order.id), 14);
+  out += center(formatOrderLabel(order), 14);
   out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
   out += divider("=");
 

@@ -23,6 +23,7 @@ import {
   formatPhoneDisplay,
   formatPrice,
   shortOrderId,
+  formatOrderLabel,
 } from "@/lib/receiptFormatters";
 
 export type ReceiptWidth = "58mm" | "80mm";
