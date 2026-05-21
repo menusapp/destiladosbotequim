@@ -30,6 +30,7 @@ import {
   formatPhoneDisplay,
   formatPrice,
   shortOrderId,
+  formatOrderLabel,
 } from "@/lib/receiptFormatters";
 
 export type PrintReceiptMode = "pedido" | "conta";
