@@ -2565,6 +2565,7 @@ export type Database = {
           created_at: string | null
           customer_cpf: string
           customer_name: string
+          daily_order_number: number | null
           dd_order_id: string | null
           dd_scheduled_for: string | null
           dd_source: boolean | null
@@ -2603,6 +2604,7 @@ export type Database = {
           created_at?: string | null
           customer_cpf: string
           customer_name: string
+          daily_order_number?: number | null
           dd_order_id?: string | null
           dd_scheduled_for?: string | null
           dd_source?: boolean | null
@@ -2641,6 +2643,7 @@ export type Database = {
           created_at?: string | null
           customer_cpf?: string
           customer_name?: string
+          daily_order_number?: number | null
           dd_order_id?: string | null
           dd_scheduled_for?: string | null
           dd_source?: boolean | null

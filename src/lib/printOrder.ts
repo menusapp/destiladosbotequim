@@ -43,6 +43,7 @@ function formatPaymentType(type: string, brand?: string | null): string {
 export const printOrder = async (
   order: {
     id: string;
+    daily_order_number?: number | null;
     created_at: string;
     customer_name: string;
     order_type?: string;
@@ -286,7 +287,7 @@ export const printOrder = async (
       <div class="line"></div>
       
       <div class="section">
-        <p><strong>Pedido:</strong> #${order.id.slice(0, 8)} — ${dateStr}</p>
+        <p><strong>Pedido:</strong> ${order.daily_order_number != null ? `Pedido ${order.daily_order_number}` : `#${order.id.slice(0, 8)}`} — ${dateStr}</p>
       </div>
       
       <div class="origin">${originLabel}</div>
@@ -345,7 +346,7 @@ export const printOrder = async (
   const html = `
     <html>
     <head>
-      <title>Pedido #${order.id.slice(0, 8)}</title>
+      <title>${order.daily_order_number != null ? `Pedido ${order.daily_order_number}` : `Pedido #${order.id.slice(0, 8)}`}</title>
       <style>
         @page { margin: 0; size: ${paperSize} auto; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -472,6 +473,7 @@ export const printOrder = async (
 export const printKitchenReceipt = async (
   order: {
     id: string;
+    daily_order_number?: number | null;
     created_at: string;
     order_type?: string;
     delivery_type?: string;
@@ -537,7 +539,7 @@ export const printKitchenReceipt = async (
   const html = `
     <html>
     <head>
-      <title>Cozinha #${order.id.slice(0, 8)}</title>
+      <title>${order.daily_order_number != null ? `Cozinha Pedido ${order.daily_order_number}` : `Cozinha #${order.id.slice(0, 8)}`}</title>
       <style>
         @page { margin: 0; size: ${paperSize} auto; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -568,7 +570,7 @@ export const printKitchenReceipt = async (
     <body>
       <div class="header">VIA DA COZINHA</div>
       <div class="info">
-        <div>Pedido #${order.id.slice(0, 8)} — ${timeStr}</div>
+        <div>${order.daily_order_number != null ? `Pedido ${order.daily_order_number}` : `Pedido #${order.id.slice(0, 8)}`} — ${timeStr}</div>
         <div>Tipo: ${typeLabel}</div>
       </div>
       <div class="double-line"></div>

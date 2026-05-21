@@ -23,6 +23,7 @@ import {
   formatPhoneDisplay,
   formatPrice,
   shortOrderId,
+  formatOrderLabel,
 } from "@/lib/receiptFormatters";
 
 export type ReceiptWidth = "58mm" | "80mm";
@@ -145,7 +146,7 @@ function buildCustomerPreview(
   // Pedido + data
   out += labeled(
     "Pedido: ",
-    `${shortOrderId(order.id)} - ${formatDateTimeShort(order.created_at)}  [NEGRITO]`,
+    `${formatOrderLabel(order)} - ${formatDateTimeShort(order.created_at)}  [NEGRITO]`,
     width
   );
 
@@ -289,7 +290,7 @@ function buildKitchenPreview(order: OrderForPrinting, width: number): string {
 
   out += center("VIA DA COZINHA  [GRANDE+NEGRITO]", width);
   out += divider("=", width);
-  out += center(shortOrderId(order.id) + "  [GIGANTE]", width);
+  out += center(formatOrderLabel(order) + "  [GIGANTE]", width);
   out += divider("=", width);
 
   const originLabel = buildOriginLabel(order);

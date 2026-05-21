@@ -86,6 +86,22 @@ export function shortOrderId(id: string): string {
 }
 
 /**
+ * Rótulo amigável do pedido para exibição em cupons/impressões.
+ * Usa o número sequencial diário (reseta à meia-noite) quando disponível,
+ * caindo de volta para o id curto em registros legados.
+ */
+export function formatOrderLabel(order: {
+  id: string;
+  daily_order_number?: number | null;
+}): string {
+  const n = order.daily_order_number;
+  if (n != null && Number.isFinite(Number(n))) {
+    return `Pedido ${n}`;
+  }
+  return shortOrderId(order.id);
+}
+
+/**
  * Determina o rótulo de origem do pedido (mesmo critério do printOrder antigo).
  */
 export function buildOriginLabel(order: {
