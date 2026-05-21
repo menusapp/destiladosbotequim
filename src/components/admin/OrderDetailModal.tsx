@@ -275,7 +275,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
             <DialogDescription className="sr-only">Detalhes do pedido</DialogDescription>
             <div className="flex items-start justify-between">
               <div>
-                <DialogTitle className="text-2xl">Pedido #{order.id.slice(0, 8)}</DialogTitle>
+                <DialogTitle className="text-2xl">{order.daily_order_number != null ? `Pedido ${order.daily_order_number}` : `Pedido #${order.id.slice(0, 8)}`}</DialogTitle>
                 <p className="text-sm text-muted-foreground mt-1">{format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
