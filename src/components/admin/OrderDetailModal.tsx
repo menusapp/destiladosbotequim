@@ -64,6 +64,7 @@ interface Order {
   dd_order_id?: string;
   dd_scheduled_for?: string;
   cancellation_reason?: string;
+  daily_order_number?: number | null;
 }
 
 interface OrderDetailModalProps {
