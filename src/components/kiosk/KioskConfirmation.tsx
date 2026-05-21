@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   orderId: string | null;
@@ -12,6 +13,23 @@ const AUTO_RESET_SECONDS = 15;
 
 export function KioskConfirmation({ orderId, primaryColor, onNewOrder }: Props) {
   const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
+  const [dailyNumber, setDailyNumber] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!orderId) { setDailyNumber(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("daily_order_number")
+        .eq("id", orderId)
+        .maybeSingle();
+      if (!cancelled && data?.daily_order_number != null) {
+        setDailyNumber(Number(data.daily_order_number));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [orderId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -23,7 +41,9 @@ export function KioskConfirmation({ orderId, primaryColor, onNewOrder }: Props) 
     return () => clearInterval(interval);
   }, [onNewOrder]);
 
-  const orderNumber = orderId ? orderId.slice(-6).toUpperCase() : "------";
+  const orderDisplay = dailyNumber != null
+    ? `Pedido ${dailyNumber}`
+    : (orderId ? `#${orderId.slice(-6).toUpperCase()}` : "------");
 
   return (
     <div className="flex flex-col items-center justify-center h-screen gap-8 px-8 text-center">
@@ -35,7 +55,7 @@ export function KioskConfirmation({ orderId, primaryColor, onNewOrder }: Props) 
 
       <div className="bg-card rounded-2xl border p-8">
         <p className="text-lg text-muted-foreground mb-2">Número do pedido</p>
-        <p className="text-5xl font-mono font-bold tracking-widest" style={{ color: primaryColor }}>#{orderNumber}</p>
+        <p className="text-5xl font-mono font-bold tracking-widest" style={{ color: primaryColor }}>{orderDisplay}</p>
       </div>
 
       <p className="text-xl text-muted-foreground max-w-md">
