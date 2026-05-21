@@ -473,6 +473,7 @@ export const printOrder = async (
 export const printKitchenReceipt = async (
   order: {
     id: string;
+    daily_order_number?: number | null;
     created_at: string;
     order_type?: string;
     delivery_type?: string;
