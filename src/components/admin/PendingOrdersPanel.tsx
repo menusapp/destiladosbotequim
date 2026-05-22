@@ -12,6 +12,7 @@ import { normalizeSearch } from "@/lib/searchNormalize";
 
 interface PendingOrder {
   id: string;
+  daily_order_number: number | null;
   customer_name: string;
   customer_cpf: string;
   created_at: string;
