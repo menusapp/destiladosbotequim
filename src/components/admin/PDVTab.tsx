@@ -207,6 +207,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const [deliveryCity, setDeliveryCity] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentType, setPaymentType] = useState("");
+  const [cashReceived, setCashReceived] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
 
   // New UX states
