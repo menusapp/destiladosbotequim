@@ -207,6 +207,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const [deliveryCity, setDeliveryCity] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentType, setPaymentType] = useState("");
+  const [cashReceived, setCashReceived] = useState("");
   const [selectedTableId, setSelectedTableId] = useState("");
 
   // New UX states
@@ -790,7 +791,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     setCart([]);
     setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
-    setNotes(""); setPaymentType(""); setSelectedTableId("");
+    setNotes(""); setPaymentType(""); setCashReceived(""); setSelectedTableId("");
     setSelectedCustomer(null);
     setSelectedAddress(null);
     setCustomerAddresses([]);
@@ -879,6 +880,10 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
     setSubmitting(true);
     let createdOrderId: string | null = null;
+    const cashReceivedNum = parseFloat((cashReceived || "").replace(",", "."));
+    const cashChangeText = paymentType === "cash" && Number.isFinite(cashReceivedNum) && cashReceivedNum > cartTotal
+      ? ` Troco para: R$ ${cashReceivedNum.toFixed(2).replace(".", ",")}`
+      : "";
     try {
       // Auto-create/update customer in CRM
       await upsertCustomerCRM();
@@ -907,7 +912,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           delivery_address: fullAddress || null,
           delivery_city: resolvedCityName || null,
           delivery_neighborhood: deliveryNeighborhood || selectedAddress?.neighborhood || null,
-          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          notes: ((notes || "") + discountNotesText + cashChangeText).trim() || null, payment_type: paymentType || null,
           coupon_discount: discountForOrder,
           delivery_fee: finalDeliveryFee,
           pdv_source: true,
@@ -944,7 +949,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
           status: "preparing", customer_name: customerName.trim(),
           customer_cpf: customerCpf,
-          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          notes: ((notes || "") + discountNotesText + cashChangeText).trim() || null, payment_type: paymentType || null,
           coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
@@ -1031,7 +1036,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           comanda_id: comandaId, status: "accepted",
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
-          notes: (notes || "") + discountNotesText || null,
+          notes: ((notes || "") + discountNotesText + cashChangeText).trim() || null,
           payment_type: null,
           payment_brand: null,
           coupon_discount: discountForOrder,
@@ -1679,6 +1684,43 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     </SelectContent>
                   </Select>
                 )}
+
+                {/* Cash received / change calculation */}
+                {paymentType === "cash" && (
+                  <div className="space-y-2 border rounded-lg p-3 bg-emerald-50/50">
+                    <Label className="text-xs font-medium">Valor recebido (para troco)</Label>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0"
+                      placeholder="Ex: 100,00"
+                      value={cashReceived}
+                      onChange={e => setCashReceived(e.target.value)}
+                      className="h-9 text-sm"
+                    />
+                    {(() => {
+                      const v = parseFloat((cashReceived || "").replace(",", "."));
+                      if (!Number.isFinite(v) || v <= 0) return null;
+                      if (v < cartTotal) {
+                        return (
+                          <p className="text-xs text-muted-foreground">
+                            Total do pedido: R$ {cartTotal.toFixed(2).replace(".", ",")}
+                          </p>
+                        );
+                      }
+                      const troco = v - cartTotal;
+                      return (
+                        <div className="text-xs space-y-0.5">
+                          <div className="flex justify-between"><span>Total do pedido</span><span>R$ {cartTotal.toFixed(2).replace(".", ",")}</span></div>
+                          <div className="flex justify-between"><span>Cliente vai pagar com</span><span>R$ {v.toFixed(2).replace(".", ",")}</span></div>
+                          <div className="flex justify-between font-semibold text-emerald-700"><span>TROCO</span><span>R$ {troco.toFixed(2).replace(".", ",")}</span></div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
 
                 {/* Employee Credit Fields */}
                 {paymentType === "employee_credit" && (
