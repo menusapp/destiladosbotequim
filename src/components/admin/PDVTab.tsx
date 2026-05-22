@@ -1036,7 +1036,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           comanda_id: comandaId, status: "accepted",
           customer_name: currentCustomerName,
           customer_cpf: currentCustomerCpf,
-          notes: (notes || "") + discountNotesText || null,
+          notes: ((notes || "") + discountNotesText + cashChangeText).trim() || null,
           payment_type: null,
           payment_brand: null,
           coupon_discount: discountForOrder,
