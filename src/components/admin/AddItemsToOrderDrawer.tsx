@@ -156,7 +156,7 @@ export const AddItemsToOrderDrawer = ({
     quantity: number;
     price: number;
     notes?: string;
-    extras: { extraId: string; name: string; price: number }[];
+    extras: { extraId: string; name: string; price: number; is_complement?: boolean }[];
   }) => {
     setAdding(true);
     try {
@@ -175,11 +175,11 @@ export const AddItemsToOrderDrawer = ({
 
       if (itemError) throw itemError;
 
-      // Insert extras
+      // Insert extras (complement-group items have no product_extras row, so store as snapshot only)
       if (item.extras.length > 0) {
         const extrasToInsert = item.extras.map((extra) => ({
           order_item_id: orderItem.id,
-          product_extra_id: extra.extraId,
+          product_extra_id: extra.is_complement ? null : extra.extraId,
           price_at_order: extra.price,
           extra_name: extra.name,
         }));
@@ -188,7 +188,10 @@ export const AddItemsToOrderDrawer = ({
           .from("order_item_extras")
           .insert(extrasToInsert);
 
-        if (extrasError) throw extrasError;
+        if (extrasError) {
+          console.error("Erro ao inserir adicionais:", extrasError);
+          throw extrasError;
+        }
       }
 
       // Stock deduction is handled by DB trigger on status change to delivered/picked_up
