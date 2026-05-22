@@ -815,7 +815,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       }).select().single();
       if (error) throw error;
       if (item.extras.length > 0) {
-        await supabase.from("order_item_extras").insert(
+        const { error: extrasError } = await supabase.from("order_item_extras").insert(
           item.extras.map(e => ({
             order_item_id: oi.id,
             product_extra_id: e.is_complement ? null : e.extraId,
@@ -823,6 +823,10 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             extra_name: e.name,
           }))
         );
+        if (extrasError) {
+          console.error("Erro ao inserir adicionais:", extrasError);
+          throw extrasError;
+        }
       }
     }
   };
