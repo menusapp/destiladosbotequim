@@ -149,6 +149,7 @@ export const TableDetailView = () => {
         .from("orders")
         .select(`
           id,
+          daily_order_number,
           status,
           created_at,
           customer_name,
