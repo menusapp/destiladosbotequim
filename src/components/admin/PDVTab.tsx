@@ -949,7 +949,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           restaurant_id: restaurantId, order_type: "delivery", delivery_type: "pickup",
           status: "preparing", customer_name: customerName.trim(),
           customer_cpf: customerCpf,
-          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          notes: ((notes || "") + discountNotesText + cashChangeText).trim() || null, payment_type: paymentType || null,
           coupon_discount: discountForOrder,
           pdv_source: true,
         }).select().single();
