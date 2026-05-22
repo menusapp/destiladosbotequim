@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { formatPaymentForDisplay } from "@/lib/utils";
 import { getOrderOriginLabel } from "@/lib/orderOrigin";
+import { parseChangeFor } from "@/lib/receiptFormatters";
 import { useOrderStatusAdvance } from "@/hooks/useOrderStatusAdvance";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
