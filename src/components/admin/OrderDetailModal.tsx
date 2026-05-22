@@ -474,6 +474,19 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                   )}
                   <p className="text-xl font-bold">Total: R$ {grandTotal.toFixed(2)}</p>
                 </div>
+                {(() => {
+                  const changeFor = parseChangeFor(order.notes);
+                  if (changeFor == null || changeFor < grandTotal) return null;
+                  const troco = changeFor - grandTotal;
+                  return (
+                    <div className="mt-3 rounded-lg border-2 border-amber-500/60 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1">
+                      <p className="font-bold text-amber-900 dark:text-amber-200 text-sm uppercase tracking-wide">💰 Troco</p>
+                      <div className="flex justify-between text-sm"><span>Total do pedido</span><span className="font-medium">R$ {grandTotal.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-sm"><span>Cliente vai pagar com</span><span className="font-medium">R$ {changeFor.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-base font-bold text-amber-900 dark:text-amber-200 pt-1 border-t border-amber-300"><span>Troco a levar</span><span>R$ {troco.toFixed(2)}</span></div>
+                    </div>
+                  );
+                })()}
               </div>
             </CollapsibleContent>
           </Collapsible>
