@@ -256,9 +256,17 @@ function buildCustomerPreview(
     );
   }
 
-  const cleanNotes = order.notes
-    ? order.notes.replace(/\[Desconto:.+?\]/g, "").trim()
-    : "";
+  const changeFor = parseChangeFor(order.notes);
+  if (changeFor != null && changeFor >= finalTotal) {
+    const troco = changeFor - finalTotal;
+    out += divider("-", width);
+    out += center("** TROCO **  [NEGRITO]", width);
+    out += lineLR("Total do pedido", formatPrice(finalTotal), width);
+    out += lineLR("Cliente vai pagar com", formatPrice(changeFor), width);
+    out += lineLR("TROCO A LEVAR", formatPrice(troco), width) + "  [NEGRITO]\n";
+  }
+
+  const cleanNotes = cleanReceiptNotes(order.notes);
   if (cleanNotes) {
     out += divider("-", width);
     out += labeled("Obs:     ", cleanNotes, width);
