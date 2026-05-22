@@ -19,6 +19,7 @@ interface ProductExtra {
   extra_category_name?: string;
   extra_categories?: { name: string } | null;
   group_order?: number;
+  is_complement?: boolean;
 }
 
 interface Product {
@@ -41,6 +42,7 @@ interface CartItem {
     extraId: string;
     name: string;
     price: number;
+    is_complement?: boolean;
   }[];
 }
 
