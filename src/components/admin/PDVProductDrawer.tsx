@@ -167,6 +167,7 @@ export const PDVProductDrawer = ({
         extraId: e.id,
         name: e.name,
         price: e.price,
+        is_complement: e.is_complement,
       }));
 
     const effectivePrice = product.promotional_price ?? product.price;
