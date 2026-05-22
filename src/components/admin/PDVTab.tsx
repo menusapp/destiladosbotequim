@@ -1685,6 +1685,43 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                   </Select>
                 )}
 
+                {/* Cash received / change calculation */}
+                {paymentType === "cash" && (
+                  <div className="space-y-2 border rounded-lg p-3 bg-emerald-50/50">
+                    <Label className="text-xs font-medium">Valor recebido (para troco)</Label>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0"
+                      placeholder="Ex: 100,00"
+                      value={cashReceived}
+                      onChange={e => setCashReceived(e.target.value)}
+                      className="h-9 text-sm"
+                    />
+                    {(() => {
+                      const v = parseFloat((cashReceived || "").replace(",", "."));
+                      if (!Number.isFinite(v) || v <= 0) return null;
+                      if (v < cartTotal) {
+                        return (
+                          <p className="text-xs text-muted-foreground">
+                            Total do pedido: R$ {cartTotal.toFixed(2).replace(".", ",")}
+                          </p>
+                        );
+                      }
+                      const troco = v - cartTotal;
+                      return (
+                        <div className="text-xs space-y-0.5">
+                          <div className="flex justify-between"><span>Total do pedido</span><span>R$ {cartTotal.toFixed(2).replace(".", ",")}</span></div>
+                          <div className="flex justify-between"><span>Cliente vai pagar com</span><span>R$ {v.toFixed(2).replace(".", ",")}</span></div>
+                          <div className="flex justify-between font-semibold text-emerald-700"><span>TROCO</span><span>R$ {troco.toFixed(2).replace(".", ",")}</span></div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+
                 {/* Employee Credit Fields */}
                 {paymentType === "employee_credit" && (
                   <div className="space-y-2 border rounded-lg p-3 bg-amber-50/50">
