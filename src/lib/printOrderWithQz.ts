@@ -31,6 +31,8 @@ import {
   formatPrice,
   shortOrderId,
   formatOrderLabel,
+  parseChangeFor,
+  cleanReceiptNotes,
 } from "@/lib/receiptFormatters";
 
 export type PrintReceiptMode = "pedido" | "conta";
