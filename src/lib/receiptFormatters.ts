@@ -122,3 +122,28 @@ export function buildOriginLabel(order: {
   if (isDelivery) return "ENTREGA";
   return "PEDIDO";
 }
+
+/**
+ * Extrai o valor "Troco para: R$ X" das observações do pedido, se houver.
+ * Retorna null quando o cliente não informou troco.
+ */
+export function parseChangeFor(notes: string | null | undefined): number | null {
+  if (!notes) return null;
+  const m = notes.match(/Troco para:\s*R?\$?\s*([\d.,]+)/i);
+  if (!m) return null;
+  const num = parseFloat(m[1].replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(num) && num > 0 ? num : null;
+}
+
+/**
+ * Remove o tag "[Desconto: ...]" e a linha de "Troco para: R$ X" das observações,
+ * já que ambos são exibidos em blocos próprios no cupom.
+ */
+export function cleanReceiptNotes(notes: string | null | undefined): string {
+  if (!notes) return "";
+  return notes
+    .replace(/\[Desconto:.+?\]/g, "")
+    .replace(/Troco para:\s*R?\$?\s*[\d.,]+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
