@@ -64,7 +64,7 @@ const PendingOrdersPanel = ({ restaurantId, dateRange, onEmitted, searchTerm = "
       const { data, error } = await supabase
         .from("orders")
         .select(`
-          id, customer_name, customer_cpf, created_at, order_type, delivery_type, delivery_address, table_id,
+          id, daily_order_number, customer_name, customer_cpf, created_at, order_type, delivery_type, delivery_address, table_id,
           tables (table_number),
           order_items (
             price_at_order, quantity,
