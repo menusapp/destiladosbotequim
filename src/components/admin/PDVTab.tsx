@@ -880,6 +880,10 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
     setSubmitting(true);
     let createdOrderId: string | null = null;
+    const cashReceivedNum = parseFloat((cashReceived || "").replace(",", "."));
+    const cashChangeText = paymentType === "cash" && Number.isFinite(cashReceivedNum) && cashReceivedNum > cartTotal
+      ? ` Troco para: R$ ${cashReceivedNum.toFixed(2).replace(".", ",")}`
+      : "";
     try {
       // Auto-create/update customer in CRM
       await upsertCustomerCRM();
