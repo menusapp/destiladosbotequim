@@ -912,7 +912,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           delivery_address: fullAddress || null,
           delivery_city: resolvedCityName || null,
           delivery_neighborhood: deliveryNeighborhood || selectedAddress?.neighborhood || null,
-          notes: (notes || "") + discountNotesText || null, payment_type: paymentType || null,
+          notes: ((notes || "") + discountNotesText + cashChangeText).trim() || null, payment_type: paymentType || null,
           coupon_discount: discountForOrder,
           delivery_fee: finalDeliveryFee,
           pdv_source: true,
