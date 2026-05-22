@@ -18,6 +18,7 @@ import { PDVProductDrawer } from "./PDVProductDrawer";
 import { CustomerSelectDialog } from "./CustomerSelectDialog";
 import { notifyOrderAcceptedFromPDV } from "@/lib/pdvNotifications";
 import { normalizeSearch } from "@/lib/searchNormalize";
+import { withProductComplements } from "@/lib/productComplements";
 
 const CARD_BRANDS_PDV = [
   { code: "visa", name: "Visa" },
@@ -42,7 +43,7 @@ interface CartItem {
   quantity: number;
   price: number;
   notes?: string;
-  extras: { extraId: string; name: string; price: number }[];
+  extras: { extraId: string; name: string; price: number; is_complement?: boolean }[];
 }
 
 const normalizeZoneText = (value?: string | null) =>
@@ -656,9 +657,15 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
       }).select().single();
       if (error) throw error;
       if (item.extras.length > 0) {
-        await supabase.from("order_item_extras").insert(
-          item.extras.map(e => ({ order_item_id: oi.id, product_extra_id: e.extraId, price_at_order: e.price, extra_name: e.name }))
+        const { error: extrasError } = await supabase.from("order_item_extras").insert(
+          item.extras.map(e => ({
+            order_item_id: oi.id,
+            product_extra_id: e.is_complement ? null : e.extraId,
+            price_at_order: e.price,
+            extra_name: e.name,
+          }))
         );
+        if (extrasError) throw extrasError;
       }
     }
   };
@@ -1073,7 +1080,15 @@ export const CreateOrderDrawer = ({ restaurantId, open, onOpenChange, onOrderCre
                       <Card
                         key={product.id}
                         className="cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => { setSelectedProduct(product); setIsProductDrawerOpen(true); }}
+                        onClick={async () => {
+                          try {
+                            setSelectedProduct(await withProductComplements(product));
+                          } catch (error) {
+                            console.error("Erro ao carregar complementos:", error);
+                            setSelectedProduct(product);
+                          }
+                          setIsProductDrawerOpen(true);
+                        }}
                       >
                         <CardContent className="p-2 space-y-1">
                           {product.image_url ? (

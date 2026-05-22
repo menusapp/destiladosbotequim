@@ -45,6 +45,7 @@ import {
   isReservationExpired,
 } from "@/lib/reservations";
 import { normalizeSearch } from "@/lib/searchNormalize";
+import { withProductComplements } from "@/lib/productComplements";
 
 interface CartItem {
   productId: string;
@@ -1863,40 +1864,13 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                         key={product.id}
                         className="cursor-pointer hover:shadow-md active:scale-[0.98] transition-all touch-manipulation"
                         onClick={async () => {
-                          // Optimistic open: show drawer immediately with what we have, then enrich
-                          setSelectedProduct(product);
-                          setIsProductDrawerOpen(true);
                           try {
-                            const { data: complementGroups } = await supabase
-                              .from("product_complement_groups")
-                              .select("extra_category_id, display_order, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
-                              .eq("product_id", product.id)
-                              .order("display_order");
-
-                            const complementExtras = (complementGroups || []).flatMap((g: any) => {
-                              const cat = g.extra_categories;
-                              if (!cat?.extra_category_items) return [];
-                              return cat.extra_category_items.map((item: any) => ({
-                                id: item.id,
-                                name: item.name,
-                                price: item.price,
-                                is_required: g.is_required,
-                                min_selection: g.min_selection,
-                                max_selection: g.max_selection,
-                                extra_category_id: g.extra_category_id,
-                                extra_category_name: cat.name,
-                                group_order: g.display_order ?? 9999,
-                                is_complement: true,
-                              }));
-                            });
-
-                            const combinedExtras = [
-                              ...(product.product_extras || []),
-                              ...complementExtras,
-                            ];
-
-                            setSelectedProduct({ ...product, product_extras: combinedExtras });
-                          } catch (_) { /* keep base extras on error */ }
+                            setSelectedProduct(await withProductComplements(product));
+                          } catch (error) {
+                            console.error("Erro ao carregar complementos:", error);
+                            setSelectedProduct(product);
+                          }
+                          setIsProductDrawerOpen(true);
                         }}
                       >
                         <CardContent className="p-2 space-y-1">
