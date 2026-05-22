@@ -111,9 +111,43 @@ export const AddItemsToOrderDrawer = ({
     return categories.flatMap((c) => c.products);
   }, [categories, searchQuery, selectedCategory]);
 
-  const handleProductClick = (product: Product) => {
+  const handleProductClick = async (product: Product) => {
+    // Open immediately with base extras, then enrich with complement groups
     setSelectedProduct(product);
     setShowProductDrawer(true);
+    try {
+      const { data: complementGroups } = await supabase
+        .from("product_complement_groups")
+        .select("extra_category_id, display_order, is_required, min_selection, max_selection, extra_categories(id, name, extra_category_items(id, name, price))")
+        .eq("product_id", product.id)
+        .order("display_order");
+
+      const complementExtras = (complementGroups || []).flatMap((g: any) => {
+        const cat = g.extra_categories;
+        if (!cat?.extra_category_items) return [];
+        return cat.extra_category_items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          is_required: g.is_required,
+          min_selection: g.min_selection,
+          max_selection: g.max_selection,
+          extra_category_id: g.extra_category_id,
+          extra_category_name: cat.name,
+          group_order: g.display_order ?? 9999,
+          is_complement: true,
+        }));
+      });
+
+      const combinedExtras = [
+        ...((product.product_extras as any[]) || []),
+        ...complementExtras,
+      ];
+
+      setSelectedProduct({ ...product, product_extras: combinedExtras as any });
+    } catch (e) {
+      console.error("Erro ao carregar complementos:", e);
+    }
   };
 
   const handleAddToOrder = async (item: {
