@@ -316,7 +316,8 @@ const RestaurantAdmin = () => {
           const shouldNotify =
             status === 'pending' ||
             (order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status)) ||
-            (order.order_type === 'local' && activeLocalStatuses.includes(status));
+            (order.order_type === 'local' && activeLocalStatuses.includes(status)) ||
+            (order.pdv_source === true && activeLocalStatuses.includes(status));
 
           // Filter by staff permission: only show notifications to users that opted in.
           // Owner sessions (no staff_role set) keep receiving everything.
