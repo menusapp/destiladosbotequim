@@ -24,6 +24,8 @@ import {
   formatPrice,
   shortOrderId,
   formatOrderLabel,
+  parseChangeFor,
+  cleanReceiptNotes,
 } from "@/lib/receiptFormatters";
 
 export type ReceiptWidth = "58mm" | "80mm";
