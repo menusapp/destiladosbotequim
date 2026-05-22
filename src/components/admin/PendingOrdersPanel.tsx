@@ -233,7 +233,7 @@ const PendingOrdersPanel = ({ restaurantId, dateRange, onEmitted, searchTerm = "
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
                 {getOriginBadge(order)}
-                <span className="font-mono text-xs">#{order.id.slice(0, 8)}</span>
+                <span className="font-mono text-xs">{order.daily_order_number != null ? `Pedido ${order.daily_order_number}` : `#${order.id.slice(0, 8)}`}</span>
                 <span className="text-xs text-muted-foreground">
                   {format(new Date(order.created_at), "dd/MM HH:mm")}
                 </span>
