@@ -149,6 +149,7 @@ export const TableDetailView = () => {
         .from("orders")
         .select(`
           id,
+          daily_order_number,
           status,
           created_at,
           customer_name,
@@ -651,7 +652,7 @@ export const TableDetailView = () => {
                   <div key={order.id} className="p-4 bg-muted/50 rounded-lg border">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <p className="font-medium">Pedido #{order.id.slice(0, 8)}</p>
+                        <p className="font-medium">{(order as any).daily_order_number != null ? `Pedido ${(order as any).daily_order_number}` : `Pedido #${order.id.slice(0, 8)}`}</p>
                         <p className="text-sm text-muted-foreground">
                           {formatDistanceToNow(new Date(order.created_at), {
                             addSuffix: true,

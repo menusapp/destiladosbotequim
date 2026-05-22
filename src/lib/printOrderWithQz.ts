@@ -31,6 +31,8 @@ import {
   formatPrice,
   shortOrderId,
   formatOrderLabel,
+  parseChangeFor,
+  cleanReceiptNotes,
 } from "@/lib/receiptFormatters";
 
 export type PrintReceiptMode = "pedido" | "conta";
@@ -352,10 +354,23 @@ function buildCustomerReceipt(
     out += ESCPOS.BOLD_OFF;
   }
 
-  // ---------- Observações gerais (sem o tag de desconto) ----------
-  const cleanNotes = order.notes
-    ? order.notes.replace(/\[Desconto:.+?\]/g, "").trim()
-    : "";
+  // ---------- Troco (quando cliente informou "Troco para: R$ X") ----------
+  const changeFor = parseChangeFor(order.notes);
+  if (changeFor != null && changeFor >= finalTotal) {
+    const troco = changeFor - finalTotal;
+    out += divider("-");
+    out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE_H;
+    out += center("** TROCO **", LINE_WIDTH);
+    out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
+    out += lineLR("Total do pedido", formatPrice(finalTotal));
+    out += lineLR("Cliente vai pagar com", formatPrice(changeFor));
+    out += ESCPOS.BOLD_ON + ESCPOS.SIZE_DOUBLE_H;
+    out += lineLR("TROCO A LEVAR", formatPrice(troco), LINE_WIDTH);
+    out += ESCPOS.SIZE_NORMAL + ESCPOS.BOLD_OFF;
+  }
+
+  // ---------- Observações gerais (sem o tag de desconto e linha de troco) ----------
+  const cleanNotes = cleanReceiptNotes(order.notes);
   if (cleanNotes) {
     out += divider();
     out += labeled("Obs:     ", cleanNotes);
