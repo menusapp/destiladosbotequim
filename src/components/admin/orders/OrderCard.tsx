@@ -36,6 +36,7 @@ interface OrderItem {
 
 export interface OrderCardOrder {
   id: string;
+  daily_order_number?: number | null;
   status: string;
   created_at: string;
   customer_name: string;
