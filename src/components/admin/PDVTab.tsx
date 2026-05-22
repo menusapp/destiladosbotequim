@@ -791,7 +791,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
     setCart([]);
     setCustomerName(""); setCustomerPhone(""); setCustomerCpf("");
     setDeliveryAddress(""); setDeliveryCep(""); setDeliveryNeighborhood(""); setDeliveryCity("");
-    setNotes(""); setPaymentType(""); setSelectedTableId("");
+    setNotes(""); setPaymentType(""); setCashReceived(""); setSelectedTableId("");
     setSelectedCustomer(null);
     setSelectedAddress(null);
     setCustomerAddresses([]);
