@@ -1483,14 +1483,63 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <h3 className="font-bold text-lg">Novo Pedido</h3>
-              <div className="flex items-center gap-1">
+            <div className="shrink-0 mb-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h3 className="font-bold text-base">Novo Pedido</h3>
                 {cart.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
+                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground h-7 px-2">
                     Limpar
                   </Button>
                 )}
+              </div>
+
+              {/* Order type pills */}
+              <div className="grid grid-cols-3 gap-0.5 p-0.5 bg-muted rounded-md mb-1.5" data-tour="pdv-order-type">
+                {(["mesa", "delivery", "retirada"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setOrderType(t)}
+                    className={cn(
+                      "h-7 rounded text-xs font-semibold transition-all capitalize leading-none",
+                      orderType === t
+                        ? "bg-background shadow-sm text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t === "mesa" ? "Mesa" : t === "delivery" ? "Delivery" : "Retirada"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Steps indicator */}
+              <div className="flex items-center gap-1">
+                {([
+                  { key: "dados", label: "Dados" },
+                  { key: "produtos", label: "Produtos" },
+                  { key: "pagamento", label: "Pagamento" },
+                ] as const).map(({ key, label }, idx) => {
+                  const currentIdx = (["dados", "produtos", "pagamento"] as const).indexOf(mobileStep);
+                  const active = mobileStep === key;
+                  const done = currentIdx > idx;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setMobileStep(key)}
+                      className={cn(
+                        "h-5 flex-1 rounded-full font-semibold leading-none transition-colors px-1 flex items-center justify-center text-[11px]",
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : done
+                          ? "bg-primary/60 text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
