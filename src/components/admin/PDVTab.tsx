@@ -1546,16 +1546,6 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
           <ScrollArea className={cn("flex-1 min-h-0", isMobile && "-mx-1")}>
             <div className={cn("space-y-5", isMobile ? "px-1 pb-2" : "pr-3")}>
-              {/* Order type tabs — desktop only (mobile uses header pills) */}
-              <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)} data-tour="pdv-order-type" className={cn(isMobile && "hidden")}>
-                <TabsList className="w-full grid grid-cols-3">
-                  <TabsTrigger value="mesa" className="text-xs">Mesa</TabsTrigger>
-                  <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
-                  <TabsTrigger value="retirada" className="text-xs">Retirada</TabsTrigger>
-
-                </TabsList>
-              </Tabs>
-
               {/* Customer Section — Inline Fields */}
               <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", mobileStep !== "dados" && "hidden")} data-tour="pdv-customer">
                 <div className="flex items-center justify-between mb-3">
