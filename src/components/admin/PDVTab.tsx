@@ -1463,52 +1463,74 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
         <div
           className={`
             ${isMobile
-              ? `fixed inset-x-0 bottom-0 z-50 bg-background flex flex-col px-4 pt-4 pb-6 rounded-t-2xl shadow-2xl border-t transition-transform duration-300 h-[90vh] ${mobileOrderPanelOpen ? "translate-y-0" : "translate-y-full"}`
+              ? `fixed inset-x-0 bottom-0 z-50 bg-background flex flex-col px-3 pt-2 rounded-t-2xl shadow-2xl border-t transition-transform duration-300 h-[100dvh] max-h-[100dvh] ${mobileOrderPanelOpen ? "translate-y-0" : "translate-y-full"}`
               : "w-[520px] flex-shrink-0 border-l pl-6 flex flex-col min-h-0"
             }
           `}
         >
           {/* Mobile drag handle */}
           {isMobile && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 rounded-full bg-muted-foreground/30" />
+            <div className="absolute top-1 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-muted-foreground/30" />
           )}
 
           {isMobile ? (
-            <>
-              {/* Mobile header: close + title + clear */}
-              <div className="flex items-center justify-between gap-2 mb-3 mt-3">
+            <div className="shrink-0 pt-2">
+              {/* Mobile header: close + title + progress + clear */}
+              <div className="flex items-center gap-2 mb-2">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setMobileOrderPanelOpen(false)}
-                  className="h-10 w-10 -ml-2"
+                  className="h-8 w-8 -ml-1"
                   aria-label="Fechar"
                 >
                   <X className="w-5 h-5" />
                 </Button>
-                <h3 className="font-bold text-base flex-1 text-center">
-                  {mobileStep === "produtos" ? "Produtos" : mobileStep === "dados" ? "Dados do pedido" : "Pagamento"}
-                </h3>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm truncate leading-tight">
+                    {mobileStep === "dados" ? "Dados do pedido" : mobileStep === "produtos" ? "Produtos" : "Pagamento"}
+                  </h3>
+                  {/* Inline progress indicator */}
+                  <div className="flex items-center gap-1 mt-1">
+                    {(["dados", "produtos", "pagamento"] as const).map((s, idx) => {
+                      const currentIdx = (["dados", "produtos", "pagamento"] as const).indexOf(mobileStep);
+                      const active = mobileStep === s;
+                      const done = currentIdx > idx;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setMobileStep(s)}
+                          className={cn(
+                            "h-1 flex-1 rounded-full transition-colors",
+                            active ? "bg-primary" : done ? "bg-primary/60" : "bg-muted"
+                          )}
+                          aria-label={`Etapa ${s}`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
                 {cart.length > 0 ? (
-                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground h-10">
+                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-[11px] text-muted-foreground h-8 px-2">
                     Limpar
                   </Button>
                 ) : (
-                  <div className="w-10" />
+                  <div className="w-8" />
                 )}
               </div>
 
-              {/* Mobile order type pills */}
-              <div className="grid grid-cols-3 gap-1.5 p-1 bg-muted rounded-xl mb-3">
+              {/* Mobile order type pills — compact */}
+              <div className="grid grid-cols-3 gap-1 p-0.5 bg-muted rounded-lg mb-2">
                 {(["mesa", "delivery", "retirada"] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setOrderType(t)}
                     className={cn(
-                      "h-9 rounded-lg text-xs font-semibold transition-all capitalize",
+                      "h-8 rounded-md text-xs font-semibold transition-all capitalize",
                       orderType === t
-                        ? "bg-background shadow text-foreground"
+                        ? "bg-background shadow-sm text-foreground"
                         : "text-muted-foreground active:scale-95"
                     )}
                   >
@@ -1516,27 +1538,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                   </button>
                 ))}
               </div>
-
-              {/* Step indicator */}
-              <div className="flex items-center gap-1.5 mb-3 px-1">
-                {(["produtos", "dados", "pagamento"] as const).map((s, idx) => {
-                  const active = mobileStep === s;
-                  const done = (["produtos", "dados", "pagamento"] as const).indexOf(mobileStep) > idx;
-                  return (
-                    <div key={s} className="flex-1 flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setMobileStep(s)}
-                        className={cn(
-                          "h-1.5 flex-1 rounded-full transition-colors",
-                          active ? "bg-primary" : done ? "bg-primary/60" : "bg-muted"
-                        )}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </>
+            </div>
           ) : (
             <div className="flex items-center justify-between gap-2 mb-4">
               <h3 className="font-bold text-lg">Novo Pedido</h3>
@@ -1550,14 +1552,15 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             </div>
           )}
 
-          <ScrollArea className="flex-1">
-            <div className="space-y-5 pr-3">
+          <ScrollArea className={cn("flex-1 min-h-0", isMobile && "-mx-1")}>
+            <div className={cn("space-y-5", isMobile ? "px-1 pb-2" : "pr-3")}>
               {/* Order type tabs — desktop only (mobile uses header pills) */}
               <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)} data-tour="pdv-order-type" className={cn(isMobile && "hidden")}>
                 <TabsList className="w-full grid grid-cols-3">
                   <TabsTrigger value="mesa" className="text-xs">Mesa</TabsTrigger>
                   <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
                   <TabsTrigger value="retirada" className="text-xs">Retirada</TabsTrigger>
+
                 </TabsList>
               </Tabs>
 
