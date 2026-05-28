@@ -1637,7 +1637,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Delivery Address Section */}
               {orderType === "delivery" && (
-                <div className="border rounded-lg p-4 bg-muted/30">
+                <div className={cn("border rounded-lg p-4 bg-muted/30", isMobile && mobileStep !== "dados" && "hidden")}>
                   <p className="text-sm font-medium text-muted-foreground mb-3">Endereço de Entrega</p>
 
                   {/* No customer data at all */}
