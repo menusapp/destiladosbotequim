@@ -1501,14 +1501,14 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               </div>
 
               {/* Mobile order type pills — compact */}
-              <div className="grid grid-cols-3 gap-1 p-0.5 bg-muted rounded-lg mb-1.5">
+              <div className="grid grid-cols-3 gap-0.5 p-0.5 bg-muted rounded-md mb-1">
                 {(["mesa", "delivery", "retirada"] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setOrderType(t)}
                     className={cn(
-                      "h-8 rounded-md text-xs font-semibold transition-all capitalize",
+                      "h-6 rounded text-[11px] font-semibold transition-all capitalize leading-none",
                       orderType === t
                         ? "bg-background shadow-sm text-foreground"
                         : "text-muted-foreground active:scale-95"
@@ -1520,7 +1520,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               </div>
 
               {/* Steps indicator — below order type pills */}
-              <div className="flex items-center gap-1 mb-2">
+              <div className="flex items-center gap-1 mb-1">
                 {([
                   { key: "dados", label: "Dados" },
                   { key: "produtos", label: "Produtos" },
@@ -1535,7 +1535,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       type="button"
                       onClick={() => setMobileStep(key)}
                       className={cn(
-                        "h-[18px] flex-1 rounded-full text-[10px] font-semibold leading-none transition-colors px-1 flex items-center justify-center",
+                        "h-[14px] flex-1 rounded-full text-[9px] font-semibold leading-none transition-colors px-1 flex items-center justify-center",
                         active
                           ? "bg-primary text-primary-foreground"
                           : done
