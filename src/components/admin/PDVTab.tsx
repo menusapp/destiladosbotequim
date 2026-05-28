@@ -1942,8 +1942,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               )}
 
 
-              <div className="space-y-3" data-tour="pdv-products">
-                <Label className="text-xs font-semibold mb-1.5 block">Produtos</Label>
+              <div className={cn("space-y-3", isMobile && mobileStep !== "produtos" && "hidden")} data-tour="pdv-products">
+                <Label className={cn("text-xs font-semibold mb-1.5 block", isMobile && "hidden")}>Produtos</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8 h-9 text-sm" />
