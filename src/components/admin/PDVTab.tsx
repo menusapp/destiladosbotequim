@@ -1490,36 +1490,6 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                   <h3 className="font-bold text-sm truncate leading-tight">
                     {mobileStep === "dados" ? "Dados do pedido" : mobileStep === "produtos" ? "Produtos" : "Pagamento"}
                   </h3>
-                  {/* Inline progress indicator */}
-                  <div className="gap-1 mt-1 flex items-center justify-start mb-1 py-0">
-                    {([
-                      { key: "dados", label: "Dados" },
-                      { key: "produtos", label: "Produtos" },
-                      { key: "pagamento", label: "Pagamento" },
-                    ] as const).map(({ key, label }, idx) => {
-                      const currentIdx = (["dados", "produtos", "pagamento"] as const).indexOf(mobileStep);
-                      const active = mobileStep === key;
-                      const done = currentIdx > idx;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setMobileStep(key)}
-                          className={cn(
-                            "h-5 flex-1 rounded-full text-[10px] font-semibold leading-none transition-colors px-1",
-                            active
-                              ? "bg-primary text-primary-foreground"
-                              : done
-                              ? "bg-primary/60 text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                          )}
-                          aria-label={`Etapa ${label}`}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
                 {cart.length > 0 ? (
                   <Button variant="ghost" size="sm" onClick={clearForm} className="text-[11px] text-muted-foreground h-8 px-2">
@@ -1531,7 +1501,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               </div>
 
               {/* Mobile order type pills — compact */}
-              <div className="grid grid-cols-3 gap-1 p-0.5 bg-muted rounded-lg mb-2">
+              <div className="grid grid-cols-3 gap-1 p-0.5 bg-muted rounded-lg mb-1.5">
                 {(["mesa", "delivery", "retirada"] as const).map((t) => (
                   <button
                     key={t}
@@ -1547,6 +1517,37 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     {t === "mesa" ? "Mesa" : t === "delivery" ? "Delivery" : "Retirada"}
                   </button>
                 ))}
+              </div>
+
+              {/* Steps indicator — below order type pills */}
+              <div className="flex items-center gap-1 mb-2">
+                {([
+                  { key: "dados", label: "Dados" },
+                  { key: "produtos", label: "Produtos" },
+                  { key: "pagamento", label: "Pagamento" },
+                ] as const).map(({ key, label }, idx) => {
+                  const currentIdx = (["dados", "produtos", "pagamento"] as const).indexOf(mobileStep);
+                  const active = mobileStep === key;
+                  const done = currentIdx > idx;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setMobileStep(key)}
+                      className={cn(
+                        "h-[18px] flex-1 rounded-full text-[10px] font-semibold leading-none transition-colors px-1 flex items-center justify-center",
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : done
+                          ? "bg-primary/60 text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                      aria-label={`Etapa ${label}`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (
