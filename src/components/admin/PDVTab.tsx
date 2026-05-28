@@ -48,6 +48,7 @@ import { normalizeSearch } from "@/lib/searchNormalize";
 import { withProductComplements } from "@/lib/productComplements";
 import { TableCardMobile } from "./pdv/mobile/TableCardMobile";
 import { TableFilterChips } from "./pdv/mobile/TableFilterChips";
+import { cn } from "@/lib/utils";
 
 interface CartItem {
   productId: string;
@@ -189,6 +190,8 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const confirm = useConfirmDialog();
   const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
   const [mobileTableFilter, setMobileTableFilter] = useState<import("./pdv/mobile/TableFilterChips").TableFilter>("all");
+  const [mobileStep, setMobileStep] = useState<"produtos" | "dados" | "pagamento">("produtos");
+  const [mobileCategoryFilter, setMobileCategoryFilter] = useState<string>("all");
 
   // Order creation state
   const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada">("mesa");
@@ -639,7 +642,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const handleAddToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);
     toast.success(`${item.productName} adicionado!`);
-    if (isMobile) setMobileOrderPanelOpen(true);
+    if (isMobile) { setMobileStep("produtos"); setMobileOrderPanelOpen(true); }
   };
 
   // Sync selectedCustomer to source-of-truth states
@@ -1469,32 +1472,88 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           {isMobile && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 rounded-full bg-muted-foreground/30" />
           )}
-          <div className={`flex items-center justify-between gap-2 ${isMobile ? "mb-3 mt-3" : "mb-4"}`}>
-            <h3 className="font-bold text-lg">Novo Pedido</h3>
-            <div className="flex items-center gap-1">
-              {cart.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
-                  Limpar
-                </Button>
-              )}
-              {isMobile && (
+
+          {isMobile ? (
+            <>
+              {/* Mobile header: close + title + clear */}
+              <div className="flex items-center justify-between gap-2 mb-3 mt-3">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setMobileOrderPanelOpen(false)}
-                  className="h-11 w-11"
+                  className="h-10 w-10 -ml-2"
                   aria-label="Fechar"
                 >
                   <X className="w-5 h-5" />
                 </Button>
-              )}
+                <h3 className="font-bold text-base flex-1 text-center">
+                  {mobileStep === "produtos" ? "Produtos" : mobileStep === "dados" ? "Dados do pedido" : "Pagamento"}
+                </h3>
+                {cart.length > 0 ? (
+                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground h-10">
+                    Limpar
+                  </Button>
+                ) : (
+                  <div className="w-10" />
+                )}
+              </div>
+
+              {/* Mobile order type pills */}
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-muted rounded-xl mb-3">
+                {(["mesa", "delivery", "retirada"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setOrderType(t)}
+                    className={cn(
+                      "h-9 rounded-lg text-xs font-semibold transition-all capitalize",
+                      orderType === t
+                        ? "bg-background shadow text-foreground"
+                        : "text-muted-foreground active:scale-95"
+                    )}
+                  >
+                    {t === "mesa" ? "Mesa" : t === "delivery" ? "Delivery" : "Retirada"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Step indicator */}
+              <div className="flex items-center gap-1.5 mb-3 px-1">
+                {(["produtos", "dados", "pagamento"] as const).map((s, idx) => {
+                  const active = mobileStep === s;
+                  const done = (["produtos", "dados", "pagamento"] as const).indexOf(mobileStep) > idx;
+                  return (
+                    <div key={s} className="flex-1 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setMobileStep(s)}
+                        className={cn(
+                          "h-1.5 flex-1 rounded-full transition-colors",
+                          active ? "bg-primary" : done ? "bg-primary/60" : "bg-muted"
+                        )}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <h3 className="font-bold text-lg">Novo Pedido</h3>
+              <div className="flex items-center gap-1">
+                {cart.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
+                    Limpar
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <ScrollArea className="flex-1">
             <div className="space-y-5 pr-3">
-              {/* Order type tabs */}
-              <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)} data-tour="pdv-order-type">
+              {/* Order type tabs — desktop only (mobile uses header pills) */}
+              <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)} data-tour="pdv-order-type" className={cn(isMobile && "hidden")}>
                 <TabsList className="w-full grid grid-cols-3">
                   <TabsTrigger value="mesa" className="text-xs">Mesa</TabsTrigger>
                   <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
@@ -1503,7 +1562,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               </Tabs>
 
               {/* Customer Section — Inline Fields */}
-              <div className="border rounded-lg p-4 bg-muted/30" data-tour="pdv-customer">
+              <div className={cn("border rounded-lg p-4 bg-muted/30", isMobile && mobileStep !== "dados" && "hidden")} data-tour="pdv-customer">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-medium text-muted-foreground">Cliente</p>
                   {(customerName || customerCpf || customerPhone) && (
@@ -1578,7 +1637,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Delivery Address Section */}
               {orderType === "delivery" && (
-                <div className="border rounded-lg p-4 bg-muted/30">
+                <div className={cn("border rounded-lg p-4 bg-muted/30", isMobile && mobileStep !== "dados" && "hidden")}>
                   <p className="text-sm font-medium text-muted-foreground mb-3">Endereço de Entrega</p>
 
                   {/* No customer data at all */}
@@ -1676,7 +1735,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Mesa selector */}
               {orderType === "mesa" && (
-                <div className="space-y-3">
+                <div className={cn("space-y-3", isMobile && mobileStep !== "dados" && "hidden")}>
                   <Label className="text-xs font-semibold mb-1.5 block">Mesa</Label>
                   <Select value={selectedTableId} onValueChange={setSelectedTableId}>
                     <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione uma mesa" /></SelectTrigger>
@@ -1692,13 +1751,13 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               )}
 
               {/* Notes */}
-              <div className="space-y-1.5">
+              <div className={cn("space-y-1.5", isMobile && mobileStep !== "dados" && "hidden")}>
                 <Label className="text-xs font-semibold mb-1.5 block">Observações</Label>
                 <Textarea placeholder="Observações..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[50px] text-sm" />
               </div>
 
               {/* Payment */}
-              <div className="space-y-1.5">
+              <div className={cn("space-y-1.5", isMobile && mobileStep !== "pagamento" && "hidden")}>
                 <Label className="text-xs font-semibold mb-1.5 block">Pagamento</Label>
                 <Select value={paymentType} onValueChange={(v) => setPaymentType(v)}>
                   <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
@@ -1808,7 +1867,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Discount Section */}
               {cart.length > 0 && (
-                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded}>
+                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded} className={cn(isMobile && mobileStep !== "pagamento" && "hidden")}>
                   <div className="border rounded-lg p-4 bg-muted/30">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-muted-foreground">Desconto</p>
@@ -1883,13 +1942,18 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               )}
 
 
-              <div className="space-y-3" data-tour="pdv-products">
-                <Label className="text-xs font-semibold mb-1.5 block">Produtos</Label>
+              <div className={cn("space-y-3", isMobile && mobileStep !== "produtos" && "hidden")} data-tour="pdv-products">
+                <Label className={cn("text-xs font-semibold mb-1.5 block", isMobile && "hidden")}>Produtos</Label>
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8 h-9 text-sm" />
+                  <Search className={cn("absolute top-1/2 -translate-y-1/2 text-muted-foreground", isMobile ? "left-3 w-4 h-4" : "left-2.5 w-3.5 h-3.5")} />
+                  <Input
+                    placeholder={isMobile ? "Buscar produto ou código" : "Buscar produto..."}
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className={cn(isMobile ? "pl-10 h-11 text-sm rounded-xl" : "pl-8 h-9 text-sm")}
+                  />
                 </div>
-                <div className="max-h-[50vh] min-h-[300px] overflow-y-auto pr-1">
+                <div className={cn(isMobile ? "pr-1" : "max-h-[50vh] min-h-[300px] overflow-y-auto pr-1")}>
                   {(() => {
                     // Group products by category
                     const categoryMap = new Map<string, { name: string; products: typeof filteredProducts }>();
@@ -1909,7 +1973,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
                     const categoriesArr = Array.from(categoryMap.entries());
 
-                    const renderProduct = (product: any) => (
+                    const renderProductDesktop = (product: any) => (
                       <Card
                         key={product.id}
                         className="cursor-pointer hover:shadow-md active:scale-[0.98] transition-all touch-manipulation"
@@ -1925,17 +1989,107 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       >
                         <CardContent className="p-2 space-y-1">
                           {product.image_url ? (
-                            <img src={product.image_url} alt={product.name} loading="lazy" className="w-full h-20 sm:h-14 object-cover rounded" />
+                            <img src={product.image_url} alt={product.name} loading="lazy" className="w-full h-14 object-cover rounded" />
                           ) : (
-                            <div className="w-full h-20 sm:h-14 bg-muted rounded flex items-center justify-center text-base font-bold text-muted-foreground">
+                            <div className="w-full h-14 bg-muted rounded flex items-center justify-center text-base font-bold text-muted-foreground">
                               {product.name.charAt(0)}
                             </div>
                           )}
-                          <p className="text-sm sm:text-xs font-medium line-clamp-2 leading-tight min-h-[2.25rem] sm:min-h-0">{product.name}</p>
-                          <p className="text-sm sm:text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
+                          <p className="text-xs font-medium line-clamp-2 leading-tight">{product.name}</p>
+                          <p className="text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
                         </CardContent>
                       </Card>
                     );
+
+                    const renderProductMobile = (product: any) => {
+                      const inCart = cart.filter(c => c.productId === product.id).reduce((s, c) => s + c.quantity, 0);
+                      return (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              setSelectedProduct(await withProductComplements(product));
+                            } catch (error) {
+                              console.error("Erro ao carregar complementos:", error);
+                              setSelectedProduct(product);
+                            }
+                            setIsProductDrawerOpen(true);
+                          }}
+                          className="w-full flex items-center gap-3 p-2.5 bg-background border border-border rounded-2xl active:scale-[0.98] active:bg-muted transition-all text-left"
+                        >
+                          {product.image_url ? (
+                            <img src={product.image_url} alt={product.name} loading="lazy" className="w-16 h-16 object-cover rounded-xl flex-shrink-0" />
+                          ) : (
+                            <div className="w-16 h-16 bg-muted rounded-xl flex items-center justify-center text-xl font-bold text-muted-foreground flex-shrink-0">
+                              {product.name.charAt(0)}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold leading-tight line-clamp-2">{product.name}</p>
+                            <p className="text-base font-bold text-primary mt-1">R$ {product.price.toFixed(2).replace(".", ",")}</p>
+                          </div>
+                          <div className="relative flex-shrink-0">
+                            <div className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
+                              <Plus className="w-5 h-5" />
+                            </div>
+                            {inCart > 0 && (
+                              <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                                {inCart}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    };
+
+                    const renderProduct = isMobile ? renderProductMobile : renderProductDesktop;
+
+                    // Mobile: category chips horizontal + filtered list
+                    if (isMobile) {
+                      const allCats = [
+                        { id: "all", name: "Todos" },
+                        ...categoriesArr.map(([id, { name }]) => ({ id, name })),
+                        ...(uncategorized.length > 0 ? [{ id: "__other", name: "Outros" }] : []),
+                      ];
+                      const visibleProducts = mobileCategoryFilter === "all"
+                        ? filteredProducts
+                        : mobileCategoryFilter === "__other"
+                          ? uncategorized
+                          : (categoryMap.get(mobileCategoryFilter)?.products || []);
+
+                      return (
+                        <>
+                          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-none sticky top-0 bg-background z-10">
+                            {allCats.map(c => {
+                              const active = mobileCategoryFilter === c.id;
+                              return (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => setMobileCategoryFilter(c.id)}
+                                  className={cn(
+                                    "flex-shrink-0 h-9 px-4 rounded-full text-xs font-semibold border transition-all whitespace-nowrap",
+                                    active
+                                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                      : "bg-background text-foreground border-border active:scale-95"
+                                  )}
+                                >
+                                  {c.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="space-y-2 mt-2">
+                            {visibleProducts.length === 0 ? (
+                              <p className="text-sm text-muted-foreground text-center py-8">Nenhum produto</p>
+                            ) : (
+                              visibleProducts.map(renderProductMobile)
+                            )}
+                          </div>
+                        </>
+                      );
+                    }
 
                     return (
                       <>
@@ -1967,7 +2121,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Cart Summary */}
               {cart.length > 0 && (
-                <div className="space-y-2 border-t pt-4">
+                <div className={cn("space-y-2 border-t pt-4", isMobile && mobileStep !== "pagamento" && "hidden")}>
                   <h4 className="font-semibold text-sm flex items-center gap-1.5">
                     <ShoppingCart className="w-4 h-4" /> Carrinho ({cart.length})
                   </h4>
@@ -2018,69 +2172,81 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             </div>
           </ScrollArea>
 
-          {/* Footer */}
-          <div className="border-t pt-3 mt-2 flex items-center justify-between">
-            <div className="text-xs flex items-center gap-2">
-              <span>
-                <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
-                {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
-              </span>
-              {cart.length > 0 && (
+          {/* Footer — desktop */}
+          {!isMobile && (
+            <div className="border-t pt-3 mt-2 flex items-center justify-between">
+              <div className="text-xs flex items-center gap-2">
+                <span>
+                  <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
+                  {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
+                </span>
+              </div>
+              <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()} data-tour="pdv-confirm">
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                Criar Pedido
+              </Button>
+            </div>
+          )}
+
+          {/* Footer — mobile step-aware */}
+          {isMobile && (
+            <div className="border-t pt-3 mt-2 pb-[env(safe-area-inset-bottom)] flex items-center gap-2">
+              {/* Back button */}
+              {mobileStep !== "produtos" && (
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  title="Copiar resumo do pedido"
-                  onClick={() => {
-                    let text = "📋 *Resumo do Pedido*\n\n";
-                    cart.forEach((item, i) => {
-                      const itemTotal = (item.price + item.extras.reduce((s, e) => s + e.price, 0)) * item.quantity;
-                      text += `${i + 1}. *${item.productName}* x${item.quantity} — R$ ${itemTotal.toFixed(2)}\n`;
-                      if (item.price > 0) text += `   Preço unit.: R$ ${item.price.toFixed(2)}\n`;
-                      if (item.extras.length > 0) {
-                        item.extras.forEach(e => {
-                          text += `   ➕ ${e.name}${e.price > 0 ? ` (+R$ ${e.price.toFixed(2)})` : ""}\n`;
-                        });
-                      }
-                      if (item.notes) text += `   📝 ${item.notes}\n`;
-                      text += "\n";
-                    });
-                    if (calculatedDiscount > 0) {
-                      text += `🏷️ Desconto: -R$ ${calculatedDiscount.toFixed(2)}\n`;
-                    }
-                    if (orderType === "delivery") {
-                      const cityParts = (deliveryCity || "").split(" - ");
-                      const cityName = (selectedAddress?.city || cityParts[0] || matchedZone?.zone_name || "").trim();
-                      const state = (selectedAddress?.state || cityParts[1] || "").trim();
-                      const cityLabel = cityName ? `${cityName}${state ? ` - ${state}` : ""}` : "";
-                      text += `🚚 Taxa de entrega: ${resolvedDeliveryFee > 0 ? `R$ ${resolvedDeliveryFee.toFixed(2)}` : "Grátis"}\n`;
-                      if (deliveryAddress) {
-                        text += `📍 Endereço: ${[cityLabel, deliveryAddress, deliveryNeighborhood || selectedAddress?.neighborhood || "", deliveryCep ? `CEP ${deliveryCep}` : ""].filter(Boolean).join(" - ")}\n`;
-                      }
-                    }
-                    text += `\n💰 *Total: R$ ${cartTotal.toFixed(2)}*`;
-                    if (customerName) text += `\n👤 Cliente: ${customerName}`;
-                    if (customerPhone) text += `\n📱 Tel: ${customerPhone}`;
-                    navigator.clipboard.writeText(text);
-                    toast.success("Resumo copiado!");
-                  }}
+                  variant="outline"
+                  size="lg"
+                  className="h-12 px-4 rounded-xl"
+                  onClick={() => setMobileStep(mobileStep === "pagamento" ? "dados" : "produtos")}
                 >
-                  <ClipboardList className="w-4 h-4" />
+                  ←
+                </Button>
+              )}
+
+              {/* Cart pill */}
+              <div className="flex-1 flex items-center gap-2 h-12 px-3 rounded-xl bg-muted">
+                <ShoppingCart className="w-4 h-4 text-muted-foreground" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] leading-none text-muted-foreground">
+                    {cart.length} ite{cart.length !== 1 ? "ns" : "m"}
+                  </p>
+                  <p className="text-sm font-bold leading-tight truncate">
+                    R$ {cartTotal.toFixed(2).replace(".", ",")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Primary CTA */}
+              {mobileStep === "pagamento" ? (
+                <Button
+                  size="lg"
+                  className="h-12 px-5 rounded-xl font-bold flex-shrink-0"
+                  onClick={handleSubmit}
+                  disabled={submitting || cart.length === 0 || !customerName.trim()}
+                  data-tour="pdv-confirm"
+                >
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                  Criar
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  className="h-12 px-5 rounded-xl font-bold flex-shrink-0"
+                  onClick={() => setMobileStep(mobileStep === "produtos" ? "dados" : "pagamento")}
+                  disabled={cart.length === 0}
+                >
+                  Próximo →
                 </Button>
               )}
             </div>
-            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()} data-tour="pdv-confirm">
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-              Criar Pedido
-            </Button>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Mobile floating "Novo Pedido" button */}
       {isMobile && !mobileOrderPanelOpen && (
         <Button
-          onClick={() => setMobileOrderPanelOpen(true)}
+          onClick={() => { setMobileStep("produtos"); setMobileOrderPanelOpen(true); }}
           className="fixed bottom-24 right-4 z-50 h-14 rounded-full shadow-lg flex items-center gap-2 px-5 md:bottom-4"
           size="lg"
         >
@@ -2201,7 +2367,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           setSelectedTableForDrawer(null);
           setOrderType("mesa");
           setSelectedTableId(tableId);
-          if (isMobile) setMobileOrderPanelOpen(true);
+          if (isMobile) { setMobileStep("produtos"); setMobileOrderPanelOpen(true); }
         }}
         onTableCleared={() => refetchTables()}
       />
