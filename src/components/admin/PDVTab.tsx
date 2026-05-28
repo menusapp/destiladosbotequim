@@ -1323,12 +1323,6 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                 value={mobileTableFilter}
                 onChange={setMobileTableFilter}
                 counts={{
-          {isMobile && tables && (
-            <div className="mb-2 flex-shrink-0">
-              <TableFilterChips
-                value={mobileTableFilter}
-                onChange={setMobileTableFilter}
-                counts={{
                   all: tables.filter(t => !t.is_hidden).length,
                   occupied: tables.filter(t => !t.is_hidden && t.is_occupied).length,
                   free: tables.filter(t => !t.is_hidden && !t.is_occupied).length,
