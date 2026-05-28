@@ -2367,7 +2367,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           setSelectedTableForDrawer(null);
           setOrderType("mesa");
           setSelectedTableId(tableId);
-          if (isMobile) setMobileOrderPanelOpen(true);
+          if (isMobile) { setMobileStep("produtos"); setMobileOrderPanelOpen(true); }
         }}
         onTableCleared={() => refetchTables()}
       />
