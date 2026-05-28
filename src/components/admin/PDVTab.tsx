@@ -1367,91 +1367,23 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                   })}
               </div>
             ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 [&>div]:min-h-24">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {tables?.map(table => {
-                const isOccupied = table.is_occupied;
-                const comandaCount = table.comandas?.length || 0;
-                const isSelected = selectedTableId === table.id;
-                const occupiedSince = table.occupied_at ? format(new Date(table.occupied_at), "HH:mm") : null;
+                const active = activeByTable.get(table.id);
                 return (
-                  <Card
+                  <TableCardMobile
                     key={table.id}
-                    className={`${table.is_hidden ? "opacity-60 cursor-not-allowed" : "cursor-pointer"} transition-all hover:shadow-md relative ${
-                      isSelected ? "ring-2 ring-primary border-primary" :
-                      table.is_hidden ? "border-border bg-muted/30" :
-                      isOccupied ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-green-300 bg-green-50 dark:bg-green-950/20"
-                    }`}
+                    table={table}
+                    isSelected={selectedTableId === table.id}
+                    pendingCount={pendingByTable.get(table.id) || 0}
+                    itemCount={active?.itemCount || 0}
+                    reservationTime={reservationByTable.get(table.id)?.reservation_time || null}
                     onClick={() => !table.is_hidden && handleTableClick(table)}
-                    onDoubleClick={() => !table.is_hidden && handleTableSelect(table)}
-                  >
-                    {/* Three-dot menu */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 z-10"
-                          onClick={(e) => e.stopPropagation()}>
-                          <MoreVertical className="w-3.5 h-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem onClick={() => handleShowQR(table)}>
-                          <QrCode className="w-4 h-4 mr-2" /> QR Code
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleCopyLink(table)}>
-                          <Link2 className="w-4 h-4 mr-2" /> Copiar Link
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleHidden(table)}>
-                          {table.is_hidden ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
-                          {table.is_hidden ? "Tornar Visível" : "Ocultar Mesa"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleClearTable(table)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Eraser className="w-4 h-4 mr-2" /> Limpar Mesa
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <CardContent className="p-4 text-center space-y-1">
-                      <div className={`w-10 h-10 rounded-full mx-auto flex items-center justify-center text-white text-sm font-bold ${
-                        table.is_hidden ? "bg-muted-foreground/40" :
-                        isOccupied ? "bg-red-500" : "bg-green-400"
-                      }`}>
-                        {table.table_number}
-                      </div>
-                      <p className="text-xs font-medium">{table.table_name || `Mesa ${table.table_number}`}</p>
-                      {(pendingByTable.get(table.id) || 0) > 0 && (
-                        <Badge variant="destructive" className="text-[10px] animate-pulse">
-                          🔔 Pedido Novo
-                        </Badge>
-                      )}
-                      {!isOccupied && reservationByTable.has(table.id) && (
-                        <Badge className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100">
-                          🕐 Reservado {reservationByTable.get(table.id)!.reservation_time?.slice(0, 5)}
-                        </Badge>
-                      )}
-                      <Badge variant={table.is_hidden ? "outline" : isOccupied ? "default" : "secondary"} className="text-[10px]">
-                        {table.is_hidden ? "Oculta" : isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
-                      </Badge>
-                      {isOccupied && occupiedSince && showPrepTimer && (
-                        <p className="text-[10px] text-muted-foreground">Desde {occupiedSince}</p>
-                      )}
-                      {isOccupied && table.comandas && table.comandas.length > 0 && (
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {table.comandas.map(c => c.customer_name).join(", ")}
-                        </div>
-                      )}
-                      {(() => {
-                        const active = activeByTable.get(table.id);
-                        if (!active || active.itemCount === 0) return null;
-                        return (
-                          <p className="text-[10px] text-muted-foreground">
-                            📋 {active.itemCount} ite{active.itemCount !== 1 ? "ns" : "m"}
-                          </p>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
+                    onShowQR={() => handleShowQR(table)}
+                    onCopyLink={() => handleCopyLink(table)}
+                    onToggleHidden={() => handleToggleHidden(table)}
+                    onClearTable={() => handleClearTable(table)}
+                  />
                 );
               })}
             </div>
