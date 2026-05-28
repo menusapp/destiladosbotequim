@@ -1953,7 +1953,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     className={cn(isMobile ? "pl-10 h-11 text-sm rounded-xl" : "pl-8 h-9 text-sm")}
                   />
                 </div>
-                <div className={cn(isMobile ? "flex-1 overflow-y-auto pr-1" : "max-h-[50vh] min-h-[300px] overflow-y-auto pr-1")}>
+                <div className={cn(isMobile ? "pr-1" : "max-h-[50vh] min-h-[300px] overflow-y-auto pr-1")}>
                   {(() => {
                     // Group products by category
                     const categoryMap = new Map<string, { name: string; products: typeof filteredProducts }>();
