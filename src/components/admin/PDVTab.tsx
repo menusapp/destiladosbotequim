@@ -1557,7 +1557,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               </Tabs>
 
               {/* Customer Section — Inline Fields */}
-              <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", isMobile && mobileStep !== "dados" && "hidden")} data-tour="pdv-customer">
+              <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", mobileStep !== "dados" && "hidden")} data-tour="pdv-customer">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-medium text-muted-foreground">Cliente</p>
                   {(customerName || customerCpf || customerPhone) && (
@@ -1632,7 +1632,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Delivery Address Section */}
               {orderType === "delivery" && (
-                <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", isMobile && mobileStep !== "dados" && "hidden")}>
+                <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", mobileStep !== "dados" && "hidden")}>
                   <p className="text-sm font-medium text-muted-foreground mb-3">Endereço de Entrega</p>
 
                   {/* No customer data at all */}
@@ -1730,7 +1730,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Mesa selector */}
               {orderType === "mesa" && (
-                <div className={cn("space-y-3", isMobile && mobileStep !== "dados" && "hidden")}>
+                <div className={cn("space-y-3", mobileStep !== "dados" && "hidden")}>
                   <Label className="text-xs font-semibold mb-1.5 block">Mesa</Label>
                   <Select value={selectedTableId} onValueChange={setSelectedTableId}>
                     <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione uma mesa" /></SelectTrigger>
@@ -1746,13 +1746,13 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               )}
 
               {/* Notes */}
-              <div className={cn("space-y-1.5", isMobile && mobileStep !== "dados" && "hidden")}>
+              <div className={cn("space-y-1.5", mobileStep !== "dados" && "hidden")}>
                 <Label className="text-xs font-semibold mb-1.5 block">Observações</Label>
                 <Textarea placeholder="Observações..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[50px] text-sm" />
               </div>
 
               {/* Payment */}
-              <div className={cn("space-y-1.5", isMobile && mobileStep !== "pagamento" && "hidden")}>
+              <div className={cn("space-y-1.5", mobileStep !== "pagamento" && "hidden")}>
                 <Label className="text-xs font-semibold mb-1.5 block">Pagamento</Label>
                 <Select value={paymentType} onValueChange={(v) => setPaymentType(v)}>
                   <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
@@ -1862,7 +1862,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Discount Section */}
               {cart.length > 0 && (
-                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded} className={cn(isMobile && mobileStep !== "pagamento" && "hidden")}>
+                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded} className={cn(mobileStep !== "pagamento" && "hidden")}>
                   <div className="border rounded-lg p-4 bg-muted/30">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-muted-foreground">Desconto</p>
@@ -1937,7 +1937,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               )}
 
 
-              <div className={cn("space-y-3", isMobile && mobileStep !== "produtos" && "hidden")} data-tour="pdv-products">
+              <div className={cn("space-y-3", mobileStep !== "produtos" && "hidden")} data-tour="pdv-products">
                 <Label className={cn("text-xs font-semibold mb-1.5 block", isMobile && "hidden")}>Produtos</Label>
                 <div className="relative">
                   <Search className={cn("absolute top-1/2 -translate-y-1/2 text-muted-foreground", isMobile ? "left-3 w-4 h-4" : "left-2.5 w-3.5 h-3.5")} />
@@ -2118,7 +2118,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Cart Summary */}
               {cart.length > 0 && (
-                <div className={cn("space-y-2 border-t pt-4", isMobile && mobileStep !== "pagamento" && "hidden")}>
+                <div className={cn("space-y-2 border-t pt-4", mobileStep !== "pagamento" && "hidden")}>
                   <h4 className="font-semibold text-sm flex items-center gap-1.5">
                     <ShoppingCart className="w-4 h-4" /> Carrinho ({cart.length})
                   </h4>
