@@ -46,6 +46,8 @@ import {
 } from "@/lib/reservations";
 import { normalizeSearch } from "@/lib/searchNormalize";
 import { withProductComplements } from "@/lib/productComplements";
+import { TableCardMobile } from "./pdv/mobile/TableCardMobile";
+import { TableFilterChips } from "./pdv/mobile/TableFilterChips";
 
 interface CartItem {
   productId: string;
