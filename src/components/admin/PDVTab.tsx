@@ -186,6 +186,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const isMobile = useIsMobile();
   const confirm = useConfirmDialog();
   const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
+  const [mobileTableFilter, setMobileTableFilter] = useState<import("./pdv/mobile/TableFilterChips").TableFilter>("all");
 
   // Order creation state
   const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada">("mesa");
